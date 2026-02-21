@@ -73,7 +73,43 @@ export default function useTodayData(): TodayData {
         setGreeting(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
         setTodayDate(now.toISOString().split('T')[0]);
       } catch {
-        // Both failed, set empty
+        // Both failed — seed demo data so the UI isn't empty
+        const now = new Date();
+        const today = now.toISOString();
+        const hour = now.getHours();
+        setGreeting(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
+        setTodayDate(now.toISOString().split('T')[0]);
+
+        const demoTasks: TodoResponse[] = [
+          { id: 'demo-1', title: 'Review ClawChat monorepo structure', status: 'pending', priority: 'high', due_date: today, tags: ['dev'], created_at: today, updated_at: today },
+          { id: 'demo-2', title: 'Set up Capacitor for Android build', status: 'pending', priority: 'medium', due_date: today, tags: ['mobile'], created_at: today, updated_at: today },
+          { id: 'demo-3', title: 'Write unit tests for platform abstraction', status: 'pending', priority: 'medium', due_date: today, tags: ['testing'], created_at: today, updated_at: today },
+          { id: 'demo-4', title: 'Design bottom navigation for mobile layout', status: 'pending', priority: 'low', due_date: today, tags: ['design', 'mobile'], created_at: today, updated_at: today },
+        ];
+
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayISO = yesterday.toISOString();
+
+        const overdueDemo: TodoResponse[] = [
+          { id: 'demo-5', title: 'Fix SSE reconnect on network change', status: 'pending', priority: 'urgent', due_date: yesterdayISO, tags: ['bug'], created_at: yesterdayISO, updated_at: yesterdayISO },
+          { id: 'demo-6', title: 'Update API documentation for v2 endpoints', status: 'pending', priority: 'high', due_date: yesterdayISO, tags: ['docs'], created_at: yesterdayISO, updated_at: yesterdayISO },
+        ];
+
+        const eventStart = new Date(now);
+        eventStart.setHours(14, 0, 0, 0);
+        const eventEnd = new Date(now);
+        eventEnd.setHours(15, 0, 0, 0);
+
+        const demoEvents: EventResponse[] = [
+          { id: 'demo-e1', title: 'Sprint planning', start_time: eventStart.toISOString(), end_time: eventEnd.toISOString(), location: 'Zoom', created_at: today, updated_at: today },
+          { id: 'demo-e2', title: 'Code review session', start_time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 16, 30).toISOString(), end_time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0).toISOString(), created_at: today, updated_at: today },
+        ];
+
+        setTodayTasks(demoTasks);
+        setOverdueTasks(overdueDemo);
+        setTodayEvents(demoEvents);
+        setInboxCount(3);
       }
     } finally {
       setIsLoading(false);

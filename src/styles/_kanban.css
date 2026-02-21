@@ -1,0 +1,119 @@
+/* ============================================================
+   Kanban Board
+   ============================================================ */
+
+.cc-kanban {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* -- Column -------------------------------------------------- */
+
+.cc-kanban__column {
+  display: flex;
+  flex-direction: column;
+  background: var(--cc-surface);
+  border-radius: 12px;
+  border: 2px solid transparent;
+  max-height: calc(100vh - 160px);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+/* Drag-over highlight per variant */
+.cc-kanban__column--todo.cc-kanban__column--drag-over {
+  border-color: var(--cc-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.cc-kanban__column--progress.cc-kanban__column--drag-over {
+  border-color: #eab308;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.15);
+  background: rgba(234, 179, 8, 0.04);
+}
+
+.cc-kanban__column--done.cc-kanban__column--drag-over {
+  border-color: var(--cc-success);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+  background: rgba(34, 197, 94, 0.04);
+}
+
+/* -- Header -------------------------------------------------- */
+
+.cc-kanban__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  user-select: none;
+}
+
+.cc-kanban__header-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.cc-kanban__header-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cc-text-secondary);
+}
+
+.cc-kanban__header-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--cc-border);
+  color: var(--cc-text-secondary);
+}
+
+/* -- Card list ----------------------------------------------- */
+
+.cc-kanban__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* -- Card wrapper -------------------------------------------- */
+
+.cc-kanban__card {
+  cursor: grab;
+  border-radius: 8px;
+  transition: opacity 0.15s;
+}
+
+.cc-kanban__card:active {
+  cursor: grabbing;
+}
+
+.cc-kanban__card--dragging {
+  opacity: 0.4;
+}
+
+/* -- Responsive ---------------------------------------------- */
+
+@media (max-width: 768px) {
+  .cc-kanban {
+    grid-template-columns: 1fr;
+  }
+
+  .cc-kanban__column {
+    max-height: none;
+  }
+}

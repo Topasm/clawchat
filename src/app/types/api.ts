@@ -56,6 +56,8 @@ export interface TodoUpdate {
   tags?: string[];
 }
 
+export type KanbanStatus = 'pending' | 'in_progress' | 'completed';
+
 // -- Events -----------------------------------------------------------------
 
 export interface EventResponse {

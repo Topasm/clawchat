@@ -6,6 +6,7 @@ import type {
   EventResponse,
   EventCreate,
   MemoResponse,
+  KanbanStatus,
 } from '../types/api';
 
 interface ModuleState {
@@ -17,6 +18,10 @@ interface ModuleState {
   addTodo: (todo: TodoResponse) => void;
   updateTodo: (id: string, updates: Partial<TodoResponse>) => void;
   removeTodo: (id: string) => void;
+
+  kanbanStatuses: Record<string, KanbanStatus>;
+  setKanbanStatus: (id: string, status: KanbanStatus) => void;
+  getKanbanStatus: (id: string) => KanbanStatus;
 
   events: EventResponse[];
   setEvents: (events: EventResponse[]) => void;
@@ -37,12 +42,26 @@ interface ModuleState {
   createEvent: (data: EventCreate) => Promise<EventResponse>;
 }
 
+// Demo seed data shown when the backend is not running
+const now = new Date().toISOString();
+const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+const DEMO_TODOS: TodoResponse[] = [
+  { id: 'demo-1', title: 'Review ClawChat monorepo structure', status: 'pending', priority: 'high', due_date: now, tags: ['dev'], created_at: now, updated_at: now },
+  { id: 'demo-2', title: 'Set up Capacitor for Android build', status: 'pending', priority: 'medium', due_date: now, tags: ['mobile'], created_at: now, updated_at: now },
+  { id: 'demo-3', title: 'Write unit tests for platform abstraction', status: 'pending', priority: 'medium', due_date: now, tags: ['testing'], created_at: now, updated_at: now },
+  { id: 'demo-4', title: 'Design bottom navigation for mobile layout', status: 'pending', priority: 'low', due_date: now, tags: ['design', 'mobile'], created_at: now, updated_at: now },
+  { id: 'demo-5', title: 'Fix SSE reconnect on network change', status: 'pending', priority: 'urgent', due_date: yesterday, tags: ['bug'], created_at: yesterday, updated_at: yesterday },
+  { id: 'demo-6', title: 'Update API documentation for v2 endpoints', status: 'pending', priority: 'high', due_date: yesterday, tags: ['docs'], created_at: yesterday, updated_at: yesterday },
+  { id: 'demo-7', title: 'Implement dark mode toggle persistence', status: 'completed', priority: 'medium', tags: ['feature'], created_at: yesterday, updated_at: now },
+  { id: 'demo-8', title: 'Add Docker health check endpoint', status: 'completed', priority: 'low', tags: ['devops'], created_at: yesterday, updated_at: now },
+];
+
 export const useModuleStore = create<ModuleState>()((set, get) => ({
   isLoading: false,
   lastFetched: null,
 
-  // --- Todos ---
-  todos: [],
+  // --- Todos --- (seeded with demo data)
+  todos: DEMO_TODOS,
   setTodos: (todos) => set({ todos }),
   addTodo: (todo) => set((state) => ({ todos: [todo, ...state.todos] })),
   updateTodo: (id, updates) =>
@@ -51,6 +70,29 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     })),
   removeTodo: (id) =>
     set((state) => ({ todos: state.todos.filter((t) => t.id !== id) })),
+
+  kanbanStatuses: { 'demo-1': 'in_progress', 'demo-5': 'in_progress' },
+  setKanbanStatus: (id, status) => {
+    set((state) => ({
+      kanbanStatuses: { ...state.kanbanStatuses, [id]: status },
+    }));
+    // Sync to server: in_progress maps to pending on the server
+    const serverStatus = status === 'in_progress' ? 'pending' : status;
+    const { todos } = get();
+    const todo = todos.find((t) => t.id === id);
+    if (todo && todo.status !== serverStatus) {
+      set((state) => ({
+        todos: state.todos.map((t) => (t.id === id ? { ...t, status: serverStatus } : t)),
+      }));
+      apiClient.patch(`/todos/${id}`, { status: serverStatus }).catch(() => {});
+    }
+  },
+  getKanbanStatus: (id) => {
+    const { kanbanStatuses, todos } = get();
+    if (kanbanStatuses[id]) return kanbanStatuses[id];
+    const todo = todos.find((t) => t.id === id);
+    return todo?.status ?? 'pending';
+  },
 
   // --- Events ---
   events: [],
@@ -80,9 +122,9 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     try {
       const response = await apiClient.get('/todos', { params });
       set({ todos: response.data?.items ?? [], isLoading: false, lastFetched: Date.now() });
-    } catch (error) {
+    } catch {
+      // Keep existing (demo) data on failure
       set({ isLoading: false });
-      throw error;
     }
   },
 
@@ -91,9 +133,8 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     try {
       const response = await apiClient.get('/events', { params });
       set({ events: response.data?.items ?? [], isLoading: false, lastFetched: Date.now() });
-    } catch (error) {
+    } catch {
       set({ isLoading: false });
-      throw error;
     }
   },
 
@@ -102,16 +143,18 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
     const newStatus = todo.status === 'completed' ? 'pending' : 'completed';
-    set((state) => ({
-      todos: state.todos.map((t) => (t.id === id ? { ...t, status: newStatus } : t)),
-    }));
+    set((state) => {
+      const next = { ...state.kanbanStatuses };
+      delete next[id];
+      return {
+        todos: state.todos.map((t) => (t.id === id ? { ...t, status: newStatus } : t)),
+        kanbanStatuses: next,
+      };
+    });
     try {
       await apiClient.patch(`/todos/${id}`, { status: newStatus });
-    } catch (error) {
-      set((state) => ({
-        todos: state.todos.map((t) => (t.id === id ? { ...t, status: todo.status } : t)),
-      }));
-      throw error;
+    } catch {
+      // Offline / no server — keep the optimistic update
     }
   },
 

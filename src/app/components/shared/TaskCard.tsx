@@ -6,13 +6,14 @@ interface TaskCardProps {
   task: TodoResponse;
   onToggle: () => void;
   onClick: () => void;
+  className?: string;
 }
 
-export default function TaskCard({ task, onToggle, onClick }: TaskCardProps) {
+export default function TaskCard({ task, onToggle, onClick, className }: TaskCardProps) {
   const isCompleted = task.status === 'completed';
 
   return (
-    <div className="cc-card cc-card--task" onClick={onClick}>
+    <div className={`cc-card cc-card--task${className ? ' ' + className : ''}`} onClick={onClick}>
       <Checkbox checked={isCompleted} onChange={onToggle} />
       <div className="cc-card__body">
         <div className={`cc-card__title${isCompleted ? ' cc-card__title--completed' : ''}`}>
