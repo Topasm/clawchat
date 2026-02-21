@@ -20,6 +20,7 @@ import QuickCaptureModal from './screens/QuickCaptureModal';
 import TaskDetailScreen from './screens/TaskDetailScreen';
 import EventDetailScreen from './screens/EventDetailScreen';
 import AllTasksScreen from './screens/AllTasksScreen';
+import SystemPromptScreen from './screens/SystemPromptScreen';
 
 const AuthStackNav = createStackNavigator();
 const MainStackNav = createStackNavigator();
@@ -111,6 +112,17 @@ function MainStack() {
         component={AllTasksScreen}
         options={{
           title: 'All Tasks',
+          headerStyle,
+          headerTintColor,
+          headerTitleStyle,
+          headerBackTitleVisible: false,
+        }}
+      />
+      <MainStackNav.Screen
+        name="SystemPrompt"
+        component={SystemPromptScreen}
+        options={{
+          title: 'System Prompt',
           headerStyle,
           headerTintColor,
           headerTitleStyle,
