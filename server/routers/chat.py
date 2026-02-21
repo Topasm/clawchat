@@ -1,9 +1,12 @@
-"""Chat router: conversation CRUD and message send (Phase 1 echo)."""
+"""Chat router: conversation CRUD, message send (echo), SSE streaming, and message management."""
 
+import asyncio
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -15,10 +18,12 @@ from schemas.chat import (
     ConversationCreate,
     ConversationListResponse,
     ConversationResponse,
+    MessageEditRequest,
     MessageListResponse,
     MessageResponse,
     SendMessageRequest,
     SendMessageResponse,
+    StreamSendRequest,
 )
 
 router = APIRouter(tags=["chat"])
@@ -149,7 +154,6 @@ async def list_messages(
     current_user: dict = Depends(get_current_user),
 ):
     """List messages for a conversation, ordered by created_at descending, with pagination."""
-    # Verify conversation exists
     conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if conv is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
@@ -180,19 +184,13 @@ async def send_message(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """Send a message (Phase 1: echo mode).
-
-    Creates the user message, then creates an echo assistant message with
-    content ``"Echo: {user_content}"``, and updates the conversation timestamp.
-    """
-    # Verify conversation exists
+    """Send a message (Phase 1: echo mode)."""
     conv = db.query(Conversation).filter(Conversation.id == body.conversation_id).first()
     if conv is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
     now = datetime.now(timezone.utc)
 
-    # Create user message
     user_msg = Message(
         id=uuid4().hex,
         conversation_id=body.conversation_id,
@@ -203,7 +201,6 @@ async def send_message(
     )
     db.add(user_msg)
 
-    # Create echo assistant message
     assistant_msg = Message(
         id=uuid4().hex,
         conversation_id=body.conversation_id,
@@ -214,7 +211,6 @@ async def send_message(
     )
     db.add(assistant_msg)
 
-    # Update conversation timestamp
     conv.updated_at = now
     db.commit()
 
@@ -222,4 +218,180 @@ async def send_message(
         message_id=assistant_msg.id,
         conversation_id=body.conversation_id,
         status="delivered",
+    )
+
+
+@router.delete(
+    "/conversations/{conversation_id}/messages/{message_id}",
+    status_code=status.HTTP_200_OK,
+)
+async def delete_message(
+    conversation_id: str,
+    message_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a specific message from a conversation."""
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conv is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    msg = (
+        db.query(Message)
+        .filter(Message.id == message_id, Message.conversation_id == conversation_id)
+        .first()
+    )
+    if msg is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+
+    db.delete(msg)
+    db.commit()
+    return {"detail": "Message deleted"}
+
+
+@router.put(
+    "/conversations/{conversation_id}/messages/{message_id}",
+    response_model=MessageResponse,
+)
+async def edit_message(
+    conversation_id: str,
+    message_id: str,
+    body: MessageEditRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Edit the content of a specific message."""
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conv is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    msg = (
+        db.query(Message)
+        .filter(Message.id == message_id, Message.conversation_id == conversation_id)
+        .first()
+    )
+    if msg is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+
+    msg.content = body.content
+    conv.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(msg)
+
+    return MessageResponse.model_validate(msg)
+
+
+# ---------------------------------------------------------------------------
+# Streaming endpoint
+# ---------------------------------------------------------------------------
+
+
+def _generate_simulated_response(user_content: str) -> str:
+    """Generate a simulated LLM response. Will be replaced by actual LLM call."""
+    return (
+        f"I received your message: \"{user_content}\". "
+        "This is a simulated streaming response from OpenClaw. "
+        "In the future, this will be powered by a real language model "
+        "that can help you manage tasks, answer questions, and much more."
+    )
+
+
+async def _stream_tokens(
+    conversation_id: str,
+    user_content: str,
+    assistant_message_id: str,
+    db: Session,
+    request: Request,
+):
+    """Async generator that yields SSE-formatted token events."""
+    meta = json.dumps({
+        "conversation_id": conversation_id,
+        "message_id": assistant_message_id,
+    })
+    yield f"data: {meta}\n\n"
+
+    response_text = _generate_simulated_response(user_content)
+    words = response_text.split(" ")
+    accumulated = ""
+
+    for i, word in enumerate(words):
+        if await request.is_disconnected():
+            break
+
+        token = word if i == 0 else f" {word}"
+        accumulated += token
+
+        token_event = json.dumps({"token": token})
+        yield f"data: {token_event}\n\n"
+
+        await asyncio.sleep(0.05)
+
+    try:
+        assistant_msg = db.query(Message).filter(Message.id == assistant_message_id).first()
+        if assistant_msg:
+            assistant_msg.content = accumulated
+        conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+        if conv:
+            conv.updated_at = datetime.now(timezone.utc)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    yield "data: [DONE]\n\n"
+
+
+@router.post("/stream")
+async def stream_message(
+    body: StreamSendRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Send a message and stream the assistant response via SSE."""
+    conv = db.query(Conversation).filter(Conversation.id == body.conversation_id).first()
+    if conv is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    user_msg = Message(
+        id=uuid4().hex,
+        conversation_id=body.conversation_id,
+        role="user",
+        content=body.content,
+        message_type="text",
+        created_at=now,
+    )
+    db.add(user_msg)
+
+    assistant_msg = Message(
+        id=uuid4().hex,
+        conversation_id=body.conversation_id,
+        role="assistant",
+        content="",
+        message_type="text",
+        created_at=now,
+    )
+    db.add(assistant_msg)
+
+    conv.updated_at = now
+    db.commit()
+
+    return StreamingResponse(
+        _stream_tokens(
+            conversation_id=body.conversation_id,
+            user_content=body.content,
+            assistant_message_id=assistant_msg.id,
+            db=db,
+            request=request,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

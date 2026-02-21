@@ -42,6 +42,10 @@ class SendMessageRequest(BaseModel):
     content: str
 
 
+class MessageEditRequest(BaseModel):
+    content: str
+
+
 class SendMessageResponse(BaseModel):
     message_id: str
     conversation_id: str
@@ -66,3 +70,28 @@ class MessageListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+# ---------------------------------------------------------------------------
+# Streaming schemas
+# ---------------------------------------------------------------------------
+
+
+class StreamSendRequest(BaseModel):
+    """Request body for the streaming chat endpoint."""
+
+    conversation_id: str
+    content: str
+
+
+class StreamEventMeta(BaseModel):
+    """First SSE event payload: metadata about the stream."""
+
+    conversation_id: str
+    message_id: str
+
+
+class StreamEventToken(BaseModel):
+    """Incremental token SSE event payload."""
+
+    token: str

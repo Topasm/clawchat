@@ -1,6 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  TouchableOpacity,
+  Text,
+} from 'react-native';
 import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../config/ThemeContext';
 import apiClient from '../services/apiClient';
 import { useChatStore } from '../stores/useChatStore';
@@ -8,6 +16,11 @@ import { useModuleStore } from '../stores/useModuleStore';
 import { parseNaturalInput, shouldAutoCreate } from '../utils/naturalLanguageParser';
 import ActionCard from '../components/ActionCard';
 import QuickActionBar from '../components/QuickActionBar';
+import MarkdownBubble from '../components/MarkdownBubble';
+import TypingIndicator from '../components/TypingIndicator';
+import MessageBubbleWrapper from '../components/MessageBubbleWrapper';
+import MessageActionMenu from '../components/MessageActionMenu';
+import CopyFeedback from '../components/CopyFeedback';
 
 function mapToGiftedMessage(msg) {
   const isUser = msg.role === 'user';
@@ -24,22 +37,55 @@ function mapToGiftedMessage(msg) {
 }
 
 export default function ChatScreen({ route, navigation }) {
-  const { colors, spacing } = useTheme();
-
+  const { colors } = useTheme();
   const conversationId = route.params?.id;
   const conversationTitle = route.params?.title || 'Chat';
 
   const messages = useChatStore((s) => s.messages);
   const setMessages = useChatStore((s) => s.setMessages);
+  const isStreaming = useChatStore((s) => s.isStreaming);
+  const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
+  const stopGeneration = useChatStore((s) => s.stopGeneration);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [inputText, setInputText] = useState('');
   const addTodo = useModuleStore((s) => s.addTodo);
   const addEvent = useModuleStore((s) => s.addEvent);
 
+  // Streaming: typing indicator before first token
+  const [waitingForFirstToken, setWaitingForFirstToken] = useState(false);
+  const prevStreamingRef = useRef(false);
+
+  // Message interaction state
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [showCopyFeedback, setShowCopyFeedback] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+
   useEffect(() => {
     navigation.setOptions({ title: conversationTitle });
   }, [navigation, conversationTitle]);
+
+  // Track streaming state for typing indicator
+  useEffect(() => {
+    if (isStreaming && !prevStreamingRef.current) {
+      setWaitingForFirstToken(true);
+    }
+    if (!isStreaming && prevStreamingRef.current) {
+      setWaitingForFirstToken(false);
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
+  useEffect(() => {
+    if (waitingForFirstToken && messages.length > 0) {
+      const lastMsg = messages[0];
+      if (lastMsg.user?._id === 'assistant' && lastMsg.text) {
+        setWaitingForFirstToken(false);
+      }
+    }
+  }, [messages, waitingForFirstToken]);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -65,6 +111,7 @@ export default function ChatScreen({ route, navigation }) {
     load();
     return () => {
       useChatStore.getState().setMessages([]);
+      useChatStore.getState().stopGeneration();
     };
   }, [fetchMessages]);
 
@@ -97,29 +144,27 @@ export default function ChatScreen({ route, navigation }) {
 
   const onSend = useCallback(
     async (newMessages = []) => {
-      if (isSending) return;
+      if (isSending || isStreaming) return;
 
       const userMessage = newMessages[0];
-      useChatStore.getState().addMessage(userMessage);
+
+      // If editing, store already updated the message
+      if (!editingMessageId) {
+        useChatStore.getState().addMessage(userMessage);
+      }
+      setEditingMessageId(null);
 
       setIsSending(true);
       try {
-        // Try smart creation first
         const actionResult = await handleSmartSend(userMessage.text);
 
-        // Send through normal chat flow
-        await apiClient.post('/chat/send', {
-          conversation_id: conversationId,
-          content: userMessage.text,
-        });
-
-        // If an action was created, inject an action card message
         if (actionResult) {
           const actionMsg = {
             _id: `action-${Date.now()}`,
-            text: actionResult.type === 'todo_created'
-              ? `Created task: "${actionResult.payload.title}"`
-              : `Created event: "${actionResult.payload.title}"`,
+            text:
+              actionResult.type === 'todo_created'
+                ? `Created task: "${actionResult.payload.title}"`
+                : `Created event: "${actionResult.payload.title}"`,
             createdAt: new Date(),
             user: { _id: 'assistant', name: 'ClawChat' },
             actionData: actionResult,
@@ -127,18 +172,120 @@ export default function ChatScreen({ route, navigation }) {
           useChatStore.getState().addMessage(actionMsg);
         }
 
-        // Poll for AI response
-        setTimeout(async () => {
-          await fetchMessages();
-          setIsSending(false);
-        }, 1500);
-      } catch (error) {
+        // Try streaming first, fall back to echo
+        try {
+          await sendMessageStreaming(conversationId, userMessage.text);
+        } catch {
+          try {
+            await apiClient.post('/chat/send', {
+              conversation_id: conversationId,
+              content: userMessage.text,
+            });
+            setTimeout(async () => {
+              await fetchMessages();
+            }, 1500);
+          } catch {
+            Alert.alert('Error', 'Failed to send message.');
+          }
+        }
+
+        setIsSending(false);
+      } catch {
         setIsSending(false);
         Alert.alert('Error', 'Failed to send message.');
       }
     },
-    [conversationId, fetchMessages, isSending, handleSmartSend]
+    [conversationId, fetchMessages, isSending, isStreaming, handleSmartSend, sendMessageStreaming, editingMessageId]
   );
+
+  // ---------------------------------------------------------------------------
+  // Message interaction handlers
+  // ---------------------------------------------------------------------------
+
+  const handleMessageLongPress = useCallback((message) => {
+    if (message?.actionData) return;
+    setSelectedMessage(message);
+    setShowActionMenu(true);
+  }, []);
+
+  const handleCloseActionMenu = useCallback(() => {
+    setShowActionMenu(false);
+    setSelectedMessage(null);
+  }, []);
+
+  const handleCopyMessage = useCallback(async (message) => {
+    if (message?.text) {
+      try {
+        await Clipboard.setStringAsync(message.text);
+        setShowCopyFeedback(true);
+      } catch { /* silently fail */ }
+    }
+  }, []);
+
+  const handleRegenerateMessage = useCallback(
+    (message) => {
+      const userText = useChatStore.getState().regenerateMessage(conversationId, message._id);
+      if (userText) {
+        // Re-send through streaming
+        setIsSending(true);
+        sendMessageStreaming(conversationId, userText)
+          .catch(() => {
+            // Fallback to echo
+            return apiClient.post('/chat/send', { conversation_id: conversationId, content: userText })
+              .then(() => setTimeout(() => fetchMessages(), 1500));
+          })
+          .finally(() => setIsSending(false));
+      }
+    },
+    [conversationId, fetchMessages, sendMessageStreaming]
+  );
+
+  const handleEditMessage = useCallback((message) => {
+    if (message?.text) {
+      setEditingMessageId(message._id);
+      setInputText(message.text);
+    }
+  }, []);
+
+  const handleDeleteMessage = useCallback(
+    (message) => {
+      useChatStore.getState().deleteMessage(conversationId, message._id);
+    },
+    [conversationId]
+  );
+
+  const handleDismissCopyFeedback = useCallback(() => {
+    setShowCopyFeedback(false);
+  }, []);
+
+  // Edit mode send handler
+  const handleSend = useCallback(
+    (newMessages = []) => {
+      if (editingMessageId && newMessages.length > 0) {
+        const newText = newMessages[0].text;
+        useChatStore.getState().editMessage(conversationId, editingMessageId, newText)
+          .then((editedText) => {
+            if (editedText) {
+              setEditingMessageId(null);
+              setIsSending(true);
+              sendMessageStreaming(conversationId, editedText)
+                .catch(() => {
+                  return apiClient.post('/chat/send', { conversation_id: conversationId, content: editedText })
+                    .then(() => setTimeout(() => fetchMessages(), 1500));
+                })
+                .finally(() => setIsSending(false));
+            }
+          });
+      } else {
+        onSend(newMessages);
+      }
+    },
+    [editingMessageId, conversationId, fetchMessages, onSend, sendMessageStreaming]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Action card handlers
+  // ---------------------------------------------------------------------------
 
   const handleActionCardAction = useCallback(
     (action, payload) => {
@@ -180,18 +327,33 @@ export default function ChatScreen({ route, navigation }) {
     setInputText(action.prefix);
   }, []);
 
-  const renderBubble = (props) => (
-    <Bubble
-      {...props}
-      wrapperStyle={{
-        left: { backgroundColor: colors.assistantBubble },
-        right: { backgroundColor: colors.userBubble },
-      }}
-      textStyle={{
-        left: { color: colors.text },
-        right: { color: '#FFFFFF' },
-      }}
-    />
+  // ---------------------------------------------------------------------------
+  // Render helpers
+  // ---------------------------------------------------------------------------
+
+  const renderMessageText = useCallback((props) => {
+    const { currentMessage, position } = props;
+    const isUser = position === 'right';
+    if (currentMessage?.actionData) return null;
+    return (
+      <MarkdownBubble
+        text={currentMessage?.text || ''}
+        isUser={isUser}
+        style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+      />
+    );
+  }, []);
+
+  const renderBubble = useCallback(
+    (props) => (
+      <MessageBubbleWrapper
+        {...props}
+        onLongPress={handleMessageLongPress}
+        selectedMessageId={selectedMessage?._id}
+        renderMessageText={renderMessageText}
+      />
+    ),
+    [handleMessageLongPress, selectedMessage, renderMessageText]
   );
 
   const renderCustomView = (props) => {
@@ -213,38 +375,71 @@ export default function ChatScreen({ route, navigation }) {
       <QuickActionBar onSelectAction={handleQuickAction} />
       <InputToolbar
         {...props}
-        containerStyle={{
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          backgroundColor: colors.surface,
-        }}
-        primaryStyle={styles.inputPrimary}
+        containerStyle={[
+          { borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+          isStreaming && { opacity: 0.5 },
+          editingMessageId && { borderTopColor: colors.primary, borderTopWidth: 2 },
+        ]}
+        primaryStyle={{ alignItems: 'center' }}
       />
     </View>
   );
 
   const renderFooter = () => {
-    if (!isSending) return null;
-    return (
-      <View style={styles.footerContainer}>
-        <ActivityIndicator size="small" color={colors.secondary} />
-      </View>
-    );
+    if (waitingForFirstToken) {
+      return (
+        <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+          <TypingIndicator />
+        </View>
+      );
+    }
+    if (isStreaming) {
+      return (
+        <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 9999,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              gap: 6,
+            }}
+            onPress={stopGeneration}
+            activeOpacity={0.7}
+          >
+            <View style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: colors.textSecondary }} />
+            <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textSecondary }}>Stop generating</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (isSending) {
+      return (
+        <View style={{ paddingVertical: 8, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={colors.secondary} />
+        </View>
+      );
+    }
+    return null;
   };
 
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GiftedChat
         messages={messages}
-        onSend={(msgs) => onSend(msgs)}
+        onSend={(msgs) => handleSend(msgs)}
         user={{ _id: 'user', name: 'You' }}
         renderBubble={renderBubble}
         renderCustomView={renderCustomView}
@@ -252,30 +447,27 @@ export default function ChatScreen({ route, navigation }) {
         renderFooter={renderFooter}
         text={inputText}
         onInputTextChanged={setInputText}
-        placeholder="Type a message or task..."
+        placeholder={editingMessageId ? 'Edit your message...' : 'Type a message or task...'}
         alwaysShowSend
         scrollToBottom
-        scrollToBottomStyle={[styles.scrollToBottom, { backgroundColor: colors.primary }]}
+        scrollToBottomStyle={{ backgroundColor: colors.primary }}
+        disableComposer={isStreaming}
+      />
+
+      <MessageActionMenu
+        visible={showActionMenu}
+        message={selectedMessage}
+        onClose={handleCloseActionMenu}
+        onCopy={handleCopyMessage}
+        onRegenerate={handleRegenerateMessage}
+        onEdit={handleEditMessage}
+        onDelete={handleDeleteMessage}
+      />
+
+      <CopyFeedback
+        visible={showCopyFeedback}
+        onDismiss={handleDismissCopyFeedback}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inputPrimary: {
-    alignItems: 'center',
-  },
-  footerContainer: {
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  scrollToBottom: {},
-});
