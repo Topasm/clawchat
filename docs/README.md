@@ -15,6 +15,20 @@ ClawChat (AI Secretary) is a privacy-first, self-hosted personal assistant that 
 | [Roadmap](./roadmap.md) | Phased development plan (Weeks 1-9) |
 | [UI/UX Redesign](./ui-redesign.md) | Things 3-style task management + chat integration |
 
+## Key Features
+
+- **AI Chat with Markdown Rendering** — Full markdown support in chat bubbles (code blocks with syntax labels, bold, italic, lists, tables, blockquotes) via `react-native-markdown-display`
+- **SSE Streaming** — Real-time token-by-token AI response streaming using Server-Sent Events (SSE) with typing indicator and stop generation support
+- **Dark Mode** — Light/Dark/System theme support with OLED-friendly pure black palette, applied across all screens and components
+- **Message Interactions** — Long-press context menu (copy, regenerate, edit, delete) with haptic feedback, animated press states, and clipboard support
+- **Configurable Settings** — 15+ user-configurable settings (chat behavior, LLM parameters, appearance, notifications) with JSON export/import
+- **Task Management** — Things 3-inspired GTD workflow with Today dashboard, Inbox, quick capture, and natural language parsing
+- **Calendar Integration** — Event management with time bars, all-day toggle, location, and reminders
+- **Notes / Memos** — Quick note capture and search
+- **Smart Send** — Auto-detect tasks and events from chat messages using keyword analysis
+- **Android Widget** — Home screen widget for at-a-glance task overview
+- **Push Notifications** — Expo push notification support for reminders and overdue task alerts
+
 ## Tech Stack
 
 | Layer | Technology | Purpose |
@@ -22,9 +36,11 @@ ClawChat (AI Secretary) is a privacy-first, self-hosted personal assistant that 
 | Mobile App | React Native (Expo) | Cross-platform UI with native widget support |
 | Navigation | React Navigation | Stack + bottom tab navigation |
 | Chat UI | react-native-gifted-chat | Message bubbles, input toolbar, scrolling |
-| State Management | Zustand | Lightweight global state (auth, chat, modules) |
+| Markdown | react-native-markdown-display | Rich markdown rendering in chat bubbles |
+| State Management | Zustand | Lightweight global state (auth, chat, modules, settings) |
 | HTTP Client | Axios | REST API communication |
-| Real-time | WebSocket | Streaming AI responses |
+| Real-time | SSE (Server-Sent Events) | Streaming AI responses via fetch + ReadableStream |
+| Clipboard / Haptics | expo-clipboard, expo-haptics | Copy-to-clipboard and tactile feedback |
 | Backend | Python FastAPI | Async API server with AI orchestration |
 | Database | SQLite | Single-file, zero-config persistent storage |
 | ORM / Migration | SQLAlchemy + Alembic | Schema management and migrations |

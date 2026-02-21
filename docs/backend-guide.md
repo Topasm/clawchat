@@ -1,6 +1,6 @@
 # Backend Guide
 
-The ClawChat server is a Python FastAPI application handling REST API, WebSocket connections, AI orchestration, and scheduled tasks.
+The ClawChat server is a Python FastAPI application handling REST API, SSE (Server-Sent Events) streaming, AI orchestration, and scheduled tasks.
 
 ## Directory Structure
 
@@ -17,7 +17,7 @@ server/
 ├── routers/
 │   ├── __init__.py
 │   ├── auth.py                 # POST /api/auth/*
-│   ├── chat.py                 # POST /api/chat/send, GET conversations/messages
+│   ├── chat.py                 # Chat endpoints: send, stream (SSE), conversations, message CRUD
 │   ├── todo.py                 # CRUD /api/todos
 │   ├── calendar.py             # CRUD /api/events
 │   ├── memo.py                 # CRUD /api/memos
@@ -34,7 +34,7 @@ server/
 │   └── agent_task.py           # AgentTask model
 ├── schemas/
 │   ├── __init__.py
-│   ├── chat.py                 # Pydantic schemas for chat requests/responses
+│   ├── chat.py                 # Chat schemas (send, stream, message edit, responses)
 │   ├── todo.py                 # Todo schemas
 │   ├── calendar.py             # Event schemas
 │   ├── memo.py                 # Memo schemas
@@ -51,9 +51,9 @@ server/
 │   ├── search_service.py       # Full-text search across tables
 │   ├── agent_service.py        # Async task execution
 │   └── scheduler.py            # APScheduler reminder & overdue checker
-├── ws/
+├── ws/                             # Legacy — SSE replaced WebSocket for streaming
 │   ├── __init__.py
-│   ├── manager.py              # WebSocket connection manager
+│   ├── manager.py              # WebSocket connection manager (future: push notifications)
 │   └── handler.py              # WebSocket message router
 ├── auth/
 │   ├── __init__.py
@@ -75,7 +75,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import engine, Base
 from routers import auth, chat, todo, calendar, memo, search, today, notifications
-from ws.handler import websocket_endpoint
 from scheduler.tasks import start_scheduler
 
 app = FastAPI(title="ClawChat Server", version="0.1.0")
@@ -84,16 +83,13 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])  # includes /stream SSE endpoint
 app.include_router(todo.router, prefix="/api/todos", tags=["todos"])
 app.include_router(calendar.router, prefix="/api/events", tags=["calendar"])
 app.include_router(memo.router, prefix="/api/memos", tags=["memos"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(today.router, prefix="/api/today", tags=["today"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
-
-# WebSocket
-app.websocket("/ws")(websocket_endpoint)
 
 @app.on_event("startup")
 async def startup():
@@ -179,52 +175,44 @@ class AIService:
         return response.json()
 ```
 
-### `ws/manager.py` — WebSocket Connection Manager
+### `routers/chat.py` — Chat Router (SSE Streaming + Message CRUD)
 
-Manages active WebSocket connections and broadcasts messages.
+Handles all chat endpoints including SSE streaming for real-time AI responses and full message CRUD.
+
+**Key endpoints:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/chat/send` | Send message with echo-mode fallback |
+| `POST /api/chat/stream` | Send message and stream AI response via SSE |
+| `GET /api/chat/conversations` | List conversations (paginated) |
+| `POST /api/chat/conversations` | Create a new conversation |
+| `GET /api/chat/conversations/:id/messages` | Get messages (paginated) |
+| `DELETE /api/chat/conversations/:id/messages/:mid` | Delete a message |
+| `PUT /api/chat/conversations/:id/messages/:mid` | Edit a message |
 
 ```python
-from fastapi import WebSocket
+from fastapi.responses import StreamingResponse
 
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: dict[str, WebSocket] = {}
+@router.post("/stream")
+async def stream_send(body: StreamSendRequest, db: Session = Depends(get_db)):
+    """SSE endpoint — streams AI response tokens to the client."""
 
-    async def connect(self, user_id: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
+    async def _stream_tokens():
+        # 1. Emit metadata event (conversation_id, message_id)
+        yield f"data: {json.dumps({'conversation_id': ..., 'message_id': ...})}\n\n"
 
-    def disconnect(self, user_id: str):
-        self.active_connections.pop(user_id, None)
+        # 2. Generate tokens from LLM and yield each one
+        for token in _generate_response(body.content):
+            yield f"data: {json.dumps({'token': token})}\n\n"
 
-    async def send_json(self, user_id: str, message: dict):
-        if ws := self.active_connections.get(user_id):
-            await ws.send_json(message)
+        # 3. Signal completion
+        yield "data: [DONE]\n\n"
 
-    async def stream_to_user(self, user_id: str, message_id: str, tokens: AsyncIterator[str]):
-        """Stream AI tokens to a user's WebSocket."""
-        await self.send_json(user_id, {
-            "type": "stream_start",
-            "data": {"message_id": message_id}
-        })
-
-        full_content = ""
-        index = 0
-        async for token in tokens:
-            full_content += token
-            await self.send_json(user_id, {
-                "type": "stream_chunk",
-                "data": {"message_id": message_id, "content": token, "index": index}
-            })
-            index += 1
-
-        await self.send_json(user_id, {
-            "type": "stream_end",
-            "data": {"message_id": message_id, "full_content": full_content}
-        })
-
-        return full_content
+    return StreamingResponse(_stream_tokens(), media_type="text/event-stream")
 ```
+
+The frontend consumes this using `fetch()` with a `ReadableStream` reader (`app/services/sseClient.js`). An `AbortController` allows the user to stop generation mid-stream.
 
 ### `services/orchestrator.py` — Intent Orchestrator
 
@@ -232,14 +220,13 @@ Routes classified intents to the appropriate service and manages the response pi
 
 ```python
 class Orchestrator:
-    def __init__(self, ai_service, todo_service, calendar_service, memo_service, ws_manager):
+    def __init__(self, ai_service, todo_service, calendar_service, memo_service):
         self.ai = ai_service
         self.todo = todo_service
         self.calendar = calendar_service
         self.memo = memo_service
-        self.ws = ws_manager
 
-    async def handle_message(self, user_id: str, conversation_id: str, content: str):
+    async def handle_message(self, conversation_id: str, content: str):
         # 1. Classify intent
         intent_result = await classify_intent(content, self.ai)
 
@@ -247,19 +234,13 @@ class Orchestrator:
         match intent_result.intent:
             case "create_todo":
                 todo = await self.todo.create(intent_result.params)
-                await self.ws.send_json(user_id, {
-                    "type": "action_card",
-                    "data": {"card_type": "todo_created", "payload": todo.dict()}
-                })
+                return {"type": "action_card", "card_type": "todo_created", "payload": todo.dict()}
             case "create_event":
                 event = await self.calendar.create(intent_result.params)
-                await self.ws.send_json(user_id, {
-                    "type": "action_card",
-                    "data": {"card_type": "event_created", "payload": event.dict()}
-                })
+                return {"type": "action_card", "card_type": "event_created", "payload": event.dict()}
             case "general_chat":
-                tokens = self.ai.stream_completion(messages)
-                await self.ws.stream_to_user(user_id, message_id, tokens)
+                # Tokens are streamed via SSE through POST /api/chat/stream
+                return self.ai.stream_completion(messages)
             # ... other intents
 ```
 

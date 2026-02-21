@@ -1,6 +1,6 @@
 # API Design
 
-All communication between the mobile app and the self-hosted server uses REST (HTTPS) for CRUD operations and WebSocket (WSS) for real-time streaming.
+All communication between the mobile app and the self-hosted server uses REST (HTTPS) for CRUD operations and SSE (Server-Sent Events) for real-time streaming.
 
 ## Base URL
 
@@ -102,8 +102,11 @@ DELETE /api/chat/conversations/:id          # Archive/delete a conversation
 ### Messages
 
 ```
-POST   /api/chat/send                       # Send a message (triggers AI processing)
-GET    /api/chat/conversations/:id/messages  # Get messages for a conversation (paginated)
+POST   /api/chat/send                                          # Send a message (echo mode fallback)
+POST   /api/chat/stream                                        # Send a message with SSE streaming response
+GET    /api/chat/conversations/:id/messages                    # Get messages for a conversation (paginated)
+DELETE /api/chat/conversations/:id/messages/:message_id        # Delete a specific message
+PUT    /api/chat/conversations/:id/messages/:message_id        # Edit a message's content
 ```
 
 #### `POST /api/chat/send`
@@ -122,6 +125,48 @@ This is the primary endpoint. Sending a message triggers intent classification a
   "message_id": "msg_xyz789",
   "conversation_id": "conv_abc123",
   "status": "processing"
+}
+```
+
+#### `POST /api/chat/stream`
+
+Primary endpoint for chat. Sends a message and streams the AI response via Server-Sent Events.
+
+```json
+// Request
+{
+  "conversation_id": "conv_abc123",
+  "content": "Explain the difference between SSE and WebSocket"
+}
+
+// Response: text/event-stream
+// Event 1 — metadata:
+data: {"conversation_id": "conv_abc123", "message_id": "msg_xyz789"}
+
+// Event 2..N — tokens:
+data: {"token": "SSE"}
+data: {"token": " is"}
+data: {"token": " a"}
+data: {"token": " simpler"}
+
+// Final event:
+data: [DONE]
+```
+
+The frontend uses `fetch()` with a `ReadableStream` reader to consume tokens in real time. An `AbortController` allows the user to stop generation mid-stream.
+
+#### `DELETE /api/chat/conversations/:id/messages/:message_id`
+
+Delete a specific message. Returns `{"detail": "Message deleted"}`.
+
+#### `PUT /api/chat/conversations/:id/messages/:message_id`
+
+Edit a message's content. Returns the updated `MessageResponse`.
+
+```json
+// Request
+{
+  "content": "Updated message text"
 }
 ```
 
@@ -342,7 +387,9 @@ GET    /api/search                 # Full-text search across all data types
 
 ---
 
-## WebSocket Protocol
+## WebSocket Protocol (Legacy — replaced by SSE)
+
+> **Note:** The WebSocket protocol described below is the original design. The current implementation uses **SSE (Server-Sent Events)** via `POST /api/chat/stream` for real-time streaming, which is simpler and works better with React Native. The WebSocket design is preserved here for reference and may be implemented for features like push notifications in the future.
 
 ### Connection
 

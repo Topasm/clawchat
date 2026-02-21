@@ -8,35 +8,43 @@
 │   Screens                    State (Zustand)                │
 │   ├── TodayScreen            ├── useAuthStore               │
 │   ├── InboxScreen            ├── useChatStore               │
-│   ├── ConversationListScreen └── useModuleStore             │
-│   ├── ChatScreen                 (async API actions)        │
-│   ├── QuickCaptureModal                                     │
-│   ├── TaskDetailScreen       Hooks                          │
-│   ├── EventDetailScreen      └── useTodayData               │
+│   ├── ConversationListScreen │   (streaming + interactions) │
+│   ├── ChatScreen             ├── useModuleStore             │
+│   ├── QuickCaptureModal      │   (async API actions)        │
+│   ├── TaskDetailScreen       └── useSettingsStore           │
+│   ├── EventDetailScreen          (15+ persisted settings)   │
 │   ├── AllTasksScreen                                        │
-│   └── SettingsScreen         Widgets                        │
-│                              └── TodayWidget (Android)      │
-│   Components                 Services                       │
-│   ├── TaskRow                ├── apiClient (axios)          │
-│   ├── EventRow               └── naturalLanguageParser      │
-│   ├── SectionHeader                                         │
-│   ├── PriorityBadge                                         │
+│   ├── SettingsScreen         Hooks                          │
+│   ├── SystemPromptScreen     └── useTodayData               │
+│   └── LoginScreen                                           │
+│                              Theme                           │
+│   Components                 ├── ThemeContext + ThemeProvider │
+│   ├── TaskRow                └── Light / Dark / System mode  │
+│   ├── EventRow                                              │
+│   ├── SectionHeader          Widgets                        │
+│   ├── PriorityBadge          └── TodayWidget (Android)      │
 │   ├── EmptyState                                            │
-│   ├── CustomTabBar                                          │
-│   ├── ActionCard                                            │
-│   ├── QuickActionBar                                        │
+│   ├── CustomTabBar           Services                       │
+│   ├── ActionCard             ├── apiClient (axios)          │
+│   ├── QuickActionBar         ├── sseClient (SSE streaming)  │
+│   ├── MarkdownBubble         └── naturalLanguageParser      │
+│   ├── TypingIndicator                                       │
+│   ├── MessageActionMenu                                     │
+│   ├── MessageBubbleWrapper                                  │
+│   ├── CopyFeedback                                          │
 │   ├── ContactRow                                            │
-│   └── Cell                                                  │
+│   ├── Cell                                                  │
+│   └── Settings cells (8)                                    │
 │                                                             │
 └─────────────────────┬───────────────────────────────────────┘
-                      │ REST (HTTPS)
+                      │ REST (HTTPS) + SSE Streaming
                       │ User's own server only
 ┌─────────────────────┼───────────────────────────────────────┐
 │  Self-Hosted Server  │                                       │
 │                      │                                       │
 │  FastAPI Backend                                             │
-│  ├── Routers (chat, todo, calendar, memo, search,            │
-│  │           today, notifications)                           │
+│  ├── Routers (chat [+stream, +CRUD msgs], todo, calendar,   │
+│  │           memo, search, today, notifications)             │
 │  ├── Services (todo, calendar, memo, scheduler)              │
 │  └── Models & Schemas (SQLAlchemy + Pydantic)                │
 │                                                              │
@@ -104,11 +112,11 @@ Mobile App ──POST /api/chat──► FastAPI Router
                     │               │               │
                     ▼               ▼               ▼
               Execute CRUD    Stream tokens    Queue task
-              Return result   via WebSocket    Notify later
+              Return result   via SSE    Notify later
                     │               │
                     ▼               ▼
               Action Card      Streaming text
-              via WebSocket    in chat bubble
+              via SSE    in chat bubble
                     │               │
                     └───────┬───────┘
                             ▼
@@ -121,7 +129,7 @@ Mobile App ──POST /api/chat──► FastAPI Router
 3. **Intent Classifier** analyzes the message using an LLM function-calling prompt to determine the intent (e.g., `create_todo`, `query_calendar`, `general_chat`)
 4. **Orchestrator** routes to the appropriate handler:
    - **Module services** execute CRUD operations and return structured results
-   - **General chat** streams AI-generated text back via WebSocket
+   - **General chat** streams AI-generated text back via SSE
    - **Agent tasks** are queued for async execution with notification on completion
 5. **WebSocket delivers** real-time responses: streaming text chunks, action cards (interactive UI for confirming todo creation, showing calendar events, etc.), and status updates
 6. **Mobile app renders** the response in the chat interface
@@ -133,10 +141,10 @@ The architecture borrows navigation and UI patterns from the [react-native-chat]
 | Aspect | Reference (react-native-chat) | ClawChat |
 |--------|-------------------------------|----------|
 | Backend | Firebase (Auth + Firestore + Storage) | Self-hosted FastAPI + SQLite |
-| Real-time | Firestore `onSnapshot` listeners | WebSocket connections |
+| Real-time | Firestore `onSnapshot` listeners | SSE streaming (POST /api/chat/stream) |
 | Auth | Firebase Auth (email/password) | JWT token (server URL + PIN/API key) |
-| State | React Context (`AuthenticatedUserContext`, `UnreadMessagesContext`) | Zustand stores (`useAuthStore`, `useChatStore`) |
-| Chat UI | react-native-gifted-chat | react-native-gifted-chat (extended with streaming + action cards) |
+| State | React Context (`AuthenticatedUserContext`, `UnreadMessagesContext`) | Zustand stores (`useAuthStore`, `useChatStore`, `useModuleStore`, `useSettingsStore`) |
+| Chat UI | react-native-gifted-chat | react-native-gifted-chat (extended with markdown, streaming, action cards, message interactions) |
 | Navigation | Stack + Bottom Tabs (Chats, Settings) | Stack + 4 Bottom Tabs (Today, Inbox, Chat, Settings) + Custom Tab Bar with "+" FAB |
 | Data model | Firestore documents | SQLite tables via SQLAlchemy |
-| Components | ContactRow, Cell, ChatHeader, ChatMenu | ContactRow, Cell (reused) + TaskRow, EventRow, SectionHeader, PriorityBadge, EmptyState, CustomTabBar, ActionCard, QuickActionBar (new) |
+| Components | ContactRow, Cell, ChatHeader, ChatMenu | ContactRow, Cell (reused) + TaskRow, EventRow, SectionHeader, PriorityBadge, EmptyState, CustomTabBar, ActionCard, QuickActionBar, MarkdownBubble, TypingIndicator, MessageActionMenu, MessageBubbleWrapper, CopyFeedback, 8 Settings cells |

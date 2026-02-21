@@ -1,6 +1,6 @@
 # Frontend Guide
 
-The ClawChat mobile app is built with React Native (Expo), adapting navigation and component patterns from the [react-native-chat](https://github.com/Ctere1/react-native-chat) reference project while replacing Firebase with a self-hosted REST + WebSocket backend and React Context with Zustand.
+The ClawChat mobile app is built with React Native (Expo), adapting navigation and component patterns from the [react-native-chat](https://github.com/Ctere1/react-native-chat) reference project while replacing Firebase with a self-hosted REST + SSE backend and React Context with Zustand.
 
 ## Directory Structure
 
@@ -12,13 +12,14 @@ app/
 ├── screens/
 │   ├── TodayScreen.js              # Hero dashboard (greeting, tasks, events)
 │   ├── InboxScreen.js              # Unscheduled tasks (GTD inbox)
-│   ├── ChatScreen.js               # AI conversation (GiftedChat + smart send)
+│   ├── ChatScreen.js               # AI conversation (GiftedChat + streaming + markdown + interactions)
 │   ├── ConversationListScreen.js   # Chat history list
 │   ├── QuickCaptureModal.js        # Natural language quick capture modal
 │   ├── TaskDetailScreen.js         # Full task editing
 │   ├── EventDetailScreen.js        # Full event editing
 │   ├── AllTasksScreen.js           # All tasks grouped by status
-│   ├── SettingsScreen.js           # Configuration and account
+│   ├── SettingsScreen.js           # Full settings (7 sections, 30+ options)
+│   ├── SystemPromptScreen.js       # LLM system prompt editor
 │   └── LoginScreen.js              # Server URL + PIN authentication
 ├── components/
 │   ├── TaskRow.js                  # Swipeable task row with checkbox
@@ -29,19 +30,38 @@ app/
 │   ├── CustomTabBar.js             # Bottom tab bar with center "+" FAB
 │   ├── ActionCard.js               # Chat inline action card (task/event created)
 │   ├── QuickActionBar.js           # Quick action chips above chat input
+│   ├── MarkdownBubble.js           # Markdown renderer for chat messages (code blocks, links, etc.)
+│   ├── TypingIndicator.js          # Animated 3-dot typing indicator for streaming
+│   ├── MessageActionMenu.js        # Long-press context menu (copy, regenerate, edit, delete)
+│   ├── MessageBubbleWrapper.js     # Bubble wrapper with haptics, long-press, timestamp toggle
+│   ├── CopyFeedback.js             # Toast notification for clipboard copy
 │   ├── ContactRow.js               # Conversation list row (from reference)
 │   ├── Cell.js                     # Settings menu cell (from reference)
-│   └── Separator.js                # List separator
+│   ├── Separator.js                # List separator
+│   └── settings/                   # Reusable settings cell components
+│       ├── SettingsToggleCell.js    # Label + Switch toggle
+│       ├── SettingsSliderCell.js    # Label + value + Slider
+│       ├── SettingsNavigationCell.js # Label + detail + chevron
+│       ├── SettingsButtonCell.js    # Action button (supports destructive style)
+│       ├── SettingsDetailCell.js    # Read-only label + value + status dot
+│       ├── SettingsSegmentedCell.js # Label + segmented control
+│       ├── SettingsSectionHeader.js # Section title
+│       ├── CustomSlider.js         # PanResponder-based slider (no external deps)
+│       └── index.js                # Barrel export
 ├── hooks/
 │   └── useTodayData.js             # Today dashboard data fetching hook
 ├── stores/
-│   ├── useAuthStore.js             # Authentication state (Zustand)
-│   ├── useChatStore.js             # Conversations & messages (Zustand)
-│   └── useModuleStore.js           # Todos, events, memos + async API actions (Zustand)
+│   ├── useAuthStore.js             # Authentication state (Zustand, persisted)
+│   ├── useChatStore.js             # Conversations, messages, streaming, message interactions (Zustand)
+│   ├── useModuleStore.js           # Todos, events, memos + async API actions (Zustand)
+│   └── useSettingsStore.js         # 15+ app settings (Zustand, persisted)
 ├── services/
-│   └── apiClient.js                # Axios REST client
+│   ├── apiClient.js                # Axios REST client
+│   └── sseClient.js                # SSE streaming client (fetch + ReadableStream)
 ├── config/
-│   └── theme.js                    # Colors, typography, spacing (Things 3 palette)
+│   ├── theme.js                    # Colors (light + dark), typography, spacing
+│   ├── ThemeContext.js             # React Context + useTheme() hook
+│   └── ThemeProvider.js            # Theme provider (light/dark/system, persisted)
 ├── utils/
 │   ├── formatters.js               # Date/time helpers + grouping + greeting
 │   └── naturalLanguageParser.js    # NL date/type/priority parser
@@ -560,6 +580,9 @@ function LoginScreen() {
 | `zustand` | State management (replaces React Context) |
 | `axios` | HTTP client for REST API |
 | `react-native-android-widget` | Android home screen widget support |
+| `react-native-markdown-display` | Markdown rendering in chat bubbles |
+| `expo-clipboard` | Copy to clipboard (message interactions) |
+| `expo-haptics` | Haptic feedback on long-press |
 
 ### Removed (Firebase)
 

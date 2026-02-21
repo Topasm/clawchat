@@ -46,20 +46,22 @@ Add the AI engine and real-time streaming.
 - [ ] Implement `AIService` wrapping OpenAI-compatible API (Ollama / cloud)
 - [ ] Implement intent classifier using LLM function calling
 - [ ] Build orchestrator to route intents to module services
-- [ ] Implement WebSocket endpoint with connection manager
-- [ ] Wire up streaming: chat message -> classify -> stream response via WebSocket
-- [ ] Add action card generation for module actions (todo created, event scheduled)
+- [x] Implement SSE streaming endpoint (`POST /api/chat/stream`)
+- [x] Wire up streaming: chat message -> stream response via SSE
+- [x] Add action card generation for module actions (todo created, event scheduled)
 - [ ] Store classified intents and metadata in messages table
 - [ ] Add docker-compose.ollama.yml with Ollama service
+- [x] Add message CRUD endpoints (DELETE, PUT for edit)
 
 ### Mobile App
 
-- [ ] Implement WebSocket manager (`services/wsManager.js`)
-- [ ] Handle `stream_start`, `stream_chunk`, `stream_end` in ChatScreen
-- [ ] Build StreamingText component for animated text rendering
-- [ ] Build ActionCard component for interactive AI responses
-- [ ] Update `useChatStore` with `appendToLastMessage` for streaming
-- [ ] Add typing indicator during AI processing
+- [x] Implement SSE client (`services/sseClient.js`) using fetch + ReadableStream
+- [x] Handle streaming tokens in ChatScreen with real-time rendering
+- [x] Build MarkdownBubble component for markdown/code block rendering
+- [x] Build ActionCard component for interactive AI responses
+- [x] Update `useChatStore` with `sendMessageStreaming` and `appendToLastMessage`
+- [x] Add TypingIndicator during AI processing (before first token)
+- [x] Add stop generation button (AbortController)
 - [ ] Test end-to-end: user message -> intent classification -> streamed response
 
 ### Milestone
@@ -86,7 +88,7 @@ Build out the full assistant functionality.
 
 - [x] Build Today dashboard with task/event sections (replaced AssistantScreen)
 - [x] Implement QuickActionBar above chat input
-- [ ] Build SettingsScreen (server info, AI model selection, briefing time, logout)
+- [x] Build SettingsScreen (server info, AI model selection, briefing time, logout)
 - [ ] Handle `notification` WebSocket messages
 - [ ] Implement search UI (cross-module search results)
 - [ ] Add pull-to-refresh on conversation list and module views
@@ -158,6 +160,21 @@ Things 3-inspired GTD experience integrated with AI chat.
 - [x] Shared components: TaskRow, EventRow, SectionHeader, PriorityBadge, EmptyState
 - [x] Store async actions (fetchTodos, fetchEvents, toggleTodoComplete, createTodo, createEvent)
 - [x] Date utility functions (isToday, isTomorrow, isOverdue, formatDueDate, getGreeting, groupTodosByDate)
+
+---
+
+## Chat Enhancements (Completed)
+
+Nekogram-inspired feature improvements for the chat experience.
+
+### Completed
+- [x] **Markdown/Code Rendering**: MarkdownBubble component with syntax-highlighted code blocks, copy-to-clipboard, language labels (react-native-markdown-display)
+- [x] **SSE Streaming**: Real-time token streaming via `POST /api/chat/stream` with SSE, replacing polling/echo approach; sseClient.js using fetch + ReadableStream; AbortController for stop generation
+- [x] **Comprehensive Settings**: 15+ configurable options across 7 sections (Chat, LLM, Appearance, Notifications, Data, About, Account); useSettingsStore with AsyncStorage persistence; SystemPromptScreen for custom prompts; import/export settings as JSON
+- [x] **Dark Mode & Theme System**: ThemeContext + ThemeProvider with light/dark/system modes; OLED-friendly pure black dark theme; iOS-bright accent colors; all 10 screens + 11 components updated; StatusBar management; AsyncStorage theme persistence
+- [x] **Message Interactions**: Long-press context menu (MessageActionMenu) with copy, edit & resend, regenerate, delete; MessageBubbleWrapper with haptic feedback (expo-haptics); CopyFeedback toast; optimistic local updates with server sync
+- [x] **Custom Settings Components**: 8 reusable cell components (SettingsToggleCell, SettingsSliderCell, SettingsNavigationCell, SettingsButtonCell, SettingsDetailCell, SettingsSegmentedCell, SettingsSectionHeader, CustomSlider)
+- [x] **Backend Message CRUD**: DELETE and PUT endpoints for individual messages in conversations
 
 ---
 
