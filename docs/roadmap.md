@@ -1,0 +1,146 @@
+# Development Roadmap
+
+A phased plan for building ClawChat from zero to a deployable AI secretary.
+
+---
+
+## Phase 1: Foundation (Weeks 1-2)
+
+Establish the core infrastructure for both server and mobile app.
+
+### Server
+
+- [ ] Initialize FastAPI project with directory structure
+- [ ] Set up SQLAlchemy + Alembic with initial migration (all tables)
+- [ ] Implement auth endpoints (`/api/auth/login`, `/api/auth/refresh`)
+- [ ] Implement JWT middleware and auth dependencies
+- [ ] Build CRUD routers: todos, events, memos
+- [ ] Add pagination and filtering to list endpoints
+- [ ] Implement health check endpoint
+- [ ] Set up configuration from environment variables
+- [ ] Write Dockerfile and docker-compose.yml
+
+### Mobile App
+
+- [ ] Initialize Expo project
+- [ ] Set up React Navigation (stack + bottom tabs)
+- [ ] Implement LoginScreen (server URL + PIN)
+- [ ] Create Zustand stores: `useAuthStore`, `useChatStore`, `useModuleStore`
+- [ ] Build API client (Axios with auth interceptor)
+- [ ] Implement ConversationListScreen (list conversations from API)
+- [ ] Implement basic ChatScreen with GiftedChat (send/receive messages via REST)
+- [ ] Port ContactRow and Cell components from reference project
+- [ ] Set up theme system (`config/theme.js`)
+
+### Milestone
+A user can log in, send a message, and receive a (non-AI) echo response. CRUD operations work for todos, events, and memos via the REST API.
+
+---
+
+## Phase 2: AI Integration (Weeks 3-4)
+
+Add the AI engine and real-time streaming.
+
+### Server
+
+- [ ] Implement `AIService` wrapping OpenAI-compatible API (Ollama / cloud)
+- [ ] Implement intent classifier using LLM function calling
+- [ ] Build orchestrator to route intents to module services
+- [ ] Implement WebSocket endpoint with connection manager
+- [ ] Wire up streaming: chat message -> classify -> stream response via WebSocket
+- [ ] Add action card generation for module actions (todo created, event scheduled)
+- [ ] Store classified intents and metadata in messages table
+- [ ] Add docker-compose.ollama.yml with Ollama service
+
+### Mobile App
+
+- [ ] Implement WebSocket manager (`services/wsManager.js`)
+- [ ] Handle `stream_start`, `stream_chunk`, `stream_end` in ChatScreen
+- [ ] Build StreamingText component for animated text rendering
+- [ ] Build ActionCard component for interactive AI responses
+- [ ] Update `useChatStore` with `appendToLastMessage` for streaming
+- [ ] Add typing indicator during AI processing
+- [ ] Test end-to-end: user message -> intent classification -> streamed response
+
+### Milestone
+A user can have a natural language conversation with the AI. The AI classifies intents and executes actions (creating todos, scheduling events) with results streamed back in real time.
+
+---
+
+## Phase 3: Assistant Features (Weeks 5-7)
+
+Build out the full assistant functionality.
+
+### Server
+
+- [ ] Complete all intent handlers in orchestrator (CRUD for all modules)
+- [ ] Implement full-text search service (SQLite FTS5)
+- [ ] Build agent service for async tasks (research, summarization)
+- [ ] Add scheduler for daily briefing generation
+- [ ] Add scheduler for reminder checks and push notifications
+- [ ] Implement `/api/search` endpoint
+- [ ] Add conversation context to AI prompts (recent messages for continuity)
+- [ ] Handle multi-turn conversations (e.g., "edit the last todo I created")
+
+### Mobile App
+
+- [ ] Build AssistantScreen with module dashboard (today's todos, upcoming events, recent memos)
+- [ ] Implement QuickActionBar above chat input
+- [ ] Build SettingsScreen (server info, AI model selection, briefing time, logout)
+- [ ] Handle `notification` WebSocket messages
+- [ ] Implement search UI (cross-module search results)
+- [ ] Add pull-to-refresh on conversation list and module views
+- [ ] Handle action card interactions (edit, delete, complete via WebSocket)
+
+### Milestone
+The app functions as a full personal assistant. Users can manage all data through conversation or direct UI, search across all modules, receive daily briefings, and delegate async tasks.
+
+---
+
+## Phase 4: Polish & Deploy (Weeks 8-9)
+
+Harden, optimize, and prepare for real usage.
+
+### Server
+
+- [ ] Add rate limiting middleware
+- [ ] Add request logging and structured error handling
+- [ ] Optimize database queries with proper indexes
+- [ ] Add database backup script
+- [ ] Write production Caddyfile for HTTPS
+- [ ] Test Docker deployment on fresh machine
+- [ ] Document all environment variables in `.env.example`
+
+### Mobile App
+
+- [ ] Add offline support (queue messages when disconnected, sync on reconnect)
+- [ ] Add push notification handling (expo-notifications)
+- [ ] Implement conversation archiving and deletion
+- [ ] Add loading states, error states, and empty states for all screens
+- [ ] UI polish: animations, transitions, haptic feedback
+- [ ] Test on both iOS and Android devices
+- [ ] Build APK for sideloading, configure TestFlight for iOS
+
+### Documentation
+
+- [ ] Finalize all docs in `docs/` folder
+- [ ] Write troubleshooting guide
+- [ ] Add architecture diagrams
+- [ ] Create video walkthrough of setup process
+
+### Milestone
+ClawChat is deployable with `docker compose up`. A user can install the server, connect the app, and use it as a daily personal assistant. All core features work reliably.
+
+---
+
+## Future Considerations (Post v1.0)
+
+These are explicitly **not** in the initial scope but worth tracking:
+
+- **Home screen widgets** (iOS WidgetKit, Android App Widgets) for glanceable data
+- **Google Calendar sync** (bidirectional via Google Calendar API)
+- **Voice input** (speech-to-text for hands-free interaction)
+- **Web dashboard** (admin panel for server management)
+- **Multi-language AI responses** (Korean, English, etc.)
+- **End-to-end encryption** (if threat model changes)
+- **Plugin system** for community-built modules
