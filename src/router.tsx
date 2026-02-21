@@ -12,6 +12,7 @@ import EventDetailPage from './app/pages/EventDetailPage';
 import SettingsPage from './app/pages/SettingsPage';
 import SystemPromptPage from './app/pages/SystemPromptPage';
 import SearchPage from './app/pages/SearchPage';
+import MemosPage from './app/pages/MemosPage';
 
 export default function AppRouter() {
   const token = useAuthStore((s) => s.token);
@@ -49,6 +50,7 @@ export default function AppRouter() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/settings/system-prompt" element={<SystemPromptPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/memos" element={<MemosPage />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>
     </Routes>

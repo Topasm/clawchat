@@ -117,6 +117,7 @@ const navItems = [
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
+  { to: '/memos', label: 'Memos', Icon: MemoIcon },
   { to: '/search', label: 'Search', Icon: SearchIcon },
   { to: '/settings', label: 'Settings', Icon: GearIcon },
 ];

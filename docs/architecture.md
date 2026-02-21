@@ -119,13 +119,16 @@ All styles use **BEM naming** with a `.cc-` prefix (ClawChat) to avoid collision
 
 ## State Management
 
-Four Zustand stores manage all client state:
+Five Zustand stores manage all client state:
 
 | Store | Responsibility |
 |-------|---------------|
 | `useAuthStore` | JWT tokens, server URL, login/logout (persisted to localStorage) |
 | `useChatStore` | Conversations, messages, SSE streaming, abort controller |
-| `useModuleStore` | Todos, events, memos, kanban statuses, CRUD + async API actions |
-| `useSettingsStore` | Theme, chat behavior, LLM params, notifications (persisted to localStorage) |
+| `useModuleStore` | Todos, events, memos, kanban statuses, kanban filters, CRUD + async API actions |
+| `useSettingsStore` | Theme, chat behavior, LLM params, panel sizes, notifications (persisted to localStorage) |
+| `useToastStore` | Toast notification queue with auto-dismiss (success/error/info/warning) |
 
 All stores use optimistic updates with server sync. Demo data is seeded when no server is configured.
+
+A `keyboard/` module provides centralized shortcut definitions (`registry.ts`) and semantic hooks (`hooks.ts`) for global, kanban, and navigation shortcuts using `react-hotkeys-hook`.
