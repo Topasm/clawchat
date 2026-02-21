@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+server/venv/
+
+# Environment variables
+.env
+server/.env
+
+# Database
+server/data/
+*.db
+
+# Node / React Native
+node_modules/
+app/node_modules/
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
