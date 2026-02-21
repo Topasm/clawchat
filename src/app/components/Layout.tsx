@@ -41,6 +41,19 @@ function ChatIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2.5" y="3.5" width="13" height="12" rx="1.5" />
+      <path d="M2.5 7.5h13" />
+      <path d="M6 2v3M12 2v3" strokeLinecap="round" />
+      <circle cx="6.5" cy="11" r="0.75" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="11" r="0.75" fill="currentColor" stroke="none" />
+      <circle cx="11.5" cy="11" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 function TasksIcon() {
   return (
     <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -116,6 +129,7 @@ const navItems = [
   { to: '/today', label: 'Today', Icon: SunIcon },
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
+  { to: '/calendar', label: 'Calendar', Icon: CalendarIcon },
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
   { to: '/memos', label: 'Memos', Icon: MemoIcon },
   { to: '/search', label: 'Search', Icon: SearchIcon },

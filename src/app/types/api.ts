@@ -67,6 +67,9 @@ export interface EventResponse {
   start_time: string;
   end_time?: string;
   location?: string;
+  is_all_day?: boolean;
+  reminder_minutes?: number;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +80,9 @@ export interface EventCreate {
   start_time: string;
   end_time?: string;
   location?: string;
+  is_all_day?: boolean;
+  reminder_minutes?: number;
+  tags?: string[];
 }
 
 export interface EventUpdate {
@@ -85,6 +91,9 @@ export interface EventUpdate {
   start_time?: string;
   end_time?: string;
   location?: string;
+  is_all_day?: boolean;
+  reminder_minutes?: number;
+  tags?: string[];
 }
 
 // -- Memos ------------------------------------------------------------------
