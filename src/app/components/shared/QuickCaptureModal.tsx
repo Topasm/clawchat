@@ -7,9 +7,10 @@ import Badge from './Badge';
 interface QuickCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
+  placeholder?: string;
 }
 
-export default function QuickCaptureModal({ isOpen, onClose }: QuickCaptureModalProps) {
+export default function QuickCaptureModal({ isOpen, onClose, placeholder }: QuickCaptureModalProps) {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -85,7 +86,7 @@ export default function QuickCaptureModal({ isOpen, onClose }: QuickCaptureModal
             ref={inputRef}
             type="text"
             className="cc-quick-capture__input"
-            placeholder='Try "Buy groceries tomorrow" or "Meeting at 3pm"...'
+            placeholder={placeholder || 'Try "Buy groceries tomorrow" or "Meeting at 3pm"...'}
             value={text}
             onChange={(e) => setText(e.target.value)}
             autoComplete="off"

@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+interface StreakData {
+  lastCompletedDate: string;
+  currentStreak: number;
+}
+
 interface SettingsState {
   // Chat
   fontSize: number;
@@ -30,6 +35,9 @@ interface SettingsState {
   saveHistory: boolean;
   analyticsEnabled: boolean;
 
+  // Streak
+  streak: StreakData;
+
   // Setters
   setFontSize: (v: number) => void;
   setMessageBubbleStyle: (v: string) => void;
@@ -49,6 +57,7 @@ interface SettingsState {
   setReminderSound: (v: boolean) => void;
   setSaveHistory: (v: boolean) => void;
   setAnalyticsEnabled: (v: boolean) => void;
+  setStreak: (v: StreakData) => void;
 
   // Actions
   resetToDefaults: () => void;
@@ -79,6 +88,8 @@ const DEFAULT_SETTINGS = {
 
   saveHistory: true,
   analyticsEnabled: false,
+
+  streak: { lastCompletedDate: '', currentStreak: 0 },
 } as const;
 
 type DefaultKeys = keyof typeof DEFAULT_SETTINGS;
@@ -110,6 +121,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       setSaveHistory: (saveHistory) => set({ saveHistory }),
       setAnalyticsEnabled: (analyticsEnabled) => set({ analyticsEnabled }),
+      setStreak: (streak) => set({ streak }),
 
       resetToDefaults: () => set({ ...DEFAULT_SETTINGS }),
 

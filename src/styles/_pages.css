@@ -16,6 +16,53 @@
   margin-top: 2px;
 }
 
+/* --- Today Progress --------------------------------------- */
+.cc-today-progress {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: 10px;
+}
+
+.cc-today-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cc-today-progress__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cc-text);
+}
+
+.cc-today-progress__streak {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cc-warning);
+}
+
+.cc-today-progress__track {
+  height: 6px;
+  background: var(--cc-surface-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cc-today-progress__bar {
+  height: 100%;
+  background: var(--cc-primary);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  min-width: 0;
+}
+
+.cc-today-progress__bar--complete {
+  background: var(--cc-success);
+}
+
 /* --- Inbox banner ----------------------------------------- */
 .cc-inbox-banner {
   display: flex;

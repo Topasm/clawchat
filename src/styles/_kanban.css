@@ -108,6 +108,12 @@
   opacity: 0.9;
 }
 
+.cc-kanban__card--focused {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: -1px;
+  border-radius: 8px;
+}
+
 /* -- Responsive ---------------------------------------------- */
 
 @media (max-width: 768px) {

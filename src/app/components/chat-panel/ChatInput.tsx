@@ -24,6 +24,11 @@ export default function ChatInput({ onSend, isStreaming, onStop, placeholder = '
   }, [text, onSend]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSend();
+      return;
+    }
     if (sendOnEnter && e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();

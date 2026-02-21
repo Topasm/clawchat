@@ -10,6 +10,8 @@ interface KanbanColumnProps {
   tasks: TodoResponse[];
   onToggle: (id: string) => void;
   onClickTask: (id: string) => void;
+  focusedTaskId?: string | null;
+  onFocusTask?: (id: string) => void;
 }
 
 const variantMap: Record<KanbanStatus, string> = {
@@ -25,6 +27,8 @@ export default function KanbanColumn({
   tasks,
   onToggle,
   onClickTask,
+  focusedTaskId,
+  onFocusTask,
 }: KanbanColumnProps) {
   const variant = variantMap[status];
 
@@ -52,6 +56,8 @@ export default function KanbanColumn({
                   index={index}
                   onToggle={() => onToggle(task.id)}
                   onClick={() => onClickTask(task.id)}
+                  isFocused={focusedTaskId === task.id}
+                  onFocus={() => onFocusTask?.(task.id)}
                 />
               ))
             )}

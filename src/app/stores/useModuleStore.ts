@@ -117,6 +117,8 @@ function isDemoMode(): boolean {
   return !useAuthStore.getState().serverUrl;
 }
 
+const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
+
 export const useModuleStore = create<ModuleState>()((set, get) => ({
   isLoading: false,
   lastFetched: null,
@@ -373,56 +375,112 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   },
 
   deleteTodo: async (id) => {
-    // Optimistic remove
-    const { todos } = get();
+    const { todos, kanbanStatuses } = get();
     const existing = todos.find((t) => t.id === id);
-    get().removeTodo(id);
-    useToastStore.getState().addToast('success', 'Task deleted');
+    if (!existing) return;
+    const savedKanbanStatus = kanbanStatuses[id];
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.delete(`/todos/${id}`);
-      } catch (err) {
-        logger.warn('Failed to delete todo on server:', err);
-        // Re-add on failure so user doesn't lose data silently
-        if (existing) get().addTodo(existing);
-        useToastStore.getState().addToast('error', 'Failed to delete task on server');
+    get().removeTodo(id);
+
+    const timeoutId = setTimeout(async () => {
+      pendingDeletes.delete(id);
+      if (!isDemoMode()) {
+        try {
+          await apiClient.delete(`/todos/${id}`);
+        } catch (err) {
+          logger.warn('Failed to delete todo on server:', err);
+          get().addTodo(existing);
+          if (savedKanbanStatus) get().setKanbanStatus(id, savedKanbanStatus);
+          useToastStore.getState().addToast('error', 'Failed to delete task on server');
+        }
       }
-    }
+    }, 5000);
+    pendingDeletes.set(id, timeoutId);
+
+    useToastStore.getState().addToast('success', 'Task deleted', {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timeoutId);
+          pendingDeletes.delete(id);
+          get().addTodo(existing);
+          if (savedKanbanStatus) {
+            set((state) => ({
+              kanbanStatuses: { ...state.kanbanStatuses, [id]: savedKanbanStatus },
+            }));
+          }
+        },
+      },
+    });
   },
 
   deleteEvent: async (id) => {
     const { events } = get();
     const existing = events.find((e) => e.id === id);
-    get().removeEvent(id);
-    useToastStore.getState().addToast('success', 'Event deleted');
+    if (!existing) return;
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.delete(`/events/${id}`);
-      } catch (err) {
-        logger.warn('Failed to delete event on server:', err);
-        if (existing) get().addEvent(existing);
-        useToastStore.getState().addToast('error', 'Failed to delete event on server');
+    get().removeEvent(id);
+
+    const timeoutId = setTimeout(async () => {
+      pendingDeletes.delete(id);
+      if (!isDemoMode()) {
+        try {
+          await apiClient.delete(`/events/${id}`);
+        } catch (err) {
+          logger.warn('Failed to delete event on server:', err);
+          get().addEvent(existing);
+          useToastStore.getState().addToast('error', 'Failed to delete event on server');
+        }
       }
-    }
+    }, 5000);
+    pendingDeletes.set(id, timeoutId);
+
+    useToastStore.getState().addToast('success', 'Event deleted', {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timeoutId);
+          pendingDeletes.delete(id);
+          get().addEvent(existing);
+        },
+      },
+    });
   },
 
   deleteMemo: async (id) => {
     const { memos } = get();
     const existing = memos.find((m) => m.id === id);
-    get().removeMemo(id);
-    useToastStore.getState().addToast('success', 'Memo deleted');
+    if (!existing) return;
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.delete(`/memos/${id}`);
-      } catch (err) {
-        logger.warn('Failed to delete memo on server:', err);
-        if (existing) get().addMemo(existing);
-        useToastStore.getState().addToast('error', 'Failed to delete memo on server');
+    get().removeMemo(id);
+
+    const timeoutId = setTimeout(async () => {
+      pendingDeletes.delete(id);
+      if (!isDemoMode()) {
+        try {
+          await apiClient.delete(`/memos/${id}`);
+        } catch (err) {
+          logger.warn('Failed to delete memo on server:', err);
+          get().addMemo(existing);
+          useToastStore.getState().addToast('error', 'Failed to delete memo on server');
+        }
       }
-    }
+    }, 5000);
+    pendingDeletes.set(id, timeoutId);
+
+    useToastStore.getState().addToast('success', 'Memo deleted', {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timeoutId);
+          pendingDeletes.delete(id);
+          get().addMemo(existing);
+        },
+      },
+    });
   },
 
   serverUpdateTodo: async (id, data) => {

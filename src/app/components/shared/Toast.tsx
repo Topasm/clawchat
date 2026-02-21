@@ -15,6 +15,17 @@ export default function Toast({ toast }: { toast: ToastData }) {
     <div className={`cc-toast cc-toast--${toast.type}`} role="alert">
       <span className="cc-toast__icon">{icons[toast.type]}</span>
       <span className="cc-toast__message">{toast.message}</span>
+      {toast.action && (
+        <button
+          className="cc-toast__action"
+          onClick={() => {
+            toast.action!.onClick();
+            removeToast(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         className="cc-toast__close"
         onClick={() => removeToast(toast.id)}
