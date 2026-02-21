@@ -4,17 +4,22 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from './config/theme';
 import { useAuthStore } from './stores/useAuthStore';
+import CustomTabBar from './components/CustomTabBar';
 
 // Screens
 import LoginScreen from './screens/LoginScreen';
+import TodayScreen from './screens/TodayScreen';
+import InboxScreen from './screens/InboxScreen';
 import ConversationListScreen from './screens/ConversationListScreen';
 import ChatScreen from './screens/ChatScreen';
-import AssistantScreen from './screens/AssistantScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import QuickCaptureModal from './screens/QuickCaptureModal';
+import TaskDetailScreen from './screens/TaskDetailScreen';
+import EventDetailScreen from './screens/EventDetailScreen';
+import AllTasksScreen from './screens/AllTasksScreen';
 
 const AuthStackNav = createStackNavigator();
 const MainStackNav = createStackNavigator();
@@ -29,51 +34,37 @@ function AuthStack() {
   );
 }
 
+const headerStyle = {
+  backgroundColor: theme.colors.surface,
+  shadowColor: theme.colors.border,
+};
+const headerTintColor = theme.colors.text;
+const headerTitleStyle = { fontWeight: '600' };
+
 // --- Tab Navigator ---
 function TabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          const icons = {
-            Chat: 'chatbubbles',
-            Assistant: 'grid',
-            Settings: 'settings',
-          };
-          const iconName = icons[route.name] + (focused ? '' : '-outline');
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.disabled,
-        tabBarStyle: {
-          borderTopColor: theme.colors.border,
-        },
-        headerStyle: {
-          backgroundColor: theme.colors.surface,
-          shadowColor: theme.colors.border,
-        },
-        headerTintColor: theme.colors.text,
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
-      })}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{
+        headerStyle,
+        headerTintColor,
+        headerTitleStyle,
+      }}
     >
+      <Tab.Screen name="Today" component={TodayScreen} />
+      <Tab.Screen name="Inbox" component={InboxScreen} />
       <Tab.Screen
         name="Chat"
         component={ConversationListScreen}
         options={{ title: 'Chats' }}
-      />
-      <Tab.Screen
-        name="Assistant"
-        component={AssistantScreen}
-        options={{ headerShown: false }}
       />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 }
 
-// --- Main Stack (authenticated: tabs + chat detail) ---
+// --- Main Stack (authenticated: tabs + detail screens) ---
 function MainStack() {
   return (
     <MainStackNav.Navigator>
@@ -87,15 +78,51 @@ function MainStack() {
         component={ChatScreen}
         options={{
           title: 'Chat',
-          headerStyle: {
-            backgroundColor: theme.colors.surface,
-            shadowColor: theme.colors.border,
-          },
-          headerTintColor: theme.colors.text,
-          headerTitleStyle: {
-            fontWeight: '600',
-          },
+          headerStyle,
+          headerTintColor,
+          headerTitleStyle,
           headerBackTitleVisible: false,
+        }}
+      />
+      <MainStackNav.Screen
+        name="TaskDetail"
+        component={TaskDetailScreen}
+        options={{
+          title: 'Task',
+          headerStyle,
+          headerTintColor,
+          headerTitleStyle,
+          headerBackTitleVisible: false,
+        }}
+      />
+      <MainStackNav.Screen
+        name="EventDetail"
+        component={EventDetailScreen}
+        options={{
+          title: 'Event',
+          headerStyle,
+          headerTintColor,
+          headerTitleStyle,
+          headerBackTitleVisible: false,
+        }}
+      />
+      <MainStackNav.Screen
+        name="AllTasks"
+        component={AllTasksScreen}
+        options={{
+          title: 'All Tasks',
+          headerStyle,
+          headerTintColor,
+          headerTitleStyle,
+          headerBackTitleVisible: false,
+        }}
+      />
+      <MainStackNav.Screen
+        name="QuickCapture"
+        component={QuickCaptureModal}
+        options={{
+          presentation: 'modal',
+          headerShown: false,
         }}
       />
     </MainStackNav.Navigator>

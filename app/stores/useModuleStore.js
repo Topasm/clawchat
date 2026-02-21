@@ -1,6 +1,11 @@
 import { create } from 'zustand';
+import apiClient from '../services/apiClient';
 
 export const useModuleStore = create((set, get) => ({
+  // --- Async state ---
+  isLoading: false,
+  lastFetched: null,
+
   // --- Todos ---
   todos: [],
 
@@ -60,4 +65,59 @@ export const useModuleStore = create((set, get) => ({
     set((state) => ({
       memos: state.memos.filter((m) => m.id !== id),
     })),
+
+  // --- Async actions ---
+  fetchTodos: async (params) => {
+    set({ isLoading: true });
+    try {
+      const response = await apiClient.get('/todos', { params });
+      set({ todos: response.data.items, isLoading: false, lastFetched: Date.now() });
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  fetchEvents: async (params) => {
+    set({ isLoading: true });
+    try {
+      const response = await apiClient.get('/events', { params });
+      set({ events: response.data.items, isLoading: false, lastFetched: Date.now() });
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  toggleTodoComplete: async (id) => {
+    const { todos } = get();
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) return;
+    const newStatus = todo.status === 'completed' ? 'pending' : 'completed';
+    // Optimistic update
+    set((state) => ({
+      todos: state.todos.map((t) => (t.id === id ? { ...t, status: newStatus } : t)),
+    }));
+    try {
+      await apiClient.patch(`/todos/${id}`, { status: newStatus });
+    } catch (error) {
+      // Revert on error
+      set((state) => ({
+        todos: state.todos.map((t) => (t.id === id ? { ...t, status: todo.status } : t)),
+      }));
+      throw error;
+    }
+  },
+
+  createTodo: async (data) => {
+    const response = await apiClient.post('/todos', data);
+    get().addTodo(response.data);
+    return response.data;
+  },
+
+  createEvent: async (data) => {
+    const response = await apiClient.post('/events', data);
+    get().addEvent(response.data);
+    return response.data;
+  },
 }));

@@ -19,12 +19,25 @@ export const theme = {
     userBubble: '#2196F3',
     streaming: '#26A69A',
     actionCard: '#FFF8E1',
+
+    // Module-specific
+    todayBlue: '#3478F6',
+    inboxYellow: '#FFCC00',
+    completedGreen: '#34C759',
+    overdueRed: '#FF3B30',
+    priorityUrgent: '#FF3B30',
+    priorityHigh: '#FF9500',
+    priorityMedium: '#FFCC00',
+    priorityLow: '#8E8E93',
   },
   typography: {
     h1: { fontSize: 24, fontWeight: '700' },
     h2: { fontSize: 20, fontWeight: '600' },
+    h3: { fontSize: 17, fontWeight: '600' },
     body: { fontSize: 16, fontWeight: '400' },
+    bodySmall: { fontSize: 14, fontWeight: '400' },
     caption: { fontSize: 12, fontWeight: '400', color: '#757575' },
+    label: { fontSize: 13, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5 },
   },
   spacing: {
     xs: 4,

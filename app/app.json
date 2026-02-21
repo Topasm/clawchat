@@ -30,7 +30,24 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "TodayWidget",
+              "label": "ClawChat Today",
+              "minWidth": "320dp",
+              "minHeight": "200dp",
+              "description": "Shows today's tasks and events",
+              "previewImage": "./assets/widget-preview.png",
+              "updatePeriodMillis": 1800000,
+              "widgetFeatures": "reconfigurable"
+            }
+          ]
+        }
+      ]
     ]
   }
 }

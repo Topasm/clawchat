@@ -1,13 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
 import { theme } from '../config/theme';
 import apiClient from '../services/apiClient';
 import { useChatStore } from '../stores/useChatStore';
+import { useModuleStore } from '../stores/useModuleStore';
+import { parseNaturalInput, shouldAutoCreate } from '../utils/naturalLanguageParser';
+import ActionCard from '../components/ActionCard';
+import QuickActionBar from '../components/QuickActionBar';
 
-/**
- * Map a server message object to the GiftedChat message format.
- */
 function mapToGiftedMessage(msg) {
   const isUser = msg.role === 'user';
   return {
@@ -18,6 +19,7 @@ function mapToGiftedMessage(msg) {
       _id: isUser ? 'user' : 'assistant',
       name: isUser ? 'You' : 'ClawChat',
     },
+    actionData: msg.actionData || null,
   };
 }
 
@@ -29,20 +31,20 @@ export default function ChatScreen({ route, navigation }) {
   const setMessages = useChatStore((s) => s.setMessages);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const addTodo = useModuleStore((s) => s.addTodo);
+  const addEvent = useModuleStore((s) => s.addEvent);
 
-  // Set the navigation header title
   useEffect(() => {
     navigation.setOptions({ title: conversationTitle });
   }, [navigation, conversationTitle]);
 
-  // Load messages on mount
   const fetchMessages = useCallback(async () => {
     try {
       const response = await apiClient.get(
         `/chat/conversations/${conversationId}/messages`
       );
       const items = response.data.items || [];
-      // GiftedChat expects newest first
       const giftedMessages = items.map(mapToGiftedMessage).reverse();
       setMessages(giftedMessages);
     } catch (error) {
@@ -59,31 +61,71 @@ export default function ChatScreen({ route, navigation }) {
       setIsLoading(false);
     };
     load();
-
-    // Clean up messages when leaving screen
     return () => {
       useChatStore.getState().setMessages([]);
     };
   }, [fetchMessages]);
 
-  // Handle sending a message
+  const handleSmartSend = useCallback(
+    async (text) => {
+      if (shouldAutoCreate(text)) {
+        const parsed = parseNaturalInput(text);
+        try {
+          if (parsed.type === 'event' || parsed.startTime) {
+            const startTime = parsed.startTime || parsed.dueDate || new Date();
+            const body = { title: parsed.title, start_time: startTime.toISOString() };
+            const response = await apiClient.post('/events', body);
+            addEvent(response.data);
+            return { type: 'event_created', payload: response.data };
+          } else {
+            const body = { title: parsed.title, priority: parsed.priority || 'medium' };
+            if (parsed.dueDate) body.due_date = parsed.dueDate.toISOString();
+            const response = await apiClient.post('/todos', body);
+            addTodo(response.data);
+            return { type: 'todo_created', payload: response.data };
+          }
+        } catch {
+          // Fall through to normal send
+        }
+      }
+      return null;
+    },
+    [addTodo, addEvent]
+  );
+
   const onSend = useCallback(
     async (newMessages = []) => {
       if (isSending) return;
 
       const userMessage = newMessages[0];
-      // Optimistically add the user message
       useChatStore.getState().addMessage(userMessage);
 
       setIsSending(true);
       try {
+        // Try smart creation first
+        const actionResult = await handleSmartSend(userMessage.text);
+
+        // Send through normal chat flow
         await apiClient.post('/chat/send', {
           conversation_id: conversationId,
           content: userMessage.text,
         });
 
-        // Phase 1: simple poll for the AI response after sending
-        // Wait briefly then re-fetch messages to get the AI reply
+        // If an action was created, inject an action card message
+        if (actionResult) {
+          const actionMsg = {
+            _id: `action-${Date.now()}`,
+            text: actionResult.type === 'todo_created'
+              ? `Created task: "${actionResult.payload.title}"`
+              : `Created event: "${actionResult.payload.title}"`,
+            createdAt: new Date(),
+            user: { _id: 'assistant', name: 'ClawChat' },
+            actionData: actionResult,
+          };
+          useChatStore.getState().addMessage(actionMsg);
+        }
+
+        // Poll for AI response
         setTimeout(async () => {
           await fetchMessages();
           setIsSending(false);
@@ -93,42 +135,88 @@ export default function ChatScreen({ route, navigation }) {
         Alert.alert('Error', 'Failed to send message.');
       }
     },
-    [conversationId, fetchMessages, isSending]
+    [conversationId, fetchMessages, isSending, handleSmartSend]
   );
 
-  // Custom bubble styling
+  const handleActionCardAction = useCallback(
+    (action, payload) => {
+      if (action === 'edit') {
+        if (payload.start_time) {
+          navigation.navigate('EventDetail', { eventId: payload.id });
+        } else {
+          navigation.navigate('TaskDetail', { todoId: payload.id });
+        }
+      } else if (action === 'complete') {
+        useModuleStore.getState().toggleTodoComplete(payload.id);
+      } else if (action === 'delete') {
+        Alert.alert('Delete', `Delete "${payload.title}"?`, [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                if (payload.start_time) {
+                  await apiClient.delete(`/events/${payload.id}`);
+                  useModuleStore.getState().removeEvent(payload.id);
+                } else {
+                  await apiClient.delete(`/todos/${payload.id}`);
+                  useModuleStore.getState().removeTodo(payload.id);
+                }
+              } catch {
+                Alert.alert('Error', 'Failed to delete.');
+              }
+            },
+          },
+        ]);
+      }
+    },
+    [navigation]
+  );
+
+  const handleQuickAction = useCallback((action) => {
+    setInputText(action.prefix);
+  }, []);
+
   const renderBubble = (props) => (
     <Bubble
       {...props}
       wrapperStyle={{
-        left: {
-          backgroundColor: theme.colors.assistantBubble,
-        },
-        right: {
-          backgroundColor: theme.colors.userBubble,
-        },
+        left: { backgroundColor: theme.colors.assistantBubble },
+        right: { backgroundColor: theme.colors.userBubble },
       }}
       textStyle={{
-        left: {
-          color: theme.colors.text,
-        },
-        right: {
-          color: theme.colors.surface,
-        },
+        left: { color: theme.colors.text },
+        right: { color: theme.colors.surface },
       }}
     />
   );
 
-  // Custom input toolbar styling
+  const renderCustomView = (props) => {
+    const { currentMessage } = props;
+    if (currentMessage?.actionData) {
+      return (
+        <ActionCard
+          type={currentMessage.actionData.type}
+          payload={currentMessage.actionData.payload}
+          onAction={handleActionCardAction}
+        />
+      );
+    }
+    return null;
+  };
+
   const renderInputToolbar = (props) => (
-    <InputToolbar
-      {...props}
-      containerStyle={styles.inputToolbar}
-      primaryStyle={styles.inputPrimary}
-    />
+    <View>
+      <QuickActionBar onSelectAction={handleQuickAction} />
+      <InputToolbar
+        {...props}
+        containerStyle={styles.inputToolbar}
+        primaryStyle={styles.inputPrimary}
+      />
+    </View>
   );
 
-  // Loading footer while AI is processing
   const renderFooter = () => {
     if (!isSending) return null;
     return (
@@ -153,9 +241,12 @@ export default function ChatScreen({ route, navigation }) {
         onSend={(msgs) => onSend(msgs)}
         user={{ _id: 'user', name: 'You' }}
         renderBubble={renderBubble}
+        renderCustomView={renderCustomView}
         renderInputToolbar={renderInputToolbar}
         renderFooter={renderFooter}
-        placeholder="Type a message..."
+        text={inputText}
+        onInputTextChanged={setInputText}
+        placeholder="Type a message or task..."
         alwaysShowSend
         scrollToBottom
         scrollToBottomStyle={styles.scrollToBottom}
