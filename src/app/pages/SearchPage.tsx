@@ -1,15 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/useAuthStore';
 import { useModuleStore } from '../stores/useModuleStore';
+import apiClient from '../services/apiClient';
 import TaskCard from '../components/shared/TaskCard';
 import EventCard from '../components/shared/EventCard';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
+import type { TodoResponse, EventResponse, MemoResponse } from '../types/api';
 
 type ResultType = 'all' | 'tasks' | 'events' | 'memos';
 
+interface ServerResults {
+  tasks: TodoResponse[];
+  events: EventResponse[];
+  memos: MemoResponse[];
+}
+
 export default function SearchPage() {
   const navigate = useNavigate();
+  const serverUrl = useAuthStore((s) => s.serverUrl);
   const todos = useModuleStore((s) => s.todos);
   const events = useModuleStore((s) => s.events);
   const memos = useModuleStore((s) => s.memos);
@@ -17,10 +27,53 @@ export default function SearchPage() {
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ResultType>('all');
+  const [serverResults, setServerResults] = useState<ServerResults | null>(null);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const q = query.toLowerCase().trim();
 
-  const results = useMemo(() => {
+  // Server search (debounced)
+  const doServerSearch = useCallback(async (searchQuery: string) => {
+    if (!serverUrl || !searchQuery.trim()) {
+      setServerResults(null);
+      return;
+    }
+    setSearching(true);
+    try {
+      const types = filter === 'all' ? 'todos,events,memos' : filter === 'tasks' ? 'todos' : filter;
+      const res = await apiClient.get('/search', { params: { q: searchQuery, types } });
+      const data = res.data;
+      setServerResults({
+        tasks: data.todos ?? [],
+        events: data.events ?? [],
+        memos: data.memos ?? [],
+      });
+    } catch {
+      // Fall back to client-side search
+      setServerResults(null);
+    } finally {
+      setSearching(false);
+    }
+  }, [serverUrl, filter]);
+
+  // Debounced server search on query change
+  useEffect(() => {
+    if (!serverUrl || !q) {
+      setServerResults(null);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      doServerSearch(q);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [q, serverUrl, doServerSearch]);
+
+  // Client-side search (used in demo mode or as fallback)
+  const clientResults = useMemo(() => {
     if (!q) return { tasks: [], events: [], memos: [] };
 
     const tasks = (filter === 'all' || filter === 'tasks')
@@ -52,6 +105,8 @@ export default function SearchPage() {
     return { tasks, events: evts, memos: mms };
   }, [q, filter, todos, events, memos]);
 
+  // Use server results when available, otherwise fall back to client-side
+  const results = serverResults ?? clientResults;
   const totalCount = results.tasks.length + results.events.length + results.memos.length;
 
   const filters: { value: ResultType; label: string }[] = [
@@ -65,7 +120,9 @@ export default function SearchPage() {
     <div>
       <div className="cc-page-header">
         <div className="cc-page-header__title">Search</div>
-        <div className="cc-page-header__subtitle">Find across all modules</div>
+        <div className="cc-page-header__subtitle">
+          Find across all modules{serverUrl ? '' : ' (demo mode)'}
+        </div>
       </div>
 
       <input
@@ -91,6 +148,8 @@ export default function SearchPage() {
 
       {!q ? (
         <EmptyState icon="🔍" message="Type to search across tasks, events, and memos" />
+      ) : searching ? (
+        <div className="cc-empty__message" style={{ padding: 40, textAlign: 'center' }}>Searching...</div>
       ) : totalCount === 0 ? (
         <EmptyState icon="😕" message={`No results for "${query}"`} />
       ) : (

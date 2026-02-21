@@ -1,16 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
-import apiClient from '../services/apiClient';
 import { formatDateTime } from '../utils/formatters';
-import type { EventResponse } from '../types/api';
+import type { EventResponse, EventUpdate } from '../types/api';
 
 export default function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const events = useModuleStore((s) => s.events);
-  const updateEvent = useModuleStore((s) => s.updateEvent);
-  const removeEvent = useModuleStore((s) => s.removeEvent);
+  const serverUpdateEvent = useModuleStore((s) => s.serverUpdateEvent);
+  const deleteEvent = useModuleStore((s) => s.deleteEvent);
 
   const event = events.find((e) => e.id === eventId);
 
@@ -27,14 +26,15 @@ export default function EventDetailPage() {
     }
   }, [event]);
 
-  const persistField = useCallback((updates: Record<string, unknown>) => {
+  const persistField = useCallback((updates: EventUpdate) => {
     if (!eventId) return;
-    updateEvent(eventId, updates as Partial<EventResponse>);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      apiClient.patch(`/events/${eventId}`, updates).catch(() => {});
+      serverUpdateEvent(eventId, updates);
     }, 500);
-  }, [eventId, updateEvent]);
+    // Immediate local update
+    useModuleStore.getState().updateEvent(eventId, updates as Partial<EventResponse>);
+  }, [eventId, serverUpdateEvent]);
 
   const handleTitleChange = (val: string) => {
     setTitle(val);
@@ -53,13 +53,8 @@ export default function EventDetailPage() {
 
   const handleDelete = async () => {
     if (!eventId) return;
-    try {
-      await apiClient.delete(`/events/${eventId}`);
-      removeEvent(eventId);
-      navigate('/today');
-    } catch {
-      // stay on page
-    }
+    await deleteEvent(eventId);
+    navigate('/today');
   };
 
   if (!event) {

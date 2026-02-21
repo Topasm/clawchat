@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import apiClient from '../services/apiClient';
+import { useAuthStore } from '../stores/useAuthStore';
+import { useModuleStore } from '../stores/useModuleStore';
 import type { TodoResponse, EventResponse } from '../types/api';
 
 interface TodayData {
@@ -13,16 +15,83 @@ interface TodayData {
   refresh: () => void;
 }
 
+/** Generate a greeting based on hour of day */
+function greetingForHour(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/**
+ * Derive today-page data from the Zustand store (used in demo mode and as
+ * a fallback when the server is unreachable).
+ */
+function deriveTodayFromStore(): Omit<TodayData, 'isLoading' | 'refresh'> {
+  const { todos, events } = useModuleStore.getState();
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(todayStart);
+  todayEnd.setDate(todayEnd.getDate() + 1);
+
+  const todayTasks = todos.filter((t) => {
+    if (!t.due_date) return false;
+    const d = new Date(t.due_date);
+    return d >= todayStart && d < todayEnd && t.status !== 'completed';
+  });
+
+  const overdueTasks = todos.filter((t) => {
+    if (!t.due_date) return false;
+    return new Date(t.due_date) < todayStart && t.status !== 'completed';
+  });
+
+  const todayEvents = events.filter((e) => {
+    const d = new Date(e.start_time);
+    return d >= todayStart && d < todayEnd;
+  });
+
+  const inboxCount = todos.filter((t) => !t.due_date && t.status === 'pending').length;
+
+  return {
+    todayTasks,
+    overdueTasks,
+    todayEvents,
+    inboxCount,
+    greeting: greetingForHour(),
+    todayDate: now.toISOString().split('T')[0],
+  };
+}
+
 export default function useTodayData(): TodayData {
-  const [todayTasks, setTodayTasks] = useState<TodoResponse[]>([]);
-  const [overdueTasks, setOverdueTasks] = useState<TodoResponse[]>([]);
-  const [todayEvents, setTodayEvents] = useState<EventResponse[]>([]);
-  const [inboxCount, setInboxCount] = useState(0);
-  const [greeting, setGreeting] = useState('');
-  const [todayDate, setTodayDate] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+  // Subscribe to store changes so demo mode stays reactive
+  const storeTodos = useModuleStore((s) => s.todos);
+  const storeEvents = useModuleStore((s) => s.events);
+
+  const demoFallback = deriveTodayFromStore();
+
+  const [todayTasks, setTodayTasks] = useState<TodoResponse[]>(demoFallback.todayTasks);
+  const [overdueTasks, setOverdueTasks] = useState<TodoResponse[]>(demoFallback.overdueTasks);
+  const [todayEvents, setTodayEvents] = useState<EventResponse[]>(demoFallback.todayEvents);
+  const [inboxCount, setInboxCount] = useState(demoFallback.inboxCount);
+  const [greeting, setGreeting] = useState(demoFallback.greeting);
+  const [todayDate, setTodayDate] = useState(demoFallback.todayDate);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // In demo mode, derive data from the store whenever todos/events change
+  useEffect(() => {
+    if (serverUrl) return; // server mode handles its own state
+    const derived = deriveTodayFromStore();
+    setTodayTasks(derived.todayTasks);
+    setOverdueTasks(derived.overdueTasks);
+    setTodayEvents(derived.todayEvents);
+    setInboxCount(derived.inboxCount);
+    setGreeting(derived.greeting);
+    setTodayDate(derived.todayDate);
+  }, [serverUrl, storeTodos, storeEvents]);
 
   const fetchData = useCallback(async () => {
+    if (!serverUrl) return; // demo mode — no fetch needed
     setIsLoading(true);
     try {
       const response = await apiClient.get('/today');
@@ -40,8 +109,8 @@ export default function useTodayData(): TodayData {
           apiClient.get('/todos', { params: { status: 'pending' } }),
           apiClient.get('/events'),
         ]);
-        const allTodos: TodoResponse[] = todosRes.data.items || [];
-        const allEvents: EventResponse[] = eventsRes.data.items || [];
+        const allTodos: TodoResponse[] = todosRes.data?.items ?? todosRes.data ?? [];
+        const allEvents: EventResponse[] = eventsRes.data?.items ?? eventsRes.data ?? [];
 
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -69,52 +138,22 @@ export default function useTodayData(): TodayData {
         );
         setInboxCount(allTodos.filter((t) => !t.due_date && t.status === 'pending').length);
 
-        const hour = now.getHours();
-        setGreeting(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
+        setGreeting(greetingForHour());
         setTodayDate(now.toISOString().split('T')[0]);
       } catch {
-        // Both failed — seed demo data so the UI isn't empty
-        const now = new Date();
-        const today = now.toISOString();
-        const hour = now.getHours();
-        setGreeting(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
-        setTodayDate(now.toISOString().split('T')[0]);
-
-        const demoTasks: TodoResponse[] = [
-          { id: 'demo-1', title: 'Review ClawChat monorepo structure', status: 'pending', priority: 'high', due_date: today, tags: ['dev'], created_at: today, updated_at: today },
-          { id: 'demo-2', title: 'Set up Capacitor for Android build', status: 'pending', priority: 'medium', due_date: today, tags: ['mobile'], created_at: today, updated_at: today },
-          { id: 'demo-3', title: 'Write unit tests for platform abstraction', status: 'pending', priority: 'medium', due_date: today, tags: ['testing'], created_at: today, updated_at: today },
-          { id: 'demo-4', title: 'Design bottom navigation for mobile layout', status: 'pending', priority: 'low', due_date: today, tags: ['design', 'mobile'], created_at: today, updated_at: today },
-        ];
-
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayISO = yesterday.toISOString();
-
-        const overdueDemo: TodoResponse[] = [
-          { id: 'demo-5', title: 'Fix SSE reconnect on network change', status: 'pending', priority: 'urgent', due_date: yesterdayISO, tags: ['bug'], created_at: yesterdayISO, updated_at: yesterdayISO },
-          { id: 'demo-6', title: 'Update API documentation for v2 endpoints', status: 'pending', priority: 'high', due_date: yesterdayISO, tags: ['docs'], created_at: yesterdayISO, updated_at: yesterdayISO },
-        ];
-
-        const eventStart = new Date(now);
-        eventStart.setHours(14, 0, 0, 0);
-        const eventEnd = new Date(now);
-        eventEnd.setHours(15, 0, 0, 0);
-
-        const demoEvents: EventResponse[] = [
-          { id: 'demo-e1', title: 'Sprint planning', start_time: eventStart.toISOString(), end_time: eventEnd.toISOString(), location: 'Zoom', created_at: today, updated_at: today },
-          { id: 'demo-e2', title: 'Code review session', start_time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 16, 30).toISOString(), end_time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0).toISOString(), created_at: today, updated_at: today },
-        ];
-
-        setTodayTasks(demoTasks);
-        setOverdueTasks(overdueDemo);
-        setTodayEvents(demoEvents);
-        setInboxCount(3);
+        // Both failed — fall back to store data
+        const derived = deriveTodayFromStore();
+        setTodayTasks(derived.todayTasks);
+        setOverdueTasks(derived.overdueTasks);
+        setTodayEvents(derived.todayEvents);
+        setInboxCount(derived.inboxCount);
+        setGreeting(derived.greeting);
+        setTodayDate(derived.todayDate);
       }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [serverUrl]);
 
   const refresh = useCallback(() => {
     fetchData();
@@ -122,6 +161,7 @@ export default function useTodayData(): TodayData {
 
   // Fetch on mount + re-fetch when window regains focus (replaces useFocusEffect)
   useEffect(() => {
+    if (!serverUrl) return; // demo mode doesn't need fetch
     fetchData();
 
     const handleVisibilityChange = () => {
@@ -134,7 +174,7 @@ export default function useTodayData(): TodayData {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchData]);
+  }, [fetchData, serverUrl]);
 
   return { todayTasks, overdueTasks, todayEvents, inboxCount, greeting, todayDate, isLoading, refresh };
 }

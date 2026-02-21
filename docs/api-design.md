@@ -124,7 +124,7 @@ This is the primary endpoint. Sending a message triggers intent classification a
 {
   "message_id": "msg_xyz789",
   "conversation_id": "conv_abc123",
-  "status": "processing"
+  "status": "delivered"
 }
 ```
 

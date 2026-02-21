@@ -154,6 +154,15 @@ export interface StreamEventToken {
   token: string;
 }
 
+// -- Search -----------------------------------------------------------------
+
+export interface SearchResponse {
+  todos: TodoResponse[];
+  events: EventResponse[];
+  memos: MemoResponse[];
+  messages: MessageResponse[];
+}
+
 // -- Today ------------------------------------------------------------------
 
 export interface TodayResponse {

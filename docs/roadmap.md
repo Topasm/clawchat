@@ -26,7 +26,7 @@ ClawChat development progress and planned work.
 - [x] @hello-pangea/dnd drag-and-drop with smooth animations and drop placeholders
 - [x] Kanban filter/sort bar (search, priority chips, tag dropdown, sort selector)
 - [x] Visual feedback: drag-over column highlights, card box-shadow + rotation
-- [x] Local `in_progress` status with server sync (`pending`/`completed` on server)
+- [x] Server-native `in_progress` status — no client-side mapping workaround needed
 - [x] Checkbox toggle moves tasks between Todo/Done, clears kanban overrides
 - [x] Quick capture modal with natural language input (tasks, events, memos)
 - [x] Responsive kanban: columns stack vertically below 768px
@@ -84,36 +84,41 @@ ClawChat development progress and planned work.
 - [x] Date/time formatters and grouping utilities
 - [x] TypeScript strict mode — zero type errors
 
+### Server Alignment (v0.2.0)
+- [x] Standalone server (`clawchat_server`) fully aligned with client types
+- [x] Removed embedded `clawchat/server/` — standalone server is the only backend
+- [x] SSE streaming endpoint (`POST /api/chat/stream`) matching client's `sseClient.ts`
+- [x] Message edit (`PUT`) and delete (`DELETE`) endpoints
+- [x] Ollama native streaming support (`/api/chat` NDJSON)
+- [x] Client TS types match server Pydantic schemas (PaginatedResponse, ConversationResponse, TodoResponse, EventResponse, MemoResponse, MessageResponse)
+- [x] Server todo status supports `in_progress` / `cancelled` — client kanban uses server status directly
+- [x] Async business services (todo, calendar, memo) in standalone server
+- [x] Orchestrator wired to real service calls (not stubs)
+- [x] Memo types include `title` field on both client and server
+
 ---
 
 ## In Progress
 
 ### Calendar & Events
-- [ ] Event creation flow from UI
+- [ ] Event creation flow from UI (form + date picker)
 - [ ] Calendar view (week/month)
 - [ ] Event reminders
-
-### Backend Integration
-- [ ] End-to-end server connection testing
-- [ ] AI intent classification wiring
-- [ ] Full CRUD sync for all modules
 
 ---
 
 ## Planned
 
-### Phase 1: Server Integration
-- [ ] Login page connected to FastAPI auth
-- [ ] Live data replacing demo seeds
-- [ ] Real-time chat with server LLM
+### Phase 1: Live Integration
+- [ ] End-to-end testing with live server
+- [ ] Live data replacing demo seeds on connection
 - [ ] Push notifications via Electron tray
 
 ### Phase 2: AI Features
-- [ ] Intent classifier (LLM function calling)
-- [ ] Chat-to-action: create tasks/events from conversation
+- [ ] Chat-to-action: create tasks/events from conversation (orchestrator → UI refresh)
 - [ ] Daily morning briefing generation
-- [ ] Cross-module search (`/api/search`)
-- [ ] Conversation context in AI prompts
+- [ ] Cross-module full-text search (`/api/search` with FTS5)
+- [ ] Auto-generate conversation titles
 
 ### Phase 3: Mobile
 - [ ] Capacitor builds for iOS and Android
@@ -124,7 +129,7 @@ ClawChat development progress and planned work.
 ### Phase 4: Polish & Deploy
 - [ ] Offline support (queue actions, sync on reconnect)
 - [ ] Electron auto-update
-- [ ] Production Docker deployment docs
+- [ ] Production Docker deployment
 - [x] Keyboard shortcuts for navigation *(completed)*
 - [ ] Performance optimization (virtualized lists)
 

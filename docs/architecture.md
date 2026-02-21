@@ -50,10 +50,10 @@
 ┌──────────────────────┼───────────────────────────────────┐
 │  Self-Hosted Server  │                                    │
 │                      │                                    │
-│  FastAPI Backend                                          │
+│  FastAPI Backend  (clawchat_server repo)                   │
 │  ├── Routers (chat, todo, calendar, memo, search, today)  │
-│  ├── Services (todo, calendar, memo, scheduler)           │
-│  └── Models & Schemas (SQLAlchemy + Pydantic)             │
+│  ├── Services (ai, orchestrator, todo, calendar, memo)    │
+│  └── Models & Schemas (SQLAlchemy async + Pydantic)       │
 │                                                           │
 │  SQLite Database                                          │
 │  ├── conversations, messages                              │

@@ -23,12 +23,13 @@ export default function AppRouter() {
   // Show nothing while rehydrating from localStorage
   if (isLoading) return null;
 
-  // Show login page only if not authenticated AND not in demo mode
-  // Demo mode = no serverUrl set (user hasn't tried to connect)
   const isAuthenticated = !!token;
+  // Demo mode: no serverUrl AND no token (fresh state or explicit "Skip to Demo")
   const isDemoMode = !serverUrl && !token;
 
+  // Allow access when authenticated OR in demo mode
   if (!isAuthenticated && !isDemoMode) {
+    // User has a serverUrl set but no valid token -> need to login
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
