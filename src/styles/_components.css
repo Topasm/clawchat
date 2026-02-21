@@ -1,0 +1,395 @@
+/* --- Card ------------------------------------------------- */
+.cc-card {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cc-card:hover {
+  background: var(--cc-surface-secondary);
+  border-color: var(--cc-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.cc-card--task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cc-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-card__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cc-text);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.cc-card__title--completed {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.cc-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.cc-card--event {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.cc-card__accent-bar {
+  width: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.cc-card__time {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cc-text-secondary);
+  white-space: nowrap;
+}
+
+.cc-card__location {
+  font-size: 11px;
+  color: var(--cc-text-tertiary);
+  margin-top: 2px;
+}
+
+/* --- Badge ------------------------------------------------ */
+.cc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.cc-badge--priority-urgent {
+  background: color-mix(in srgb, var(--cc-priority-urgent) 15%, transparent);
+  color: var(--cc-priority-urgent);
+}
+.cc-badge--priority-high {
+  background: color-mix(in srgb, var(--cc-priority-high) 15%, transparent);
+  color: var(--cc-priority-high);
+}
+.cc-badge--priority-medium {
+  background: color-mix(in srgb, var(--cc-priority-medium) 15%, transparent);
+  color: var(--cc-priority-medium);
+}
+.cc-badge--priority-low {
+  background: color-mix(in srgb, var(--cc-priority-low) 15%, transparent);
+  color: var(--cc-priority-low);
+}
+
+.cc-badge--due-overdue {
+  background: color-mix(in srgb, var(--cc-error) 15%, transparent);
+  color: var(--cc-error);
+}
+.cc-badge--due-today {
+  background: color-mix(in srgb, var(--cc-primary) 15%, transparent);
+  color: var(--cc-primary);
+}
+.cc-badge--due-tomorrow {
+  background: color-mix(in srgb, var(--cc-warning) 15%, transparent);
+  color: var(--cc-warning);
+}
+.cc-badge--due-default {
+  background: var(--cc-meta-tag-bg);
+  color: var(--cc-text-secondary);
+}
+
+.cc-badge--tag {
+  background: var(--cc-meta-tag-bg);
+  color: var(--cc-text-secondary);
+}
+
+.cc-badge--status {
+  background: color-mix(in srgb, var(--cc-success) 15%, transparent);
+  color: var(--cc-success);
+}
+
+.cc-badge--count {
+  background: color-mix(in srgb, var(--cc-text-secondary) 15%, transparent);
+  color: var(--cc-text-secondary);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+/* --- Checkbox --------------------------------------------- */
+.cc-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--cc-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cc-checkbox:hover {
+  border-color: var(--cc-primary);
+}
+
+.cc-checkbox--checked {
+  background: var(--cc-success);
+  border-color: var(--cc-success);
+}
+
+.cc-checkbox__check {
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* --- Section Header --------------------------------------- */
+.cc-section {
+  margin-bottom: 4px;
+}
+
+.cc-section__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.cc-section__header:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-section__header--warning {
+  background: color-mix(in srgb, var(--cc-warning) 5%, transparent);
+  border-color: color-mix(in srgb, var(--cc-warning) 20%, transparent);
+}
+.cc-section__header--warning:hover {
+  background: color-mix(in srgb, var(--cc-warning) 10%, transparent);
+}
+
+.cc-section__header--accent {
+  background: color-mix(in srgb, var(--cc-primary) 5%, transparent);
+  border-color: color-mix(in srgb, var(--cc-primary) 20%, transparent);
+}
+.cc-section__header--accent:hover {
+  background: color-mix(in srgb, var(--cc-primary) 10%, transparent);
+}
+
+.cc-section__header--success {
+  background: color-mix(in srgb, var(--cc-success) 5%, transparent);
+  border-color: color-mix(in srgb, var(--cc-success) 20%, transparent);
+}
+.cc-section__header--success:hover {
+  background: color-mix(in srgb, var(--cc-success) 10%, transparent);
+}
+
+.cc-section__chevron {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+  color: var(--cc-text-tertiary);
+  flex-shrink: 0;
+}
+
+.cc-section__chevron--open {
+  transform: rotate(90deg);
+}
+
+.cc-section__title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cc-text-secondary);
+  flex: 1;
+}
+
+.cc-section__header--warning .cc-section__title {
+  color: var(--cc-warning);
+}
+.cc-section__header--accent .cc-section__title {
+  color: var(--cc-primary);
+}
+.cc-section__header--success .cc-section__title {
+  color: var(--cc-success);
+}
+
+.cc-section__count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--cc-text-secondary) 15%, transparent);
+  color: var(--cc-text-secondary);
+}
+
+.cc-section__body {
+  padding: 4px 0 8px;
+}
+
+/* --- Empty State ------------------------------------------ */
+.cc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  gap: 8px;
+}
+
+.cc-empty__icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.cc-empty__message {
+  font-size: 14px;
+  color: var(--cc-text-secondary);
+  max-width: 260px;
+}
+
+/* --- Conversation Item ------------------------------------ */
+.cc-convo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  background: transparent;
+}
+
+.cc-convo-item:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-convo-item__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cc-primary) 15%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cc-convo-item__avatar svg {
+  width: 18px;
+  height: 18px;
+  color: var(--cc-primary);
+}
+
+.cc-convo-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-convo-item__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cc-convo-item__preview {
+  font-size: 12px;
+  color: var(--cc-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.cc-convo-item__time {
+  font-size: 11px;
+  color: var(--cc-text-tertiary);
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* --- Buttons ---------------------------------------------- */
+.cc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.cc-btn--primary {
+  background: var(--cc-primary);
+  color: #fff;
+}
+
+.cc-btn--primary:hover {
+  opacity: 0.85;
+}
+
+.cc-btn--secondary {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+}
+
+.cc-btn--secondary:hover {
+  background: var(--cc-border);
+}
+
+.cc-btn--danger {
+  background: color-mix(in srgb, var(--cc-error) 15%, transparent);
+  color: var(--cc-error);
+}
+
+.cc-btn--danger:hover {
+  background: color-mix(in srgb, var(--cc-error) 25%, transparent);
+}
+
+.cc-btn--ghost {
+  background: transparent;
+  color: var(--cc-text-secondary);
+}
+
+.cc-btn--ghost:hover {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+}

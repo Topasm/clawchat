@@ -1,38 +1,25 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-
-# Virtual environment
-server/venv/
-
-# Environment variables
+node_modules
+dist
+dist-electron
+release
 .env
-server/.env
+*.local
 
-# Database
-server/data/
-*.db
-
-# Node / React Native
-node_modules/
-app/node_modules/
-.expo/
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-*.orig.*
+# Capacitor
+android/app/build
+ios/App/Pods
 
 # IDE
-.vscode/
-.idea/
+.idea
+.vscode
 *.swp
-*.swo
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Python
+server/__pycache__
+server/**/__pycache__
+server/data/
+*.pyc

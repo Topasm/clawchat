@@ -1,0 +1,16 @@
+/* ============================================================
+   ClawChat — Global Styles
+   All classes prefixed with .cc- to avoid collisions.
+   Colors are injected as CSS custom properties on .cc-root
+   from the theme bridge in ThemeProvider.
+   ============================================================ */
+
+@import './_reset.css';
+@import './_variables.css';
+@import './_layout.css';
+@import './_components.css';
+@import './_chat.css';
+@import './_settings.css';
+@import './_pages.css';
+@import './_utilities.css';
+@import './_capacitor.css';

@@ -1,13 +1,12 @@
 """Chat router: conversation CRUD, message send (echo), SSE streaming, and message management."""
 
-import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth.dependencies import get_current_user
@@ -25,6 +24,9 @@ from schemas.chat import (
     SendMessageResponse,
     StreamSendRequest,
 )
+from services.ai_service import AIUnavailableError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
@@ -285,59 +287,30 @@ async def edit_message(
 # Streaming endpoint
 # ---------------------------------------------------------------------------
 
+SYSTEM_PROMPT = (
+    "You are ClawChat, a helpful personal AI assistant. "
+    "You help the user manage tasks, answer questions, and stay organized. "
+    "Be concise and friendly."
+)
 
-def _generate_simulated_response(user_content: str) -> str:
-    """Generate a simulated LLM response. Will be replaced by actual LLM call."""
-    return (
-        f"I received your message: \"{user_content}\". "
-        "This is a simulated streaming response from OpenClaw. "
-        "In the future, this will be powered by a real language model "
-        "that can help you manage tasks, answer questions, and much more."
+
+def _build_message_history(db: Session, conversation_id: str) -> list[dict]:
+    """Build the message list for the AI, using the last 20 messages plus a system prompt."""
+    recent = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at.desc())
+        .limit(20)
+        .all()
     )
+    # Reverse so oldest first
+    recent.reverse()
 
-
-async def _stream_tokens(
-    conversation_id: str,
-    user_content: str,
-    assistant_message_id: str,
-    db: Session,
-    request: Request,
-):
-    """Async generator that yields SSE-formatted token events."""
-    meta = json.dumps({
-        "conversation_id": conversation_id,
-        "message_id": assistant_message_id,
-    })
-    yield f"data: {meta}\n\n"
-
-    response_text = _generate_simulated_response(user_content)
-    words = response_text.split(" ")
-    accumulated = ""
-
-    for i, word in enumerate(words):
-        if await request.is_disconnected():
-            break
-
-        token = word if i == 0 else f" {word}"
-        accumulated += token
-
-        token_event = json.dumps({"token": token})
-        yield f"data: {token_event}\n\n"
-
-        await asyncio.sleep(0.05)
-
-    try:
-        assistant_msg = db.query(Message).filter(Message.id == assistant_message_id).first()
-        if assistant_msg:
-            assistant_msg.content = accumulated
-        conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-        if conv:
-            conv.updated_at = datetime.now(timezone.utc)
-        db.commit()
-    except Exception:
-        db.rollback()
-
-    yield "data: [DONE]\n\n"
+    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for msg in recent:
+        if msg.role in ("user", "assistant"):
+            messages.append({"role": msg.role, "content": msg.content})
+    return messages
 
 
 @router.post("/stream")
@@ -357,6 +330,7 @@ async def stream_message(
 
     now = datetime.now(timezone.utc)
 
+    # Save user message
     user_msg = Message(
         id=uuid4().hex,
         conversation_id=body.conversation_id,
@@ -366,28 +340,76 @@ async def stream_message(
         created_at=now,
     )
     db.add(user_msg)
-
-    assistant_msg = Message(
-        id=uuid4().hex,
-        conversation_id=body.conversation_id,
-        role="assistant",
-        content="",
-        message_type="text",
-        created_at=now,
-    )
-    db.add(assistant_msg)
-
     conv.updated_at = now
     db.commit()
 
+    # Build message history (includes the user message we just saved)
+    ai_messages = _build_message_history(db, body.conversation_id)
+
+    # Pre-create assistant message ID
+    assistant_msg_id = uuid4().hex
+
+    # Grab references we need inside the generator (db session may close after response returns)
+    ai_service = request.app.state.ai_service
+    session_factory = request.app.state.session_factory
+    conversation_id = body.conversation_id
+
+    async def _generate():
+        # First event: metadata
+        yield f"data: {json.dumps({'conversation_id': conversation_id, 'message_id': assistant_msg_id})}\n\n"
+
+        accumulated = ""
+        error_occurred = False
+
+        try:
+            async for token in ai_service.stream_completion(ai_messages):
+                if await request.is_disconnected():
+                    break
+                accumulated += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
+        except AIUnavailableError as exc:
+            logger.warning("AI service unavailable: %s", exc)
+            error_msg = "I'm sorry, the AI service is currently unavailable. Please try again later."
+            accumulated = error_msg
+            yield f"data: {json.dumps({'token': error_msg})}\n\n"
+            error_occurred = True
+        except Exception:
+            logger.exception("Unexpected error during streaming")
+            error_msg = "An unexpected error occurred. Please try again."
+            accumulated = error_msg
+            yield f"data: {json.dumps({'token': error_msg})}\n\n"
+            error_occurred = True
+
+        # Save assistant message using a fresh DB session
+        # (the dependency-injected session may already be closed)
+        try:
+            save_db = session_factory()
+            try:
+                assistant_msg = Message(
+                    id=assistant_msg_id,
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=accumulated,
+                    message_type="text",
+                    created_at=datetime.now(timezone.utc),
+                )
+                save_db.add(assistant_msg)
+                save_conv = save_db.query(Conversation).filter(Conversation.id == conversation_id).first()
+                if save_conv:
+                    save_conv.updated_at = datetime.now(timezone.utc)
+                save_db.commit()
+            except Exception:
+                logger.exception("Failed to save assistant message")
+                save_db.rollback()
+            finally:
+                save_db.close()
+        except Exception:
+            logger.exception("Failed to create DB session for saving assistant message")
+
+        yield "data: [DONE]\n\n"
+
     return StreamingResponse(
-        _stream_tokens(
-            conversation_id=body.conversation_id,
-            user_content=body.content,
-            assistant_message_id=assistant_msg.id,
-            db=db,
-            request=request,
-        ),
+        _generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -4,13 +4,26 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from database import Base, engine
+from database import Base, SessionLocal, engine
 from routers import auth, calendar, chat, memo, notifications, search, today, todo
+from services.ai_service import AIService
 
 # Create all tables (safe to call repeatedly; no-ops for existing tables)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ClawChat Server", version="0.1.0")
+
+# ---------------------------------------------------------------------------
+# Application state (shared services)
+# ---------------------------------------------------------------------------
+
+app.state.ai_service = AIService(
+    provider=settings.AI_PROVIDER,
+    base_url=settings.AI_BASE_URL,
+    api_key=settings.AI_API_KEY,
+    model=settings.AI_MODEL,
+)
+app.state.session_factory = SessionLocal
 
 app.add_middleware(
     CORSMiddleware,

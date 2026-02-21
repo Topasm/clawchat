@@ -1,0 +1,12 @@
+/* --- Root ------------------------------------------------- */
+/* CSS variables are injected as custom properties on .cc-root
+   from the theme bridge in Layout.tsx / ThemeProvider.       */
+
+.cc-root {
+  display: flex;
+  height: 100vh;
+  background: var(--cc-background);
+  color: var(--cc-text);
+  font-size: 14px;
+  line-height: 1.5;
+}

@@ -1,0 +1,11 @@
+/* --- Utility classes -------------------------------------- */
+.cc-mt-4 { margin-top: 4px; }
+.cc-mt-8 { margin-top: 8px; }
+.cc-mt-16 { margin-top: 16px; }
+.cc-mb-8 { margin-bottom: 8px; }
+.cc-mb-16 { margin-bottom: 16px; }
+.cc-gap-4 { gap: 4px; }
+.cc-flex { display: flex; }
+.cc-flex-col { flex-direction: column; }
+.cc-items-center { align-items: center; }
+.cc-justify-between { justify-content: space-between; }

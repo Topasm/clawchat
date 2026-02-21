@@ -1,0 +1,120 @@
+/* --- Capacitor / Mobile Overrides ------------------------- */
+/* Applied when running inside Capacitor on iOS/Android.      */
+
+/* Safe area insets for notch / bottom bar */
+.cc-root {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* On mobile, hide the sidebar and show a bottom nav instead */
+@media (max-width: 768px) {
+  .cc-sidebar {
+    display: none;
+  }
+
+  .cc-root {
+    flex-direction: column;
+  }
+
+  .cc-main {
+    flex: 1;
+  }
+
+  .cc-content {
+    padding: 16px;
+  }
+
+  /* Bottom navigation bar for mobile */
+  .cc-bottom-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background: var(--cc-surface);
+    border-top: 1px solid var(--cc-border);
+    padding: 8px 0;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+  }
+
+  .cc-bottom-nav__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 12px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--cc-text-secondary);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .cc-bottom-nav__item--active {
+    color: var(--cc-primary);
+  }
+
+  .cc-bottom-nav__icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Chat panel becomes full screen on mobile */
+  .cc-chat-panel--expanded {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    z-index: 50;
+  }
+
+  /* Larger touch targets */
+  .cc-card {
+    padding: 12px 14px;
+  }
+
+  .cc-nav-item {
+    padding: 12px 16px;
+    min-height: 44px;
+  }
+
+  .cc-settings-row {
+    min-height: 48px;
+  }
+
+  .cc-bubble__actions {
+    display: none;
+  }
+
+  /* Page headers */
+  .cc-page-header__title {
+    font-size: 20px;
+  }
+}
+
+/* Disable hover effects on touch devices */
+@media (hover: none) {
+  .cc-card:hover {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .cc-nav-item:hover {
+    background: transparent;
+  }
+
+  .cc-convo-item:hover {
+    background: transparent;
+  }
+
+  .cc-settings-row:hover {
+    background: transparent;
+  }
+}
