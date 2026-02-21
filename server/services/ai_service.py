@@ -3,6 +3,7 @@
 import json
 import logging
 from collections.abc import AsyncIterator
+from typing import Any, Optional
 
 import httpx
 
@@ -53,6 +54,17 @@ class AIService:
         else:
             async for token in self._stream_openai(messages):
                 yield token
+
+    async def complete(self, messages: list[dict]) -> str:
+        """Non-streaming completion. Returns the full response text.
+
+        Useful for generating conversation titles, summaries, or other
+        short completions where streaming is not needed.
+        """
+        if self.provider == "ollama":
+            return await self._complete_ollama(messages)
+        else:
+            return await self._complete_openai(messages)
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -135,6 +147,64 @@ class AIService:
                         token = choices[0].get("delta", {}).get("content", "")
                         if token:
                             yield token
+        except httpx.ConnectError as exc:
+            raise AIUnavailableError(
+                f"Cannot connect to AI provider at {self.base_url}: {exc}"
+            ) from exc
+        except httpx.ReadTimeout as exc:
+            raise AIUnavailableError(f"AI provider read timeout: {exc}") from exc
+
+    # ------------------------------------------------------------------
+    # Ollama non-streaming completion
+    # ------------------------------------------------------------------
+
+    async def _complete_ollama(self, messages: list[dict]) -> str:
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+        }
+
+        try:
+            resp = await self._client.post(url, json=payload)
+            if resp.status_code != 200:
+                raise AIUnavailableError(
+                    f"Ollama returned {resp.status_code}: {resp.text[:500]}"
+                )
+            data = resp.json()
+            return data.get("message", {}).get("content", "")
+        except httpx.ConnectError as exc:
+            raise AIUnavailableError(f"Cannot connect to Ollama at {self.base_url}: {exc}") from exc
+        except httpx.ReadTimeout as exc:
+            raise AIUnavailableError(f"Ollama read timeout: {exc}") from exc
+
+    # ------------------------------------------------------------------
+    # OpenAI-compatible non-streaming completion
+    # ------------------------------------------------------------------
+
+    async def _complete_openai(self, messages: list[dict]) -> str:
+        url = f"{self.base_url}/v1/chat/completions"
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+        }
+        headers: dict[str, str] = {}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        try:
+            resp = await self._client.post(url, json=payload, headers=headers)
+            if resp.status_code != 200:
+                raise AIUnavailableError(
+                    f"OpenAI-compatible API returned {resp.status_code}: {resp.text[:500]}"
+                )
+            data = resp.json()
+            choices = data.get("choices", [])
+            if choices:
+                return choices[0].get("message", {}).get("content", "")
+            return ""
         except httpx.ConnectError as exc:
             raise AIUnavailableError(
                 f"Cannot connect to AI provider at {self.base_url}: {exc}"

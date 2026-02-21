@@ -1,5 +1,8 @@
 """FastAPI application entry point for ClawChat."""
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,11 +10,58 @@ from config import settings
 from database import Base, SessionLocal, engine
 from routers import auth, calendar, chat, memo, notifications, search, today, todo
 from services.ai_service import AIService
+from services.intent_classifier import IntentClassifier
+from services.orchestrator import Orchestrator
+
+logger = logging.getLogger(__name__)
 
 # Create all tables (safe to call repeatedly; no-ops for existing tables)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="ClawChat Server", version="0.1.0")
+
+# ---------------------------------------------------------------------------
+# Lifespan (startup + shutdown)
+# ---------------------------------------------------------------------------
+
+_scheduler = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle: start scheduler, cleanup on shutdown."""
+    global _scheduler
+
+    # Start scheduler if enabled
+    if settings.ENABLE_SCHEDULER:
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from services.scheduler import check_overdue_tasks, check_reminders
+
+            _scheduler = BackgroundScheduler()
+            _scheduler.add_job(
+                check_reminders,
+                "interval",
+                seconds=settings.REMINDER_CHECK_INTERVAL,
+            )
+            _scheduler.add_job(check_overdue_tasks, "interval", minutes=5)
+            _scheduler.start()
+            logger.info("Scheduler started (reminder interval=%ds)", settings.REMINDER_CHECK_INTERVAL)
+        except ImportError:
+            logger.warning("apscheduler not installed, scheduler disabled")
+
+    yield
+
+    # Shutdown
+    if _scheduler is not None:
+        _scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped")
+
+    await app.state.ai_service.close()
+    await app.state.intent_classifier.close()
+    logger.info("AI services closed")
+
+
+app = FastAPI(title="ClawChat Server", version="0.1.0", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
 # Application state (shared services)
@@ -23,6 +73,13 @@ app.state.ai_service = AIService(
     api_key=settings.AI_API_KEY,
     model=settings.AI_MODEL,
 )
+app.state.intent_classifier = IntentClassifier(
+    provider=settings.AI_PROVIDER,
+    base_url=settings.AI_BASE_URL,
+    api_key=settings.AI_API_KEY,
+    model=settings.AI_MODEL,
+)
+app.state.orchestrator = Orchestrator()
 app.state.session_factory = SessionLocal
 
 app.add_middleware(
@@ -61,20 +118,3 @@ async def health():
         "ai_provider": settings.AI_PROVIDER,
         "ai_model": settings.AI_MODEL,
     }
-
-
-# ---------------------------------------------------------------------------
-# Scheduler (reminders & overdue checks)
-# ---------------------------------------------------------------------------
-
-if settings.ENABLE_SCHEDULER:
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from services.scheduler import check_overdue_tasks, check_reminders
-
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(check_reminders, "interval", seconds=settings.REMINDER_CHECK_INTERVAL)
-        scheduler.add_job(check_overdue_tasks, "interval", minutes=5)
-        scheduler.start()
-    except ImportError:
-        pass  # apscheduler not installed, skip

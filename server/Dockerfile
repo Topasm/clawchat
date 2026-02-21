@@ -15,6 +15,9 @@ COPY . .
 # Create data directory for SQLite
 RUN mkdir -p /app/data
 
-# Run migrations and start server
+# Expose port
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+
+# Run alembic migrations (if available) then start the server.
+# Tables are also auto-created via Base.metadata.create_all in main.py.
+CMD ["sh", "-c", "alembic upgrade head 2>/dev/null; uvicorn main:app --host 0.0.0.0 --port 8000"]
