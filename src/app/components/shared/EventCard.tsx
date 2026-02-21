@@ -3,7 +3,7 @@ import { formatTime } from '../../utils/formatters';
 
 interface EventCardProps {
   event: EventResponse;
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export default function EventCard({ event, onClick }: EventCardProps) {

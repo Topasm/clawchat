@@ -3,95 +3,84 @@
 ## System Diagram
 
 ```
-┌─ React Native Mobile App (Expo) ──────────────────────────┐
-│                                                             │
-│   Screens                    State (Zustand)                │
-│   ├── TodayScreen            ├── useAuthStore               │
-│   ├── InboxScreen            ├── useChatStore               │
-│   ├── ConversationListScreen │   (streaming + interactions) │
-│   ├── ChatScreen             ├── useModuleStore             │
-│   ├── QuickCaptureModal      │   (async API actions)        │
-│   ├── TaskDetailScreen       └── useSettingsStore           │
-│   ├── EventDetailScreen          (15+ persisted settings)   │
-│   ├── AllTasksScreen                                        │
-│   ├── SettingsScreen         Hooks                          │
-│   ├── SystemPromptScreen     └── useTodayData               │
-│   └── LoginScreen                                           │
-│                              Theme                           │
-│   Components                 ├── ThemeContext + ThemeProvider │
-│   ├── TaskRow                └── Light / Dark / System mode  │
-│   ├── EventRow                                              │
-│   ├── SectionHeader          Widgets                        │
-│   ├── PriorityBadge          └── TodayWidget (Android)      │
-│   ├── EmptyState                                            │
-│   ├── CustomTabBar           Services                       │
-│   ├── ActionCard             ├── apiClient (axios)          │
-│   ├── QuickActionBar         ├── sseClient (SSE streaming)  │
-│   ├── MarkdownBubble         └── naturalLanguageParser      │
-│   ├── TypingIndicator                                       │
-│   ├── MessageActionMenu                                     │
-│   ├── MessageBubbleWrapper                                  │
-│   ├── CopyFeedback                                          │
-│   ├── ContactRow                                            │
-│   ├── Cell                                                  │
-│   └── Settings cells (8)                                    │
-│                                                             │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ REST (HTTPS) + SSE Streaming
-                      │ User's own server only
-┌─────────────────────┼───────────────────────────────────────┐
-│  Self-Hosted Server  │                                       │
-│                      │                                       │
-│  FastAPI Backend                                             │
-│  ├── Routers (chat [+stream, +CRUD msgs], todo, calendar,   │
-│  │           memo, search, today, notifications)             │
-│  ├── Services (todo, calendar, memo, scheduler)              │
-│  └── Models & Schemas (SQLAlchemy + Pydantic)                │
-│                                                              │
-│  SQLite Database                                             │
-│  ├── conversations, messages                                 │
-│  ├── todos, events, memos                                    │
-│  └── agent_tasks                                             │
-│                                                              │
-│  LLM Provider                                                │
-│  └── Ollama (local) or OpenAI-compatible API (cloud)         │
-└──────────────────────────────────────────────────────────────┘
+┌─ ClawChat Desktop / Web App ───────────────────────────┐
+│                                                          │
+│   Platform Targets                                       │
+│   ├── Electron (Windows, macOS, Linux)                   │
+│   ├── Web Browser (Vite dev server / static build)       │
+│   └── Capacitor (iOS, Android) — planned                 │
+│                                                          │
+│   Pages                         State (Zustand)          │
+│   ├── TodayPage                 ├── useAuthStore         │
+│   ├── InboxPage                 ├── useChatStore         │
+│   ├── ChatListPage              │   (streaming + CRUD)   │
+│   ├── ChatPage                  ├── useModuleStore       │
+│   ├── AllTasksPage (Kanban)     │   (todos, events,      │
+│   ├── TaskDetailPage            │    memos, kanban)       │
+│   ├── EventDetailPage           └── useSettingsStore     │
+│   ├── SettingsPage                  (15+ settings)       │
+│   └── SystemPromptPage                                   │
+│                                                          │
+│   Components                    Shared                   │
+│   ├── Layout (sidebar + main)   ├── TaskCard             │
+│   ├── kanban/                   ├── Badge                │
+│   │   ├── KanbanBoard           ├── Checkbox             │
+│   │   ├── KanbanColumn          ├── SectionHeader        │
+│   │   └── KanbanCard            ├── EmptyState           │
+│   ├── chat-panel/               ├── EventCard            │
+│   │   ├── ChatPanel             ├── SegmentedControl     │
+│   │   ├── ChatInput             ├── Toggle / Slider      │
+│   │   ├── MessageBubble         └── Settings components  │
+│   │   └── StreamingIndicator                             │
+│   └── ConversationItem                                   │
+│                                                          │
+│   Services                      Hooks                    │
+│   └── apiClient (Axios)         └── useTodayData         │
+│                                                          │
+│   Styles (_*.css partials)      Utils                    │
+│   ├── _reset, _variables        ├── formatters           │
+│   ├── _layout, _components      └── platform detection   │
+│   ├── _chat, _pages, _kanban                             │
+│   ├── _settings, _utilities                              │
+│   └── _capacitor                                         │
+│                                                          │
+└──────────────────────┬───────────────────────────────────┘
+                       │ REST (HTTPS) + SSE Streaming
+                       │ User's own server only
+┌──────────────────────┼───────────────────────────────────┐
+│  Self-Hosted Server  │                                    │
+│                      │                                    │
+│  FastAPI Backend                                          │
+│  ├── Routers (chat, todo, calendar, memo, search, today)  │
+│  ├── Services (todo, calendar, memo, scheduler)           │
+│  └── Models & Schemas (SQLAlchemy + Pydantic)             │
+│                                                           │
+│  SQLite Database                                          │
+│  ├── conversations, messages                              │
+│  ├── todos, events, memos                                 │
+│  └── agent_tasks                                          │
+│                                                           │
+│  LLM Provider                                             │
+│  └── Ollama (local) or OpenAI-compatible API (cloud)      │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ## Design Principles
 
 ### 1. Self-Hosted & Privacy-First
-All data stays on the user's server. The mobile app communicates only with this server over HTTPS. No telemetry, no analytics, no third-party data processing. When using a local LLM (Ollama), even AI inference stays on-premise.
+All data stays on the user's server. The app communicates only with this server over HTTPS. No telemetry, no analytics, no third-party data processing.
 
 ### 2. Conversation as Interface
-Natural language chat is the primary way users interact with all features. Users can create, query, update, and delete tasks, events, and notes through conversation. Direct manipulation UI (tapping, swiping) remains available but conversation is always a viable alternative.
+Natural language chat is the primary way users interact with all features. Direct manipulation UI (clicking, dragging) remains available as an alternative.
 
 ### 3. Unified Data Model
-Todos, calendar events, notes, and conversations live in a single SQLite database. This enables cross-module awareness (the AI knows your schedule when suggesting task priorities), full-text search across all data types, and traceability (every item links back to the conversation that created it).
+Todos, calendar events, notes, and conversations live in a single SQLite database, enabling cross-module awareness, full-text search, and traceability.
 
-### 4. Local by Default, Cloud by Choice
-The system works fully offline with a local LLM. Cloud services (Claude API, Google Calendar sync) are optional enhancements configured through the settings screen.
+### 4. Cross-Platform from a Single Codebase
+One React + TypeScript codebase targets Electron (desktop), web browsers, and Capacitor (mobile — planned). Platform differences are handled via runtime detection (`IS_ELECTRON`, `IS_WEB`, `IS_MOBILE`).
 
-## Component Overview
-
-### Mobile App
-- **Expo + React Native**: Cross-platform with native capabilities
-- **React Navigation**: 4-tab layout (Today, Inbox, Chat, Settings) with custom tab bar, center "+" FAB, and stack screens for detail views
-- **Zustand**: Lightweight state management replacing React Context
-- **react-native-gifted-chat**: Chat UI with custom rendering for AI features
-- **Axios + WebSocket**: Communication with the self-hosted server
-
-### Backend Server
-- **FastAPI**: Async Python framework handling REST and WebSocket connections
-- **SQLAlchemy**: ORM for database operations
-- **Alembic**: Database migration management
-- **Pydantic**: Request/response validation and serialization
-
-### AI Layer
-- **Intent Classifier**: Determines what the user wants (create_todo, query_calendar, general_chat, etc.)
-- **Orchestrator**: Routes classified intents to the appropriate module service
-- **AI Service**: Manages streaming completions from the LLM provider
-- **Scheduler**: Runs periodic tasks (morning briefings, reminders, auto-tasks)
+### 5. Local by Default, Cloud by Choice
+The system works fully offline with demo data. Cloud services (LLM APIs, server sync) are optional enhancements.
 
 ## Data Flow
 
@@ -99,7 +88,7 @@ The system works fully offline with a local LLM. Cloud services (Claude API, Goo
 User sends message
     │
     ▼
-Mobile App ──POST /api/chat──► FastAPI Router
+App ──POST /api/chat/stream──► FastAPI Router
                                     │
                                     ▼
                               Intent Classifier
@@ -112,39 +101,31 @@ Mobile App ──POST /api/chat──► FastAPI Router
                     │               │               │
                     ▼               ▼               ▼
               Execute CRUD    Stream tokens    Queue task
-              Return result   via SSE    Notify later
-                    │               │
-                    ▼               ▼
-              Action Card      Streaming text
-              via SSE    in chat bubble
+              Return result   via SSE          Notify later
                     │               │
                     └───────┬───────┘
                             ▼
-                    Mobile App renders
-                    response in chat
+                    App renders response
+                    in chat panel
 ```
 
-1. **User sends a message** via the chat input
-2. **App sends POST** to `/api/chat/send` with the message text and conversation ID
-3. **Intent Classifier** analyzes the message using an LLM function-calling prompt to determine the intent (e.g., `create_todo`, `query_calendar`, `general_chat`)
-4. **Orchestrator** routes to the appropriate handler:
-   - **Module services** execute CRUD operations and return structured results
-   - **General chat** streams AI-generated text back via SSE
-   - **Agent tasks** are queued for async execution with notification on completion
-5. **WebSocket delivers** real-time responses: streaming text chunks, action cards (interactive UI for confirming todo creation, showing calendar events, etc.), and status updates
-6. **Mobile app renders** the response in the chat interface
+## CSS Architecture
 
-## Reference Project Comparison
+All styles use **BEM naming** with a `.cc-` prefix (ClawChat) to avoid collisions:
+- Colors are injected as CSS custom properties on `.cc-root` from the theme bridge
+- Partials are organized by concern: `_layout.css`, `_components.css`, `_chat.css`, `_kanban.css`, etc.
+- Light and dark themes swap CSS variable values — components reference variables, never hardcoded colors
+- Responsive breakpoints handle desktop-to-mobile transitions (e.g., kanban columns stack at 768px)
 
-The architecture borrows navigation and UI patterns from the [react-native-chat](https://github.com/Ctere1/react-native-chat) reference project, adapting them for a self-hosted AI assistant context.
+## State Management
 
-| Aspect | Reference (react-native-chat) | ClawChat |
-|--------|-------------------------------|----------|
-| Backend | Firebase (Auth + Firestore + Storage) | Self-hosted FastAPI + SQLite |
-| Real-time | Firestore `onSnapshot` listeners | SSE streaming (POST /api/chat/stream) |
-| Auth | Firebase Auth (email/password) | JWT token (server URL + PIN/API key) |
-| State | React Context (`AuthenticatedUserContext`, `UnreadMessagesContext`) | Zustand stores (`useAuthStore`, `useChatStore`, `useModuleStore`, `useSettingsStore`) |
-| Chat UI | react-native-gifted-chat | react-native-gifted-chat (extended with markdown, streaming, action cards, message interactions) |
-| Navigation | Stack + Bottom Tabs (Chats, Settings) | Stack + 4 Bottom Tabs (Today, Inbox, Chat, Settings) + Custom Tab Bar with "+" FAB |
-| Data model | Firestore documents | SQLite tables via SQLAlchemy |
-| Components | ContactRow, Cell, ChatHeader, ChatMenu | ContactRow, Cell (reused) + TaskRow, EventRow, SectionHeader, PriorityBadge, EmptyState, CustomTabBar, ActionCard, QuickActionBar, MarkdownBubble, TypingIndicator, MessageActionMenu, MessageBubbleWrapper, CopyFeedback, 8 Settings cells |
+Four Zustand stores manage all client state:
+
+| Store | Responsibility |
+|-------|---------------|
+| `useAuthStore` | JWT tokens, server URL, login/logout (persisted to localStorage) |
+| `useChatStore` | Conversations, messages, SSE streaming, abort controller |
+| `useModuleStore` | Todos, events, memos, kanban statuses, CRUD + async API actions |
+| `useSettingsStore` | Theme, chat behavior, LLM params, notifications (persisted to localStorage) |
+
+All stores use optimistic updates with server sync. Demo data is seeded when no server is configured.

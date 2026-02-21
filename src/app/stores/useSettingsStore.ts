@@ -19,6 +19,8 @@ interface SettingsState {
   // Appearance
   theme: string;
   compactMode: boolean;
+  sidebarSize: number;
+  chatPanelSize: number;
 
   // Notifications
   notificationsEnabled: boolean;
@@ -41,6 +43,8 @@ interface SettingsState {
   setStreamResponses: (v: boolean) => void;
   setTheme: (v: string) => void;
   setCompactMode: (v: boolean) => void;
+  setSidebarSize: (v: number) => void;
+  setChatPanelSize: (v: number) => void;
   setNotificationsEnabled: (v: boolean) => void;
   setReminderSound: (v: boolean) => void;
   setSaveHistory: (v: boolean) => void;
@@ -67,6 +71,8 @@ const DEFAULT_SETTINGS = {
 
   theme: 'system',
   compactMode: false,
+  sidebarSize: 18,
+  chatPanelSize: 30,
 
   notificationsEnabled: true,
   reminderSound: true,
@@ -96,6 +102,8 @@ export const useSettingsStore = create<SettingsState>()(
 
       setTheme: (theme) => set({ theme }),
       setCompactMode: (compactMode) => set({ compactMode }),
+      setSidebarSize: (sidebarSize) => set({ sidebarSize }),
+      setChatPanelSize: (chatPanelSize) => set({ chatPanelSize }),
 
       setNotificationsEnabled: (notificationsEnabled) => set({ notificationsEnabled }),
       setReminderSound: (reminderSound) => set({ reminderSound }),

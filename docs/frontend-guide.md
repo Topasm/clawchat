@@ -1,594 +1,220 @@
 # Frontend Guide
 
-The ClawChat mobile app is built with React Native (Expo), adapting navigation and component patterns from the [react-native-chat](https://github.com/Ctere1/react-native-chat) reference project while replacing Firebase with a self-hosted REST + SSE backend and React Context with Zustand.
+The ClawChat frontend is built with React 18, TypeScript, and Vite. It runs as a web app in any browser and as an Electron desktop app on Windows, macOS, and Linux.
 
 ## Directory Structure
 
 ```
-app/
-├── App.js                          # Root: providers, 4-tab navigation
-├── app.json                        # Expo config + widget plugin
-├── package.json
-├── screens/
-│   ├── TodayScreen.js              # Hero dashboard (greeting, tasks, events)
-│   ├── InboxScreen.js              # Unscheduled tasks (GTD inbox)
-│   ├── ChatScreen.js               # AI conversation (GiftedChat + streaming + markdown + interactions)
-│   ├── ConversationListScreen.js   # Chat history list
-│   ├── QuickCaptureModal.js        # Natural language quick capture modal
-│   ├── TaskDetailScreen.js         # Full task editing
-│   ├── EventDetailScreen.js        # Full event editing
-│   ├── AllTasksScreen.js           # All tasks grouped by status
-│   ├── SettingsScreen.js           # Full settings (7 sections, 30+ options)
-│   ├── SystemPromptScreen.js       # LLM system prompt editor
-│   └── LoginScreen.js              # Server URL + PIN authentication
-├── components/
-│   ├── TaskRow.js                  # Swipeable task row with checkbox
-│   ├── EventRow.js                 # Event display with time bar
-│   ├── SectionHeader.js            # Section header with count + action
-│   ├── PriorityBadge.js            # Priority color dot indicator
-│   ├── EmptyState.js               # Generic empty state with CTA
-│   ├── CustomTabBar.js             # Bottom tab bar with center "+" FAB
-│   ├── ActionCard.js               # Chat inline action card (task/event created)
-│   ├── QuickActionBar.js           # Quick action chips above chat input
-│   ├── MarkdownBubble.js           # Markdown renderer for chat messages (code blocks, links, etc.)
-│   ├── TypingIndicator.js          # Animated 3-dot typing indicator for streaming
-│   ├── MessageActionMenu.js        # Long-press context menu (copy, regenerate, edit, delete)
-│   ├── MessageBubbleWrapper.js     # Bubble wrapper with haptics, long-press, timestamp toggle
-│   ├── CopyFeedback.js             # Toast notification for clipboard copy
-│   ├── ContactRow.js               # Conversation list row (from reference)
-│   ├── Cell.js                     # Settings menu cell (from reference)
-│   ├── Separator.js                # List separator
-│   └── settings/                   # Reusable settings cell components
-│       ├── SettingsToggleCell.js    # Label + Switch toggle
-│       ├── SettingsSliderCell.js    # Label + value + Slider
-│       ├── SettingsNavigationCell.js # Label + detail + chevron
-│       ├── SettingsButtonCell.js    # Action button (supports destructive style)
-│       ├── SettingsDetailCell.js    # Read-only label + value + status dot
-│       ├── SettingsSegmentedCell.js # Label + segmented control
-│       ├── SettingsSectionHeader.js # Section title
-│       ├── CustomSlider.js         # PanResponder-based slider (no external deps)
-│       └── index.js                # Barrel export
-├── hooks/
-│   └── useTodayData.js             # Today dashboard data fetching hook
-├── stores/
-│   ├── useAuthStore.js             # Authentication state (Zustand, persisted)
-│   ├── useChatStore.js             # Conversations, messages, streaming, message interactions (Zustand)
-│   ├── useModuleStore.js           # Todos, events, memos + async API actions (Zustand)
-│   └── useSettingsStore.js         # 15+ app settings (Zustand, persisted)
-├── services/
-│   ├── apiClient.js                # Axios REST client
-│   └── sseClient.js                # SSE streaming client (fetch + ReadableStream)
-├── config/
-│   ├── theme.js                    # Colors (light + dark), typography, spacing
-│   ├── ThemeContext.js             # React Context + useTheme() hook
-│   └── ThemeProvider.js            # Theme provider (light/dark/system, persisted)
-├── utils/
-│   ├── formatters.js               # Date/time helpers + grouping + greeting
-│   └── naturalLanguageParser.js    # NL date/type/priority parser
-└── widgets/
-    ├── TodayWidget.js              # Android home screen widget UI
-    └── widgetTaskHandler.js        # Widget headless data fetcher
+src/
+├── main.tsx                           # React entry point
+├── App.tsx                            # Root: ThemeProvider + Router
+├── router.tsx                         # React Router v6 route definitions
+├── app/
+│   ├── types/
+│   │   ├── api.ts                     # API request/response interfaces (Pydantic mirrors)
+│   │   ├── platform.ts               # Platform detection (Electron, Capacitor, Web)
+│   │   └── electron.d.ts             # Electron API type declarations
+│   ├── stores/
+│   │   ├── useAuthStore.ts           # Auth state: JWT, serverUrl, login/logout (persisted)
+│   │   ├── useChatStore.ts           # Chat: conversations, messages, SSE streaming
+│   │   ├── useModuleStore.ts         # Modules: todos, events, memos, kanban statuses
+│   │   └── useSettingsStore.ts       # Settings: theme, LLM, chat, notifications (persisted)
+│   ├── pages/
+│   │   ├── TodayPage.tsx             # Dashboard: greeting, tasks, events, inbox count
+│   │   ├── InboxPage.tsx             # Unscheduled tasks (GTD inbox)
+│   │   ├── ChatListPage.tsx          # Conversation history list
+│   │   ├── ChatPage.tsx              # Full-screen AI conversation
+│   │   ├── AllTasksPage.tsx          # Kanban board (renders KanbanBoard)
+│   │   ├── TaskDetailPage.tsx        # Task editing (title, priority, due date, tags)
+│   │   ├── EventDetailPage.tsx       # Event editing (time, location)
+│   │   ├── SettingsPage.tsx          # All settings (7 sections)
+│   │   └── SystemPromptPage.tsx      # LLM system prompt editor
+│   ├── components/
+│   │   ├── Layout.tsx                # Sidebar navigation + main content area + chat panel
+│   │   ├── kanban/
+│   │   │   ├── KanbanBoard.tsx       # Board orchestrator: groups todos, renders 3 columns
+│   │   │   ├── KanbanColumn.tsx      # Drop target: drag-over highlight, header, card list
+│   │   │   └── KanbanCard.tsx        # Draggable wrapper: HTML5 drag events + TaskCard
+│   │   ├── chat-panel/
+│   │   │   ├── ChatPanel.tsx         # Collapsible bottom chat panel
+│   │   │   ├── ChatInput.tsx         # Textarea + send/stop buttons
+│   │   │   ├── ChatPanelMessages.tsx # Message list (column-reverse)
+│   │   │   ├── MessageBubble.tsx     # User/assistant bubble with actions
+│   │   │   └── StreamingIndicator.tsx # Animated 3-dot typing indicator
+│   │   └── shared/
+│   │       ├── TaskCard.tsx          # Task row: checkbox + title + badge meta
+│   │       ├── Badge.tsx             # Pill badge: priority, due, tag, status, count
+│   │       ├── Checkbox.tsx          # Circular animated checkbox
+│   │       ├── SectionHeader.tsx     # Collapsible section with chevron + count
+│   │       ├── EmptyState.tsx        # Icon + message placeholder
+│   │       ├── EventCard.tsx         # Event display with time + location
+│   │       ├── ConversationItem.tsx  # Chat list row with avatar + preview
+│   │       ├── SegmentedControl.tsx  # Multi-option toggle
+│   │       ├── Toggle.tsx            # On/off switch
+│   │       ├── Slider.tsx            # Range input with value display
+│   │       ├── SettingsRow.tsx       # Label + control settings row
+│   │       └── SettingsSection.tsx   # Settings group container
+│   ├── hooks/
+│   │   └── useTodayData.ts          # Today dashboard data aggregation
+│   ├── services/
+│   │   └── apiClient.ts             # Axios with auth interceptor + token refresh
+│   ├── config/
+│   │   └── colors.ts                # Color palette object (light + dark)
+│   └── utils/
+│       └── formatters.ts            # Date/time helpers, grouping, greeting
+├── styles/
+│   ├── index.css                     # Main entry: imports all partials
+│   ├── _reset.css                    # Box-sizing, scrollbar, font smoothing
+│   ├── _variables.css                # .cc-root base styles
+│   ├── _layout.css                   # Sidebar (220px), main area, content
+│   ├── _components.css               # Cards, badges, checkbox, sections, buttons
+│   ├── _chat.css                     # Bubbles, chat panel, input, streaming dots
+│   ├── _kanban.css                   # 3-column grid, columns, drag states, responsive
+│   ├── _pages.css                    # Page headers, detail pages, chat page
+│   ├── _settings.css                 # Toggle, slider, segmented control, settings rows
+│   ├── _utilities.css                # Margin, flex, gap helpers
+│   └── _capacitor.css                # Mobile-specific overrides
+└── electron/
+    ├── main.ts                       # Electron main process
+    └── preload.ts                    # Electron preload (exposes electronAPI)
 ```
 
-## Pattern Migration Guide
+## Navigation
 
-This section maps patterns from the reference project to ClawChat equivalents. Each subsection shows the reference approach and the adapted ClawChat approach.
+React Router v6 with a nested layout route:
 
----
-
-### Navigation
-
-**Reference (`App.js`)**:
-The reference project uses a conditional navigator pattern — `AuthStack` (Login/SignUp) when no user is authenticated, `MainStack` (tabs + screens) when authenticated. Bottom tabs contain Chats and Settings.
-
-```javascript
-// Reference pattern
-const RootNavigator = () => {
-  const { user } = useContext(AuthenticatedUserContext);
-  return (
-    <NavigationContainer>
-      {user ? <MainStack /> : <AuthStack />}
-    </NavigationContainer>
-  );
-};
-
-// TabNavigator has: Chats, Settings
+```
+/ → redirect to /today
+/today         → TodayPage
+/inbox         → InboxPage
+/chats         → ChatListPage
+/chats/:id     → ChatPage (full screen, hides chat panel)
+/tasks         → AllTasksPage (Kanban board)
+/tasks/:id     → TaskDetailPage
+/events/:id    → EventDetailPage
+/settings      → SettingsPage
+/settings/system-prompt → SystemPromptPage
 ```
 
-**ClawChat adaptation**:
-Keep the same conditional auth/main stack pattern. Replace Context with Zustand. Update tabs to Today + Inbox + Chat + Settings.
+All routes are wrapped in `<Layout />` which provides the sidebar and persistent chat panel.
 
-```javascript
-// ClawChat pattern — 4-tab layout with custom tab bar
-import { useAuthStore } from './stores/useAuthStore';
-import CustomTabBar from './components/CustomTabBar';
+## State Management
 
-const TabNavigator = () => (
-  <Tab.Navigator tabBar={(props) => <CustomTabBar {...props} />}>
-    <Tab.Screen name="Today" component={TodayScreen} />
-    <Tab.Screen name="Inbox" component={InboxScreen} />
-    <Tab.Screen name="Chat" component={ConversationListScreen} options={{ title: 'Chats' }} />
-    <Tab.Screen name="Settings" component={SettingsScreen} />
-  </Tab.Navigator>
-);
+### useModuleStore
 
-// MainStack includes tab navigator + detail screens
-const MainStack = () => (
-  <MainStackNav.Navigator>
-    <MainStackNav.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
-    <MainStackNav.Screen name="ChatScreen" component={ChatScreen} />
-    <MainStackNav.Screen name="TaskDetail" component={TaskDetailScreen} />
-    <MainStackNav.Screen name="EventDetail" component={EventDetailScreen} />
-    <MainStackNav.Screen name="AllTasks" component={AllTasksScreen} />
-    <MainStackNav.Screen name="QuickCapture" component={QuickCaptureModal}
-      options={{ presentation: 'modal', headerShown: false }} />
-  </MainStackNav.Navigator>
-);
+Manages todos, events, memos, and kanban board state:
+
+```typescript
+// Key state
+todos: TodoResponse[]              // Seeded with 15 demo tasks
+kanbanStatuses: Record<string, KanbanStatus>  // Local in_progress overrides
+events: EventResponse[]
+memos: MemoResponse[]
+
+// Key actions
+setKanbanStatus(id, status)        // Move task between kanban columns
+toggleTodoComplete(id)             // Toggle + clear kanban override
+fetchTodos(params)                 // GET /todos (skips if no server configured)
 ```
 
----
+The kanban board uses a **local override pattern**: the server only knows `pending` and `completed` statuses. The `in_progress` status is tracked client-side in `kanbanStatuses`. When a task is moved to "In Progress", its server status remains `pending` but the UI shows it in the correct column.
 
-### Chat Screen
+### useAuthStore
 
-**Reference (`Chat.js`)**:
-Uses GiftedChat with Firestore `onSnapshot` for real-time updates. Custom `RenderBubble` and `RenderInputToolbar`. Messages fetched from Firestore document.
-
-```javascript
-// Reference: Firestore real-time listener
-useEffect(() => {
-  const unsubscribe = onSnapshot(doc(database, 'chats', route.params.id), (document) => {
-    setMessages(document.data().messages.map(/* ... */));
-  });
-  return () => unsubscribe();
-}, [route.params.id]);
+```typescript
+token: string | null               // JWT access token
+refreshToken: string | null        // JWT refresh token
+serverUrl: string | null           // User's server URL
+login(serverUrl, pin)              // POST /api/auth/login
+logout()                           // Clear all auth state
 ```
 
-**ClawChat adaptation**:
-Replace Firestore with WebSocket for streaming AI responses. Extend GiftedChat with custom message types for streaming text and action cards.
+### useChatStore
 
-```javascript
-// ClawChat: WebSocket streaming
-import { wsManager } from '../services/wsManager';
-import { useChatStore } from '../stores/useChatStore';
-
-function ChatScreen({ route }) {
-  const { messages, addMessage, appendToLastMessage } = useChatStore();
-  const [isStreaming, setIsStreaming] = useState(false);
-
-  useEffect(() => {
-    // Load conversation messages via REST
-    apiClient.get(`/chat/conversations/${route.params.id}/messages`)
-      .then(res => useChatStore.getState().setMessages(res.data.items));
-
-    // WebSocket handlers for streaming
-    const handlers = {
-      stream_start: ({ message_id }) => {
-        setIsStreaming(true);
-        addMessage({ _id: message_id, text: '', user: { _id: 'assistant' } });
-      },
-      stream_chunk: ({ content }) => {
-        appendToLastMessage(content);
-      },
-      stream_end: ({ full_content }) => {
-        setIsStreaming(false);
-      },
-      action_card: ({ card_type, payload, actions }) => {
-        addMessage({
-          _id: payload.id,
-          text: '',
-          user: { _id: 'assistant' },
-          actionCard: { card_type, payload, actions },
-        });
-      },
-    };
-
-    wsManager.subscribe(handlers);
-    return () => wsManager.unsubscribe(handlers);
-  }, [route.params.id]);
-
-  const onSend = useCallback(async (newMessages = []) => {
-    addMessage(newMessages[0]);
-    await apiClient.post('/chat/send', {
-      conversation_id: route.params.id,
-      content: newMessages[0].text,
-    });
-  }, [route.params.id]);
-
-  return (
-    <GiftedChat
-      messages={messages}
-      onSend={onSend}
-      user={{ _id: 'user' }}
-      renderBubble={(props) => <CustomBubble {...props} />}
-      renderInputToolbar={(props) => <CustomInputToolbar {...props} isStreaming={isStreaming} />}
-      renderCustomView={(props) =>
-        props.currentMessage.actionCard
-          ? <ActionCard card={props.currentMessage.actionCard} />
-          : null
-      }
-      renderFooter={() => isStreaming ? <TypingIndicator /> : null}
-    />
-  );
-}
+```typescript
+conversations: ConversationResponse[]
+messages: ChatMessage[]            // Internal format with _id, text, user
+isStreaming: boolean
+sendMessageStreaming(id, text)     // SSE streaming with optimistic insert
+stopGeneration()                   // AbortController
+deleteMessage / editMessage / regenerateMessage
 ```
 
----
+### useSettingsStore
 
-### State Management
+15+ persisted settings across: chat behavior, LLM parameters, appearance (theme), notifications, and privacy.
 
-**Reference (Context API)**:
-Uses `AuthenticatedUserContext` and `UnreadMessagesContext` with `useState` + `useMemo`.
+## Kanban Board
 
-```javascript
-// Reference: AuthenticatedUserContext.js
-export const AuthenticatedUserProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (authenticatedUser) => {
-      setUser(authenticatedUser || null);
-    });
-    return unsubscribe;
-  }, []);
-  const value = useMemo(() => ({ user, setUser }), [user]);
-  return (
-    <AuthenticatedUserContext.Provider value={value}>
-      {children}
-    </AuthenticatedUserContext.Provider>
-  );
-};
+The All Tasks page (`/tasks`) renders a 3-column kanban board:
+
+| Column | Status | Color |
+|--------|--------|-------|
+| Todo | `pending` | Blue highlight on drag-over |
+| In Progress | `in_progress` | Yellow highlight on drag-over |
+| Done | `completed` | Green highlight on drag-over |
+
+**Drag and drop**: Uses HTML5 Drag and Drop API (no external dependencies).
+- `KanbanCard` sets `dataTransfer` with the task ID on `dragStart`
+- `KanbanColumn` handles `dragOver`/`drop` events and calls `setKanbanStatus`
+- Visual feedback: dragging card gets `opacity: 0.4`, target column gets a colored border glow
+- Checkbox toggle moves task between Todo/Done and clears any kanban override
+
+**Responsive**: Columns stack vertically below 768px viewport width.
+
+## CSS Architecture
+
+All classes use BEM naming with `.cc-` prefix:
+
+```
+.cc-kanban                    → Board grid
+.cc-kanban__column            → Column container
+.cc-kanban__column--todo      → Todo variant
+.cc-kanban__column--drag-over → Active drop target
+.cc-kanban__header            → Column header
+.cc-kanban__card              → Draggable card wrapper
+.cc-kanban__card--dragging    → Reduced opacity while dragging
 ```
 
-**ClawChat adaptation (Zustand)**:
-Replace Context providers with Zustand stores. No provider nesting needed.
+Colors are injected as CSS custom properties on `.cc-root`:
+- `--cc-background`, `--cc-surface`, `--cc-text`, `--cc-primary`, `--cc-success`, etc.
+- Light/dark themes swap variable values; components never use hardcoded colors
 
-```javascript
-// stores/useAuthStore.js
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+## Platform Detection
 
-export const useAuthStore = create(
-  persist(
-    (set, get) => ({
-      token: null,
-      serverUrl: null,
-      isLoading: true,
+Runtime detection for cross-platform behavior:
 
-      login: async (serverUrl, pin) => {
-        const response = await fetch(`${serverUrl}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin }),
-        });
-        const data = await response.json();
-        set({ token: data.access_token, serverUrl, isLoading: false });
-      },
-
-      logout: () => set({ token: null, serverUrl: null }),
-      setLoading: (isLoading) => set({ isLoading }),
-    }),
-    {
-      name: 'auth-storage',
-      storage: createJSONStorage(() => AsyncStorage),
-      onRehydrateStorage: () => (state) => {
-        state?.setLoading(false);
-      },
-    }
-  )
-);
-
-// stores/useChatStore.js
-export const useChatStore = create((set, get) => ({
-  conversations: [],
-  messages: [],
-  currentConversationId: null,
-
-  setMessages: (messages) => set({ messages }),
-  addMessage: (message) => set((state) => ({
-    messages: [message, ...state.messages],
-  })),
-  appendToLastMessage: (content) => set((state) => {
-    const updated = [...state.messages];
-    if (updated.length > 0) {
-      updated[0] = { ...updated[0], text: updated[0].text + content };
-    }
-    return { messages: updated };
-  }),
-}));
+```typescript
+IS_ELECTRON  // window.electronAPI exists
+IS_CAPACITOR // window.Capacitor exists
+IS_IOS / IS_ANDROID / IS_MOBILE
+IS_WEB       // Not Electron, not Capacitor
+detectPlatform(): 'web' | 'electron' | 'ios' | 'android'
 ```
 
----
+## API Types
 
-### API Client
+All API interfaces mirror the server's Pydantic schemas:
 
-**Reference (`firebase.js`)**:
-Initializes Firebase app, auth, and Firestore with config from Expo constants.
+```typescript
+TodoResponse    { id, title, description, status, priority, due_date, tags, created_at, updated_at }
+TodoCreate      { title, description?, priority?, due_date?, tags? }
+TodoUpdate      { title?, description?, status?, priority?, due_date?, tags? }
+KanbanStatus    = 'pending' | 'in_progress' | 'completed'  // Client-side extension
 
-```javascript
-// Reference: firebase.js
-const app = initializeApp(firebaseConfig);
-export const auth = initializeAuth(app, { persistence });
-export const database = getFirestore();
+EventResponse   { id, title, description, start_time, end_time, location, created_at, updated_at }
+ConversationResponse { id, title, last_message, created_at, updated_at }
+MessageResponse { id, conversation_id, role, content, created_at }
+TodayResponse   { today_tasks, overdue_tasks, today_events, inbox_count, greeting, date }
 ```
 
-**ClawChat adaptation (Axios + WebSocket)**:
-Replace Firebase with an Axios client pointing at the user's server, plus a WebSocket manager.
+## Development
 
-```javascript
-// services/apiClient.js
-import axios from 'axios';
-import { useAuthStore } from '../stores/useAuthStore';
-
-const apiClient = axios.create();
-
-apiClient.interceptors.request.use((config) => {
-  const { token, serverUrl } = useAuthStore.getState();
-  config.baseURL = `${serverUrl}/api`;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default apiClient;
-
-// services/wsManager.js
-class WebSocketManager {
-  constructor() {
-    this.ws = null;
-    this.listeners = new Map();
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-  }
-
-  connect(serverUrl, token) {
-    const wsUrl = serverUrl.replace(/^http/, 'ws');
-    this.ws = new WebSocket(`${wsUrl}/ws?token=${token}`);
-
-    this.ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      this.listeners.forEach((handlers) => {
-        if (handlers[message.type]) {
-          handlers[message.type](message.data);
-        }
-      });
-    };
-
-    this.ws.onclose = () => {
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectAttempts++;
-        setTimeout(() => this.connect(serverUrl, token), 1000 * this.reconnectAttempts);
-      }
-    };
-  }
-
-  subscribe(handlers) {
-    const id = Symbol();
-    this.listeners.set(id, handlers);
-    return id;
-  }
-
-  unsubscribe(id) {
-    this.listeners.delete(id);
-  }
-
-  send(type, data) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type, data }));
-    }
-  }
-
-  disconnect() {
-    this.ws?.close();
-    this.ws = null;
-  }
-}
-
-export const wsManager = new WebSocketManager();
+```bash
+npm run dev           # Vite dev server (web)
+npm run dev:electron  # Electron + Vite
+npm run typecheck     # npx tsc --noEmit
+npm run build         # Production build
 ```
 
----
-
-### Components
-
-**Reused from reference** (with minimal changes):
-
-- **`ContactRow`** — Used for conversation list rows. Keep the avatar, name, subtitle, forward icon pattern. Add an `aiIndicator` prop for showing AI status.
-- **`Cell`** — Used for settings menu items. Keep the icon + title + subtitle + forward icon pattern.
-
-**New components for ClawChat**:
-
-#### `TaskRow`
-Swipeable task row with animated checkbox, title, due date chip, and priority dot. Used across Today, Inbox, AllTasks, and Chat screens.
-
-#### `EventRow`
-Event display row with colored time bar, time label, title, and optional location.
-
-#### `SectionHeader`
-Section header with uppercase label, optional count badge, and right-side action link.
-
-#### `PriorityBadge`
-Color-coded priority dot (urgent=red, high=orange, low=gray). Hidden for medium priority.
-
-#### `EmptyState`
-Centered empty state with icon, title, subtitle, and optional action button.
-
-#### `CustomTabBar`
-Custom bottom tab bar rendering 4 tabs with a raised center "+" FAB button between Inbox and Chat.
-
-#### `ActionCard`
-Inline action cards rendered in chat bubbles for task/event creation confirmations. Shows title, metadata, and Edit/Complete/Delete action buttons.
-
-#### `QuickActionBar`
-Horizontal scroll bar of action chips ("New Task", "Schedule", "Note", "Today's Plan") above the chat input that prefill the input text.
-
----
-
-### Styling / Theme
-
-**Reference (`constants.js`)**:
-Minimal color constants.
-
-```javascript
-// Reference
-export const colors = {
-  primary: '#2196f3',
-  border: '#565656',
-  red: '#EF5350',
-  pink: '#EC407A',
-  teal: '#26A69A',
-  grey: '#BDBDBD',
-};
-```
-
-**ClawChat adaptation (`theme.js`)**:
-Expand into a full theme system with colors, typography, spacing, and component-specific tokens.
-
-```javascript
-// config/theme.js
-export const theme = {
-  colors: {
-    primary: '#2196F3',
-    primaryLight: '#64B5F6',
-    primaryDark: '#1976D2',
-    secondary: '#26A69A',
-    success: '#4CAF50',
-    warning: '#FF9800',
-    error: '#EF5350',
-    background: '#F5F5F5',
-    surface: '#FFFFFF',
-    text: '#212121',
-    textSecondary: '#757575',
-    border: '#E0E0E0',
-    disabled: '#BDBDBD',
-
-    // AI-specific
-    assistantBubble: '#F0F4F8',
-    userBubble: '#2196F3',
-    streaming: '#26A69A',
-    actionCard: '#FFF8E1',
-  },
-  typography: {
-    h1: { fontSize: 24, fontWeight: '700' },
-    h2: { fontSize: 20, fontWeight: '600' },
-    body: { fontSize: 16, fontWeight: '400' },
-    caption: { fontSize: 12, fontWeight: '400', color: '#757575' },
-  },
-  spacing: {
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-  },
-  borderRadius: {
-    sm: 4,
-    md: 8,
-    lg: 16,
-    full: 9999,
-  },
-};
-```
-
----
-
-### Login Screen
-
-**Reference (`Login.js`)**:
-Email + password form with Firebase Auth.
-
-**ClawChat adaptation**:
-Replace with server URL + PIN form. The user enters their self-hosted server address and authenticates with a PIN.
-
-```javascript
-// screens/LoginScreen.js
-function LoginScreen() {
-  const [serverUrl, setServerUrl] = useState('');
-  const [pin, setPin] = useState('');
-  const { login } = useAuthStore();
-
-  const handleLogin = async () => {
-    try {
-      await login(serverUrl, pin);
-    } catch (error) {
-      Alert.alert('Connection failed', 'Check your server URL and PIN.');
-    }
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>ClawChat</Text>
-      <Text style={styles.subtitle}>Connect to your server</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Server URL (e.g., https://192.168.1.100:8000)"
-        value={serverUrl}
-        onChangeText={setServerUrl}
-        autoCapitalize="none"
-        keyboardType="url"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="PIN"
-        value={pin}
-        onChangeText={setPin}
-        secureTextEntry
-        keyboardType="number-pad"
-      />
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Connect</Text>
-      </TouchableOpacity>
-    </SafeAreaView>
-  );
-}
-```
-
----
-
-## Dependencies
-
-### Kept from Reference
-
-| Package | Purpose |
-|---------|---------|
-| `expo` | Build and development framework |
-| `@react-navigation/native` | Navigation core |
-| `@react-navigation/bottom-tabs` | Tab navigator |
-| `@react-navigation/stack` | Stack navigator |
-| `react-native-gifted-chat` | Chat UI components |
-| `@expo/vector-icons` | Ionicons and other icon sets |
-| `@react-native-async-storage/async-storage` | Local persistent storage |
-| `react-native-safe-area-context` | Safe area handling |
-| `react-native-screens` | Native screen containers |
-| `react-native-gesture-handler` | Gesture support |
-| `react-native-reanimated` | Animation library |
-
-### Added for ClawChat
-
-| Package | Purpose |
-|---------|---------|
-| `zustand` | State management (replaces React Context) |
-| `axios` | HTTP client for REST API |
-| `react-native-android-widget` | Android home screen widget support |
-| `react-native-markdown-display` | Markdown rendering in chat bubbles |
-| `expo-clipboard` | Copy to clipboard (message interactions) |
-| `expo-haptics` | Haptic feedback on long-press |
-
-### Removed (Firebase)
-
-| Package | Reason |
-|---------|--------|
-| `firebase` | Replaced by self-hosted REST API + WebSocket |
-| `react-native-emoji-modal` | Not needed for AI assistant UX |
-| `react-native-popup-menu` | Replaced by simpler action patterns |
-| `react-native-uuid` | Use built-in `crypto.randomUUID()` or expo-crypto |
+Demo mode activates automatically when no server URL is configured — all pages show seeded sample data.

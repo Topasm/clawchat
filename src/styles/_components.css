@@ -72,6 +72,12 @@
 }
 
 /* --- Badge ------------------------------------------------ */
+.cc-badge__priority-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
 .cc-badge {
   display: inline-flex;
   align-items: center;

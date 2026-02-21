@@ -101,6 +101,7 @@
 
 .cc-chat-panel--expanded {
   height: 360px;
+  max-height: 50vh;
 }
 
 .cc-chat-panel__header {

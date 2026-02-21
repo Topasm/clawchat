@@ -13,5 +13,9 @@
 @import './_settings.css';
 @import './_pages.css';
 @import './_kanban.css';
+@import './_kanban-filter.css';
+@import './_toast.css';
+@import './_dialog.css';
+@import './_command-palette.css';
 @import './_utilities.css';
 @import './_capacitor.css';

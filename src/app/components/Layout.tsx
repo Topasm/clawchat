@@ -1,9 +1,17 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
 import { useChatStore } from '../stores/useChatStore';
 import ChatPanel from './chat-panel/ChatPanel';
 import useChatPanel from '../hooks/useChatPanel';
+import usePlatform from '../hooks/usePlatform';
+import ToastContainer from './shared/ToastContainer';
+import CommandPalette from './shared/CommandPalette';
+import ShortcutsHelp from './shared/ShortcutsHelp';
+import useCommandPalette from '../hooks/useCommandPalette';
+import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
 
 // --- SVG icon components ---
@@ -50,6 +58,24 @@ function GearIcon() {
   );
 }
 
+function MemoIcon() {
+  return (
+    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M14 2.5H4a1.5 1.5 0 00-1.5 1.5v10a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V4A1.5 1.5 0 0014 2.5z" />
+      <path d="M6 6.5h6M6 9.5h6M6 12.5h3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="5" />
+      <path d="M15.5 15.5l-3.6-3.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // --- Theme bridge: map ColorPalette → CSS custom properties ---
 function cssVars(colors: ColorPalette): React.CSSProperties {
   return {
@@ -91,6 +117,7 @@ const navItems = [
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
+  { to: '/search', label: 'Search', Icon: SearchIcon },
   { to: '/settings', label: 'Settings', Icon: GearIcon },
 ];
 
@@ -98,6 +125,16 @@ export default function Layout() {
   const { colors } = useTheme();
   const location = useLocation();
   const chatPanel = useChatPanel();
+  const commandPalette = useCommandPalette();
+  const { isMobile } = usePlatform();
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Wire global keyboard shortcuts
+  useGlobalShortcuts({
+    onToggleChat: chatPanel.toggle,
+    onShowHelp: () => setShowShortcuts(true),
+  });
+  useNavigationShortcuts();
 
   // Badge counts
   const inboxCount = useModuleStore((s) =>
@@ -108,46 +145,69 @@ export default function Layout() {
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
 
+  const sidebar = (
+    <nav className="cc-sidebar">
+      <div className="cc-sidebar__header">ClawChat</div>
+      {navItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) =>
+            `cc-nav-item${isActive ? ' cc-nav-item--active' : ''}`
+          }
+        >
+          <item.Icon />
+          {item.label}
+          {item.to === '/inbox' && inboxCount > 0 && (
+            <span className="cc-nav-badge">{inboxCount}</span>
+          )}
+          {item.to === '/chats' && chatCount > 0 && (
+            <span className="cc-nav-badge">{chatCount}</span>
+          )}
+        </NavLink>
+      ))}
+      <div className="cc-sidebar__spacer" />
+    </nav>
+  );
+
+  const mainContent = (
+    <>
+      <div className="cc-content">
+        <Outlet />
+      </div>
+      {!onChatPage && (
+        <ChatPanel
+          isOpen={chatPanel.isOpen}
+          conversationId={chatPanel.conversationId}
+          onToggle={chatPanel.toggle}
+          onSetConversationId={chatPanel.setConversationId}
+        />
+      )}
+    </>
+  );
+
   return (
     <div className="cc-root" style={cssVars(colors)}>
-      {/* Sidebar */}
-      <nav className="cc-sidebar">
-        <div className="cc-sidebar__header">ClawChat</div>
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `cc-nav-item${isActive ? ' cc-nav-item--active' : ''}`
-            }
-          >
-            <item.Icon />
-            {item.label}
-            {item.to === '/inbox' && inboxCount > 0 && (
-              <span className="cc-nav-badge">{inboxCount}</span>
-            )}
-            {item.to === '/chats' && chatCount > 0 && (
-              <span className="cc-nav-badge">{chatCount}</span>
-            )}
-          </NavLink>
-        ))}
-        <div className="cc-sidebar__spacer" />
-      </nav>
+      <ToastContainer />
+      <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
+      <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
 
-      {/* Main area */}
-      <div className="cc-main">
-        <div className="cc-content">
-          <Outlet />
-        </div>
-        {!onChatPage && (
-          <ChatPanel
-            isOpen={chatPanel.isOpen}
-            conversationId={chatPanel.conversationId}
-            onToggle={chatPanel.toggle}
-            onSetConversationId={chatPanel.setConversationId}
-          />
-        )}
-      </div>
+      {isMobile ? (
+        <>
+          {sidebar}
+          <div className="cc-main">{mainContent}</div>
+        </>
+      ) : (
+        <PanelGroup orientation="horizontal" id="cc-layout-h">
+          <Panel defaultSize={18} minSize={12} maxSize={30} id="sidebar" className="cc-sidebar-panel">
+            {sidebar}
+          </Panel>
+          <PanelResizeHandle className="cc-resize-handle cc-resize-handle--vertical" />
+          <Panel minSize={40} id="main-content">
+            <div className="cc-main">{mainContent}</div>
+          </Panel>
+        </PanelGroup>
+      )}
     </div>
   );
 }

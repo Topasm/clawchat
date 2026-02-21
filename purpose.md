@@ -112,14 +112,16 @@ To maintain focus and avoid scope creep, the following are explicitly **not** go
 ## Architecture Summary
 
 ```
-┌─ React Native Mobile App ──────────────────────────┐
+┌─ ClawChat Desktop / Web App ───────────────────────┐
 │                                                      │
-│   Widgets          Screens                           │
-│   (Todo, Cal,      (Chat, Todo, Calendar,            │
-│    Memo, Quick)     Memo, Settings)                  │
+│   Electron (desktop)    Pages (React + TypeScript)   │
+│   Web Browser (Vite)    ├── Today, Inbox, Chat       │
+│   Capacitor (planned)   ├── Kanban Board (All Tasks) │
+│                         ├── Task/Event Detail        │
+│                         └── Settings                 │
 │                                                      │
 └──────────────────────┬───────────────────────────────┘
-                       │ REST + WebSocket (HTTPS)
+                       │ REST + SSE Streaming (HTTPS)
                        │ User's own server only
 ┌──────────────────────┼───────────────────────────────┐
 │  Self-Hosted Server  │                                │
@@ -144,9 +146,9 @@ To maintain focus and avoid scope creep, the following are explicitly **not** go
 The project is considered successful when a user can:
 
 1. Install the server with a single `docker compose up` command
-2. Connect the mobile app by entering their server address
+2. Connect the desktop/web app by entering their server address
 3. Add a task, event, or note entirely through conversation
-4. See the result reflected on their home screen widget within seconds
+4. See the result reflected on the kanban board and today dashboard immediately
 5. Receive a morning briefing summarizing their day
 6. Delegate a research task to the AI and receive results via notification
 7. Verify that no data has left their server by inspecting network traffic
@@ -157,14 +159,16 @@ The project is considered successful when a user can:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Mobile framework | React Native | Cross-platform with native widget support |
+| Desktop shell | Electron | Native desktop app (Windows, macOS, Linux) |
+| Web framework | Vite + React 18 + TypeScript | Fast builds, type safety, single codebase |
 | Server framework | Python FastAPI | Async, fast, excellent for AI workloads |
 | Database | SQLite | Zero-config, single-file, sufficient for single-user |
 | State management | Zustand | Lightweight, minimal boilerplate |
+| Styling | CSS custom properties + BEM | Theme-aware, no runtime CSS-in-JS overhead |
 | LLM abstraction | Ollama + Claude API | Local-first with cloud fallback option |
 | Deployment | Docker Compose | One-command setup, reproducible environment |
-| Real-time | WebSocket | Streaming AI responses + push notifications |
-| Auth | Token-based (API key) | Simple, sufficient for single-user self-hosted |
+| Real-time | SSE (Server-Sent Events) | Streaming AI responses |
+| Auth | JWT (PIN-based) | Simple, sufficient for single-user self-hosted |
 
 ---
 

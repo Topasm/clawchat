@@ -1,13 +1,18 @@
 /* --- Sidebar ---------------------------------------------- */
 .cc-sidebar {
-  width: 220px;
-  min-width: 220px;
+  width: 100%;
+  height: 100%;
   background: var(--cc-surface);
   border-right: 1px solid var(--cc-border);
   display: flex;
   flex-direction: column;
   padding: 16px 0;
   user-select: none;
+  overflow: hidden;
+}
+
+.cc-sidebar-panel {
+  min-width: 0;
 }
 
 .cc-sidebar__header {
@@ -91,10 +96,75 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  height: 100%;
 }
 
 .cc-content {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+}
+
+/* --- Resize Handles --------------------------------------- */
+.cc-resize-handle {
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.cc-resize-handle--vertical {
+  width: 4px;
+}
+
+.cc-resize-handle--horizontal {
+  height: 4px;
+}
+
+.cc-resize-handle:hover,
+.cc-resize-handle[data-resize-handle-active] {
+  background: var(--cc-primary);
+}
+
+/* --- Shortcuts help --------------------------------------- */
+.cc-shortcuts-help {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cc-shortcuts-help__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-shortcuts-help__scope {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cc-text-tertiary);
+  margin-bottom: 4px;
+}
+
+.cc-shortcuts-help__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.cc-shortcuts-help__desc {
+  font-size: 13px;
+  color: var(--cc-text);
+}
+
+.cc-shortcuts-help__key {
+  font-size: 11px;
+  font-family: inherit;
+  background: var(--cc-surface-secondary);
+  border: 1px solid var(--cc-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--cc-text-secondary);
 }

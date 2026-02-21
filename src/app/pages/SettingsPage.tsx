@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { useAuthStore } from '../stores/useAuthStore';
 import SettingsSection from '../components/shared/SettingsSection';
 import SettingsRow from '../components/shared/SettingsRow';
 import Toggle from '../components/shared/Toggle';
@@ -11,6 +12,9 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { mode, setMode } = useTheme();
   const settings = useSettingsStore();
+  const token = useAuthStore((s) => s.token);
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+  const logout = useAuthStore((s) => s.logout);
 
   return (
     <div style={{ maxWidth: 560 }}>
@@ -118,6 +122,27 @@ export default function SettingsPage() {
             Reset
           </button>
         </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="Server Connection">
+        {token ? (
+          <>
+            <SettingsRow label="Server" sublabel={serverUrl ?? 'Unknown'}>
+              <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
+            </SettingsRow>
+            <SettingsRow label="Logout" sublabel="Disconnect from server">
+              <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/today'); }}>
+                Logout
+              </button>
+            </SettingsRow>
+          </>
+        ) : (
+          <SettingsRow label="Demo Mode" sublabel="No server connected">
+            <button className="cc-btn cc-btn--primary" onClick={() => navigate('/login')}>
+              Connect
+            </button>
+          </SettingsRow>
+        )}
       </SettingsSection>
     </div>
   );

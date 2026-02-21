@@ -1,0 +1,148 @@
+/* ============================================================
+   Kanban Filter Bar
+   ============================================================ */
+
+.cc-kanban-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* -- Search -------------------------------------------------- */
+
+.cc-kanban-filter__search {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+  max-width: 280px;
+}
+
+.cc-kanban-filter__search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--cc-text-tertiary);
+  pointer-events: none;
+}
+
+.cc-kanban-filter__search-input {
+  width: 100%;
+  padding: 6px 10px 6px 30px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--cc-text);
+  background: var(--cc-background);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cc-kanban-filter__search-input:focus {
+  border-color: var(--cc-primary);
+}
+
+.cc-kanban-filter__search-input::placeholder {
+  color: var(--cc-text-tertiary);
+}
+
+/* -- Filter Chips -------------------------------------------- */
+
+.cc-kanban-filter__chips {
+  display: flex;
+  gap: 4px;
+}
+
+.cc-kanban-filter__chip {
+  padding: 4px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: var(--cc-text-secondary);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.cc-kanban-filter__chip:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-kanban-filter__chip--active {
+  border-color: currentColor;
+}
+
+.cc-kanban-filter__chip--urgent.cc-kanban-filter__chip--active {
+  background: color-mix(in srgb, var(--cc-priority-urgent) 15%, transparent);
+  color: var(--cc-priority-urgent);
+  border-color: var(--cc-priority-urgent);
+}
+
+.cc-kanban-filter__chip--high.cc-kanban-filter__chip--active {
+  background: color-mix(in srgb, var(--cc-priority-high) 15%, transparent);
+  color: var(--cc-priority-high);
+  border-color: var(--cc-priority-high);
+}
+
+.cc-kanban-filter__chip--medium.cc-kanban-filter__chip--active {
+  background: color-mix(in srgb, var(--cc-priority-medium) 15%, transparent);
+  color: var(--cc-priority-medium);
+  border-color: var(--cc-priority-medium);
+}
+
+.cc-kanban-filter__chip--low.cc-kanban-filter__chip--active {
+  background: color-mix(in srgb, var(--cc-priority-low) 15%, transparent);
+  color: var(--cc-priority-low);
+  border-color: var(--cc-priority-low);
+}
+
+/* -- Dropdowns ----------------------------------------------- */
+
+.cc-kanban-filter__select {
+  padding: 5px 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--cc-text-secondary);
+  background: var(--cc-background);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cc-kanban-filter__select:focus {
+  border-color: var(--cc-primary);
+}
+
+/* -- Clear button -------------------------------------------- */
+
+.cc-kanban-filter__clear {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--cc-error) 10%, transparent);
+  color: var(--cc-error);
+  transition: background 0.15s;
+}
+
+.cc-kanban-filter__clear:hover {
+  background: color-mix(in srgb, var(--cc-error) 20%, transparent);
+}
+
+/* -- Responsive ---------------------------------------------- */
+
+@media (max-width: 768px) {
+  .cc-kanban-filter {
+    gap: 6px;
+  }
+
+  .cc-kanban-filter__search {
+    min-width: 100%;
+  }
+}
