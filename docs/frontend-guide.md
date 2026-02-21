@@ -6,33 +6,48 @@ The ClawChat mobile app is built with React Native (Expo), adapting navigation a
 
 ```
 app/
-├── App.js                          # Root: providers, navigation
-├── app.json                        # Expo config
+├── App.js                          # Root: providers, 4-tab navigation
+├── app.json                        # Expo config + widget plugin
 ├── package.json
 ├── screens/
-│   ├── ChatScreen.js               # AI conversation (GiftedChat + streaming)
-│   ├── AssistantScreen.js          # Module dashboard (todos, events, memos)
+│   ├── TodayScreen.js              # Hero dashboard (greeting, tasks, events)
+│   ├── InboxScreen.js              # Unscheduled tasks (GTD inbox)
+│   ├── ChatScreen.js               # AI conversation (GiftedChat + smart send)
+│   ├── ConversationListScreen.js   # Chat history list
+│   ├── QuickCaptureModal.js        # Natural language quick capture modal
+│   ├── TaskDetailScreen.js         # Full task editing
+│   ├── EventDetailScreen.js        # Full event editing
+│   ├── AllTasksScreen.js           # All tasks grouped by status
 │   ├── SettingsScreen.js           # Configuration and account
-│   ├── LoginScreen.js              # Server URL + PIN authentication
-│   └── ConversationListScreen.js   # Chat history list
+│   └── LoginScreen.js              # Server URL + PIN authentication
 ├── components/
-│   ├── ActionCard.js               # Interactive cards for AI actions (new)
-│   ├── StreamingText.js            # Animated text for streaming responses (new)
-│   ├── QuickActionBar.js           # Shortcut buttons above chat input (new)
-│   ├── ContactRow.js               # Reusable list row (from reference)
+│   ├── TaskRow.js                  # Swipeable task row with checkbox
+│   ├── EventRow.js                 # Event display with time bar
+│   ├── SectionHeader.js            # Section header with count + action
+│   ├── PriorityBadge.js            # Priority color dot indicator
+│   ├── EmptyState.js               # Generic empty state with CTA
+│   ├── CustomTabBar.js             # Bottom tab bar with center "+" FAB
+│   ├── ActionCard.js               # Chat inline action card (task/event created)
+│   ├── QuickActionBar.js           # Quick action chips above chat input
+│   ├── ContactRow.js               # Conversation list row (from reference)
 │   ├── Cell.js                     # Settings menu cell (from reference)
 │   └── Separator.js                # List separator
+├── hooks/
+│   └── useTodayData.js             # Today dashboard data fetching hook
 ├── stores/
 │   ├── useAuthStore.js             # Authentication state (Zustand)
 │   ├── useChatStore.js             # Conversations & messages (Zustand)
-│   └── useModuleStore.js           # Todos, events, memos (Zustand)
+│   └── useModuleStore.js           # Todos, events, memos + async API actions (Zustand)
 ├── services/
-│   ├── apiClient.js                # Axios REST client
-│   └── wsManager.js                # WebSocket connection manager
+│   └── apiClient.js                # Axios REST client
 ├── config/
-│   └── theme.js                    # Colors, typography, spacing
-└── utils/
-    └── formatters.js               # Date/time formatting helpers
+│   └── theme.js                    # Colors, typography, spacing (Things 3 palette)
+├── utils/
+│   ├── formatters.js               # Date/time helpers + grouping + greeting
+│   └── naturalLanguageParser.js    # NL date/type/priority parser
+└── widgets/
+    ├── TodayWidget.js              # Android home screen widget UI
+    └── widgetTaskHandler.js        # Widget headless data fetcher
 ```
 
 ## Pattern Migration Guide
@@ -61,43 +76,34 @@ const RootNavigator = () => {
 ```
 
 **ClawChat adaptation**:
-Keep the same conditional auth/main stack pattern. Replace Context with Zustand. Update tabs to Chat + Assistant + Settings.
+Keep the same conditional auth/main stack pattern. Replace Context with Zustand. Update tabs to Today + Inbox + Chat + Settings.
 
 ```javascript
-// ClawChat pattern
+// ClawChat pattern — 4-tab layout with custom tab bar
 import { useAuthStore } from './stores/useAuthStore';
+import CustomTabBar from './components/CustomTabBar';
 
 const TabNavigator = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      tabBarIcon: ({ focused, color, size }) => {
-        const icons = {
-          Chat: 'chatbubbles',
-          Assistant: 'grid',
-          Settings: 'settings',
-        };
-        const name = icons[route.name] + (focused ? '' : '-outline');
-        return <Ionicons name={name} size={size} color={color} />;
-      },
-      tabBarActiveTintColor: theme.colors.primary,
-    })}
-  >
-    <Tab.Screen name="Chat" component={ConversationListScreen} />
-    <Tab.Screen name="Assistant" component={AssistantScreen} />
+  <Tab.Navigator tabBar={(props) => <CustomTabBar {...props} />}>
+    <Tab.Screen name="Today" component={TodayScreen} />
+    <Tab.Screen name="Inbox" component={InboxScreen} />
+    <Tab.Screen name="Chat" component={ConversationListScreen} options={{ title: 'Chats' }} />
     <Tab.Screen name="Settings" component={SettingsScreen} />
   </Tab.Navigator>
 );
 
-const RootNavigator = () => {
-  const { token, isLoading } = useAuthStore();
-
-  if (isLoading) return <LoadingScreen />;
-  return (
-    <NavigationContainer>
-      {token ? <MainStack /> : <AuthStack />}
-    </NavigationContainer>
-  );
-};
+// MainStack includes tab navigator + detail screens
+const MainStack = () => (
+  <MainStackNav.Navigator>
+    <MainStackNav.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
+    <MainStackNav.Screen name="ChatScreen" component={ChatScreen} />
+    <MainStackNav.Screen name="TaskDetail" component={TaskDetailScreen} />
+    <MainStackNav.Screen name="EventDetail" component={EventDetailScreen} />
+    <MainStackNav.Screen name="AllTasks" component={AllTasksScreen} />
+    <MainStackNav.Screen name="QuickCapture" component={QuickCaptureModal}
+      options={{ presentation: 'modal', headerShown: false }} />
+  </MainStackNav.Navigator>
+);
 ```
 
 ---
@@ -382,89 +388,29 @@ export const wsManager = new WebSocketManager();
 
 **New components for ClawChat**:
 
+#### `TaskRow`
+Swipeable task row with animated checkbox, title, due date chip, and priority dot. Used across Today, Inbox, AllTasks, and Chat screens.
+
+#### `EventRow`
+Event display row with colored time bar, time label, title, and optional location.
+
+#### `SectionHeader`
+Section header with uppercase label, optional count badge, and right-side action link.
+
+#### `PriorityBadge`
+Color-coded priority dot (urgent=red, high=orange, low=gray). Hidden for medium priority.
+
+#### `EmptyState`
+Centered empty state with icon, title, subtitle, and optional action button.
+
+#### `CustomTabBar`
+Custom bottom tab bar rendering 4 tabs with a raised center "+" FAB button between Inbox and Chat.
+
 #### `ActionCard`
-Renders interactive cards for AI actions (todo created, event scheduled, etc.).
-
-```javascript
-// components/ActionCard.js
-const ActionCard = ({ card }) => {
-  const { card_type, payload, actions } = card;
-
-  const renderContent = () => {
-    switch (card_type) {
-      case 'todo_created':
-        return (
-          <View style={styles.card}>
-            <Ionicons name="checkbox-outline" size={20} color={theme.colors.success} />
-            <Text style={styles.cardTitle}>{payload.title}</Text>
-            {payload.due_date && <Text style={styles.cardMeta}>Due: {formatDate(payload.due_date)}</Text>}
-          </View>
-        );
-      case 'event_created':
-        return (
-          <View style={styles.card}>
-            <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
-            <Text style={styles.cardTitle}>{payload.title}</Text>
-            <Text style={styles.cardMeta}>{formatDateTime(payload.start_time)}</Text>
-          </View>
-        );
-      // ... other card types
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      {renderContent()}
-      <View style={styles.actionsRow}>
-        {actions?.map((action) => (
-          <TouchableOpacity key={action.action} style={styles.actionButton}
-            onPress={() => wsManager.send('action_response', action)}>
-            <Text style={styles.actionLabel}>{action.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-};
-```
-
-#### `StreamingText`
-Renders text that grows character-by-character as the AI streams its response.
-
-```javascript
-// components/StreamingText.js
-const StreamingText = ({ text, isStreaming }) => (
-  <Text style={styles.text}>
-    {text}
-    {isStreaming && <Text style={styles.cursor}>|</Text>}
-  </Text>
-);
-```
+Inline action cards rendered in chat bubbles for task/event creation confirmations. Shows title, metadata, and Edit/Complete/Delete action buttons.
 
 #### `QuickActionBar`
-Shortcut buttons above the chat input for common actions.
-
-```javascript
-// components/QuickActionBar.js
-const QUICK_ACTIONS = [
-  { label: 'New Todo', icon: 'checkbox-outline', prefix: 'Create a todo: ' },
-  { label: 'Schedule', icon: 'calendar-outline', prefix: 'Schedule: ' },
-  { label: 'Note', icon: 'document-text-outline', prefix: 'Save a note: ' },
-  { label: 'Briefing', icon: 'sunny-outline', prefix: 'Give me my daily briefing' },
-];
-
-const QuickActionBar = ({ onAction }) => (
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bar}>
-    {QUICK_ACTIONS.map((action) => (
-      <TouchableOpacity key={action.label} style={styles.chip}
-        onPress={() => onAction(action.prefix)}>
-        <Ionicons name={action.icon} size={16} color={theme.colors.primary} />
-        <Text style={styles.chipLabel}>{action.label}</Text>
-      </TouchableOpacity>
-    ))}
-  </ScrollView>
-);
-```
+Horizontal scroll bar of action chips ("New Task", "Schedule", "Note", "Today's Plan") above the chat input that prefill the input text.
 
 ---
 
@@ -613,6 +559,7 @@ function LoginScreen() {
 |---------|---------|
 | `zustand` | State management (replaces React Context) |
 | `axios` | HTTP client for REST API |
+| `react-native-android-widget` | Android home screen widget support |
 
 ### Removed (Firebase)
 

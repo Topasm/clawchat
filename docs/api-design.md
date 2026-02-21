@@ -237,6 +237,72 @@ DELETE /api/memos/:id              # Delete a memo
 
 ---
 
+## Today Dashboard Endpoint
+
+```
+GET    /api/today                   # Consolidated today view (tasks, events, overdue, inbox count)
+```
+
+#### `GET /api/today`
+
+Returns all data needed for the Today dashboard in a single request.
+
+```json
+// Response 200
+{
+  "today_tasks": [
+    {
+      "id": "todo_001",
+      "title": "Review VLA paper",
+      "status": "pending",
+      "priority": "high",
+      "due_date": "2026-02-21T23:59:00Z",
+      "tags": ["research"],
+      "created_at": "2026-02-21T09:00:00Z",
+      "updated_at": "2026-02-21T09:00:00Z"
+    }
+  ],
+  "overdue_tasks": [],
+  "today_events": [
+    {
+      "id": "evt_001",
+      "title": "VLA Model Review",
+      "start_time": "2026-02-21T15:00:00Z",
+      "end_time": "2026-02-21T16:00:00Z",
+      "is_all_day": false
+    }
+  ],
+  "inbox_count": 3,
+  "greeting": "Good morning",
+  "date": "2026-02-21"
+}
+```
+
+---
+
+## Notification Endpoints
+
+```
+POST   /api/notifications/register-token   # Register an Expo push notification token
+```
+
+#### `POST /api/notifications/register-token`
+
+```json
+// Request
+{
+  "token": "ExponentPushToken[xxxxxx]",
+  "device_id": "optional-device-id"
+}
+
+// Response 200
+{
+  "status": "registered"
+}
+```
+
+---
+
 ## Search Endpoint
 
 ```

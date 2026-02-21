@@ -23,14 +23,14 @@ Establish the core infrastructure for both server and mobile app.
 ### Mobile App
 
 - [ ] Initialize Expo project
-- [ ] Set up React Navigation (stack + bottom tabs)
+- [x] Set up React Navigation (stack + bottom tabs)
 - [ ] Implement LoginScreen (server URL + PIN)
-- [ ] Create Zustand stores: `useAuthStore`, `useChatStore`, `useModuleStore`
+- [x] Create Zustand stores: `useAuthStore`, `useChatStore`, `useModuleStore`
 - [ ] Build API client (Axios with auth interceptor)
 - [ ] Implement ConversationListScreen (list conversations from API)
 - [ ] Implement basic ChatScreen with GiftedChat (send/receive messages via REST)
 - [ ] Port ContactRow and Cell components from reference project
-- [ ] Set up theme system (`config/theme.js`)
+- [x] Set up theme system (`config/theme.js`)
 
 ### Milestone
 A user can log in, send a message, and receive a (non-AI) echo response. CRUD operations work for todos, events, and memos via the REST API.
@@ -84,13 +84,13 @@ Build out the full assistant functionality.
 
 ### Mobile App
 
-- [ ] Build AssistantScreen with module dashboard (today's todos, upcoming events, recent memos)
-- [ ] Implement QuickActionBar above chat input
+- [x] Build Today dashboard with task/event sections (replaced AssistantScreen)
+- [x] Implement QuickActionBar above chat input
 - [ ] Build SettingsScreen (server info, AI model selection, briefing time, logout)
 - [ ] Handle `notification` WebSocket messages
 - [ ] Implement search UI (cross-module search results)
 - [ ] Add pull-to-refresh on conversation list and module views
-- [ ] Handle action card interactions (edit, delete, complete via WebSocket)
+- [x] Handle action card interactions (edit, delete, complete)
 
 ### Milestone
 The app functions as a full personal assistant. Users can manage all data through conversation or direct UI, search across all modules, receive daily briefings, and delegate async tasks.
@@ -133,11 +133,39 @@ ClawChat is deployable with `docker compose up`. A user can install the server, 
 
 ---
 
+## UI/UX Redesign (Completed)
+
+Things 3-inspired GTD experience integrated with AI chat.
+
+### Completed
+- [x] 4-tab layout: Today, Inbox, (+) FAB, Chat, Settings
+- [x] Custom tab bar with center "+" quick capture button
+- [x] Today dashboard (greeting, events, tasks, overdue, inbox count)
+- [x] Inbox screen for unscheduled tasks with swipe gestures
+- [x] Task detail editing (priority, due date, description, delete)
+- [x] Event detail editing (time, location, all-day toggle, delete)
+- [x] All tasks grouped view (in progress, pending, completed)
+- [x] Quick capture modal with natural language parsing
+- [x] Chat smart send (auto-detect tasks/events from keywords)
+- [x] Action cards in chat (task/event created confirmations)
+- [x] Quick action bar chips above chat input
+- [x] Natural language parser (dates, times, types, priorities)
+- [x] Backend /api/today consolidated endpoint
+- [x] APScheduler reminder and overdue task checker
+- [x] Push notification token registration endpoint
+- [x] Android home screen widget (react-native-android-widget)
+- [x] Things 3 color palette (todayBlue, inboxYellow, completedGreen, overdueRed)
+- [x] Shared components: TaskRow, EventRow, SectionHeader, PriorityBadge, EmptyState
+- [x] Store async actions (fetchTodos, fetchEvents, toggleTodoComplete, createTodo, createEvent)
+- [x] Date utility functions (isToday, isTomorrow, isOverdue, formatDueDate, getGreeting, groupTodosByDate)
+
+---
+
 ## Future Considerations (Post v1.0)
 
 These are explicitly **not** in the initial scope but worth tracking:
 
-- **Home screen widgets** (iOS WidgetKit, Android App Widgets) for glanceable data
+- **~~Home screen widgets~~** — Android widget implemented via react-native-android-widget; iOS WidgetKit pending
 - **Google Calendar sync** (bidirectional via Google Calendar API)
 - **Voice input** (speech-to-text for hands-free interaction)
 - **Web dashboard** (admin panel for server management)

@@ -3,40 +3,51 @@
 ## System Diagram
 
 ```
-┌─ React Native Mobile App (Expo) ─────────────────────┐
-│                                                        │
-│   Screens              State (Zustand)                 │
-│   ├── ChatScreen       ├── useAuthStore                │
-│   ├── AssistantScreen  ├── useChatStore                │
-│   └── SettingsScreen   └── useModuleStore              │
-│                                                        │
-│   Components           Services                        │
-│   ├── ActionCard       ├── apiClient (axios)           │
-│   ├── StreamingText    └── wsManager (WebSocket)       │
-│   ├── QuickActionBar                                   │
-│   ├── ContactRow                                       │
-│   └── Cell                                             │
-│                                                        │
-└────────────────────┬──────────────────────────────────┘
-                     │ REST (HTTPS) + WebSocket (WSS)
-                     │ User's own server only
-┌────────────────────┼──────────────────────────────────┐
-│  Self-Hosted Server │                                  │
-│                     │                                  │
-│  FastAPI Backend                                       │
-│  ├── Routers (chat, todo, calendar, memo, search)      │
-│  ├── Services (ai_service, ws_manager, scheduler)      │
-│  ├── Agent (intent classifier + orchestrator)          │
-│  └── Models & Schemas (SQLAlchemy + Pydantic)          │
-│                                                        │
-│  SQLite Database                                       │
-│  ├── conversations, messages                           │
-│  ├── todos, events, memos                              │
-│  └── agent_tasks                                       │
-│                                                        │
-│  LLM Provider                                          │
-│  └── Ollama (local) or OpenAI-compatible API (cloud)   │
-└────────────────────────────────────────────────────────┘
+┌─ React Native Mobile App (Expo) ──────────────────────────┐
+│                                                             │
+│   Screens                    State (Zustand)                │
+│   ├── TodayScreen            ├── useAuthStore               │
+│   ├── InboxScreen            ├── useChatStore               │
+│   ├── ConversationListScreen └── useModuleStore             │
+│   ├── ChatScreen                 (async API actions)        │
+│   ├── QuickCaptureModal                                     │
+│   ├── TaskDetailScreen       Hooks                          │
+│   ├── EventDetailScreen      └── useTodayData               │
+│   ├── AllTasksScreen                                        │
+│   └── SettingsScreen         Widgets                        │
+│                              └── TodayWidget (Android)      │
+│   Components                 Services                       │
+│   ├── TaskRow                ├── apiClient (axios)          │
+│   ├── EventRow               └── naturalLanguageParser      │
+│   ├── SectionHeader                                         │
+│   ├── PriorityBadge                                         │
+│   ├── EmptyState                                            │
+│   ├── CustomTabBar                                          │
+│   ├── ActionCard                                            │
+│   ├── QuickActionBar                                        │
+│   ├── ContactRow                                            │
+│   └── Cell                                                  │
+│                                                             │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ REST (HTTPS)
+                      │ User's own server only
+┌─────────────────────┼───────────────────────────────────────┐
+│  Self-Hosted Server  │                                       │
+│                      │                                       │
+│  FastAPI Backend                                             │
+│  ├── Routers (chat, todo, calendar, memo, search,            │
+│  │           today, notifications)                           │
+│  ├── Services (todo, calendar, memo, scheduler)              │
+│  └── Models & Schemas (SQLAlchemy + Pydantic)                │
+│                                                              │
+│  SQLite Database                                             │
+│  ├── conversations, messages                                 │
+│  ├── todos, events, memos                                    │
+│  └── agent_tasks                                             │
+│                                                              │
+│  LLM Provider                                                │
+│  └── Ollama (local) or OpenAI-compatible API (cloud)         │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## Design Principles
@@ -57,7 +68,7 @@ The system works fully offline with a local LLM. Cloud services (Claude API, Goo
 
 ### Mobile App
 - **Expo + React Native**: Cross-platform with native capabilities
-- **React Navigation**: Tab-based layout (Chat, Assistant, Settings) with stack screens
+- **React Navigation**: 4-tab layout (Today, Inbox, Chat, Settings) with custom tab bar, center "+" FAB, and stack screens for detail views
 - **Zustand**: Lightweight state management replacing React Context
 - **react-native-gifted-chat**: Chat UI with custom rendering for AI features
 - **Axios + WebSocket**: Communication with the self-hosted server
@@ -126,6 +137,6 @@ The architecture borrows navigation and UI patterns from the [react-native-chat]
 | Auth | Firebase Auth (email/password) | JWT token (server URL + PIN/API key) |
 | State | React Context (`AuthenticatedUserContext`, `UnreadMessagesContext`) | Zustand stores (`useAuthStore`, `useChatStore`) |
 | Chat UI | react-native-gifted-chat | react-native-gifted-chat (extended with streaming + action cards) |
-| Navigation | Stack + Bottom Tabs (Chats, Settings) | Stack + Bottom Tabs (Chat, Assistant, Settings) |
+| Navigation | Stack + Bottom Tabs (Chats, Settings) | Stack + 4 Bottom Tabs (Today, Inbox, Chat, Settings) + Custom Tab Bar with "+" FAB |
 | Data model | Firestore documents | SQLite tables via SQLAlchemy |
-| Components | ContactRow, Cell, ChatHeader, ChatMenu | ContactRow, Cell (reused) + ActionCard, StreamingText, QuickActionBar (new) |
+| Components | ContactRow, Cell, ChatHeader, ChatMenu | ContactRow, Cell (reused) + TaskRow, EventRow, SectionHeader, PriorityBadge, EmptyState, CustomTabBar, ActionCard, QuickActionBar (new) |

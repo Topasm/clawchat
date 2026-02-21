@@ -21,7 +21,9 @@ server/
 │   ├── todo.py                 # CRUD /api/todos
 │   ├── calendar.py             # CRUD /api/events
 │   ├── memo.py                 # CRUD /api/memos
-│   └── search.py               # GET /api/search
+│   ├── search.py               # GET /api/search
+│   ├── today.py                # GET /api/today (consolidated dashboard)
+│   └── notifications.py        # POST /api/notifications/register-token
 ├── models/
 │   ├── __init__.py
 │   ├── conversation.py         # Conversation SQLAlchemy model
@@ -36,7 +38,8 @@ server/
 │   ├── todo.py                 # Todo schemas
 │   ├── calendar.py             # Event schemas
 │   ├── memo.py                 # Memo schemas
-│   └── common.py               # Shared schemas (pagination, error, etc.)
+│   ├── common.py               # Shared schemas (pagination, error, etc.)
+│   └── today.py                # Today dashboard response schema
 ├── services/
 │   ├── __init__.py
 │   ├── ai_service.py           # LLM client (OpenAI-compatible)
@@ -46,7 +49,8 @@ server/
 │   ├── calendar_service.py     # Event CRUD operations
 │   ├── memo_service.py         # Memo CRUD operations
 │   ├── search_service.py       # Full-text search across tables
-│   └── agent_service.py        # Async task execution
+│   ├── agent_service.py        # Async task execution
+│   └── scheduler.py            # APScheduler reminder & overdue checker
 ├── ws/
 │   ├── __init__.py
 │   ├── manager.py              # WebSocket connection manager
@@ -70,7 +74,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import engine, Base
-from routers import auth, chat, todo, calendar, memo, search
+from routers import auth, chat, todo, calendar, memo, search, today, notifications
 from ws.handler import websocket_endpoint
 from scheduler.tasks import start_scheduler
 
@@ -85,6 +89,8 @@ app.include_router(todo.router, prefix="/api/todos", tags=["todos"])
 app.include_router(calendar.router, prefix="/api/events", tags=["calendar"])
 app.include_router(memo.router, prefix="/api/memos", tags=["memos"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(today.router, prefix="/api/today", tags=["today"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 
 # WebSocket
 app.websocket("/ws")(websocket_endpoint)
@@ -301,6 +307,7 @@ source venv/bin/activate  # Linux/Mac
 # or: venv\Scripts\activate  # Windows
 
 # Install dependencies
+# Includes apscheduler>=3.10.0 and exponent-server-sdk>=2.0.0
 pip install -r requirements.txt
 
 # Copy and edit environment config

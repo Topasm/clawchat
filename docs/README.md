@@ -13,6 +13,7 @@ ClawChat (AI Secretary) is a privacy-first, self-hosted personal assistant that 
 | [Frontend Guide](./frontend-guide.md) | React Native app structure and reference pattern migrations |
 | [Deployment](./deployment.md) | Docker setup, environment variables, and production config |
 | [Roadmap](./roadmap.md) | Phased development plan (Weeks 1-9) |
+| [UI/UX Redesign](./ui-redesign.md) | Things 3-style task management + chat integration |
 
 ## Tech Stack
 
