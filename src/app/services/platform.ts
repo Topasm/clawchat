@@ -32,3 +32,31 @@ export const storage = {
     localStorage.removeItem(key);
   },
 };
+
+/**
+ * Secure storage — uses Electron's safeStorage (OS-level encryption) when
+ * running in Electron, falls back to the regular storage abstraction otherwise.
+ */
+export const secureStorage = {
+  async get(key: string): Promise<string | null> {
+    const api = (window as any).electronAPI;
+    if (api?.secureStore) {
+      return api.secureStore.get(key);
+    }
+    return storage.get(key);
+  },
+  async set(key: string, value: string): Promise<void> {
+    const api = (window as any).electronAPI;
+    if (api?.secureStore) {
+      return api.secureStore.set(key, value);
+    }
+    return storage.set(key, value);
+  },
+  async remove(key: string): Promise<void> {
+    const api = (window as any).electronAPI;
+    if (api?.secureStore) {
+      return api.secureStore.delete(key);
+    }
+    return storage.remove(key);
+  },
+};

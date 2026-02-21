@@ -3,13 +3,20 @@ import { useAuthStore } from './useAuthStore';
 import { useToastStore } from './useToastStore';
 import { connectSSE } from '../services/sseClient';
 import apiClient from '../services/apiClient';
+import { logger } from '../services/logger';
 import type { ConversationResponse, StreamEventMeta } from '../types/api';
+
+const MAX_MESSAGES = 500;
 
 export interface ChatMessage {
   _id: string;
   text: string;
   createdAt: Date;
   user: { _id: string; name: string };
+}
+
+function trimMessages(msgs: ChatMessage[]): ChatMessage[] {
+  return msgs.length > MAX_MESSAGES ? msgs.slice(0, MAX_MESSAGES) : msgs;
 }
 
 // Demo conversations shown when no server is configured
@@ -103,12 +110,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   conversationsLoaded: false,
 
   setConversations: (conversations) => set({ conversations }),
-  setMessages: (messages) => set({ messages }),
+  setMessages: (messages) => set({ messages: trimMessages(messages) }),
   setCurrentConversationId: (id) => set({ currentConversationId: id }),
 
   addMessage: (message) =>
     set((state) => ({
-      messages: [message, ...state.messages],
+      messages: trimMessages([message, ...state.messages]),
     })),
 
   appendToLastMessage: (content) =>
@@ -145,7 +152,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const items: ConversationResponse[] = res.data?.items ?? res.data ?? [];
       set({ conversations: items, conversationsLoaded: true });
     } catch (err) {
-      console.warn('Failed to fetch conversations:', err);
+      logger.warn('Failed to fetch conversations:', err);
       // Keep existing data
     }
   },
@@ -170,7 +177,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       get().addConversation(convo);
       return convo;
     } catch (err) {
-      console.warn('Failed to create conversation on server:', err);
+      logger.warn('Failed to create conversation on server:', err);
       // Fall back to local creation
       const localConvo: ConversationResponse = {
         id: `local-conv-${Date.now()}`,
@@ -195,7 +202,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       try {
         await apiClient.delete(`/chat/conversations/${id}`);
       } catch (err) {
-        console.warn('Failed to delete conversation on server:', err);
+        logger.warn('Failed to delete conversation on server:', err);
         if (existing) get().addConversation(existing);
         useToastStore.getState().addToast('error', 'Failed to delete conversation on server');
       }
@@ -218,9 +225,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         createdAt: new Date(m.created_at),
         user: { _id: m.role, name: m.role === 'user' ? 'You' : 'ClawChat' },
       }));
-      set({ messages: msgs.reverse() });
+      set({ messages: trimMessages(msgs.reverse()) });
     } catch (err) {
-      console.warn('Failed to fetch messages:', err);
+      logger.warn('Failed to fetch messages:', err);
       // Keep existing messages
     }
   },
@@ -240,7 +247,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           user: { _id: 'assistant', name: 'ClawChat' },
         };
         set((state) => ({
-          messages: [assistantMessage, ...state.messages],
+          messages: trimMessages([assistantMessage, ...state.messages]),
         }));
         resolve();
         return;
@@ -315,14 +322,29 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   deleteMessage: async (conversationId, messageId) => {
+    const { messages } = get();
+    const deletedIndex = messages.findIndex((m) => m._id === messageId);
+    const deletedMessage = deletedIndex !== -1 ? messages[deletedIndex] : null;
+
     set((state) => ({
       messages: state.messages.filter((m) => m._id !== messageId),
     }));
+
     if (!isDemoMode()) {
       try {
         await apiClient.delete(`/chat/conversations/${conversationId}/messages/${messageId}`);
       } catch (error) {
-        console.warn('Failed to delete message on server:', error);
+        logger.warn('Failed to delete message on server:', error);
+        if (deletedMessage) {
+          set((state) => {
+            const updated = [...state.messages];
+            // Re-insert at the original position (clamped to array bounds)
+            const insertAt = Math.min(deletedIndex, updated.length);
+            updated.splice(insertAt, 0, deletedMessage);
+            return { messages: updated };
+          });
+        }
+        useToastStore.getState().addToast('error', 'Failed to delete message on server');
       }
     }
   },
@@ -348,7 +370,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (!isDemoMode()) {
       apiClient
         .delete(`/chat/conversations/${conversationId}/messages/${assistantMessageId}`)
-        .catch((err) => console.warn('Failed to delete assistant message on server:', err));
+        .catch((err) => logger.warn('Failed to delete assistant message on server:', err));
     }
 
     return userMessage.text;
@@ -382,7 +404,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         for (const id of assistantMessagesToRemove) {
           apiClient
             .delete(`/chat/conversations/${conversationId}/messages/${id}`)
-            .catch((err) => console.warn('Failed to delete old assistant message:', err));
+            .catch((err) => logger.warn('Failed to delete old assistant message:', err));
         }
       }
     }
@@ -391,7 +413,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       try {
         await apiClient.put(`/chat/conversations/${conversationId}/messages/${messageId}`, { content: newText });
       } catch (error) {
-        console.warn('Failed to edit message on server:', error);
+        logger.warn('Failed to edit message on server:', error);
       }
     }
 

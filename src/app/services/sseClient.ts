@@ -1,4 +1,8 @@
 import type { StreamEventMeta } from '../types/api';
+import { logger } from './logger';
+
+const SSE_TIMEOUT_MS = 60_000;
+const MAX_RETRIES = 2;
 
 export interface SSECallbacks {
   onMeta?: (meta: StreamEventMeta) => void;
@@ -36,6 +40,23 @@ export function connectSSE(
 
   let accumulated = '';
   let metaReceived = false;
+  let retryCount = 0;
+  let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearInactivityTimer = () => {
+    if (inactivityTimer !== null) {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = null;
+    }
+  };
+
+  const resetInactivityTimer = () => {
+    clearInactivityTimer();
+    inactivityTimer = setTimeout(() => {
+      logger.warn('SSE connection timed out after inactivity', { url, accumulatedLength: accumulated.length });
+      abortController.abort();
+    }, SSE_TIMEOUT_MS);
+  };
 
   const run = async () => {
     try {
@@ -64,9 +85,13 @@ export function connectSSE(
         const decoder = new TextDecoder();
         let buffer = '';
 
+        resetInactivityTimer();
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+
+          resetInactivityTimer();
 
           buffer += decoder.decode(value, { stream: true });
 
@@ -80,6 +105,7 @@ export function connectSSE(
 
           for (const eventData of events) {
             if (eventData === '[DONE]') {
+              clearInactivityTimer();
               onDone?.(accumulated);
               return;
             }
@@ -99,6 +125,8 @@ export function connectSSE(
             }
           }
         }
+
+        clearInactivityTimer();
 
         if (accumulated) {
           onDone?.(accumulated);
@@ -131,10 +159,46 @@ export function connectSSE(
         onDone?.(accumulated);
       }
     } catch (error) {
+      clearInactivityTimer();
+
       if ((error as Error).name === 'AbortError') {
         onDone?.(accumulated);
         return;
       }
+
+      // If no tokens were received yet, retry with exponential backoff
+      if (!metaReceived && accumulated === '' && retryCount < MAX_RETRIES) {
+        retryCount++;
+        const delayMs = 1000 * Math.pow(2, retryCount - 1);
+        logger.warn('SSE connection error, retrying', {
+          url,
+          attempt: retryCount,
+          maxRetries: MAX_RETRIES,
+          delayMs,
+          error: (error as Error).message,
+        });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        run();
+        return;
+      }
+
+      // If tokens were already received, salvage the partial response
+      if (accumulated) {
+        logger.warn('SSE connection lost after receiving partial response, returning accumulated data', {
+          url,
+          accumulatedLength: accumulated.length,
+          error: (error as Error).message,
+        });
+        onDone?.(accumulated);
+        return;
+      }
+
+      // No tokens received and retries exhausted
+      logger.error('SSE connection failed after all retries', {
+        url,
+        retries: retryCount,
+        error: (error as Error).message,
+      });
       onError?.(error as Error);
     }
   };

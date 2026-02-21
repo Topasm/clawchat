@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from './useAuthStore';
 import { useToastStore } from './useToastStore';
+import { logger } from '../services/logger';
 import type {
   TodoResponse,
   TodoCreate,
@@ -133,6 +134,10 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
 
   kanbanStatuses: { 'demo-5': 'in_progress', 'demo-11': 'in_progress', 'demo-12': 'in_progress' },
   setKanbanStatus: (id, status) => {
+    // Capture previous state for rollback
+    const prevKanbanStatus = get().kanbanStatuses[id];
+    const prevTodo = get().todos.find((t) => t.id === id);
+
     set((state) => ({
       kanbanStatuses: { ...state.kanbanStatuses, [id]: status },
     }));
@@ -147,7 +152,18 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
         todos: state.todos.map((t) => (t.id === id ? { ...t, status: serverStatus } : t)),
       }));
       if (!isDemoMode()) {
-        apiClient.patch(`/todos/${id}`, { status: serverStatus }).catch(() => {});
+        apiClient.patch(`/todos/${id}`, { status: serverStatus }).catch(() => {
+          // Rollback kanban status and todo status on server error
+          set((state) => ({
+            kanbanStatuses: prevKanbanStatus !== undefined
+              ? { ...state.kanbanStatuses, [id]: prevKanbanStatus }
+              : (() => { const next = { ...state.kanbanStatuses }; delete next[id]; return next; })(),
+            todos: state.todos.map((t) =>
+              t.id === id ? { ...t, status: prevTodo?.status ?? t.status } : t,
+            ),
+          }));
+          useToastStore.getState().addToast('error', 'Failed to move task on server, change reverted');
+        });
       }
     }
   },
@@ -256,10 +272,12 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   },
 
   toggleTodoComplete: async (id) => {
-    const { todos } = get();
+    const { todos, kanbanStatuses } = get();
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
     const newStatus = todo.status === 'completed' ? 'pending' : 'completed';
+    // Capture previous kanban status for rollback (optimistic update deletes it)
+    const prevKanbanStatus = kanbanStatuses[id];
     // Optimistic update
     set((state) => {
       const next = { ...state.kanbanStatuses };
@@ -277,7 +295,14 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       try {
         await apiClient.patch(`/todos/${id}`, { status: newStatus });
       } catch {
-        // Offline / no server -- keep the optimistic update
+        // Rollback: revert status and restore previous kanban status
+        set((state) => ({
+          todos: state.todos.map((t) => (t.id === id ? { ...t, status: todo.status } : t)),
+          kanbanStatuses: prevKanbanStatus !== undefined
+            ? { ...state.kanbanStatuses, [id]: prevKanbanStatus }
+            : state.kanbanStatuses,
+        }));
+        useToastStore.getState().addToast('error', 'Failed to update task on server, change reverted');
       }
     }
   },
@@ -358,7 +383,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       try {
         await apiClient.delete(`/todos/${id}`);
       } catch (err) {
-        console.warn('Failed to delete todo on server:', err);
+        logger.warn('Failed to delete todo on server:', err);
         // Re-add on failure so user doesn't lose data silently
         if (existing) get().addTodo(existing);
         useToastStore.getState().addToast('error', 'Failed to delete task on server');
@@ -376,7 +401,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       try {
         await apiClient.delete(`/events/${id}`);
       } catch (err) {
-        console.warn('Failed to delete event on server:', err);
+        logger.warn('Failed to delete event on server:', err);
         if (existing) get().addEvent(existing);
         useToastStore.getState().addToast('error', 'Failed to delete event on server');
       }
@@ -393,7 +418,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       try {
         await apiClient.delete(`/memos/${id}`);
       } catch (err) {
-        console.warn('Failed to delete memo on server:', err);
+        logger.warn('Failed to delete memo on server:', err);
         if (existing) get().addMemo(existing);
         useToastStore.getState().addToast('error', 'Failed to delete memo on server');
       }
@@ -401,6 +426,8 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   },
 
   serverUpdateTodo: async (id, data) => {
+    // Capture previous state for rollback
+    const previousTodo = get().todos.find((t) => t.id === id);
     // Optimistic update
     get().updateTodo(id, { ...data, updated_at: new Date().toISOString() } as Partial<TodoResponse>);
 
@@ -408,34 +435,46 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       try {
         await apiClient.patch(`/todos/${id}`, data);
       } catch (err) {
-        console.warn('Failed to update todo on server:', err);
-        useToastStore.getState().addToast('warning', 'Changes saved locally, server sync failed');
+        logger.warn('Failed to update todo on server:', err);
+        // Rollback to previous state
+        if (previousTodo) get().updateTodo(id, previousTodo);
+        useToastStore.getState().addToast('error', 'Failed to update task on server, changes reverted');
       }
     }
   },
 
   serverUpdateEvent: async (id, data) => {
+    // Capture previous state for rollback
+    const previousEvent = get().events.find((e) => e.id === id);
+    // Optimistic update
     get().updateEvent(id, { ...data, updated_at: new Date().toISOString() } as Partial<EventResponse>);
 
     if (!isDemoMode()) {
       try {
         await apiClient.patch(`/events/${id}`, data);
       } catch (err) {
-        console.warn('Failed to update event on server:', err);
-        useToastStore.getState().addToast('warning', 'Changes saved locally, server sync failed');
+        logger.warn('Failed to update event on server:', err);
+        // Rollback to previous state
+        if (previousEvent) get().updateEvent(id, previousEvent);
+        useToastStore.getState().addToast('error', 'Failed to update event on server, changes reverted');
       }
     }
   },
 
   serverUpdateMemo: async (id, data) => {
+    // Capture previous state for rollback
+    const previousMemo = get().memos.find((m) => m.id === id);
+    // Optimistic update
     get().updateMemo(id, { ...data, updated_at: new Date().toISOString() } as Partial<MemoResponse>);
 
     if (!isDemoMode()) {
       try {
         await apiClient.patch(`/memos/${id}`, data);
       } catch (err) {
-        console.warn('Failed to update memo on server:', err);
-        useToastStore.getState().addToast('warning', 'Changes saved locally, server sync failed');
+        logger.warn('Failed to update memo on server:', err);
+        // Rollback to previous state
+        if (previousMemo) get().updateMemo(id, previousMemo);
+        useToastStore.getState().addToast('error', 'Failed to update memo on server, changes reverted');
       }
     }
   },

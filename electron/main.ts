@@ -1,5 +1,45 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
+
+// ── Secure store helpers ──────────────────────────────────────────────
+function getStorePath(): string {
+  return path.join(app.getPath('userData'), 'secure-store.json');
+}
+
+function readStore(): Record<string, string> {
+  try {
+    const raw = fs.readFileSync(getStorePath(), 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function writeStore(data: Record<string, string>): void {
+  fs.writeFileSync(getStorePath(), JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// ── IPC handlers for encrypted storage ────────────────────────────────
+ipcMain.handle('secure-store:set', (_event, key: string, value: string) => {
+  const encrypted = safeStorage.encryptString(value);
+  const store = readStore();
+  store[key] = encrypted.toString('base64');
+  writeStore(store);
+});
+
+ipcMain.handle('secure-store:get', (_event, key: string): string | null => {
+  const store = readStore();
+  const base64 = store[key];
+  if (!base64) return null;
+  return safeStorage.decryptString(Buffer.from(base64, 'base64'));
+});
+
+ipcMain.handle('secure-store:delete', (_event, key: string) => {
+  const store = readStore();
+  delete store[key];
+  writeStore(store);
+});
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;

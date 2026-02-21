@@ -14,4 +14,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener(channel, listener);
     };
   },
+  secureStore: {
+    get: (key: string) => ipcRenderer.invoke('secure-store:get', key),
+    set: (key: string, value: string) => ipcRenderer.invoke('secure-store:set', key, value),
+    delete: (key: string) => ipcRenderer.invoke('secure-store:delete', key),
+  },
 });

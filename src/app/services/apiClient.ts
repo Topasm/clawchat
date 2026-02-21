@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from 'axios';
 import { useAuthStore } from '../stores/useAuthStore';
+import { logger } from './logger';
 
 const apiClient = axios.create();
 
@@ -31,11 +32,13 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config;
     if (!originalRequest || error.response?.status !== 401) {
+      logger.warn('API request failed', { url: originalRequest?.url, status: error.response?.status });
       return Promise.reject(error);
     }
 
     // Avoid infinite loop on the refresh endpoint itself
     if (originalRequest.url?.includes('/auth/refresh')) {
+      logger.warn('Token refresh failed, logging out');
       useAuthStore.getState().logout();
       return Promise.reject(error);
     }
@@ -73,6 +76,7 @@ apiClient.interceptors.response.use(
 
       return apiClient(originalRequest);
     } catch {
+      logger.error('Token refresh error, logging out', error);
       useAuthStore.getState().logout();
       return Promise.reject(error);
     } finally {

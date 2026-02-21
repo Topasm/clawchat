@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { secureStorage } from '../services/platform';
 
 interface AuthState {
   token: string | null;
@@ -56,7 +57,17 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => ({
+        getItem: async (name: string) => {
+          return secureStorage.get(name);
+        },
+        setItem: async (name: string, value: string) => {
+          await secureStorage.set(name, value);
+        },
+        removeItem: async (name: string) => {
+          await secureStorage.remove(name);
+        },
+      })),
       onRehydrateStorage: () => (state) => {
         state?.setLoading(false);
       },
