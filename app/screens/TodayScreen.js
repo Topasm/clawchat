@@ -7,7 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
 import useTodayData from '../hooks/useTodayData';
 import TaskRow from '../components/TaskRow';
@@ -16,6 +16,8 @@ import SectionHeader from '../components/SectionHeader';
 import EmptyState from '../components/EmptyState';
 
 export default function TodayScreen({ navigation }) {
+  const { colors } = useTheme();
+
   const {
     todayTasks,
     overdueTasks,
@@ -54,24 +56,24 @@ export default function TodayScreen({ navigation }) {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}
       refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
     >
       {/* Greeting Header */}
-      <View style={styles.greetingHeader}>
-        <Text style={styles.greeting}>{greeting}</Text>
-        <Text style={styles.date}>{dateString}</Text>
+      <View style={[styles.greetingHeader, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.greeting, { color: colors.text }]}>{greeting}</Text>
+        <Text style={[styles.date, { color: colors.textSecondary }]}>{dateString}</Text>
         {totalTodayCount > 0 && (
-          <Text style={styles.summary}>
+          <Text style={[styles.summary, { color: colors.todayBlue }]}>
             {totalTodayCount} task{totalTodayCount !== 1 ? 's' : ''} for today
           </Text>
         )}
@@ -136,8 +138,16 @@ export default function TodayScreen({ navigation }) {
 
       {/* Inbox indicator */}
       {inboxCount > 0 && (
-        <View style={styles.inboxBanner}>
-          <Text style={styles.inboxText}>
+        <View
+          style={[
+            styles.inboxBanner,
+            {
+              backgroundColor: colors.surface,
+              borderLeftColor: colors.inboxYellow,
+            },
+          ]}
+        >
+          <Text style={[styles.inboxText, { color: colors.textSecondary }]}>
             {inboxCount} item{inboxCount !== 1 ? 's' : ''} in Inbox
           </Text>
         </View>
@@ -149,7 +159,6 @@ export default function TodayScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   contentContainer: {
     paddingBottom: 32,
@@ -158,27 +167,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
   },
   greetingHeader: {
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 16,
-    backgroundColor: theme.colors.surface,
   },
   greeting: {
     fontSize: 28,
     fontWeight: '700',
-    color: theme.colors.text,
   },
   date: {
     fontSize: 15,
-    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   summary: {
     fontSize: 14,
-    color: theme.colors.todayBlue,
     marginTop: 8,
     fontWeight: '500',
   },
@@ -187,13 +191,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: theme.colors.inboxYellow,
   },
   inboxText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
   },
 });

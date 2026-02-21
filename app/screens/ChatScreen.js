@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import apiClient from '../services/apiClient';
 import { useChatStore } from '../stores/useChatStore';
 import { useModuleStore } from '../stores/useModuleStore';
@@ -24,6 +24,8 @@ function mapToGiftedMessage(msg) {
 }
 
 export default function ChatScreen({ route, navigation }) {
+  const { colors, spacing } = useTheme();
+
   const conversationId = route.params?.id;
   const conversationTitle = route.params?.title || 'Chat';
 
@@ -182,12 +184,12 @@ export default function ChatScreen({ route, navigation }) {
     <Bubble
       {...props}
       wrapperStyle={{
-        left: { backgroundColor: theme.colors.assistantBubble },
-        right: { backgroundColor: theme.colors.userBubble },
+        left: { backgroundColor: colors.assistantBubble },
+        right: { backgroundColor: colors.userBubble },
       }}
       textStyle={{
-        left: { color: theme.colors.text },
-        right: { color: theme.colors.surface },
+        left: { color: colors.text },
+        right: { color: '#FFFFFF' },
       }}
     />
   );
@@ -211,7 +213,11 @@ export default function ChatScreen({ route, navigation }) {
       <QuickActionBar onSelectAction={handleQuickAction} />
       <InputToolbar
         {...props}
-        containerStyle={styles.inputToolbar}
+        containerStyle={{
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          backgroundColor: colors.surface,
+        }}
         primaryStyle={styles.inputPrimary}
       />
     </View>
@@ -221,21 +227,21 @@ export default function ChatScreen({ route, navigation }) {
     if (!isSending) return null;
     return (
       <View style={styles.footerContainer}>
-        <ActivityIndicator size="small" color={theme.colors.secondary} />
+        <ActivityIndicator size="small" color={colors.secondary} />
       </View>
     );
   };
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <GiftedChat
         messages={messages}
         onSend={(msgs) => onSend(msgs)}
@@ -249,7 +255,7 @@ export default function ChatScreen({ route, navigation }) {
         placeholder="Type a message or task..."
         alwaysShowSend
         scrollToBottom
-        scrollToBottomStyle={styles.scrollToBottom}
+        scrollToBottomStyle={[styles.scrollToBottom, { backgroundColor: colors.primary }]}
       />
     </View>
   );
@@ -258,27 +264,18 @@ export default function ChatScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
-  },
-  inputToolbar: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
   },
   inputPrimary: {
     alignItems: 'center',
   },
   footerContainer: {
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: 8,
     alignItems: 'center',
   },
-  scrollToBottom: {
-    backgroundColor: theme.colors.primary,
-  },
+  scrollToBottom: {},
 });

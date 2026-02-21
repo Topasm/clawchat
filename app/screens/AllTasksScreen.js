@@ -1,13 +1,15 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, SectionList, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
 import TaskRow from '../components/TaskRow';
 import SectionHeader from '../components/SectionHeader';
 import EmptyState from '../components/EmptyState';
 
 export default function AllTasksScreen({ navigation }) {
+  const { colors } = useTheme();
+
   const todos = useModuleStore((s) => s.todos);
   const fetchTodos = useModuleStore((s) => s.fetchTodos);
   const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
@@ -64,7 +66,7 @@ export default function AllTasksScreen({ navigation }) {
 
   if (sections.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <EmptyState
           icon="clipboard-outline"
           title="No Tasks"
@@ -75,7 +77,7 @@ export default function AllTasksScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
@@ -83,7 +85,9 @@ export default function AllTasksScreen({ navigation }) {
         renderSectionHeader={renderSectionHeader}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: colors.border }]} />
+        )}
         stickySectionHeadersEnabled={false}
       />
     </View>
@@ -93,11 +97,9 @@ export default function AllTasksScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   separator: {
     height: 1,
-    backgroundColor: theme.colors.border,
     marginLeft: 52,
   },
 });

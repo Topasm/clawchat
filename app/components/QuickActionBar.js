@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 
 const ACTIONS = [
   { key: 'task', label: 'New Task', icon: 'add-circle-outline', prefix: 'Create task: ' },
@@ -11,6 +11,8 @@ const ACTIONS = [
 ];
 
 export default function QuickActionBar({ onSelectAction }) {
+  const { colors } = useTheme();
+
   return (
     <ScrollView
       horizontal
@@ -20,12 +22,15 @@ export default function QuickActionBar({ onSelectAction }) {
       {ACTIONS.map((action) => (
         <TouchableOpacity
           key={action.key}
-          style={styles.chip}
+          style={[
+            styles.chip,
+            { backgroundColor: colors.background, borderColor: colors.border },
+          ]}
           onPress={() => onSelectAction?.(action)}
           activeOpacity={0.7}
         >
-          <Ionicons name={action.icon} size={14} color={theme.colors.primary} />
-          <Text style={styles.chipText}>{action.label}</Text>
+          <Ionicons name={action.icon} size={14} color={colors.primary} />
+          <Text style={[styles.chipText, { color: colors.primary }]}>{action.label}</Text>
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -44,14 +49,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: theme.colors.border,
     gap: 4,
   },
   chipText: {
     fontSize: 13,
     fontWeight: '500',
-    color: theme.colors.primary,
   },
 });

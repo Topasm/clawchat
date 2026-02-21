@@ -2,13 +2,15 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { View, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import apiClient from '../services/apiClient';
 import { useModuleStore } from '../stores/useModuleStore';
 import TaskRow from '../components/TaskRow';
 import EmptyState from '../components/EmptyState';
 
 export default function InboxScreen({ navigation }) {
+  const { colors } = useTheme();
+
   const todos = useModuleStore((s) => s.todos);
   const fetchTodos = useModuleStore((s) => s.fetchTodos);
   const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
@@ -83,7 +85,7 @@ export default function InboxScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={inboxTodos}
         keyExtractor={(item) => item.id}
@@ -98,10 +100,12 @@ export default function InboxScreen({ navigation }) {
             subtitle="All caught up. No unscheduled tasks."
           />
         }
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: colors.border }]} />
+        )}
       />
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: colors.primary }]}
         onPress={() => navigation.navigate('QuickCapture')}
         activeOpacity={0.8}
       >
@@ -114,14 +118,12 @@ export default function InboxScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   emptyContainer: {
     flex: 1,
   },
   separator: {
     height: 1,
-    backgroundColor: theme.colors.border,
     marginLeft: 52,
   },
   fab: {
@@ -131,7 +133,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,

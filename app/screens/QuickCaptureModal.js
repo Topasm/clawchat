@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import apiClient from '../services/apiClient';
 import { useModuleStore } from '../stores/useModuleStore';
 
@@ -95,6 +95,8 @@ function parseNaturalInput(text) {
 }
 
 export default function QuickCaptureModal({ navigation }) {
+  const { colors } = useTheme();
+
   const [text, setText] = useState('');
   const [selectedType, setSelectedType] = useState('task');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,19 +149,25 @@ export default function QuickCaptureModal({ navigation }) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.surface }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={28} color={theme.colors.text} />
+          <Ionicons name="close" size={28} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quick Capture</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Quick Capture</Text>
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={!text.trim() || isSubmitting}
         >
-          <Text style={[styles.saveButton, (!text.trim() || isSubmitting) && styles.saveButtonDisabled]}>
+          <Text
+            style={[
+              styles.saveButton,
+              { color: colors.primary },
+              (!text.trim() || isSubmitting) && { color: colors.disabled },
+            ]}
+          >
             Save
           </Text>
         </TouchableOpacity>
@@ -167,9 +175,9 @@ export default function QuickCaptureModal({ navigation }) {
 
       <TextInput
         ref={inputRef}
-        style={styles.input}
+        style={[styles.input, { color: colors.text }]}
         placeholder='Try "buy milk tomorrow" or "meeting at 3pm"'
-        placeholderTextColor={theme.colors.disabled}
+        placeholderTextColor={colors.disabled}
         value={text}
         onChangeText={setText}
         multiline
@@ -178,19 +186,29 @@ export default function QuickCaptureModal({ navigation }) {
         blurOnSubmit
       />
 
-      <View style={styles.typeRow}>
+      <View style={[styles.typeRow, { borderTopColor: colors.border }]}>
         {TYPE_OPTIONS.map((opt) => (
           <TouchableOpacity
             key={opt.key}
-            style={[styles.typePill, selectedType === opt.key && styles.typePillSelected]}
+            style={[
+              styles.typePill,
+              { backgroundColor: colors.background },
+              selectedType === opt.key && { backgroundColor: colors.primary },
+            ]}
             onPress={() => setSelectedType(opt.key)}
           >
             <Ionicons
               name={opt.icon}
               size={16}
-              color={selectedType === opt.key ? '#FFF' : theme.colors.textSecondary}
+              color={selectedType === opt.key ? '#FFF' : colors.textSecondary}
             />
-            <Text style={[styles.typePillText, selectedType === opt.key && styles.typePillTextSelected]}>
+            <Text
+              style={[
+                styles.typePillText,
+                { color: colors.textSecondary },
+                selectedType === opt.key && { color: '#FFF' },
+              ]}
+            >
               {opt.label}
             </Text>
           </TouchableOpacity>
@@ -203,7 +221,6 @@ export default function QuickCaptureModal({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -212,25 +229,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: theme.colors.text,
   },
   saveButton: {
     fontSize: 17,
     fontWeight: '600',
-    color: theme.colors.primary,
-  },
-  saveButtonDisabled: {
-    color: theme.colors.disabled,
   },
   input: {
     flex: 1,
     fontSize: 18,
-    color: theme.colors.text,
     padding: 16,
     textAlignVertical: 'top',
   },
@@ -239,7 +249,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
     gap: 8,
   },
   typePill: {
@@ -248,18 +257,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: theme.colors.background,
     gap: 6,
-  },
-  typePillSelected: {
-    backgroundColor: theme.colors.primary,
   },
   typePillText: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme.colors.textSecondary,
-  },
-  typePillTextSelected: {
-    color: '#FFF',
   },
 });

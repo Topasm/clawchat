@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import apiClient from '../services/apiClient';
 import { useModuleStore } from '../stores/useModuleStore';
 import PriorityBadge from '../components/PriorityBadge';
@@ -20,6 +20,8 @@ const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 const PRIORITY_LABELS = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' };
 
 export default function TaskDetailScreen({ route, navigation }) {
+  const { colors } = useTheme();
+
   const { todoId } = route.params;
   const updateStoreTodo = useModuleStore((s) => s.updateTodo);
   const removeTodo = useModuleStore((s) => s.removeTodo);
@@ -115,8 +117,8 @@ export default function TaskDetailScreen({ route, navigation }) {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -126,75 +128,102 @@ export default function TaskDetailScreen({ route, navigation }) {
   const isCompleted = todo.status === 'completed';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.surface }]}
+      contentContainerStyle={styles.content}
+    >
       <View style={styles.titleRow}>
         <TouchableOpacity
-          style={[styles.checkbox, isCompleted && styles.checkboxCompleted]}
+          style={[
+            styles.checkbox,
+            { borderColor: colors.border },
+            isCompleted && {
+              backgroundColor: colors.completedGreen,
+              borderColor: colors.completedGreen,
+            },
+          ]}
           onPress={toggleComplete}
         >
           {isCompleted && <Ionicons name="checkmark" size={18} color="#FFF" />}
         </TouchableOpacity>
         <TextInput
-          style={[styles.titleInput, isCompleted && styles.titleCompleted]}
+          style={[
+            styles.titleInput,
+            { color: colors.text },
+            isCompleted && { textDecorationLine: 'line-through', color: colors.textSecondary },
+          ]}
           value={title}
           onChangeText={handleTitleChange}
           placeholder="Task title"
-          placeholderTextColor={theme.colors.disabled}
+          placeholderTextColor={colors.disabled}
         />
       </View>
 
-      <TouchableOpacity style={styles.cell} onPress={cyclePriority}>
-        <Ionicons name="flag-outline" size={20} color={theme.colors.textSecondary} />
-        <Text style={styles.cellLabel}>Priority</Text>
+      <TouchableOpacity
+        style={[styles.cell, { borderBottomColor: colors.border }]}
+        onPress={cyclePriority}
+      >
+        <Ionicons name="flag-outline" size={20} color={colors.textSecondary} />
+        <Text style={[styles.cellLabel, { color: colors.text }]}>Priority</Text>
         <View style={styles.cellRight}>
-          <Text style={styles.cellValue}>{PRIORITY_LABELS[todo.priority]}</Text>
+          <Text style={[styles.cellValue, { color: colors.textSecondary }]}>
+            {PRIORITY_LABELS[todo.priority]}
+          </Text>
           <PriorityBadge priority={todo.priority} size={10} />
         </View>
       </TouchableOpacity>
 
-      <View style={styles.cell}>
-        <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
-        <Text style={styles.cellLabel}>Due Date</Text>
-        <Text style={styles.cellValue}>
+      <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+        <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} />
+        <Text style={[styles.cellLabel, { color: colors.text }]}>Due Date</Text>
+        <Text style={[styles.cellValue, { color: colors.textSecondary }]}>
           {todo.due_date ? formatDate(todo.due_date) : 'None'}
         </Text>
       </View>
 
       {todo.tags && todo.tags.length > 0 && (
-        <View style={styles.cell}>
-          <Ionicons name="pricetag-outline" size={20} color={theme.colors.textSecondary} />
-          <Text style={styles.cellLabel}>Tags</Text>
-          <Text style={styles.cellValue}>{todo.tags.join(', ')}</Text>
+        <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+          <Ionicons name="pricetag-outline" size={20} color={colors.textSecondary} />
+          <Text style={[styles.cellLabel, { color: colors.text }]}>Tags</Text>
+          <Text style={[styles.cellValue, { color: colors.textSecondary }]}>
+            {todo.tags.join(', ')}
+          </Text>
         </View>
       )}
 
-      <View style={styles.cell}>
-        <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
-        <Text style={styles.cellLabel}>Status</Text>
-        <Text style={styles.cellValue}>{todo.status}</Text>
+      <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+        <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
+        <Text style={[styles.cellLabel, { color: colors.text }]}>Status</Text>
+        <Text style={[styles.cellValue, { color: colors.textSecondary }]}>{todo.status}</Text>
       </View>
 
-      <Text style={styles.sectionLabel}>Description</Text>
+      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Description</Text>
       <TextInput
-        style={styles.descriptionInput}
+        style={[
+          styles.descriptionInput,
+          { color: colors.text, backgroundColor: colors.background },
+        ]}
         value={description}
         onChangeText={handleDescriptionChange}
         placeholder="Add a description..."
-        placeholderTextColor={theme.colors.disabled}
+        placeholderTextColor={colors.disabled}
         multiline
         textAlignVertical="top"
       />
 
       {todo.conversation_id && (
         <TouchableOpacity style={styles.chatLink}>
-          <Ionicons name="chatbubble-outline" size={16} color={theme.colors.primary} />
-          <Text style={styles.chatLinkText}>Created from chat</Text>
+          <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
+          <Text style={[styles.chatLinkText, { color: colors.primary }]}>Created from chat</Text>
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-        <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
-        <Text style={styles.deleteText}>Delete Task</Text>
+      <TouchableOpacity
+        style={[styles.deleteButton, { backgroundColor: colors.deleteBackground }]}
+        onPress={handleDelete}
+      >
+        <Ionicons name="trash-outline" size={18} color={colors.error} />
+        <Text style={[styles.deleteText, { color: colors.error }]}>Delete Task</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -203,7 +232,6 @@ export default function TaskDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.surface,
   },
   content: {
     padding: 16,
@@ -212,7 +240,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
   },
   titleRow: {
     flexDirection: 'row',
@@ -224,36 +251,24 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
-  },
-  checkboxCompleted: {
-    backgroundColor: theme.colors.completedGreen,
-    borderColor: theme.colors.completedGreen,
   },
   titleInput: {
     flex: 1,
     fontSize: 22,
     fontWeight: '600',
-    color: theme.colors.text,
-  },
-  titleCompleted: {
-    textDecorationLine: 'line-through',
-    color: theme.colors.textSecondary,
   },
   cell: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
   },
   cellLabel: {
     flex: 1,
     fontSize: 16,
-    color: theme.colors.text,
     marginLeft: 12,
   },
   cellRight: {
@@ -263,23 +278,19 @@ const styles = StyleSheet.create({
   },
   cellValue: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    color: theme.colors.textSecondary,
     marginTop: 24,
     marginBottom: 8,
   },
   descriptionInput: {
     fontSize: 16,
-    color: theme.colors.text,
     minHeight: 100,
     padding: 12,
-    backgroundColor: theme.colors.background,
     borderRadius: 8,
   },
   chatLink: {
@@ -290,7 +301,6 @@ const styles = StyleSheet.create({
   },
   chatLinkText: {
     fontSize: 14,
-    color: theme.colors.primary,
   },
   deleteButton: {
     flexDirection: 'row',
@@ -299,12 +309,10 @@ const styles = StyleSheet.create({
     marginTop: 32,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#FFF0F0',
     gap: 8,
   },
   deleteText: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme.colors.error,
   },
 });

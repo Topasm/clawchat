@@ -11,12 +11,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import apiClient from '../services/apiClient';
 import { useModuleStore } from '../stores/useModuleStore';
 import { formatDate, formatTime } from '../utils/formatters';
 
 export default function EventDetailScreen({ route, navigation }) {
+  const { colors } = useTheme();
+
   const { eventId } = route.params;
   const updateStoreEvent = useModuleStore((s) => s.updateEvent);
   const removeEvent = useModuleStore((s) => s.removeEvent);
@@ -111,8 +113,8 @@ export default function EventDetailScreen({ route, navigation }) {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -120,77 +122,88 @@ export default function EventDetailScreen({ route, navigation }) {
   if (!event) return null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.surface }]}
+      contentContainerStyle={styles.content}
+    >
       <TextInput
-        style={styles.titleInput}
+        style={[styles.titleInput, { color: colors.text }]}
         value={title}
         onChangeText={handleTitleChange}
         placeholder="Event title"
-        placeholderTextColor={theme.colors.disabled}
+        placeholderTextColor={colors.disabled}
       />
 
-      <View style={styles.cell}>
-        <Ionicons name="time-outline" size={20} color={theme.colors.textSecondary} />
-        <Text style={styles.cellLabel}>Start</Text>
-        <Text style={styles.cellValue}>
+      <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+        <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+        <Text style={[styles.cellLabel, { color: colors.text }]}>Start</Text>
+        <Text style={[styles.cellValue, { color: colors.textSecondary }]}>
           {formatDate(event.start_time)} {!event.is_all_day && formatTime(event.start_time)}
         </Text>
       </View>
 
       {event.end_time && (
-        <View style={styles.cell}>
-          <Ionicons name="time-outline" size={20} color={theme.colors.textSecondary} />
-          <Text style={styles.cellLabel}>End</Text>
-          <Text style={styles.cellValue}>
+        <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+          <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+          <Text style={[styles.cellLabel, { color: colors.text }]}>End</Text>
+          <Text style={[styles.cellValue, { color: colors.textSecondary }]}>
             {formatDate(event.end_time)} {!event.is_all_day && formatTime(event.end_time)}
           </Text>
         </View>
       )}
 
-      <View style={styles.cell}>
-        <Ionicons name="sunny-outline" size={20} color={theme.colors.textSecondary} />
-        <Text style={styles.cellLabel}>All Day</Text>
+      <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+        <Ionicons name="sunny-outline" size={20} color={colors.textSecondary} />
+        <Text style={[styles.cellLabel, { color: colors.text }]}>All Day</Text>
         <Switch
           value={event.is_all_day}
           onValueChange={toggleAllDay}
-          trackColor={{ true: theme.colors.primary }}
+          trackColor={{ true: colors.primary }}
         />
       </View>
 
-      <View style={styles.cell}>
-        <Ionicons name="location-outline" size={20} color={theme.colors.textSecondary} />
-        <Text style={styles.cellLabel}>Location</Text>
+      <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+        <Ionicons name="location-outline" size={20} color={colors.textSecondary} />
+        <Text style={[styles.cellLabel, { color: colors.text }]}>Location</Text>
         <TextInput
-          style={styles.cellInput}
+          style={[styles.cellInput, { color: colors.text }]}
           value={location}
           onChangeText={handleLocationChange}
           placeholder="Add location"
-          placeholderTextColor={theme.colors.disabled}
+          placeholderTextColor={colors.disabled}
         />
       </View>
 
       {event.reminder_minutes != null && (
-        <View style={styles.cell}>
-          <Ionicons name="notifications-outline" size={20} color={theme.colors.textSecondary} />
-          <Text style={styles.cellLabel}>Reminder</Text>
-          <Text style={styles.cellValue}>{event.reminder_minutes} min before</Text>
+        <View style={[styles.cell, { borderBottomColor: colors.border }]}>
+          <Ionicons name="notifications-outline" size={20} color={colors.textSecondary} />
+          <Text style={[styles.cellLabel, { color: colors.text }]}>Reminder</Text>
+          <Text style={[styles.cellValue, { color: colors.textSecondary }]}>
+            {event.reminder_minutes} min before
+          </Text>
         </View>
       )}
 
-      <Text style={styles.sectionLabel}>Description</Text>
+      <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Description</Text>
       <TextInput
-        style={styles.descriptionInput}
+        style={[
+          styles.descriptionInput,
+          { color: colors.text, backgroundColor: colors.background },
+        ]}
         value={description}
         onChangeText={handleDescriptionChange}
         placeholder="Add a description..."
-        placeholderTextColor={theme.colors.disabled}
+        placeholderTextColor={colors.disabled}
         multiline
         textAlignVertical="top"
       />
 
-      <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-        <Ionicons name="trash-outline" size={18} color={theme.colors.error} />
-        <Text style={styles.deleteText}>Delete Event</Text>
+      <TouchableOpacity
+        style={[styles.deleteButton, { backgroundColor: colors.deleteBackground }]}
+        onPress={handleDelete}
+      >
+        <Ionicons name="trash-outline" size={18} color={colors.error} />
+        <Text style={[styles.deleteText, { color: colors.error }]}>Delete Event</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -199,7 +212,6 @@ export default function EventDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.surface,
   },
   content: {
     padding: 16,
@@ -208,12 +220,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.surface,
   },
   titleInput: {
     fontSize: 22,
     fontWeight: '600',
-    color: theme.colors.text,
     marginBottom: 24,
   },
   cell: {
@@ -221,21 +231,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
   },
   cellLabel: {
     flex: 1,
     fontSize: 16,
-    color: theme.colors.text,
     marginLeft: 12,
   },
   cellValue: {
     fontSize: 16,
-    color: theme.colors.textSecondary,
   },
   cellInput: {
     fontSize: 16,
-    color: theme.colors.text,
     textAlign: 'right',
     flex: 0,
     minWidth: 120,
@@ -245,16 +251,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    color: theme.colors.textSecondary,
     marginTop: 24,
     marginBottom: 8,
   },
   descriptionInput: {
     fontSize: 16,
-    color: theme.colors.text,
     minHeight: 100,
     padding: 12,
-    backgroundColor: theme.colors.background,
     borderRadius: 8,
   },
   deleteButton: {
@@ -264,12 +267,10 @@ const styles = StyleSheet.create({
     marginTop: 32,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#FFF0F0',
     gap: 8,
   },
   deleteText: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme.colors.error,
   },
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
 import Cell from '../components/Cell';
 import Separator from '../components/Separator';
@@ -9,6 +9,8 @@ import Separator from '../components/Separator';
 const APP_VERSION = '0.1.0';
 
 export default function SettingsScreen() {
+  const { colors, typography, spacing } = useTheme();
+
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const logout = useAuthStore((s) => s.logout);
 
@@ -24,11 +26,24 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <ScrollView style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['bottom']}>
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Connection Section */}
-        <Text style={styles.sectionHeader}>CONNECTION</Text>
-        <View style={styles.section}>
+        <Text
+          style={[
+            styles.sectionHeader,
+            typography.caption,
+            {
+              color: colors.textSecondary,
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.lg,
+              paddingBottom: spacing.sm,
+            },
+          ]}
+        >
+          CONNECTION
+        </Text>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Cell
             title="Server"
             subtitle={serverUrl || 'Not connected'}
@@ -38,8 +53,21 @@ export default function SettingsScreen() {
         </View>
 
         {/* About Section */}
-        <Text style={styles.sectionHeader}>ABOUT</Text>
-        <View style={styles.section}>
+        <Text
+          style={[
+            styles.sectionHeader,
+            typography.caption,
+            {
+              color: colors.textSecondary,
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.lg,
+              paddingBottom: spacing.sm,
+            },
+          ]}
+        >
+          ABOUT
+        </Text>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Cell
             title="Version"
             subtitle={APP_VERSION}
@@ -56,8 +84,21 @@ export default function SettingsScreen() {
         </View>
 
         {/* Account Section */}
-        <Text style={styles.sectionHeader}>ACCOUNT</Text>
-        <View style={styles.section}>
+        <Text
+          style={[
+            styles.sectionHeader,
+            typography.caption,
+            {
+              color: colors.textSecondary,
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.lg,
+              paddingBottom: spacing.sm,
+            },
+          ]}
+        >
+          ACCOUNT
+        </Text>
+        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Cell
             title="Logout"
             iconName="log-out-outline"
@@ -74,27 +115,18 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   sectionHeader: {
-    ...theme.typography.caption,
-    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.sm,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   section: {
-    backgroundColor: theme.colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
   },
 });

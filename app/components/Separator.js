@@ -1,18 +1,25 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 
 /**
  * Separator - Simple horizontal line separator.
  */
 export default function Separator() {
-  return <View style={styles.separator} />;
+  const { colors, spacing } = useTheme();
+
+  return (
+    <View
+      style={[
+        styles.separator,
+        { backgroundColor: colors.border, marginLeft: spacing.md },
+      ]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.border,
-    marginLeft: theme.spacing.md,
   },
 });

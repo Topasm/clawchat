@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme as NavDefaultTheme,
+  DarkTheme as NavDarkTheme,
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { theme } from './config/theme';
+import ThemeProvider from './config/ThemeProvider';
+import { useTheme } from './config/ThemeContext';
 import { useAuthStore } from './stores/useAuthStore';
 import CustomTabBar from './components/CustomTabBar';
 
@@ -34,15 +39,17 @@ function AuthStack() {
   );
 }
 
-const headerStyle = {
-  backgroundColor: theme.colors.surface,
-  shadowColor: theme.colors.border,
-};
-const headerTintColor = theme.colors.text;
-const headerTitleStyle = { fontWeight: '600' };
-
 // --- Tab Navigator ---
 function TabNavigator() {
+  const { colors } = useTheme();
+
+  const headerStyle = {
+    backgroundColor: colors.surface,
+    shadowColor: colors.border,
+  };
+  const headerTintColor = colors.text;
+  const headerTitleStyle = { fontWeight: '600' };
+
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
@@ -66,6 +73,15 @@ function TabNavigator() {
 
 // --- Main Stack (authenticated: tabs + detail screens) ---
 function MainStack() {
+  const { colors } = useTheme();
+
+  const headerStyle = {
+    backgroundColor: colors.surface,
+    shadowColor: colors.border,
+  };
+  const headerTintColor = colors.text;
+  const headerTitleStyle = { fontWeight: '600' };
+
   return (
     <MainStackNav.Navigator>
       <MainStackNav.Screen
@@ -133,17 +149,35 @@ function MainStack() {
 function RootNavigator() {
   const token = useAuthStore((s) => s.token);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const { colors, isDark } = useTheme();
+
+  // Merge our custom colors into the React Navigation theme
+  const navigationTheme = useMemo(() => {
+    const base = isDark ? NavDarkTheme : NavDefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        primary: colors.primary,
+        background: colors.background,
+        card: colors.surface,
+        text: colors.text,
+        border: colors.border,
+        notification: colors.error,
+      },
+    };
+  }, [isDark, colors]);
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       {token ? <MainStack /> : <AuthStack />}
     </NavigationContainer>
   );
@@ -153,7 +187,9 @@ function RootNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <RootNavigator />
+      <ThemeProvider>
+        <RootNavigator />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -163,6 +199,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
   },
 });

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 
 /**
  * Cell - Settings menu cell component.
@@ -22,32 +22,54 @@ export default function Cell({
   showChevron = true,
   danger = false,
 }) {
-  const textColor = danger ? theme.colors.error : theme.colors.text;
-  const iconColor = danger ? theme.colors.error : theme.colors.primary;
+  const { colors, typography, spacing, borderRadius } = useTheme();
+
+  const textColor = danger ? colors.error : colors.text;
+  const iconColor = danger ? colors.error : colors.primary;
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[
+        styles.container,
+        {
+          paddingVertical: spacing.sm + 4,
+          paddingHorizontal: spacing.md,
+          backgroundColor: colors.surface,
+        },
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
       disabled={!onPress}
     >
       {iconName ? (
-        <View style={styles.iconWrapper}>
+        <View
+          style={[
+            styles.iconWrapper,
+            {
+              borderRadius: borderRadius.md,
+              backgroundColor: colors.surfaceSecondary,
+              marginRight: spacing.sm + 4,
+            },
+          ]}
+        >
           <Ionicons name={iconName} size={22} color={iconColor} />
         </View>
       ) : null}
 
       <View style={styles.content}>
-        <Text style={[styles.title, { color: textColor }]}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        <Text style={[styles.title, typography.body, { color: textColor }]}>{title}</Text>
+        {subtitle ? (
+          <Text style={[styles.subtitle, typography.caption, { color: colors.textSecondary }]}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
 
       {showChevron && onPress ? (
         <Ionicons
           name="chevron-forward"
           size={20}
-          color={theme.colors.disabled}
+          color={colors.disabled}
         />
       ) : null}
     </TouchableOpacity>
@@ -58,29 +80,19 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: theme.spacing.sm + 4,
-    paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
   },
   iconWrapper: {
     width: 32,
     height: 32,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: theme.spacing.sm + 4,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
   },
-  title: {
-    ...theme.typography.body,
-  },
+  title: {},
   subtitle: {
-    ...theme.typography.caption,
-    color: theme.colors.textSecondary,
     marginTop: 2,
   },
 });

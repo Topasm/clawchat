@@ -10,10 +10,12 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
 
 export default function LoginScreen() {
+  const { colors, typography, spacing, borderRadius } = useTheme();
+
   const [serverUrl, setServerUrl] = useState('');
   const [pin, setPin] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
@@ -46,21 +48,42 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { paddingHorizontal: spacing.xl }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>ClawChat</Text>
-          <Text style={styles.subtitle}>Connect to your server</Text>
+        <View style={[styles.header, { marginBottom: spacing.xl }]}>
+          <Text
+            style={[
+              styles.title,
+              typography.h1,
+              { color: colors.primary, marginBottom: spacing.sm },
+            ]}
+          >
+            ClawChat
+          </Text>
+          <Text style={[styles.subtitle, typography.body, { color: colors.textSecondary }]}>
+            Connect to your server
+          </Text>
         </View>
 
         <View style={styles.form}>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderRadius: borderRadius.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm + 4,
+                color: colors.text,
+                marginBottom: spacing.md,
+              },
+            ]}
             placeholder="Server URL (e.g., https://192.168.1.100:8000)"
-            placeholderTextColor={theme.colors.disabled}
+            placeholderTextColor={colors.disabled}
             value={serverUrl}
             onChangeText={setServerUrl}
             autoCapitalize="none"
@@ -70,9 +93,20 @@ export default function LoginScreen() {
           />
 
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderRadius: borderRadius.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm + 4,
+                color: colors.text,
+                marginBottom: spacing.md,
+              },
+            ]}
             placeholder="PIN"
-            placeholderTextColor={theme.colors.disabled}
+            placeholderTextColor={colors.disabled}
             value={pin}
             onChangeText={setPin}
             secureTextEntry
@@ -82,7 +116,14 @@ export default function LoginScreen() {
           />
 
           <TouchableOpacity
-            style={[styles.button, isConnecting && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              {
+                backgroundColor: isConnecting ? colors.disabled : colors.primary,
+                borderRadius: borderRadius.md,
+                marginTop: spacing.sm,
+              },
+            ]}
             onPress={handleLogin}
             disabled={isConnecting}
             activeOpacity={0.8}
@@ -100,54 +141,32 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: theme.spacing.xl,
   },
   header: {
     alignItems: 'center',
-    marginBottom: theme.spacing.xl,
   },
   title: {
-    ...theme.typography.h1,
-    color: theme.colors.primary,
     fontSize: 36,
     fontWeight: '700',
-    marginBottom: theme.spacing.sm,
   },
-  subtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-  },
+  subtitle: {},
   form: {
     width: '100%',
   },
   input: {
-    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm + 4,
     fontSize: 16,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
   },
   button: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.sm + 6,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: theme.spacing.sm,
-  },
-  buttonDisabled: {
-    backgroundColor: theme.colors.disabled,
   },
   buttonText: {
-    color: theme.colors.surface,
+    color: '#FFF',
     fontSize: 18,
     fontWeight: '600',
   },

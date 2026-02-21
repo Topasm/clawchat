@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../config/theme';
+import { useTheme } from '../config/ThemeContext';
 import apiClient from '../services/apiClient';
 import { useChatStore } from '../stores/useChatStore';
 import ContactRow from '../components/ContactRow';
@@ -18,6 +18,8 @@ import Separator from '../components/Separator';
 import { formatRelativeTime, truncate } from '../utils/formatters';
 
 export default function ConversationListScreen({ navigation }) {
+  const { colors, typography, spacing } = useTheme();
+
   const conversations = useChatStore((s) => s.conversations);
   const setConversations = useChatStore((s) => s.setConversations);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,10 +101,12 @@ export default function ConversationListScreen({ navigation }) {
         <Ionicons
           name="chatbubbles-outline"
           size={64}
-          color={theme.colors.disabled}
+          color={colors.disabled}
         />
-        <Text style={styles.emptyTitle}>No conversations yet</Text>
-        <Text style={styles.emptySubtitle}>
+        <Text style={[styles.emptyTitle, typography.h2, { color: colors.text }]}>
+          No conversations yet
+        </Text>
+        <Text style={[styles.emptySubtitle, typography.body, { color: colors.textSecondary }]}>
           Tap the + button to start a new chat
         </Text>
       </View>
@@ -111,15 +115,15 @@ export default function ConversationListScreen({ navigation }) {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['bottom']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <FlatList
           data={conversations}
           keyExtractor={(item) => item.id}
@@ -134,15 +138,15 @@ export default function ConversationListScreen({ navigation }) {
         />
 
         <TouchableOpacity
-          style={styles.fab}
+          style={[styles.fab, { backgroundColor: colors.primary }]}
           onPress={handleNewChat}
           activeOpacity={0.8}
           disabled={isCreating}
         >
           {isCreating ? (
-            <ActivityIndicator size="small" color={theme.colors.surface} />
+            <ActivityIndicator size="small" color="#FFF" />
           ) : (
-            <Ionicons name="add" size={28} color={theme.colors.surface} />
+            <Ionicons name="add" size={28} color="#FFF" />
           )}
         </TouchableOpacity>
       </View>
@@ -153,17 +157,14 @@ export default function ConversationListScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
   },
   emptyList: {
     flexGrow: 1,
@@ -172,27 +173,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.xl,
+    paddingHorizontal: 32,
   },
   emptyTitle: {
-    ...theme.typography.h2,
-    color: theme.colors.text,
-    marginTop: theme.spacing.md,
+    marginTop: 16,
   },
   emptySubtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.sm,
+    marginTop: 8,
     textAlign: 'center',
   },
   fab: {
     position: 'absolute',
-    right: theme.spacing.lg,
-    bottom: theme.spacing.lg,
+    right: 24,
+    bottom: 24,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
