@@ -1,0 +1,515 @@
+/* ============================================================
+   Calendar — Month & Week views
+   ============================================================ */
+
+/* --- Main container --------------------------------------- */
+.cc-calendar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* --- Header ----------------------------------------------- */
+.cc-calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.cc-calendar__header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cc-calendar__header-right {
+  flex-shrink: 0;
+}
+
+.cc-calendar__title {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.cc-calendar__nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cc-calendar__nav-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cc-calendar__today-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+}
+
+/* ============================================================
+   Month View
+   ============================================================ */
+
+.cc-calendar__month {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Day-of-week header row */
+.cc-calendar__dow-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-calendar__dow {
+  padding: 6px 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cc-text-secondary);
+}
+
+/* Grid of cells */
+.cc-calendar__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  min-height: 0;
+}
+
+/* Individual day cell */
+.cc-calendar__cell {
+  border-right: 1px solid var(--cc-border);
+  border-bottom: 1px solid var(--cc-border);
+  padding: 4px 6px;
+  min-height: 80px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cc-calendar__cell:nth-child(7n) {
+  border-right: none;
+}
+
+.cc-calendar__cell:hover {
+  background: var(--cc-surface-hover, var(--cc-surface-secondary));
+}
+
+.cc-calendar__cell--other-month {
+  opacity: 0.35;
+}
+
+.cc-calendar__cell--today {
+  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
+}
+
+.cc-calendar__cell--today:hover {
+  background: color-mix(in srgb, var(--cc-primary) 12%, transparent);
+}
+
+/* Day number */
+.cc-calendar__day-number {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cc-text-secondary);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.cc-calendar__day-number--today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--cc-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Events list inside cell */
+.cc-calendar__cell-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Event pill (month view) */
+.cc-calendar__event-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--cc-primary) 15%, transparent);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+  min-width: 0;
+  width: 100%;
+}
+
+.cc-calendar__event-pill:hover {
+  background: color-mix(in srgb, var(--cc-primary) 28%, transparent);
+}
+
+.cc-calendar__event-pill-time {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--cc-primary);
+  flex-shrink: 0;
+}
+
+.cc-calendar__event-pill-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* "+N more" text */
+.cc-calendar__more {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--cc-text-tertiary);
+  padding: 1px 4px;
+}
+
+/* ============================================================
+   Week View
+   ============================================================ */
+
+.cc-calendar__week {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Column headers */
+.cc-calendar__week-header {
+  display: flex;
+  border-bottom: 1px solid var(--cc-border);
+  flex-shrink: 0;
+}
+
+.cc-calendar__time-gutter-header {
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.cc-calendar__week-col-header {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px 8px;
+  min-width: 0;
+}
+
+.cc-calendar__week-col-header--today {
+  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
+}
+
+.cc-calendar__week-day-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cc-text-secondary);
+}
+
+.cc-calendar__week-day-number {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--cc-text);
+  line-height: 1;
+}
+
+.cc-calendar__week-day-number--today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cc-primary);
+  color: #fff;
+}
+
+/* Scrollable body */
+.cc-calendar__week-body {
+  flex: 1;
+  display: flex;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Time gutter */
+.cc-calendar__time-gutter {
+  width: 56px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.cc-calendar__time-label {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--cc-text-tertiary);
+  white-space: nowrap;
+}
+
+/* Day column */
+.cc-calendar__week-col {
+  flex: 1;
+  position: relative;
+  border-left: 1px solid var(--cc-border);
+  min-width: 0;
+}
+
+/* Time slot (hourly grid line) */
+.cc-calendar__time-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 60px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cc-border) 60%, transparent);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.cc-calendar__time-slot:hover {
+  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
+}
+
+/* Event block (week view) */
+.cc-calendar__event-block {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--cc-primary) 18%, transparent);
+  border-left: 3px solid var(--cc-primary);
+  padding: 3px 6px;
+  cursor: pointer;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  text-align: left;
+  overflow: hidden;
+  z-index: 1;
+  transition: background 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cc-calendar__event-block:hover {
+  background: color-mix(in srgb, var(--cc-primary) 30%, transparent);
+}
+
+.cc-calendar__event-block--allday {
+  position: relative;
+  top: auto;
+  height: auto;
+  margin-bottom: 2px;
+}
+
+.cc-calendar__event-block-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cc-calendar__event-block-time {
+  font-size: 10px;
+  color: var(--cc-text-secondary);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   Event Create Dialog — form styles
+   ============================================================ */
+
+.cc-event-dialog {
+  width: 440px;
+  max-width: 92vw;
+}
+
+.cc-event-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cc-event-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-event-form__field--half {
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-event-form__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cc-text-secondary);
+}
+
+.cc-event-form__input,
+.cc-event-form__select {
+  padding: 8px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--cc-text);
+  background: var(--cc-background);
+  outline: none;
+  transition: border-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.cc-event-form__input:focus,
+.cc-event-form__select:focus {
+  border-color: var(--cc-primary);
+}
+
+.cc-event-form__input::placeholder {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-event-form__textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--cc-text);
+  background: var(--cc-background);
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.cc-event-form__textarea:focus {
+  border-color: var(--cc-primary);
+}
+
+.cc-event-form__textarea::placeholder {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-event-form__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.cc-event-form__time-row {
+  display: flex;
+  gap: 12px;
+}
+
+/* ============================================================
+   Responsive — mobile (<768px)
+   ============================================================ */
+
+@media (max-width: 767px) {
+  .cc-calendar__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .cc-calendar__header-left {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .cc-calendar__cell {
+    min-height: 56px;
+    padding: 2px 3px;
+  }
+
+  .cc-calendar__day-number {
+    font-size: 11px;
+  }
+
+  .cc-calendar__event-pill {
+    padding: 1px 3px;
+  }
+
+  .cc-calendar__event-pill-time {
+    display: none;
+  }
+
+  .cc-calendar__event-pill-title {
+    font-size: 10px;
+  }
+
+  /* Week view: stack vertically */
+  .cc-calendar__week-body {
+    flex-direction: column;
+    overflow-x: auto;
+    min-width: 600px;
+  }
+
+  .cc-calendar__time-gutter-header {
+    width: 44px;
+  }
+
+  .cc-calendar__time-gutter {
+    width: 44px;
+  }
+
+  .cc-calendar__time-label {
+    font-size: 9px;
+  }
+}

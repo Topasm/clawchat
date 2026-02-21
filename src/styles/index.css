@@ -14,6 +14,7 @@
 @import './_pages.css';
 @import './_kanban.css';
 @import './_kanban-filter.css';
+@import './_calendar.css';
 @import './_toast.css';
 @import './_dialog.css';
 @import './_command-palette.css';

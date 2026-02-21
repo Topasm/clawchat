@@ -123,11 +123,14 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     return todo?.status ?? 'pending';
   },
 
-  // --- Events --- (seeded with demo data)
+  // --- Events --- (seeded with demo data across several days for calendar view)
   events: [
-    { id: 'demo-e1', title: 'Sprint Planning', description: 'Review sprint goals and assign tasks', start_time: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(15, 0, 0, 0)).toISOString(), location: 'Zoom', created_at: now, updated_at: now },
-    { id: 'demo-e2', title: 'Code Review Session', start_time: new Date(new Date().setHours(16, 30, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(17, 0, 0, 0)).toISOString(), created_at: now, updated_at: now },
-    { id: 'demo-e3', title: 'Team Standup', description: 'Daily sync', start_time: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(10, 15, 0, 0)).toISOString(), location: 'Discord', created_at: yesterday, updated_at: yesterday },
+    { id: 'demo-e1', title: 'Sprint Planning', description: 'Review sprint goals and assign tasks', start_time: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(15, 0, 0, 0)).toISOString(), location: 'Zoom', tags: ['work'], created_at: now, updated_at: now },
+    { id: 'demo-e2', title: 'Code Review Session', start_time: new Date(new Date().setHours(16, 30, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(17, 0, 0, 0)).toISOString(), tags: ['dev'], created_at: now, updated_at: now },
+    { id: 'demo-e3', title: 'Team Standup', description: 'Daily sync', start_time: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(10, 15, 0, 0)).toISOString(), location: 'Discord', tags: ['work'], created_at: yesterday, updated_at: yesterday },
+    { id: 'demo-e4', title: 'Dentist Appointment', start_time: new Date(Date.now() + 86_400_000 * 2).toISOString().replace(/T\d{2}/, 'T09'), end_time: new Date(Date.now() + 86_400_000 * 2).toISOString().replace(/T\d{2}/, 'T10'), location: 'Downtown Dental', is_all_day: false, tags: ['personal'], created_at: now, updated_at: now },
+    { id: 'demo-e5', title: 'Team Offsite', is_all_day: true, start_time: new Date(Date.now() + 86_400_000 * 4).toISOString(), tags: ['work'], created_at: now, updated_at: now },
+    { id: 'demo-e6', title: 'Lunch with Sarah', start_time: new Date(Date.now() - 86_400_000).toISOString().replace(/T\d{2}:\d{2}/, 'T12:00'), end_time: new Date(Date.now() - 86_400_000).toISOString().replace(/T\d{2}:\d{2}/, 'T13:00'), location: 'Cafe Roma', tags: ['personal'], created_at: yesterday, updated_at: yesterday },
   ],
   setEvents: (events) => set({ events }),
   addEvent: (event) => set((state) => ({ events: [event, ...state.events] })),
