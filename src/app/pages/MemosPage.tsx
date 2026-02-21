@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useModuleStore } from '../stores/useModuleStore';
-import { useToastStore } from '../stores/useToastStore';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 
 export default function MemosPage() {
   const memos = useModuleStore((s) => s.memos);
-  const addMemo = useModuleStore((s) => s.addMemo);
-  const updateMemo = useModuleStore((s) => s.updateMemo);
-  const removeMemo = useModuleStore((s) => s.removeMemo);
+  const createMemo = useModuleStore((s) => s.createMemo);
+  const serverUpdateMemo = useModuleStore((s) => s.serverUpdateMemo);
+  const deleteMemo = useModuleStore((s) => s.deleteMemo);
 
   const [newContent, setNewContent] = useState('');
   const [newTags, setNewTags] = useState('');
@@ -16,19 +15,15 @@ export default function MemosPage() {
   const [editContent, setEditContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const content = newContent.trim();
     if (!content) return;
-    const now = new Date().toISOString();
     const tags = newTags.trim() ? newTags.split(',').map((t) => t.trim()).filter(Boolean) : [];
-    addMemo({
-      id: `memo-${Date.now()}`,
-      content,
-      tags,
-      created_at: now,
-      updated_at: now,
-    });
-    useToastStore.getState().addToast('success', 'Memo saved');
+    try {
+      await createMemo({ content, tags });
+    } catch {
+      // handled in store
+    }
     setNewContent('');
     setNewTags('');
   };
@@ -44,16 +39,14 @@ export default function MemosPage() {
     setEditContent(content);
   };
 
-  const saveEdit = (id: string) => {
+  const saveEdit = async (id: string) => {
     if (!editContent.trim()) return;
-    updateMemo(id, { content: editContent.trim(), updated_at: new Date().toISOString() });
-    useToastStore.getState().addToast('success', 'Memo updated');
+    await serverUpdateMemo(id, { content: editContent.trim() });
     setEditingId(null);
   };
 
-  const handleDelete = (id: string) => {
-    removeMemo(id);
-    useToastStore.getState().addToast('success', 'Memo deleted');
+  const handleDelete = async (id: string) => {
+    await deleteMemo(id);
   };
 
   const filtered = searchQuery.trim()

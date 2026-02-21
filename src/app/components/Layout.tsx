@@ -7,6 +7,7 @@ import { useChatStore } from '../stores/useChatStore';
 import ChatPanel from './chat-panel/ChatPanel';
 import useChatPanel from '../hooks/useChatPanel';
 import usePlatform from '../hooks/usePlatform';
+import useDataSync from '../hooks/useDataSync';
 import ToastContainer from './shared/ToastContainer';
 import CommandPalette from './shared/CommandPalette';
 import ShortcutsHelp from './shared/ShortcutsHelp';
@@ -129,6 +130,9 @@ export default function Layout() {
   const commandPalette = useCommandPalette();
   const { isMobile } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Central data sync: fetches all data from server on mount (no-op in demo mode)
+  useDataSync();
 
   // Wire global keyboard shortcuts
   useGlobalShortcuts({

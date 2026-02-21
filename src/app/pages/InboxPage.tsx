@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
-import { useToastStore } from '../stores/useToastStore';
 import TaskCard from '../components/shared/TaskCard';
 import Badge from '../components/shared/Badge';
 import SectionHeader from '../components/shared/SectionHeader';
@@ -12,23 +11,16 @@ export default function InboxPage() {
   const navigate = useNavigate();
   const todos = useModuleStore((s) => s.todos);
   const memos = useModuleStore((s) => s.memos);
-  const addMemo = useModuleStore((s) => s.addMemo);
-  const updateMemo = useModuleStore((s) => s.updateMemo);
-  const removeMemo = useModuleStore((s) => s.removeMemo);
+  const createMemo = useModuleStore((s) => s.createMemo);
+  const serverUpdateMemo = useModuleStore((s) => s.serverUpdateMemo);
+  const deleteMemo = useModuleStore((s) => s.deleteMemo);
 
-  const [error, setError] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
 
   // Memo inline state
   const [newContent, setNewContent] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
-
-  useEffect(() => {
-    useModuleStore.getState().fetchTodos().catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : 'Failed to load');
-    });
-  }, []);
 
   const handleToggle = (id: string) => {
     useModuleStore.getState().toggleTodoComplete(id).catch(() => {});
@@ -39,12 +31,14 @@ export default function InboxPage() {
     : [];
 
   // Memo handlers
-  const handleCreateMemo = () => {
+  const handleCreateMemo = async () => {
     const content = newContent.trim();
     if (!content) return;
-    const now = new Date().toISOString();
-    addMemo({ id: `memo-${Date.now()}`, content, tags: [], created_at: now, updated_at: now });
-    useToastStore.getState().addToast('success', 'Memo saved');
+    try {
+      await createMemo({ content, tags: [] });
+    } catch {
+      // handled in store
+    }
     setNewContent('');
   };
 
@@ -52,16 +46,14 @@ export default function InboxPage() {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleCreateMemo();
   };
 
-  const saveEdit = (id: string) => {
+  const saveEdit = async (id: string) => {
     if (!editContent.trim()) return;
-    updateMemo(id, { content: editContent.trim(), updated_at: new Date().toISOString() });
-    useToastStore.getState().addToast('success', 'Memo updated');
+    await serverUpdateMemo(id, { content: editContent.trim() });
     setEditingId(null);
   };
 
-  const handleDeleteMemo = (id: string) => {
-    removeMemo(id);
-    useToastStore.getState().addToast('success', 'Memo deleted');
+  const handleDeleteMemo = async (id: string) => {
+    await deleteMemo(id);
   };
 
   const formatDate = (dateStr: string) => {
@@ -87,12 +79,6 @@ export default function InboxPage() {
         </button>
       </div>
       <QuickCaptureModal isOpen={showCapture} onClose={() => setShowCapture(false)} />
-
-      {error && (
-        <div style={{ padding: '12px 16px', marginBottom: 12, borderRadius: 8, background: 'var(--cc-delete-bg)', color: 'var(--cc-error)', fontSize: 13 }}>
-          Could not connect to server: {error}
-        </div>
-      )}
 
       {/* Unscheduled tasks */}
       {inboxTasks.length > 0 && (

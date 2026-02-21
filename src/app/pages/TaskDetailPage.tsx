@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
-import apiClient from '../services/apiClient';
 import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
-import type { TodoResponse } from '../types/api';
+import type { TodoResponse, TodoUpdate } from '../types/api';
 
 const PRIORITIES: Array<TodoResponse['priority']> = ['low', 'medium', 'high', 'urgent'];
 
@@ -12,8 +11,8 @@ export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
   const todos = useModuleStore((s) => s.todos);
-  const updateTodo = useModuleStore((s) => s.updateTodo);
-  const removeTodo = useModuleStore((s) => s.removeTodo);
+  const serverUpdateTodo = useModuleStore((s) => s.serverUpdateTodo);
+  const deleteTodo = useModuleStore((s) => s.deleteTodo);
   const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
 
   const task = todos.find((t) => t.id === taskId);
@@ -29,14 +28,15 @@ export default function TaskDetailPage() {
     }
   }, [task]);
 
-  const persistField = useCallback((updates: Record<string, unknown>) => {
+  const persistField = useCallback((updates: TodoUpdate) => {
     if (!taskId) return;
-    updateTodo(taskId, updates as Partial<TodoResponse>);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      apiClient.patch(`/todos/${taskId}`, updates).catch(() => {});
+      serverUpdateTodo(taskId, updates);
     }, 500);
-  }, [taskId, updateTodo]);
+    // Immediate local update via the store's optimistic path
+    useModuleStore.getState().updateTodo(taskId, updates as Partial<TodoResponse>);
+  }, [taskId, serverUpdateTodo]);
 
   const handleTitleChange = (val: string) => {
     setTitle(val);
@@ -57,13 +57,8 @@ export default function TaskDetailPage() {
 
   const handleDelete = async () => {
     if (!taskId) return;
-    try {
-      await apiClient.delete(`/todos/${taskId}`);
-      removeTodo(taskId);
-      navigate('/tasks');
-    } catch {
-      // stay on page
-    }
+    await deleteTodo(taskId);
+    navigate('/tasks');
   };
 
   if (!task) {
