@@ -1,0 +1,245 @@
+/* ============================================================
+   Action Card — structured action data in chat messages
+   ============================================================ */
+
+.cc-action-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--cc-surface-secondary);
+  border: 1px solid var(--cc-border);
+  font-size: 13px;
+}
+
+.cc-action-card--warning {
+  border-color: var(--cc-warning);
+  background: color-mix(in srgb, var(--cc-warning) 8%, var(--cc-surface-secondary));
+}
+
+.cc-action-card--success {
+  border-color: var(--cc-success);
+  background: color-mix(in srgb, var(--cc-success) 8%, var(--cc-surface-secondary));
+}
+
+.cc-action-card--suggestions {
+  flex-direction: column;
+}
+
+.cc-action-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.cc-action-card__icon--event {
+  background: color-mix(in srgb, var(--cc-primary) 15%, transparent);
+  color: var(--cc-primary);
+}
+
+.cc-action-card__icon--todo {
+  background: color-mix(in srgb, var(--cc-success) 15%, transparent);
+  color: var(--cc-success);
+}
+
+.cc-action-card__icon--memo {
+  background: color-mix(in srgb, var(--cc-secondary) 15%, transparent);
+  color: var(--cc-secondary);
+}
+
+.cc-action-card__icon--warning {
+  background: color-mix(in srgb, var(--cc-warning) 15%, transparent);
+  color: var(--cc-warning);
+}
+
+.cc-action-card__icon--success {
+  background: color-mix(in srgb, var(--cc-success) 15%, transparent);
+  color: var(--cc-success);
+}
+
+.cc-action-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-action-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cc-text-secondary);
+}
+
+.cc-action-card__title {
+  font-weight: 500;
+  color: var(--cc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-action-card__detail {
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-action-card__view-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.cc-action-card__suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-action-card__suggestion:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.cc-action-card__suggestion-reason {
+  font-size: 11px;
+  color: var(--cc-text-tertiary);
+  font-style: italic;
+}
+
+.cc-action-card__schedule-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
+/* Task progress card */
+.cc-task-progress {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--cc-surface-secondary);
+  border: 1px solid var(--cc-border);
+}
+
+.cc-task-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.cc-task-progress__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--cc-text-secondary);
+}
+
+.cc-task-progress__percent {
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-task-progress__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cc-border);
+  overflow: hidden;
+}
+
+.cc-task-progress__fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--cc-primary);
+  transition: width 0.3s ease;
+}
+
+.cc-task-progress__message {
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
+  margin-top: 4px;
+}
+
+.cc-task-progress__subtasks {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-task-progress__subtask {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--cc-text-secondary);
+}
+
+.cc-task-progress__subtask-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cc-task-progress__subtask-dot--pending {
+  background: var(--cc-disabled);
+}
+
+.cc-task-progress__subtask-dot--running {
+  background: var(--cc-primary);
+}
+
+.cc-task-progress__subtask-dot--completed {
+  background: var(--cc-success);
+}
+
+.cc-task-progress__subtask-dot--failed {
+  background: var(--cc-error);
+}
+
+/* Recurrence selector */
+.cc-recurrence__days {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.cc-recurrence__day-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--cc-border);
+  background: transparent;
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cc-recurrence__day-btn:hover {
+  border-color: var(--cc-primary);
+}
+
+.cc-recurrence__day-btn--active {
+  background: var(--cc-primary);
+  color: white;
+  border-color: var(--cc-primary);
+}
+
+.cc-recurrence__ends {
+  margin-top: 8px;
+}

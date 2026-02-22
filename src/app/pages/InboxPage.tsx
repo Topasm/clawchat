@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
+import { formatShortDateTime } from '../utils/formatters';
 import TaskCard from '../components/shared/TaskCard';
 import Badge from '../components/shared/Badge';
 import SectionHeader from '../components/shared/SectionHeader';
@@ -30,6 +31,11 @@ export default function InboxPage() {
     ? todos.filter((t) => !t.due_date && t.status !== 'completed')
     : [];
 
+  // Group: root tasks first, sub-tasks indented under their parent
+  const rootInboxTasks = inboxTasks.filter((t) => !t.parent_id);
+  const childrenOf = (parentId: string) =>
+    inboxTasks.filter((t) => t.parent_id === parentId);
+
   // Memo handlers
   const handleCreateMemo = async () => {
     const content = newContent.trim();
@@ -56,11 +62,6 @@ export default function InboxPage() {
     await deleteMemo(id);
   };
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  };
-
   const totalItems = inboxTasks.length + memos.length;
 
   return (
@@ -83,13 +84,24 @@ export default function InboxPage() {
       {/* Unscheduled tasks */}
       {inboxTasks.length > 0 && (
         <SectionHeader title="Unscheduled Tasks" count={inboxTasks.length} variant="accent">
-          {inboxTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onToggle={() => handleToggle(task.id)}
-              onClick={() => navigate(`/tasks/${task.id}`)}
-            />
+          {rootInboxTasks.map((task) => (
+            <div key={task.id}>
+              <TaskCard
+                task={task}
+                onToggle={() => handleToggle(task.id)}
+                onClick={() => navigate(`/tasks/${task.id}`)}
+                subTaskCount={childrenOf(task.id).length}
+              />
+              {childrenOf(task.id).map((child) => (
+                <TaskCard
+                  key={child.id}
+                  task={child}
+                  onToggle={() => handleToggle(child.id)}
+                  onClick={() => navigate(`/tasks/${child.id}`)}
+                  isSubTask
+                />
+              ))}
+            </div>
           ))}
         </SectionHeader>
       )}
@@ -148,7 +160,7 @@ export default function InboxPage() {
                   <>
                     <div className="cc-memo-card__content">{memo.content}</div>
                     <div className="cc-memo-card__meta">
-                      <span className="cc-memo-card__date">{formatDate(memo.updated_at)}</span>
+                      <span className="cc-memo-card__date">{formatShortDateTime(memo.updated_at)}</span>
                       {memo.tags?.map((tag) => (
                         <Badge key={tag} variant="tag">{tag}</Badge>
                       ))}

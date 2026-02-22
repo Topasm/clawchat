@@ -9,7 +9,7 @@ import {
   type Platform,
 } from '../types/platform';
 
-export interface PlatformInfo {
+interface PlatformInfo {
   platform: Platform;
   isMobile: boolean;
   isDesktop: boolean;

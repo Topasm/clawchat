@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettingsStore, DEFAULT_SETTINGS } from '../stores/useSettingsStore';
+import CodeEditor from '../components/shared/CodeEditor';
 
 const MAX_LENGTH = 4000;
 
@@ -30,10 +31,12 @@ export default function SystemPromptPage() {
         </div>
       </div>
 
-      <textarea
-        className="cc-sysprompt__textarea"
+      <CodeEditor
         value={draft}
-        onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
+        onChange={setDraft}
+        language="markdown"
+        maxLength={MAX_LENGTH}
+        height="300px"
         placeholder="Enter your system prompt..."
       />
 

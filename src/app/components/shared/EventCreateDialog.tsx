@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Dialog from './Dialog';
 import Toggle from './Toggle';
+import RecurrenceSelector from './RecurrenceSelector';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
 
@@ -52,6 +53,7 @@ export default function EventCreateDialog({
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [reminder, setReminder] = useState('');
+  const [recurrenceRule, setRecurrenceRule] = useState<string | undefined>();
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -72,6 +74,7 @@ export default function EventCreateDialog({
       setDescription('');
       setTagsInput('');
       setReminder('');
+      setRecurrenceRule(undefined);
     }
   }, [open, initialDate, initialTime]);
 
@@ -107,6 +110,7 @@ export default function EventCreateDialog({
       location: location.trim() || undefined,
       is_all_day: isAllDay || undefined,
       reminder_minutes: reminder ? Number(reminder) : undefined,
+      recurrence_rule: recurrenceRule || undefined,
       tags: tags.length > 0 ? tags : undefined,
       created_at: now,
       updated_at: now,
@@ -224,6 +228,8 @@ export default function EventCreateDialog({
             ))}
           </select>
         </div>
+
+        <RecurrenceSelector value={recurrenceRule} onChange={setRecurrenceRule} />
 
         <div className="cc-dialog__actions">
           <button

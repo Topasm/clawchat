@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { parseNaturalInput } from '../../utils/naturalLanguageParser';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
@@ -8,9 +9,10 @@ interface QuickCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
   placeholder?: string;
+  defaultParentId?: string;
 }
 
-export default function QuickCaptureModal({ isOpen, onClose, placeholder }: QuickCaptureModalProps) {
+export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaultParentId }: QuickCaptureModalProps) {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +69,8 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder }: Quic
         priority: parsed.priority ?? undefined,
         due_date: parsed.dueDate?.toISOString(),
         tags: [],
+        parent_id: defaultParentId ?? null,
+        sort_order: 0,
         created_at: now,
         updated_at: now,
       });
@@ -76,53 +80,69 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder }: Quic
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="cc-modal-overlay" onClick={onClose}>
-      <div className="cc-modal cc-quick-capture" onClick={(e) => e.stopPropagation()}>
-        <form onSubmit={handleSubmit}>
-          <input
-            ref={inputRef}
-            type="text"
-            className="cc-quick-capture__input"
-            placeholder={placeholder || 'Try "Buy groceries tomorrow" or "Meeting at 3pm"...'}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            autoComplete="off"
-          />
-          {parsed && text.trim() && (
-            <div className="cc-quick-capture__preview">
-              <span className="cc-quick-capture__type">
-                {parsed.type === 'event' ? 'Event' : parsed.type === 'note' ? 'Note' : 'Task'}
-              </span>
-              {parsed.priority && (
-                <Badge variant="priority" level={parsed.priority} />
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="cc-modal-overlay"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          <motion.div
+            className="cc-modal cc-quick-capture"
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, y: -12, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <form onSubmit={handleSubmit}>
+              <input
+                ref={inputRef}
+                type="text"
+                className="cc-quick-capture__input"
+                placeholder={placeholder || 'Try "Buy groceries tomorrow" or "Meeting at 3pm"...'}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                autoComplete="off"
+              />
+              {parsed && text.trim() && (
+                <div className="cc-quick-capture__preview">
+                  <span className="cc-quick-capture__type">
+                    {parsed.type === 'event' ? 'Event' : parsed.type === 'note' ? 'Note' : 'Task'}
+                  </span>
+                  {parsed.priority && (
+                    <Badge variant="priority" level={parsed.priority} />
+                  )}
+                  {parsed.dueDate && (
+                    <Badge variant="due" dueDate={parsed.dueDate.toISOString()} />
+                  )}
+                  {parsed.startTime && (
+                    <span className="cc-quick-capture__time">
+                      {parsed.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
               )}
-              {parsed.dueDate && (
-                <Badge variant="due" dueDate={parsed.dueDate.toISOString()} />
-              )}
-              {parsed.startTime && (
-                <span className="cc-quick-capture__time">
-                  {parsed.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-            </div>
-          )}
-          <div className="cc-quick-capture__actions">
-            <button type="button" className="cc-btn cc-btn--ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="cc-btn cc-btn--primary"
-              disabled={!parsed?.title}
-            >
-              Create
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+              <div className="cc-quick-capture__actions">
+                <button type="button" className="cc-btn cc-btn--ghost" onClick={onClose}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="cc-btn cc-btn--primary"
+                  disabled={!parsed?.title}
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

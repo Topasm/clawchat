@@ -114,11 +114,17 @@ To maintain focus and avoid scope creep, the following are explicitly **not** go
 ```
 ┌─ ClawChat Desktop / Web App ───────────────────────┐
 │                                                      │
-│   Electron (desktop)    Pages (React + TypeScript)   │
+│   Electron (desktop)    Pages (thin re-exports)      │
 │   Web Browser (Vite)    ├── Today, Inbox, Chat       │
-│   Capacitor (planned)   ├── Kanban Board (All Tasks) │
+│   Capacitor (mobile)    ├── Kanban Board (All Tasks) │
 │                         ├── Task/Event Detail        │
+│                         ├── Calendar, Admin          │
 │                         └── Settings                 │
+│                                                      │
+│   Component Architecture:                            │
+│     Container (hooks + data) → View (JSX) → Shared   │
+│     calendar-views/, admin-views/, today-views/,     │
+│     kanban/ — feature-based co-location              │
 │                                                      │
 └──────────────────────┬───────────────────────────────┘
                        │ REST + SSE Streaming (HTTPS)

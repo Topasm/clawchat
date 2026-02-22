@@ -1,0 +1,220 @@
+/* Admin Dashboard */
+
+.cc-admin-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--cc-border);
+  overflow-x: auto;
+}
+
+.cc-admin-tab {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--cc-text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.cc-admin-tab:hover {
+  color: var(--cc-text);
+}
+
+.cc-admin-tab--active {
+  color: var(--cc-primary);
+  border-bottom-color: var(--cc-primary);
+}
+
+/* Stat card grid */
+.cc-admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cc-admin-stat {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+}
+
+.cc-admin-stat__label {
+  font-size: 11px;
+  color: var(--cc-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cc-admin-stat__value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--cc-text);
+  margin-top: 2px;
+}
+
+/* Activity feed */
+.cc-admin-activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.cc-admin-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-admin-activity-item__badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  flex-shrink: 0;
+  min-width: 56px;
+  text-align: center;
+}
+
+.cc-admin-activity-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-admin-activity-item__summary {
+  font-size: 13px;
+  color: var(--cc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-admin-activity-item__time {
+  font-size: 11px;
+  color: var(--cc-text-tertiary);
+}
+
+/* Status indicator */
+.cc-admin-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.cc-admin-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cc-admin-status__dot--ok { background: var(--cc-success); }
+.cc-admin-status__dot--error { background: var(--cc-error); }
+
+/* Agent tasks table */
+.cc-admin-tasks-table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.cc-admin-tasks-table th {
+  text-align: left;
+  padding: 6px 8px;
+  font-weight: 600;
+  color: var(--cc-text-secondary);
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-admin-tasks-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--cc-border);
+  color: var(--cc-text);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Config table */
+.cc-admin-config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--cc-border);
+  font-size: 13px;
+}
+
+.cc-admin-config-row__key {
+  color: var(--cc-text-secondary);
+  font-weight: 500;
+}
+
+.cc-admin-config-row__value {
+  color: var(--cc-text);
+  font-family: monospace;
+  font-size: 12px;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Purge form */
+.cc-admin-purge-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cc-admin-purge-form select,
+.cc-admin-purge-form input {
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font-family: inherit;
+}
+
+.cc-admin-purge-form input {
+  width: 80px;
+}
+
+/* Models list */
+.cc-admin-models-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cc-admin-model-tag {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font-family: monospace;
+}
+
+/* Button row */
+.cc-admin-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}

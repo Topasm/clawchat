@@ -1,4 +1,4 @@
-export interface ParsedInput {
+interface ParsedInput {
   title: string;
   type: 'task' | 'event' | 'note';
   dueDate: Date | null;
@@ -102,14 +102,4 @@ export function parseNaturalInput(text: string): ParsedInput {
 
   result.title = cleanTitle.replace(/\s+/g, ' ').trim();
   return result;
-}
-
-export function shouldAutoCreate(text: string): boolean {
-  const parsed = parseNaturalInput(text);
-  return !!(
-    parsed.dueDate ||
-    parsed.startTime ||
-    parsed.type === 'event' ||
-    /\b(remind|buy|do|finish|complete|schedule|book|make|create|add)\b/i.test(text)
-  );
 }

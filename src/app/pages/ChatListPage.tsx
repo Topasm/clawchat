@@ -1,28 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Virtuoso } from 'react-virtuoso';
 import { useChatStore } from '../stores/useChatStore';
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
+import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 
 export default function ChatListPage() {
   const navigate = useNavigate();
   const conversations = useChatStore((s) => s.conversations);
   const conversationsLoaded = useChatStore((s) => s.conversationsLoaded);
-  const fetchConversations = useChatStore((s) => s.fetchConversations);
   const createConversation = useChatStore((s) => s.createConversation);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
 
-  const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  // Fetch conversations on mount if not already loaded by useDataSync
-  useEffect(() => {
-    if (!conversationsLoaded) {
-      setLoading(true);
-      fetchConversations().finally(() => setLoading(false));
-    }
-  }, [conversationsLoaded, fetchConversations]);
+  const loading = !conversationsLoaded;
 
   const handleNewChat = async () => {
     try {
@@ -50,22 +44,25 @@ export default function ChatListPage() {
         </button>
       </div>
 
-      {loading && conversations.length === 0 && (
-        <div className="cc-empty__message" style={{ padding: 40, textAlign: 'center' }}>Loading conversations...</div>
-      )}
+      {loading && conversations.length === 0 && <ChatListSkeleton />}
 
       {!loading && conversations.length === 0 ? (
         <EmptyState icon={'\uD83D\uDCAC'} message="No conversations yet. Start a new chat!" />
-      ) : (
-        conversations.map((convo) => (
-          <ConversationItem
-            key={convo.id}
-            conversation={convo}
-            onClick={() => navigate(`/chats/${convo.id}`)}
-            onDelete={() => setDeleteTarget(convo.id)}
-          />
-        ))
-      )}
+      ) : conversations.length > 0 ? (
+        <Virtuoso
+          style={{ height: 'calc(100vh - 160px)' }}
+          data={conversations}
+          increaseViewportBy={200}
+          itemContent={(_index, convo) => (
+            <ConversationItem
+              key={convo.id}
+              conversation={convo}
+              onClick={() => navigate(`/chats/${convo.id}`)}
+              onDelete={() => setDeleteTarget(convo.id)}
+            />
+          )}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={!!deleteTarget}

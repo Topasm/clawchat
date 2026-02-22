@@ -1,0 +1,16 @@
+export const queryKeys = {
+  todos: ['todos'] as const,
+  events: ['events'] as const,
+  memos: ['memos'] as const,
+  conversations: ['conversations'] as const,
+  messages: (id: string) => ['messages', id] as const,
+  today: ['today'] as const,
+  taskRelationships: (todoId: string) => ['task-relationships', todoId] as const,
+  attachments: (ownerId: string) => ['attachments', ownerId] as const,
+  adminOverview: ['admin', 'overview'] as const,
+  adminAI: ['admin', 'ai'] as const,
+  adminActivity: ['admin', 'activity'] as const,
+  adminSessions: ['admin', 'sessions'] as const,
+  adminConfig: ['admin', 'config'] as const,
+  adminData: ['admin', 'data'] as const,
+};

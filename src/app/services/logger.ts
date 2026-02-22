@@ -1,6 +1,6 @@
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export interface LogEntry {
+interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
@@ -64,28 +64,12 @@ class Logger {
     this.log('debug', message, metadata);
   }
 
-  getEntries(level?: LogLevel): LogEntry[] {
-    if (!level) return [...this.entries];
-    return this.entries.filter((e) => e.level === level);
-  }
-
   flush(): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.entries));
     } catch {
       // Storage full or unavailable — silently ignore
     }
-  }
-
-  exportAsText(): string {
-    return this.entries
-      .map((e) => {
-        let line = `[${e.timestamp}] [${e.level.toUpperCase()}] ${e.message}`;
-        if (e.metadata) line += ` ${JSON.stringify(e.metadata)}`;
-        if (e.stack) line += `\n  ${e.stack}`;
-        return line;
-      })
-      .join('\n');
   }
 
   private push(entry: LogEntry): void {

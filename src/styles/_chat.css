@@ -88,20 +88,11 @@
 .cc-chat-panel {
   border-top: 1px solid var(--cc-border);
   background: var(--cc-surface);
-  transition: height 0.2s ease;
+  /* height animated by framer-motion */
   overflow: hidden;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-}
-
-.cc-chat-panel--collapsed {
-  height: 52px;
-}
-
-.cc-chat-panel--expanded {
-  height: 360px;
-  max-height: 50vh;
 }
 
 .cc-chat-panel__header {
@@ -140,10 +131,7 @@
 
 .cc-chat-panel__messages {
   flex: 1;
-  overflow-y: auto;
   padding: 8px 12px;
-  display: flex;
-  flex-direction: column-reverse;
   gap: 4px;
 }
 
@@ -251,4 +239,38 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Intent badge */
+.cc-bubble__intent {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--cc-primary);
+  background: var(--cc-primary-light);
+  padding: 1px 8px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* Edit mode */
+.cc-chat-input--editing {
+  border-color: var(--cc-primary);
+}
+.cc-chat-input__cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--cc-text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.cc-chat-input__cancel-btn:hover {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-error);
 }

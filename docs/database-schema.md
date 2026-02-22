@@ -5,12 +5,16 @@ ClawChat uses a single SQLite database storing all user data on the self-hosted 
 ## Entity Relationship Overview
 
 ```
-conversations 1──N messages
-messages      N──1 conversations
-todos         (standalone, linked via conversation_id)
-events        (standalone, linked via conversation_id)
-memos         (standalone, linked via conversation_id)
-agent_tasks   (standalone, linked via conversation_id)
+conversations       1──N messages
+messages            N──1 conversations
+todos               (standalone, linked via conversation_id)
+todos               N──1 todos (self-ref via parent_id for sub-tasks)
+task_relationships  N──1 todos (source_todo_id, target_todo_id)
+attachments         N──1 memos (memo_id, CASCADE)
+attachments         N──1 todos (todo_id, CASCADE)
+events              (standalone, linked via conversation_id)
+memos               (standalone, linked via conversation_id)
+agent_tasks         (standalone, linked via conversation_id)
 ```
 
 All module tables (`todos`, `events`, `memos`) link back to the `conversation_id` and `message_id` that created them, enabling full traceability.
@@ -65,6 +69,20 @@ Stores task/to-do items, created via conversation or direct API.
 | `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Creation timestamp |
 | `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Last modification timestamp |
 | `tags` | JSON | NULLABLE | Array of string tags for categorization |
+| `parent_id` | TEXT (UUID) | FOREIGN KEY -> todos.id ON DELETE SET NULL, NULLABLE | Parent task ID for sub-task hierarchy |
+| `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Manual ordering within kanban columns |
+
+### `task_relationships`
+
+Stores directional relationships between tasks (blocking, related, duplicate).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT (UUID) | PRIMARY KEY | Unique relationship identifier (`trel_` prefix) |
+| `source_todo_id` | TEXT (UUID) | FOREIGN KEY -> todos.id ON DELETE CASCADE, NOT NULL | Source task |
+| `target_todo_id` | TEXT (UUID) | FOREIGN KEY -> todos.id ON DELETE CASCADE, NOT NULL | Target task |
+| `relationship_type` | TEXT | NOT NULL | Type: `blocks`, `blocked_by`, `related`, `duplicate_of` |
+| `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | When the relationship was created |
 
 ### `events`
 
@@ -86,6 +104,21 @@ Stores calendar events.
 | `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Creation timestamp |
 | `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Last modification timestamp |
 | `tags` | JSON | NULLABLE | Array of string tags |
+
+### `attachments`
+
+Stores file attachments linked to memos or todos.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT (UUID) | PRIMARY KEY | Unique attachment identifier (`att_` prefix) |
+| `filename` | VARCHAR(255) | NOT NULL | Original uploaded filename |
+| `stored_filename` | VARCHAR(255) | NOT NULL | UUID-based filename on disk |
+| `content_type` | VARCHAR(100) | NOT NULL | MIME type (e.g., `image/jpeg`) |
+| `size_bytes` | BIGINT | NOT NULL | File size in bytes |
+| `memo_id` | TEXT (UUID) | FOREIGN KEY -> memos.id ON DELETE CASCADE, NULLABLE | Linked memo |
+| `todo_id` | TEXT (UUID) | FOREIGN KEY -> todos.id ON DELETE CASCADE, NULLABLE | Linked todo |
+| `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Upload timestamp |
 
 ### `memos`
 
@@ -132,10 +165,17 @@ CREATE INDEX idx_messages_created_at ON messages(created_at);
 -- Conversation ordering
 CREATE INDEX idx_conversations_updated_at ON conversations(updated_at);
 
--- Todo queries (by status, due date)
+-- Todo queries (by status, due date, hierarchy, ordering)
 CREATE INDEX idx_todos_status ON todos(status);
 CREATE INDEX idx_todos_due_date ON todos(due_date);
 CREATE INDEX idx_todos_conversation_id ON todos(conversation_id);
+CREATE INDEX idx_todos_parent_id ON todos(parent_id);
+CREATE INDEX idx_todos_sort_order ON todos(sort_order);
+
+-- Task relationship queries
+CREATE INDEX idx_trel_source ON task_relationships(source_todo_id);
+CREATE INDEX idx_trel_target ON task_relationships(target_todo_id);
+CREATE INDEX idx_trel_type ON task_relationships(relationship_type);
 
 -- Event queries (by time range)
 CREATE INDEX idx_events_start_time ON events(start_time);
@@ -145,6 +185,10 @@ CREATE INDEX idx_events_conversation_id ON events(conversation_id);
 -- Memo lookup
 CREATE INDEX idx_memos_conversation_id ON memos(conversation_id);
 CREATE INDEX idx_memos_updated_at ON memos(updated_at);
+
+-- Attachment lookup (by owner)
+CREATE INDEX idx_attachments_memo_id ON attachments(memo_id);
+CREATE INDEX idx_attachments_todo_id ON attachments(todo_id);
 
 -- Agent task status monitoring
 CREATE INDEX idx_agent_tasks_status ON agent_tasks(status);

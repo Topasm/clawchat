@@ -19,7 +19,8 @@
 │   ├── TaskDetailPage            │    memos, kanban)       │
 │   ├── EventDetailPage           └── useSettingsStore     │
 │   ├── SettingsPage                  (15+ settings)       │
-│   └── SystemPromptPage                                   │
+│   ├── SystemPromptPage                                   │
+│   └── AdminPage (7-tab dashboard)                                   │
 │                                                          │
 │   Components                    Shared                   │
 │   ├── Layout (sidebar + main)   ├── TaskCard             │
@@ -27,20 +28,23 @@
 │   │   ├── KanbanBoard           ├── Checkbox             │
 │   │   ├── KanbanColumn          ├── SectionHeader        │
 │   │   └── KanbanCard            ├── EmptyState           │
-│   ├── chat-panel/               ├── EventCard            │
-│   │   ├── ChatPanel             ├── SegmentedControl     │
-│   │   ├── ChatInput             ├── Toggle / Slider      │
-│   │   ├── MessageBubble         └── Settings components  │
-│   │   └── StreamingIndicator                             │
+│   ├── chat-panel/               ├── Icons (Calendar, Memo)│
+│   │   ├── ChatPanel             ├── EventCard            │
+│   │   ├── ChatInput             ├── SegmentedControl     │
+│   │   ├── MessageBubble         ├── Toggle / Slider      │
+│   │   └── StreamingIndicator    └── Settings components  │
 │   └── ConversationItem                                   │
 │                                                          │
 │   Services                      Hooks                    │
-│   └── apiClient (Axios)         └── useTodayData         │
+│   ├── apiClient (Axios)         ├── useRegenerate        │
+│   ├── sseClient (SSE)           ├── useDebouncedPersist  │
+│   ├── wsClient (WebSocket)      ├── useTodayData         │
+│   └── logger                    └── queries/ (React Q.)  │
 │                                                          │
 │   Styles (_*.css partials)      Utils                    │
 │   ├── _reset, _variables        ├── formatters           │
-│   ├── _layout, _components      └── platform detection   │
-│   ├── _chat, _pages, _kanban                             │
+│   ├── _layout, _components      ├── helpers (isDemoMode) │
+│   ├── _chat, _pages, _kanban    └── platform detection   │
 │   ├── _settings, _utilities                              │
 │   └── _capacitor                                         │
 │                                                          │
@@ -51,14 +55,18 @@
 │  Self-Hosted Server  │                                    │
 │                      │                                    │
 │  FastAPI Backend  (clawchat_server repo)                   │
-│  ├── Routers (chat, todo, calendar, memo, search, today)  │
+│  ├── Routers (chat, todo, calendar, memo, attachment,     │
+│  │           search, today, admin)                        │
 │  ├── Services (ai, orchestrator, todo, calendar, memo)    │
 │  └── Models & Schemas (SQLAlchemy async + Pydantic)       │
 │                                                           │
 │  SQLite Database                                          │
 │  ├── conversations, messages                              │
-│  ├── todos, events, memos                                 │
+│  ├── todos, events, memos, attachments                    │
 │  └── agent_tasks                                          │
+│                                                           │
+│  File Storage (data/uploads/)                             │
+│  └── Uploaded attachments (UUID-named files)              │
 │                                                           │
 │  LLM Provider                                             │
 │  └── Ollama (local) or OpenAI-compatible API (cloud)      │
@@ -132,3 +140,15 @@ Five Zustand stores manage all client state:
 All stores use optimistic updates with server sync. Demo data is seeded when no server is configured.
 
 A `keyboard/` module provides centralized shortcut definitions (`registry.ts`) and semantic hooks (`hooks.ts`) for global, kanban, and navigation shortcuts using `react-hotkeys-hook`.
+
+### State Management Architecture
+
+The architecture splits state responsibilities between specialized tools (completed in Phase 2):
+
+| Layer | Tool | Responsibility |
+|-------|------|---------------|
+| **Server state** | TanStack Query (React Query) | Handles API data fetching, caching, background refetch, and optimistic mutations |
+| **UI state** | Zustand | Manages filters, panel sizes, theme, and local-only preferences |
+| **Validation** | Zod | Validates API responses and form inputs at runtime |
+
+This mirrors the pattern used in production by vibe-kanban, where Zustand handles UI preferences and React Query handles all server-side data with intelligent caching. See [roadmap.md](./roadmap.md) Phase 2 for details.

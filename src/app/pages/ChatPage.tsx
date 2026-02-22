@@ -1,6 +1,8 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Virtuoso } from 'react-virtuoso';
 import { useChatStore } from '../stores/useChatStore';
+import { useRegenerate } from '../hooks/useRegenerate';
 import MessageBubble from '../components/chat-panel/MessageBubble';
 import StreamingIndicator from '../components/chat-panel/StreamingIndicator';
 import ChatInput from '../components/chat-panel/ChatInput';
@@ -15,7 +17,6 @@ export default function ChatPage() {
   const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
   const stopGeneration = useChatStore((s) => s.stopGeneration);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
-  const regenerateMessage = useChatStore((s) => s.regenerateMessage);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
   const conversations = useChatStore((s) => s.conversations);
 
@@ -46,13 +47,15 @@ export default function ChatPage() {
     }
   }, [conversationId, addMessage, sendMessageStreaming]);
 
-  const handleRegenerate = (msgId: string) => {
-    if (!conversationId) return;
-    const userText = regenerateMessage(conversationId, msgId);
-    if (userText) {
-      sendMessageStreaming(conversationId, userText);
-    }
-  };
+  const handleRegenerate = useRegenerate(conversationId);
+
+  // Store has newest-first; Virtuoso needs oldest-first
+  const chronological = useMemo(() => [...messages].reverse(), [messages]);
+
+  const Footer = useMemo(() => {
+    if (!isStreaming || messages[0]?.text !== '') return null;
+    return () => <StreamingIndicator />;
+  }, [isStreaming, messages]);
 
   return (
     <div className="cc-chat-page">
@@ -65,9 +68,13 @@ export default function ChatPage() {
         <span className="cc-chat-page__title">{convo?.title || 'Chat'}</span>
       </div>
 
-      <div className="cc-chat-page__messages">
-        {isStreaming && messages[0]?.text === '' && <StreamingIndicator />}
-        {messages.map((msg) => (
+      <Virtuoso
+        className="cc-chat-page__messages"
+        data={chronological}
+        initialTopMostItemIndex={Math.max(0, chronological.length - 1)}
+        followOutput="smooth"
+        increaseViewportBy={{ top: 200, bottom: 200 }}
+        itemContent={(_index, msg) => (
           <MessageBubble
             key={msg._id}
             message={msg}
@@ -78,8 +85,9 @@ export default function ChatPage() {
                 : undefined
             }
           />
-        ))}
-      </div>
+        )}
+        components={Footer ? { Footer } : undefined}
+      />
 
       <ChatInput
         onSend={handleSend}

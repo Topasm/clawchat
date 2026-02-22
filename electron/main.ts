@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain, Notification } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -39,6 +39,16 @@ ipcMain.handle('secure-store:delete', (_event, key: string) => {
   const store = readStore();
   delete store[key];
   writeStore(store);
+});
+
+// ── IPC handler for desktop notifications ────────────────────────────
+ipcMain.on('notification:show', (_event, title: string, body: string) => {
+  const notification = new Notification({ title, body, silent: false });
+  notification.on('click', () => {
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
+  notification.show();
 });
 
 let mainWindow: BrowserWindow | null = null;

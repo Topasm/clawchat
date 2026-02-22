@@ -4,9 +4,10 @@ import { logger } from './logger';
 const SSE_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 2;
 
-export interface SSECallbacks {
+interface SSECallbacks {
   onMeta?: (meta: StreamEventMeta) => void;
   onToken?: (token: string) => void;
+  onTitleGenerated?: (title: string) => void;
   onDone?: (fullMessage: string) => void;
   onError?: (error: Error) => void;
 }
@@ -35,7 +36,7 @@ export function connectSSE(
   token: string,
   callbacks: SSECallbacks,
 ): AbortController {
-  const { onMeta, onToken, onDone, onError } = callbacks;
+  const { onMeta, onToken, onTitleGenerated, onDone, onError } = callbacks;
   const abortController = new AbortController();
 
   let accumulated = '';
@@ -119,6 +120,8 @@ export function connectSSE(
               } else if (parsed.token !== undefined) {
                 accumulated += parsed.token;
                 onToken?.(parsed.token);
+              } else if (parsed.title_generated !== undefined) {
+                onTitleGenerated?.(parsed.title_generated);
               }
             } catch {
               // Skip malformed JSON events
@@ -150,6 +153,8 @@ export function connectSSE(
             } else if (parsed.token !== undefined) {
               accumulated += parsed.token;
               onToken?.(parsed.token);
+            } else if (parsed.title_generated !== undefined) {
+              onTitleGenerated?.(parsed.title_generated);
             }
           } catch {
             // Skip malformed JSON events
@@ -207,5 +212,3 @@ export function connectSSE(
 
   return abortController;
 }
-
-export default connectSSE;

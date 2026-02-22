@@ -1,7 +1,12 @@
 import { useState } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { useModuleStore } from '../stores/useModuleStore';
+import { formatShortDateTime } from '../utils/formatters';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
+import RichTextEditor from '../components/shared/RichTextEditor';
+import FileDropZone from '../components/shared/FileDropZone';
+import AttachmentList from '../components/shared/AttachmentList';
 
 export default function MemosPage() {
   const memos = useModuleStore((s) => s.memos);
@@ -14,6 +19,7 @@ export default function MemosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [createEditorKey, setCreateEditorKey] = useState(0);
 
   const handleCreate = async () => {
     const content = newContent.trim();
@@ -26,12 +32,7 @@ export default function MemosPage() {
     }
     setNewContent('');
     setNewTags('');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      handleCreate();
-    }
+    setCreateEditorKey((k) => k + 1);
   };
 
   const startEdit = (id: string, content: string) => {
@@ -57,11 +58,6 @@ export default function MemosPage() {
       )
     : memos;
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  };
-
   return (
     <div>
       <div className="cc-page-header">
@@ -73,13 +69,11 @@ export default function MemosPage() {
 
       {/* New memo form */}
       <div className="cc-memo-form">
-        <textarea
-          className="cc-memo-form__textarea"
-          placeholder="Write a quick note... (Ctrl+Enter to save)"
-          value={newContent}
-          onChange={(e) => setNewContent(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={3}
+        <RichTextEditor
+          key={`create-${createEditorKey}`}
+          onChange={setNewContent}
+          placeholder="Write a quick note... (rich text supported)"
+          onSave={handleCreate}
         />
         <div className="cc-memo-form__footer">
           <input
@@ -117,18 +111,22 @@ export default function MemosPage() {
           message={memos.length === 0 ? 'No memos yet. Write one above!' : 'No memos match your search.'}
         />
       ) : (
-        <div className="cc-memo-list">
-          {filtered.map((memo) => (
-            <div key={memo.id} className="cc-memo-card">
+        <Virtuoso
+          style={{ height: 'calc(100vh - 280px)' }}
+          data={filtered}
+          increaseViewportBy={200}
+          itemContent={(_index, memo) => (
+            <div className="cc-memo-card" style={{ marginBottom: 8 }}>
               {editingId === memo.id ? (
                 <div className="cc-memo-card__edit">
-                  <textarea
-                    className="cc-memo-form__textarea"
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    rows={3}
-                    autoFocus
+                  <RichTextEditor
+                    key={`edit-${memo.id}`}
+                    initialMarkdown={editContent}
+                    onChange={setEditContent}
+                    placeholder="Edit memo..."
                   />
+                  <FileDropZone memoId={memo.id} />
+                  <AttachmentList ownerId={memo.id} ownerType="memo" />
                   <div className="cc-memo-card__edit-actions">
                     <button className="cc-btn cc-btn--ghost" onClick={() => setEditingId(null)}>
                       Cancel
@@ -140,9 +138,14 @@ export default function MemosPage() {
                 </div>
               ) : (
                 <>
-                  <div className="cc-memo-card__content">{memo.content}</div>
+                  <RichTextEditor
+                    key={`view-${memo.id}-${memo.updated_at}`}
+                    initialMarkdown={memo.content}
+                    editable={false}
+                  />
+                  <AttachmentList ownerId={memo.id} ownerType="memo" />
                   <div className="cc-memo-card__meta">
-                    <span className="cc-memo-card__date">{formatDate(memo.updated_at)}</span>
+                    <span className="cc-memo-card__date">{formatShortDateTime(memo.updated_at)}</span>
                     {memo.tags?.map((tag) => (
                       <Badge key={tag} variant="tag">{tag}</Badge>
                     ))}
@@ -165,8 +168,8 @@ export default function MemosPage() {
                 </>
               )}
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
     </div>
   );

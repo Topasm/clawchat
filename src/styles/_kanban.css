@@ -96,6 +96,24 @@
   cursor: grab;
   border-radius: 8px;
   transition: box-shadow 0.15s, transform 0.15s, opacity 0.15s;
+  position: relative;
+}
+
+/* -- Drag handle (hidden by default, shown on touch devices) -- */
+
+.cc-kanban__drag-handle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  color: var(--cc-text-secondary);
+  opacity: 0.4;
+  touch-action: none;
+  z-index: 1;
 }
 
 .cc-kanban__card:active {
@@ -114,6 +132,46 @@
   border-radius: 8px;
 }
 
+.cc-kanban__card--selected {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: -1px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--cc-primary) 8%, transparent);
+}
+
+.cc-kanban__card--subtask {
+  margin-left: 20px;
+  position: relative;
+}
+
+.cc-kanban__card--subtask::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: var(--cc-border);
+}
+
+/* -- Drag handle visible on touch devices -------------------- */
+
+@media (hover: none) {
+  .cc-kanban__drag-handle {
+    display: flex;
+  }
+
+  .cc-kanban__card {
+    cursor: default;
+    padding-left: 28px;
+  }
+
+  .cc-kanban__card--dragging {
+    transform: scale(1.03);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  }
+}
+
 /* -- Responsive ---------------------------------------------- */
 
 @media (max-width: 768px) {
@@ -124,4 +182,119 @@
   .cc-kanban__column {
     max-height: none;
   }
+}
+
+/* -- Column tabs (mobile) ------------------------------------ */
+
+.cc-kanban-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cc-kanban-tabs__bar {
+  display: flex;
+  background: var(--cc-surface);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.cc-kanban-tabs__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cc-text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cc-kanban-tabs__tab--active {
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.cc-kanban-tabs__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--cc-border);
+  color: var(--cc-text-secondary);
+}
+
+.cc-kanban-tabs__content {
+  min-height: 200px;
+}
+
+/* -- Swipe actions ------------------------------------------- */
+
+.cc-swipe-actions {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.cc-swipe-actions__content {
+  position: relative;
+  z-index: 1;
+  background: var(--cc-bg);
+}
+
+.cc-swipe-actions__panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.cc-swipe-actions__panel--right {
+  right: 0;
+}
+
+.cc-swipe-actions__panel--left {
+  left: 0;
+}
+
+.cc-swipe-actions__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cc-swipe-actions__btn--move {
+  background: var(--cc-primary);
+  color: #fff;
+}
+
+.cc-swipe-actions__btn--complete {
+  background: var(--cc-success);
+  color: #fff;
 }

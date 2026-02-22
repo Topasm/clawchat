@@ -1,38 +1,37 @@
-import { useRef, useEffect } from 'react';
+import { useMemo } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { useChatStore } from '../../stores/useChatStore';
+import { useRegenerate } from '../../hooks/useRegenerate';
 import MessageBubble from './MessageBubble';
 import StreamingIndicator from './StreamingIndicator';
 
 interface ChatPanelMessagesProps {
   conversationId: string | null;
+  onEditMessage?: (messageId: string) => void;
 }
 
-export default function ChatPanelMessages({ conversationId }: ChatPanelMessagesProps) {
+export default function ChatPanelMessages({ conversationId, onEditMessage }: ChatPanelMessagesProps) {
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
-  const regenerateMessage = useChatStore((s) => s.regenerateMessage);
-  const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const handleRegenerate = useRegenerate(conversationId);
 
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [messages.length]);
+  // Store has newest-first; Virtuoso needs oldest-first
+  const chronological = useMemo(() => [...messages].reverse(), [messages]);
 
-  const handleRegenerate = (msgId: string) => {
-    if (!conversationId) return;
-    const userText = regenerateMessage(conversationId, msgId);
-    if (userText) {
-      sendMessageStreaming(conversationId, userText);
-    }
-  };
+  const Footer = useMemo(() => {
+    if (!isStreaming || messages[0]?.text !== '') return null;
+    return () => <StreamingIndicator />;
+  }, [isStreaming, messages]);
 
   return (
-    <div className="cc-chat-panel__messages" ref={containerRef}>
-      {isStreaming && messages[0]?.text === '' && <StreamingIndicator />}
-      {messages.map((msg) => (
+    <Virtuoso
+      className="cc-chat-panel__messages"
+      data={chronological}
+      initialTopMostItemIndex={Math.max(0, chronological.length - 1)}
+      followOutput="smooth"
+      increaseViewportBy={{ top: 200, bottom: 200 }}
+      itemContent={(_index, msg) => (
         <MessageBubble
           key={msg._id}
           message={msg}
@@ -42,8 +41,10 @@ export default function ChatPanelMessages({ conversationId }: ChatPanelMessagesP
               ? () => handleRegenerate(msg._id)
               : undefined
           }
+          onEdit={msg.user._id === 'user' ? onEditMessage : undefined}
         />
-      ))}
-    </div>
+      )}
+      components={Footer ? { Footer } : undefined}
+    />
   );
 }

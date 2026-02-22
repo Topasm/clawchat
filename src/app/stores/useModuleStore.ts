@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import apiClient from '../services/apiClient';
-import { useAuthStore } from './useAuthStore';
 import { useToastStore } from './useToastStore';
 import { logger } from '../services/logger';
+import { isDemoMode } from '../utils/helpers';
 import type {
   TodoResponse,
   TodoCreate,
@@ -14,6 +14,7 @@ import type {
   MemoCreate,
   MemoUpdate,
   KanbanStatus,
+  BulkTodoUpdate,
 } from '../types/api';
 
 interface ModuleState {
@@ -42,19 +43,32 @@ interface ModuleState {
   updateMemo: (id: string, updates: Partial<MemoResponse>) => void;
   removeMemo: (id: string) => void;
 
+  setKanbanStatuses: (statuses: Record<string, KanbanStatus>) => void;
+  resetToDemo: () => void;
+
+  // Multi-select & bulk operations
+  selectedTodoIds: Set<string>;
+  toggleTodoSelection: (id: string) => void;
+  selectAllTodos: (ids: string[]) => void;
+  clearTodoSelection: () => void;
+  bulkUpdateTodos: (update: BulkTodoUpdate) => Promise<void>;
+  reorderTodoInColumn: (todoId: string, newIndex: number, columnStatus: KanbanStatus) => void;
+
   // Kanban filters
   kanbanFilters: {
     searchQuery: string;
     priorities: string[];
     tags: string[];
-    sortField: 'title' | 'priority' | 'due_date' | 'created_at';
+    sortField: 'title' | 'priority' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order';
     sortDirection: 'asc' | 'desc';
+    showSubTasks: boolean;
   };
   setKanbanSearchQuery: (query: string) => void;
   toggleKanbanPriorityFilter: (priority: string) => void;
   toggleKanbanTagFilter: (tag: string) => void;
-  setKanbanSort: (field: 'title' | 'priority' | 'due_date' | 'created_at', direction: 'asc' | 'desc') => void;
+  setKanbanSort: (field: 'title' | 'priority' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order', direction: 'asc' | 'desc') => void;
   clearKanbanFilters: () => void;
+  toggleShowSubTasks: () => void;
 
   // Async actions
   fetchTodos: (params?: Record<string, string>) => Promise<void>;
@@ -66,6 +80,7 @@ interface ModuleState {
   createMemo: (data: MemoCreate) => Promise<MemoResponse>;
   deleteTodo: (id: string) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
+  deleteEventOccurrence: (eventId: string, date: string, mode: string) => Promise<void>;
   deleteMemo: (id: string) => Promise<void>;
   serverUpdateTodo: (id: string, data: TodoUpdate) => Promise<void>;
   serverUpdateEvent: (id: string, data: EventUpdate) => Promise<void>;
@@ -77,24 +92,25 @@ const now = new Date().toISOString();
 const yesterday = new Date(Date.now() - 86_400_000).toISOString();
 const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
 const DEMO_TODOS: TodoResponse[] = [
-  // Todo column
-  { id: 'demo-1', title: 'Review ClawChat monorepo structure', status: 'pending', priority: 'high', due_date: now, tags: ['dev'], created_at: now, updated_at: now },
-  { id: 'demo-2', title: 'Set up Capacitor for Android build', status: 'pending', priority: 'medium', due_date: now, tags: ['mobile'], created_at: now, updated_at: now },
-  { id: 'demo-3', title: 'Write unit tests for platform abstraction', status: 'pending', priority: 'medium', due_date: now, tags: ['testing'], created_at: now, updated_at: now },
-  { id: 'demo-4', title: 'Design bottom navigation for mobile layout', status: 'pending', priority: 'low', due_date: now, tags: ['design', 'mobile'], created_at: now, updated_at: now },
-  { id: 'demo-6', title: 'Update API documentation for v2 endpoints', status: 'pending', priority: 'high', due_date: yesterday, tags: ['docs'], created_at: yesterday, updated_at: yesterday },
-  { id: 'demo-9', title: 'Add push notification support', status: 'pending', priority: 'medium', tags: ['feature', 'mobile'], created_at: now, updated_at: now },
-  { id: 'demo-10', title: 'Create onboarding tutorial flow', status: 'pending', priority: 'low', tags: ['ux'], created_at: now, updated_at: now },
-  // In Progress column (via kanbanStatuses override)
-  { id: 'demo-5', title: 'Fix SSE reconnect on network change', status: 'pending', priority: 'urgent', due_date: yesterday, tags: ['bug'], created_at: yesterday, updated_at: yesterday },
-  { id: 'demo-11', title: 'Implement file upload in chat', status: 'pending', priority: 'high', due_date: now, tags: ['feature', 'chat'], created_at: yesterday, updated_at: now },
-  { id: 'demo-12', title: 'Migrate auth to JWT refresh tokens', status: 'pending', priority: 'high', tags: ['security'], created_at: twoDaysAgo, updated_at: now },
+  // Todo column — demo-3 and demo-4 are sub-tasks of demo-1
+  { id: 'demo-1', title: 'Review ClawChat monorepo structure', status: 'pending', priority: 'high', due_date: now, tags: ['dev'], parent_id: null, sort_order: 0, created_at: now, updated_at: now },
+  { id: 'demo-2', title: 'Set up Capacitor for Android build', status: 'pending', priority: 'medium', due_date: now, tags: ['mobile'], parent_id: null, sort_order: 1, created_at: now, updated_at: now },
+  { id: 'demo-3', title: 'Write unit tests for platform abstraction', status: 'pending', priority: 'medium', due_date: now, tags: ['testing'], parent_id: 'demo-1', sort_order: 0, created_at: now, updated_at: now },
+  { id: 'demo-4', title: 'Design bottom navigation for mobile layout', status: 'pending', priority: 'low', due_date: now, tags: ['design', 'mobile'], parent_id: 'demo-1', sort_order: 1, created_at: now, updated_at: now },
+  { id: 'demo-6', title: 'Update API documentation for v2 endpoints', status: 'pending', priority: 'high', due_date: yesterday, tags: ['docs'], parent_id: null, sort_order: 2, created_at: yesterday, updated_at: yesterday },
+  { id: 'demo-9', title: 'Add push notification support', status: 'pending', priority: 'medium', tags: ['feature', 'mobile'], parent_id: null, sort_order: 3, created_at: now, updated_at: now },
+  { id: 'demo-10', title: 'Create onboarding tutorial flow', status: 'pending', priority: 'low', tags: ['ux'], parent_id: null, sort_order: 4, created_at: now, updated_at: now },
+  // In Progress column (via kanbanStatuses override) — demo-16 is sub-task of demo-5
+  { id: 'demo-5', title: 'Fix SSE reconnect on network change', status: 'pending', priority: 'urgent', due_date: yesterday, tags: ['bug'], parent_id: null, sort_order: 0, created_at: yesterday, updated_at: yesterday },
+  { id: 'demo-16', title: 'Add exponential backoff to reconnect logic', status: 'pending', priority: 'high', tags: ['bug'], parent_id: 'demo-5', sort_order: 0, created_at: yesterday, updated_at: yesterday },
+  { id: 'demo-11', title: 'Implement file upload in chat', status: 'pending', priority: 'high', due_date: now, tags: ['feature', 'chat'], parent_id: null, sort_order: 1, created_at: yesterday, updated_at: now },
+  { id: 'demo-12', title: 'Migrate auth to JWT refresh tokens', status: 'pending', priority: 'high', tags: ['security'], parent_id: null, sort_order: 2, created_at: twoDaysAgo, updated_at: now },
   // Done column
-  { id: 'demo-7', title: 'Implement dark mode toggle persistence', status: 'completed', priority: 'medium', tags: ['feature'], created_at: yesterday, updated_at: now },
-  { id: 'demo-8', title: 'Add Docker health check endpoint', status: 'completed', priority: 'low', tags: ['devops'], created_at: yesterday, updated_at: now },
-  { id: 'demo-13', title: 'Set up CI pipeline with GitHub Actions', status: 'completed', priority: 'high', tags: ['devops', 'ci'], created_at: twoDaysAgo, updated_at: yesterday },
-  { id: 'demo-14', title: 'Fix message ordering bug in chat', status: 'completed', priority: 'urgent', tags: ['bug', 'chat'], created_at: twoDaysAgo, updated_at: yesterday },
-  { id: 'demo-15', title: 'Add keyboard shortcuts for navigation', status: 'completed', priority: 'low', tags: ['ux'], created_at: twoDaysAgo, updated_at: now },
+  { id: 'demo-7', title: 'Implement dark mode toggle persistence', status: 'completed', priority: 'medium', tags: ['feature'], parent_id: null, sort_order: 0, created_at: yesterday, updated_at: now },
+  { id: 'demo-8', title: 'Add Docker health check endpoint', status: 'completed', priority: 'low', tags: ['devops'], parent_id: null, sort_order: 1, created_at: yesterday, updated_at: now },
+  { id: 'demo-13', title: 'Set up CI pipeline with GitHub Actions', status: 'completed', priority: 'high', tags: ['devops', 'ci'], parent_id: null, sort_order: 2, created_at: twoDaysAgo, updated_at: yesterday },
+  { id: 'demo-14', title: 'Fix message ordering bug in chat', status: 'completed', priority: 'urgent', tags: ['bug', 'chat'], parent_id: null, sort_order: 3, created_at: twoDaysAgo, updated_at: yesterday },
+  { id: 'demo-15', title: 'Add keyboard shortcuts for navigation', status: 'completed', priority: 'low', tags: ['ux'], parent_id: null, sort_order: 4, created_at: twoDaysAgo, updated_at: now },
 ];
 
 const DEMO_EVENTS: EventResponse[] = [
@@ -107,15 +123,10 @@ const DEMO_EVENTS: EventResponse[] = [
 ];
 
 const DEMO_MEMOS: MemoResponse[] = [
-  { id: 'memo-1', content: 'ClawChat uses Zustand for state management — lightweight and no provider nesting needed.', tags: ['dev', 'architecture'], created_at: now, updated_at: now },
-  { id: 'memo-2', content: 'Remember to test drag-and-drop on both Chrome and Firefox — they handle dataTransfer differently.', tags: ['testing'], created_at: yesterday, updated_at: yesterday },
-  { id: 'memo-3', content: 'The server API uses JWT with refresh tokens. PIN auth is the primary method for single-user setups.', tags: ['security', 'api'], created_at: yesterday, updated_at: now },
+  { id: 'memo-1', title: 'ClawChat Architecture', content: '## ClawChat Architecture\n\nClawChat uses **Zustand** for state management — lightweight and no provider nesting needed.\n\n### Key Benefits\n- Simple API\n- No boilerplate\n- Works great with TypeScript\n\n> *Lightweight and no provider nesting needed.*', tags: ['dev', 'architecture'], created_at: now, updated_at: now },
+  { id: 'memo-2', title: 'Drag-and-drop testing', content: 'Remember to test drag-and-drop on both **Chrome** and **Firefox**.\n\n### Checklist\n- Chrome desktop\n- Firefox desktop\n- Safari (if available)', tags: ['testing'], created_at: yesterday, updated_at: yesterday },
+  { id: 'memo-3', title: 'Server API auth', content: 'The server API uses **JWT** with refresh tokens.\n\n```\nAuthorization: Bearer <token>\n```\n\nSee the [FastAPI docs](https://fastapi.tiangolo.com/) for more.', tags: ['security', 'api'], created_at: yesterday, updated_at: now },
 ];
-
-/** Helper: returns true when no server is configured (demo mode) */
-function isDemoMode(): boolean {
-  return !useAuthStore.getState().serverUrl;
-}
 
 const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -134,7 +145,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   removeTodo: (id) =>
     set((state) => ({ todos: state.todos.filter((t) => t.id !== id) })),
 
-  kanbanStatuses: { 'demo-5': 'in_progress', 'demo-11': 'in_progress', 'demo-12': 'in_progress' },
+  kanbanStatuses: { 'demo-5': 'in_progress', 'demo-11': 'in_progress', 'demo-12': 'in_progress', 'demo-16': 'in_progress' } as Record<string, KanbanStatus>,
   setKanbanStatus: (id, status) => {
     // Capture previous state for rollback
     const prevKanbanStatus = get().kanbanStatuses[id];
@@ -176,6 +187,90 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     return todo?.status ?? 'pending';
   },
 
+  setKanbanStatuses: (statuses) => set({ kanbanStatuses: statuses }),
+
+  // --- Multi-select & bulk ---
+  selectedTodoIds: new Set<string>(),
+  toggleTodoSelection: (id) =>
+    set((state) => {
+      const next = new Set(state.selectedTodoIds);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return { selectedTodoIds: next };
+    }),
+  selectAllTodos: (ids) => set({ selectedTodoIds: new Set(ids) }),
+  clearTodoSelection: () => set({ selectedTodoIds: new Set<string>() }),
+  bulkUpdateTodos: async (update) => {
+    if (isDemoMode()) {
+      // Apply locally in demo mode
+      const { todos } = get();
+      if (update.delete) {
+        set({ todos: todos.filter((t) => !update.ids.includes(t.id)) });
+        useToastStore.getState().addToast('success', `${update.ids.length} tasks deleted`);
+      } else {
+        set({
+          todos: todos.map((t) => {
+            if (!update.ids.includes(t.id)) return t;
+            const u: Partial<TodoResponse> = {};
+            if (update.status) u.status = update.status;
+            if (update.priority) u.priority = update.priority;
+            if (update.tags) u.tags = update.tags;
+            u.updated_at = new Date().toISOString();
+            return { ...t, ...u };
+          }),
+        });
+        useToastStore.getState().addToast('success', `${update.ids.length} tasks updated`);
+      }
+      set({ selectedTodoIds: new Set<string>() });
+      return;
+    }
+    try {
+      await apiClient.patch('/todos/bulk', update);
+      await get().fetchTodos();
+      set({ selectedTodoIds: new Set<string>() });
+      useToastStore.getState().addToast('success', `Bulk operation completed`);
+    } catch (err) {
+      logger.warn('Bulk update failed:', err);
+      useToastStore.getState().addToast('error', 'Bulk operation failed');
+    }
+  },
+  reorderTodoInColumn: (todoId, newIndex, columnStatus) => {
+    const { todos, kanbanStatuses } = get();
+    const getEffective = (t: TodoResponse): KanbanStatus =>
+      kanbanStatuses[t.id] ?? (t.status as KanbanStatus);
+    const columnTodos = todos
+      .filter((t) => getEffective(t) === columnStatus && !t.parent_id)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const fromIdx = columnTodos.findIndex((t) => t.id === todoId);
+    if (fromIdx < 0) return;
+    const [moved] = columnTodos.splice(fromIdx, 1);
+    columnTodos.splice(newIndex, 0, moved);
+    // Reassign sort_order
+    const updates: Record<string, number> = {};
+    columnTodos.forEach((t, i) => { updates[t.id] = i; });
+    set((state) => ({
+      todos: state.todos.map((t) =>
+        updates[t.id] !== undefined ? { ...t, sort_order: updates[t.id] } : t,
+      ),
+    }));
+    // Persist to server
+    if (!isDemoMode()) {
+      Object.entries(updates).forEach(([id, order]) => {
+        apiClient.patch(`/todos/${id}`, { sort_order: order }).catch(() => {});
+      });
+    }
+  },
+
+  resetToDemo: () =>
+    set({
+      todos: DEMO_TODOS,
+      events: DEMO_EVENTS,
+      memos: DEMO_MEMOS,
+      kanbanStatuses: { 'demo-5': 'in_progress', 'demo-11': 'in_progress', 'demo-12': 'in_progress', 'demo-16': 'in_progress' } as Record<string, KanbanStatus>,
+      selectedTodoIds: new Set<string>(),
+      isLoading: false,
+      lastFetched: null,
+    }),
+
   // --- Events --- (seeded with demo data across several days for calendar view)
   events: DEMO_EVENTS,
   setEvents: (events) => set({ events }),
@@ -205,6 +300,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     tags: [],
     sortField: 'created_at' as const,
     sortDirection: 'desc' as const,
+    showSubTasks: false,
   },
   setKanbanSearchQuery: (query) =>
     set((state) => ({ kanbanFilters: { ...state.kanbanFilters, searchQuery: query } })),
@@ -234,8 +330,13 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
         tags: [],
         sortField: 'created_at',
         sortDirection: 'desc',
+        showSubTasks: false,
       },
     }),
+  toggleShowSubTasks: () =>
+    set((state) => ({
+      kanbanFilters: { ...state.kanbanFilters, showSubTasks: !state.kanbanFilters.showSubTasks },
+    })),
 
   // --- Async actions ---
 
@@ -244,7 +345,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await apiClient.get('/todos', { params });
-      set({ todos: response.data?.items ?? response.data ?? [], isLoading: false, lastFetched: Date.now() });
+      set({ todos: response.data?.items ?? response.data ?? [], kanbanStatuses: {}, isLoading: false, lastFetched: Date.now() });
     } catch {
       // Keep existing (demo) data on failure
       set({ isLoading: false });
@@ -320,6 +421,8 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
         priority: data.priority,
         due_date: data.due_date,
         tags: data.tags,
+        parent_id: data.parent_id ?? null,
+        sort_order: data.sort_order ?? 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -359,6 +462,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     if (isDemoMode()) {
       const localMemo: MemoResponse = {
         id: `local-${Date.now()}`,
+        title: data.content.slice(0, 50).trim(),
         content: data.content,
         tags: data.tags,
         created_at: new Date().toISOString(),
@@ -447,6 +551,28 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
         },
       },
     });
+  },
+
+  deleteEventOccurrence: async (eventId, date, mode) => {
+    if (mode === 'all') {
+      // Delegate to deleteEvent for full series deletion
+      await get().deleteEvent(eventId);
+      return;
+    }
+    // For this_only and this_and_future, call the server endpoint
+    if (!isDemoMode()) {
+      try {
+        await apiClient.delete(`/events/${eventId}/occurrences/${date}`, { params: { mode } });
+        // Refresh events from server to reflect changes
+        await get().fetchEvents();
+        useToastStore.getState().addToast('success', 'Occurrence deleted');
+      } catch (err) {
+        logger.warn('Failed to delete event occurrence:', err);
+        useToastStore.getState().addToast('error', 'Failed to delete occurrence');
+      }
+    } else {
+      useToastStore.getState().addToast('success', 'Occurrence deleted');
+    }
   },
 
   deleteMemo: async (id) => {

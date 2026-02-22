@@ -41,45 +41,6 @@ export interface ColorPalette {
   metaTagBackground: string;
 }
 
-export interface TypographyToken {
-  fontSize: number;
-  fontWeight: string;
-  textTransform?: string;
-  letterSpacing?: number;
-}
-
-export interface Typography {
-  h1: TypographyToken;
-  h2: TypographyToken;
-  h3: TypographyToken;
-  body: TypographyToken;
-  bodySmall: TypographyToken;
-  caption: TypographyToken;
-  label: TypographyToken;
-}
-
-export interface Spacing {
-  xs: number;
-  sm: number;
-  md: number;
-  lg: number;
-  xl: number;
-}
-
-export interface BorderRadius {
-  sm: number;
-  md: number;
-  lg: number;
-  full: number;
-}
-
-export interface Theme {
-  colors: ColorPalette;
-  typography: Typography;
-  spacing: Spacing;
-  borderRadius: BorderRadius;
-}
-
 // ---- Light palette --------------------------------------------------------
 
 export const lightColors: ColorPalette = {
@@ -161,48 +122,3 @@ export const darkColors: ColorPalette = {
   deleteBackground: '#3A2020',
   metaTagBackground: 'rgba(255,255,255,0.08)',
 };
-
-// ---- Shared tokens --------------------------------------------------------
-
-export const typography: Typography = {
-  h1: { fontSize: 24, fontWeight: '700' },
-  h2: { fontSize: 20, fontWeight: '600' },
-  h3: { fontSize: 17, fontWeight: '600' },
-  body: { fontSize: 16, fontWeight: '400' },
-  bodySmall: { fontSize: 14, fontWeight: '400' },
-  caption: { fontSize: 12, fontWeight: '400' },
-  label: { fontSize: 13, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5 },
-};
-
-export const spacing: Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-};
-
-export const borderRadius: BorderRadius = {
-  sm: 4,
-  md: 8,
-  lg: 16,
-  full: 9999,
-};
-
-// ---- Composed theme objects -----------------------------------------------
-
-export const lightTheme: Theme = {
-  colors: lightColors,
-  typography,
-  spacing,
-  borderRadius,
-};
-
-export const darkTheme: Theme = {
-  colors: darkColors,
-  typography,
-  spacing,
-  borderRadius,
-};
-
-export const themes = { light: lightTheme, dark: darkTheme } as const;

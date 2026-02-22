@@ -28,7 +28,7 @@
   min-width: 260px;
   max-width: 380px;
   pointer-events: auto;
-  animation: cc-toast-slide-in 0.25s ease-out;
+  /* animation handled by framer-motion */
 }
 
 .cc-toast--success { border-left-color: var(--cc-success, #22c55e); }

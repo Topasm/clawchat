@@ -12,10 +12,11 @@ src/
 ├── app/
 │   ├── types/
 │   │   ├── api.ts                     # API request/response interfaces (Pydantic mirrors)
+│   │   ├── schemas.ts                # Zod schemas for API validation
 │   │   ├── platform.ts               # Platform detection (Electron, Capacitor, Web)
 │   │   └── electron.d.ts             # Electron API type declarations
 │   ├── stores/
-│   │   ├── useAuthStore.ts           # Auth state: JWT, serverUrl, login/logout (persisted)
+│   │   ├── useAuthStore.ts           # Auth state: JWT, serverUrl, login/logout (persisted) + ConnectionStatus type (canonical)
 │   │   ├── useChatStore.ts           # Chat: conversations, messages, SSE streaming
 │   │   ├── useModuleStore.ts         # Modules: todos, events, memos, kanban statuses, filters
 │   │   ├── useSettingsStore.ts       # Settings: theme, LLM, chat, panel sizes (persisted)
@@ -28,10 +29,11 @@ src/
 │   │   ├── AllTasksPage.tsx          # Kanban board (renders KanbanBoard)
 │   │   ├── TaskDetailPage.tsx        # Task editing (title, priority, due date, tags)
 │   │   ├── EventDetailPage.tsx       # Event editing (time, location)
-│   │   ├── MemosPage.tsx             # Memo CRUD with tagging
+│   │   ├── MemosPage.tsx             # Memo CRUD with Lexical rich text + attachments
 │   │   ├── SearchPage.tsx            # Full-text search across tasks, events, memos
 │   │   ├── SettingsPage.tsx          # All settings (7 sections)
-│   │   ├── SystemPromptPage.tsx      # LLM system prompt editor
+│   │   ├── SystemPromptPage.tsx      # LLM system prompt editor (CodeMirror)
+│   │   ├── AdminPage.tsx             # Admin dashboard (7 tabs: overview, AI, DB, activity, sessions, config, data)
 │   │   └── LoginPage.tsx             # PIN-based authentication
 │   ├── components/
 │   │   ├── Layout.tsx                # Sidebar + resizable panels + chat panel + shortcuts
@@ -63,9 +65,15 @@ src/
 │   │       ├── ConfirmDialog.tsx     # Confirm/cancel dialog with danger variant
 │   │       ├── CommandPalette.tsx    # Ctrl+K command menu (cmdk + Radix)
 │   │       ├── ShortcutsHelp.tsx     # Keyboard shortcuts help dialog (?)
+│   │       ├── Icons.tsx             # Shared SVG icons (CalendarIcon, MemoIcon)
+│   │       ├── ErrorBoundary.tsx     # App-level error boundary with fallback UI
 │   │       ├── Toast.tsx             # Single toast notification item
 │   │       ├── ToastContainer.tsx    # Fixed bottom-right toast container (React portal)
-│   │       └── QuickCaptureModal.tsx # Natural language task/event/memo creation
+│   │       ├── QuickCaptureModal.tsx # Natural language task/event/memo creation
+│   │       ├── RichTextEditor.tsx   # Lexical rich text editor (markdown round-trip)
+│   │       ├── CodeEditor.tsx       # CodeMirror wrapper with dark mode
+│   │       ├── FileDropZone.tsx     # Drag-and-drop file upload zone
+│   │       └── AttachmentList.tsx   # Attachment list with preview + download
 │   ├── keyboard/
 │   │   ├── index.ts                  # Barrel export
 │   │   ├── registry.ts              # Shortcut definitions with scopes
@@ -75,13 +83,32 @@ src/
 │   │   ├── useChatPanel.ts          # Chat panel open/close state
 │   │   ├── usePlatform.ts           # Platform detection (mobile/desktop/web)
 │   │   ├── useKanbanFilters.ts      # Kanban filter/sort via useMemo
-│   │   └── useCommandPalette.ts     # Command palette open/close + Ctrl+K listener
+│   │   ├── useCommandPalette.ts     # Command palette open/close + Ctrl+K listener
+│   │   ├── useRegenerate.ts         # Chat message regeneration (shared by ChatPage + ChatPanel)
+│   │   ├── useDebouncedPersist.ts   # Debounced optimistic persist for detail pages
+│   │   ├── useDataSync.ts           # Centralized data sync on app startup
+│   │   ├── useWebSocket.ts          # WebSocket connection + real-time events
+│   │   └── queries/
+│   │       ├── useChatQueries.ts    # React Query hooks for chat data
+│   │       ├── useModuleQueries.ts  # React Query hooks for todos/events/memos
+│   │       ├── useAdminQueries.ts   # React Query hooks for admin dashboard (6 queries + 5 mutations)
+│   │       ├── useTodayQuery.ts     # Today dashboard query with greeting
+│   │       └── queryKeys.ts         # Centralized React Query keys
 │   ├── services/
-│   │   └── apiClient.ts             # Axios with auth interceptor + token refresh
+│   │   ├── apiClient.ts             # Axios with auth interceptor + token refresh
+│   │   ├── sseClient.ts            # SSE streaming for chat responses
+│   │   ├── wsClient.ts             # WebSocket for real-time sync
+│   │   ├── platform.ts             # Platform detection + secure storage
+│   │   └── logger.ts               # Structured logging utility
 │   ├── config/
-│   │   └── colors.ts                # Color palette object (light + dark)
+│   │   ├── theme.ts                # Color palettes (light/dark) + ColorPalette type
+│   │   ├── ThemeContext.tsx         # React context for theme colors
+│   │   ├── ThemeProvider.tsx        # Theme provider with system detection
+│   │   ├── constants.ts            # App constants (DEFAULT_SERVER_URL)
+│   │   └── queryClient.ts          # React Query client configuration
 │   └── utils/
-│       ├── formatters.ts            # Date/time helpers, grouping, greeting
+│       ├── helpers.ts             # Shared utilities (isDemoMode, isTextInput)
+│       ├── formatters.ts          # Date/time formatting, greeting, formatShortDateTime
 │       └── naturalLanguageParser.ts # Parse natural input into task/event/memo
 ├── styles/
 │   ├── index.css                     # Main entry: imports all partials
@@ -98,7 +125,9 @@ src/
 │   ├── _pages.css                    # Page headers, detail pages, chat page
 │   ├── _settings.css                 # Toggle, slider, segmented control, settings rows
 │   ├── _utilities.css                # Margin, flex, gap helpers
-│   └── _capacitor.css                # Mobile-specific overrides
+│   ├── _capacitor.css                # Mobile-specific overrides
+│   ├── _editor.css                   # Lexical RTE, CodeMirror, drop zone, attachments
+│   └── _admin.css                    # Admin dashboard tabs, stat cards, activity feed, tables
 └── electron/
     ├── main.ts                       # Electron main process
     └── preload.ts                    # Electron preload (exposes electronAPI)
@@ -121,6 +150,7 @@ React Router v6 with a nested layout route:
 /search        → SearchPage
 /settings      → SettingsPage
 /settings/system-prompt → SystemPromptPage
+/admin         → AdminPage
 ```
 
 All routes are wrapped in `<Layout />` which provides the sidebar, resizable panels, chat panel, command palette, and toast container.
@@ -286,18 +316,30 @@ On mobile (Capacitor), resizable panels are skipped and fixed layout is used ins
 
 ## API Types
 
-All API interfaces mirror the server's Pydantic schemas:
+All API types are defined as Zod schemas in `types/schemas.ts` for runtime validation, with TypeScript types inferred via `z.infer<>` and re-exported from `types/api.ts`:
 
 ```typescript
-TodoResponse    { id, title, description, status, priority, due_date, tags, created_at, updated_at }
+TodoResponse    { id, title, description, status, priority, due_date, completed_at, tags, created_at, updated_at }
 TodoCreate      { title, description?, priority?, due_date?, tags? }
-TodoUpdate      { title?, description?, status?, priority?, due_date?, tags? }
-KanbanStatus    = 'pending' | 'in_progress' | 'completed'  // Client-side extension
-
-EventResponse   { id, title, description, start_time, end_time, location, created_at, updated_at }
-ConversationResponse { id, title, last_message, created_at, updated_at }
-MessageResponse { id, conversation_id, role, content, created_at }
+EventResponse   { id, title, description, start_time, end_time, location, is_all_day, reminder_minutes, recurrence_rule, tags, created_at, updated_at }
+ConversationResponse { id, title, last_message, is_archived?, created_at, updated_at }
+MessageResponse { id, conversation_id, role, content, message_type?, created_at }
+MemoResponse    { id, title, content, tags, created_at, updated_at }
+AttachmentResponse { id, filename, stored_filename, content_type, size_bytes, memo_id, todo_id, url, created_at }
+SearchResponse  { items: SearchHit[], total, page, limit }  // Paginated
 TodayResponse   { today_tasks, overdue_tasks, today_events, inbox_count, greeting, date }
+
+// Admin Dashboard
+AdminOverviewResponse { server: ServerOverview, counts: TableCounts, storage: StorageStats }
+AIConfigResponse      { provider, model, base_url, connected, available_models[] }
+AITestResponse        { connected, latency_ms?, error? }
+ActivityResponse      { recent: RecentActivity[], agent_tasks: AgentTaskSummary[] }
+SessionsResponse      { active_connections: ActiveSession[], total_connections }
+ServerConfigResponse  { host, port, database_url, jwt_expiry_hours, ai_provider, ai_base_url, ai_model, ... }
+DataOverviewResponse  { modules: ModuleDataOverview[] }
+PurgeResponse         { deleted_count, target }
+ReindexResponse       { status, tables_reindexed[] }
+BackupResponse        { filename, size_bytes }
 ```
 
 ## Development

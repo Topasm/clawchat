@@ -282,6 +282,74 @@ DELETE /api/memos/:id              # Delete a memo
 
 ---
 
+## Attachment Endpoints
+
+```
+POST   /api/attachments                    # Upload a file (multipart/form-data)
+GET    /api/attachments                    # List attachments (filter by memo_id or todo_id)
+GET    /api/attachments/:id/download       # Download an attachment file
+DELETE /api/attachments/:id                # Delete an attachment (removes file + DB row)
+```
+
+#### `POST /api/attachments`
+
+Upload a file attachment linked to a memo or todo.
+
+```
+Content-Type: multipart/form-data
+Query params: ?memo_id=memo_abc123  (or ?todo_id=todo_xyz789)
+Body: file (binary)
+```
+
+```json
+// Response 201
+{
+  "id": "att_abc123",
+  "filename": "screenshot.png",
+  "stored_filename": "a1b2c3d4e5f6.png",
+  "content_type": "image/png",
+  "size_bytes": 102400,
+  "memo_id": "memo_abc123",
+  "todo_id": null,
+  "url": "/api/attachments/att_abc123/download",
+  "created_at": "2026-02-22T12:00:00Z"
+}
+```
+
+**Validation:**
+- Allowed extensions: `jpg, jpeg, png, gif, webp, svg, pdf, txt, md, zip` (configurable)
+- Max file size: 10 MB (configurable via `MAX_UPLOAD_SIZE_MB`)
+- Files stored on disk as `{uuid}.{ext}` in the configured `upload_dir`
+
+#### `GET /api/attachments`
+
+```json
+// Query params: ?memo_id=memo_abc123 or ?todo_id=todo_xyz789
+
+// Response 200
+[
+  {
+    "id": "att_abc123",
+    "filename": "screenshot.png",
+    "stored_filename": "a1b2c3d4e5f6.png",
+    "content_type": "image/png",
+    "size_bytes": 102400,
+    "memo_id": "memo_abc123",
+    "todo_id": null,
+    "url": "/api/attachments/att_abc123/download",
+    "created_at": "2026-02-22T12:00:00Z"
+  }
+]
+```
+
+#### `DELETE /api/attachments/:id`
+
+Deletes the attachment file from disk and the DB row. Returns `204 No Content`.
+
+**Cascade behavior:** Deleting a memo or todo automatically deletes all associated attachment DB rows (via `ON DELETE CASCADE`). Orphaned files on disk are cleaned up by the delete endpoint.
+
+---
+
 ## Today Dashboard Endpoint
 
 ```
@@ -530,6 +598,79 @@ User typing indicator (optional).
   }
 }
 ```
+
+---
+
+## Admin Endpoints
+
+Server management and monitoring endpoints. All require JWT authentication.
+
+```
+GET    /api/admin/overview                    # Server stats, table counts, storage
+GET    /api/admin/ai                          # AI config + available models
+POST   /api/admin/ai/test                     # Test AI connectivity + measure latency
+GET    /api/admin/activity                    # Recent activity feed + agent task history
+GET    /api/admin/sessions                    # Active WebSocket connections
+POST   /api/admin/sessions/:user_id/disconnect  # Force-close a WebSocket connection
+GET    /api/admin/config                      # Read-only server config from .env
+GET    /api/admin/data                        # Per-module data overview (counts + date ranges)
+POST   /api/admin/db/reindex                  # Trigger FTS5 reindex
+POST   /api/admin/db/backup                   # Create timestamped DB backup
+POST   /api/admin/db/purge                    # Purge old data (conversations, messages, completed todos)
+```
+
+#### `GET /api/admin/overview`
+
+```json
+// Response 200
+{
+  "server": {
+    "uptime_seconds": 3600.5,
+    "version": "0.1.0",
+    "ai_provider": "ollama",
+    "ai_model": "llama3.2",
+    "ai_base_url": "http://localhost:11434",
+    "ai_connected": true,
+    "active_ws_connections": 1,
+    "scheduler_enabled": false,
+    "scheduler_running": false
+  },
+  "counts": {
+    "conversations": 12,
+    "messages": 150,
+    "todos": 25,
+    "events": 8,
+    "memos": 5,
+    "agent_tasks": 3,
+    "attachments": 2,
+    "task_relationships": 4
+  },
+  "storage": {
+    "db_size_bytes": 524288,
+    "upload_dir_size_bytes": 102400,
+    "attachment_count": 2,
+    "attachment_total_bytes": 98304
+  }
+}
+```
+
+#### `POST /api/admin/db/purge`
+
+```json
+// Request
+{
+  "target": "conversations",
+  "older_than_days": 90
+}
+
+// Response 200
+{
+  "deleted_count": 5,
+  "target": "conversations"
+}
+```
+
+Valid targets: `conversations`, `messages`, `todos` (only completed todos are purged).
 
 ---
 

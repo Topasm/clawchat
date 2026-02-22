@@ -105,6 +105,9 @@ volumes:
 | `AI_BASE_URL` | `http://localhost:11434` | AI provider API base URL |
 | `AI_API_KEY` | *(empty)* | API key (required for OpenAI/Claude) |
 | `AI_MODEL` | `llama3.2` | Model name to use |
+| `UPLOAD_DIR` | `data/uploads` | Directory for uploaded attachment files |
+| `MAX_UPLOAD_SIZE_MB` | `10` | Maximum file upload size in MB |
+| `ALLOWED_EXTENSIONS` | `jpg,jpeg,...,zip` | Comma-separated allowed file extensions |
 | `ENABLE_SCHEDULER` | `true` | Enable background scheduler |
 | `BRIEFING_TIME` | `08:00` | Daily briefing time (HH:MM, 24h) |
 | `REMINDER_CHECK_INTERVAL` | `60` | Seconds between reminder checks |

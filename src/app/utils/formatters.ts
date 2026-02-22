@@ -1,5 +1,3 @@
-import type { TodoResponse } from '../types/api';
-
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
@@ -76,18 +74,6 @@ export function isOverdue(dateString: string): boolean {
   return date < now;
 }
 
-export function isThisWeek(dateString: string): boolean {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 7);
-  return date >= startOfWeek && date < endOfWeek;
-}
-
 export function formatDueDate(dateString: string): string {
   if (!dateString) return '';
   if (isToday(dateString)) return 'Today';
@@ -103,40 +89,39 @@ export function getGreeting(): string {
   return 'Good evening';
 }
 
-interface TodoGroups {
-  overdue: TodoResponse[];
-  today: TodoResponse[];
-  tomorrow: TodoResponse[];
-  thisWeek: TodoResponse[];
-  later: TodoResponse[];
-  noDate: TodoResponse[];
+export function formatShortDateTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export function groupTodosByDate(todos: TodoResponse[]): TodoGroups {
-  const groups: TodoGroups = {
-    overdue: [],
-    today: [],
-    tomorrow: [],
-    thisWeek: [],
-    later: [],
-    noDate: [],
-  };
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
 
-  todos.forEach((todo) => {
-    if (!todo.due_date) {
-      groups.noDate.push(todo);
-    } else if (isOverdue(todo.due_date) && todo.status !== 'completed') {
-      groups.overdue.push(todo);
-    } else if (isToday(todo.due_date)) {
-      groups.today.push(todo);
-    } else if (isTomorrow(todo.due_date)) {
-      groups.tomorrow.push(todo);
-    } else if (isThisWeek(todo.due_date)) {
-      groups.thisWeek.push(todo);
-    } else {
-      groups.later.push(todo);
-    }
-  });
+export function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
 
-  return groups;
+export function formatDateTimeShort(iso: string): string {
+  return new Date(iso).toLocaleString();
+}
+
+export function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }

@@ -34,7 +34,3 @@ export const SHORTCUTS: ShortcutDef[] = [
   // Dialog
   { key: 'Escape', label: 'Esc', scope: 'DIALOG', description: 'Close dialog / palette' },
 ];
-
-export function getShortcutsByScope(scope: ShortcutScope): ShortcutDef[] {
-  return SHORTCUTS.filter((s) => s.scope === scope);
-}

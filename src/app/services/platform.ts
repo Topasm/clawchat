@@ -1,4 +1,36 @@
-import { IS_CAPACITOR } from '../types/platform';
+import { IS_CAPACITOR, IS_ELECTRON } from '../types/platform';
+
+/**
+ * Cross-platform desktop notification.
+ * - Electron: uses native Notification via IPC
+ * - Capacitor: uses LocalNotifications plugin
+ * - Web: uses the browser Notification API
+ */
+export async function notify(title: string, body: string): Promise<void> {
+  if (IS_ELECTRON) {
+    window.electronAPI?.showNotification(title, body);
+  } else if (IS_CAPACITOR) {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    const perm = await LocalNotifications.checkPermissions();
+    if (perm.display === 'prompt') await LocalNotifications.requestPermissions();
+    await LocalNotifications.schedule({
+      notifications: [{
+        title,
+        body,
+        id: Date.now(),
+        schedule: { at: new Date(Date.now() + 100) },
+        smallIcon: 'ic_stat_clawchat',
+      }],
+    });
+  } else if (typeof Notification !== 'undefined') {
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body });
+    } else if (Notification.permission !== 'denied') {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') new Notification(title, { body });
+    }
+  }
+}
 
 /**
  * Storage abstraction — uses Capacitor Preferences on mobile,

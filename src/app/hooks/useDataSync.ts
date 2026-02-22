@@ -1,46 +1,30 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { useTodosQuery, useEventsQuery, useMemosQuery, useConversationsQuery } from './queries';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import { useAuthStore } from '../stores/useAuthStore';
-import { useModuleStore } from '../stores/useModuleStore';
-import { useChatStore } from '../stores/useChatStore';
 
 /**
  * Central data-sync hook.
- * - Runs on app mount (called from Layout.tsx).
- * - When `serverUrl` is set, fetches todos, events, memos, and conversations in parallel.
- * - When `serverUrl` is null (demo mode), this is a no-op — stores keep their seed data.
- * - Re-fetches whenever `serverUrl` changes.
- * - Exposes a manual `refresh()` function and a `syncing` loading flag.
+ * Activates React Query hooks that fetch + validate + sync to Zustand.
+ * In demo mode (no serverUrl), queries are disabled — stores keep seed data.
  */
 export function useDataSync() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-  const fetchTodos = useModuleStore((s) => s.fetchTodos);
-  const fetchEvents = useModuleStore((s) => s.fetchEvents);
-  const fetchMemos = useModuleStore((s) => s.fetchMemos);
-  const fetchConversations = useChatStore((s) => s.fetchConversations);
-  const [syncing, setSyncing] = useState(false);
+  const todosQ = useTodosQuery();
+  const eventsQ = useEventsQuery();
+  const memosQ = useMemosQuery();
+  const convsQ = useConversationsQuery();
 
-  const refresh = useCallback(async () => {
-    if (!serverUrl) return;
-    setSyncing(true);
-    try {
-      await Promise.all([
-        fetchTodos(),
-        fetchEvents(),
-        fetchMemos(),
-        fetchConversations(),
-      ]);
-    } catch (err) {
-      console.warn('Data sync error:', err);
-    } finally {
-      setSyncing(false);
-    }
-  }, [serverUrl, fetchTodos, fetchEvents, fetchMemos, fetchConversations]);
+  const syncing = todosQ.isLoading || eventsQ.isLoading || memosQ.isLoading || convsQ.isLoading;
 
-  // Initial fetch + refetch when serverUrl changes
-  useEffect(() => {
+  const refresh = useCallback(() => {
     if (!serverUrl) return;
-    refresh();
-  }, [serverUrl, refresh]);
+    todosQ.refetch();
+    eventsQ.refetch();
+    memosQ.refetch();
+    convsQ.refetch();
+    useSettingsStore.getState().fetchSettings();
+  }, [serverUrl, todosQ, eventsQ, memosQ, convsQ]);
 
   return { syncing, refresh };
 }

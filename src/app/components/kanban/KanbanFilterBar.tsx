@@ -7,6 +7,8 @@ const SORT_OPTIONS = [
   { value: 'priority', label: 'Priority' },
   { value: 'due_date', label: 'Due Date' },
   { value: 'title', label: 'Title' },
+  { value: 'updated_at', label: 'Last Updated' },
+  { value: 'sort_order', label: 'Manual Order' },
 ] as const;
 
 export default function KanbanFilterBar() {
@@ -17,6 +19,7 @@ export default function KanbanFilterBar() {
   const toggleTag = useModuleStore((s) => s.toggleKanbanTagFilter);
   const setSort = useModuleStore((s) => s.setKanbanSort);
   const clearFilters = useModuleStore((s) => s.clearKanbanFilters);
+  const toggleSubTasks = useModuleStore((s) => s.toggleShowSubTasks);
   const todos = useModuleStore((s) => s.todos);
 
   const allTags = useMemo(() => {
@@ -91,6 +94,13 @@ export default function KanbanFilterBar() {
           <option key={`${opt.value}-asc`} value={`${opt.value}-asc`}>↑ {opt.label}</option>
         ))}
       </select>
+
+      <button
+        className={`cc-kanban-filter__chip${filters.showSubTasks ? ' cc-kanban-filter__chip--active' : ''}`}
+        onClick={toggleSubTasks}
+      >
+        Sub-tasks
+      </button>
 
       {hasActiveFilters && (
         <button className="cc-kanban-filter__clear" onClick={clearFilters}>

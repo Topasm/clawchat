@@ -1,5 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useChatStore } from '../../stores/useChatStore';
 import ChatPanelMessages from './ChatPanelMessages';
 import ChatInput from './ChatInput';
@@ -18,8 +19,34 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
   const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
   const addMessage = useChatStore((s) => s.addMessage);
   const addConversation = useChatStore((s) => s.addConversation);
+  const editMessage = useChatStore((s) => s.editMessage);
+  const messages = useChatStore((s) => s.messages);
+
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+
+  const handleStartEdit = useCallback((messageId: string) => {
+    const msg = messages.find((m) => m._id === messageId);
+    if (msg) {
+      setEditingMessageId(messageId);
+      setEditingText(msg.text);
+    }
+  }, [messages]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessageId(null);
+    setEditingText('');
+  }, []);
 
   const handleSend = useCallback(async (text: string) => {
+    // If in edit mode, call editMessage instead
+    if (editingMessageId && conversationId) {
+      await editMessage(conversationId, editingMessageId, text);
+      setEditingMessageId(null);
+      setEditingText('');
+      return;
+    }
+
     let cid = conversationId;
     if (!cid) {
       // Create a new conversation stub
@@ -41,7 +68,7 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
     } catch {
       // Error handled in store
     }
-  }, [conversationId, onSetConversationId, addConversation, addMessage, sendMessageStreaming]);
+  }, [conversationId, editingMessageId, onSetConversationId, addConversation, addMessage, sendMessageStreaming, editMessage]);
 
   const handlePopOut = () => {
     if (conversationId) {
@@ -52,7 +79,11 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
   };
 
   return (
-    <div className={`cc-chat-panel ${isOpen ? 'cc-chat-panel--expanded' : 'cc-chat-panel--collapsed'}`}>
+    <motion.div
+      className="cc-chat-panel"
+      animate={{ height: isOpen ? 360 : 52 }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+    >
       {isOpen ? (
         <>
           <div className="cc-chat-panel__header">
@@ -68,11 +99,14 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
               </svg>
             </button>
           </div>
-          <ChatPanelMessages conversationId={conversationId} />
+          <ChatPanelMessages conversationId={conversationId} onEditMessage={handleStartEdit} />
           <ChatInput
             onSend={handleSend}
             isStreaming={isStreaming}
             onStop={stopGeneration}
+            editingMessageId={editingMessageId}
+            editingText={editingText}
+            onCancelEdit={handleCancelEdit}
           />
         </>
       ) : (
@@ -94,6 +128,6 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

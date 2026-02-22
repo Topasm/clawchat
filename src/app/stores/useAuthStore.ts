@@ -2,15 +2,19 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { secureStorage } from '../services/platform';
 
+export type ConnectionStatus = 'demo' | 'connected' | 'disconnected' | 'reconnecting';
+
 interface AuthState {
   token: string | null;
   refreshToken: string | null;
   serverUrl: string | null;
   isLoading: boolean;
+  connectionStatus: ConnectionStatus;
   login: (serverUrl: string, pin: string) => Promise<void>;
   logout: () => void;
   setToken: (token: string) => void;
   setLoading: (isLoading: boolean) => void;
+  setConnectionStatus: (status: ConnectionStatus) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -20,6 +24,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       serverUrl: null,
       isLoading: true,
+      connectionStatus: 'demo' as ConnectionStatus,
 
       login: async (serverUrl: string, pin: string) => {
         const response = await fetch(`${serverUrl}/api/auth/login`, {
@@ -44,16 +49,23 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      logout: () =>
+      logout: () => {
         set({
           token: null,
           refreshToken: null,
           serverUrl: null,
-        }),
+          connectionStatus: 'demo' as ConnectionStatus,
+        });
+        // Reset module and chat stores back to demo data (lazy import to avoid circular deps)
+        import('./useModuleStore').then((m) => m.useModuleStore.getState().resetToDemo());
+        import('./useChatStore').then((m) => m.useChatStore.getState().resetToDemo());
+      },
 
       setToken: (token: string) => set({ token }),
 
       setLoading: (isLoading: boolean) => set({ isLoading }),
+
+      setConnectionStatus: (connectionStatus: ConnectionStatus) => set({ connectionStatus }),
     }),
     {
       name: 'auth-storage',

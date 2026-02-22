@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener(channel, listener);
     };
   },
+  showNotification: (title: string, body: string) => {
+    ipcRenderer.send('notification:show', title, body);
+  },
   secureStore: {
     get: (key: string) => ipcRenderer.invoke('secure-store:get', key),
     set: (key: string, value: string) => ipcRenderer.invoke('secure-store:set', key, value),

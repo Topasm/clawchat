@@ -1,0 +1,48 @@
+/* ============================================================
+   Bulk Action Toolbar — floating bottom bar for multi-select
+   ============================================================ */
+
+.cc-bulk-toolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  z-index: 100;
+  /* animation handled by framer-motion */
+}
+
+@keyframes cc-bulk-slide-up {
+  from {
+    transform: translateX(-50%) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+.cc-bulk-toolbar__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cc-text);
+  white-space: nowrap;
+}
+
+.cc-bulk-toolbar__select {
+  padding: 6px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  background: var(--cc-background);
+  color: var(--cc-text);
+  font-size: 12px;
+  cursor: pointer;
+}

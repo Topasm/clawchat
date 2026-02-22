@@ -5,8 +5,9 @@ interface KanbanFilters {
   searchQuery: string;
   priorities: string[];
   tags: string[];
-  sortField: 'title' | 'priority' | 'due_date' | 'created_at';
+  sortField: 'title' | 'priority' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order';
   sortDirection: 'asc' | 'desc';
+  showSubTasks?: boolean;
 }
 
 const PRIORITY_ORDER: Record<string, number> = {
@@ -61,6 +62,10 @@ export default function useKanbanFilters(
           const db = b.due_date ? new Date(b.due_date).getTime() : Infinity;
           return dir * (da - db);
         }
+        case 'updated_at':
+          return dir * (new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+        case 'sort_order':
+          return dir * ((a.sort_order ?? 0) - (b.sort_order ?? 0));
         case 'created_at':
         default:
           return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());

@@ -11,7 +11,8 @@ clawchat_server/server/
 ├── main.py                     # FastAPI app entry point (async lifespan)
 ├── config.py                   # Pydantic Settings from .env
 ├── database.py                 # Async SQLAlchemy engine + session factory
-├── utils.py                    # make_id() prefixed UUID helper
+├── utils.py                    # Utilities: make_id(), serialize_tags/deserialize_tags, apply_model_updates, strip_markdown_fences
+├── constants.py                # Shared constants (SYSTEM_PROMPT)
 ├── exceptions.py               # AppError hierarchy + error handler
 ├── requirements.txt            # Python dependencies
 ├── .env.example                # Example environment config
@@ -22,7 +23,10 @@ clawchat_server/server/
 │   ├── todo.py                 # Full CRUD /api/todos
 │   ├── calendar.py             # Full CRUD /api/events
 │   ├── memo.py                 # Full CRUD /api/memos
+│   ├── attachment.py           # File upload/download /api/attachments
+│   ├── admin.py                # Admin dashboard /api/admin/* (11 endpoints)
 │   ├── search.py               # GET /api/search (stub)
+│   ├── tags.py                 # GET /api/tags (aggregated tags)
 │   ├── today.py                # GET /api/today (dashboard aggregation)
 │   └── notifications.py        # POST /api/notifications/register-token
 ├── models/
@@ -32,24 +36,35 @@ clawchat_server/server/
 │   ├── todo.py                 # Todo model (status, priority, completed_at, tags)
 │   ├── event.py                # Event model (start/end time, is_all_day, reminder, tags)
 │   ├── memo.py                 # Memo model (title, content, tags)
+│   ├── attachment.py           # Attachment model (filename, content_type, memo_id, todo_id)
 │   └── agent_task.py           # AgentTask model (queued async work)
 ├── schemas/
 │   ├── __init__.py
-│   ├── common.py               # PaginatedResponse, ErrorResponse
+│   ├── common.py               # PaginatedResponse
 │   ├── auth.py                 # Login/token schemas
-│   ├── chat.py                 # StreamSendRequest, MessageEditRequest, conversation/message responses
+│   ├── chat.py                 # SendMessageRequest, MessageEditRequest, conversation/message responses
 │   ├── todo.py                 # TodoCreate, TodoUpdate, TodoResponse
 │   ├── calendar.py             # EventCreate, EventUpdate, EventResponse
 │   ├── memo.py                 # MemoCreate, MemoUpdate, MemoResponse
-│   └── today.py                # TodayResponse
+│   ├── attachment.py           # AttachmentResponse
+│   ├── admin.py                # Admin response models (overview, AI config, activity, sessions, config, data, purge, reindex, backup)
+│   ├── today.py                # TodayResponse
+│   ├── search.py               # SearchHit, search response schema
 ├── services/
 │   ├── __init__.py
 │   ├── ai_service.py           # LLM client (Ollama native + OpenAI-compatible)
-│   ├── intent_classifier.py    # Intent classification via function calling
+│   ├── intent_classifier.py    # Intent classification via function calling (16 intents)
 │   ├── orchestrator.py         # Routes intents to services, streams via WebSocket
 │   ├── todo_service.py         # Async todo CRUD with completed_at auto-set
-│   ├── calendar_service.py     # Async event CRUD
-│   └── memo_service.py         # Async memo CRUD
+│   ├── calendar_service.py     # Async event CRUD with recurrence support
+│   ├── memo_service.py         # Async memo CRUD
+│   ├── search_service.py       # FTS5 full-text search
+│   ├── agent_task_service.py   # Background task execution pipeline
+│   ├── briefing_service.py     # Daily briefing generation
+│   ├── admin_service.py        # Admin: table counts, storage, uptime, activity, purge, reindex, backup
+│   ├── reminder_service.py     # Event/todo reminder checks
+│   ├── recurrence_service.py   # Recurring event expansion
+│   └── scheduler.py            # Background loops (reminders, briefing)
 ├── ws/
 │   ├── __init__.py
 │   ├── manager.py              # WebSocket ConnectionManager
@@ -59,7 +74,8 @@ clawchat_server/server/
 │   ├── jwt.py                  # JWT creation and verification
 │   └── dependencies.py         # get_current_user FastAPI dependency
 └── data/
-    └── clawchat.db             # SQLite database (auto-created)
+    ├── clawchat.db             # SQLite database (auto-created)
+    └── uploads/                # Uploaded attachment files (auto-created)
 ```
 
 ## Key Modules
@@ -143,7 +159,7 @@ daily_briefing → stub (coming soon)
 
 ### `services/intent_classifier.py` — Intent Classification
 
-Uses LLM function calling to classify user messages into 17 actionable intents with parameter extraction.
+Uses LLM function calling to classify user messages into 16 actionable intents with parameter extraction.
 
 ## Configuration
 
@@ -169,6 +185,11 @@ AI_PROVIDER=ollama                          # "ollama" or "openai"
 AI_BASE_URL=http://localhost:11434          # Ollama default
 AI_API_KEY=                                 # Required for OpenAI/Claude
 AI_MODEL=llama3.2                           # Model name
+
+# File Uploads
+UPLOAD_DIR=data/uploads                     # Directory for uploaded files
+MAX_UPLOAD_SIZE_MB=10                       # Max file size in MB
+ALLOWED_EXTENSIONS=jpg,jpeg,png,gif,webp,svg,pdf,txt,md,zip
 
 # Scheduler (optional)
 ENABLE_SCHEDULER=false

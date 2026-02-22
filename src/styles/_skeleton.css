@@ -1,0 +1,40 @@
+/* ============================================================
+   Skeleton Loading Placeholders
+   ============================================================ */
+
+.cc-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--cc-surface-secondary, #f0f0f0) 25%,
+    var(--cc-border, #e5e5e5) 50%,
+    var(--cc-surface-secondary, #f0f0f0) 75%
+  );
+  background-size: 200% 100%;
+  animation: cc-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.cc-skeleton--text {
+  height: 16px;
+  border-radius: 4px;
+}
+
+.cc-skeleton--circular {
+  border-radius: 50%;
+}
+
+.cc-skeleton--rectangular {
+  border-radius: 8px;
+}
+
+.cc-skeleton--mt8 {
+  margin-top: 8px;
+}
+
+@keyframes cc-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

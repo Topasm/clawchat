@@ -141,6 +141,13 @@
   font-size: 11px;
 }
 
+.cc-badge--blocker {
+  background: color-mix(in srgb, var(--cc-error) 15%, transparent);
+  color: var(--cc-error);
+  font-weight: 600;
+  font-size: 11px;
+}
+
 /* --- Checkbox --------------------------------------------- */
 .cc-checkbox {
   width: 20px;
@@ -398,4 +405,86 @@
 .cc-btn--ghost:hover {
   background: var(--cc-surface-secondary);
   color: var(--cc-text);
+}
+
+/* Tag autocomplete */
+.cc-tag-autocomplete {
+  position: relative;
+}
+.cc-tag-autocomplete__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-surface);
+  min-height: 34px;
+  align-items: center;
+}
+.cc-tag-autocomplete__tags:focus-within {
+  border-color: var(--cc-primary);
+}
+.cc-tag-autocomplete__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: var(--cc-primary-light);
+  color: var(--cc-primary);
+  border-radius: 12px;
+  font-weight: 500;
+}
+.cc-tag-autocomplete__tag-remove {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.7;
+}
+.cc-tag-autocomplete__tag-remove:hover {
+  opacity: 1;
+}
+.cc-tag-autocomplete__input {
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--cc-text);
+  flex: 1;
+  min-width: 80px;
+}
+.cc-tag-autocomplete__input::placeholder {
+  color: var(--cc-text-tertiary);
+}
+.cc-tag-autocomplete__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  margin-top: 4px;
+  box-shadow: 0 4px 12px var(--cc-shadow);
+  z-index: 10;
+  overflow: hidden;
+}
+.cc-tag-autocomplete__suggestion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--cc-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.cc-tag-autocomplete__suggestion:hover {
+  background: var(--cc-surface-secondary);
 }

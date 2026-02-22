@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './app/stores/useAuthStore';
+import ErrorBoundary from './app/components/shared/ErrorBoundary';
 import Layout from './app/components/Layout';
 import LoginPage from './app/pages/LoginPage';
 import TodayPage from './app/pages/TodayPage';
@@ -14,6 +15,7 @@ import SystemPromptPage from './app/pages/SystemPromptPage';
 import SearchPage from './app/pages/SearchPage';
 import MemosPage from './app/pages/MemosPage';
 import CalendarPage from './app/pages/CalendarPage';
+import AdminPage from './app/pages/AdminPage';
 
 export default function AppRouter() {
   const token = useAuthStore((s) => s.token);
@@ -42,18 +44,19 @@ export default function AppRouter() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<Layout />}>
-        <Route path="/today" element={<TodayPage />} />
-        <Route path="/inbox" element={<InboxPage />} />
-        <Route path="/chats" element={<ChatListPage />} />
-        <Route path="/chats/:conversationId" element={<ChatPage />} />
-        <Route path="/tasks" element={<AllTasksPage />} />
-        <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/events/:eventId" element={<EventDetailPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/settings/system-prompt" element={<SystemPromptPage />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/memos" element={<MemosPage />} />
+        <Route path="/today" element={<ErrorBoundary name="TodayPage"><TodayPage /></ErrorBoundary>} />
+        <Route path="/inbox" element={<ErrorBoundary name="InboxPage"><InboxPage /></ErrorBoundary>} />
+        <Route path="/chats" element={<ErrorBoundary name="ChatListPage"><ChatListPage /></ErrorBoundary>} />
+        <Route path="/chats/:conversationId" element={<ErrorBoundary name="ChatPage"><ChatPage /></ErrorBoundary>} />
+        <Route path="/tasks" element={<ErrorBoundary name="AllTasksPage"><AllTasksPage /></ErrorBoundary>} />
+        <Route path="/tasks/:taskId" element={<ErrorBoundary name="TaskDetailPage"><TaskDetailPage /></ErrorBoundary>} />
+        <Route path="/calendar" element={<ErrorBoundary name="CalendarPage"><CalendarPage /></ErrorBoundary>} />
+        <Route path="/events/:eventId" element={<ErrorBoundary name="EventDetailPage"><EventDetailPage /></ErrorBoundary>} />
+        <Route path="/settings" element={<ErrorBoundary name="SettingsPage"><SettingsPage /></ErrorBoundary>} />
+        <Route path="/settings/system-prompt" element={<ErrorBoundary name="SystemPromptPage"><SystemPromptPage /></ErrorBoundary>} />
+        <Route path="/search" element={<ErrorBoundary name="SearchPage"><SearchPage /></ErrorBoundary>} />
+        <Route path="/memos" element={<ErrorBoundary name="MemosPage"><MemosPage /></ErrorBoundary>} />
+        <Route path="/admin" element={<ErrorBoundary name="AdminPage"><AdminPage /></ErrorBoundary>} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>
     </Routes>

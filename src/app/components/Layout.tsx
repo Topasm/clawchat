@@ -1,94 +1,33 @@
-import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
 import { useChatStore } from '../stores/useChatStore';
 import ChatPanel from './chat-panel/ChatPanel';
+import ErrorBoundary from './shared/ErrorBoundary';
 import useChatPanel from '../hooks/useChatPanel';
 import usePlatform from '../hooks/usePlatform';
 import useDataSync from '../hooks/useDataSync';
+import useWebSocket from '../hooks/useWebSocket';
+import { useAuthStore } from '../stores/useAuthStore';
+import type { ConnectionStatus } from '../stores/useAuthStore';
+import AnimatedOutlet from './AnimatedOutlet';
 import ToastContainer from './shared/ToastContainer';
 import CommandPalette from './shared/CommandPalette';
 import ShortcutsHelp from './shared/ShortcutsHelp';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
+import type { HealthResponse } from '../types/api';
 
 // --- SVG icon components ---
-function SunIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="9" cy="9" r="3.5" />
-      <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function InboxIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M2.5 10h4l1 2h3l1-2h4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4.1 4.5L2.5 10v4a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5v-4l-1.6-5.5A1.5 1.5 0 0012.5 3h-7a1.5 1.5 0 00-1.4 1.5z" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ChatIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M16 12a1.5 1.5 0 01-1.5 1.5H5L2 16.5V4A1.5 1.5 0 013.5 2.5h11A1.5 1.5 0 0116 4z" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="2.5" y="3.5" width="13" height="12" rx="1.5" />
-      <path d="M2.5 7.5h13" />
-      <path d="M6 2v3M12 2v3" strokeLinecap="round" />
-      <circle cx="6.5" cy="11" r="0.75" fill="currentColor" stroke="none" />
-      <circle cx="9" cy="11" r="0.75" fill="currentColor" stroke="none" />
-      <circle cx="11.5" cy="11" r="0.75" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function TasksIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M3 4.5h12M3 9h12M3 13.5h12" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="9" cy="9" r="2.5" />
-      <path d="M14.7 11.2a1.2 1.2 0 00.2 1.3l.04.04a1.44 1.44 0 11-2.04 2.04l-.04-.04a1.2 1.2 0 00-1.3-.2 1.2 1.2 0 00-.73 1.1v.12a1.44 1.44 0 11-2.88 0v-.06a1.2 1.2 0 00-.78-1.1 1.2 1.2 0 00-1.3.2l-.04.04a1.44 1.44 0 11-2.04-2.04l.04-.04a1.2 1.2 0 00.2-1.3 1.2 1.2 0 00-1.1-.73H3.45a1.44 1.44 0 110-2.88h.06a1.2 1.2 0 001.1-.78 1.2 1.2 0 00-.2-1.3l-.04-.04A1.44 1.44 0 116.41 3.43l.04.04a1.2 1.2 0 001.3.2h.06a1.2 1.2 0 00.73-1.1V2.45a1.44 1.44 0 012.88 0v.06a1.2 1.2 0 00.73 1.1 1.2 1.2 0 001.3-.2l.04-.04a1.44 1.44 0 112.04 2.04l-.04.04a1.2 1.2 0 00-.2 1.3v.06a1.2 1.2 0 001.1.73h.12a1.44 1.44 0 010 2.88h-.06a1.2 1.2 0 00-1.1.73z" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function MemoIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M14 2.5H4a1.5 1.5 0 00-1.5 1.5v10a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5V4A1.5 1.5 0 0014 2.5z" />
-      <path d="M6 6.5h6M6 9.5h6M6 12.5h3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg className="cc-nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="8" cy="8" r="5" />
-      <path d="M15.5 15.5l-3.6-3.6" strokeLinecap="round" />
-    </svg>
-  );
-}
+import {
+  SunIcon, InboxIcon, ChatIcon, NavCalendarIcon,
+  TasksIcon, GearIcon, NavMemoIcon, SearchIcon, AdminIcon,
+} from './shared/NavIcons';
+import BottomNav from './shared/BottomNav';
 
 // --- Theme bridge: map ColorPalette → CSS custom properties ---
 function cssVars(colors: ColorPalette): React.CSSProperties {
@@ -126,15 +65,23 @@ function cssVars(colors: ColorPalette): React.CSSProperties {
   } as React.CSSProperties;
 }
 
+const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
+  demo: 'Demo Mode',
+  connected: 'Connected',
+  disconnected: 'Disconnected',
+  reconnecting: 'Reconnecting...',
+};
+
 const navItems = [
   { to: '/today', label: 'Today', Icon: SunIcon },
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
-  { to: '/calendar', label: 'Calendar', Icon: CalendarIcon },
+  { to: '/calendar', label: 'Calendar', Icon: NavCalendarIcon },
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
-  { to: '/memos', label: 'Memos', Icon: MemoIcon },
+  { to: '/memos', label: 'Memos', Icon: NavMemoIcon },
   { to: '/search', label: 'Search', Icon: SearchIcon },
   { to: '/settings', label: 'Settings', Icon: GearIcon },
+  { to: '/admin', label: 'Admin', Icon: AdminIcon },
 ];
 
 export default function Layout() {
@@ -148,12 +95,40 @@ export default function Layout() {
   // Central data sync: fetches all data from server on mount (no-op in demo mode)
   useDataSync();
 
+  // Health check polling
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+  const [healthData, setHealthData] = useState<HealthResponse | null>(null);
+
+  useEffect(() => {
+    if (!serverUrl) {
+      setHealthData(null);
+      return;
+    }
+    let cancelled = false;
+    const fetchHealth = async () => {
+      try {
+        const res = await axios.get(`${serverUrl}/api/health`);
+        if (!cancelled) setHealthData(res.data);
+      } catch {
+        if (!cancelled) setHealthData(null);
+      }
+    };
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [serverUrl]);
+
+  // WebSocket connection for real-time updates
+  useWebSocket();
+
   // Wire global keyboard shortcuts
   useGlobalShortcuts({
     onToggleChat: chatPanel.toggle,
     onShowHelp: () => setShowShortcuts(true),
   });
   useNavigationShortcuts();
+
+  const connectionStatus = useAuthStore((s) => s.connectionStatus);
 
   // Badge counts
   const inboxCount = useModuleStore((s) =>
@@ -167,6 +142,16 @@ export default function Layout() {
   const sidebar = (
     <nav className="cc-sidebar">
       <div className="cc-sidebar__header">ClawChat</div>
+      <div className={`cc-connection-status cc-connection-status--${connectionStatus}`}>
+        <span className="cc-connection-status__dot" />
+        {CONNECTION_LABELS[connectionStatus]}
+      </div>
+      {healthData && (
+        <div className={`cc-health-status cc-health-status--${healthData.ai_connected ? 'ok' : 'degraded'}`}>
+          <span className="cc-health-status__dot" />
+          AI: {healthData.ai_connected ? healthData.ai_model : 'Offline'}
+        </div>
+      )}
       {navItems.map((item) => (
         <NavLink
           key={item.to}
@@ -192,7 +177,9 @@ export default function Layout() {
   const mainContent = (
     <>
       <div className="cc-content">
-        <Outlet />
+        <ErrorBoundary name="PageContent">
+          <AnimatedOutlet />
+        </ErrorBoundary>
       </div>
       {!onChatPage && (
         <ChatPanel
@@ -213,8 +200,8 @@ export default function Layout() {
 
       {isMobile ? (
         <>
-          {sidebar}
           <div className="cc-main">{mainContent}</div>
+          <BottomNav />
         </>
       ) : (
         <PanelGroup orientation="horizontal" id="cc-layout-h">

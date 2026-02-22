@@ -4,15 +4,26 @@ import { useToastStore } from './useToastStore';
 import { connectSSE } from '../services/sseClient';
 import apiClient from '../services/apiClient';
 import { logger } from '../services/logger';
+import { isDemoMode } from '../utils/helpers';
 import type { ConversationResponse, StreamEventMeta } from '../types/api';
 
 const MAX_MESSAGES = 500;
+
+export interface TaskProgressData {
+  status?: string;
+  progress?: number;
+  message?: string;
+  result?: string;
+  error?: string;
+  sub_tasks?: Array<{ id: string; instruction: string; status: string; progress: number }>;
+}
 
 export interface ChatMessage {
   _id: string;
   text: string;
   createdAt: Date;
   user: { _id: string; name: string };
+  metadata?: Record<string, unknown>;
 }
 
 function trimMessages(msgs: ChatMessage[]): ChatMessage[] {
@@ -68,11 +79,6 @@ const DEMO_MESSAGES: Record<string, ChatMessage[]> = {
   ],
 };
 
-/** Helper: returns true when no server is configured (demo mode) */
-function isDemoMode(): boolean {
-  return !useAuthStore.getState().serverUrl;
-}
-
 interface ChatState {
   conversations: ConversationResponse[];
   messages: ChatMessage[];
@@ -80,19 +86,27 @@ interface ChatState {
   isStreaming: boolean;
   streamAbortController: AbortController | null;
   conversationsLoaded: boolean;
+  taskProgress: Record<string, TaskProgressData>;
 
   setConversations: (conversations: ConversationResponse[]) => void;
   setMessages: (messages: ChatMessage[]) => void;
   setCurrentConversationId: (id: string | null) => void;
   addMessage: (message: ChatMessage) => void;
   appendToLastMessage: (content: string) => void;
+  appendToMessage: (messageId: string, content: string) => void;
+  finalizeStreamMessage: (messageId: string, fullContent: string, metadata?: Record<string, unknown>) => void;
+  updateConversationTitle: (conversationId: string, title: string) => void;
+  setStreamingState: (streaming: boolean) => void;
   addConversation: (conversation: ConversationResponse) => void;
   removeConversation: (id: string) => void;
+  updateTaskProgress: (taskId: string, data: Partial<TaskProgressData>) => void;
 
   fetchConversations: () => Promise<void>;
   createConversation: (title?: string) => Promise<ConversationResponse>;
   deleteConversation: (id: string) => Promise<void>;
   fetchMessages: (conversationId: string) => Promise<void>;
+
+  resetToDemo: () => void;
 
   sendMessageStreaming: (conversationId: string, text: string) => Promise<void>;
   stopGeneration: () => void;
@@ -108,6 +122,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   isStreaming: false,
   streamAbortController: null,
   conversationsLoaded: false,
+  taskProgress: {},
 
   setConversations: (conversations) => set({ conversations }),
   setMessages: (messages) => set({ messages: trimMessages(messages) }),
@@ -127,6 +142,29 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       return { messages: updated };
     }),
 
+  appendToMessage: (messageId, content) =>
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m._id === messageId ? { ...m, text: m.text + content } : m,
+      ),
+    })),
+
+  finalizeStreamMessage: (messageId, fullContent, metadata) =>
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m._id === messageId ? { ...m, text: fullContent, metadata } : m,
+      ),
+    })),
+
+  updateConversationTitle: (conversationId, title) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === conversationId ? { ...c, title } : c,
+      ),
+    })),
+
+  setStreamingState: (streaming) => set({ isStreaming: streaming }),
+
   addConversation: (conversation) =>
     set((state) => ({
       conversations: [conversation, ...state.conversations],
@@ -136,6 +174,25 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     set((state) => ({
       conversations: state.conversations.filter((c) => c.id !== id),
     })),
+
+  updateTaskProgress: (taskId, data) =>
+    set((state) => ({
+      taskProgress: {
+        ...state.taskProgress,
+        [taskId]: { ...state.taskProgress[taskId], ...data },
+      },
+    })),
+
+  resetToDemo: () =>
+    set({
+      conversations: DEMO_CONVERSATIONS,
+      messages: [],
+      currentConversationId: null,
+      conversationsLoaded: false,
+      isStreaming: false,
+      streamAbortController: null,
+      taskProgress: {},
+    }),
 
   // --- Async conversation actions ---
 
@@ -217,13 +274,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
     try {
       const res = await apiClient.get(`/chat/conversations/${conversationId}/messages`);
-      const rawMessages: Array<{ id: string; content: string; role: string; created_at: string }> =
-        res.data?.items ?? res.data ?? [];
+      const rawMessages: Array<{
+        id: string; content: string; role: string; created_at: string;
+        intent?: string; metadata?: Record<string, unknown>;
+      }> = res.data?.items ?? res.data ?? [];
       const msgs: ChatMessage[] = rawMessages.map((m) => ({
         _id: m.id,
         text: m.content,
         createdAt: new Date(m.created_at),
         user: { _id: m.role, name: m.role === 'user' ? 'You' : 'ClawChat' },
+        ...(m.metadata ? { metadata: m.metadata } : {}),
       }));
       set({ messages: trimMessages(msgs.reverse()) });
     } catch (err) {
@@ -234,25 +294,43 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   // --- Streaming / message actions ---
 
-  sendMessageStreaming: (conversationId, text) => {
-    return new Promise<void>((resolve, reject) => {
-      const { serverUrl, token } = useAuthStore.getState();
+  sendMessageStreaming: async (conversationId, text) => {
+    const { serverUrl, token, connectionStatus } = useAuthStore.getState();
 
-      // In demo mode, simulate a response
-      if (!serverUrl) {
-        const assistantMessage: ChatMessage = {
-          _id: `demo-reply-${Date.now()}`,
-          text: 'This is a demo response. Connect to a server for real AI chat.',
-          createdAt: new Date(),
-          user: { _id: 'assistant', name: 'ClawChat' },
-        };
-        set((state) => ({
-          messages: trimMessages([assistantMessage, ...state.messages]),
-        }));
-        resolve();
+    // In demo mode, simulate a response
+    if (!serverUrl) {
+      const assistantMessage: ChatMessage = {
+        _id: `demo-reply-${Date.now()}`,
+        text: 'This is a demo response. Connect to a server for real AI chat.',
+        createdAt: new Date(),
+        user: { _id: 'assistant', name: 'ClawChat' },
+      };
+      set((state) => ({
+        messages: trimMessages([assistantMessage, ...state.messages]),
+      }));
+      return;
+    }
+
+    // Orchestrator path: POST /send when WebSocket is connected
+    // Response arrives via WS stream_start/chunk/end events (handled in useWebSocket)
+    if (connectionStatus === 'connected') {
+      try {
+        set({ isStreaming: true });
+        await apiClient.post('/chat/send', {
+          conversation_id: conversationId,
+          content: text,
+        });
+        // Server returns 202 — assistant response will arrive via WebSocket events
         return;
+      } catch (err) {
+        logger.warn('Orchestrator /send failed, falling back to SSE:', err);
+        set({ isStreaming: false });
+        // Fall through to SSE fallback
       }
+    }
 
+    // Fallback: SSE streaming via /stream
+    return new Promise<void>((resolve, reject) => {
       const url = `${serverUrl}/api/chat/stream`;
 
       const assistantPlaceholderId = `streaming-${Date.now()}`;
@@ -291,6 +369,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               }
               return { messages: updated };
             });
+          },
+          onTitleGenerated: (title: string) => {
+            get().updateConversationTitle(conversationId, title);
           },
           onDone: () => {
             set({ isStreaming: false, streamAbortController: null });
