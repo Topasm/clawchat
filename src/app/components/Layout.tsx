@@ -11,6 +11,7 @@ import useChatPanel from '../hooks/useChatPanel';
 import usePlatform from '../hooks/usePlatform';
 import useDataSync from '../hooks/useDataSync';
 import useWebSocket from '../hooks/useWebSocket';
+import useNetworkStatus from '../hooks/useNetworkStatus';
 import { useAuthStore } from '../stores/useAuthStore';
 import type { ConnectionStatus } from '../stores/useAuthStore';
 import AnimatedOutlet from './AnimatedOutlet';
@@ -28,6 +29,7 @@ import {
   TasksIcon, GearIcon, NavMemoIcon, SearchIcon, AdminIcon,
 } from './shared/NavIcons';
 import BottomNav from './shared/BottomNav';
+import UpdateNotification from './shared/UpdateNotification';
 
 // --- Theme bridge: map ColorPalette → CSS custom properties ---
 function cssVars(colors: ColorPalette): React.CSSProperties {
@@ -93,7 +95,10 @@ export default function Layout() {
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Central data sync: fetches all data from server on mount (no-op in demo mode)
-  useDataSync();
+  const { refresh } = useDataSync();
+
+  // Offline queue: monitor network status and flush on reconnect
+  const { isFlushing, pendingCount } = useNetworkStatus(refresh);
 
   // Health check polling
   const serverUrl = useAuthStore((s) => s.serverUrl);
@@ -144,7 +149,12 @@ export default function Layout() {
       <div className="cc-sidebar__header">ClawChat</div>
       <div className={`cc-connection-status cc-connection-status--${connectionStatus}`}>
         <span className="cc-connection-status__dot" />
-        {CONNECTION_LABELS[connectionStatus]}
+        {isFlushing ? 'Syncing...' : CONNECTION_LABELS[connectionStatus]}
+        {pendingCount > 0 && (
+          <span className="cc-offline-badge" title={`${pendingCount} pending action${pendingCount > 1 ? 's' : ''}`}>
+            {pendingCount}
+          </span>
+        )}
       </div>
       {healthData && (
         <div className={`cc-health-status cc-health-status--${healthData.ai_connected ? 'ok' : 'degraded'}`}>
@@ -194,6 +204,7 @@ export default function Layout() {
 
   return (
     <div className="cc-root" style={cssVars(colors)}>
+      <UpdateNotification />
       <ToastContainer />
       <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
       <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />

@@ -22,4 +22,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     set: (key: string, value: string) => ipcRenderer.invoke('secure-store:set', key, value),
     delete: (key: string) => ipcRenderer.invoke('secure-store:delete', key),
   },
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke('update:check'),
+    downloadUpdate: () => ipcRenderer.invoke('update:download'),
+    installUpdate: () => ipcRenderer.invoke('update:install'),
+    onUpdateAvailable: (cb: (info: { version: string; releaseNotes?: string }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, info: { version: string; releaseNotes?: string }) => cb(info);
+      ipcRenderer.on('update-available', listener);
+      return () => ipcRenderer.removeListener('update-available', listener);
+    },
+    onUpdateDownloaded: (cb: () => void) => {
+      const listener = () => cb();
+      ipcRenderer.on('update-downloaded', listener);
+      return () => ipcRenderer.removeListener('update-downloaded', listener);
+    },
+  },
 });

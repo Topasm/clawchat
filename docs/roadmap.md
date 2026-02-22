@@ -229,9 +229,9 @@ ClawChat development progress and planned work.
 - [x] Push notifications (Capacitor)
 
 ### Phase 7: Polish & Deploy
-- [ ] Offline support (queue actions, sync on reconnect)
-- [ ] Electron auto-update
-- [ ] Production Docker deployment
+- [x] Offline support (queue actions, sync on reconnect)
+- [x] Electron auto-update
+- [x] Production Docker deployment
 - [x] Keyboard shortcuts for navigation *(completed)*
 - [x] Performance optimization — see below
 
@@ -241,11 +241,17 @@ ClawChat development progress and planned work.
 - [x] Loading skeletons/placeholders for pages while data fetches
 
 #### Component Architecture Refactor
-- [ ] Adopt Container → View → Primitive pattern for complex components
-  - **Containers**: manage state, call hooks, pass data down (e.g., `KanbanContainer`)
-  - **Views**: stateless, receive props, handle layout (e.g., `KanbanBoardView`)
-  - **Primitives**: reusable UI atoms (buttons, inputs, badges — already partially done in `shared/`)
-- [ ] Extract large page components (CalendarPage, SettingsPage) into smaller sub-components
+- [x] Adopt Container → View → Primitive pattern for complex components
+  - **Containers**: manage state, call hooks, pass data down (e.g., `CalendarContainer`, `AdminContainer`, `TodayContainer`)
+  - **Views**: stateless, receive props, handle layout (e.g., `KanbanBoardView`, `TodayView`, `MonthView`, `WeekView`)
+  - **Primitives**: reusable UI atoms (buttons, inputs, badges — in `shared/`)
+- [x] Extract large page components into smaller sub-components
+  - CalendarPage (517 → 1 line): `utils/calendarUtils.ts`, `hooks/useCalendarNavigation.ts`, `calendar-views/` (7 files)
+  - AdminPage (457 → 1 line): `formatters.ts` additions, `admin-views/` (9 files)
+  - SettingsPage (328 → 190 lines): `hooks/useSettingsExportImport.ts`
+  - KanbanBoard (237 → 80 lines): `hooks/useKanbanKeyboardNav.ts`, `hooks/useKanbanDragDrop.ts`, `kanban/KanbanBoardView.tsx`
+  - TodayPage (219 → 1 line): `hooks/useTodayProgress.ts`, `hooks/useTodayBriefing.ts`, `hooks/useTodayHotkeys.ts`, `today-views/` (2 files)
+  - Pages are thin re-exports; `router.tsx` unchanged; 146 tests pass; 0 type errors
 
 ### Phase 8: Admin Dashboard
 - [x] Server: admin schemas (`server/schemas/admin.py`) — 13 Pydantic response/request models

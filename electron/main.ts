@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain, Notification } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -124,9 +125,40 @@ function createTray() {
   });
 }
 
+// ── Auto-updater setup ─────────────────────────────────────────────
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update-available', {
+      version: info.version,
+      releaseNotes: info.releaseNotes,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    mainWindow?.webContents.send('update-downloaded');
+  });
+
+  autoUpdater.on('error', (err) => {
+    mainWindow?.webContents.send('update-error', err.message);
+  });
+
+  // IPC handlers for renderer control
+  ipcMain.handle('update:check', () => autoUpdater.checkForUpdates());
+  ipcMain.handle('update:download', () => autoUpdater.downloadUpdate());
+  ipcMain.handle('update:install', () => autoUpdater.quitAndInstall());
+
+  // Check on startup and every 4 hours
+  autoUpdater.checkForUpdates().catch(() => {});
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 60 * 60 * 1000);
+}
+
 app.whenReady().then(() => {
   createWindow();
   createTray();
+  setupAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

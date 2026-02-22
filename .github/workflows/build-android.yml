@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -33,42 +32,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build web assets
-        run: npx vite build
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
       - name: Bump Android version
         run: node tools/bump-android-version.js
 
       - name: Decode keystore
-        if: github.event_name == 'push'
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > clawchat-release.jks
 
-      - name: Build debug APK
-        if: github.event_name == 'pull_request'
-        working-directory: android
-        run: ./gradlew assembleDebug
-
-      - name: Build release APK
-        if: github.event_name == 'push'
-        working-directory: android
+      - name: Build web + sync + assemble release
         env:
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          RELEASE_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEYSTORE_ALIAS: ${{ secrets.RELEASE_KEYSTORE_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: npm run dist:android:prod
 
-      - name: Upload debug APK
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload release APK
-        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release

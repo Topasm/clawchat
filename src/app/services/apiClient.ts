@@ -1,6 +1,7 @@
 import axios, { type AxiosError } from 'axios';
 import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from './logger';
+import { offlineQueue } from './offlineQueue';
 
 const apiClient = axios.create();
 
@@ -26,11 +27,29 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor: try token refresh on 401, then logout if that also fails
+// Response interceptor: handle network errors + token refresh on 401
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config;
+
+    // Detect network error (no response at all, e.g. offline)
+    const isNetworkError = !error.response && (error.code === 'ERR_NETWORK' || error.message === 'Network Error');
+    if (isNetworkError && originalRequest) {
+      const method = (originalRequest.method ?? 'get').toUpperCase();
+      // For mutations: enqueue and return a stub so optimistic state stays
+      if (method !== 'GET') {
+        let body = originalRequest.data;
+        if (typeof body === 'string') {
+          try { body = JSON.parse(body); } catch { /* keep as-is */ }
+        }
+        offlineQueue.enqueue(originalRequest.method as any, originalRequest.url ?? '', body);
+        return { data: {}, status: 0, statusText: 'offline-queued', headers: {}, config: originalRequest };
+      }
+      // For GETs: reject normally — React Query handles retries
+      return Promise.reject(error);
+    }
+
     if (!originalRequest || error.response?.status !== 401) {
       logger.warn('API request failed', { url: originalRequest?.url, status: error.response?.status });
       return Promise.reject(error);

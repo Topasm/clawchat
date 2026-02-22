@@ -15,3 +15,7 @@ mac:
 linux:
   target:
     - AppImage
+publish:
+  - provider: github
+    owner: Topasm
+    repo: clawchat
