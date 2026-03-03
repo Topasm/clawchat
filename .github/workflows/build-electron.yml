@@ -2,6 +2,7 @@ name: Build Electron
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
@@ -26,6 +27,14 @@ jobs:
         with:
           name: ClawChat-linux
           path: release/*.AppImage
+      - name: Attach to Nightly Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: 'Nightly Build'
+          prerelease: true
+          files: release/*.AppImage
 
   windows:
     name: Windows
@@ -47,6 +56,14 @@ jobs:
         with:
           name: ClawChat-windows
           path: release/*.exe
+      - name: Attach to Nightly Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: 'Nightly Build'
+          prerelease: true
+          files: release/*.exe
 
   mac:
     name: macOS
@@ -68,3 +85,11 @@ jobs:
         with:
           name: ClawChat-mac
           path: release/*.dmg
+      - name: Attach to Nightly Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: 'Nightly Build'
+          prerelease: true
+          files: release/*.dmg
