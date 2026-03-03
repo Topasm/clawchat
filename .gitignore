@@ -5,6 +5,11 @@ release
 .env
 *.local
 
+# Keystore
+*.jks
+*.keystore
+keystore_base64.txt
+
 # Capacitor
 android/app/build
 ios/App/Pods

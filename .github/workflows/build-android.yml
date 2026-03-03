@@ -36,7 +36,7 @@ jobs:
         run: node tools/bump-android-version.js
 
       - name: Decode keystore
-        run: echo -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > clawchat-release.jks
+        run: echo -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -di > clawchat-release.jks
 
       - name: Build web + sync + assemble release
         env:
