@@ -9,6 +9,29 @@ import type { ConversationResponse, StreamEventMeta } from '../types/api';
 
 const MAX_MESSAGES = 500;
 
+let pendingRunTimer: ReturnType<typeof setTimeout> | null = null;
+
+function armPendingRunTimeout() {
+  clearPendingRunTimeout();
+  pendingRunTimer = setTimeout(() => {
+    const { isStreaming } = useChatStore.getState();
+    if (isStreaming) {
+      useChatStore.setState({
+        isStreaming: false,
+        streamAbortController: null,
+      });
+      useToastStore.getState().addToast('error', 'Response timed out. Please try again.');
+    }
+  }, 120_000);
+}
+
+export function clearPendingRunTimeout() {
+  if (pendingRunTimer) {
+    clearTimeout(pendingRunTimer);
+    pendingRunTimer = null;
+  }
+}
+
 export interface TaskProgressData {
   status?: string;
   progress?: number;
@@ -28,6 +51,29 @@ export interface ChatMessage {
 
 function trimMessages(msgs: ChatMessage[]): ChatMessage[] {
   return msgs.length > MAX_MESSAGES ? msgs.slice(0, MAX_MESSAGES) : msgs;
+}
+
+/**
+ * Remove duplicate messages that can appear when the same message arrives
+ * via both a WebSocket event and a React Query refetch.  Uses a composite
+ * key of `user._id | createdAt | text` (content-based fingerprint).
+ * Messages that lack enough data to build a key are always kept.
+ */
+function dedupeMessages(msgs: ChatMessage[]): ChatMessage[] {
+  const seen = new Set<string>();
+  return msgs.filter((msg) => {
+    const userId = msg.user?._id;
+    const timestamp = msg.createdAt instanceof Date ? msg.createdAt.toISOString() : String(msg.createdAt);
+    const text = msg.text;
+
+    // If we can't build a reliable key, keep the message as-is
+    if (!userId || !timestamp || text == null) return true;
+
+    const key = `${userId}|${timestamp}|${text}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // Demo conversations shown when no server is configured
@@ -109,6 +155,7 @@ interface ChatState {
   resetToDemo: () => void;
 
   sendMessageStreaming: (conversationId: string, text: string) => Promise<void>;
+  clearStreamingState: () => void;
   stopGeneration: () => void;
   deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
   regenerateMessage: (conversationId: string, assistantMessageId: string) => string | null;
@@ -130,7 +177,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   addMessage: (message) =>
     set((state) => ({
-      messages: trimMessages([message, ...state.messages]),
+      messages: trimMessages(dedupeMessages([message, ...state.messages])),
     })),
 
   appendToLastMessage: (content) =>
@@ -285,7 +332,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         user: { _id: m.role, name: m.role === 'user' ? 'You' : 'ClawChat' },
         ...(m.metadata ? { metadata: m.metadata } : {}),
       }));
-      set({ messages: trimMessages(msgs.reverse()) });
+      set({ messages: trimMessages(dedupeMessages(msgs.reverse())) });
     } catch (err) {
       logger.warn('Failed to fetch messages:', err);
       // Keep existing messages
@@ -295,6 +342,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // --- Streaming / message actions ---
 
   sendMessageStreaming: async (conversationId, text) => {
+    const idempotencyKey = crypto.randomUUID();
     const { serverUrl, token, connectionStatus } = useAuthStore.getState();
 
     // In demo mode, simulate a response
@@ -311,14 +359,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       return;
     }
 
+    const { healthOK } = useAuthStore.getState();
+    if (!healthOK) {
+      useToastStore.getState().addToast('error', 'Cannot send — server is unreachable');
+      return;
+    }
+
     // Orchestrator path: POST /send when WebSocket is connected
     // Response arrives via WS stream_start/chunk/end events (handled in useWebSocket)
     if (connectionStatus === 'connected') {
       try {
         set({ isStreaming: true });
+        armPendingRunTimeout();
         await apiClient.post('/chat/send', {
           conversation_id: conversationId,
           content: text,
+          idempotency_key: idempotencyKey,
         });
         // Server returns 202 — assistant response will arrive via WebSocket events
         return;
@@ -334,6 +390,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const url = `${serverUrl}/api/chat/stream`;
 
       const assistantPlaceholderId = `streaming-${Date.now()}`;
+      let streamingMessageId: string | null = null;
       const assistantMessage: ChatMessage = {
         _id: assistantPlaceholderId,
         text: '',
@@ -345,13 +402,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         messages: [assistantMessage, ...state.messages],
         isStreaming: true,
       }));
+      armPendingRunTimeout();
 
       const abortController = connectSSE(
         url,
-        { conversation_id: conversationId, content: text },
+        { conversation_id: conversationId, content: text, idempotency_key: idempotencyKey },
         token ?? '',
         {
           onMeta: (meta: StreamEventMeta) => {
+            streamingMessageId = meta.message_id;
             set((state) => {
               const updated = state.messages.map((msg) =>
                 msg._id === assistantPlaceholderId
@@ -362,29 +421,35 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             });
           },
           onToken: (tokenText: string) => {
-            set((state) => {
-              const updated = [...state.messages];
-              if (updated.length > 0 && updated[0].user?._id === 'assistant') {
-                updated[0] = { ...updated[0], text: updated[0].text + tokenText };
-              }
-              return { messages: updated };
-            });
+            const targetId = streamingMessageId ?? assistantPlaceholderId;
+            set((state) => ({
+              messages: state.messages.map((msg) =>
+                msg._id === targetId
+                  ? { ...msg, text: msg.text + tokenText }
+                  : msg,
+              ),
+            }));
           },
           onTitleGenerated: (title: string) => {
             get().updateConversationTitle(conversationId, title);
           },
           onDone: () => {
+            clearPendingRunTimeout();
             set({ isStreaming: false, streamAbortController: null });
             resolve();
           },
           onError: (error: Error) => {
-            set((state) => {
-              const updated = [...state.messages];
-              if (updated.length > 0 && updated[0].user?._id === 'assistant' && !updated[0].text) {
-                updated[0] = { ...updated[0], text: 'Sorry, an error occurred while generating a response.' };
-              }
-              return { messages: updated, isStreaming: false, streamAbortController: null };
-            });
+            clearPendingRunTimeout();
+            const targetId = streamingMessageId ?? assistantPlaceholderId;
+            set((state) => ({
+              messages: state.messages.map((msg) =>
+                msg._id === targetId && !msg.text
+                  ? { ...msg, text: 'Sorry, an error occurred while generating a response.' }
+                  : msg,
+              ),
+              isStreaming: false,
+              streamAbortController: null,
+            }));
             reject(error);
           },
         },
@@ -394,7 +459,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     });
   },
 
+  clearStreamingState: () => {
+    const { streamAbortController } = get();
+    if (streamAbortController) {
+      streamAbortController.abort();
+    }
+    set({ isStreaming: false, streamAbortController: null });
+  },
+
   stopGeneration: () => {
+    clearPendingRunTimeout();
     const { streamAbortController } = get();
     if (streamAbortController) {
       streamAbortController.abort();

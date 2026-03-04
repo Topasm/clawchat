@@ -35,7 +35,7 @@ export default function ChatPage() {
   const handleSend = useCallback(async (text: string) => {
     if (!conversationId) return;
     addMessage({
-      _id: `user-${Date.now()}`,
+      _id: crypto.randomUUID(),
       text,
       createdAt: new Date(),
       user: { _id: 'user', name: 'You' },

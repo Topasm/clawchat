@@ -167,7 +167,7 @@ export function connectSSE(
       clearInactivityTimer();
 
       if ((error as Error).name === 'AbortError') {
-        onDone?.(accumulated);
+        if (accumulated) onDone?.(accumulated);
         return;
       }
 
@@ -183,6 +183,7 @@ export function connectSSE(
           error: (error as Error).message,
         });
         await new Promise((resolve) => setTimeout(resolve, delayMs));
+        if (abortController.signal.aborted) return;
         run();
         return;
       }

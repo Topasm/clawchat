@@ -6,15 +6,20 @@ import { offlineQueue } from './offlineQueue';
 const apiClient = axios.create();
 
 let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
+let refreshSubscribers: { resolve: (token: string) => void; reject: (error: unknown) => void }[] = [];
 
 function onTokenRefreshed(newToken: string) {
-  refreshSubscribers.forEach((cb) => cb(newToken));
+  refreshSubscribers.forEach((sub) => sub.resolve(newToken));
   refreshSubscribers = [];
 }
 
-function addRefreshSubscriber(cb: (token: string) => void) {
-  refreshSubscribers.push(cb);
+function onTokenRefreshFailed(error: unknown) {
+  refreshSubscribers.forEach((sub) => sub.reject(error));
+  refreshSubscribers = [];
+}
+
+function addRefreshSubscriber(resolve: (token: string) => void, reject: (error: unknown) => void) {
+  refreshSubscribers.push({ resolve, reject });
 }
 
 // Request interceptor: attach baseURL and Authorization header from auth store
@@ -55,6 +60,11 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Prevent infinite 401 loop: if this request was already retried, reject immediately
+    if ((originalRequest as any)._retry) {
+      return Promise.reject(error);
+    }
+
     // Avoid infinite loop on the refresh endpoint itself
     if (originalRequest.url?.includes('/auth/refresh')) {
       logger.warn('Token refresh failed, logging out');
@@ -72,11 +82,17 @@ apiClient.interceptors.response.use(
 
     // If already refreshing, queue this request
     if (isRefreshing) {
-      return new Promise((resolve) => {
-        addRefreshSubscriber((newToken: string) => {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          resolve(apiClient(originalRequest));
-        });
+      return new Promise((resolve, reject) => {
+        addRefreshSubscriber(
+          (newToken: string) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            (originalRequest as any)._retry = true;
+            resolve(apiClient(originalRequest));
+          },
+          (err: unknown) => {
+            reject(err);
+          },
+        );
       });
     }
 
@@ -91,13 +107,15 @@ apiClient.interceptors.response.use(
       useAuthStore.getState().setToken(newToken);
 
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      (originalRequest as any)._retry = true;
       onTokenRefreshed(newToken);
 
       return apiClient(originalRequest);
-    } catch {
-      logger.error('Token refresh error, logging out', error);
+    } catch (refreshError) {
+      onTokenRefreshFailed(refreshError);
+      logger.error('Token refresh error, logging out', refreshError);
       useAuthStore.getState().logout();
-      return Promise.reject(error);
+      return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
     }

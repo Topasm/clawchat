@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { wsClient } from '../services/wsClient';
 import { useAuthStore } from '../stores/useAuthStore';
-import { useChatStore, type ChatMessage } from '../stores/useChatStore';
+import { useChatStore, clearPendingRunTimeout, type ChatMessage } from '../stores/useChatStore';
 import { useToastStore } from '../stores/useToastStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { notify } from '../services/platform';
@@ -26,6 +26,15 @@ export default function useWebSocket(): void {
     const unsubStatus = wsClient.onStatusChange((status) => {
       useAuthStore.getState().setConnectionStatus(status);
     });
+
+    // Fail pending streaming state on disconnect so the UI doesn't get stuck
+    wsClient.onDisconnect = () => {
+      const { isStreaming, clearStreamingState } = useChatStore.getState();
+      if (isStreaming) {
+        clearStreamingState();
+        useToastStore.getState().addToast('error', 'Connection lost during response. Reconnecting...');
+      }
+    };
 
     const handleModuleChange = (data: unknown) => {
       const d = data as { module?: string };
@@ -103,10 +112,45 @@ export default function useWebSocket(): void {
     };
 
     const handleStreamEnd = (data: unknown) => {
-      const d = data as { message_id: string; full_content: string; metadata?: Record<string, unknown> };
+      const d = data as { message_id: string; full_content: string; metadata?: Record<string, unknown>; conversation_id?: string };
+      clearPendingRunTimeout();
       const chatStore = useChatStore.getState();
       chatStore.finalizeStreamMessage(d.message_id, d.full_content, d.metadata);
       chatStore.setStreamingState(false);
+      const conversationId = d.conversation_id || chatStore.currentConversationId;
+      if (conversationId) {
+        useChatStore.getState().fetchMessages(conversationId);
+      }
+    };
+
+    const handleStreamError = (data: unknown) => {
+      const d = data as { conversation_id?: string; error_message?: string; message?: string };
+      clearPendingRunTimeout();
+      const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
+      useChatStore.setState({
+        isStreaming: false,
+        streamAbortController: null
+      });
+      const errorMsg = d.error_message || d.message || 'An error occurred while generating a response';
+      useToastStore.getState().addToast('error', errorMsg);
+      // Reload messages to get authoritative server state
+      if (conversationId) {
+        useChatStore.getState().fetchMessages(conversationId);
+      }
+    };
+
+    const handleStreamAborted = (data: unknown) => {
+      const d = data as { conversation_id?: string };
+      clearPendingRunTimeout();
+      const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
+      useChatStore.setState({
+        isStreaming: false,
+        streamAbortController: null
+      });
+      // Reload messages to get authoritative server state
+      if (conversationId) {
+        useChatStore.getState().fetchMessages(conversationId);
+      }
     };
 
     const handleConversationUpdated = (data: unknown) => {
@@ -116,6 +160,12 @@ export default function useWebSocket(): void {
       }
     };
 
+    // Server liveness signals — wsClient already tracked lastMessageTime; ignore here
+    const handleLivenessNoop = () => {};
+    wsClient.on('tick', handleLivenessNoop);
+    wsClient.on('heartbeat', handleLivenessNoop);
+    wsClient.on('pong', handleLivenessNoop);
+
     wsClient.on('module_data_changed', handleModuleChange);
     wsClient.on('reminder', handleReminder);
     wsClient.on('task_completed', handleTaskCompleted);
@@ -124,10 +174,15 @@ export default function useWebSocket(): void {
     wsClient.on('stream_start', handleStreamStart);
     wsClient.on('stream_chunk', handleStreamChunk);
     wsClient.on('stream_end', handleStreamEnd);
+    wsClient.on('stream_error', handleStreamError);
+    wsClient.on('stream_aborted', handleStreamAborted);
     wsClient.on('conversation_updated', handleConversationUpdated);
 
     return () => {
       unsubStatus();
+      wsClient.off('tick', handleLivenessNoop);
+      wsClient.off('heartbeat', handleLivenessNoop);
+      wsClient.off('pong', handleLivenessNoop);
       wsClient.off('module_data_changed', handleModuleChange);
       wsClient.off('reminder', handleReminder);
       wsClient.off('task_completed', handleTaskCompleted);
@@ -136,7 +191,10 @@ export default function useWebSocket(): void {
       wsClient.off('stream_start', handleStreamStart);
       wsClient.off('stream_chunk', handleStreamChunk);
       wsClient.off('stream_end', handleStreamEnd);
+      wsClient.off('stream_error', handleStreamError);
+      wsClient.off('stream_aborted', handleStreamAborted);
       wsClient.off('conversation_updated', handleConversationUpdated);
+      wsClient.onDisconnect = null;
       wsClient.disconnect();
     };
   }, [serverUrl, token, queryClient]);

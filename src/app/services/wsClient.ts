@@ -8,6 +8,9 @@ import type { ConnectionStatus } from '../stores/useAuthStore';
 type MessageHandler = (data: unknown) => void;
 type StatusChangeHandler = (status: ConnectionStatus) => void;
 
+const KEEPALIVE_INTERVAL = 20000;
+const LIVENESS_TIMEOUT = 90000;
+
 class WSClient {
   private ws: WebSocket | null = null;
   private listeners: Map<string, Set<MessageHandler>> = new Map();
@@ -18,6 +21,11 @@ class WSClient {
   private token = '';
   private shouldReconnect = false;
   private statusListeners: Set<StatusChangeHandler> = new Set();
+  private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+  private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
+  private livenessTimer: ReturnType<typeof setInterval> | null = null;
+  private lastMessageTime: number = 0;
+  onDisconnect: (() => void) | null = null;
 
   onStatusChange(callback: StatusChangeHandler): () => void {
     this.statusListeners.add(callback);
@@ -33,10 +41,14 @@ class WSClient {
     this.token = token;
     this.shouldReconnect = true;
     this._connect();
+    this.startWatchdog();
   }
 
   disconnect(): void {
+    this.stopWatchdog();
     this.shouldReconnect = false;
+    this._stopKeepalive();
+    this._stopLivenessCheck();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -60,7 +72,7 @@ class WSClient {
   }
 
   private _connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return;
 
     const wsUrl = this.serverUrl.replace(/^http/, 'ws') + `/ws?token=${encodeURIComponent(this.token)}`;
 
@@ -69,13 +81,19 @@ class WSClient {
 
       this.ws.onopen = () => {
         this.reconnectDelay = 1000;
+        this.lastMessageTime = 0;
         this._emitStatus('connected');
+        this._startKeepalive();
+        this._startLivenessCheck();
       };
 
       this.ws.onmessage = (event) => {
+        this.lastMessageTime = Date.now();
         try {
           const msg = JSON.parse(event.data);
           const type = msg.type as string;
+          // Server liveness signals — already tracked via lastMessageTime, skip dispatch
+          if (type === 'tick' || type === 'heartbeat' || type === 'pong') return;
           const handlers = this.listeners.get(type);
           if (handlers) {
             for (const handler of handlers) {
@@ -88,7 +106,10 @@ class WSClient {
       };
 
       this.ws.onclose = () => {
+        this._stopKeepalive();
+        this._stopLivenessCheck();
         this.ws = null;
+        this.onDisconnect?.();
         if (this.shouldReconnect) {
           this._scheduleReconnect();
         } else {
@@ -103,6 +124,65 @@ class WSClient {
       if (this.shouldReconnect) {
         this._scheduleReconnect();
       }
+    }
+  }
+
+  private _startKeepalive(): void {
+    this._stopKeepalive();
+    this.keepaliveTimer = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(JSON.stringify({ type: 'ping' }));
+        } catch {
+          this.ws.close();
+          this._scheduleReconnect();
+        }
+      }
+    }, KEEPALIVE_INTERVAL);
+  }
+
+  private _stopKeepalive(): void {
+    if (this.keepaliveTimer) {
+      clearInterval(this.keepaliveTimer);
+      this.keepaliveTimer = null;
+    }
+  }
+
+  private _startLivenessCheck(): void {
+    this._stopLivenessCheck();
+    this.livenessTimer = setInterval(() => {
+      if (this.lastMessageTime > 0 && Date.now() - this.lastMessageTime > LIVENESS_TIMEOUT) {
+        console.warn('Server liveness timeout — forcing reconnect');
+        this.ws?.close();
+      }
+    }, 30000);
+  }
+
+  private _stopLivenessCheck(): void {
+    if (this.livenessTimer) {
+      clearInterval(this.livenessTimer);
+      this.livenessTimer = null;
+    }
+  }
+
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    this.watchdogTimer = setInterval(() => {
+      if (
+        this.shouldReconnect &&
+        this.ws?.readyState !== WebSocket.OPEN &&
+        this.ws?.readyState !== WebSocket.CONNECTING &&
+        this.reconnectTimer === null
+      ) {
+        this._connect();
+      }
+    }, 30000);
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
     }
   }
 

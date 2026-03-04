@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import axios from 'axios';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
-import { useChatStore } from '../stores/useChatStore';
+import apiClient from '../services/apiClient';
 import ChatPanel from './chat-panel/ChatPanel';
 import ErrorBoundary from './shared/ErrorBoundary';
 import useChatPanel from '../hooks/useChatPanel';
@@ -112,7 +111,7 @@ export default function Layout() {
     let cancelled = false;
     const fetchHealth = async () => {
       try {
-        const res = await axios.get(`${serverUrl}/api/health`);
+        const res = await apiClient.get(`${serverUrl}/api/health`);
         if (!cancelled) setHealthData(res.data);
       } catch {
         if (!cancelled) setHealthData(null);
@@ -139,7 +138,8 @@ export default function Layout() {
   const inboxCount = useModuleStore((s) =>
     (s.todos ?? []).filter((t) => !t.due_date && t.status !== 'completed').length,
   );
-  const chatCount = useChatStore((s) => (s.conversations ?? []).length);
+  // Badge removed: conversations.length is total count, not unread count.
+  // There is no unread tracking in the data model, so showing a badge is misleading.
 
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
@@ -174,9 +174,6 @@ export default function Layout() {
           {item.label}
           {item.to === '/inbox' && inboxCount > 0 && (
             <span className="cc-nav-badge">{inboxCount}</span>
-          )}
-          {item.to === '/chats' && chatCount > 0 && (
-            <span className="cc-nav-badge">{chatCount}</span>
           )}
         </NavLink>
       ))}

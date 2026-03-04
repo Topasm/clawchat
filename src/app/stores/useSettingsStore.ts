@@ -139,7 +139,10 @@ export const useSettingsStore = create<SettingsState>()(
       setAnalyticsEnabled: (analyticsEnabled) => { set({ analyticsEnabled }); scheduleSave(); },
       setStreak: (streak) => set({ streak }),
 
-      resetToDefaults: () => set({ ...DEFAULT_SETTINGS }),
+      resetToDefaults: () => {
+        if (_syncTimer) clearTimeout(_syncTimer);
+        set({ ...DEFAULT_SETTINGS });
+      },
 
       exportSettings: () => {
         const state = get();

@@ -10,11 +10,13 @@ interface AuthState {
   serverUrl: string | null;
   isLoading: boolean;
   connectionStatus: ConnectionStatus;
+  healthOK: boolean;
   login: (serverUrl: string, pin: string) => Promise<void>;
   logout: () => void;
   setToken: (token: string) => void;
   setLoading: (isLoading: boolean) => void;
   setConnectionStatus: (status: ConnectionStatus) => void;
+  setHealthOK: (ok: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -25,6 +27,7 @@ export const useAuthStore = create<AuthState>()(
       serverUrl: null,
       isLoading: true,
       connectionStatus: 'demo' as ConnectionStatus,
+      healthOK: true,
 
       login: async (serverUrl: string, pin: string) => {
         const response = await fetch(`${serverUrl}/api/auth/login`, {
@@ -66,6 +69,8 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (isLoading: boolean) => set({ isLoading }),
 
       setConnectionStatus: (connectionStatus: ConnectionStatus) => set({ connectionStatus }),
+
+      setHealthOK: (ok: boolean) => set({ healthOK: ok }),
     }),
     {
       name: 'auth-storage',
@@ -80,8 +85,15 @@ export const useAuthStore = create<AuthState>()(
           await secureStorage.remove(name);
         },
       })),
-      onRehydrateStorage: () => (state) => {
-        state?.setLoading(false);
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('Auth store rehydration failed:', error);
+        }
+        if (state) {
+          state.setLoading(false);
+        } else {
+          useAuthStore.setState({ isLoading: false });
+        }
       },
     },
   ),

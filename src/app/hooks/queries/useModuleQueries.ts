@@ -34,7 +34,6 @@ export function useTodosQuery() {
   useEffect(() => {
     if (query.data) {
       useModuleStore.getState().setTodos(query.data);
-      useModuleStore.getState().setKanbanStatuses({});
     }
   }, [query.data]);
 
@@ -283,9 +282,7 @@ export function useUploadAttachment() {
       const params = new URLSearchParams();
       if (memoId) params.set('memo_id', memoId);
       if (todoId) params.set('todo_id', todoId);
-      const res = await apiClient.post(`/attachments?${params.toString()}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await apiClient.post(`/attachments?${params.toString()}`, formData);
       return res.data;
     },
     onSuccess: (_data, variables) => {

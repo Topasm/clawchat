@@ -254,13 +254,22 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     }));
     // Persist to server
     if (!isDemoMode()) {
-      Object.entries(updates).forEach(([id, order]) => {
-        apiClient.patch(`/todos/${id}`, { sort_order: order }).catch(() => {});
+      Promise.all(
+        Object.entries(updates).map(([id, order]) =>
+          apiClient.patch(`/todos/${id}`, { sort_order: order }),
+        ),
+      ).catch((err) => {
+        logger.warn('Failed to persist reorder to server:', err);
+        useToastStore.getState().addToast('error', 'Failed to save reorder on server');
       });
     }
   },
 
-  resetToDemo: () =>
+  resetToDemo: () => {
+    // Cancel any pending undo-able delete timers so they don't fire after reset
+    for (const [, timer] of pendingDeletes) clearTimeout(timer);
+    pendingDeletes.clear();
+
     set({
       todos: DEMO_TODOS,
       events: DEMO_EVENTS,
@@ -269,7 +278,8 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       selectedTodoIds: new Set<string>(),
       isLoading: false,
       lastFetched: null,
-    }),
+    });
+  },
 
   // --- Events --- (seeded with demo data across several days for calendar view)
   events: DEMO_EVENTS,

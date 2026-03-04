@@ -39,9 +39,9 @@ export default function KanbanBoard() {
     return todo.status as KanbanStatus;
   }, [kanbanStatuses]);
 
-  const todoTasks = visibleTodos.filter((t) => getEffectiveStatus(t) === 'pending');
-  const inProgressTasks = visibleTodos.filter((t) => getEffectiveStatus(t) === 'in_progress');
-  const doneTasks = visibleTodos.filter((t) => getEffectiveStatus(t) === 'completed');
+  const todoTasks = useMemo(() => visibleTodos.filter((t) => getEffectiveStatus(t) === 'pending'), [visibleTodos, getEffectiveStatus]);
+  const inProgressTasks = useMemo(() => visibleTodos.filter((t) => getEffectiveStatus(t) === 'in_progress'), [visibleTodos, getEffectiveStatus]);
+  const doneTasks = useMemo(() => visibleTodos.filter((t) => getEffectiveStatus(t) === 'completed'), [visibleTodos, getEffectiveStatus]);
 
   const allTasksFlat = useMemo(
     () => [...todoTasks, ...inProgressTasks, ...doneTasks],

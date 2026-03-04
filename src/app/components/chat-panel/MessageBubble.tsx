@@ -36,8 +36,12 @@ export default function MessageBubble({ message, onDelete, onRegenerate, onEdit 
   const isUser = message.user._id === 'user';
   const role = isUser ? 'user' : 'assistant';
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message.text);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.text);
+    } catch {
+      // Clipboard API not available in this context
+    }
   };
 
   const intent = message.metadata?.intent as string | undefined;
@@ -49,7 +53,7 @@ export default function MessageBubble({ message, onDelete, onRegenerate, onEdit 
         {!isUser && intentLabel && (
           <div className="cc-bubble__intent">{intentLabel}</div>
         )}
-        {message.text}
+        <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{message.text}</span>
         {message.metadata && <ActionCard metadata={message.metadata} />}
         {showTimestamps && (
           <div className="cc-bubble__time">

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from 'react';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -23,6 +24,7 @@ export default function ChatInput({
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendOnEnter = useSettingsStore((s) => s.sendOnEnter);
+  const healthOK = useAuthStore((s) => s.healthOK);
   const isEditing = !!editingMessageId;
 
   // Pre-fill textarea when entering edit mode
@@ -121,8 +123,8 @@ export default function ChatInput({
             type="button"
             className="cc-chat-input__btn cc-chat-input__btn--send"
             onClick={handleSend}
-            disabled={!text.trim()}
-            title={isEditing ? 'Save edit' : 'Send'}
+            disabled={!text.trim() || !healthOK}
+            title={!healthOK ? 'Server unreachable' : isEditing ? 'Save edit' : 'Send'}
           >
             {isEditing ? (
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

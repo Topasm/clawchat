@@ -50,14 +50,14 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
     let cid = conversationId;
     if (!cid) {
       // Create a new conversation stub
-      const newId = `panel-${Date.now()}`;
+      const newId = crypto.randomUUID();
       cid = newId;
       onSetConversationId(newId);
       addConversation({ id: newId, title: text.slice(0, 40), created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     }
 
     addMessage({
-      _id: `user-${Date.now()}`,
+      _id: crypto.randomUUID(),
       text,
       createdAt: new Date(),
       user: { _id: 'user', name: 'You' },
