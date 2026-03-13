@@ -2,7 +2,7 @@ import { useState, type FormEvent, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
-import { DEFAULT_SERVER_URL } from '../config/constants';
+import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'error';
 
@@ -120,7 +120,7 @@ export default function LoginPage() {
           value={serverUrl}
           onChange={(e) => { setServerUrl(e.target.value); setHealthStatus('idle'); }}
           onBlur={handleServerUrlBlur}
-          placeholder="http://localhost:8000"
+          placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
           required
           style={{
             width: '100%',
@@ -135,7 +135,10 @@ export default function LoginPage() {
             outline: 'none',
             transition: 'border-color 0.2s',
           }}
-        />
+          />
+        <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}>
+          When ClawChat is opened through Tailscale or a reverse proxy, leaving this as the current site URL is usually correct.
+        </div>
 
         <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
           PIN

@@ -177,6 +177,31 @@ your-domain.com {
 }
 ```
 
+## Same-Mac Tailscale Setup
+
+For a private remote-access setup on one Mac, keep all services local and publish only the reverse proxy through Tailscale Serve:
+
+- `OpenClaw` on `127.0.0.1:18789`
+- `clawchat_server` on `127.0.0.1:8000`
+- `Caddy` on `127.0.0.1:8080`
+- `Tailscale Serve` on `https://<machine>.<tailnet>.ts.net/`
+
+In this mode, ClawChat does not use Telegram at all. Telegram is only for a separate OpenClaw bot channel, if enabled.
+
+See [Same-Mac Remote Access Runbook](./remote-access-runbook.md) for the full launchd + userspace Tailscale setup.
+
+## Mobile Access Checklist
+
+When testing from a phone or tablet:
+
+1. Install the Tailscale app on the mobile device.
+2. Log in with the same tailnet account that can reach `clawchat-mac.tailaa7944.ts.net`.
+3. Open `https://clawchat-mac.tailaa7944.ts.net/` in the mobile browser.
+4. Leave the `Server URL` field as the prefilled site URL unless you intentionally changed it.
+5. Enter the ClawChat PIN and confirm the health indicator shows the server is reachable.
+6. If the app loads but login fails, confirm `serve status` on the Mac and verify `/api/health` still works locally.
+7. If the site name does not resolve on mobile, confirm the mobile device is actually connected to the same tailnet and that MagicDNS is enabled in Tailscale admin.
+
 ## Dev vs Production
 
 | Aspect | Development | Production |

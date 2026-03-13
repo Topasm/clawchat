@@ -12,6 +12,7 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 | [Backend Guide](./backend-guide.md) | FastAPI project structure, modules, and dev setup |
 | [Frontend Guide](./frontend-guide.md) | Vite + React + TypeScript app structure and component reference |
 | [Deployment](./deployment.md) | Docker setup, environment variables, and production config |
+| [Same-Mac Remote Access Runbook](./remote-access-runbook.md) | Run OpenClaw, ClawChat server, and the web UI on one Mac with tailnet-only access |
 | [Roadmap](./roadmap.md) | Development progress and upcoming work (includes vibe-kanban-inspired upgrades) |
 | [Upgrade Reference](./upgrade-reference.md) | Libraries, patterns, and code examples for planned upgrades |
 
@@ -35,7 +36,14 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 - **Full-Text Search** — Search across tasks, events, and memos from a dedicated search page
 - **Dialog System** — Accessible animated modals using @radix-ui/react-dialog with focus trap and ESC support
 - **Cross-Platform** — Runs as an Electron desktop app (Windows/macOS/Linux) and as a web app in any browser
+- **Private Remote Access** — Can be published to the same user's Tailscale tailnet without exposing OpenClaw directly to the internet
 - **Demo Mode** — Fully functional UI with seeded demo data when no backend is connected
+
+## Integration Notes
+
+- ClawChat itself does not depend on Telegram.
+- Telegram is only relevant if OpenClaw is also being used as a chat bot in a separate channel.
+- ClawChat talks to `clawchat_server` over HTTPS, SSE, and WebSocket, and the server talks to OpenClaw over loopback.
 
 ## Tech Stack
 
