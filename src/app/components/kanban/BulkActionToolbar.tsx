@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useModuleStore } from '../../stores/useModuleStore';
+import type { TodoResponse } from '../../types/api';
 
 export default function BulkActionToolbar() {
   const selectedIds = useModuleStore((s) => s.selectedTodoIds);
@@ -25,7 +26,7 @@ export default function BulkActionToolbar() {
             className="cc-bulk-toolbar__select"
             value=""
             onChange={(e) => {
-              if (e.target.value) bulkUpdate({ ids, status: e.target.value });
+              if (e.target.value) bulkUpdate({ ids, status: e.target.value as TodoResponse['status'] });
             }}
           >
             <option value="">Set Status</option>
@@ -37,7 +38,7 @@ export default function BulkActionToolbar() {
             className="cc-bulk-toolbar__select"
             value=""
             onChange={(e) => {
-              if (e.target.value) bulkUpdate({ ids, priority: e.target.value });
+              if (e.target.value) bulkUpdate({ ids, priority: e.target.value as NonNullable<TodoResponse['priority']> });
             }}
           >
             <option value="">Set Priority</option>

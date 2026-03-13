@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useTaskRelationshipsQuery, useCreateTaskRelationship, useDeleteTaskRelationship } from '../../hooks/queries';
 import { isDemoMode } from '../../utils/helpers';
-import type { RelationshipType } from '../../types/api';
+import type { RelationshipType, TaskRelationshipResponse } from '../../types/api';
 
 interface RelationshipsSectionProps {
   taskId: string;
@@ -48,7 +48,7 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
     duplicate_of: relationships.filter((r) => r.relationship_type === 'duplicate_of'),
   };
 
-  const getLinkedId = (r: { source_todo_id: string; target_todo_id: string }) =>
+  const getLinkedId = (r: Pick<TaskRelationshipResponse, 'source_todo_id' | 'target_todo_id'>) =>
     r.source_todo_id === taskId ? r.target_todo_id : r.source_todo_id;
 
   const getTodoTitle = (id: string) => todos.find((t) => t.id === id)?.title ?? id;

@@ -55,6 +55,7 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
     } else if (parsed.type === 'note') {
       useModuleStore.getState().addMemo({
         id,
+        title: parsed.title,
         content: parsed.title,
         tags: [],
         created_at: now,

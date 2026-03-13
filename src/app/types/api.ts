@@ -19,6 +19,8 @@ export type {
   SettingsPayload,
   HealthResponse,
   TaskRelationshipCreate,
+  TaskRelationshipResponse,
+  RelationshipType,
   BulkTodoUpdate,
   AttachmentResponse,
   AdminOverviewResponse,

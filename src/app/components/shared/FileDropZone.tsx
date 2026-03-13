@@ -22,7 +22,7 @@ export default function FileDropZone({ memoId, todoId, onUploadComplete }: FileD
   const addToast = useToastStore((s) => s.addToast);
 
   const validateFile = useCallback((file: File): string | null => {
-    const ext = file.name.rsplit ? '' : file.name.split('.').pop()?.toLowerCase() ?? '';
+    const ext = file.name.includes('.') ? (file.name.split('.').pop()?.toLowerCase() ?? '') : '';
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return `File type '.${ext}' is not allowed`;
     }

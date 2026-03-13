@@ -23,44 +23,61 @@ class Logger {
     }
   }
 
-  log(level: LogLevel, message: string, metadata?: Record<string, unknown>): void {
+  private normalizeMetadata(metadata?: unknown): Record<string, unknown> | undefined {
+    if (metadata == null) return undefined;
+    if (metadata instanceof Error) {
+      return {
+        name: metadata.name,
+        message: metadata.message,
+        ...(metadata.stack ? { stack: metadata.stack } : {}),
+      };
+    }
+    if (typeof metadata === 'object') {
+      return metadata as Record<string, unknown>;
+    }
+    return { value: metadata };
+  }
+
+  log(level: LogLevel, message: string, metadata?: unknown): void {
+    const normalizedMetadata = this.normalizeMetadata(metadata);
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
       message,
-      ...(metadata ? { metadata } : {}),
+      ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
     };
     this.push(entry);
     // eslint-disable-next-line no-console
     console[level === 'debug' ? 'log' : level](
       `[${entry.timestamp}] [${level.toUpperCase()}] ${message}`,
-      metadata ?? '',
+      normalizedMetadata ?? '',
     );
   }
 
-  error(message: string, error?: unknown, metadata?: Record<string, unknown>): void {
+  error(message: string, error?: unknown, metadata?: unknown): void {
     const stack = error instanceof Error ? error.stack : undefined;
+    const normalizedMetadata = this.normalizeMetadata(metadata);
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'error',
       message,
-      ...(metadata ? { metadata } : {}),
+      ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
       ...(stack ? { stack } : {}),
     };
     this.push(entry);
     // eslint-disable-next-line no-console
-    console.error(`[${entry.timestamp}] [ERROR] ${message}`, error ?? '', metadata ?? '');
+    console.error(`[${entry.timestamp}] [ERROR] ${message}`, error ?? '', normalizedMetadata ?? '');
   }
 
-  warn(message: string, metadata?: Record<string, unknown>): void {
+  warn(message: string, metadata?: unknown): void {
     this.log('warn', message, metadata);
   }
 
-  info(message: string, metadata?: Record<string, unknown>): void {
+  info(message: string, metadata?: unknown): void {
     this.log('info', message, metadata);
   }
 
-  debug(message: string, metadata?: Record<string, unknown>): void {
+  debug(message: string, metadata?: unknown): void {
     this.log('debug', message, metadata);
   }
 

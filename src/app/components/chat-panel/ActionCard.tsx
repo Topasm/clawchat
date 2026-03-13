@@ -36,6 +36,8 @@ function CheckIcon() {
 export default function ActionCard({ metadata }: ActionCardProps) {
   const navigate = useNavigate();
   const actionType = metadata.action_type as string;
+  const eventStartTime =
+    typeof metadata.event_start_time === 'string' ? metadata.event_start_time : null;
 
   if (!actionType) return null;
 
@@ -51,11 +53,11 @@ export default function ActionCard({ metadata }: ActionCardProps) {
             {actionType === 'event_created' ? 'Event Created' : 'Event Updated'}
           </span>
           <span className="cc-action-card__title">{metadata.event_title as string}</span>
-          {metadata.event_start_time && (
+          {eventStartTime ? (
             <span className="cc-action-card__detail">
-              {new Date(metadata.event_start_time as string).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+              {new Date(eventStartTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
             </span>
-          )}
+          ) : null}
         </div>
         <button
           type="button"
