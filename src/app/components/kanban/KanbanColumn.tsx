@@ -81,6 +81,7 @@ export default function KanbanColumn({
       subTaskCount={subTaskCount}
       isDragDisabled={isMultiSelectMode}
       isMobile={isMobile}
+      isCompletedOverride={!isSubTask ? status === 'completed' : undefined}
     />
   );
 

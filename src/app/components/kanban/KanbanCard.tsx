@@ -18,9 +18,10 @@ interface KanbanCardProps {
   subTaskCount?: number;
   isDragDisabled?: boolean;
   isMobile?: boolean;
+  isCompletedOverride?: boolean;
 }
 
-export default function KanbanCard({ task, index, onToggle, onClick, isFocused, onFocus, isSelected, onSelect, onSelectTouch, isSubTask, subTaskCount, isDragDisabled, isMobile }: KanbanCardProps) {
+export default function KanbanCard({ task, index, onToggle, onClick, isFocused, onFocus, isSelected, onSelect, onSelectTouch, isSubTask, subTaskCount, isDragDisabled, isMobile, isCompletedOverride }: KanbanCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const touchSelectHandlers = useTouchSelect({
@@ -69,7 +70,14 @@ export default function KanbanCard({ task, index, onToggle, onClick, isFocused, 
               </svg>
             </div>
           )}
-          <TaskCard task={task} onToggle={onToggle} onClick={onClick} isSubTask={isSubTask} subTaskCount={subTaskCount} />
+          <TaskCard
+            task={task}
+            onToggle={onToggle}
+            onClick={onClick}
+            isSubTask={isSubTask}
+            subTaskCount={subTaskCount}
+            isCompletedOverride={isCompletedOverride}
+          />
         </div>
       )}
     </Draggable>

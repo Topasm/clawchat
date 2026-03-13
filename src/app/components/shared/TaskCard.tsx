@@ -11,10 +11,11 @@ interface TaskCardProps {
   isSubTask?: boolean;
   subTaskCount?: number;
   blockerCount?: number;
+  isCompletedOverride?: boolean;
 }
 
-export default function TaskCard({ task, onToggle, onClick, className, isSubTask, subTaskCount, blockerCount }: TaskCardProps) {
-  const isCompleted = task.status === 'completed';
+export default function TaskCard({ task, onToggle, onClick, className, isSubTask, subTaskCount, blockerCount, isCompletedOverride }: TaskCardProps) {
+  const isCompleted = isCompletedOverride ?? (task.status === 'completed');
 
   return (
     <div className={`cc-card cc-card--task${className ? ' ' + className : ''}${isSubTask ? ' cc-kanban__card--subtask' : ''}`} onClick={onClick}>
