@@ -96,9 +96,10 @@ export default function SwipeActions({ children, taskId, currentStatus, onMove, 
   };
 
   const moveTargets = allStatuses.filter((s) => s !== currentStatus);
+  const isActive = offsetX !== 0 || showMoveMenu;
 
   return (
-    <div className="cc-swipe-actions" ref={containerRef}>
+    <div className={`cc-swipe-actions${isActive ? ' cc-swipe-actions--active' : ''}`} ref={containerRef}>
       {/* Right-side panel (revealed by swiping left) */}
       <div className="cc-swipe-actions__panel cc-swipe-actions__panel--right">
         {showMoveMenu ? (

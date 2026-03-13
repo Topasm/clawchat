@@ -268,6 +268,13 @@
   align-items: center;
   gap: 4px;
   padding: 0 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.cc-swipe-actions--active .cc-swipe-actions__panel {
+  opacity: 1;
 }
 
 .cc-swipe-actions__panel--right {
@@ -290,6 +297,10 @@
   cursor: pointer;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
+}
+
+.cc-swipe-actions--active .cc-swipe-actions__btn {
+  pointer-events: auto;
 }
 
 .cc-swipe-actions__btn--move {
