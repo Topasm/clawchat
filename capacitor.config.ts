@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'ClawChat',
   webDir: 'dist',
   server: {
-    androidScheme: 'https',
+    androidScheme: 'http',
   },
   plugins: {
     Keyboard: {
