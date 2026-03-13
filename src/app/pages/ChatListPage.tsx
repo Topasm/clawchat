@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import usePlatform from '../hooks/usePlatform';
 import { useNavigate } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { useChatStore } from '../stores/useChatStore';
@@ -13,6 +14,7 @@ export default function ChatListPage() {
   const conversationsLoaded = useChatStore((s) => s.conversationsLoaded);
   const createConversation = useChatStore((s) => s.createConversation);
   const deleteConversation = useChatStore((s) => s.deleteConversation);
+  const { isMobile } = usePlatform();
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
@@ -35,22 +37,23 @@ export default function ChatListPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile ? 12 : 16 }}>
         <div className="cc-page-header" style={{ marginBottom: 0 }}>
           <div className="cc-page-header__title">Chats</div>
+          {!isMobile && <div className="cc-page-header__subtitle">Recent conversations</div>}
         </div>
         <button type="button" className="cc-btn cc-btn--primary" onClick={handleNewChat}>
-          + New Chat
+          {isMobile ? '+ New' : '+ New Chat'}
         </button>
       </div>
 
       {loading && conversations.length === 0 && <ChatListSkeleton />}
 
       {!loading && conversations.length === 0 ? (
-        <EmptyState icon={'\uD83D\uDCAC'} message="No conversations yet. Start a new chat!" />
+        <EmptyState icon={'\uD83D\uDCAC'} message={isMobile ? 'Start chatting.' : 'No conversations yet. Start a new chat!'} />
       ) : conversations.length > 0 ? (
         <Virtuoso
-          style={{ height: 'calc(100vh - 160px)' }}
+          style={{ height: isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 160px)' }}
           data={conversations}
           increaseViewportBy={200}
           itemContent={(_index, convo) => (

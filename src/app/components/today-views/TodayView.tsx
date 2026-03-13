@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../../stores/useModuleStore';
+import usePlatform from '../../hooks/usePlatform';
 import { formatDate } from '../../utils/formatters';
 import SectionHeader from '../shared/SectionHeader';
 import TaskCard from '../shared/TaskCard';
@@ -44,9 +45,12 @@ export default function TodayView({
 }: TodayViewProps) {
   const navigate = useNavigate();
   const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
+  const { isMobile } = usePlatform();
 
   const totalTasks = todayTasks.length + overdueTasks.length;
   const hasAnything = totalTasks > 0 || todayEvents.length > 0;
+  const visibleOverdueTasks = isMobile ? overdueTasks.slice(0, 3) : overdueTasks;
+  const visibleTodayTasks = isMobile ? todayTasks.slice(0, 4) : todayTasks;
 
   return (
     <div>
@@ -54,7 +58,7 @@ export default function TodayView({
         <div className="cc-page-header__title">{greeting || 'Hello'}</div>
         <div className="cc-page-header__subtitle">
           {todayDate ? formatDate(todayDate) : ''}
-          {totalTasks > 0 && ` \u00B7 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} for today`}
+          {!isMobile && totalTasks > 0 && ` \u00B7 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} for today`}
         </div>
       </div>
 
@@ -64,15 +68,28 @@ export default function TodayView({
         placeholder={capturePlaceholder}
       />
 
+      {isMobile && (
+        <div className="cc-today-home-actions">
+          <button type="button" className="cc-btn cc-btn--primary" onClick={() => navigate('/chats')}>
+            Open Chat
+          </button>
+          <button type="button" className="cc-btn cc-btn--secondary" onClick={() => navigate('/inbox')}>
+            Inbox
+          </button>
+        </div>
+      )}
+
       {progress.total > 0 && (
         <div className="cc-today-progress">
           <div className="cc-today-progress__header">
             <span className="cc-today-progress__label">
               {progress.allDone
                 ? '\u2705 All done!'
-                : `Today\u2019s Progress: ${progress.completed}/${progress.total} tasks`}
+                : isMobile
+                  ? `${progress.completed}/${progress.total} done today`
+                  : `Today\u2019s Progress: ${progress.completed}/${progress.total} tasks`}
             </span>
-            {streakCount > 0 && (
+            {!isMobile && streakCount > 0 && (
               <span className="cc-today-progress__streak">
                 {'\uD83D\uDD25'} {streakCount} day streak
               </span>
@@ -87,13 +104,13 @@ export default function TodayView({
         </div>
       )}
 
-      {progress.total === 0 && !isLoading && hasAnything && (
+      {progress.total === 0 && !isLoading && hasAnything && !isMobile && (
         <div className="cc-today-progress">
           <span className="cc-today-progress__label">No tasks for today</span>
         </div>
       )}
 
-      {briefing && (
+      {briefing && !isMobile && (
         <div className="cc-briefing-card">
           <div className="cc-briefing-card__header">
             <span className="cc-briefing-card__icon">{'\uD83D\uDCCB'}</span>
@@ -107,10 +124,10 @@ export default function TodayView({
       {isLoading && !hasAnything && <TodayPageSkeleton />}
 
       {!isLoading && !hasAnything && (
-        <EmptyState icon="\u2728" message="All clear! Nothing scheduled for today." />
+        <EmptyState icon="\u2728" message={isMobile ? 'Nothing urgent right now.' : 'All clear! Nothing scheduled for today.'} />
       )}
 
-      {todayEvents.length > 0 && (
+      {todayEvents.length > 0 && !isMobile && (
         <SectionHeader title="Events" count={todayEvents.length} variant="accent">
           {todayEvents.map((event) => (
             <EventCard
@@ -123,8 +140,8 @@ export default function TodayView({
       )}
 
       {overdueTasks.length > 0 && (
-        <SectionHeader title="Overdue" count={overdueTasks.length} variant="warning">
-          {overdueTasks.map((task) => (
+        <SectionHeader title="Overdue" count={overdueTasks.length} variant="warning" defaultOpen>
+          {visibleOverdueTasks.map((task) => (
             <TaskCard
               key={task.id}
               task={task}
@@ -132,12 +149,17 @@ export default function TodayView({
               onClick={() => navigate(`/tasks/${task.id}`)}
             />
           ))}
+          {isMobile && overdueTasks.length > visibleOverdueTasks.length && (
+            <button type="button" className="cc-link-btn" onClick={() => navigate('/tasks')}>
+              See all overdue
+            </button>
+          )}
         </SectionHeader>
       )}
 
       {todayTasks.length > 0 && (
-        <SectionHeader title="Today's Tasks" count={todayTasks.length}>
-          {todayTasks.map((task) => (
+        <SectionHeader title="Today's Tasks" count={todayTasks.length} defaultOpen>
+          {visibleTodayTasks.map((task) => (
             <TaskCard
               key={task.id}
               task={task}
@@ -145,10 +167,15 @@ export default function TodayView({
               onClick={() => navigate(`/tasks/${task.id}`)}
             />
           ))}
+          {isMobile && todayTasks.length > visibleTodayTasks.length && (
+            <button type="button" className="cc-link-btn" onClick={() => navigate('/tasks')}>
+              See all tasks
+            </button>
+          )}
         </SectionHeader>
       )}
 
-      {inboxCount > 0 && (
+      {inboxCount > 0 && !isMobile && (
         <div className="cc-inbox-banner" onClick={() => navigate('/inbox')}>
           <span style={{ fontSize: 16 }}>{'\uD83D\uDCE5'}</span>
           <span className="cc-inbox-banner__text">

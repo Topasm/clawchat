@@ -361,8 +361,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
     const { healthOK } = useAuthStore.getState();
     if (!healthOK) {
-      useToastStore.getState().addToast('error', 'Cannot send — server is unreachable');
-      return;
+      useToastStore.getState().addToast('warning', 'Server status looks uncertain. Trying anyway...');
     }
 
     // Orchestrator path: POST /send when WebSocket is connected

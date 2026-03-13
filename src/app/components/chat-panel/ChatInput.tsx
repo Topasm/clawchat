@@ -123,8 +123,8 @@ export default function ChatInput({
             type="button"
             className="cc-chat-input__btn cc-chat-input__btn--send"
             onClick={handleSend}
-            disabled={!text.trim() || !healthOK}
-            title={!healthOK ? 'Server unreachable' : isEditing ? 'Save edit' : 'Send'}
+            disabled={!text.trim()}
+            title={!healthOK ? 'Server status uncertain — try sending anyway' : isEditing ? 'Save edit' : 'Send'}
           >
             {isEditing ? (
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

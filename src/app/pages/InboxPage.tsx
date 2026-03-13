@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
+import usePlatform from '../hooks/usePlatform';
 import { formatShortDateTime } from '../utils/formatters';
 import TaskCard from '../components/shared/TaskCard';
 import Badge from '../components/shared/Badge';
@@ -15,6 +16,7 @@ export default function InboxPage() {
   const createMemo = useModuleStore((s) => s.createMemo);
   const serverUpdateMemo = useModuleStore((s) => s.serverUpdateMemo);
   const deleteMemo = useModuleStore((s) => s.deleteMemo);
+  const { isMobile } = usePlatform();
 
   const [showCapture, setShowCapture] = useState(false);
 
@@ -71,8 +73,8 @@ export default function InboxPage() {
           <div className="cc-page-header__title">Inbox</div>
           <div className="cc-page-header__subtitle">
             {totalItems > 0
-              ? `${totalItems} item${totalItems !== 1 ? 's' : ''}`
-              : 'Capture tasks and notes'}
+              ? `${totalItems} quick item${totalItems !== 1 ? 's' : ''}`
+              : 'Capture first, organise later'}
           </div>
         </div>
         <button className="cc-btn cc-btn--primary" onClick={() => setShowCapture(true)}>
@@ -83,7 +85,7 @@ export default function InboxPage() {
 
       {/* Unscheduled tasks */}
       {inboxTasks.length > 0 && (
-        <SectionHeader title="Unscheduled Tasks" count={inboxTasks.length} variant="accent">
+        <SectionHeader title="Needs organising" count={inboxTasks.length} variant="accent" defaultOpen>
           {rootInboxTasks.map((task) => (
             <div key={task.id}>
               <TaskCard
@@ -107,20 +109,20 @@ export default function InboxPage() {
       )}
 
       {/* Memos section */}
-      <SectionHeader title="Quick Notes" count={memos.length} variant="default">
+      <SectionHeader title="Quick Notes" count={memos.length} variant="default" defaultOpen={!isMobile && memos.length <= 4}>
         {/* Inline memo creation */}
         <div className="cc-memo-form">
           <textarea
             className="cc-memo-form__textarea"
-            placeholder="Write a quick note... (Ctrl+Enter to save)"
+            placeholder={isMobile ? 'Quick note…' : 'Write a quick note... (Ctrl+Enter to save)'}
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
             onKeyDown={handleMemoKeyDown}
-            rows={2}
+            rows={isMobile ? 1 : 2}
           />
           <div className="cc-memo-form__footer">
             <span style={{ fontSize: 11, color: 'var(--cc-text-tertiary)' }}>
-              Ctrl+Enter to save
+              {isMobile ? 'Quick note' : 'Ctrl+Enter to save'}
             </span>
             <button
               className="cc-btn cc-btn--primary"
@@ -189,7 +191,7 @@ export default function InboxPage() {
       </SectionHeader>
 
       {totalItems === 0 && (
-        <EmptyState icon="🌟" message="Inbox Zero! Create a task or note to get started." />
+        <EmptyState icon="🌟" message={isMobile ? 'Inbox is clear. Add something when it comes up.' : 'Inbox is clear. Capture a task or note when something comes up.'} />
       )}
     </div>
   );

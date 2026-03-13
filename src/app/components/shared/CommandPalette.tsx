@@ -53,7 +53,7 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                   <span>💬</span> Chats
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/tasks')}>
-                  <span>📋</span> All Tasks
+                  <span>📋</span> Tasks
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/settings')}>
                   <span>⚙️</span> Settings

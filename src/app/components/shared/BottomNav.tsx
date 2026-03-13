@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { SunIcon, ChatIcon, TasksIcon, NavCalendarIcon, GearIcon } from './NavIcons';
+import { SunIcon, ChatIcon, TasksIcon, InboxIcon, GearIcon } from './NavIcons';
 
 const tabs = [
   { to: '/today', label: 'Today', Icon: SunIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
   { to: '/tasks', label: 'Tasks', Icon: TasksIcon },
-  { to: '/calendar', label: 'Calendar', Icon: NavCalendarIcon },
+  { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/settings', label: 'More', Icon: GearIcon },
 ];
 

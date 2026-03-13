@@ -105,7 +105,7 @@
 }
 
 .cc-settings-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .cc-settings-section__title {
@@ -146,4 +146,26 @@
 .cc-settings-row__control {
   flex-shrink: 0;
   margin-left: 16px;
+}
+
+@media (max-width: 768px) {
+  .cc-settings-section {
+    margin-bottom: 16px;
+  }
+
+  .cc-settings-section__title {
+    padding-bottom: 6px;
+  }
+
+  .cc-settings-row {
+    padding: 9px 10px;
+  }
+
+  .cc-settings-row__label {
+    font-size: 13px;
+  }
+
+  .cc-settings-row__sublabel {
+    font-size: 11px;
+  }
 }

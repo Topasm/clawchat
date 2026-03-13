@@ -56,9 +56,9 @@ export default function KanbanBoardView({
     <div>
       <div className="cc-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div className="cc-page-header__title">All Tasks</div>
+          <div className="cc-page-header__title">Tasks</div>
           <div className="cc-page-header__subtitle">
-            {todos.length} total task{todos.length !== 1 ? 's' : ''}
+            {todos.length} task{todos.length !== 1 ? 's' : ''} organised by status
           </div>
         </div>
         <button className="cc-btn cc-btn--primary" onClick={onNewTask}>

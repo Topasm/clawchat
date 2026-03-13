@@ -1,6 +1,6 @@
 /* --- Page Headers ----------------------------------------- */
 .cc-page-header {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .cc-page-header__title {
@@ -18,7 +18,7 @@
 
 /* --- Today Progress --------------------------------------- */
 .cc-today-progress {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   padding: 10px 14px;
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
@@ -72,7 +72,7 @@
   background: color-mix(in srgb, var(--cc-inbox-yellow) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--cc-inbox-yellow) 25%, transparent);
   border-radius: 8px;
-  margin-top: 16px;
+  margin-top: 14px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -84,6 +84,27 @@
 .cc-inbox-banner__text {
   font-size: 13px;
   color: var(--cc-text);
+}
+
+.cc-link-btn {
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cc-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cc-today-home-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cc-today-home-actions .cc-btn {
+  flex: 1;
 }
 
 /* --- Detail page fields ----------------------------------- */
@@ -355,7 +376,7 @@
   background: var(--cc-surface);
   border-radius: 10px;
   border: 1px solid var(--cc-border);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   overflow: hidden;
 }
 
@@ -372,6 +393,43 @@
   box-sizing: border-box;
   font-family: inherit;
   line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .cc-page-header {
+    margin-bottom: 12px;
+  }
+
+  .cc-page-header__title {
+    font-size: 20px;
+  }
+
+  .cc-page-header__subtitle {
+    font-size: 12px;
+  }
+
+  .cc-today-progress {
+    padding: 9px 12px;
+    margin-bottom: 12px;
+  }
+
+  .cc-today-home-actions {
+    margin-bottom: 10px;
+  }
+
+  .cc-today-progress__header {
+    margin-bottom: 6px;
+  }
+
+  .cc-today-progress__label,
+  .cc-inbox-banner__text {
+    font-size: 12px;
+  }
+
+  .cc-memo-form__textarea {
+    min-height: 48px;
+    padding: 10px 12px;
+  }
 }
 
 .cc-memo-form__textarea::placeholder {

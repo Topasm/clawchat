@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
+import usePlatform from '../hooks/usePlatform';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
@@ -12,6 +13,7 @@ import SegmentedControl from '../components/shared/SegmentedControl';
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { mode, setMode } = useTheme();
+  const { isMobile } = usePlatform();
   const settings = useSettingsStore();
   const token = useAuthStore((s) => s.token);
   const serverUrl = useAuthStore((s) => s.serverUrl);
@@ -24,14 +26,16 @@ export default function SettingsPage() {
         <div className="cc-page-header__title">Settings</div>
       </div>
 
-      <SettingsSection title="Chat">
-        <SettingsRow label="Font size">
-          <Slider
-            value={settings.fontSize}
-            min={12}
-            max={22}
-            onChange={settings.setFontSize}
-            formatValue={(v) => `${v}px`}
+      <SettingsSection title="Essentials">
+        <SettingsRow label="Theme">
+          <SegmentedControl
+            options={[
+              { label: 'System', value: 'system' },
+              { label: 'Light', value: 'light' },
+              { label: 'Dark', value: 'dark' },
+            ]}
+            value={mode}
+            onChange={(v) => setMode(v as 'light' | 'dark' | 'system')}
           />
         </SettingsRow>
         <SettingsRow label="Send on Enter" sublabel="Use Shift+Enter for newline">
@@ -45,7 +49,7 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="LLM">
+      <SettingsSection title="Advanced AI">
         <SettingsRow label="Temperature">
           <Slider
             value={settings.temperature}
@@ -81,21 +85,34 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Appearance">
-        <SettingsRow label="Theme">
-          <SegmentedControl
-            options={[
-              { label: 'System', value: 'system' },
-              { label: 'Light', value: 'light' },
-              { label: 'Dark', value: 'dark' },
-            ]}
-            value={mode}
-            onChange={(v) => setMode(v as 'light' | 'dark' | 'system')}
+      <SettingsSection title="Workspace">
+        <SettingsRow label="Calendar view" sublabel="Optional planning view">
+          <button
+            type="button"
+            className="cc-btn cc-btn--secondary"
+            onClick={() => navigate('/calendar')}
+            style={{ fontSize: 12, padding: '4px 10px' }}
+          >
+            Open
+          </button>
+        </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="Display">
+        <SettingsRow label="Font size">
+          <Slider
+            value={settings.fontSize}
+            min={12}
+            max={22}
+            onChange={settings.setFontSize}
+            formatValue={(v) => `${v}px`}
           />
         </SettingsRow>
-        <SettingsRow label="Compact mode">
-          <Toggle checked={settings.compactMode} onChange={settings.setCompactMode} />
-        </SettingsRow>
+        {!isMobile && (
+          <SettingsRow label="Compact mode">
+            <Toggle checked={settings.compactMode} onChange={settings.setCompactMode} />
+          </SettingsRow>
+        )}
       </SettingsSection>
 
       <SettingsSection title="Notifications">
@@ -107,7 +124,7 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Data & Storage">
+      <SettingsSection title="Privacy & Storage">
         <SettingsRow label="Save history">
           <Toggle checked={settings.saveHistory} onChange={settings.setSaveHistory} />
         </SettingsRow>
@@ -126,7 +143,7 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Data Management">
+      <SettingsSection title="Import / Export">
         <SettingsRow label="Export all data" sublabel="Download todos, events, memos, and conversations as JSON">
           <button
             type="button"

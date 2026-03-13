@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useChatStore } from '../../stores/useChatStore';
@@ -21,9 +21,15 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
   const addConversation = useChatStore((s) => s.addConversation);
   const editMessage = useChatStore((s) => s.editMessage);
   const messages = useChatStore((s) => s.messages);
+  const setCurrentConversationId = useChatStore((s) => s.setCurrentConversationId);
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+
+  useEffect(() => {
+    setCurrentConversationId(conversationId);
+    return () => setCurrentConversationId(null);
+  }, [conversationId, setCurrentConversationId]);
 
   const handleStartEdit = useCallback((messageId: string) => {
     const msg = messages.find((m) => m._id === messageId);
@@ -53,6 +59,7 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
       const newId = crypto.randomUUID();
       cid = newId;
       onSetConversationId(newId);
+      setCurrentConversationId(newId);
       addConversation({ id: newId, title: text.slice(0, 40), created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     }
 
@@ -68,7 +75,7 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
     } catch {
       // Error handled in store
     }
-  }, [conversationId, editingMessageId, onSetConversationId, addConversation, addMessage, sendMessageStreaming, editMessage]);
+  }, [conversationId, editingMessageId, onSetConversationId, addConversation, addMessage, sendMessageStreaming, editMessage, setCurrentConversationId]);
 
   const handlePopOut = () => {
     if (conversationId) {

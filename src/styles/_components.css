@@ -196,6 +196,31 @@
   border: 1px solid transparent;
 }
 
+@media (max-width: 768px) {
+  .cc-section {
+    margin-bottom: 2px;
+  }
+
+  .cc-section__header {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+
+  .cc-section__title {
+    font-size: 11px;
+    letter-spacing: 0.3px;
+  }
+
+  .cc-section__count {
+    font-size: 10px;
+    padding: 0 5px;
+  }
+
+  .cc-section__body {
+    padding: 2px 0 6px;
+  }
+}
+
 .cc-section__header:hover {
   background: var(--cc-surface-secondary);
 }

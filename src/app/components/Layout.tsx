@@ -24,7 +24,7 @@ import type { HealthResponse } from '../types/api';
 
 // --- SVG icon components ---
 import {
-  SunIcon, InboxIcon, ChatIcon, NavCalendarIcon,
+  SunIcon, InboxIcon, ChatIcon,
   TasksIcon, GearIcon, NavMemoIcon, SearchIcon, AdminIcon,
 } from './shared/NavIcons';
 import BottomNav from './shared/BottomNav';
@@ -77,7 +77,6 @@ const navItems = [
   { to: '/today', label: 'Today', Icon: SunIcon },
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
-  { to: '/calendar', label: 'Calendar', Icon: NavCalendarIcon },
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
   { to: '/memos', label: 'Memos', Icon: NavMemoIcon },
   { to: '/search', label: 'Search', Icon: SearchIcon },
@@ -101,26 +100,34 @@ export default function Layout() {
 
   // Health check polling
   const serverUrl = useAuthStore((s) => s.serverUrl);
+  const setHealthOK = useAuthStore((s) => s.setHealthOK);
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
 
   useEffect(() => {
     if (!serverUrl) {
       setHealthData(null);
+      setHealthOK(true);
       return;
     }
     let cancelled = false;
     const fetchHealth = async () => {
       try {
         const res = await apiClient.get(`${serverUrl}/api/health`);
-        if (!cancelled) setHealthData(res.data);
+        if (!cancelled) {
+          setHealthData(res.data);
+          setHealthOK(true);
+        }
       } catch {
-        if (!cancelled) setHealthData(null);
+        if (!cancelled) {
+          setHealthData(null);
+          setHealthOK(false);
+        }
       }
     };
     fetchHealth();
     const interval = setInterval(fetchHealth, 60_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [serverUrl]);
+  }, [serverUrl, setHealthOK]);
 
   // WebSocket connection for real-time updates
   useWebSocket();
