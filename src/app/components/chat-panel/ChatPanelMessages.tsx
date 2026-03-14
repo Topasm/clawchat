@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { Virtuoso } from 'react-virtuoso';
+import { useEffect, useMemo, useRef } from 'react';
 import { useChatStore } from '../../stores/useChatStore';
 import { useRegenerate } from '../../hooks/useRegenerate';
 import MessageBubble from './MessageBubble';
@@ -15,23 +14,19 @@ export default function ChatPanelMessages({ conversationId, onEditMessage }: Cha
   const isStreaming = useChatStore((s) => s.isStreaming);
   const deleteMessage = useChatStore((s) => s.deleteMessage);
   const handleRegenerate = useRegenerate(conversationId);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Store has newest-first; Virtuoso needs oldest-first
   const chronological = useMemo(() => [...messages].reverse(), [messages]);
 
-  const Footer = useMemo(() => {
-    if (!isStreaming || messages[0]?.text !== '') return null;
-    return () => <StreamingIndicator />;
-  }, [isStreaming, messages]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chronological, isStreaming]);
 
   return (
-    <Virtuoso
-      className="cc-chat-panel__messages"
-      data={chronological}
-      initialTopMostItemIndex={Math.max(0, chronological.length - 1)}
-      followOutput="smooth"
-      increaseViewportBy={{ top: 200, bottom: 200 }}
-      itemContent={(_index, msg) => (
+    <div className="cc-chat-panel__messages" ref={scrollRef}>
+      {chronological.map((msg) => (
         <MessageBubble
           key={msg._id}
           message={msg}
@@ -43,8 +38,8 @@ export default function ChatPanelMessages({ conversationId, onEditMessage }: Cha
           }
           onEdit={msg.user._id === 'user' ? onEditMessage : undefined}
         />
-      )}
-      components={Footer ? { Footer } : undefined}
-    />
+      ))}
+      {isStreaming && messages[0]?.text === '' && <StreamingIndicator />}
+    </div>
   );
 }

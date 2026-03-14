@@ -132,7 +132,11 @@
 .cc-chat-panel__messages {
   flex: 1;
   padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* --- Chat Input ------------------------------------------- */
