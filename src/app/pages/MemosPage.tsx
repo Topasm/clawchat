@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Virtuoso } from 'react-virtuoso';
 import { useModuleStore } from '../stores/useModuleStore';
 import { formatShortDateTime } from '../utils/formatters';
 import Badge from '../components/shared/Badge';
@@ -111,12 +110,9 @@ export default function MemosPage() {
           message={memos.length === 0 ? 'No memos yet. Write one above!' : 'No memos match your search.'}
         />
       ) : (
-        <Virtuoso
-          style={{ height: 'calc(100vh - 280px)' }}
-          data={filtered}
-          increaseViewportBy={200}
-          itemContent={(_index, memo) => (
-            <div className="cc-memo-card" style={{ marginBottom: 8 }}>
+        <div style={{ height: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+          {filtered.map((memo) => (
+            <div key={memo.id} className="cc-memo-card" style={{ marginBottom: 8 }}>
               {editingId === memo.id ? (
                 <div className="cc-memo-card__edit">
                   <RichTextEditor
@@ -168,8 +164,8 @@ export default function MemosPage() {
                 </>
               )}
             </div>
-          )}
-        />
+          ))}
+        </div>
       )}
     </div>
   );

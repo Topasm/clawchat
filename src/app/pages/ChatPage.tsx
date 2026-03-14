@@ -1,6 +1,5 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Virtuoso } from 'react-virtuoso';
 import { useChatStore } from '../stores/useChatStore';
 import { useRegenerate } from '../hooks/useRegenerate';
 import MessageBubble from '../components/chat-panel/MessageBubble';
@@ -21,6 +20,7 @@ export default function ChatPage() {
   const conversations = useChatStore((s) => s.conversations);
 
   const convo = conversations.find((c) => c.id === conversationId);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -52,10 +52,11 @@ export default function ChatPage() {
   // Store has newest-first; Virtuoso needs oldest-first
   const chronological = useMemo(() => [...messages].reverse(), [messages]);
 
-  const Footer = useMemo(() => {
-    if (!isStreaming || messages[0]?.text !== '') return null;
-    return () => <StreamingIndicator />;
-  }, [isStreaming, messages]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chronological, isStreaming]);
 
   return (
     <div className="cc-chat-page">
@@ -68,13 +69,8 @@ export default function ChatPage() {
         <span className="cc-chat-page__title">{convo?.title || 'Chat'}</span>
       </div>
 
-      <Virtuoso
-        className="cc-chat-page__messages"
-        data={chronological}
-        initialTopMostItemIndex={Math.max(0, chronological.length - 1)}
-        followOutput="smooth"
-        increaseViewportBy={{ top: 200, bottom: 200 }}
-        itemContent={(_index, msg) => (
+      <div className="cc-chat-page__messages" ref={scrollRef}>
+        {chronological.map((msg) => (
           <MessageBubble
             key={msg._id}
             message={msg}
@@ -85,9 +81,9 @@ export default function ChatPage() {
                 : undefined
             }
           />
-        )}
-        components={Footer ? { Footer } : undefined}
-      />
+        ))}
+        {isStreaming && messages[0]?.text === '' && <StreamingIndicator />}
+      </div>
 
       <ChatInput
         onSend={handleSend}

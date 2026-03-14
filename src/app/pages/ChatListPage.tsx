@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import usePlatform from '../hooks/usePlatform';
 import { useNavigate } from 'react-router-dom';
-import { Virtuoso } from 'react-virtuoso';
 import { useChatStore } from '../stores/useChatStore';
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
@@ -52,19 +51,16 @@ export default function ChatListPage() {
       {!loading && conversations.length === 0 ? (
         <EmptyState icon={'\uD83D\uDCAC'} message={isMobile ? 'Start chatting.' : 'No conversations yet. Start a new chat!'} />
       ) : conversations.length > 0 ? (
-        <Virtuoso
-          style={{ height: isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 160px)' }}
-          data={conversations}
-          increaseViewportBy={200}
-          itemContent={(_index, convo) => (
+        <div style={{ height: isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 160px)', overflowY: 'auto' }}>
+          {conversations.map((convo) => (
             <ConversationItem
               key={convo.id}
               conversation={convo}
               onClick={() => navigate(`/chats/${convo.id}`)}
               onDelete={() => setDeleteTarget(convo.id)}
             />
-          )}
-        />
+          ))}
+        </div>
       ) : null}
 
       <ConfirmDialog
