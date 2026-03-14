@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
@@ -27,7 +27,7 @@ import {
   SunIcon, InboxIcon, ChatIcon,
   TasksIcon, GearIcon, NavMemoIcon, SearchIcon, AdminIcon,
 } from './shared/NavIcons';
-import BottomNav from './shared/BottomNav';
+import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
 
 // --- Theme bridge: map ColorPalette → CSS custom properties ---
@@ -87,10 +87,13 @@ const navItems = [
 export default function Layout() {
   const { colors } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const chatPanel = useChatPanel();
   const commandPalette = useCommandPalette();
   const { isMobile } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
   // Central data sync: fetches all data from server on mount (no-op in demo mode)
   const { refresh } = useDataSync();
@@ -151,6 +154,13 @@ export default function Layout() {
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
 
+  const activeMobileTabIndex = useMemo(() => {
+    const idx = mobileTabs.findIndex((tab) => location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`));
+    return idx >= 0 ? idx : 0;
+  }, [location.pathname]);
+
+  const canSwipeTabs = isMobile && !onChatPage;
+
   const sidebar = (
     <nav className="cc-sidebar">
       <div className="cc-sidebar__header">ClawChat</div>
@@ -188,6 +198,33 @@ export default function Layout() {
     </nav>
   );
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!canSwipeTabs) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, button, [role="button"], [contenteditable="true"], .cc-chat-input, .cc-lexical-editor, .cc-rich-editor')) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!canSwipeTabs || touchStartX.current == null || touchStartY.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+
+    if (dx < 0 && activeMobileTabIndex < mobileTabs.length - 1) {
+      navigate(mobileTabs[activeMobileTabIndex + 1].to);
+    } else if (dx > 0 && activeMobileTabIndex > 0) {
+      navigate(mobileTabs[activeMobileTabIndex - 1].to);
+    }
+  };
+
   const mainContent = (
     <>
       <div className="cc-content">
@@ -215,7 +252,7 @@ export default function Layout() {
 
       {isMobile ? (
         <>
-          <div className="cc-main">{mainContent}</div>
+          <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{mainContent}</div>
           <BottomNav />
         </>
       ) : (

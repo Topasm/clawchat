@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { SunIcon, ChatIcon, TasksIcon, InboxIcon, GearIcon } from './NavIcons';
 
-const tabs = [
+export const mobileTabs = [
   { to: '/today', label: 'Today', Icon: SunIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
   { to: '/tasks', label: 'Tasks', Icon: TasksIcon },
@@ -12,7 +12,7 @@ const tabs = [
 export default function BottomNav() {
   return (
     <nav className="cc-bottom-nav">
-      {tabs.map((t) => (
+      {mobileTabs.map((t) => (
         <NavLink
           key={t.to}
           to={t.to}
