@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useTodosQuery, useEventsQuery, useMemosQuery, useConversationsQuery } from './queries';
+import { useTodosQuery, useEventsQuery, useConversationsQuery } from './queries';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useAuthStore } from '../stores/useAuthStore';
 
@@ -12,19 +12,17 @@ export function useDataSync() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const todosQ = useTodosQuery();
   const eventsQ = useEventsQuery();
-  const memosQ = useMemosQuery();
   const convsQ = useConversationsQuery();
 
-  const syncing = todosQ.isLoading || eventsQ.isLoading || memosQ.isLoading || convsQ.isLoading;
+  const syncing = todosQ.isLoading || eventsQ.isLoading || convsQ.isLoading;
 
   const refresh = useCallback(() => {
     if (!serverUrl) return;
     todosQ.refetch();
     eventsQ.refetch();
-    memosQ.refetch();
     convsQ.refetch();
     useSettingsStore.getState().fetchSettings();
-  }, [serverUrl, todosQ, eventsQ, memosQ, convsQ]);
+  }, [serverUrl, todosQ, eventsQ, convsQ]);
 
   return { syncing, refresh };
 }

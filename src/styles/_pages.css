@@ -39,6 +39,9 @@
 }
 
 .cc-today-progress__streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
   font-weight: 600;
   color: var(--cc-warning);
@@ -654,7 +657,9 @@
   margin-bottom: 8px;
 }
 .cc-briefing-card__icon {
-  font-size: 16px;
+  display: flex;
+  align-items: center;
+  color: var(--cc-text-secondary);
 }
 .cc-briefing-card__title {
   font-weight: 600;

@@ -52,16 +52,6 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
         updated_at: now,
       });
       useToastStore.getState().addToast('success', 'Event created');
-    } else if (parsed.type === 'note') {
-      useModuleStore.getState().addMemo({
-        id,
-        title: parsed.title,
-        content: parsed.title,
-        tags: [],
-        created_at: now,
-        updated_at: now,
-      });
-      useToastStore.getState().addToast('success', 'Memo saved');
     } else {
       useModuleStore.getState().addTodo({
         id,

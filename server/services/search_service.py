@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from schemas.search import SearchHit
 
-ALL_TYPES = ["messages", "todos", "events", "memos"]
+ALL_TYPES = ["messages", "todos", "events"]
 
 
 async def search(
@@ -84,28 +84,6 @@ async def search(
             preview = " | ".join(parts)[:200] if parts else r.title
             hits.append(SearchHit(
                 type="event",
-                id=r.id,
-                title=r.title,
-                preview=preview,
-                rank=r.rank,
-                created_at=_parse_dt(r.created_at),
-            ))
-
-    if "memos" in enabled:
-        rows = (await db.execute(
-            text("""
-                SELECT f.id, f.title, f.content, bm25(memos_fts) AS rank, m.created_at
-                FROM memos_fts f
-                JOIN memos m ON m.id = f.id
-                WHERE memos_fts MATCH :q
-                ORDER BY rank
-            """),
-            {"q": fts_query},
-        )).fetchall()
-        for r in rows:
-            preview = r.content[:200] if r.content else r.title
-            hits.append(SearchHit(
-                type="memo",
                 id=r.id,
                 title=r.title,
                 preview=preview,

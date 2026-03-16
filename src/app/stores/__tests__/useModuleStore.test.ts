@@ -48,12 +48,6 @@ describe('useModuleStore', () => {
       expect(events[0].id).toMatch(/^demo-/);
     });
 
-    it('starts with demo memos', () => {
-      const { memos } = useModuleStore.getState();
-      expect(memos.length).toBeGreaterThan(0);
-      expect(memos[0].id).toMatch(/^memo-/);
-    });
-
     it('starts with demo kanban overrides', () => {
       const { kanbanStatuses } = useModuleStore.getState();
       expect(kanbanStatuses['demo-5']).toBe('in_progress');
@@ -68,7 +62,6 @@ describe('useModuleStore', () => {
       // Mutate state
       store.setTodos([]);
       store.setEvents([]);
-      store.setMemos([]);
       store.setKanbanStatuses({});
 
       expect(useModuleStore.getState().todos).toHaveLength(0);
@@ -79,7 +72,6 @@ describe('useModuleStore', () => {
       const state = useModuleStore.getState();
       expect(state.todos.length).toBeGreaterThan(0);
       expect(state.events.length).toBeGreaterThan(0);
-      expect(state.memos.length).toBeGreaterThan(0);
       expect(state.kanbanStatuses['demo-5']).toBe('in_progress');
       expect(state.isLoading).toBe(false);
       expect(state.lastFetched).toBeNull();

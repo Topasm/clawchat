@@ -1,7 +1,6 @@
 export const queryKeys = {
   todos: ['todos'] as const,
   events: ['events'] as const,
-  memos: ['memos'] as const,
   conversations: ['conversations'] as const,
   messages: (id: string) => ['messages', id] as const,
   today: ['today'] as const,

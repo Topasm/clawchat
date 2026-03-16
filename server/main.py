@@ -11,7 +11,6 @@ from routers import admin as admin_router
 from routers import auth as auth_router
 from routers import calendar as calendar_router
 from routers import chat as chat_router
-from routers import memo as memo_router
 from routers import notifications as notifications_router
 from routers import search as search_router
 from routers import settings as settings_router
@@ -94,7 +93,6 @@ app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
 app.include_router(calendar_router.router, prefix="/api/events", tags=["calendar"])
-app.include_router(memo_router.router, prefix="/api/memos", tags=["memos"])
 app.include_router(search_router.router, prefix="/api/search", tags=["search"])
 app.include_router(today_router.router, prefix="/api/today", tags=["today"])
 app.include_router(notifications_router.router, prefix="/api/notifications", tags=["notifications"])

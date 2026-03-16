@@ -42,13 +42,10 @@ export default function useWebSocket(): void {
         queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       } else if (d.module === 'events') {
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
-      } else if (d.module === 'memos') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.memos });
       } else {
         // Refresh all
         queryClient.invalidateQueries({ queryKey: queryKeys.todos });
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
-        queryClient.invalidateQueries({ queryKey: queryKeys.memos });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
     };

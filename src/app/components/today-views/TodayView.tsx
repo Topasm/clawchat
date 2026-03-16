@@ -6,6 +6,7 @@ import SectionHeader from '../shared/SectionHeader';
 import TaskCard from '../shared/TaskCard';
 import EventCard from '../shared/EventCard';
 import EmptyState from '../shared/EmptyState';
+import { SparkleIcon, ClipboardIcon, InboxTrayIcon, FlameIcon } from '../shared/Icons';
 import QuickCaptureModal from '../shared/QuickCaptureModal';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
 import type { TodoResponse, EventResponse } from '../../types/api';
@@ -91,7 +92,7 @@ export default function TodayView({
             </span>
             {!isMobile && streakCount > 0 && (
               <span className="cc-today-progress__streak">
-                {'\uD83D\uDD25'} {streakCount} day streak
+                <FlameIcon size={14} /> {streakCount} day streak
               </span>
             )}
           </div>
@@ -113,7 +114,7 @@ export default function TodayView({
       {briefing && !isMobile && (
         <div className="cc-briefing-card">
           <div className="cc-briefing-card__header">
-            <span className="cc-briefing-card__icon">{'\uD83D\uDCCB'}</span>
+            <span className="cc-briefing-card__icon"><ClipboardIcon size={16} /></span>
             <span className="cc-briefing-card__title">Daily Briefing</span>
           </div>
           <div className="cc-briefing-card__content">{briefing}</div>
@@ -124,7 +125,7 @@ export default function TodayView({
       {isLoading && !hasAnything && <TodayPageSkeleton />}
 
       {!isLoading && !hasAnything && (
-        <EmptyState icon="\u2728" message={isMobile ? 'Nothing urgent right now.' : 'All clear! Nothing scheduled for today.'} />
+        <EmptyState icon={<SparkleIcon size={20} />} message={isMobile ? 'Nothing urgent right now.' : 'All clear! Nothing scheduled for today.'} />
       )}
 
       {todayEvents.length > 0 && !isMobile && (
@@ -177,7 +178,7 @@ export default function TodayView({
 
       {inboxCount > 0 && !isMobile && (
         <div className="cc-inbox-banner" onClick={() => navigate('/inbox')}>
-          <span style={{ fontSize: 16 }}>{'\uD83D\uDCE5'}</span>
+          <InboxTrayIcon size={16} />
           <span className="cc-inbox-banner__text">
             {inboxCount} item{inboxCount !== 1 ? 's' : ''} in your inbox
           </span>

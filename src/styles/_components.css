@@ -305,8 +305,14 @@
 }
 
 .cc-empty__icon {
-  font-size: 40px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-tertiary);
   margin-bottom: 4px;
 }
 

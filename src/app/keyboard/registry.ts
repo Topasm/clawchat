@@ -26,7 +26,6 @@ export const SHORTCUTS: ShortcutDef[] = [
   // Today
   { key: 't', label: 'T', scope: 'TODAY', description: 'New task' },
   { key: 'e', label: 'E', scope: 'TODAY', description: 'New event' },
-  { key: 'n', label: 'N', scope: 'TODAY', description: 'New memo' },
 
   // Chat
   { key: 'mod+Enter', label: 'Ctrl+Enter', scope: 'CHAT', description: 'Send message' },

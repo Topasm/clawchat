@@ -14,7 +14,6 @@ from models.conversation import Conversation
 from models.message import Message
 from models.todo import Todo
 from models.event import Event
-from models.memo import Memo
 from models.agent_task import AgentTask
 from models.attachment import Attachment
 from models.task_relationship import TaskRelationship
@@ -31,7 +30,6 @@ async def get_table_counts(db: AsyncSession) -> dict[str, int]:
         "messages": Message,
         "todos": Todo,
         "events": Event,
-        "memos": Memo,
         "agent_tasks": AgentTask,
         "attachments": Attachment,
         "task_relationships": TaskRelationship,
@@ -109,17 +107,6 @@ async def get_recent_activity(db: AsyncSession, limit: int = 50) -> list[dict]:
             "created_at": e.created_at.isoformat(),
         })
 
-    memos = (await db.execute(
-        select(Memo).order_by(Memo.created_at.desc()).limit(limit)
-    )).scalars().all()
-    for m in memos:
-        items.append({
-            "type": "memo",
-            "id": m.id,
-            "summary": (m.title or "")[:120],
-            "created_at": m.created_at.isoformat(),
-        })
-
     items.sort(key=lambda x: x["created_at"], reverse=True)
     return items[:limit]
 
@@ -156,7 +143,6 @@ async def get_module_data_overview(db: AsyncSession) -> list[dict]:
         ("messages", Message, Message.created_at),
         ("todos", Todo, Todo.created_at),
         ("events", Event, Event.created_at),
-        ("memos", Memo, Memo.created_at),
     ]
     result = []
     for name, model, date_col in modules:
@@ -204,7 +190,7 @@ async def purge_old_data(db: AsyncSession, target: str, older_than_days: int) ->
 
 async def reindex_fts(db: AsyncSession) -> list[str]:
     """Drop and rebuild FTS5 content."""
-    tables = ["messages_fts", "todos_fts", "events_fts", "memos_fts"]
+    tables = ["messages_fts", "todos_fts", "events_fts"]
     for table in tables:
         await db.execute(text(f"DELETE FROM {table}"))
 
@@ -212,7 +198,6 @@ async def reindex_fts(db: AsyncSession) -> list[str]:
         "INSERT INTO messages_fts(id, content) SELECT id, content FROM messages",
         "INSERT INTO todos_fts(id, title, description) SELECT id, title, COALESCE(description, '') FROM todos",
         "INSERT INTO events_fts(id, title, description, location) SELECT id, title, COALESCE(description, ''), COALESCE(location, '') FROM events",
-        "INSERT INTO memos_fts(id, title, content) SELECT id, title, content FROM memos",
     ]
     for stmt in backfill:
         await db.execute(text(stmt))

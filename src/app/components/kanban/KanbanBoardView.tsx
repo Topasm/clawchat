@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
 import type { KanbanStatus, TodoResponse } from '../../types/api';
 import KanbanColumn from './KanbanColumn';
@@ -9,7 +10,7 @@ import QuickCaptureModal from '../shared/QuickCaptureModal';
 interface ColumnDef {
   status: KanbanStatus;
   title: string;
-  icon: string;
+  icon: ReactNode;
   tasks: TodoResponse[];
 }
 

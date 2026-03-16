@@ -15,7 +15,6 @@ from services import (
     agent_task_service,
     briefing_service,
     calendar_service,
-    memo_service,
     scheduling_service,
     search_service,
     todo_service,
@@ -38,10 +37,6 @@ MODULE_INTENTS = {
     "query_events": "check your calendar",
     "update_event": "update a calendar event",
     "delete_event": "delete a calendar event",
-    "create_memo": "create a memo",
-    "query_memos": "search your memos",
-    "update_memo": "update a memo",
-    "delete_memo": "delete a memo",
     "suggest_time": "suggest a time for an event",
     "check_conflicts": "check for scheduling conflicts",
     "analyze_schedule": "analyze your schedule",
@@ -407,31 +402,6 @@ class Orchestrator:
                     lines.append(f"...and {total - 5} more.")
                 return "\n".join(lines), None
 
-            elif intent == "create_memo":
-                memo = await memo_service.create_memo(
-                    db,
-                    title=params.get("title", "Quick Note"),
-                    content=params.get("description", params.get("title", "")),
-                )
-                return (
-                    f"Saved memo: '{memo.title}'.",
-                    {"action_type": "memo_created", "module": "memos", "memo_id": memo.id, "memo_title": memo.title},
-                )
-
-            elif intent == "query_memos":
-                memos, total = await memo_service.get_memos(db)
-                if not memos:
-                    return "You don't have any memos yet.", None
-                lines = [f"You have {total} memo(s):"]
-                for m in memos[:5]:
-                    preview = (
-                        m.content[:60] + "..." if len(m.content) > 60 else m.content
-                    )
-                    lines.append(f"- {m.title}: {preview}")
-                if total > 5:
-                    lines.append(f"...and {total - 5} more.")
-                return "\n".join(lines), None
-
             elif intent == "update_todo":
                 title = params.get("title", "")
                 if not title:
@@ -512,43 +482,6 @@ class Orchestrator:
                 return (
                     f"Deleted event '{deleted_title}'.",
                     {"action_type": "event_deleted", "module": "events", "event_id": deleted_id, "event_title": deleted_title},
-                )
-
-            elif intent == "update_memo":
-                title = params.get("title", "")
-                if not title:
-                    return "Which memo would you like to update? Please mention the memo name.", None
-                memos, _ = await memo_service.get_memos(db, limit=100)
-                memo = _find_by_title(memos, title)
-                if not memo:
-                    return f"I couldn't find a memo matching '{title}'. Try listing your memos first.", None
-                updates = {}
-                if params.get("description"):
-                    updates["content"] = params["description"]
-                if params.get("new_title"):
-                    updates["title"] = params["new_title"]
-                if not updates:
-                    return f"I found '{memo.title}', but I'm not sure what to change. What would you like to update?", None
-                memo = await memo_service.update_memo(db, memo.id, **updates)
-                return (
-                    f"Updated memo '{memo.title}'.",
-                    {"action_type": "memo_updated", "module": "memos", "memo_id": memo.id, "memo_title": memo.title},
-                )
-
-            elif intent == "delete_memo":
-                title = params.get("title", "")
-                if not title:
-                    return "Which memo would you like to delete? Please mention the memo name.", None
-                memos, _ = await memo_service.get_memos(db, limit=100)
-                memo = _find_by_title(memos, title)
-                if not memo:
-                    return f"I couldn't find a memo matching '{title}'. Try listing your memos first.", None
-                deleted_title = memo.title
-                deleted_id = memo.id
-                await memo_service.delete_memo(db, memo.id)
-                return (
-                    f"Deleted memo '{deleted_title}'.",
-                    {"action_type": "memo_deleted", "module": "memos", "memo_id": deleted_id, "memo_title": deleted_title},
                 )
 
             elif intent == "suggest_time":

@@ -115,27 +115,6 @@ export const EventUpdateSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
-// -- Memos ------------------------------------------------------------------
-
-export const MemoResponseSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  content: z.string(),
-  tags: z.array(z.string()).optional(),
-  created_at: z.string(),
-  updated_at: z.string(),
-});
-
-export const MemoCreateSchema = z.object({
-  content: z.string().min(1, 'Content is required'),
-  tags: z.array(z.string()).optional(),
-});
-
-export const MemoUpdateSchema = z.object({
-  content: z.string().min(1, 'Content is required').optional(),
-  tags: z.array(z.string()).optional(),
-});
-
 // -- Chat -------------------------------------------------------------------
 
 export const ConversationResponseSchema = z.object({
@@ -239,7 +218,7 @@ export const SettingsResponseSchema = z.object({
 export const HealthResponseSchema = z.object({
   status: z.enum(['ok', 'degraded']),
   version: z.string(),
-  ai_provider: z.string(),
+  ai_backend: z.string(),
   ai_model: z.string(),
   ai_connected: z.boolean(),
 });
@@ -273,10 +252,6 @@ export type KanbanStatus = z.infer<typeof KanbanStatusSchema>;
 export type EventResponse = z.infer<typeof EventResponseSchema>;
 export type EventCreate = z.infer<typeof EventCreateSchema>;
 export type EventUpdate = z.infer<typeof EventUpdateSchema>;
-
-export type MemoResponse = z.infer<typeof MemoResponseSchema>;
-export type MemoCreate = z.infer<typeof MemoCreateSchema>;
-export type MemoUpdate = z.infer<typeof MemoUpdateSchema>;
 
 export type ConversationResponse = z.infer<typeof ConversationResponseSchema>;
 export type ConversationCreate = z.infer<typeof ConversationCreateSchema>;
@@ -357,7 +332,7 @@ export type AttachmentResponse = z.infer<typeof AttachmentResponseSchema>;
 export const ServerOverviewSchema = z.object({
   uptime_seconds: z.number(),
   version: z.string(),
-  ai_provider: z.string(),
+  ai_backend: z.string(),
   ai_model: z.string(),
   ai_base_url: z.string(),
   ai_connected: z.boolean(),
@@ -371,7 +346,6 @@ export const TableCountsSchema = z.object({
   messages: z.number(),
   todos: z.number(),
   events: z.number(),
-  memos: z.number(),
   agent_tasks: z.number(),
   attachments: z.number(),
   task_relationships: z.number(),
@@ -391,7 +365,7 @@ export const AdminOverviewResponseSchema = z.object({
 });
 
 export const AIConfigResponseSchema = z.object({
-  provider: z.string(),
+  backend: z.string(),
   model: z.string(),
   base_url: z.string(),
   connected: z.boolean(),
@@ -443,7 +417,7 @@ export const ServerConfigResponseSchema = z.object({
   port: z.number(),
   database_url: z.string(),
   jwt_expiry_hours: z.number(),
-  ai_provider: z.string(),
+  ai_backend: z.string(),
   ai_base_url: z.string(),
   ai_model: z.string(),
   upload_dir: z.string(),

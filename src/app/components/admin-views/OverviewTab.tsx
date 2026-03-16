@@ -1,10 +1,16 @@
 import { useAdminOverviewQuery } from '../../hooks/queries';
 import { formatBytes, formatUptime } from '../../utils/formatters';
+import { isDemoMode } from '../../utils/helpers';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
+import EmptyState from '../shared/EmptyState';
 
 export default function OverviewTab() {
   const { data, isLoading } = useAdminOverviewQuery();
+
+  if (isDemoMode()) {
+    return <EmptyState icon="🔌" message="Admin dashboard requires a server connection. Connect to a server in Settings to view server statistics." />;
+  }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;
 
@@ -26,7 +32,7 @@ export default function OverviewTab() {
           </span>
         </SettingsRow>
         <SettingsRow label="AI Provider">
-          <span style={{ fontSize: 13 }}>{server.ai_provider} / {server.ai_model}</span>
+          <span style={{ fontSize: 13 }}>{server.ai_backend} / {server.ai_model}</span>
         </SettingsRow>
         <SettingsRow label="WebSocket Connections">
           <span style={{ fontSize: 13 }}>{server.active_ws_connections}</span>

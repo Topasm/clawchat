@@ -1,9 +1,15 @@
 import { useAdminDataQuery } from '../../hooks/queries';
 import { formatDateTimeShort } from '../../utils/formatters';
+import { isDemoMode } from '../../utils/helpers';
 import SettingsSection from '../shared/SettingsSection';
+import EmptyState from '../shared/EmptyState';
 
 export default function DataTab() {
   const { data, isLoading } = useAdminDataQuery();
+
+  if (isDemoMode()) {
+    return <EmptyState icon="📁" message="Data overview requires a server connection." />;
+  }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;
 

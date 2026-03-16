@@ -1,14 +1,15 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, type ReactNode } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
 import type { TodoResponse, KanbanStatus } from '../../types/api';
 import KanbanCard from './KanbanCard';
 import SwipeActions from './SwipeActions';
 import EmptyState from '../shared/EmptyState';
+import { ClipboardIcon } from '../shared/Icons';
 
 interface KanbanColumnProps {
   status: KanbanStatus;
   title: string;
-  icon: string;
+  icon: ReactNode;
   tasks: TodoResponse[];
   allTodos: TodoResponse[];
   showSubTasks: boolean;
@@ -112,7 +113,7 @@ export default function KanbanColumn({
           )}
           <div className="cc-kanban__cards">
             {rootTasks.length === 0 && !snapshot.isDraggingOver ? (
-              <EmptyState icon="\uD83D\uDCCB" message={`No ${title.toLowerCase()} tasks`} />
+              <EmptyState icon={<ClipboardIcon size={20} />} message={`No ${title.toLowerCase()} tasks`} />
             ) : (
               rootTasks.map((task) => {
                 const idx = draggableIndex++;

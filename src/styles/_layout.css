@@ -12,7 +12,8 @@
 }
 
 .cc-sidebar-panel {
-  min-width: 160px;
+  min-width: 160px !important;
+  flex-shrink: 0;
 }
 
 .cc-sidebar__header {

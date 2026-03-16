@@ -1,9 +1,15 @@
 import { useAdminActivityQuery } from '../../hooks/queries';
 import { relativeTime } from '../../utils/formatters';
+import { isDemoMode } from '../../utils/helpers';
 import SettingsSection from '../shared/SettingsSection';
+import EmptyState from '../shared/EmptyState';
 
 export default function ActivityTab() {
   const { data, isLoading } = useAdminActivityQuery();
+
+  if (isDemoMode()) {
+    return <EmptyState icon="📊" message="Activity log requires a server connection." />;
+  }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;
 

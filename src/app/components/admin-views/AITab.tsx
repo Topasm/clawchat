@@ -1,10 +1,16 @@
 import { useAdminAIQuery, useTestAIConnection } from '../../hooks/queries';
+import { isDemoMode } from '../../utils/helpers';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
+import EmptyState from '../shared/EmptyState';
 
 export default function AITab() {
   const { data, isLoading } = useAdminAIQuery();
   const testConnection = useTestAIConnection();
+
+  if (isDemoMode()) {
+    return <EmptyState icon="🤖" message="AI configuration requires a server connection." />;
+  }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;
 
@@ -12,7 +18,7 @@ export default function AITab() {
     <>
       <SettingsSection title="AI Provider">
         <SettingsRow label="Provider">
-          <span style={{ fontSize: 13 }}>{data.provider}</span>
+          <span style={{ fontSize: 13 }}>{data.backend}</span>
         </SettingsRow>
         <SettingsRow label="Model">
           <span style={{ fontSize: 13, fontFamily: 'monospace' }}>{data.model}</span>

@@ -6,12 +6,18 @@ import {
   usePurgeData,
 } from '../../hooks/queries';
 import { formatBytes } from '../../utils/formatters';
+import { isDemoMode } from '../../utils/helpers';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import ConfirmDialog from '../shared/ConfirmDialog';
+import EmptyState from '../shared/EmptyState';
 
 export default function DatabaseTab() {
   const { data: overview } = useAdminOverviewQuery();
+
+  if (isDemoMode()) {
+    return <EmptyState icon="💾" message="Database management requires a server connection." />;
+  }
   const reindex = useReindexFTS();
   const backup = useBackupDatabase();
   const purge = usePurgeData();

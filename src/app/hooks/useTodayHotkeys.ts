@@ -20,12 +20,5 @@ export default function useTodayHotkeys() {
     setShowCapture(true);
   }, { enableOnFormTags: false });
 
-  useHotkeys('n', (e) => {
-    if (isTextInput(e)) return;
-    e.preventDefault();
-    setCapturePlaceholder('New memo: e.g. "Remember to check logs"');
-    setShowCapture(true);
-  }, { enableOnFormTags: false });
-
   return { showCapture, setShowCapture, capturePlaceholder };
 }

@@ -5,16 +5,15 @@ import { useModuleStore } from '../stores/useModuleStore';
 import apiClient from '../services/apiClient';
 import TaskCard from '../components/shared/TaskCard';
 import EventCard from '../components/shared/EventCard';
-import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
-import type { TodoResponse, EventResponse, MemoResponse } from '../types/api';
+import { MagnifyingGlassIcon } from '../components/shared/Icons';
+import type { TodoResponse, EventResponse } from '../types/api';
 
-type ResultType = 'all' | 'tasks' | 'events' | 'memos';
+type ResultType = 'all' | 'tasks' | 'events';
 
 interface ServerResults {
   tasks: TodoResponse[];
   events: EventResponse[];
-  memos: MemoResponse[];
 }
 
 export default function SearchPage() {
@@ -22,7 +21,6 @@ export default function SearchPage() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const todos = useModuleStore((s) => s.todos);
   const events = useModuleStore((s) => s.events);
-  const memos = useModuleStore((s) => s.memos);
   const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
 
   const [query, setQuery] = useState('');
@@ -41,13 +39,12 @@ export default function SearchPage() {
     }
     setSearching(true);
     try {
-      const types = filter === 'all' ? 'todos,events,memos' : filter === 'tasks' ? 'todos' : filter;
+      const types = filter === 'all' ? 'todos,events' : filter === 'tasks' ? 'todos' : filter;
       const res = await apiClient.get('/search', { params: { q: searchQuery, types } });
       const data = res.data;
       setServerResults({
         tasks: data.todos ?? [],
         events: data.events ?? [],
-        memos: data.memos ?? [],
       });
     } catch {
       // Fall back to client-side search
@@ -74,7 +71,7 @@ export default function SearchPage() {
 
   // Client-side search (used in demo mode or as fallback)
   const clientResults = useMemo(() => {
-    if (!q) return { tasks: [], events: [], memos: [] };
+    if (!q) return { tasks: [], events: [] };
 
     const tasks = (filter === 'all' || filter === 'tasks')
       ? todos.filter(
@@ -94,26 +91,17 @@ export default function SearchPage() {
         )
       : [];
 
-    const mms = (filter === 'all' || filter === 'memos')
-      ? memos.filter(
-          (m) =>
-            m.content.toLowerCase().includes(q) ||
-            m.tags?.some((tag) => tag.toLowerCase().includes(q)),
-        )
-      : [];
-
-    return { tasks, events: evts, memos: mms };
-  }, [q, filter, todos, events, memos]);
+    return { tasks, events: evts };
+  }, [q, filter, todos, events]);
 
   // Use server results when available, otherwise fall back to client-side
   const results = serverResults ?? clientResults;
-  const totalCount = results.tasks.length + results.events.length + results.memos.length;
+  const totalCount = results.tasks.length + results.events.length;
 
   const filters: { value: ResultType; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'tasks', label: 'Tasks' },
     { value: 'events', label: 'Events' },
-    { value: 'memos', label: 'Memos' },
   ];
 
   return (
@@ -128,7 +116,7 @@ export default function SearchPage() {
       <input
         className="cc-search__input"
         type="text"
-        placeholder="Search tasks, events, memos..."
+        placeholder="Search tasks and events..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         autoFocus
@@ -147,11 +135,11 @@ export default function SearchPage() {
       </div>
 
       {!q ? (
-        <EmptyState icon="🔍" message="Type to search across tasks, events, and memos" />
+        <EmptyState icon={<MagnifyingGlassIcon size={20} />} message="Type to search across tasks and events" />
       ) : searching ? (
         <div className="cc-empty__message" style={{ padding: 40, textAlign: 'center' }}>Searching...</div>
       ) : totalCount === 0 ? (
-        <EmptyState icon="😕" message={`No results for "${query}"`} />
+        <EmptyState icon={<MagnifyingGlassIcon size={20} />} message={`No results for "${query}"`} />
       ) : (
         <div className="cc-search__results">
           <div className="cc-search__result-count">
@@ -185,21 +173,6 @@ export default function SearchPage() {
             </div>
           )}
 
-          {results.memos.length > 0 && (
-            <div className="cc-search__section">
-              <div className="cc-search__section-title">Memos ({results.memos.length})</div>
-              {results.memos.map((memo) => (
-                <div key={memo.id} className="cc-search__memo-card">
-                  <div className="cc-search__memo-content">{memo.content}</div>
-                  <div className="cc-search__memo-meta">
-                    {memo.tags?.map((tag) => (
-                      <Badge key={tag} variant="tag">{tag}</Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>

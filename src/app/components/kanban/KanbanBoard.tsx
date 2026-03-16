@@ -9,6 +9,7 @@ import useKanbanDragDrop from '../../hooks/useKanbanDragDrop';
 import type { KanbanStatus } from '../../types/api';
 import { useKanbanShortcuts } from '../../keyboard';
 import KanbanBoardView from './KanbanBoardView';
+import { ClipboardIcon, SpinArrowsIcon, CheckCircleIcon } from '../shared/Icons';
 
 export default function KanbanBoard() {
   const navigate = useNavigate();
@@ -64,9 +65,9 @@ export default function KanbanBoard() {
   const handleMove = (id: string, status: KanbanStatus) => setKanbanStatus(id, status);
 
   const columnDefs = [
-    { status: 'pending' as KanbanStatus, title: 'Todo', icon: '\uD83D\uDCCB', tasks: todoTasks },
-    { status: 'in_progress' as KanbanStatus, title: 'In Progress', icon: '\uD83D\uDD04', tasks: inProgressTasks },
-    { status: 'completed' as KanbanStatus, title: 'Done', icon: '\u2705', tasks: doneTasks },
+    { status: 'pending' as KanbanStatus, title: 'Todo', icon: <ClipboardIcon size={14} />, tasks: todoTasks },
+    { status: 'in_progress' as KanbanStatus, title: 'In Progress', icon: <SpinArrowsIcon size={14} />, tasks: inProgressTasks },
+    { status: 'completed' as KanbanStatus, title: 'Done', icon: <CheckCircleIcon size={14} />, tasks: doneTasks },
   ];
 
   return (

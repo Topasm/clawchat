@@ -6,8 +6,6 @@ import {
   TodoUpdateSchema,
   EventResponseSchema,
   EventCreateSchema,
-  MemoResponseSchema,
-  MemoCreateSchema,
   ConversationResponseSchema,
   MessageResponseSchema,
   TokenResponseSchema,
@@ -116,29 +114,6 @@ describe('Zod schemas', () => {
     });
   });
 
-  // -- MemoResponse ---------------------------------------------------------
-  describe('MemoResponseSchema', () => {
-    it('parses valid memo', () => {
-      const memo = { id: 'm1', title: 'My Memo', content: 'Note', created_at: now, updated_at: now };
-      expect(MemoResponseSchema.parse(memo)).toEqual(memo);
-    });
-  });
-
-  // -- MemoCreate -----------------------------------------------------------
-  describe('MemoCreateSchema', () => {
-    it('rejects empty content', () => {
-      expect(() => MemoCreateSchema.parse({ content: '' })).toThrow(ZodError);
-    });
-
-    it('error says Content is required', () => {
-      try {
-        MemoCreateSchema.parse({ content: '' });
-      } catch (err) {
-        expect((err as ZodError).issues[0].message).toBe('Content is required');
-      }
-    });
-  });
-
   // -- ConversationResponse -------------------------------------------------
   describe('ConversationResponseSchema', () => {
     it('parses valid conversation', () => {
@@ -213,7 +188,7 @@ describe('Zod schemas', () => {
   // -- HealthResponse -------------------------------------------------------
   describe('HealthResponseSchema', () => {
     it('parses valid health response', () => {
-      const data = { status: 'ok' as const, version: '1.0.0', ai_provider: 'anthropic', ai_model: 'claude', ai_connected: true };
+      const data = { status: 'ok' as const, version: '1.0.0', ai_backend: 'anthropic', ai_model: 'claude', ai_connected: true };
       expect(HealthResponseSchema.parse(data)).toEqual(data);
     });
   });

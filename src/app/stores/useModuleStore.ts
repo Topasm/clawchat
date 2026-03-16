@@ -10,9 +10,6 @@ import type {
   EventResponse,
   EventCreate,
   EventUpdate,
-  MemoResponse,
-  MemoCreate,
-  MemoUpdate,
   KanbanStatus,
   BulkTodoUpdate,
 } from '../types/api';
@@ -36,12 +33,6 @@ interface ModuleState {
   addEvent: (event: EventResponse) => void;
   updateEvent: (id: string, updates: Partial<EventResponse>) => void;
   removeEvent: (id: string) => void;
-
-  memos: MemoResponse[];
-  setMemos: (memos: MemoResponse[]) => void;
-  addMemo: (memo: MemoResponse) => void;
-  updateMemo: (id: string, updates: Partial<MemoResponse>) => void;
-  removeMemo: (id: string) => void;
 
   setKanbanStatuses: (statuses: Record<string, KanbanStatus>) => void;
   resetToDemo: () => void;
@@ -73,18 +64,14 @@ interface ModuleState {
   // Async actions
   fetchTodos: (params?: Record<string, string>) => Promise<void>;
   fetchEvents: (params?: Record<string, string>) => Promise<void>;
-  fetchMemos: (params?: Record<string, string>) => Promise<void>;
   toggleTodoComplete: (id: string) => Promise<void>;
   createTodo: (data: TodoCreate) => Promise<TodoResponse>;
   createEvent: (data: EventCreate) => Promise<EventResponse>;
-  createMemo: (data: MemoCreate) => Promise<MemoResponse>;
   deleteTodo: (id: string) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   deleteEventOccurrence: (eventId: string, date: string, mode: string) => Promise<void>;
-  deleteMemo: (id: string) => Promise<void>;
   serverUpdateTodo: (id: string, data: TodoUpdate) => Promise<void>;
   serverUpdateEvent: (id: string, data: EventUpdate) => Promise<void>;
-  serverUpdateMemo: (id: string, data: MemoUpdate) => Promise<void>;
 }
 
 // Demo seed data shown when the backend is not running
@@ -120,12 +107,6 @@ const DEMO_EVENTS: EventResponse[] = [
   { id: 'demo-e4', title: 'Dentist Appointment', start_time: new Date(Date.now() + 86_400_000 * 2).toISOString().replace(/T\d{2}/, 'T09'), end_time: new Date(Date.now() + 86_400_000 * 2).toISOString().replace(/T\d{2}/, 'T10'), location: 'Downtown Dental', is_all_day: false, tags: ['personal'], created_at: now, updated_at: now },
   { id: 'demo-e5', title: 'Team Offsite', is_all_day: true, start_time: new Date(Date.now() + 86_400_000 * 4).toISOString(), tags: ['work'], created_at: now, updated_at: now },
   { id: 'demo-e6', title: 'Lunch with Sarah', start_time: new Date(Date.now() - 86_400_000).toISOString().replace(/T\d{2}:\d{2}/, 'T12:00'), end_time: new Date(Date.now() - 86_400_000).toISOString().replace(/T\d{2}:\d{2}/, 'T13:00'), location: 'Cafe Roma', tags: ['personal'], created_at: yesterday, updated_at: yesterday },
-];
-
-const DEMO_MEMOS: MemoResponse[] = [
-  { id: 'memo-1', title: 'ClawChat Architecture', content: '## ClawChat Architecture\n\nClawChat uses **Zustand** for state management — lightweight and no provider nesting needed.\n\n### Key Benefits\n- Simple API\n- No boilerplate\n- Works great with TypeScript\n\n> *Lightweight and no provider nesting needed.*', tags: ['dev', 'architecture'], created_at: now, updated_at: now },
-  { id: 'memo-2', title: 'Drag-and-drop testing', content: 'Remember to test drag-and-drop on both **Chrome** and **Firefox**.\n\n### Checklist\n- Chrome desktop\n- Firefox desktop\n- Safari (if available)', tags: ['testing'], created_at: yesterday, updated_at: yesterday },
-  { id: 'memo-3', title: 'Server API auth', content: 'The server API uses **JWT** with refresh tokens.\n\n```\nAuthorization: Bearer <token>\n```\n\nSee the [FastAPI docs](https://fastapi.tiangolo.com/) for more.', tags: ['security', 'api'], created_at: yesterday, updated_at: now },
 ];
 
 const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
@@ -273,7 +254,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     set({
       todos: DEMO_TODOS,
       events: DEMO_EVENTS,
-      memos: DEMO_MEMOS,
       kanbanStatuses: { 'demo-5': 'in_progress', 'demo-11': 'in_progress', 'demo-12': 'in_progress', 'demo-16': 'in_progress' } as Record<string, KanbanStatus>,
       selectedTodoIds: new Set<string>(),
       isLoading: false,
@@ -291,17 +271,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     })),
   removeEvent: (id) =>
     set((state) => ({ events: state.events.filter((e) => e.id !== id) })),
-
-  // --- Memos ---
-  memos: DEMO_MEMOS,
-  setMemos: (memos) => set({ memos }),
-  addMemo: (memo) => set((state) => ({ memos: [memo, ...state.memos] })),
-  updateMemo: (id, updates) =>
-    set((state) => ({
-      memos: state.memos.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-    })),
-  removeMemo: (id) =>
-    set((state) => ({ memos: state.memos.filter((m) => m.id !== id) })),
 
   // --- Kanban filters ---
   kanbanFilters: {
@@ -368,17 +337,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     try {
       const response = await apiClient.get('/events', { params });
       set({ events: response.data?.items ?? response.data ?? [], isLoading: false, lastFetched: Date.now() });
-    } catch {
-      set({ isLoading: false });
-    }
-  },
-
-  fetchMemos: async (params) => {
-    if (isDemoMode()) return;
-    set({ isLoading: true });
-    try {
-      const response = await apiClient.get('/memos', { params });
-      set({ memos: response.data?.items ?? response.data ?? [], isLoading: false, lastFetched: Date.now() });
     } catch {
       set({ isLoading: false });
     }
@@ -465,26 +423,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     const response = await apiClient.post('/events', data);
     get().addEvent(response.data);
     useToastStore.getState().addToast('success', 'Event created');
-    return response.data;
-  },
-
-  createMemo: async (data) => {
-    if (isDemoMode()) {
-      const localMemo: MemoResponse = {
-        id: `local-${Date.now()}`,
-        title: data.content.slice(0, 50).trim(),
-        content: data.content,
-        tags: data.tags,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      get().addMemo(localMemo);
-      useToastStore.getState().addToast('success', 'Memo saved');
-      return localMemo;
-    }
-    const response = await apiClient.post('/memos', data);
-    get().addMemo(response.data);
-    useToastStore.getState().addToast('success', 'Memo saved');
     return response.data;
   },
 
@@ -585,40 +523,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     }
   },
 
-  deleteMemo: async (id) => {
-    const { memos } = get();
-    const existing = memos.find((m) => m.id === id);
-    if (!existing) return;
-
-    get().removeMemo(id);
-
-    const timeoutId = setTimeout(async () => {
-      pendingDeletes.delete(id);
-      if (!isDemoMode()) {
-        try {
-          await apiClient.delete(`/memos/${id}`);
-        } catch (err) {
-          logger.warn('Failed to delete memo on server:', err);
-          get().addMemo(existing);
-          useToastStore.getState().addToast('error', 'Failed to delete memo on server');
-        }
-      }
-    }, 5000);
-    pendingDeletes.set(id, timeoutId);
-
-    useToastStore.getState().addToast('success', 'Memo deleted', {
-      duration: 5000,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          clearTimeout(timeoutId);
-          pendingDeletes.delete(id);
-          get().addMemo(existing);
-        },
-      },
-    });
-  },
-
   serverUpdateTodo: async (id, data) => {
     // Capture previous state for rollback
     const previousTodo = get().todos.find((t) => t.id === id);
@@ -655,21 +559,4 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     }
   },
 
-  serverUpdateMemo: async (id, data) => {
-    // Capture previous state for rollback
-    const previousMemo = get().memos.find((m) => m.id === id);
-    // Optimistic update
-    get().updateMemo(id, { ...data, updated_at: new Date().toISOString() } as Partial<MemoResponse>);
-
-    if (!isDemoMode()) {
-      try {
-        await apiClient.patch(`/memos/${id}`, data);
-      } catch (err) {
-        logger.warn('Failed to update memo on server:', err);
-        // Rollback to previous state
-        if (previousMemo) get().updateMemo(id, previousMemo);
-        useToastStore.getState().addToast('error', 'Failed to update memo on server, changes reverted');
-      }
-    }
-  },
 }));

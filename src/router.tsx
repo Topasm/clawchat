@@ -15,7 +15,6 @@ import EventDetailPage from './app/pages/EventDetailPage';
 import SettingsPage from './app/pages/SettingsPage';
 import SystemPromptPage from './app/pages/SystemPromptPage';
 import SearchPage from './app/pages/SearchPage';
-import MemosPage from './app/pages/MemosPage';
 import CalendarPage from './app/pages/CalendarPage';
 import AdminPage from './app/pages/AdminPage';
 
@@ -73,7 +72,6 @@ export default function AppRouter() {
         <Route path="/settings" element={<ErrorBoundary name="SettingsPage"><SettingsPage /></ErrorBoundary>} />
         <Route path="/settings/system-prompt" element={<ErrorBoundary name="SystemPromptPage"><SystemPromptPage /></ErrorBoundary>} />
         <Route path="/search" element={<ErrorBoundary name="SearchPage"><SearchPage /></ErrorBoundary>} />
-        <Route path="/memos" element={<ErrorBoundary name="MemosPage"><MemosPage /></ErrorBoundary>} />
         <Route path="/admin" element={<ErrorBoundary name="AdminPage"><AdminPage /></ErrorBoundary>} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>

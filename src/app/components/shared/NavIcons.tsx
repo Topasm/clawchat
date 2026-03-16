@@ -1,4 +1,4 @@
-import { CalendarIcon, MemoIcon } from './Icons';
+import { CalendarIcon } from './Icons';
 
 export function SunIcon() {
   return (
@@ -45,10 +45,6 @@ export function GearIcon() {
       <path d="M14.7 11.2a1.2 1.2 0 00.2 1.3l.04.04a1.44 1.44 0 11-2.04 2.04l-.04-.04a1.2 1.2 0 00-1.3-.2 1.2 1.2 0 00-.73 1.1v.12a1.44 1.44 0 11-2.88 0v-.06a1.2 1.2 0 00-.78-1.1 1.2 1.2 0 00-1.3.2l-.04.04a1.44 1.44 0 11-2.04-2.04l.04-.04a1.2 1.2 0 00.2-1.3 1.2 1.2 0 00-1.1-.73H3.45a1.44 1.44 0 110-2.88h.06a1.2 1.2 0 001.1-.78 1.2 1.2 0 00-.2-1.3l-.04-.04A1.44 1.44 0 116.41 3.43l.04.04a1.2 1.2 0 001.3.2h.06a1.2 1.2 0 00.73-1.1V2.45a1.44 1.44 0 012.88 0v.06a1.2 1.2 0 00.73 1.1 1.2 1.2 0 001.3-.2l.04-.04a1.44 1.44 0 112.04 2.04l-.04.04a1.2 1.2 0 00-.2 1.3v.06a1.2 1.2 0 001.1.73h.12a1.44 1.44 0 010 2.88h-.06a1.2 1.2 0 00-1.1.73z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
-}
-
-export function NavMemoIcon() {
-  return <MemoIcon className="cc-nav-icon" />;
 }
 
 export function AdminIcon() {

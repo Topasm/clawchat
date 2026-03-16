@@ -1,8 +1,14 @@
 import { useAdminConfigQuery } from '../../hooks/queries';
+import { isDemoMode } from '../../utils/helpers';
 import SettingsSection from '../shared/SettingsSection';
+import EmptyState from '../shared/EmptyState';
 
 export default function ConfigTab() {
   const { data, isLoading } = useAdminConfigQuery();
+
+  if (isDemoMode()) {
+    return <EmptyState icon="⚙️" message="Server configuration requires a server connection." />;
+  }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;
 
@@ -11,7 +17,7 @@ export default function ConfigTab() {
     ['Port', String(data.port)],
     ['Database', data.database_url],
     ['JWT Expiry', `${data.jwt_expiry_hours}h`],
-    ['AI Provider', data.ai_provider],
+    ['AI Provider', data.ai_backend],
     ['AI Base URL', data.ai_base_url],
     ['AI Model', data.ai_model],
     ['Upload Dir', data.upload_dir],

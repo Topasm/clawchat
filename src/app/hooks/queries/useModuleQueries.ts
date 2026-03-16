@@ -7,11 +7,10 @@ import { useModuleStore } from '../../stores/useModuleStore';
 import {
   TodoResponseSchema,
   EventResponseSchema,
-  MemoResponseSchema,
   TaskRelationshipResponseSchema,
   AttachmentResponseSchema,
 } from '../../types/schemas';
-import type { TodoCreate, TodoUpdate, EventCreate, EventUpdate, MemoCreate, MemoUpdate, KanbanStatus, TaskRelationshipCreate, BulkTodoUpdate } from '../../types/api';
+import type { TodoCreate, TodoUpdate, EventCreate, EventUpdate, KanbanStatus, TaskRelationshipCreate, BulkTodoUpdate } from '../../types/api';
 import { queryKeys } from './queryKeys';
 
 // ---------------------------------------------------------------------------
@@ -56,28 +55,6 @@ export function useEventsQuery() {
   useEffect(() => {
     if (query.data) {
       useModuleStore.getState().setEvents(query.data);
-    }
-  }, [query.data]);
-
-  return query;
-}
-
-export function useMemosQuery() {
-  const serverUrl = useAuthStore((s) => s.serverUrl);
-
-  const query = useQuery({
-    queryKey: queryKeys.memos,
-    queryFn: async () => {
-      const res = await apiClient.get('/memos');
-      const raw = res.data?.items ?? res.data ?? [];
-      return z.array(MemoResponseSchema).parse(raw);
-    },
-    enabled: !!serverUrl,
-  });
-
-  useEffect(() => {
-    if (query.data) {
-      useModuleStore.getState().setMemos(query.data);
     }
   }, [query.data]);
 
@@ -180,37 +157,6 @@ export function useDeleteEvent() {
   });
 }
 
-export function useCreateMemo() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: MemoCreate) => useModuleStore.getState().createMemo(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.memos });
-    },
-  });
-}
-
-export function useUpdateMemo() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: MemoUpdate }) =>
-      useModuleStore.getState().serverUpdateMemo(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.memos });
-    },
-  });
-}
-
-export function useDeleteMemo() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => useModuleStore.getState().deleteMemo(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.memos });
-    },
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Task Relationships
 // ---------------------------------------------------------------------------
@@ -259,13 +205,13 @@ export function useDeleteTaskRelationship() {
 // Attachments
 // ---------------------------------------------------------------------------
 
-export function useAttachmentsQuery(ownerId: string, ownerType: 'memo' | 'todo') {
+export function useAttachmentsQuery(ownerId: string, ownerType: 'todo') {
   const serverUrl = useAuthStore((s) => s.serverUrl);
 
   return useQuery({
     queryKey: queryKeys.attachments(ownerId),
     queryFn: async () => {
-      const params = ownerType === 'memo' ? { memo_id: ownerId } : { todo_id: ownerId };
+      const params = { todo_id: ownerId };
       const res = await apiClient.get('/attachments', { params });
       return z.array(AttachmentResponseSchema).parse(res.data);
     },

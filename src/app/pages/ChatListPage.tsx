@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useChatStore } from '../stores/useChatStore';
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
+import { ChatBubbleIcon } from '../components/shared/Icons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 
@@ -49,7 +50,7 @@ export default function ChatListPage() {
       {loading && conversations.length === 0 && <ChatListSkeleton />}
 
       {!loading && conversations.length === 0 ? (
-        <EmptyState icon={'\uD83D\uDCAC'} message={isMobile ? 'Start chatting.' : 'No conversations yet. Start a new chat!'} />
+        <EmptyState icon={<ChatBubbleIcon size={20} />} message={isMobile ? 'Start chatting.' : 'No conversations yet. Start a new chat!'} />
       ) : conversations.length > 0 ? (
         <div style={{ height: isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 160px)', overflowY: 'auto' }}>
           {conversations.map((convo) => (

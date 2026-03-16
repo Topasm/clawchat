@@ -1,10 +1,16 @@
 import { useAdminSessionsQuery, useDisconnectSession } from '../../hooks/queries';
+import { isDemoMode } from '../../utils/helpers';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
+import EmptyState from '../shared/EmptyState';
 
 export default function SessionsTab() {
   const { data, isLoading } = useAdminSessionsQuery();
   const disconnect = useDisconnectSession();
+
+  if (isDemoMode()) {
+    return <EmptyState icon="🔗" message="Session management requires a server connection." />;
+  }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;
 

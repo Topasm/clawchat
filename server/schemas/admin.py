@@ -23,7 +23,6 @@ class TableCounts(BaseModel):
     messages: int
     todos: int
     events: int
-    memos: int
     agent_tasks: int
     attachments: int
     task_relationships: int

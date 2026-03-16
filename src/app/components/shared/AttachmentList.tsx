@@ -13,7 +13,7 @@ function formatFileSize(bytes: number): string {
 
 interface AttachmentListProps {
   ownerId: string;
-  ownerType: 'memo' | 'todo';
+  ownerType: 'todo';
 }
 
 export default function AttachmentList({ ownerId, ownerType }: AttachmentListProps) {

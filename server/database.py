@@ -23,7 +23,6 @@ _FTS5_VIRTUAL_TABLES = [
     "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(id UNINDEXED, content)",
     "CREATE VIRTUAL TABLE IF NOT EXISTS todos_fts USING fts5(id UNINDEXED, title, description)",
     "CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(id UNINDEXED, title, description, location)",
-    "CREATE VIRTUAL TABLE IF NOT EXISTS memos_fts USING fts5(id UNINDEXED, title, content)",
 ]
 
 _FTS5_TRIGGERS = [
@@ -64,17 +63,6 @@ _FTS5_TRIGGERS = [
     """CREATE TRIGGER IF NOT EXISTS events_ad AFTER DELETE ON events BEGIN
         DELETE FROM events_fts WHERE id = old.id;
     END""",
-    # -- Memos triggers
-    """CREATE TRIGGER IF NOT EXISTS memos_ai AFTER INSERT ON memos BEGIN
-        INSERT INTO memos_fts(id, title, content) VALUES (new.id, new.title, new.content);
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS memos_au AFTER UPDATE ON memos BEGIN
-        DELETE FROM memos_fts WHERE id = old.id;
-        INSERT INTO memos_fts(id, title, content) VALUES (new.id, new.title, new.content);
-    END""",
-    """CREATE TRIGGER IF NOT EXISTS memos_ad AFTER DELETE ON memos BEGIN
-        DELETE FROM memos_fts WHERE id = old.id;
-    END""",
 ]
 
 _FTS5_BACKFILL = [
@@ -87,9 +75,6 @@ _FTS5_BACKFILL = [
     """INSERT INTO events_fts(id, title, description, location)
         SELECT id, title, COALESCE(description, ''), COALESCE(location, '') FROM events
         WHERE id NOT IN (SELECT id FROM events_fts)""",
-    """INSERT INTO memos_fts(id, title, content)
-        SELECT id, title, content FROM memos
-        WHERE id NOT IN (SELECT id FROM memos_fts)""",
 ]
 
 

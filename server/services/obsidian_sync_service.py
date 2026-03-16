@@ -17,13 +17,33 @@ from utils import deserialize_tags, make_id, serialize_tags
 logger = logging.getLogger(__name__)
 
 # Regex patterns for parsing Obsidian tasks
+# Supports both - and * list markers, numbered lists, and any single-char checkbox
 _TASK_RE = re.compile(
     r"^(?P<indent>\s*)"
-    r"- \[(?P<marker>[ x>])\]\s+"
+    r"(?:[*-]|\d+\.)\s+"
+    r"\[(?P<marker>.?)\]\s+"
+    r"(?:(?P<dateprefix>(?:\d{4}-)?\d{2}-\d{2}):\s*)?"
     r"(?P<title>.+)$"
 )
+
+# Legacy @due/@completed format
 _DUE_RE = re.compile(r"@due\((?P<date>\d{4}-\d{2}-\d{2})\)")
 _COMPLETED_RE = re.compile(r"@completed\((?P<date>\d{4}-\d{2}-\d{2})\)")
+
+# Dataview inline field format: [key:: value]
+_DATAVIEW_RE = re.compile(r"\[([^:\]]+)::([^\]]+)\]")
+
+# @shortcut format (not inside wiki links)
+_AT_SHORTCUT_RE = re.compile(r"(?<!\[)@(\w+)(?![(\w])")
+
+# Hashtag format: #tag (must start with letter)
+_HASHTAG_RE = re.compile(r"#([a-zA-Z][a-zA-Z0-9_-]*)")
+
+# Priority shortcuts
+_PRIORITY_SHORTCUTS = {"critical": "urgent", "high": "high", "medium": "medium", "low": "low", "lowest": "low"}
+
+# Code block fence
+_CODE_BLOCK_RE = re.compile(r"^\s*```")
 
 # Priority emoji mapping from section headers
 _PRIORITY_EMOJI_MAP = {
@@ -49,6 +69,7 @@ class ObsidianTask:
     source_id: str
     project: str
     indent: str = ""
+    tags: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -74,8 +95,12 @@ class WriteBackChange:
 
 def _make_source_id(file_path: str, title: str) -> str:
     """Generate a stable source_id by hashing file_path:title."""
-    # Strip metadata tags from title before hashing for stability
-    clean_title = re.sub(r"\s*@\w+\([^)]*\)", "", title).strip()
+    # Strip all metadata formats from title before hashing for stability
+    clean_title = re.sub(r"\s*@\w+\([^)]*\)", "", title)  # @due(...)
+    clean_title = _DATAVIEW_RE.sub("", clean_title)  # [key:: value]
+    clean_title = _AT_SHORTCUT_RE.sub("", clean_title)  # @keyword
+    clean_title = _HASHTAG_RE.sub("", clean_title)  # #tag
+    clean_title = re.sub(r"\s+", " ", clean_title).strip()
     raw = f"{file_path}:{clean_title}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
@@ -101,12 +126,92 @@ def _detect_priority_from_header(header_text: str) -> str | None:
 
 
 def _parse_date(date_str: str) -> datetime | None:
-    """Parse a YYYY-MM-DD date string into a timezone-aware datetime."""
+    """Parse a YYYY-MM-DD or MM-DD date string into a timezone-aware datetime."""
     try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        if len(date_str) <= 5:
+            # MM-DD format — assume current year, bump to next year if in the past
+            dt = datetime.strptime(f"{datetime.now().year}-{date_str}", "%Y-%m-%d")
+            if dt.date() < datetime.now().date():
+                dt = dt.replace(year=dt.year + 1)
+        else:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
         return dt.replace(tzinfo=timezone.utc)
     except ValueError:
         return None
+
+
+def _marker_to_status(marker: str) -> tuple[bool, bool]:
+    """Convert checkbox marker to (completed, in_progress) tuple.
+
+    Supports: [ ] space, [x] complete, [>] in-progress,
+    [-] canceled, [c] canceled, [d] delegated, [!] attention.
+    """
+    m = marker.lower() if marker else " "
+    completed = m == "x"
+    in_progress = m == ">"
+    return completed, in_progress
+
+
+def _extract_attributes(raw_title: str, current_priority: str) -> tuple[
+    str, datetime | None, datetime | None, str, list[str]
+]:
+    """Extract metadata from task title text.
+
+    Supports:
+      - Legacy: @due(YYYY-MM-DD), @completed(YYYY-MM-DD)
+      - Dataview: [due:: YYYY-MM-DD], [completed:: YYYY-MM-DD], [priority:: high]
+      - @shortcuts: @high, @critical, @low, etc.
+      - Hashtags: #tag
+
+    Returns (clean_title, due_date, completed_date, priority, tags).
+    """
+    due_date: datetime | None = None
+    completed_date: datetime | None = None
+    priority = current_priority
+    tags: list[str] = []
+
+    # --- Legacy @due/@completed ---
+    due_match = _DUE_RE.search(raw_title)
+    if due_match:
+        due_date = _parse_date(due_match.group("date"))
+
+    comp_match = _COMPLETED_RE.search(raw_title)
+    if comp_match:
+        completed_date = _parse_date(comp_match.group("date"))
+
+    # --- Dataview [key:: value] ---
+    for dv_match in _DATAVIEW_RE.finditer(raw_title):
+        key = dv_match.group(1).strip().lower()
+        value = dv_match.group(2).strip()
+        if key == "due" and due_date is None:
+            due_date = _parse_date(value)
+        elif key in ("completed", "done", "completion") and completed_date is None:
+            completed_date = _parse_date(value)
+        elif key == "priority":
+            mapped = _PRIORITY_SHORTCUTS.get(value.lower())
+            if mapped:
+                priority = mapped
+
+    # --- @priority shortcuts ---
+    for at_match in _AT_SHORTCUT_RE.finditer(raw_title):
+        keyword = at_match.group(1).lower()
+        if keyword in _PRIORITY_SHORTCUTS:
+            priority = _PRIORITY_SHORTCUTS[keyword]
+
+    # --- Hashtags ---
+    for tag_match in _HASHTAG_RE.finditer(raw_title):
+        tag = tag_match.group(1)
+        if tag not in tags:
+            tags.append(tag)
+
+    # --- Clean title: remove all metadata for display ---
+    clean_title = re.sub(r"\s*@\w+\([^)]*\)", "", raw_title)  # @due(...)
+    clean_title = _DATAVIEW_RE.sub("", clean_title)  # [key:: value]
+    clean_title = _AT_SHORTCUT_RE.sub("", clean_title)  # @keyword
+    clean_title = _HASHTAG_RE.sub("", clean_title)  # #tag
+    clean_title = re.sub(r"\s+", " ", clean_title).strip()
+
+    return clean_title, due_date, completed_date, priority, tags
 
 
 def parse_markdown_file(file_path: str, vault_path: str) -> list[ObsidianTask]:
@@ -123,9 +228,17 @@ def parse_markdown_file(file_path: str, vault_path: str) -> list[ObsidianTask]:
 
     current_priority = "medium"  # default
     project = _extract_project(file_path)
+    inside_code_block = False
 
     for line_number, line in enumerate(lines, start=1):
         line_stripped = line.rstrip("\n\r")
+
+        # Track fenced code blocks — skip tasks inside them
+        if _CODE_BLOCK_RE.match(line_stripped):
+            inside_code_block = not inside_code_block
+            continue
+        if inside_code_block:
+            continue
 
         # Check for section headers that might indicate priority
         header_match = _SECTION_HEADER_RE.match(line_stripped)
@@ -143,24 +256,18 @@ def parse_markdown_file(file_path: str, vault_path: str) -> list[ObsidianTask]:
         marker = task_match.group("marker")
         raw_title = task_match.group("title").strip()
         indent = task_match.group("indent")
+        date_prefix = task_match.group("dateprefix")
 
-        completed = marker == "x"
-        in_progress = marker == ">"
+        completed, in_progress = _marker_to_status(marker)
 
-        # Extract due date
-        due_date = None
-        due_match = _DUE_RE.search(raw_title)
-        if due_match:
-            due_date = _parse_date(due_match.group("date"))
+        # Extract all attributes from the title text
+        clean_title, due_date, completed_date, priority, hashtags = _extract_attributes(
+            raw_title, current_priority
+        )
 
-        # Extract completed date
-        completed_date = None
-        comp_match = _COMPLETED_RE.search(raw_title)
-        if comp_match:
-            completed_date = _parse_date(comp_match.group("date"))
-
-        # Clean title: remove metadata tags for display
-        clean_title = re.sub(r"\s*@\w+\([^)]*\)", "", raw_title).strip()
+        # Date prefix (e.g., "2025-01-15: Buy groceries") as fallback due date
+        if due_date is None and date_prefix:
+            due_date = _parse_date(date_prefix)
 
         source_id = _make_source_id(file_path, raw_title)
 
@@ -170,12 +277,13 @@ def parse_markdown_file(file_path: str, vault_path: str) -> list[ObsidianTask]:
             in_progress=in_progress,
             due_date=due_date,
             completed_date=completed_date,
-            priority=current_priority,
+            priority=priority,
             file_path=file_path,
             line_number=line_number,
             source_id=source_id,
             project=project,
             indent=indent,
+            tags=hashtags,
         ))
 
     return tasks
@@ -289,6 +397,7 @@ async def sync_obsidian_todos(db: AsyncSession, vault_path: str) -> SyncResult:
             tags = ["obsidian"]
             if task.project:
                 tags.append(task.project)
+            tags.extend(t for t in task.tags if t not in tags)
 
             status = "completed" if task.completed else "pending"
 
@@ -394,7 +503,12 @@ def write_back_to_obsidian(vault_path: str, changes: list[WriteBackChange]) -> i
                         continue
 
                     raw_title = task_match.group("title").strip()
-                    clean = re.sub(r"\s*@\w+\([^)]*\)", "", raw_title).strip()
+                    # Clean title using same logic as parsing
+                    clean = re.sub(r"\s*@\w+\([^)]*\)", "", raw_title)
+                    clean = _DATAVIEW_RE.sub("", clean)
+                    clean = _AT_SHORTCUT_RE.sub("", clean)
+                    clean = _HASHTAG_RE.sub("", clean)
+                    clean = re.sub(r"\s+", " ", clean).strip()
                     if clean != change.title:
                         continue
 

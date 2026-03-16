@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { CalendarIcon, MemoIcon } from '../shared/Icons';
+import { CalendarIcon } from '../shared/Icons';
 import SchedulingSuggestions from './SchedulingSuggestions';
 import TaskProgressCard from './TaskProgressCard';
 
@@ -93,23 +93,6 @@ export default function ActionCard({ metadata }: ActionCardProps) {
     );
   }
 
-  // Memo actions
-  if (actionType === 'memo_created' || actionType === 'memo_updated') {
-    return (
-      <div className="cc-action-card">
-        <div className="cc-action-card__icon cc-action-card__icon--memo">
-          <MemoIcon size={14} />
-        </div>
-        <div className="cc-action-card__content">
-          <span className="cc-action-card__label">
-            {actionType === 'memo_created' ? 'Memo Saved' : 'Memo Updated'}
-          </span>
-          <span className="cc-action-card__title">{metadata.memo_title as string}</span>
-        </div>
-      </div>
-    );
-  }
-
   // Scheduling suggestions (Phase 3)
   if (actionType === 'scheduling_suggestions') {
     const suggestions = metadata.suggestions as Array<{ start: string; end: string; reason: string }>;
@@ -166,11 +149,11 @@ export default function ActionCard({ metadata }: ActionCardProps) {
   // Delete actions
   if (actionType.endsWith('_deleted')) {
     const module = metadata.module as string;
-    const title = (metadata.event_title ?? metadata.todo_title ?? metadata.memo_title) as string;
+    const title = (metadata.event_title ?? metadata.todo_title) as string;
     return (
       <div className="cc-action-card cc-action-card--warning">
         <div className="cc-action-card__content">
-          <span className="cc-action-card__label">{module === 'events' ? 'Event' : module === 'todos' ? 'Task' : 'Memo'} Deleted</span>
+          <span className="cc-action-card__label">{module === 'events' ? 'Event' : 'Task'} Deleted</span>
           <span className="cc-action-card__title">{title}</span>
         </div>
       </div>

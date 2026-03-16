@@ -2,7 +2,6 @@ export { queryKeys } from './queryKeys';
 export {
   useTodosQuery,
   useEventsQuery,
-  useMemosQuery,
   useCreateTodo,
   useUpdateTodo,
   useDeleteTodo,
@@ -11,9 +10,6 @@ export {
   useCreateEvent,
   useUpdateEvent,
   useDeleteEvent,
-  useCreateMemo,
-  useUpdateMemo,
-  useDeleteMemo,
   useTaskRelationshipsQuery,
   useCreateTaskRelationship,
   useDeleteTaskRelationship,

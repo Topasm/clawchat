@@ -9,7 +9,6 @@ interface BackupData {
   data: {
     todos: unknown[];
     events: unknown[];
-    memos: unknown[];
     conversations: unknown[];
   };
 }
@@ -23,7 +22,6 @@ function isValidBackup(obj: unknown): obj is BackupData {
   return (
     Array.isArray(data.todos) &&
     Array.isArray(data.events) &&
-    Array.isArray(data.memos) &&
     Array.isArray(data.conversations)
   );
 }
@@ -32,13 +30,13 @@ export default function useSettingsExportImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
-    const { todos, events, memos } = useModuleStore.getState();
+    const { todos, events } = useModuleStore.getState();
     const { conversations } = useChatStore.getState();
 
     const backup: BackupData = {
       version: 1,
       exportedAt: new Date().toISOString(),
-      data: { todos, events, memos, conversations },
+      data: { todos, events, conversations },
     };
 
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -71,9 +69,9 @@ export default function useSettingsExportImport() {
       return;
     }
 
-    const { todos, events, memos, conversations } = backup.data;
+    const { todos, events, conversations } = backup.data;
     const confirmed = window.confirm(
-      `Import ${todos.length} todos, ${events.length} events, ${memos.length} memos, and ${conversations.length} conversations?\n\nThis will add them as new items.`,
+      `Import ${todos.length} todos, ${events.length} events, and ${conversations.length} conversations?\n\nThis will add them as new items.`,
     );
     if (!confirmed) return;
 
@@ -109,18 +107,6 @@ export default function useSettingsExportImport() {
           location: location != null ? String(location) : undefined,
           is_all_day: typeof is_all_day === 'boolean' ? is_all_day : undefined,
           reminder_minutes: typeof reminder_minutes === 'number' ? reminder_minutes : undefined,
-          tags: Array.isArray(tags) ? tags : undefined,
-        });
-      } catch {
-        errors++;
-      }
-    }
-
-    for (const memo of memos) {
-      try {
-        const { content, tags } = memo as Record<string, unknown>;
-        await moduleStore.createMemo({
-          content: String(content ?? ''),
           tags: Array.isArray(tags) ? tags : undefined,
         });
       } catch {

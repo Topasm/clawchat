@@ -20,10 +20,6 @@ Intents:
 - query_events: User wants to check their calendar (e.g., "what's on my schedule?")
 - update_event: User wants to modify an event
 - delete_event: User wants to cancel an event
-- create_memo: User wants to save a note (e.g., "note that the API key is...")
-- query_memos: User wants to find notes (e.g., "what did I note about...")
-- update_memo: User wants to edit a note
-- delete_memo: User wants to remove a note
 - search: User wants to search across all data (e.g., "find everything about VLA")
 - delegate_task: User wants to assign a complex async task to the AI agent
 - daily_briefing: User wants a summary of their day (e.g., "what's my day look like?")
@@ -55,10 +51,6 @@ INTENT_TOOLS_SCHEMA = [
                             "query_events",
                             "update_event",
                             "delete_event",
-                            "create_memo",
-                            "query_memos",
-                            "update_memo",
-                            "delete_memo",
                             "search",
                             "delegate_task",
                             "daily_briefing",

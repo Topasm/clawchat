@@ -25,7 +25,7 @@ import type { HealthResponse } from '../types/api';
 // --- SVG icon components ---
 import {
   SunIcon, InboxIcon, ChatIcon,
-  TasksIcon, GearIcon, NavMemoIcon, SearchIcon, AdminIcon,
+  TasksIcon, GearIcon, SearchIcon, AdminIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
@@ -78,7 +78,6 @@ const navItems = [
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/chats', label: 'Chats', Icon: ChatIcon },
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
-  { to: '/memos', label: 'Memos', Icon: NavMemoIcon },
   { to: '/search', label: 'Search', Icon: SearchIcon },
   { to: '/settings', label: 'Settings', Icon: GearIcon },
   { to: '/admin', label: 'Admin', Icon: AdminIcon },
@@ -265,12 +264,12 @@ export default function Layout() {
           <BottomNav />
         </>
       ) : (
-        <PanelGroup orientation="horizontal" id="cc-layout-h">
-          <Panel defaultSize={18} minSize={14} maxSize={30} id="sidebar" className="cc-sidebar-panel">
+        <PanelGroup orientation="horizontal">
+          <Panel defaultSize={18} minSize={15} maxSize={30} className="cc-sidebar-panel">
             {sidebar}
           </Panel>
           <PanelResizeHandle className="cc-resize-handle cc-resize-handle--vertical" />
-          <Panel minSize={40} id="main-content">
+          <Panel minSize={40}>
             <div className="cc-main">{mainContent}</div>
           </Panel>
         </PanelGroup>

@@ -46,7 +46,6 @@ describe('useDataSync logic (store-level)', () => {
 
     await useModuleStore.getState().fetchTodos();
     await useModuleStore.getState().fetchEvents();
-    await useModuleStore.getState().fetchMemos();
     await useChatStore.getState().fetchConversations();
 
     expect(apiClient.get).not.toHaveBeenCalled();
@@ -58,11 +57,10 @@ describe('useDataSync logic (store-level)', () => {
 
     await useModuleStore.getState().fetchTodos();
     await useModuleStore.getState().fetchEvents();
-    await useModuleStore.getState().fetchMemos();
     await useChatStore.getState().fetchConversations();
 
-    // 3 module fetches + 1 chat fetch = 4 calls
-    expect(apiClient.get).toHaveBeenCalledTimes(4);
+    // 2 module fetches + 1 chat fetch = 3 calls
+    expect(apiClient.get).toHaveBeenCalledTimes(3);
   });
 
   it('setKanbanStatuses clears overrides before fetch', () => {
