@@ -18,7 +18,7 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
   const stopGeneration = useChatStore((s) => s.stopGeneration);
   const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
   const addMessage = useChatStore((s) => s.addMessage);
-  const addConversation = useChatStore((s) => s.addConversation);
+  const createConversation = useChatStore((s) => s.createConversation);
   const editMessage = useChatStore((s) => s.editMessage);
   const messages = useChatStore((s) => s.messages);
   const setCurrentConversationId = useChatStore((s) => s.setCurrentConversationId);
@@ -55,12 +55,11 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
 
     let cid = conversationId;
     if (!cid) {
-      // Create a new conversation stub
-      const newId = crypto.randomUUID();
-      cid = newId;
-      onSetConversationId(newId);
-      setCurrentConversationId(newId);
-      addConversation({ id: newId, title: text.slice(0, 40), created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      // Create conversation on the server first
+      const convo = await createConversation(text.slice(0, 40));
+      cid = convo.id;
+      onSetConversationId(cid);
+      setCurrentConversationId(cid);
     }
 
     addMessage({
@@ -75,7 +74,7 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
     } catch {
       // Error handled in store
     }
-  }, [conversationId, editingMessageId, onSetConversationId, addConversation, addMessage, sendMessageStreaming, editMessage, setCurrentConversationId]);
+  }, [conversationId, editingMessageId, onSetConversationId, createConversation, addMessage, sendMessageStreaming, editMessage, setCurrentConversationId]);
 
   const handlePopOut = () => {
     if (conversationId) {
