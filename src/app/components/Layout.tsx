@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
 import apiClient from '../services/apiClient';
@@ -91,6 +90,7 @@ export default function Layout() {
   const commandPalette = useCommandPalette();
   const { isMobile } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
@@ -170,21 +170,38 @@ export default function Layout() {
   const canSwipeTabs = isMobile && !onChatPage;
 
   const sidebar = (
-    <nav className="cc-sidebar">
-      <div className="cc-sidebar__header">ClawChat</div>
+    <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
+      <div className="cc-sidebar__header">
+        <span className="cc-sidebar__title">ClawChat</span>
+        <button
+          className="cc-sidebar-toggle"
+          onClick={() => setSidebarCollapsed((c) => !c)}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="cc-nav-icon">
+            {sidebarCollapsed ? (
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            ) : (
+              <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            )}
+          </svg>
+        </button>
+      </div>
       <div className={`cc-connection-status cc-connection-status--${connectionStatus}`}>
         <span className="cc-connection-status__dot" />
-        {isFlushing ? 'Syncing...' : CONNECTION_LABELS[connectionStatus]}
-        {pendingCount > 0 && (
-          <span className="cc-offline-badge" title={`${pendingCount} pending action${pendingCount > 1 ? 's' : ''}`}>
-            {pendingCount}
-          </span>
-        )}
+        <span className="cc-sidebar__label">
+          {isFlushing ? 'Syncing...' : CONNECTION_LABELS[connectionStatus]}
+          {pendingCount > 0 && (
+            <span className="cc-offline-badge" title={`${pendingCount} pending action${pendingCount > 1 ? 's' : ''}`}>
+              {pendingCount}
+            </span>
+          )}
+        </span>
       </div>
       {healthData && (
         <div className={`cc-health-status cc-health-status--${healthData.ai_connected ? 'ok' : 'degraded'}`}>
           <span className="cc-health-status__dot" />
-          AI: {healthData.ai_connected ? healthData.ai_model : 'Offline'}
+          <span className="cc-sidebar__label">AI: {healthData.ai_connected ? healthData.ai_model : 'Offline'}</span>
         </div>
       )}
       {navItems.map((item) => (
@@ -194,9 +211,10 @@ export default function Layout() {
           className={({ isActive }) =>
             `cc-nav-item${isActive ? ' cc-nav-item--active' : ''}`
           }
+          title={sidebarCollapsed ? item.label : undefined}
         >
           <item.Icon />
-          {item.label}
+          <span className="cc-sidebar__label">{item.label}</span>
           {item.to === '/inbox' && inboxCount > 0 && (
             <span className="cc-nav-badge">{inboxCount}</span>
           )}
@@ -264,15 +282,10 @@ export default function Layout() {
           <BottomNav />
         </>
       ) : (
-        <PanelGroup orientation="horizontal">
-          <Panel defaultSize={18} minSize={15} maxSize={30} className="cc-sidebar-panel">
-            {sidebar}
-          </Panel>
-          <PanelResizeHandle className="cc-resize-handle cc-resize-handle--vertical" />
-          <Panel minSize={40}>
-            <div className="cc-main">{mainContent}</div>
-          </Panel>
-        </PanelGroup>
+        <>
+          {sidebar}
+          <div className="cc-main">{mainContent}</div>
+        </>
       )}
     </div>
   );

@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("", response_model=PaginatedResponse[SearchHit])
 async def search(
     q: str = Query("", description="Search query"),
-    types: str | None = Query(None, description="Comma-separated types: messages,todos,events,memos"),
+    types: str | None = Query(None, description="Comma-separated types: messages,todos,events"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),

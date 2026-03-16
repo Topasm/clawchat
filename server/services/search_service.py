@@ -15,7 +15,7 @@ async def search(
     page: int = 1,
     limit: int = 20,
 ) -> tuple[list[SearchHit], int]:
-    """Full-text search across messages, todos, events, and memos."""
+    """Full-text search across messages, todos, and events."""
     enabled = types or ALL_TYPES
     hits: list[SearchHit] = []
 

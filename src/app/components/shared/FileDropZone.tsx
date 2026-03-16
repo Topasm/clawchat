@@ -10,12 +10,11 @@ const ALLOWED_EXTENSIONS = new Set([
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 interface FileDropZoneProps {
-  memoId?: string;
   todoId?: string;
   onUploadComplete?: () => void;
 }
 
-export default function FileDropZone({ memoId, todoId, onUploadComplete }: FileDropZoneProps) {
+export default function FileDropZone({ todoId, onUploadComplete }: FileDropZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadAttachment();
@@ -45,13 +44,13 @@ export default function FileDropZone({ memoId, todoId, onUploadComplete }: FileD
     }
 
     try {
-      await uploadMutation.mutateAsync({ file, memoId, todoId });
+      await uploadMutation.mutateAsync({ file, todoId });
       addToast('success', `Uploaded ${file.name}`);
       onUploadComplete?.();
     } catch {
       addToast('error', 'Failed to upload file');
     }
-  }, [memoId, todoId, uploadMutation, addToast, onUploadComplete, validateFile]);
+  }, [todoId, uploadMutation, addToast, onUploadComplete, validateFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

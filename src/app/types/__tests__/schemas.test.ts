@@ -165,7 +165,7 @@ describe('Zod schemas', () => {
     });
 
     it('validates SearchHitSchema fields', () => {
-      const hit = { type: 'memo', id: 'm1', title: 'Note', preview: 'A note...', rank: 1, created_at: now };
+      const hit = { type: 'todo', id: 't1', title: 'Note', preview: 'A note...', rank: 1, created_at: now };
       expect(SearchHitSchema.parse(hit)).toEqual(hit);
     });
   });
@@ -315,7 +315,6 @@ describe('Zod schemas', () => {
       stored_filename: 'abcdef123456.jpg',
       content_type: 'image/jpeg',
       size_bytes: 102400,
-      memo_id: 'memo_1',
       todo_id: null,
       url: '/api/attachments/att_abc123/download',
       created_at: now,
@@ -330,17 +329,15 @@ describe('Zod schemas', () => {
       expect(() => AttachmentResponseSchema.parse(bad)).toThrow(ZodError);
     });
 
-    it('allows nullable memo_id and todo_id', () => {
-      const att = { ...validAttachment, memo_id: null, todo_id: null };
+    it('allows nullable todo_id', () => {
+      const att = { ...validAttachment, todo_id: null };
       const parsed = AttachmentResponseSchema.parse(att);
-      expect(parsed.memo_id).toBeNull();
       expect(parsed.todo_id).toBeNull();
     });
 
-    it('allows omitted memo_id and todo_id', () => {
-      const { memo_id: _m, todo_id: _t, ...att } = validAttachment;
+    it('allows omitted todo_id', () => {
+      const { todo_id: _t, ...att } = validAttachment;
       const parsed = AttachmentResponseSchema.parse(att);
-      expect(parsed.memo_id).toBeUndefined();
       expect(parsed.todo_id).toBeUndefined();
     });
   });

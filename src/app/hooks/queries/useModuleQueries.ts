@@ -222,17 +222,15 @@ export function useAttachmentsQuery(ownerId: string, ownerType: 'todo') {
 export function useUploadAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, memoId, todoId }: { file: File; memoId?: string; todoId?: string }) => {
+    mutationFn: async ({ file, todoId }: { file: File; todoId?: string }) => {
       const formData = new FormData();
       formData.append('file', file);
       const params = new URLSearchParams();
-      if (memoId) params.set('memo_id', memoId);
       if (todoId) params.set('todo_id', todoId);
       const res = await apiClient.post(`/attachments?${params.toString()}`, formData);
       return res.data;
     },
     onSuccess: (_data, variables) => {
-      if (variables.memoId) queryClient.invalidateQueries({ queryKey: queryKeys.attachments(variables.memoId) });
       if (variables.todoId) queryClient.invalidateQueries({ queryKey: queryKeys.attachments(variables.todoId) });
     },
   });

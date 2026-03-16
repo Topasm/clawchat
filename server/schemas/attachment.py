@@ -9,7 +9,6 @@ class AttachmentResponse(BaseModel):
     stored_filename: str
     content_type: str
     size_bytes: int
-    memo_id: str | None = None
     todo_id: str | None = None
     url: str
     created_at: datetime
