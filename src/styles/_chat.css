@@ -73,6 +73,8 @@
 
 .cc-bubble-row {
   display: flex;
+  align-items: flex-end;
+  gap: 8px;
   padding: 2px 0;
 }
 
@@ -82,6 +84,27 @@
 
 .cc-bubble-row--assistant {
   justify-content: flex-start;
+}
+
+/* --- Chat Avatars ----------------------------------------- */
+.cc-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cc-avatar--assistant {
+  background: var(--cc-primary-light);
+  color: var(--cc-primary);
+}
+
+.cc-avatar--user {
+  background: var(--cc-user-bubble);
+  color: #fff;
 }
 
 /* --- Chat Panel ------------------------------------------- */

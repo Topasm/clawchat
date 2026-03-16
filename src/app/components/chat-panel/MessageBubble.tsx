@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../../stores/useChatStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { SparkleIcon } from '../shared/Icons';
 import ActionCard from './ActionCard';
 
 const INTENT_LABELS: Record<string, string> = {
@@ -45,6 +46,11 @@ export default function MessageBubble({ message, onDelete, onRegenerate, onEdit 
 
   return (
     <div className={`cc-bubble-row cc-bubble-row--${role}`}>
+      {!isUser && (
+        <div className="cc-avatar cc-avatar--assistant">
+          <SparkleIcon size={16} />
+        </div>
+      )}
       <div className={`cc-bubble cc-bubble--${role}`}>
         {!isUser && intentLabel && (
           <div className="cc-bubble__intent">{intentLabel}</div>
@@ -87,6 +93,14 @@ export default function MessageBubble({ message, onDelete, onRegenerate, onEdit 
           )}
         </div>
       </div>
+      {isUser && (
+        <div className="cc-avatar cc-avatar--user">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="5.5" r="3" />
+            <path d="M2.5 14.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" strokeLinecap="round" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
