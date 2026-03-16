@@ -42,6 +42,7 @@ ClawChat development progress and planned work.
 - [x] Stop generation (AbortController)
 - [x] Message actions: copy, delete, edit, regenerate
 - [x] User/assistant message bubbles with hover action menus
+- [x] Chat avatar icons: SparkleIcon for AI (left), person icon for user (right) — 28px circular badges
 - [x] Conversation list with avatars and previews
 - [x] Auto-generate conversation titles (via orchestrator WS `conversation_updated` + SSE `title_generated`)
 - [x] Action cards in chat: visual feedback for CRUD actions, scheduling, search results, task delegation

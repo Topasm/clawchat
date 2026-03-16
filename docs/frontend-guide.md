@@ -46,7 +46,7 @@ src/
 │   │   │   ├── ChatPanel.tsx         # Collapsible bottom chat panel
 │   │   │   ├── ChatInput.tsx         # Textarea + send/stop buttons
 │   │   │   ├── ChatPanelMessages.tsx # Message list (column-reverse)
-│   │   │   ├── MessageBubble.tsx     # User/assistant bubble with actions
+│   │   │   ├── MessageBubble.tsx     # User/assistant bubble with avatar icons and actions
 │   │   │   └── StreamingIndicator.tsx # Animated 3-dot typing indicator
 │   │   └── shared/
 │   │       ├── TaskCard.tsx          # Task row: checkbox + title + badge meta
@@ -65,7 +65,7 @@ src/
 │   │       ├── ConfirmDialog.tsx     # Confirm/cancel dialog with danger variant
 │   │       ├── CommandPalette.tsx    # Ctrl+K command menu (cmdk + Radix)
 │   │       ├── ShortcutsHelp.tsx     # Keyboard shortcuts help dialog (?)
-│   │       ├── Icons.tsx             # Shared SVG icons (CalendarIcon, MemoIcon)
+│   │       ├── Icons.tsx             # Shared SVG icons (CalendarIcon, MemoIcon, SparkleIcon, etc.)
 │   │       ├── ErrorBoundary.tsx     # App-level error boundary with fallback UI
 │   │       ├── Toast.tsx             # Single toast notification item
 │   │       ├── ToastContainer.tsx    # Fixed bottom-right toast container (React portal)
