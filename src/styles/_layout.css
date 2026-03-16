@@ -1,6 +1,6 @@
 /* --- Sidebar ---------------------------------------------- */
 .cc-sidebar {
-  width: 100%;
+  width: 220px;
   height: 100%;
   background: var(--cc-surface);
   border-right: 1px solid var(--cc-border);
@@ -9,19 +9,88 @@
   padding: 16px 0;
   user-select: none;
   overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.2s ease;
 }
 
-.cc-sidebar-panel {
-  min-width: 160px !important;
-  flex-shrink: 0;
+.cc-sidebar--collapsed {
+  width: 48px;
 }
 
 .cc-sidebar__header {
-  padding: 0 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 20px;
   font-size: 18px;
   font-weight: 700;
   color: var(--cc-primary);
   letter-spacing: -0.3px;
+  min-height: 24px;
+}
+
+.cc-sidebar__title {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.cc-sidebar--collapsed .cc-sidebar__title {
+  width: 0;
+  opacity: 0;
+}
+
+.cc-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--cc-text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cc-sidebar-toggle:hover {
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+}
+
+.cc-sidebar--collapsed .cc-sidebar__header {
+  justify-content: center;
+  padding: 0 0 20px;
+}
+
+/* Labels hidden when collapsed */
+.cc-sidebar__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: opacity 0.15s;
+}
+
+.cc-sidebar--collapsed .cc-sidebar__label {
+  width: 0;
+  opacity: 0;
+  flex: 0;
+}
+
+.cc-sidebar--collapsed .cc-nav-badge {
+  display: none;
+}
+
+.cc-sidebar--collapsed .cc-connection-status,
+.cc-sidebar--collapsed .cc-health-status {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.cc-sidebar--collapsed .cc-offline-badge {
+  display: none;
 }
 
 .cc-nav-item {
@@ -39,6 +108,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.cc-sidebar--collapsed .cc-nav-item {
+  justify-content: center;
+  padding: 8px 0;
 }
 
 .cc-nav-item:hover {
@@ -195,25 +269,6 @@
   padding: 24px;
 }
 
-/* --- Resize Handles --------------------------------------- */
-.cc-resize-handle {
-  background: transparent;
-  transition: background 0.15s;
-  position: relative;
-}
-
-.cc-resize-handle--vertical {
-  width: 4px;
-}
-
-.cc-resize-handle--horizontal {
-  height: 4px;
-}
-
-.cc-resize-handle:hover,
-.cc-resize-handle[data-resize-handle-active] {
-  background: var(--cc-primary);
-}
 
 /* --- Shortcuts help --------------------------------------- */
 .cc-shortcuts-help {

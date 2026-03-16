@@ -319,7 +319,6 @@ export const AttachmentResponseSchema = z.object({
   stored_filename: z.string(),
   content_type: z.string(),
   size_bytes: z.number(),
-  memo_id: z.string().nullable().optional(),
   todo_id: z.string().nullable().optional(),
   url: z.string(),
   created_at: z.string(),

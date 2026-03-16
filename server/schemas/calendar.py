@@ -1,6 +1,7 @@
+import json
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class EventCreate(BaseModel):
@@ -48,3 +49,10 @@ class EventResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _parse_tags(cls, v: object) -> list[str] | None:
+        if isinstance(v, str):
+            return json.loads(v)
+        return v  # type: ignore[return-value]

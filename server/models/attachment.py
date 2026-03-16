@@ -15,9 +15,6 @@ class Attachment(Base):
     stored_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    memo_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("memos.id", ondelete="CASCADE"), nullable=True
-    )
     todo_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("todos.id", ondelete="CASCADE"), nullable=True
     )
@@ -26,6 +23,5 @@ class Attachment(Base):
     )
 
     __table_args__ = (
-        Index("idx_attachments_memo_id", "memo_id"),
         Index("idx_attachments_todo_id", "todo_id"),
     )

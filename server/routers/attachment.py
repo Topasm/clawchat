@@ -35,7 +35,6 @@ def _to_response(att: Attachment) -> AttachmentResponse:
         stored_filename=att.stored_filename,
         content_type=att.content_type,
         size_bytes=att.size_bytes,
-        memo_id=att.memo_id,
         todo_id=att.todo_id,
         url=f"/api/attachments/{att.id}/download",
         created_at=att.created_at,
@@ -45,7 +44,6 @@ def _to_response(att: Attachment) -> AttachmentResponse:
 @router.post("", response_model=AttachmentResponse, status_code=201)
 async def upload_attachment(
     file: UploadFile = File(...),
-    memo_id: str | None = Query(None),
     todo_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
@@ -77,7 +75,6 @@ async def upload_attachment(
         stored_filename=stored_filename,
         content_type=file.content_type or "application/octet-stream",
         size_bytes=len(content),
-        memo_id=memo_id,
         todo_id=todo_id,
     )
     db.add(attachment)
@@ -89,14 +86,11 @@ async def upload_attachment(
 
 @router.get("", response_model=list[AttachmentResponse])
 async def list_attachments(
-    memo_id: str | None = Query(None),
     todo_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
     q = select(Attachment).order_by(Attachment.created_at.desc())
-    if memo_id:
-        q = q.where(Attachment.memo_id == memo_id)
     if todo_id:
         q = q.where(Attachment.todo_id == todo_id)
     rows = (await db.execute(q)).scalars().all()

@@ -152,7 +152,7 @@ export default function SettingsPage() {
       </SettingsSection>
 
       <SettingsSection title="Import / Export">
-        <SettingsRow label="Export all data" sublabel="Download todos, events, memos, and conversations as JSON">
+        <SettingsRow label="Export all data" sublabel="Download todos, events, and conversations as JSON">
           <button
             type="button"
             className="cc-btn cc-btn--secondary"
