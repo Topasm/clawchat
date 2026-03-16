@@ -68,6 +68,27 @@ export const TodoUpdateSchema = z.object({
   assignee: z.string().nullable().optional(),
 });
 
+export const ProjectTodoResponseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: TodoStatusSchema,
+  priority: PrioritySchema.optional(),
+  due_date: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  completed_at: z.string().nullable().optional(),
+  parent_id: z.string().nullable().optional(),
+  sort_order: z.number().optional(),
+  source: z.string().nullable().optional(),
+  source_id: z.string().nullable().optional(),
+  assignee: z.string().nullable().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  conversation_id: z.string().nullable().optional(),
+  subtask_count: z.number().optional(),
+  completed_subtask_count: z.number().optional(),
+});
+
 export const KanbanStatusSchema = z.enum(['pending', 'in_progress', 'completed']);
 
 // -- Events -----------------------------------------------------------------
@@ -122,12 +143,14 @@ export const ConversationResponseSchema = z.object({
   title: z.string().optional(),
   last_message: z.string().optional(),
   is_archived: z.boolean().optional(),
+  project_todo_id: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
 
 export const ConversationCreateSchema = z.object({
   title: z.string().optional(),
+  project_todo_id: z.string().optional(),
 });
 
 export const MessageResponseSchema = z.object({
@@ -247,6 +270,7 @@ export type RefreshRequest = z.infer<typeof RefreshRequestSchema>;
 export type TodoResponse = z.infer<typeof TodoResponseSchema>;
 export type TodoCreate = z.infer<typeof TodoCreateSchema>;
 export type TodoUpdate = z.infer<typeof TodoUpdateSchema>;
+export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
 export type KanbanStatus = z.infer<typeof KanbanStatusSchema>;
 
 export type EventResponse = z.infer<typeof EventResponseSchema>;

@@ -11,6 +11,7 @@ from exceptions import AIUnavailableError
 from models.agent_task import AgentTask
 from models.conversation import Conversation
 from models.message import Message
+from models.todo import Todo
 from services import (
     agent_task_service,
     briefing_service,
@@ -225,7 +226,11 @@ class Orchestrator:
         rows = (await db.execute(q)).scalars().all()
         history = list(reversed(rows))
 
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        system_content = SYSTEM_PROMPT
+        conv = await db.get(Conversation, conversation_id)
+        if conv and conv.project_todo_id:
+            system_content += await self._build_project_context(db, conv.project_todo_id)
+        messages = [{"role": "system", "content": system_content}]
         for msg in history:
             messages.append({"role": msg.role, "content": msg.content})
 
@@ -310,7 +315,7 @@ class Orchestrator:
         intent: str,
         params: dict,
     ):
-        response_text, action_metadata = await self._execute_module_intent(db, intent, params)
+        response_text, action_metadata = await self._execute_module_intent(db, intent, params, conversation_id)
         await self._send_assistant_message(
             db, user_id, conversation_id, intent, response_text, metadata=action_metadata
         )
@@ -323,15 +328,22 @@ class Orchestrator:
             })
 
     async def _execute_module_intent(
-        self, db: AsyncSession, intent: str, params: dict
+        self, db: AsyncSession, intent: str, params: dict, conversation_id: str | None = None
     ) -> tuple[str, dict | None]:
         try:
             if intent == "create_todo":
+                # Auto-associate with project if conversation is linked to one
+                parent_id = params.get("parent_id")
+                if not parent_id and conversation_id:
+                    conv = await db.get(Conversation, conversation_id)
+                    if conv and conv.project_todo_id:
+                        parent_id = conv.project_todo_id
                 todo = await todo_service.create_todo(
                     db,
                     title=params.get("title", "Untitled task"),
                     description=params.get("description"),
                     priority=params.get("priority", "medium"),
+                    parent_id=parent_id,
                 )
                 return (
                     f"Created task: '{todo.title}' with {todo.priority} priority.",
@@ -557,6 +569,26 @@ class Orchestrator:
             logger.exception("Module action failed for intent %s", intent)
             action = MODULE_INTENTS.get(intent, intent)
             return f"I tried to {action} but something went wrong. Please try again.", None
+
+    async def _build_project_context(self, db: AsyncSession, project_todo_id: str) -> str:
+        """Build project context string for AI system prompt."""
+        project = await db.get(Todo, project_todo_id)
+        if not project:
+            return ""
+        q = select(Todo).where(Todo.parent_id == project_todo_id)
+        subtasks = (await db.execute(q)).scalars().all()
+
+        ctx = f"\n\n[Project: {project.title}]\n"
+        if project.description:
+            ctx += f"Project Notes:\n{project.description}\n"
+        if subtasks:
+            ctx += f"Tasks ({len(subtasks)}):\n"
+            for t in subtasks:
+                ctx += f"  - [{t.status}] {t.title}"
+                if t.priority != "medium":
+                    ctx += f" ({t.priority})"
+                ctx += "\n"
+        return ctx
 
     async def _generate_title(
         self,

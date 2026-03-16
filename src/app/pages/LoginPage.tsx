@@ -59,12 +59,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSkipToDemo = () => {
-    // Clear any existing auth so isDemoMode logic works
-    useAuthStore.getState().logout();
-    navigate('/today');
-  };
-
   const checkHealth = useCallback(async () => {
     const url = serverUrl.replace(/\/+$/, '');
     if (!url) {
@@ -251,33 +245,6 @@ export default function LoginPage() {
           </button>
         )}
 
-        <div
-          style={{
-            textAlign: 'center',
-            marginTop: 16,
-            paddingTop: 16,
-            borderTop: `1px solid ${colors.border}`,
-          }}
-        >
-          <button
-            type="button"
-            onClick={handleSkipToDemo}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: colors.textSecondary,
-              fontSize: 13,
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              padding: '4px 8px',
-            }}
-          >
-            Skip to Demo Mode
-          </button>
-          <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 4 }}>
-            Explore the app with sample data, no server needed
-          </div>
-        </div>
       </form>
       {showScanner && (
         <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />

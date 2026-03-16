@@ -6,7 +6,7 @@ import {
   usePurgeData,
 } from '../../hooks/queries';
 import { formatBytes } from '../../utils/formatters';
-import { isDemoMode } from '../../utils/helpers';
+import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import ConfirmDialog from '../shared/ConfirmDialog';
@@ -15,7 +15,7 @@ import EmptyState from '../shared/EmptyState';
 export default function DatabaseTab() {
   const { data: overview } = useAdminOverviewQuery();
 
-  if (isDemoMode()) {
+  if (!useAuthStore.getState().serverUrl) {
     return <EmptyState icon="💾" message="Database management requires a server connection." />;
   }
   const reindex = useReindexFTS();

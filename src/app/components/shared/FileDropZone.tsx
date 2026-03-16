@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useUploadAttachment } from '../../hooks/queries';
 import { useToastStore } from '../../stores/useToastStore';
-import { isDemoMode } from '../../utils/helpers';
-
 const ALLOWED_EXTENSIONS = new Set([
   'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
   'pdf', 'txt', 'md', 'zip',
@@ -32,11 +30,6 @@ export default function FileDropZone({ todoId, onUploadComplete }: FileDropZoneP
   }, []);
 
   const handleUpload = useCallback(async (file: File) => {
-    if (isDemoMode()) {
-      addToast('info', 'File upload not available in demo mode');
-      return;
-    }
-
     const error = validateFile(file);
     if (error) {
       addToast('error', error);

@@ -1,13 +1,13 @@
 import { useAdminActivityQuery } from '../../hooks/queries';
 import { relativeTime } from '../../utils/formatters';
-import { isDemoMode } from '../../utils/helpers';
+import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
 
 export default function ActivityTab() {
   const { data, isLoading } = useAdminActivityQuery();
 
-  if (isDemoMode()) {
+  if (!useAuthStore.getState().serverUrl) {
     return <EmptyState icon="📊" message="Activity log requires a server connection." />;
   }
 

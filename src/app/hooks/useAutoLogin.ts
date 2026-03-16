@@ -27,7 +27,7 @@ export function useAutoLogin() {
         await login(url, config.pin);
       } catch (err) {
         console.error('Auto-login failed:', err);
-        // Reset so user sees demo mode instead of stuck splash
+        // Reset so user sees login page instead of stuck splash
         useAuthStore.setState({ serverUrl: null });
       }
     })();

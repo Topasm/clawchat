@@ -109,7 +109,7 @@ export default function SearchPage() {
       <div className="cc-page-header">
         <div className="cc-page-header__title">Search</div>
         <div className="cc-page-header__subtitle">
-          Find across all modules{serverUrl ? '' : ' (demo mode)'}
+          Find across all modules
         </div>
       </div>
 

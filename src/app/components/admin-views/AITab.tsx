@@ -1,5 +1,5 @@
 import { useAdminAIQuery, useTestAIConnection } from '../../hooks/queries';
-import { isDemoMode } from '../../utils/helpers';
+import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import EmptyState from '../shared/EmptyState';
@@ -8,7 +8,7 @@ export default function AITab() {
   const { data, isLoading } = useAdminAIQuery();
   const testConnection = useTestAIConnection();
 
-  if (isDemoMode()) {
+  if (!useAuthStore.getState().serverUrl) {
     return <EmptyState icon="🤖" message="AI configuration requires a server connection." />;
   }
 

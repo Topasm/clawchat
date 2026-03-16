@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.dependencies import get_current_user
 from database import get_db
 from exceptions import NotFoundError
+from models.conversation import Conversation
 from models.todo import Todo
 from schemas.bulk import BulkTodoResponse, BulkTodoUpdate
 from schemas.common import PaginatedResponse
-from schemas.todo import TodoCreate, TodoResponse, TodoUpdate
+from schemas.todo import ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
 from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
 
 router = APIRouter()
@@ -21,6 +22,63 @@ _ORDER_COLUMNS = {
     "sort_order": Todo.sort_order,
     "priority": Todo.priority,
 }
+
+
+@router.get("/projects", response_model=list[ProjectTodoResponse])
+async def list_projects(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """List root todos (projects) with their conversation IDs and subtask counts."""
+    q = (
+        select(Todo)
+        .where(Todo.parent_id.is_(None))
+        .order_by(Todo.updated_at.desc())
+    )
+    projects = (await db.execute(q)).scalars().all()
+
+    items = []
+    for project in projects:
+        # Get associated conversation
+        conv_q = select(Conversation.id).where(
+            Conversation.project_todo_id == project.id,
+            Conversation.is_archived == False,  # noqa: E712
+        ).limit(1)
+        conv_id = (await db.execute(conv_q)).scalar()
+
+        # Count subtasks
+        subtask_q = select(func.count(Todo.id)).where(Todo.parent_id == project.id)
+        subtask_count = (await db.execute(subtask_q)).scalar() or 0
+
+        completed_q = select(func.count(Todo.id)).where(
+            Todo.parent_id == project.id,
+            Todo.status == "completed",
+        )
+        completed_count = (await db.execute(completed_q)).scalar() or 0
+
+        resp = ProjectTodoResponse(
+            id=project.id,
+            title=project.title,
+            description=project.description,
+            status=project.status,
+            priority=project.priority,
+            due_date=project.due_date,
+            completed_at=project.completed_at,
+            tags=deserialize_tags(project.tags) if project.tags else None,
+            parent_id=project.parent_id,
+            sort_order=project.sort_order,
+            source=project.source,
+            source_id=project.source_id,
+            assignee=project.assignee,
+            created_at=project.created_at,
+            updated_at=project.updated_at,
+            conversation_id=conv_id,
+            subtask_count=subtask_count,
+            completed_subtask_count=completed_count,
+        )
+        items.append(resp)
+
+    return items
 
 
 @router.get("", response_model=PaginatedResponse[TodoResponse])

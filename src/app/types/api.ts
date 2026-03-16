@@ -8,6 +8,7 @@ export type {
   TodoCreate,
   TodoUpdate,
   KanbanStatus,
+  ProjectTodoResponse,
   EventResponse,
   EventCreate,
   EventUpdate,

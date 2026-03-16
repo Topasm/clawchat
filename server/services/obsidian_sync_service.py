@@ -443,8 +443,8 @@ async def sync_obsidian_todos(db: AsyncSession, vault_path: str) -> SyncResult:
 
         task_line = f"- [{marker}] {todo.title}{due_str}{comp_str}"
 
-        # Generate source_id for this todo so it won't be re-appended
-        source_id = _make_source_id("00_Inbox/TODO.md", task_line)
+        # Generate source_id using the clean title (consistent with parsing logic)
+        source_id = _make_source_id("00_Inbox/TODO.md", todo.title)
         todo.source_id = source_id
         todo.updated_at = datetime.now(timezone.utc)
 

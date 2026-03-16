@@ -29,6 +29,37 @@ class TodoUpdate(BaseModel):
     assignee: str | None = None
 
 
+class ProjectTodoResponse(BaseModel):
+    """Extended todo response used for the project list endpoint."""
+    id: str
+    title: str
+    description: str | None = None
+    status: str
+    priority: str
+    due_date: datetime | None = None
+    completed_at: datetime | None = None
+    tags: list[str] | None = None
+    parent_id: str | None = None
+    sort_order: int = 0
+    source: str | None = None
+    source_id: str | None = None
+    assignee: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    conversation_id: str | None = None
+    subtask_count: int = 0
+    completed_subtask_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _parse_tags(cls, v: object) -> list[str] | None:
+        if isinstance(v, str):
+            return json.loads(v)
+        return v  # type: ignore[return-value]
+
+
 class TodoResponse(BaseModel):
     id: str
     title: str

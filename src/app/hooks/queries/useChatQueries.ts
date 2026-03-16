@@ -5,12 +5,34 @@ import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useChatStore } from '../../stores/useChatStore';
 import type { ChatMessage } from '../../stores/useChatStore';
-import { ConversationResponseSchema, MessageResponseSchema } from '../../types/schemas';
+import { ConversationResponseSchema, MessageResponseSchema, ProjectTodoResponseSchema } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
 
 // ---------------------------------------------------------------------------
 // Query hooks
 // ---------------------------------------------------------------------------
+
+export function useProjectsQuery() {
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+
+  const query = useQuery({
+    queryKey: queryKeys.projects,
+    queryFn: async () => {
+      const res = await apiClient.get('/todos/projects');
+      const raw = res.data ?? [];
+      return z.array(ProjectTodoResponseSchema).parse(raw);
+    },
+    enabled: !!serverUrl,
+  });
+
+  useEffect(() => {
+    if (query.data) {
+      useChatStore.setState({ projects: query.data, projectsLoaded: true });
+    }
+  }, [query.data]);
+
+  return query;
+}
 
 export function useConversationsQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);

@@ -3,7 +3,7 @@ import { SunIcon, ChatIcon, TasksIcon, InboxIcon, GearIcon } from './NavIcons';
 
 export const mobileTabs = [
   { to: '/today', label: 'Today', Icon: SunIcon },
-  { to: '/chats', label: 'Chats', Icon: ChatIcon },
+  { to: '/chats', label: 'Projects', Icon: ChatIcon },
   { to: '/tasks', label: 'Tasks', Icon: TasksIcon },
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/settings', label: 'More', Icon: GearIcon },

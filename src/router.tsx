@@ -21,7 +21,6 @@ import AdminPage from './app/pages/AdminPage';
 export default function AppRouter() {
   const token = useAuthStore((s) => s.token);
   const isLoading = useAuthStore((s) => s.isLoading);
-  const serverUrl = useAuthStore((s) => s.serverUrl);
 
   // Auto-login on Electron (reads config from main process)
   useAutoLogin();
@@ -30,11 +29,9 @@ export default function AppRouter() {
   if (isLoading) return null;
 
   const isAuthenticated = !!token;
-  // Demo mode: no serverUrl AND no token (fresh state or explicit "Skip to Demo")
-  const isDemoMode = !serverUrl && !token;
 
   // On Electron, show splash while server is starting and auto-login hasn't completed
-  if (IS_ELECTRON && !isAuthenticated && !isDemoMode) {
+  if (IS_ELECTRON && !isAuthenticated) {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -46,9 +43,7 @@ export default function AppRouter() {
     );
   }
 
-  // Allow access when authenticated OR in demo mode
-  if (!isAuthenticated && !isDemoMode) {
-    // User has a serverUrl set but no valid token -> need to login
+  if (!isAuthenticated) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />

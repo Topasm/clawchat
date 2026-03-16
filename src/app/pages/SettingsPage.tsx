@@ -239,24 +239,14 @@ export default function SettingsPage() {
 
       {!isElectron && (
         <SettingsSection title="Server Connection">
-          {token ? (
-            <>
-              <SettingsRow label="Server" sublabel={serverUrl ?? 'Unknown'}>
-                <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
-              </SettingsRow>
-              <SettingsRow label="Logout" sublabel="Disconnect from server">
-                <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/today'); }}>
-                  Logout
-                </button>
-              </SettingsRow>
-            </>
-          ) : (
-            <SettingsRow label="Demo Mode" sublabel="No server connected">
-              <button className="cc-btn cc-btn--primary" onClick={() => navigate('/login')}>
-                Connect
-              </button>
-            </SettingsRow>
-          )}
+          <SettingsRow label="Server" sublabel={serverUrl ?? 'Unknown'}>
+            <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
+          </SettingsRow>
+          <SettingsRow label="Logout" sublabel="Disconnect from server">
+            <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/login'); }}>
+              Logout
+            </button>
+          </SettingsRow>
         </SettingsSection>
       )}
       {isElectron && (

@@ -66,7 +66,6 @@ function cssVars(colors: ColorPalette): React.CSSProperties {
 }
 
 const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
-  demo: 'Demo Mode',
   connected: 'Connected',
   disconnected: 'Disconnected',
   reconnecting: 'Reconnecting...',
@@ -75,7 +74,7 @@ const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
 const navItems = [
   { to: '/today', label: 'Today', Icon: SunIcon },
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
-  { to: '/chats', label: 'Chats', Icon: ChatIcon },
+  { to: '/chats', label: 'Projects', Icon: ChatIcon },
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
   { to: '/search', label: 'Search', Icon: SearchIcon },
   { to: '/settings', label: 'Settings', Icon: GearIcon },

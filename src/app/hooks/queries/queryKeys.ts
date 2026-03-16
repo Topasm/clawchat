@@ -2,6 +2,7 @@ export const queryKeys = {
   todos: ['todos'] as const,
   events: ['events'] as const,
   conversations: ['conversations'] as const,
+  projects: ['projects'] as const,
   messages: (id: string) => ['messages', id] as const,
   today: ['today'] as const,
   taskRelationships: (todoId: string) => ['task-relationships', todoId] as const,

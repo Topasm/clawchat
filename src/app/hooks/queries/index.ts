@@ -19,6 +19,7 @@ export {
   useDeleteAttachment,
 } from './useModuleQueries';
 export {
+  useProjectsQuery,
   useConversationsQuery,
   useMessagesQuery,
   useCreateConversation,

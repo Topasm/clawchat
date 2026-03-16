@@ -1,13 +1,13 @@
 import { useAdminDataQuery } from '../../hooks/queries';
 import { formatDateTimeShort } from '../../utils/formatters';
-import { isDemoMode } from '../../utils/helpers';
+import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
 
 export default function DataTab() {
   const { data, isLoading } = useAdminDataQuery();
 
-  if (isDemoMode()) {
+  if (!useAuthStore.getState().serverUrl) {
     return <EmptyState icon="📁" message="Data overview requires a server connection." />;
   }
 

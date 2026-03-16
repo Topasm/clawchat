@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import apiClient from '../services/apiClient';
 import { useToastStore } from './useToastStore';
 import { logger } from '../services/logger';
-import { isDemoMode } from '../utils/helpers';
 import type {
   TodoResponse,
   TodoCreate,
@@ -74,49 +73,14 @@ interface ModuleState {
   serverUpdateEvent: (id: string, data: EventUpdate) => Promise<void>;
 }
 
-// Demo seed data shown when the backend is not running
-const now = new Date().toISOString();
-const yesterday = new Date(Date.now() - 86_400_000).toISOString();
-const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
-const DEMO_TODOS: TodoResponse[] = [
-  // Todo column — demo-3 and demo-4 are sub-tasks of demo-1
-  { id: 'demo-1', title: 'Review ClawChat monorepo structure', status: 'pending', priority: 'high', due_date: now, tags: ['dev'], parent_id: null, sort_order: 0, created_at: now, updated_at: now },
-  { id: 'demo-2', title: 'Set up Capacitor for Android build', status: 'pending', priority: 'medium', due_date: now, tags: ['mobile'], parent_id: null, sort_order: 1, created_at: now, updated_at: now },
-  { id: 'demo-3', title: 'Write unit tests for platform abstraction', status: 'pending', priority: 'medium', due_date: now, tags: ['testing'], parent_id: 'demo-1', sort_order: 0, created_at: now, updated_at: now },
-  { id: 'demo-4', title: 'Design bottom navigation for mobile layout', status: 'pending', priority: 'low', due_date: now, tags: ['design', 'mobile'], parent_id: 'demo-1', sort_order: 1, created_at: now, updated_at: now },
-  { id: 'demo-6', title: 'Update API documentation for v2 endpoints', status: 'pending', priority: 'high', due_date: yesterday, tags: ['docs'], parent_id: null, sort_order: 2, created_at: yesterday, updated_at: yesterday },
-  { id: 'demo-9', title: 'Add push notification support', status: 'pending', priority: 'medium', tags: ['feature', 'mobile'], parent_id: null, sort_order: 3, created_at: now, updated_at: now },
-  { id: 'demo-10', title: 'Create onboarding tutorial flow', status: 'pending', priority: 'low', tags: ['ux'], parent_id: null, sort_order: 4, created_at: now, updated_at: now },
-  // In Progress column (via kanbanStatuses override) — demo-16 is sub-task of demo-5
-  { id: 'demo-5', title: 'Fix SSE reconnect on network change', status: 'pending', priority: 'urgent', due_date: yesterday, tags: ['bug'], parent_id: null, sort_order: 0, created_at: yesterday, updated_at: yesterday },
-  { id: 'demo-16', title: 'Add exponential backoff to reconnect logic', status: 'pending', priority: 'high', tags: ['bug'], parent_id: 'demo-5', sort_order: 0, created_at: yesterday, updated_at: yesterday },
-  { id: 'demo-11', title: 'Implement file upload in chat', status: 'pending', priority: 'high', due_date: now, tags: ['feature', 'chat'], parent_id: null, sort_order: 1, created_at: yesterday, updated_at: now },
-  { id: 'demo-12', title: 'Migrate auth to JWT refresh tokens', status: 'pending', priority: 'high', tags: ['security'], parent_id: null, sort_order: 2, created_at: twoDaysAgo, updated_at: now },
-  // Done column
-  { id: 'demo-7', title: 'Implement dark mode toggle persistence', status: 'completed', priority: 'medium', tags: ['feature'], parent_id: null, sort_order: 0, created_at: yesterday, updated_at: now },
-  { id: 'demo-8', title: 'Add Docker health check endpoint', status: 'completed', priority: 'low', tags: ['devops'], parent_id: null, sort_order: 1, created_at: yesterday, updated_at: now },
-  { id: 'demo-13', title: 'Set up CI pipeline with GitHub Actions', status: 'completed', priority: 'high', tags: ['devops', 'ci'], parent_id: null, sort_order: 2, created_at: twoDaysAgo, updated_at: yesterday },
-  { id: 'demo-14', title: 'Fix message ordering bug in chat', status: 'completed', priority: 'urgent', tags: ['bug', 'chat'], parent_id: null, sort_order: 3, created_at: twoDaysAgo, updated_at: yesterday },
-  { id: 'demo-15', title: 'Add keyboard shortcuts for navigation', status: 'completed', priority: 'low', tags: ['ux'], parent_id: null, sort_order: 4, created_at: twoDaysAgo, updated_at: now },
-];
-
-const DEMO_EVENTS: EventResponse[] = [
-  { id: 'demo-e1', title: 'Sprint Planning', description: 'Review sprint goals and assign tasks', start_time: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(15, 0, 0, 0)).toISOString(), location: 'Zoom', tags: ['work'], created_at: now, updated_at: now },
-  { id: 'demo-e2', title: 'Code Review Session', start_time: new Date(new Date().setHours(16, 30, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(17, 0, 0, 0)).toISOString(), tags: ['dev'], created_at: now, updated_at: now },
-  { id: 'demo-e3', title: 'Team Standup', description: 'Daily sync', start_time: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(), end_time: new Date(new Date().setHours(10, 15, 0, 0)).toISOString(), location: 'Discord', tags: ['work'], created_at: yesterday, updated_at: yesterday },
-  { id: 'demo-e4', title: 'Dentist Appointment', start_time: new Date(Date.now() + 86_400_000 * 2).toISOString().replace(/T\d{2}/, 'T09'), end_time: new Date(Date.now() + 86_400_000 * 2).toISOString().replace(/T\d{2}/, 'T10'), location: 'Downtown Dental', is_all_day: false, tags: ['personal'], created_at: now, updated_at: now },
-  { id: 'demo-e5', title: 'Team Offsite', is_all_day: true, start_time: new Date(Date.now() + 86_400_000 * 4).toISOString(), tags: ['work'], created_at: now, updated_at: now },
-  { id: 'demo-e6', title: 'Lunch with Sarah', start_time: new Date(Date.now() - 86_400_000).toISOString().replace(/T\d{2}:\d{2}/, 'T12:00'), end_time: new Date(Date.now() - 86_400_000).toISOString().replace(/T\d{2}:\d{2}/, 'T13:00'), location: 'Cafe Roma', tags: ['personal'], created_at: yesterday, updated_at: yesterday },
-];
-
 const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const useModuleStore = create<ModuleState>()((set, get) => ({
   isLoading: false,
   lastFetched: null,
 
-  // --- Todos --- (seeded with demo data)
-  todos: DEMO_TODOS,
+  // --- Todos ---
+  todos: [],
   setTodos: (todos) => set({ todos }),
   addTodo: (todo) => set((state) => ({ todos: [todo, ...state.todos] })),
   updateTodo: (id, updates) =>
@@ -126,7 +90,7 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   removeTodo: (id) =>
     set((state) => ({ todos: state.todos.filter((t) => t.id !== id) })),
 
-  kanbanStatuses: { 'demo-5': 'in_progress', 'demo-11': 'in_progress', 'demo-12': 'in_progress', 'demo-16': 'in_progress' } as Record<string, KanbanStatus>,
+  kanbanStatuses: {} as Record<string, KanbanStatus>,
   setKanbanStatus: (id, status) => {
     // Capture previous state for rollback
     const prevKanbanStatus = get().kanbanStatuses[id];
@@ -145,20 +109,18 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       set((state) => ({
         todos: state.todos.map((t) => (t.id === id ? { ...t, status: serverStatus } : t)),
       }));
-      if (!isDemoMode()) {
-        apiClient.patch(`/todos/${id}`, { status: serverStatus }).catch(() => {
-          // Rollback kanban status and todo status on server error
-          set((state) => ({
-            kanbanStatuses: prevKanbanStatus !== undefined
-              ? { ...state.kanbanStatuses, [id]: prevKanbanStatus }
-              : (() => { const next = { ...state.kanbanStatuses }; delete next[id]; return next; })(),
-            todos: state.todos.map((t) =>
-              t.id === id ? { ...t, status: prevTodo?.status ?? t.status } : t,
-            ),
-          }));
-          useToastStore.getState().addToast('error', 'Failed to move task on server, change reverted');
-        });
-      }
+      apiClient.patch(`/todos/${id}`, { status: serverStatus }).catch(() => {
+        // Rollback kanban status and todo status on server error
+        set((state) => ({
+          kanbanStatuses: prevKanbanStatus !== undefined
+            ? { ...state.kanbanStatuses, [id]: prevKanbanStatus }
+            : (() => { const next = { ...state.kanbanStatuses }; delete next[id]; return next; })(),
+          todos: state.todos.map((t) =>
+            t.id === id ? { ...t, status: prevTodo?.status ?? t.status } : t,
+          ),
+        }));
+        useToastStore.getState().addToast('error', 'Failed to move task on server, change reverted');
+      });
     }
   },
   getKanbanStatus: (id) => {
@@ -181,29 +143,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   selectAllTodos: (ids) => set({ selectedTodoIds: new Set(ids) }),
   clearTodoSelection: () => set({ selectedTodoIds: new Set<string>() }),
   bulkUpdateTodos: async (update) => {
-    if (isDemoMode()) {
-      // Apply locally in demo mode
-      const { todos } = get();
-      if (update.delete) {
-        set({ todos: todos.filter((t) => !update.ids.includes(t.id)) });
-        useToastStore.getState().addToast('success', `${update.ids.length} tasks deleted`);
-      } else {
-        set({
-          todos: todos.map((t) => {
-            if (!update.ids.includes(t.id)) return t;
-            const u: Partial<TodoResponse> = {};
-            if (update.status) u.status = update.status;
-            if (update.priority) u.priority = update.priority;
-            if (update.tags) u.tags = update.tags;
-            u.updated_at = new Date().toISOString();
-            return { ...t, ...u };
-          }),
-        });
-        useToastStore.getState().addToast('success', `${update.ids.length} tasks updated`);
-      }
-      set({ selectedTodoIds: new Set<string>() });
-      return;
-    }
     try {
       await apiClient.patch('/todos/bulk', update);
       await get().fetchTodos();
@@ -234,16 +173,14 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       ),
     }));
     // Persist to server
-    if (!isDemoMode()) {
-      Promise.all(
-        Object.entries(updates).map(([id, order]) =>
-          apiClient.patch(`/todos/${id}`, { sort_order: order }),
-        ),
-      ).catch((err) => {
-        logger.warn('Failed to persist reorder to server:', err);
-        useToastStore.getState().addToast('error', 'Failed to save reorder on server');
-      });
-    }
+    Promise.all(
+      Object.entries(updates).map(([id, order]) =>
+        apiClient.patch(`/todos/${id}`, { sort_order: order }),
+      ),
+    ).catch((err) => {
+      logger.warn('Failed to persist reorder to server:', err);
+      useToastStore.getState().addToast('error', 'Failed to save reorder on server');
+    });
   },
 
   resetToDemo: () => {
@@ -252,17 +189,17 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     pendingDeletes.clear();
 
     set({
-      todos: DEMO_TODOS,
-      events: DEMO_EVENTS,
-      kanbanStatuses: { 'demo-5': 'in_progress', 'demo-11': 'in_progress', 'demo-12': 'in_progress', 'demo-16': 'in_progress' } as Record<string, KanbanStatus>,
+      todos: [],
+      events: [],
+      kanbanStatuses: {} as Record<string, KanbanStatus>,
       selectedTodoIds: new Set<string>(),
       isLoading: false,
       lastFetched: null,
     });
   },
 
-  // --- Events --- (seeded with demo data across several days for calendar view)
-  events: DEMO_EVENTS,
+  // --- Events ---
+  events: [],
   setEvents: (events) => set({ events }),
   addEvent: (event) => set((state) => ({ events: [event, ...state.events] })),
   updateEvent: (id, updates) =>
@@ -320,19 +257,16 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   // --- Async actions ---
 
   fetchTodos: async (params) => {
-    if (isDemoMode()) return; // Keep demo data
     set({ isLoading: true });
     try {
       const response = await apiClient.get('/todos', { params });
       set({ todos: response.data?.items ?? response.data ?? [], kanbanStatuses: {}, isLoading: false, lastFetched: Date.now() });
     } catch {
-      // Keep existing (demo) data on failure
       set({ isLoading: false });
     }
   },
 
   fetchEvents: async (params) => {
-    if (isDemoMode()) return;
     set({ isLoading: true });
     try {
       const response = await apiClient.get('/events', { params });
@@ -362,42 +296,21 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       'success',
       newStatus === 'completed' ? 'Task completed' : 'Task reopened',
     );
-    if (!isDemoMode()) {
-      try {
-        await apiClient.patch(`/todos/${id}`, { status: newStatus });
-      } catch {
-        // Rollback: revert status and restore previous kanban status
-        set((state) => ({
-          todos: state.todos.map((t) => (t.id === id ? { ...t, status: todo.status } : t)),
-          kanbanStatuses: prevKanbanStatus !== undefined
-            ? { ...state.kanbanStatuses, [id]: prevKanbanStatus }
-            : state.kanbanStatuses,
-        }));
-        useToastStore.getState().addToast('error', 'Failed to update task on server, change reverted');
-      }
+    try {
+      await apiClient.patch(`/todos/${id}`, { status: newStatus });
+    } catch {
+      // Rollback: revert status and restore previous kanban status
+      set((state) => ({
+        todos: state.todos.map((t) => (t.id === id ? { ...t, status: todo.status } : t)),
+        kanbanStatuses: prevKanbanStatus !== undefined
+          ? { ...state.kanbanStatuses, [id]: prevKanbanStatus }
+          : state.kanbanStatuses,
+      }));
+      useToastStore.getState().addToast('error', 'Failed to update task on server, change reverted');
     }
   },
 
   createTodo: async (data) => {
-    if (isDemoMode()) {
-      // Create locally in demo mode
-      const localTodo: TodoResponse = {
-        id: `local-${Date.now()}`,
-        title: data.title,
-        description: data.description,
-        status: 'pending',
-        priority: data.priority,
-        due_date: data.due_date,
-        tags: data.tags,
-        parent_id: data.parent_id ?? null,
-        sort_order: data.sort_order ?? 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      get().addTodo(localTodo);
-      useToastStore.getState().addToast('success', 'Task created');
-      return localTodo;
-    }
     const response = await apiClient.post('/todos', data);
     get().addTodo(response.data);
     useToastStore.getState().addToast('success', 'Task created');
@@ -405,21 +318,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   },
 
   createEvent: async (data) => {
-    if (isDemoMode()) {
-      const localEvent: EventResponse = {
-        id: `local-${Date.now()}`,
-        title: data.title,
-        description: data.description,
-        start_time: data.start_time,
-        end_time: data.end_time,
-        location: data.location,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      get().addEvent(localEvent);
-      useToastStore.getState().addToast('success', 'Event created');
-      return localEvent;
-    }
     const response = await apiClient.post('/events', data);
     get().addEvent(response.data);
     useToastStore.getState().addToast('success', 'Event created');
@@ -436,15 +334,13 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
 
     const timeoutId = setTimeout(async () => {
       pendingDeletes.delete(id);
-      if (!isDemoMode()) {
-        try {
-          await apiClient.delete(`/todos/${id}`);
-        } catch (err) {
-          logger.warn('Failed to delete todo on server:', err);
-          get().addTodo(existing);
-          if (savedKanbanStatus) get().setKanbanStatus(id, savedKanbanStatus);
-          useToastStore.getState().addToast('error', 'Failed to delete task on server');
-        }
+      try {
+        await apiClient.delete(`/todos/${id}`);
+      } catch (err) {
+        logger.warn('Failed to delete todo on server:', err);
+        get().addTodo(existing);
+        if (savedKanbanStatus) get().setKanbanStatus(id, savedKanbanStatus);
+        useToastStore.getState().addToast('error', 'Failed to delete task on server');
       }
     }, 5000);
     pendingDeletes.set(id, timeoutId);
@@ -476,14 +372,12 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
 
     const timeoutId = setTimeout(async () => {
       pendingDeletes.delete(id);
-      if (!isDemoMode()) {
-        try {
-          await apiClient.delete(`/events/${id}`);
-        } catch (err) {
-          logger.warn('Failed to delete event on server:', err);
-          get().addEvent(existing);
-          useToastStore.getState().addToast('error', 'Failed to delete event on server');
-        }
+      try {
+        await apiClient.delete(`/events/${id}`);
+      } catch (err) {
+        logger.warn('Failed to delete event on server:', err);
+        get().addEvent(existing);
+        useToastStore.getState().addToast('error', 'Failed to delete event on server');
       }
     }, 5000);
     pendingDeletes.set(id, timeoutId);
@@ -508,18 +402,14 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
       return;
     }
     // For this_only and this_and_future, call the server endpoint
-    if (!isDemoMode()) {
-      try {
-        await apiClient.delete(`/events/${eventId}/occurrences/${date}`, { params: { mode } });
-        // Refresh events from server to reflect changes
-        await get().fetchEvents();
-        useToastStore.getState().addToast('success', 'Occurrence deleted');
-      } catch (err) {
-        logger.warn('Failed to delete event occurrence:', err);
-        useToastStore.getState().addToast('error', 'Failed to delete occurrence');
-      }
-    } else {
+    try {
+      await apiClient.delete(`/events/${eventId}/occurrences/${date}`, { params: { mode } });
+      // Refresh events from server to reflect changes
+      await get().fetchEvents();
       useToastStore.getState().addToast('success', 'Occurrence deleted');
+    } catch (err) {
+      logger.warn('Failed to delete event occurrence:', err);
+      useToastStore.getState().addToast('error', 'Failed to delete occurrence');
     }
   },
 
@@ -529,33 +419,25 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
     // Optimistic update
     get().updateTodo(id, { ...data, updated_at: new Date().toISOString() } as Partial<TodoResponse>);
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.patch(`/todos/${id}`, data);
-      } catch (err) {
-        logger.warn('Failed to update todo on server:', err);
-        // Rollback to previous state
-        if (previousTodo) get().updateTodo(id, previousTodo);
-        useToastStore.getState().addToast('error', 'Failed to update task on server, changes reverted');
-      }
+    try {
+      await apiClient.patch(`/todos/${id}`, data);
+    } catch (err) {
+      logger.warn('Failed to update todo on server:', err);
+      if (previousTodo) get().updateTodo(id, previousTodo);
+      useToastStore.getState().addToast('error', 'Failed to update task on server, changes reverted');
     }
   },
 
   serverUpdateEvent: async (id, data) => {
-    // Capture previous state for rollback
     const previousEvent = get().events.find((e) => e.id === id);
-    // Optimistic update
     get().updateEvent(id, { ...data, updated_at: new Date().toISOString() } as Partial<EventResponse>);
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.patch(`/events/${id}`, data);
-      } catch (err) {
-        logger.warn('Failed to update event on server:', err);
-        // Rollback to previous state
-        if (previousEvent) get().updateEvent(id, previousEvent);
-        useToastStore.getState().addToast('error', 'Failed to update event on server, changes reverted');
-      }
+    try {
+      await apiClient.patch(`/events/${id}`, data);
+    } catch (err) {
+      logger.warn('Failed to update event on server:', err);
+      if (previousEvent) get().updateEvent(id, previousEvent);
+      useToastStore.getState().addToast('error', 'Failed to update event on server, changes reverted');
     }
   },
 

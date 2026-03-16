@@ -1,6 +1,6 @@
 import { useAdminOverviewQuery } from '../../hooks/queries';
 import { formatBytes, formatUptime } from '../../utils/formatters';
-import { isDemoMode } from '../../utils/helpers';
+import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import EmptyState from '../shared/EmptyState';
@@ -8,7 +8,7 @@ import EmptyState from '../shared/EmptyState';
 export default function OverviewTab() {
   const { data, isLoading } = useAdminOverviewQuery();
 
-  if (isDemoMode()) {
+  if (!useAuthStore.getState().serverUrl) {
     return <EmptyState icon="🔌" message="Admin dashboard requires a server connection. Connect to a server in Settings to view server statistics." />;
   }
 

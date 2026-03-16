@@ -4,8 +4,7 @@ import { useToastStore } from './useToastStore';
 import { connectSSE } from '../services/sseClient';
 import apiClient from '../services/apiClient';
 import { logger } from '../services/logger';
-import { isDemoMode } from '../utils/helpers';
-import type { ConversationResponse, StreamEventMeta } from '../types/api';
+import type { ConversationResponse, ProjectTodoResponse, StreamEventMeta } from '../types/api';
 
 const MAX_MESSAGES = 500;
 
@@ -76,57 +75,10 @@ function dedupeMessages(msgs: ChatMessage[]): ChatMessage[] {
   });
 }
 
-// Demo conversations shown when no server is configured
-const DEMO_CONVERSATIONS: ConversationResponse[] = [
-  {
-    id: 'demo-conv-1',
-    title: 'Project Architecture',
-    last_message: 'Zustand is a great choice for state management in this project.',
-    created_at: new Date(Date.now() - 3_600_000).toISOString(),
-    updated_at: new Date(Date.now() - 3_600_000).toISOString(),
-  },
-  {
-    id: 'demo-conv-2',
-    title: 'Deployment Strategy',
-    last_message: 'Docker Compose with a reverse proxy is the recommended setup.',
-    created_at: new Date(Date.now() - 86_400_000).toISOString(),
-    updated_at: new Date(Date.now() - 86_400_000).toISOString(),
-  },
-];
-
-const DEMO_MESSAGES: Record<string, ChatMessage[]> = {
-  'demo-conv-1': [
-    {
-      _id: 'demo-msg-1a',
-      text: 'Zustand is a great choice for state management in this project.',
-      createdAt: new Date(Date.now() - 3_600_000),
-      user: { _id: 'assistant', name: 'ClawChat' },
-    },
-    {
-      _id: 'demo-msg-1b',
-      text: 'What state management library should I use for this project?',
-      createdAt: new Date(Date.now() - 3_601_000),
-      user: { _id: 'user', name: 'You' },
-    },
-  ],
-  'demo-conv-2': [
-    {
-      _id: 'demo-msg-2a',
-      text: 'Docker Compose with a reverse proxy is the recommended setup.',
-      createdAt: new Date(Date.now() - 86_400_000),
-      user: { _id: 'assistant', name: 'ClawChat' },
-    },
-    {
-      _id: 'demo-msg-2b',
-      text: 'How should I deploy ClawChat?',
-      createdAt: new Date(Date.now() - 86_401_000),
-      user: { _id: 'user', name: 'You' },
-    },
-  ],
-};
-
 interface ChatState {
   conversations: ConversationResponse[];
+  projects: ProjectTodoResponse[];
+  projectsLoaded: boolean;
   messages: ChatMessage[];
   currentConversationId: string | null;
   isStreaming: boolean;
@@ -148,9 +100,11 @@ interface ChatState {
   updateTaskProgress: (taskId: string, data: Partial<TaskProgressData>) => void;
 
   fetchConversations: () => Promise<void>;
-  createConversation: (title?: string) => Promise<ConversationResponse>;
+  createConversation: (title?: string, projectTodoId?: string) => Promise<ConversationResponse>;
   deleteConversation: (id: string) => Promise<void>;
   fetchMessages: (conversationId: string) => Promise<void>;
+  fetchProjects: () => Promise<void>;
+  getOrCreateProjectConversation: (todoId: string) => Promise<ConversationResponse>;
 
   resetToDemo: () => void;
 
@@ -163,7 +117,9 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>()((set, get) => ({
-  conversations: DEMO_CONVERSATIONS,
+  conversations: [],
+  projects: [],
+  projectsLoaded: false,
   messages: [],
   currentConversationId: null,
   isStreaming: false,
@@ -232,7 +188,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   resetToDemo: () =>
     set({
-      conversations: DEMO_CONVERSATIONS,
+      conversations: [],
+      projects: [],
+      projectsLoaded: false,
       messages: [],
       currentConversationId: null,
       conversationsLoaded: false,
@@ -244,13 +202,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // --- Async conversation actions ---
 
   fetchConversations: async () => {
-    if (isDemoMode()) {
-      // Seed demo conversations if not already loaded
-      if (!get().conversationsLoaded) {
-        set({ conversations: DEMO_CONVERSATIONS, conversationsLoaded: true });
-      }
-      return;
-    }
     try {
       const res = await apiClient.get('/chat/conversations');
       const items: ConversationResponse[] = res.data?.items ?? res.data ?? [];
@@ -261,28 +212,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  createConversation: async (title?: string) => {
+  createConversation: async (title?: string, projectTodoId?: string) => {
     const convoTitle = title || 'New Conversation';
 
-    if (isDemoMode()) {
-      const localConvo: ConversationResponse = {
-        id: `local-conv-${Date.now()}`,
-        title: convoTitle,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      get().addConversation(localConvo);
-      return localConvo;
-    }
-
     try {
-      const res = await apiClient.post('/chat/conversations', { title: convoTitle });
+      const payload: Record<string, string> = { title: convoTitle };
+      if (projectTodoId) payload.project_todo_id = projectTodoId;
+      const res = await apiClient.post('/chat/conversations', payload);
       const convo: ConversationResponse = res.data;
       get().addConversation(convo);
       return convo;
     } catch (err) {
       logger.warn('Failed to create conversation on server:', err);
-      // Fall back to local creation
       const localConvo: ConversationResponse = {
         id: `local-conv-${Date.now()}`,
         title: convoTitle,
@@ -302,23 +243,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     get().removeConversation(id);
     useToastStore.getState().addToast('success', 'Conversation deleted');
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.delete(`/chat/conversations/${id}`);
-      } catch (err) {
-        logger.warn('Failed to delete conversation on server:', err);
-        if (existing) get().addConversation(existing);
-        useToastStore.getState().addToast('error', 'Failed to delete conversation on server');
-      }
+    try {
+      await apiClient.delete(`/chat/conversations/${id}`);
+    } catch (err) {
+      logger.warn('Failed to delete conversation on server:', err);
+      if (existing) get().addConversation(existing);
+      useToastStore.getState().addToast('error', 'Failed to delete conversation on server');
     }
   },
 
   fetchMessages: async (conversationId) => {
-    if (isDemoMode()) {
-      const demoMsgs = DEMO_MESSAGES[conversationId] ?? [];
-      set({ messages: demoMsgs });
-      return;
-    }
     try {
       const res = await apiClient.get(`/chat/conversations/${conversationId}/messages`);
       const rawMessages: Array<{
@@ -339,27 +273,35 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
+  fetchProjects: async () => {
+    try {
+      const res = await apiClient.get('/todos/projects');
+      const items: ProjectTodoResponse[] = res.data ?? [];
+      set({ projects: items, projectsLoaded: true });
+    } catch (err) {
+      logger.warn('Failed to fetch projects:', err);
+    }
+  },
+
+  getOrCreateProjectConversation: async (todoId: string) => {
+    try {
+      const res = await apiClient.get(`/chat/conversations/by-project/${todoId}`);
+      const convo: ConversationResponse = res.data;
+      // Add to conversations list if not already present
+      const exists = get().conversations.some((c) => c.id === convo.id);
+      if (!exists) get().addConversation(convo);
+      return convo;
+    } catch (err) {
+      logger.warn('Failed to get/create project conversation:', err);
+      throw err;
+    }
+  },
+
   // --- Streaming / message actions ---
 
   sendMessageStreaming: async (conversationId, text) => {
     const idempotencyKey = crypto.randomUUID();
-    const { serverUrl, token, connectionStatus } = useAuthStore.getState();
-
-    // In demo mode, simulate a response
-    if (!serverUrl) {
-      const assistantMessage: ChatMessage = {
-        _id: `demo-reply-${Date.now()}`,
-        text: 'This is a demo response. Connect to a server for real AI chat.',
-        createdAt: new Date(),
-        user: { _id: 'assistant', name: 'ClawChat' },
-      };
-      set((state) => ({
-        messages: trimMessages([assistantMessage, ...state.messages]),
-      }));
-      return;
-    }
-
-    const { healthOK } = useAuthStore.getState();
+    const { serverUrl, token, connectionStatus, healthOK } = useAuthStore.getState();
     if (!healthOK) {
       useToastStore.getState().addToast('warning', 'Server status looks uncertain. Trying anyway...');
     }
@@ -484,22 +426,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       messages: state.messages.filter((m) => m._id !== messageId),
     }));
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.delete(`/chat/conversations/${conversationId}/messages/${messageId}`);
-      } catch (error) {
-        logger.warn('Failed to delete message on server:', error);
-        if (deletedMessage) {
-          set((state) => {
-            const updated = [...state.messages];
-            // Re-insert at the original position (clamped to array bounds)
-            const insertAt = Math.min(deletedIndex, updated.length);
-            updated.splice(insertAt, 0, deletedMessage);
-            return { messages: updated };
-          });
-        }
-        useToastStore.getState().addToast('error', 'Failed to delete message on server');
+    try {
+      await apiClient.delete(`/chat/conversations/${conversationId}/messages/${messageId}`);
+    } catch (error) {
+      logger.warn('Failed to delete message on server:', error);
+      if (deletedMessage) {
+        set((state) => {
+          const updated = [...state.messages];
+          const insertAt = Math.min(deletedIndex, updated.length);
+          updated.splice(insertAt, 0, deletedMessage);
+          return { messages: updated };
+        });
       }
+      useToastStore.getState().addToast('error', 'Failed to delete message on server');
     }
   },
 
@@ -521,11 +460,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       messages: state.messages.filter((m) => m._id !== assistantMessageId),
     }));
 
-    if (!isDemoMode()) {
-      apiClient
-        .delete(`/chat/conversations/${conversationId}/messages/${assistantMessageId}`)
-        .catch((err) => logger.warn('Failed to delete assistant message on server:', err));
-    }
+    apiClient
+      .delete(`/chat/conversations/${conversationId}/messages/${assistantMessageId}`)
+      .catch((err) => logger.warn('Failed to delete assistant message on server:', err));
 
     return userMessage.text;
   },
@@ -554,21 +491,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set((state) => ({
         messages: state.messages.filter((m) => !assistantMessagesToRemove.includes(m._id)),
       }));
-      if (!isDemoMode()) {
-        for (const id of assistantMessagesToRemove) {
-          apiClient
-            .delete(`/chat/conversations/${conversationId}/messages/${id}`)
-            .catch((err) => logger.warn('Failed to delete old assistant message:', err));
-        }
+      for (const id of assistantMessagesToRemove) {
+        apiClient
+          .delete(`/chat/conversations/${conversationId}/messages/${id}`)
+          .catch((err) => logger.warn('Failed to delete old assistant message:', err));
       }
     }
 
-    if (!isDemoMode()) {
-      try {
-        await apiClient.put(`/chat/conversations/${conversationId}/messages/${messageId}`, { content: newText });
-      } catch (error) {
-        logger.warn('Failed to edit message on server:', error);
-      }
+    try {
+      await apiClient.put(`/chat/conversations/${conversationId}/messages/${messageId}`, { content: newText });
+    } catch (error) {
+      logger.warn('Failed to edit message on server:', error);
     }
 
     return newText;

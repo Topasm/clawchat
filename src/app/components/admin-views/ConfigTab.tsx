@@ -1,12 +1,12 @@
 import { useAdminConfigQuery } from '../../hooks/queries';
-import { isDemoMode } from '../../utils/helpers';
+import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
 
 export default function ConfigTab() {
   const { data, isLoading } = useAdminConfigQuery();
 
-  if (isDemoMode()) {
+  if (!useAuthStore.getState().serverUrl) {
     return <EmptyState icon="⚙️" message="Server configuration requires a server connection." />;
   }
 

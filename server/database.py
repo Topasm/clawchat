@@ -99,6 +99,7 @@ async def init_db():
             "ALTER TABLE todos ADD COLUMN source TEXT",
             "ALTER TABLE todos ADD COLUMN source_id TEXT",
             "ALTER TABLE todos ADD COLUMN assignee TEXT",
+            "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
         ]
         for stmt in _ALTER_TABLE_STMTS:
             try:

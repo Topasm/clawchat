@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { secureStorage } from '../services/platform';
 
-export type ConnectionStatus = 'demo' | 'connected' | 'disconnected' | 'reconnecting';
+export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
 
 interface AuthState {
   token: string | null;
@@ -26,7 +26,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       serverUrl: null,
       isLoading: true,
-      connectionStatus: 'demo' as ConnectionStatus,
+      connectionStatus: 'disconnected' as ConnectionStatus,
       healthOK: true,
 
       login: async (serverUrl: string, pin: string) => {
@@ -57,9 +57,9 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           refreshToken: null,
           serverUrl: null,
-          connectionStatus: 'demo' as ConnectionStatus,
+          connectionStatus: 'disconnected' as ConnectionStatus,
         });
-        // Reset module and chat stores back to demo data (lazy import to avoid circular deps)
+        // Reset module and chat stores (lazy import to avoid circular deps)
         import('./useModuleStore').then((m) => m.useModuleStore.getState().resetToDemo());
         import('./useChatStore').then((m) => m.useChatStore.getState().resetToDemo());
       },

@@ -20,6 +20,10 @@ export default function ChatPage() {
   const conversations = useChatStore((s) => s.conversations);
 
   const convo = conversations.find((c) => c.id === conversationId);
+  const projects = useChatStore((s) => s.projects);
+  const projectTodo = convo?.project_todo_id
+    ? projects.find((p) => p.id === convo.project_todo_id)
+    : null;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,6 +72,29 @@ export default function ChatPage() {
         </button>
         <span className="cc-chat-page__title">{convo?.title || 'Chat'}</span>
       </div>
+
+      {projectTodo && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '8px 16px',
+          background: 'var(--cc-primary-light)',
+          borderBottom: '1px solid var(--cc-border)',
+          fontSize: 13,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--cc-primary)" strokeWidth="2">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+          </svg>
+          <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{projectTodo.title}</span>
+          {projectTodo.subtask_count != null && projectTodo.subtask_count > 0 && (
+            <span style={{ color: 'var(--cc-text-tertiary)', marginLeft: 'auto' }}>
+              {projectTodo.completed_subtask_count ?? 0}/{projectTodo.subtask_count} tasks done
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="cc-chat-page__messages" ref={scrollRef}>
         {chronological.map((msg) => (

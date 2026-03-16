@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import apiClient from '../services/apiClient';
-import { isDemoMode } from '../utils/helpers';
 import type { SettingsPayload } from '../types/api';
 
 interface StreakData {
@@ -170,7 +169,6 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       fetchSettings: async () => {
-        if (isDemoMode()) return;
         try {
           const response = await apiClient.get('/settings');
           const serverSettings: SettingsPayload = response.data?.settings ?? response.data;
@@ -189,7 +187,6 @@ export const useSettingsStore = create<SettingsState>()(
       },
 
       saveSettings: async () => {
-        if (isDemoMode()) return;
         try {
           const state = get();
           const payload: SettingsPayload = {

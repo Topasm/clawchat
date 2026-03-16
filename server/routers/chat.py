@@ -12,6 +12,7 @@ from database import get_db
 from exceptions import NotFoundError
 from models.conversation import Conversation
 from models.message import Message
+from models.todo import Todo
 from schemas.chat import (
     ConversationDetailResponse,
     ConversationResponse,
@@ -27,24 +28,49 @@ from utils import make_id
 router = APIRouter()
 
 
+async def _build_project_context(db: AsyncSession, project_todo_id: str) -> str:
+    """Build project context string for AI system prompt."""
+    project = await db.get(Todo, project_todo_id)
+    if not project:
+        return ""
+    # Fetch sub-tasks
+    q = select(Todo).where(Todo.parent_id == project_todo_id)
+    subtasks = (await db.execute(q)).scalars().all()
+
+    ctx = f"\n\n[Project: {project.title}]\n"
+    if project.description:
+        ctx += f"Project Notes:\n{project.description}\n"
+    if subtasks:
+        ctx += f"Tasks ({len(subtasks)}):\n"
+        for t in subtasks:
+            ctx += f"  - [{t.status}] {t.title}"
+            if t.priority != "medium":
+                ctx += f" ({t.priority})"
+            ctx += "\n"
+    return ctx
+
+
 @router.get("/conversations", response_model=PaginatedResponse[ConversationResponse])
 async def list_conversations(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     archived: bool = False,
+    project_todo_id: str | None = None,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
     offset = (page - 1) * limit
 
-    count_q = select(func.count(Conversation.id)).where(
-        Conversation.is_archived == archived
-    )
+    conditions = [Conversation.is_archived == archived]
+    if project_todo_id is not None:
+        conditions.append(Conversation.project_todo_id == project_todo_id)
+
+    count_q = select(func.count(Conversation.id)).where(*conditions)
     total = (await db.execute(count_q)).scalar() or 0
 
     q = (
         select(Conversation)
-        .where(Conversation.is_archived == archived)
+        .where(*conditions)
         .order_by(Conversation.updated_at.desc())
         .offset(offset)
         .limit(limit)
@@ -71,6 +97,7 @@ async def list_conversations(
                 updated_at=conv.updated_at,
                 is_archived=conv.is_archived,
                 last_message=preview,
+                project_todo_id=conv.project_todo_id,
             )
         )
 
@@ -83,7 +110,7 @@ async def create_conversation(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    conv = Conversation(title=body.title)
+    conv = Conversation(title=body.title, project_todo_id=body.project_todo_id)
     db.add(conv)
     await db.commit()
     await db.refresh(conv)
@@ -93,6 +120,42 @@ async def create_conversation(
         created_at=conv.created_at,
         updated_at=conv.updated_at,
         is_archived=conv.is_archived,
+        project_todo_id=conv.project_todo_id,
+    )
+
+
+@router.get("/conversations/by-project/{todo_id}", response_model=ConversationResponse)
+async def get_or_create_project_conversation(
+    todo_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Get (or create) the conversation for a project todo."""
+    # Check if project todo exists
+    project = await db.get(Todo, todo_id)
+    if not project:
+        raise NotFoundError("Project todo not found")
+
+    # Look for existing conversation
+    q = select(Conversation).where(
+        Conversation.project_todo_id == todo_id,
+        Conversation.is_archived == False,  # noqa: E712
+    )
+    conv = (await db.execute(q)).scalars().first()
+
+    if not conv:
+        conv = Conversation(title=project.title, project_todo_id=todo_id)
+        db.add(conv)
+        await db.commit()
+        await db.refresh(conv)
+
+    return ConversationResponse(
+        id=conv.id,
+        title=conv.title,
+        created_at=conv.created_at,
+        updated_at=conv.updated_at,
+        is_archived=conv.is_archived,
+        project_todo_id=conv.project_todo_id,
     )
 
 
@@ -119,6 +182,7 @@ async def get_conversation(
         created_at=conv.created_at,
         updated_at=conv.updated_at,
         is_archived=conv.is_archived,
+        project_todo_id=conv.project_todo_id,
         messages=[MessageResponse.model_validate(m) for m in messages],
     )
 
@@ -170,7 +234,10 @@ async def stream_chat(
     rows = (await db.execute(q)).scalars().all()
     history = list(reversed(rows))
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    system_content = SYSTEM_PROMPT
+    if conv.project_todo_id:
+        system_content += await _build_project_context(db, conv.project_todo_id)
+    messages = [{"role": "system", "content": system_content}]
     for msg in history:
         messages.append({"role": msg.role, "content": msg.content})
 

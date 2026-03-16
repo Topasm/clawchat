@@ -6,6 +6,7 @@ from pydantic import BaseModel, model_validator
 
 class CreateConversationRequest(BaseModel):
     title: str = ""
+    project_todo_id: str | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -15,6 +16,7 @@ class ConversationResponse(BaseModel):
     updated_at: datetime
     is_archived: bool
     last_message: str | None = None
+    project_todo_id: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -80,6 +82,7 @@ class ConversationDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     is_archived: bool
+    project_todo_id: str | None = None
     messages: list[MessageResponse] = []
 
     model_config = {"from_attributes": True}

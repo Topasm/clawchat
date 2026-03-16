@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useTaskRelationshipsQuery, useCreateTaskRelationship, useDeleteTaskRelationship } from '../../hooks/queries';
-import { isDemoMode } from '../../utils/helpers';
 import type { RelationshipType, TaskRelationshipResponse } from '../../types/api';
 
 interface RelationshipsSectionProps {
@@ -28,18 +27,6 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
   const [showForm, setShowForm] = useState(false);
   const [selectedTodoId, setSelectedTodoId] = useState('');
   const [selectedType, setSelectedType] = useState<RelationshipType>('related');
-
-  // In demo mode, show empty section with disabled add
-  if (isDemoMode() && relationships.length === 0) {
-    return (
-      <div className="cc-detail__section">
-        <div className="cc-detail__section-title">Relationships</div>
-        <div style={{ fontSize: 13, color: 'var(--cc-text-tertiary)', padding: '8px 0' }}>
-          Connect to a server to manage task relationships.
-        </div>
-      </div>
-    );
-  }
 
   const grouped = {
     blocks: relationships.filter((r) => r.relationship_type === 'blocks' && r.source_todo_id === taskId),

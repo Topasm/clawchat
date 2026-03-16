@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Index, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -23,7 +23,13 @@ class Conversation(Base):
     )
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     metadata_json: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
+    project_todo_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("todos.id", ondelete="SET NULL"), nullable=True
+    )
 
     messages = relationship("Message", back_populates="conversation", lazy="selectin")
 
-    __table_args__ = (Index("idx_conversations_updated_at", "updated_at"),)
+    __table_args__ = (
+        Index("idx_conversations_updated_at", "updated_at"),
+        Index("idx_conversations_project_todo_id", "project_todo_id"),
+    )
