@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import usePlatform from '../hooks/usePlatform';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useToastStore } from '../stores/useToastStore';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
+import apiClient from '../services/apiClient';
 import SettingsSection from '../components/shared/SettingsSection';
 import SettingsRow from '../components/shared/SettingsRow';
 import Toggle from '../components/shared/Toggle';
@@ -19,6 +22,27 @@ export default function SettingsPage() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const logout = useAuthStore((s) => s.logout);
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
+  const addToast = useToastStore((s) => s.addToast);
+  const [obsidianSyncing, setObsidianSyncing] = useState(false);
+  const [obsidianResult, setObsidianResult] = useState<string | null>(null);
+
+  const handleObsidianSync = async () => {
+    setObsidianSyncing(true);
+    setObsidianResult(null);
+    try {
+      const res = await apiClient.post('/obsidian/sync');
+      const d = res.data;
+      const msg = `Synced: ${d.created ?? 0} created, ${d.updated ?? 0} updated, ${d.synced ?? d.total ?? 0} total`;
+      setObsidianResult(msg);
+      addToast('success', msg);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Obsidian sync failed';
+      setObsidianResult(null);
+      addToast('error', message);
+    } finally {
+      setObsidianSyncing(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: 560 }}>
@@ -171,6 +195,27 @@ export default function SettingsPage() {
             Import
           </button>
         </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="Obsidian Sync">
+        <SettingsRow label="Sync Now" sublabel="Pull tasks from Obsidian vault">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="cc-btn cc-btn--secondary"
+              onClick={handleObsidianSync}
+              disabled={obsidianSyncing}
+              style={{ fontSize: 12, padding: '4px 10px' }}
+            >
+              {obsidianSyncing ? 'Syncing...' : 'Sync Now'}
+            </button>
+          </div>
+        </SettingsRow>
+        {obsidianResult && (
+          <SettingsRow label="">
+            <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>{obsidianResult}</span>
+          </SettingsRow>
+        )}
       </SettingsSection>
 
       <SettingsSection title="Server Connection">

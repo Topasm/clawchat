@@ -38,6 +38,9 @@ export const TodoResponseSchema = z.object({
   completed_at: z.string().nullable().optional(),
   parent_id: z.string().nullable().optional(),
   sort_order: z.number().optional(),
+  source: z.string().nullable().optional(),
+  source_id: z.string().nullable().optional(),
+  assignee: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -50,6 +53,7 @@ export const TodoCreateSchema = z.object({
   tags: z.array(z.string()).optional(),
   parent_id: z.string().nullable().optional(),
   sort_order: z.number().optional(),
+  assignee: z.string().nullable().optional(),
 });
 
 export const TodoUpdateSchema = z.object({
@@ -61,6 +65,7 @@ export const TodoUpdateSchema = z.object({
   tags: z.array(z.string()).optional(),
   parent_id: z.string().nullable().optional(),
   sort_order: z.number().optional(),
+  assignee: z.string().nullable().optional(),
 });
 
 export const KanbanStatusSchema = z.enum(['pending', 'in_progress', 'completed']);

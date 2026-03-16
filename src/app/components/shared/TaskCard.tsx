@@ -23,6 +23,9 @@ export default function TaskCard({ task, onToggle, onClick, className, isSubTask
       <div className="cc-card__body">
         <div className={`cc-card__title${isCompleted ? ' cc-card__title--completed' : ''}`}>
           {task.title}
+          {task.source === 'obsidian' && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginLeft: 6, padding: '1px 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px', borderRadius: 4, backgroundColor: '#7C3AED', color: '#fff', verticalAlign: 'middle' }}>OB</span>
+          )}
         </div>
         <div className="cc-card__meta">
           {task.priority && task.priority !== 'medium' && (
@@ -34,6 +37,9 @@ export default function TaskCard({ task, onToggle, onClick, className, isSubTask
           {task.tags?.map((tag) => (
             <Badge key={tag} variant="tag">{tag}</Badge>
           ))}
+          {task.assignee === 'openclaw' && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff' }}>AI</span>
+          )}
           {(blockerCount ?? 0) > 0 && <BlockerBadge count={blockerCount!} />}
           {(subTaskCount ?? 0) > 0 && (
             <span className="cc-badge cc-badge--count">{subTaskCount} sub-task{subTaskCount !== 1 ? 's' : ''}</span>

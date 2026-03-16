@@ -116,6 +116,27 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
+      <div className="cc-detail__field">
+        <span className="cc-detail__field-label">Assignee</span>
+        <div className="cc-detail__field-value">
+          <button
+            type="button"
+            className="cc-detail__field-btn"
+            onClick={() => {
+              const next = task.assignee === 'openclaw' ? null : 'openclaw';
+              persistField({ assignee: next });
+            }}
+            style={{ fontSize: 13 }}
+          >
+            {task.assignee === 'openclaw' ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff', fontSize: 12, fontWeight: 600 }}>OpenClaw AI</span>
+            ) : (
+              <span style={{ color: 'var(--cc-text-tertiary)', fontSize: 12 }}>Unassigned</span>
+            )}
+          </button>
+        </div>
+      </div>
+
       {task.tags && task.tags.length > 0 && (
         <div className="cc-detail__field">
           <span className="cc-detail__field-label">Tags</span>
