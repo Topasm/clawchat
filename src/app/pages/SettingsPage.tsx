@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import usePlatform from '../hooks/usePlatform';
@@ -12,11 +12,12 @@ import SettingsRow from '../components/shared/SettingsRow';
 import Toggle from '../components/shared/Toggle';
 import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
+import MobileConnectionPanel from '../components/shared/MobileConnectionPanel';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { mode, setMode } = useTheme();
-  const { isMobile } = usePlatform();
+  const { isMobile, isElectron } = usePlatform();
   const settings = useSettingsStore();
   const token = useAuthStore((s) => s.token);
   const serverUrl = useAuthStore((s) => s.serverUrl);
@@ -25,6 +26,15 @@ export default function SettingsPage() {
   const addToast = useToastStore((s) => s.addToast);
   const [obsidianSyncing, setObsidianSyncing] = useState(false);
   const [obsidianResult, setObsidianResult] = useState<string | null>(null);
+  const [obsidianVaultPath, setObsidianVaultPath] = useState('');
+
+  useEffect(() => {
+    if (isElectron) {
+      window.electronAPI.server.getConfig().then((cfg) => {
+        setObsidianVaultPath(cfg.obsidianVaultPath ?? '');
+      });
+    }
+  }, [isElectron]);
 
   const handleObsidianSync = async () => {
     setObsidianSyncing(true);
@@ -61,9 +71,6 @@ export default function SettingsPage() {
             value={mode}
             onChange={(v) => setMode(v as 'light' | 'dark' | 'system')}
           />
-        </SettingsRow>
-        <SettingsRow label="Send on Enter" sublabel="Use Shift+Enter for newline">
-          <Toggle checked={settings.sendOnEnter} onChange={settings.setSendOnEnter} />
         </SettingsRow>
         <SettingsRow label="Show timestamps">
           <Toggle checked={settings.showTimestamps} onChange={settings.setShowTimestamps} />
@@ -198,13 +205,48 @@ export default function SettingsPage() {
       </SettingsSection>
 
       <SettingsSection title="Obsidian Sync">
+        {isElectron && (
+          <SettingsRow label="Vault path" sublabel={obsidianVaultPath || 'Not configured'}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                type="button"
+                className="cc-btn cc-btn--secondary"
+                onClick={async () => {
+                  const folder = await window.electronAPI.server.selectFolder();
+                  if (folder) {
+                    setObsidianVaultPath(folder);
+                    await window.electronAPI.server.updateConfig({ obsidianVaultPath: folder });
+                    addToast('success', 'Vault path saved. Restart the app for changes to take effect.');
+                  }
+                }}
+                style={{ fontSize: 12, padding: '4px 10px' }}
+              >
+                Browse
+              </button>
+              {obsidianVaultPath && (
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--danger"
+                  onClick={async () => {
+                    setObsidianVaultPath('');
+                    await window.electronAPI.server.updateConfig({ obsidianVaultPath: '' });
+                    addToast('success', 'Vault path cleared.');
+                  }}
+                  style={{ fontSize: 12, padding: '4px 10px' }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </SettingsRow>
+        )}
         <SettingsRow label="Sync Now" sublabel="Pull tasks from Obsidian vault">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
               className="cc-btn cc-btn--secondary"
               onClick={handleObsidianSync}
-              disabled={obsidianSyncing}
+              disabled={obsidianSyncing || (isElectron && !obsidianVaultPath)}
               style={{ fontSize: 12, padding: '4px 10px' }}
             >
               {obsidianSyncing ? 'Syncing...' : 'Sync Now'}
@@ -218,26 +260,45 @@ export default function SettingsPage() {
         )}
       </SettingsSection>
 
-      <SettingsSection title="Server Connection">
-        {token ? (
-          <>
-            <SettingsRow label="Server" sublabel={serverUrl ?? 'Unknown'}>
-              <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
-            </SettingsRow>
-            <SettingsRow label="Logout" sublabel="Disconnect from server">
-              <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/today'); }}>
-                Logout
+      {!isElectron && (
+        <SettingsSection title="Server Connection">
+          {token ? (
+            <>
+              <SettingsRow label="Server" sublabel={serverUrl ?? 'Unknown'}>
+                <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
+              </SettingsRow>
+              <SettingsRow label="Logout" sublabel="Disconnect from server">
+                <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/today'); }}>
+                  Logout
+                </button>
+              </SettingsRow>
+            </>
+          ) : (
+            <SettingsRow label="Demo Mode" sublabel="No server connected">
+              <button className="cc-btn cc-btn--primary" onClick={() => navigate('/login')}>
+                Connect
               </button>
             </SettingsRow>
-          </>
-        ) : (
-          <SettingsRow label="Demo Mode" sublabel="No server connected">
-            <button className="cc-btn cc-btn--primary" onClick={() => navigate('/login')}>
-              Connect
+          )}
+        </SettingsSection>
+      )}
+      {isElectron && (
+        <SettingsSection title="Connect Mobile Device">
+          <MobileConnectionPanel />
+        </SettingsSection>
+      )}
+      {isElectron && token && (
+        <SettingsSection title="Account">
+          <SettingsRow label="Server" sublabel={serverUrl ?? 'localhost:8000'}>
+            <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
+          </SettingsRow>
+          <SettingsRow label="Logout">
+            <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/today'); }} style={{ fontSize: 12, padding: '4px 10px' }}>
+              Logout
             </button>
           </SettingsRow>
-        )}
-      </SettingsSection>
+        </SettingsSection>
+      )}
     </div>
   );
 }

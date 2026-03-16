@@ -6,6 +6,15 @@ directories:
 files:
   - dist-electron
   - dist
+extraResources:
+  - from: "server"
+    to: "server"
+    filter:
+      - "**/*"
+      - "!__pycache__/**"
+      - "!venv/**"
+      - "!data/**"
+      - "!*.log"
 win:
   target:
     - nsis

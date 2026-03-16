@@ -12,7 +12,7 @@
 }
 
 .cc-sidebar-panel {
-  min-width: 0;
+  min-width: 160px;
 }
 
 .cc-sidebar__header {
@@ -35,6 +35,9 @@
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
   position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cc-nav-item:hover {

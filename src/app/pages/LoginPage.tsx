@@ -2,7 +2,9 @@ import { useState, type FormEvent, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
+import { IS_ELECTRON, IS_CAPACITOR } from '../types/platform';
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
+import QRScanner from '../components/shared/QRScanner';
 
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'error';
 
@@ -16,6 +18,32 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
+  const [showServerUrl, setShowServerUrl] = useState(!IS_ELECTRON);
+  const [showScanner, setShowScanner] = useState(false);
+
+  const handleQRScan = async (data: string) => {
+    setShowScanner(false);
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.serverUrl && parsed.pin) {
+        setServerUrl(parsed.serverUrl);
+        setPin(parsed.pin);
+        // Auto-login
+        setLoading(true);
+        setError('');
+        try {
+          await login(parsed.serverUrl.replace(/\/+$/, ''), parsed.pin);
+          navigate('/today');
+        } catch (err) {
+          setError((err as Error).message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    } catch {
+      setError('Invalid QR code');
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -111,34 +139,51 @@ export default function LoginPage() {
           ClawChat
         </h1>
 
-        <label style={{ display: 'flex', alignItems: 'center', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
-          Server URL
-          {healthIndicator()}
-        </label>
-        <input
-          type="url"
-          value={serverUrl}
-          onChange={(e) => { setServerUrl(e.target.value); setHealthStatus('idle'); }}
-          onBlur={handleServerUrlBlur}
-          placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
-          required
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            marginBottom: 16,
-            border: `1px solid ${healthStatus === 'ok' ? colors.success : healthStatus === 'error' ? colors.error : colors.border}`,
-            borderRadius: 8,
-            fontSize: 14,
-            background: colors.background,
-            color: colors.text,
-            boxSizing: 'border-box',
-            outline: 'none',
-            transition: 'border-color 0.2s',
-          }}
-          />
-        <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}>
-          When ClawChat is opened through Tailscale or a reverse proxy, leaving this as the current site URL is usually correct.
-        </div>
+        {showServerUrl ? (
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
+              Server URL
+              {healthIndicator()}
+            </label>
+            <input
+              type="url"
+              value={serverUrl}
+              onChange={(e) => { setServerUrl(e.target.value); setHealthStatus('idle'); }}
+              onBlur={handleServerUrlBlur}
+              placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
+              required
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                marginBottom: 16,
+                border: `1px solid ${healthStatus === 'ok' ? colors.success : healthStatus === 'error' ? colors.error : colors.border}`,
+                borderRadius: 8,
+                fontSize: 14,
+                background: colors.background,
+                color: colors.text,
+                boxSizing: 'border-box',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+              }}
+            />
+            <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}>
+              When ClawChat is opened through Tailscale or a reverse proxy, leaving this as the current site URL is usually correct.
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <span style={{ fontSize: 12, color: colors.textTertiary }}>
+              Server: {serverUrl}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowServerUrl(true)}
+              style={{ background: 'none', border: 'none', color: colors.textSecondary, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Change
+            </button>
+          </div>
+        )}
 
         <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
           PIN
@@ -185,6 +230,27 @@ export default function LoginPage() {
           {loading ? 'Connecting...' : 'Login'}
         </button>
 
+        {!IS_ELECTRON && (
+          <button
+            type="button"
+            onClick={() => setShowScanner(true)}
+            style={{
+              width: '100%',
+              padding: '10px 0',
+              marginTop: 10,
+              background: 'transparent',
+              color: colors.primary,
+              border: `1px solid ${colors.primary}`,
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Scan QR Code
+          </button>
+        )}
+
         <div
           style={{
             textAlign: 'center',
@@ -213,6 +279,9 @@ export default function LoginPage() {
           </div>
         </div>
       </form>
+      {showScanner && (
+        <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />
+      )}
     </div>
   );
 }

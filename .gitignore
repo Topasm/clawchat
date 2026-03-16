@@ -23,9 +23,11 @@ ios/App/Pods
 .DS_Store
 Thumbs.db
 
-# Python
+# Python / Server
 server/__pycache__
 server/**/__pycache__
 server/data/
+server/venv/
+server/*.log
 *.pyc
 .claude/worktrees/

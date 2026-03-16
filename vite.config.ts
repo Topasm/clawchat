@@ -45,6 +45,11 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    server: {
+      watch: {
+        ignored: ['**/server/**'],
+      },
+    },
     test: {
       globals: true,
       environment: 'jsdom',

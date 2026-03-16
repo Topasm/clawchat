@@ -253,7 +253,7 @@ export default function Layout() {
   );
 
   return (
-    <div className="cc-root" style={cssVars(colors)}>
+    <div className={`cc-root${isMobile ? ' cc-root--mobile' : ''}`} style={cssVars(colors)}>
       <UpdateNotification />
       <ToastContainer />
       <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
@@ -266,7 +266,7 @@ export default function Layout() {
         </>
       ) : (
         <PanelGroup orientation="horizontal" id="cc-layout-h">
-          <Panel defaultSize={18} minSize={12} maxSize={30} id="sidebar" className="cc-sidebar-panel">
+          <Panel defaultSize={18} minSize={14} maxSize={30} id="sidebar" className="cc-sidebar-panel">
             {sidebar}
           </Panel>
           <PanelResizeHandle className="cc-resize-handle cc-resize-handle--vertical" />

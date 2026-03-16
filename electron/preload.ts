@@ -37,4 +37,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('update-downloaded', listener);
     },
   },
+  server: {
+    getStatus: () => ipcRenderer.invoke('server:status'),
+    getConfig: () => ipcRenderer.invoke('server:config'),
+    getNetworkInfo: () => ipcRenderer.invoke('server:network-info'),
+    updateConfig: (updates: Record<string, unknown>) => ipcRenderer.invoke('server:update-config', updates),
+    selectFolder: () => ipcRenderer.invoke('server:select-folder'),
+    onStatusChange: (cb: (status: string) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: string) => cb(status);
+      ipcRenderer.on('server:status-changed', listener);
+      return () => ipcRenderer.removeListener('server:status-changed', listener);
+    },
+  },
 });

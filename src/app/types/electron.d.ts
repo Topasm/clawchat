@@ -6,6 +6,15 @@ export interface ElectronUpdater {
   onUpdateDownloaded: (cb: () => void) => () => void;
 }
 
+export interface ElectronServerAPI {
+  getStatus: () => Promise<string>;
+  getConfig: () => Promise<{ port: number; pin: string; obsidianVaultPath: string }>;
+  getNetworkInfo: () => Promise<{ addresses: { ip: string; name: string; isTailscale: boolean }[] }>;
+  updateConfig: (updates: Record<string, unknown>) => Promise<void>;
+  selectFolder: () => Promise<string | null>;
+  onStatusChange: (cb: (status: string) => void) => () => void;
+}
+
 export interface ElectronAPI {
   platform: string;
   appVersion: string;
@@ -13,6 +22,7 @@ export interface ElectronAPI {
   on: (channel: string, callback: (...args: unknown[]) => void) => () => void;
   showNotification: (title: string, body: string) => void;
   updater: ElectronUpdater;
+  server: ElectronServerAPI;
 }
 
 declare global {

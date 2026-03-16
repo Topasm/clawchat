@@ -69,7 +69,7 @@ export default function ChatInput({
       handleSend();
       return;
     }
-    if (sendOnEnter && e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }

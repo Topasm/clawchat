@@ -9,26 +9,27 @@
   padding-right: env(safe-area-inset-right);
 }
 
-/* On mobile, hide the sidebar and show a bottom nav instead */
+/* On mobile, hide the sidebar and show a bottom nav instead.
+   Scoped to .cc-root--mobile so Electron narrow windows keep the sidebar. */
 @media (max-width: 768px) {
-  .cc-sidebar {
+  .cc-root--mobile .cc-sidebar {
     display: none;
   }
 
-  .cc-root {
+  .cc-root--mobile {
     flex-direction: column;
   }
 
-  .cc-main {
+  .cc-root--mobile .cc-main {
     flex: 1;
   }
 
-  .cc-content {
+  .cc-root--mobile .cc-content {
     padding: 16px;
   }
 
   /* Bottom navigation bar for mobile */
-  .cc-bottom-nav {
+  .cc-root--mobile .cc-bottom-nav {
     display: flex;
     align-items: center;
     justify-content: space-around;
@@ -39,7 +40,7 @@
     flex-shrink: 0;
   }
 
-  .cc-bottom-nav__item {
+  .cc-root--mobile .cc-bottom-nav__item {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -54,17 +55,17 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .cc-bottom-nav__item--active {
+  .cc-root--mobile .cc-bottom-nav__item--active {
     color: var(--cc-primary);
   }
 
-  .cc-bottom-nav__icon {
+  .cc-root--mobile .cc-bottom-nav__icon {
     width: 22px;
     height: 22px;
   }
 
   /* Chat panel becomes full screen on mobile */
-  .cc-chat-panel--expanded {
+  .cc-root--mobile .cc-chat-panel--expanded {
     position: fixed;
     top: 0;
     left: 0;
@@ -75,30 +76,30 @@
   }
 
   /* Larger touch targets */
-  .cc-card {
+  .cc-root--mobile .cc-card {
     padding: 12px 14px;
   }
 
-  .cc-nav-item {
+  .cc-root--mobile .cc-nav-item {
     padding: 12px 16px;
     min-height: 44px;
   }
 
-  .cc-settings-row {
+  .cc-root--mobile .cc-settings-row {
     min-height: 48px;
   }
 
-  .cc-bubble__actions {
+  .cc-root--mobile .cc-bubble__actions {
     display: none;
   }
 
   /* Kanban cards — larger touch target */
-  .cc-kanban__card {
+  .cc-root--mobile .cc-kanban__card {
     min-height: 52px;
   }
 
   /* Page headers */
-  .cc-page-header__title {
+  .cc-root--mobile .cc-page-header__title {
     font-size: 20px;
   }
 }
