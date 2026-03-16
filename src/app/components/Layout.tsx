@@ -95,6 +95,15 @@ export default function Layout() {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
+  // Widget deep-link navigation
+  useEffect(() => {
+    const handler = ((e: CustomEvent<string>) => {
+      if (e.detail) navigate(e.detail);
+    }) as EventListener;
+    window.addEventListener('navigate', handler);
+    return () => window.removeEventListener('navigate', handler);
+  }, [navigate]);
+
   // Central data sync: fetches all data from server on mount (no-op in demo mode)
   const { refresh } = useDataSync();
 

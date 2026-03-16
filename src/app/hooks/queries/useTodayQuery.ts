@@ -7,6 +7,8 @@ import { TodayResponseSchema, TodoResponseSchema, EventResponseSchema } from '..
 import { getGreeting } from '../../utils/formatters';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
+import { syncWidgetData } from '../../services/widgetSync';
+import { scheduleEventReminders } from '../../services/eventReminders';
 
 interface TodayData {
   todayTasks: TodoResponse[];
@@ -141,6 +143,9 @@ export default function useTodayData(): TodayData {
   // Server mode: use query data or fallback to store-derived data
   const data = query.data;
   if (data) {
+    // Sync widget and schedule event reminders with fresh server data
+    syncWidgetData();
+    scheduleEventReminders(data.todayEvents);
     return {
       ...data,
       isLoading: query.isLoading,

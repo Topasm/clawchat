@@ -4,4 +4,5 @@
     <string name="title_activity_main">ClawChat</string>
     <string name="package_name">com.clawchat.app</string>
     <string name="custom_url_scheme">com.clawchat.app</string>
+    <string name="widget_description">Shows today\'s tasks and upcoming events</string>
 </resources>
