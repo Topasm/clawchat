@@ -80,30 +80,7 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Advanced AI">
-        <SettingsRow label="Temperature">
-          <Slider
-            value={settings.temperature}
-            min={0}
-            max={2}
-            step={0.1}
-            onChange={settings.setTemperature}
-            formatValue={(v) => v.toFixed(1)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Max tokens">
-          <Slider
-            value={settings.maxTokens}
-            min={256}
-            max={8192}
-            step={256}
-            onChange={settings.setMaxTokens}
-            formatValue={(v) => `${v}`}
-          />
-        </SettingsRow>
-        <SettingsRow label="Stream responses">
-          <Toggle checked={settings.streamResponses} onChange={settings.setStreamResponses} />
-        </SettingsRow>
+      <SettingsSection title="AI">
         <SettingsRow label="System prompt">
           <button
             type="button"

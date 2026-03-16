@@ -4,13 +4,12 @@ import { IS_ELECTRON } from '../types/platform';
 
 /**
  * Auto-login on Electron by reading server config from the main process.
- * Only runs when Electron + not authenticated.
+ * Always runs on Electron when there's no valid token — clears stale auth and logs in fresh.
  */
 export function useAutoLogin() {
   const token = useAuthStore((s) => s.token);
-  const serverUrl = useAuthStore((s) => s.serverUrl);
-  const login = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const login = useAuthStore((s) => s.login);
   const attempted = useRef(false);
 
   useEffect(() => {
@@ -20,12 +19,17 @@ export function useAutoLogin() {
 
     (async () => {
       try {
+        // Clear any stale auth state before fresh login
+        useAuthStore.setState({ serverUrl: null, token: null, refreshToken: null });
+
         const config = await window.electronAPI.server.getConfig();
         const url = `http://localhost:${config.port}`;
         await login(url, config.pin);
       } catch (err) {
         console.error('Auto-login failed:', err);
+        // Reset so user sees demo mode instead of stuck splash
+        useAuthStore.setState({ serverUrl: null });
       }
     })();
-  }, [IS_ELECTRON, isLoading, token, login]);
+  }, [isLoading, token, login]);
 }
