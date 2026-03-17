@@ -1,4 +1,4 @@
-"""Obsidian vault sync endpoints."""
+"""Obsidian vault export endpoints."""
 
 import logging
 from datetime import datetime, timezone
@@ -11,11 +11,10 @@ from auth.dependencies import get_current_user
 from config import settings
 from database import get_db
 from models.todo import Todo
-from services.obsidian_sync_service import (
-    get_last_sync_time,
-    scan_vault,
-    set_last_sync_time,
-    sync_obsidian_todos,
+from services.obsidian_export_service import (
+    export_all_todos,
+    get_last_export_time,
+    set_last_export_time,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,23 +23,25 @@ router = APIRouter()
 
 
 @router.post("/sync")
-async def trigger_sync(
+async def trigger_export(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    """Trigger a full bidirectional sync with the Obsidian vault."""
+    """Export all todos from the DB to the Obsidian vault."""
     vault_path = settings.obsidian_vault_path
     if not vault_path:
-        return {"error": "Obsidian vault path not configured", "synced": 0, "created": 0, "updated": 0, "written_back": 0}
+        return {"error": "Obsidian vault path not configured", "exported": 0}
 
-    result = await sync_obsidian_todos(db, vault_path)
-    set_last_sync_time(datetime.now(timezone.utc))
+    stmt = select(Todo)
+    todos = list((await db.execute(stmt)).scalars().all())
+
+    result = export_all_todos(vault_path, todos)
+    set_last_export_time(datetime.now(timezone.utc))
 
     return {
-        "synced": result.synced,
-        "created": result.created,
-        "updated": result.updated,
-        "written_back": result.written_back,
+        "exported": result.exported,
+        "file_count": result.file_count,
+        "errors": result.errors,
     }
 
 
@@ -49,33 +50,18 @@ async def get_status(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    """Return current Obsidian sync status."""
+    """Return current Obsidian export status."""
     vault_path = settings.obsidian_vault_path
     enabled = bool(vault_path)
 
-    file_count = 0
-    task_count = 0
-
-    if enabled:
-        # Count files and tasks from a quick vault scan
-        try:
-            tasks = scan_vault(vault_path)
-            task_count = len(tasks)
-            file_count = len({t.file_path for t in tasks})
-        except Exception as e:
-            logger.warning("Failed to scan vault for status: %s", e)
-
-    # Count DB todos with source=obsidian
-    stmt = select(func.count(Todo.id)).where(Todo.source == "obsidian")
+    stmt = select(func.count(Todo.id))
     db_task_count = (await db.execute(stmt)).scalar() or 0
 
-    last_sync = get_last_sync_time()
+    last_export = get_last_export_time()
 
     return {
         "enabled": enabled,
         "vault_path": vault_path,
-        "last_sync": last_sync.isoformat() if last_sync else None,
-        "file_count": file_count,
-        "task_count": task_count,
+        "last_sync": last_export.isoformat() if last_export else None,
         "db_task_count": db_task_count,
     }

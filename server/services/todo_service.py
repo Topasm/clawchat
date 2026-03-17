@@ -1,13 +1,18 @@
 """Async service layer for todo CRUD operations."""
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from exceptions import NotFoundError
 from models.todo import Todo
+from services.obsidian_export_service import export_todo, remove_todo_from_vault
 from utils import apply_model_updates, make_id, serialize_tags
+
+logger = logging.getLogger(__name__)
 
 
 _ORDER_COLUMNS = {
@@ -96,6 +101,15 @@ async def create_todo(
     )
     db.add(todo)
     await db.flush()
+
+    if settings.obsidian_vault_path:
+        project_name = None
+        if todo.parent_id:
+            parent = await db.get(Todo, todo.parent_id)
+            if parent:
+                project_name = parent.title
+        export_todo(settings.obsidian_vault_path, todo, project_name)
+
     return todo
 
 
@@ -110,10 +124,23 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
             todo.completed_at = None
 
     await db.flush()
+
+    if settings.obsidian_vault_path:
+        project_name = None
+        if todo.parent_id:
+            parent = await db.get(Todo, todo.parent_id)
+            if parent:
+                project_name = parent.title
+        export_todo(settings.obsidian_vault_path, todo, project_name)
+
     return todo
 
 
 async def delete_todo(db: AsyncSession, todo_id: str) -> None:
     todo = await get_todo(db, todo_id)
+    deleted_id = todo.id
     await db.delete(todo)
     await db.flush()
+
+    if settings.obsidian_vault_path:
+        remove_todo_from_vault(settings.obsidian_vault_path, deleted_id)

@@ -13,6 +13,8 @@ from schemas.bulk import BulkTodoResponse, BulkTodoUpdate
 from schemas.common import PaginatedResponse
 from schemas.todo import ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
 from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
+from config import settings
+from services.obsidian_export_service import export_todo, remove_todo_from_vault
 
 router = APIRouter()
 
@@ -141,6 +143,8 @@ async def bulk_update_todos(
 ):
     updated = 0
     deleted = 0
+    deleted_ids: list[str] = []
+    updated_todos: list[Todo] = []
     errors: list[str] = []
     for todo_id in body.ids:
         todo = await db.get(Todo, todo_id)
@@ -148,6 +152,7 @@ async def bulk_update_todos(
             errors.append(f"Todo {todo_id} not found")
             continue
         if body.delete:
+            deleted_ids.append(todo.id)
             await db.delete(todo)
             deleted += 1
         else:
@@ -162,8 +167,21 @@ async def bulk_update_todos(
             if body.tags is not None:
                 todo.tags = serialize_tags(body.tags)
             todo.updated_at = datetime.now(timezone.utc)
+            updated_todos.append(todo)
             updated += 1
     await db.commit()
+
+    if settings.obsidian_vault_path:
+        for tid in deleted_ids:
+            remove_todo_from_vault(settings.obsidian_vault_path, tid)
+        for todo in updated_todos:
+            project_name = None
+            if todo.parent_id:
+                parent = await db.get(Todo, todo.parent_id)
+                if parent:
+                    project_name = parent.title
+            export_todo(settings.obsidian_vault_path, todo, project_name)
+
     return BulkTodoResponse(updated=updated, deleted=deleted, errors=errors)
 
 
@@ -189,6 +207,14 @@ async def create_todo(
     db.add(todo)
     await db.commit()
     await db.refresh(todo)
+
+    if settings.obsidian_vault_path:
+        project_name = None
+        if todo.parent_id:
+            parent = await db.get(Todo, todo.parent_id)
+            if parent:
+                project_name = parent.title
+        export_todo(settings.obsidian_vault_path, todo, project_name)
 
     resp = TodoResponse.model_validate(todo)
     if todo.tags:
@@ -234,6 +260,14 @@ async def update_todo(
     await db.commit()
     await db.refresh(todo)
 
+    if settings.obsidian_vault_path:
+        project_name = None
+        if todo.parent_id:
+            parent = await db.get(Todo, todo.parent_id)
+            if parent:
+                project_name = parent.title
+        export_todo(settings.obsidian_vault_path, todo, project_name)
+
     resp = TodoResponse.model_validate(todo)
     if todo.tags:
         resp.tags = deserialize_tags(todo.tags)
@@ -249,5 +283,9 @@ async def delete_todo(
     todo = await db.get(Todo, todo_id)
     if not todo:
         raise NotFoundError("Todo not found")
+    deleted_id = todo.id
     await db.delete(todo)
     await db.commit()
+
+    if settings.obsidian_vault_path:
+        remove_todo_from_vault(settings.obsidian_vault_path, deleted_id)

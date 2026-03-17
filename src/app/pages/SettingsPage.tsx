@@ -47,11 +47,11 @@ export default function SettingsPage() {
     try {
       const res = await apiClient.post('/obsidian/sync');
       const d = res.data;
-      const msg = `Synced: ${d.created ?? 0} created, ${d.updated ?? 0} updated, ${d.synced ?? d.total ?? 0} total`;
+      const msg = `Exported: ${d.exported ?? 0} tasks to ${d.file_count ?? 0} files`;
       setObsidianResult(msg);
       addToast('success', msg);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Obsidian sync failed';
+      const message = err instanceof Error ? err.message : 'Obsidian export failed';
       setObsidianResult(null);
       addToast('error', message);
     } finally {
@@ -186,7 +186,7 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Obsidian Sync">
+      <SettingsSection title="Obsidian Export">
         {isElectron && (
           <SettingsRow label="Vault path" sublabel={obsidianVaultPath || 'Not configured'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -222,7 +222,7 @@ export default function SettingsPage() {
             </div>
           </SettingsRow>
         )}
-        <SettingsRow label="Sync Now" sublabel="Pull tasks from Obsidian vault">
+        <SettingsRow label="Export Now" sublabel="Export all tasks to Obsidian vault">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
@@ -231,11 +231,11 @@ export default function SettingsPage() {
               disabled={obsidianSyncing || (isElectron && !obsidianVaultPath)}
               style={{ fontSize: 12, padding: '4px 10px' }}
             >
-              {obsidianSyncing ? 'Syncing...' : 'Sync Now'}
+              {obsidianSyncing ? 'Exporting...' : 'Export Now'}
             </button>
           </div>
         </SettingsRow>
-        <SettingsRow label="Open in Obsidian" sublabel="Launch Obsidian to your synced vault">
+        <SettingsRow label="Open in Obsidian" sublabel="Launch Obsidian to view your vault">
           <button
             type="button"
             className="cc-btn cc-btn--secondary"
