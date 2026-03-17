@@ -188,7 +188,7 @@ export default function TaskDetailPage() {
           onClick={() => useQuickCaptureStore.getState().open({ defaultParentId: taskId })}
         >
           + Add sub-task
-
+        </button>
       </div>
 
       {/* Relationships section */}
