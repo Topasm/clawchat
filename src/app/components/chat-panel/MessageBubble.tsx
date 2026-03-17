@@ -23,12 +23,13 @@ const INTENT_LABELS: Record<string, string> = {
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  projectIcon?: string;
   onDelete?: () => void;
   onRegenerate?: () => void;
   onEdit?: (messageId: string) => void;
 }
 
-export default function MessageBubble({ message, onDelete, onRegenerate, onEdit }: MessageBubbleProps) {
+export default function MessageBubble({ message, projectIcon, onDelete, onRegenerate, onEdit }: MessageBubbleProps) {
   const showTimestamps = useSettingsStore((s) => s.showTimestamps);
   const isUser = message.user._id === 'user';
   const role = isUser ? 'user' : 'assistant';
@@ -48,7 +49,7 @@ export default function MessageBubble({ message, onDelete, onRegenerate, onEdit 
     <div className={`cc-bubble-row cc-bubble-row--${role}`}>
       {!isUser && (
         <div className="cc-avatar cc-avatar--assistant">
-          <SparkleIcon size={16} />
+          {projectIcon ? <span style={{ fontSize: 16, lineHeight: 1 }}>{projectIcon}</span> : <SparkleIcon size={16} />}
         </div>
       )}
       <div className={`cc-bubble cc-bubble--${role}`}>

@@ -7,6 +7,7 @@ import EmptyState from '../components/shared/EmptyState';
 import { ChatBubbleIcon } from '../components/shared/Icons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
+import { getProjectIcon } from '../utils/projectIcons';
 
 export default function ChatListPage() {
   const navigate = useNavigate();
@@ -108,12 +109,10 @@ export default function ChatListPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
-                  fontSize: 16,
+                  fontSize: 20,
+                  lineHeight: 1,
                 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cc-primary)" strokeWidth="2">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                  </svg>
+                  {getProjectIcon(project.id)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 500, color: 'var(--cc-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

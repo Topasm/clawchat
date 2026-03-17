@@ -5,6 +5,7 @@ import { useRegenerate } from '../hooks/useRegenerate';
 import MessageBubble from '../components/chat-panel/MessageBubble';
 import StreamingIndicator from '../components/chat-panel/StreamingIndicator';
 import ChatInput from '../components/chat-panel/ChatInput';
+import { getProjectIcon } from '../utils/projectIcons';
 
 export default function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -70,6 +71,7 @@ export default function ChatPage() {
             <path d="M10 2L4 8l6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
+        {projectTodo && <span style={{ fontSize: 18, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>}
         <span className="cc-chat-page__title">{convo?.title || 'Chat'}</span>
       </div>
 
@@ -83,10 +85,7 @@ export default function ChatPage() {
           borderBottom: '1px solid var(--cc-border)',
           fontSize: 13,
         }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--cc-primary)" strokeWidth="2">
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-          </svg>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>
           <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{projectTodo.title}</span>
           {projectTodo.subtask_count != null && projectTodo.subtask_count > 0 && (
             <span style={{ color: 'var(--cc-text-tertiary)', marginLeft: 'auto' }}>
@@ -101,6 +100,7 @@ export default function ChatPage() {
           <MessageBubble
             key={msg._id}
             message={msg}
+            projectIcon={projectTodo ? getProjectIcon(projectTodo.id) : undefined}
             onDelete={() => conversationId && deleteMessage(conversationId, msg._id)}
             onRegenerate={
               msg.user._id === 'assistant'
