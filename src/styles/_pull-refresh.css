@@ -1,0 +1,43 @@
+/* ============================================================
+   Pull-to-Refresh — Mobile Only
+   ============================================================ */
+
+.cc-pull-indicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.cc-pull-indicator__icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  box-shadow: 0 2px 8px var(--cc-shadow);
+  color: var(--cc-text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.cc-pull-indicator__icon--flipped {
+  transform: rotate(180deg);
+}
+
+.cc-pull-indicator__icon--spinning svg {
+  animation: cc-spin 0.8s linear infinite;
+}
+
+@keyframes cc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.cc-root--mobile .cc-content {
+  overscroll-behavior: contain;
+}

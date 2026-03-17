@@ -84,7 +84,7 @@ async def list_projects(
 @router.get("", response_model=PaginatedResponse[TodoResponse])
 async def list_todos(
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=1000),
     status: str | None = None,
     priority: str | None = None,
     due_before: datetime | None = None,

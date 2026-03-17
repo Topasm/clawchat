@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain, Notification, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain, Notification, dialog, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -58,6 +58,33 @@ ipcMain.handle('secure-store:delete', (_event, key: string) => {
   const store = readStore();
   delete store[key];
   writeStore(store);
+});
+
+// ── IPC handler for opening Obsidian vault ───────────────────────────
+ipcMain.handle('obsidian:open-vault', async () => {
+  const config = (() => {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'server-config.json');
+      return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } catch {
+      return {};
+    }
+  })();
+
+  const vaultPath: string = config.obsidianVaultPath ?? '';
+  if (!vaultPath) {
+    dialog.showErrorBox('Obsidian', 'No Obsidian vault path is configured. Set it in Settings first.');
+    return;
+  }
+
+  const vaultName = path.basename(vaultPath);
+  const uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}`;
+
+  try {
+    await shell.openExternal(uri);
+  } catch {
+    dialog.showErrorBox('Obsidian', 'Could not open Obsidian. Make sure it is installed.');
+  }
 });
 
 // ── IPC handler for desktop notifications ────────────────────────────

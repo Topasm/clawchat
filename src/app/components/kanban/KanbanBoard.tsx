@@ -1,7 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useModuleStore } from '../../stores/useModuleStore';
+import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
 import useKanbanFilters from '../../hooks/useKanbanFilters';
 import usePlatform from '../../hooks/usePlatform';
 import useKanbanKeyboardNav from '../../hooks/useKanbanKeyboardNav';
@@ -14,7 +15,6 @@ import { ClipboardIcon, SpinArrowsIcon, CheckCircleIcon } from '../shared/Icons'
 export default function KanbanBoard() {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
-  const [showCapture, setShowCapture] = useState(false);
   const todos = useModuleStore((s) => s.todos);
   const kanbanStatuses = useModuleStore((s) => s.kanbanStatuses);
   const kanbanFilters = useModuleStore((s) => s.kanbanFilters);
@@ -27,7 +27,7 @@ export default function KanbanBoard() {
   const reorderTodoInColumn = useModuleStore((s) => s.reorderTodoInColumn);
   const isMultiSelectMode = selectedTodoIds.size > 0;
 
-  useKanbanShortcuts({ onNewTask: () => setShowCapture(true) });
+  useKanbanShortcuts({ onNewTask: () => useQuickCaptureStore.getState().open() });
   useHotkeys('Escape', () => { clearTodoSelection(); }, { enableOnFormTags: true });
 
   const filteredTodos = useKanbanFilters(todos, kanbanStatuses, kanbanFilters);
@@ -76,13 +76,11 @@ export default function KanbanBoard() {
       columnDefs={columnDefs}
       showSubTasks={kanbanFilters.showSubTasks}
       isMobile={isMobile}
-      showCapture={showCapture}
-      onCloseCapture={() => setShowCapture(false)}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onToggle={handleToggle}
       onClickTask={handleClickTask}
-      onNewTask={() => setShowCapture(true)}
+      onNewTask={() => useQuickCaptureStore.getState().open()}
       focusedTaskId={focusedTaskId}
       onFocusTask={setFocusedTaskId}
       selectedIds={selectedTodoIds}

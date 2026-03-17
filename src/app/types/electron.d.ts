@@ -12,6 +12,7 @@ export interface ElectronServerAPI {
   getNetworkInfo: () => Promise<{ addresses: { ip: string; name: string; isTailscale: boolean }[] }>;
   updateConfig: (updates: Record<string, unknown>) => Promise<void>;
   selectFolder: () => Promise<string | null>;
+  openObsidianVault: () => Promise<void>;
   onStatusChange: (cb: (status: string) => void) => () => void;
 }
 

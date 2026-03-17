@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
@@ -16,6 +16,10 @@ import AnimatedOutlet from './AnimatedOutlet';
 import ToastContainer from './shared/ToastContainer';
 import CommandPalette from './shared/CommandPalette';
 import ShortcutsHelp from './shared/ShortcutsHelp';
+import QuickCaptureModal from './shared/QuickCaptureModal';
+import FloatingActionButton from './shared/FloatingActionButton';
+import PullToRefresh from './shared/PullToRefresh';
+import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
@@ -92,6 +96,8 @@ export default function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const quickCapture = useQuickCaptureStore();
 
   // Widget deep-link navigation
   useEffect(() => {
@@ -167,6 +173,8 @@ export default function Layout() {
   }, [location.pathname]);
 
   const canSwipeTabs = isMobile && !onChatPage;
+  const isDetailPage = isMobile && (/^\/(tasks|chats|events)\/[^/]+/.test(location.pathname)
+    || location.pathname === '/settings/system-prompt');
 
   const sidebar = (
     <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
@@ -224,7 +232,7 @@ export default function Layout() {
   );
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!canSwipeTabs) return;
+    if (!canSwipeTabs && !isDetailPage) return;
     const target = e.target as HTMLElement;
     if (target.closest('input, textarea, button, [role="button"], [contenteditable="true"], .cc-chat-input, .cc-lexical-editor, .cc-rich-editor')) {
       touchStartX.current = null;
@@ -236,12 +244,21 @@ export default function Layout() {
   };
 
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!canSwipeTabs || touchStartX.current == null || touchStartY.current == null) return;
+    if ((!canSwipeTabs && !isDetailPage) || touchStartX.current == null || touchStartY.current == null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
+    const savedStartX = touchStartX.current;
     touchStartX.current = null;
     touchStartY.current = null;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+
+    // Edge swipe back on detail pages
+    if (isDetailPage && savedStartX <= 20 && dx > 50) {
+      navigate(-1);
+      return;
+    }
+
+    if (!canSwipeTabs) return;
 
     if (dx < 0 && activeMobileTabIndex < mobileTabs.length - 1) {
       navigate(mobileTabs[activeMobileTabIndex + 1].to);
@@ -250,13 +267,16 @@ export default function Layout() {
     }
   };
 
+  const handleRefresh = useCallback(() => { refresh(); }, [refresh]);
+
   const mainContent = (
     <>
-      <div className="cc-content">
+      <div className="cc-content" ref={contentRef}>
         <ErrorBoundary name="PageContent">
           <AnimatedOutlet />
         </ErrorBoundary>
       </div>
+      {isMobile && <PullToRefresh contentRef={contentRef} onRefresh={handleRefresh} disabled={onChatPage} />}
       {!onChatPage && (
         <ChatPanel
           isOpen={chatPanel.isOpen}
@@ -274,10 +294,17 @@ export default function Layout() {
       <ToastContainer />
       <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
       <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
+      <QuickCaptureModal
+        isOpen={quickCapture.isOpen}
+        onClose={quickCapture.close}
+        placeholder={quickCapture.placeholder || undefined}
+        defaultParentId={quickCapture.defaultParentId}
+      />
 
       {isMobile ? (
         <>
           <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{mainContent}</div>
+          <FloatingActionButton />
           <BottomNav />
         </>
       ) : (

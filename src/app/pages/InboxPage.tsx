@@ -1,19 +1,16 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
+import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import usePlatform from '../hooks/usePlatform';
 import TaskCard from '../components/shared/TaskCard';
 import SectionHeader from '../components/shared/SectionHeader';
 import EmptyState from '../components/shared/EmptyState';
 import { InboxTrayIcon } from '../components/shared/Icons';
-import QuickCaptureModal from '../components/shared/QuickCaptureModal';
 
 export default function InboxPage() {
   const navigate = useNavigate();
   const todos = useModuleStore((s) => s.todos);
   const { isMobile } = usePlatform();
-
-  const [showCapture, setShowCapture] = useState(false);
 
   const handleToggle = (id: string) => {
     useModuleStore.getState().toggleTodoComplete(id).catch(() => {});
@@ -41,11 +38,12 @@ export default function InboxPage() {
               : 'Capture first, organise later'}
           </div>
         </div>
-        <button className="cc-btn cc-btn--primary" onClick={() => setShowCapture(true)}>
-          + New
-        </button>
+        {!isMobile && (
+          <button className="cc-btn cc-btn--primary" onClick={() => useQuickCaptureStore.getState().open()}>
+            + New
+          </button>
+        )}
       </div>
-      <QuickCaptureModal isOpen={showCapture} onClose={() => setShowCapture(false)} />
 
       {/* Unscheduled tasks */}
       {inboxTasks.length > 0 && (

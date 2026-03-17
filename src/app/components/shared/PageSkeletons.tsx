@@ -65,9 +65,16 @@ export function ChatPageSkeleton() {
 export function BriefingSkeleton() {
   return (
     <div className="cc-briefing-card">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <Skeleton variant="circular" width={20} height={20} />
         <Skeleton variant="text" width={120} height={14} />
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {[80, 64, 72].map((w, i) => (
+          <div key={i} style={{ borderRadius: 100, overflow: 'hidden' }}>
+            <Skeleton variant="rectangular" width={w} height={22} />
+          </div>
+        ))}
       </div>
       <Skeleton variant="text" width="90%" height={13} />
       <Skeleton variant="text" width="75%" height={13} className="cc-skeleton--mt8" />

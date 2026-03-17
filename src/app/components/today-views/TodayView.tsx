@@ -6,10 +6,10 @@ import SectionHeader from '../shared/SectionHeader';
 import TaskCard from '../shared/TaskCard';
 import EventCard from '../shared/EventCard';
 import EmptyState from '../shared/EmptyState';
-import { SparkleIcon, ClipboardIcon, InboxTrayIcon, FlameIcon } from '../shared/Icons';
-import QuickCaptureModal from '../shared/QuickCaptureModal';
+import { SparkleIcon, ClipboardIcon, InboxTrayIcon, FlameIcon, CalendarIcon, CheckCircleIcon, SpinArrowsIcon } from '../shared/Icons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
 import type { TodoResponse, EventResponse } from '../../types/api';
+import type { BriefingData } from '../../hooks/useTodayBriefing';
 
 interface TodayViewProps {
   greeting: string;
@@ -21,11 +21,8 @@ interface TodayViewProps {
   isLoading: boolean;
   progress: { completed: number; total: number; percentage: number; allDone: boolean };
   streakCount: number;
-  briefing: string | null;
+  briefingData: BriefingData | null;
   briefingLoading: boolean;
-  showCapture: boolean;
-  onCloseCapture: () => void;
-  capturePlaceholder: string;
 }
 
 export default function TodayView({
@@ -38,11 +35,8 @@ export default function TodayView({
   isLoading,
   progress,
   streakCount,
-  briefing,
+  briefingData,
   briefingLoading,
-  showCapture,
-  onCloseCapture,
-  capturePlaceholder,
 }: TodayViewProps) {
   const navigate = useNavigate();
   const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
@@ -62,12 +56,6 @@ export default function TodayView({
           {!isMobile && totalTasks > 0 && ` \u00B7 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} for today`}
         </div>
       </div>
-
-      <QuickCaptureModal
-        isOpen={showCapture}
-        onClose={onCloseCapture}
-        placeholder={capturePlaceholder}
-      />
 
       {isMobile && (
         <div className="cc-today-home-actions">
@@ -111,16 +99,47 @@ export default function TodayView({
         </div>
       )}
 
-      {briefing && !isMobile && (
+      {briefingData && !isMobile && (
         <div className="cc-briefing-card">
           <div className="cc-briefing-card__header">
             <span className="cc-briefing-card__icon"><ClipboardIcon size={16} /></span>
             <span className="cc-briefing-card__title">Daily Briefing</span>
           </div>
-          <div className="cc-briefing-card__content">{briefing}</div>
+
+          {Object.values(briefingData.stats).some(v => v > 0) && (
+            <div className="cc-briefing-card__stats">
+              {briefingData.stats.events > 0 && (
+                <span className="cc-briefing-pill cc-briefing-pill--event">
+                  <CalendarIcon size={13} /> {briefingData.stats.events} event{briefingData.stats.events !== 1 ? 's' : ''}
+                </span>
+              )}
+              {briefingData.stats.tasks_due > 0 && (
+                <span className="cc-briefing-pill cc-briefing-pill--task">
+                  <CheckCircleIcon size={13} /> {briefingData.stats.tasks_due} due
+                </span>
+              )}
+              {briefingData.stats.overdue > 0 && (
+                <span className="cc-briefing-pill cc-briefing-pill--warning">
+                  <FlameIcon size={13} /> {briefingData.stats.overdue} overdue
+                </span>
+              )}
+              {briefingData.stats.in_progress > 0 && (
+                <span className="cc-briefing-pill cc-briefing-pill--progress">
+                  <SpinArrowsIcon size={13} /> {briefingData.stats.in_progress} in progress
+                </span>
+              )}
+              {briefingData.stats.inbox > 0 && (
+                <span className="cc-briefing-pill cc-briefing-pill--inbox">
+                  <InboxTrayIcon size={13} /> {briefingData.stats.inbox} inbox
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="cc-briefing-card__content">{briefingData.summary}</div>
         </div>
       )}
-      {briefingLoading && !briefing && <BriefingSkeleton />}
+      {briefingLoading && !briefingData && <BriefingSkeleton />}
 
       {isLoading && !hasAnything && <TodayPageSkeleton />}
 

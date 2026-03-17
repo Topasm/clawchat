@@ -125,25 +125,30 @@ def _format_briefing_prompt(data: dict) -> str:
     return "\n".join(lines)
 
 
-async def generate_briefing(db: AsyncSession, ai_service: AIService) -> str:
+async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
     data = await gather_briefing_data(db)
 
+    stats = {
+        "events": len(data["events"]),
+        "tasks_due": len(data["pending_todos"]),
+        "overdue": len(data["overdue_todos"]),
+        "in_progress": len(data["in_progress"]),
+        "inbox": data["inbox_count"],
+        "agent_tasks": len(data["agent_tasks"]),
+    }
+
     # Nothing to brief
-    has_items = (
-        data["events"]
-        or data["pending_todos"]
-        or data["overdue_todos"]
-        or data["in_progress"]
-        or data["inbox_count"] > 0
-        or data["agent_tasks"]
-    )
+    has_items = any(v > 0 for v in stats.values())
     if not has_items:
-        return "Your schedule is clear today. No tasks, events, or pending items."
+        return {
+            "summary": "Your schedule is clear today. No tasks, events, or pending items.",
+            "stats": stats,
+        }
 
     prompt_text = _format_briefing_prompt(data)
 
     try:
-        return await ai_service.generate_completion(
+        summary = await ai_service.generate_completion(
             system_prompt=(
                 "You are a personal assistant generating a daily briefing. "
                 "Summarize the user's day in a friendly, concise way. "
@@ -153,4 +158,6 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> str:
         )
     except AIUnavailableError:
         logger.warning("LLM unavailable for briefing, using plain text fallback")
-        return _format_briefing_prompt(data)
+        summary = _format_briefing_prompt(data)
+
+    return {"summary": summary, "stats": stats}

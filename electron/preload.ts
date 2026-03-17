@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getNetworkInfo: () => ipcRenderer.invoke('server:network-info'),
     updateConfig: (updates: Record<string, unknown>) => ipcRenderer.invoke('server:update-config', updates),
     selectFolder: () => ipcRenderer.invoke('server:select-folder'),
+    openObsidianVault: () => ipcRenderer.invoke('obsidian:open-vault'),
     onStatusChange: (cb: (status: string) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, status: string) => cb(status);
       ipcRenderer.on('server:status-changed', listener);

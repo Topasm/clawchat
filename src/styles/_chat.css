@@ -88,23 +88,25 @@
 
 /* --- Chat Avatars ----------------------------------------- */
 .cc-avatar {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 1px solid var(--cc-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .cc-avatar--assistant {
-  background: var(--cc-primary-light);
+  background: var(--cc-surface-secondary);
   color: var(--cc-primary);
 }
 
 .cc-avatar--user {
-  background: var(--cc-user-bubble);
-  color: #fff;
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
 }
 
 /* --- Chat Panel ------------------------------------------- */

@@ -64,9 +64,11 @@ export default function ChatListPage() {
           <div className="cc-page-header__title">Projects</div>
           {!isMobile && <div className="cc-page-header__subtitle">Project conversations &amp; quick chats</div>}
         </div>
-        <button type="button" className="cc-btn cc-btn--primary" onClick={handleNewChat}>
-          {isMobile ? '+ New' : '+ Quick Chat'}
-        </button>
+        {!isMobile && (
+          <button type="button" className="cc-btn cc-btn--primary" onClick={handleNewChat}>
+            + Quick Chat
+          </button>
+        )}
       </div>
 
       {loading && projects.length === 0 && conversations.length === 0 && <ChatListSkeleton />}

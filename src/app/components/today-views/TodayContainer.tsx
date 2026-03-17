@@ -7,8 +7,8 @@ import TodayView from './TodayView';
 export default function TodayContainer() {
   const { todayTasks, overdueTasks, todayEvents, inboxCount, greeting, todayDate, isLoading } = useTodayData();
   const { progress, streak } = useTodayProgress();
-  const { briefing, briefingLoading } = useTodayBriefing();
-  const { showCapture, setShowCapture, capturePlaceholder } = useTodayHotkeys();
+  const { briefingData, briefingLoading } = useTodayBriefing();
+  useTodayHotkeys();
 
   return (
     <TodayView
@@ -21,11 +21,8 @@ export default function TodayContainer() {
       isLoading={isLoading}
       progress={progress}
       streakCount={streak.currentStreak}
-      briefing={briefing}
+      briefingData={briefingData}
       briefingLoading={briefingLoading}
-      showCapture={showCapture}
-      onCloseCapture={() => setShowCapture(false)}
-      capturePlaceholder={capturePlaceholder}
     />
   );
 }

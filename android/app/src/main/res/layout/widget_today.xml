@@ -44,6 +44,7 @@
 
     <!-- Content: tasks (left) + events (right) -->
     <LinearLayout
+        android:id="@+id/widget_content"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -228,8 +229,45 @@
         android:layout_height="1dp"
         android:background="#2a2a4a" />
 
+    <!-- Empty state: setup prompt -->
+    <TextView
+        android:id="@+id/widget_empty_setup"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="Open ClawChat to get started"
+        android:textColor="#9CA3AF"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <!-- Empty state: tap to refresh -->
+    <TextView
+        android:id="@+id/widget_empty_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="Tap to refresh"
+        android:textColor="#818CF8"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <!-- Empty state: loading -->
+    <TextView
+        android:id="@+id/widget_loading"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="Refreshing..."
+        android:textColor="#9CA3AF"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <!-- Action bar: Chat + Add Task -->
     <LinearLayout
+        android:id="@+id/widget_footer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"

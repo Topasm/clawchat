@@ -1,0 +1,83 @@
+/* ============================================================
+   Floating Action Button — Mobile Only
+   ============================================================ */
+
+.cc-fab {
+  position: fixed;
+  bottom: calc(70px + env(safe-area-inset-bottom));
+  right: 20px;
+  z-index: 90;
+}
+
+.cc-fab__button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--cc-primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px var(--cc-shadow);
+  transition: transform 0.2s ease;
+}
+
+.cc-fab__button:active {
+  transform: scale(0.92);
+}
+
+.cc-fab__button svg {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.25s ease;
+}
+
+.cc-fab__button--open svg {
+  transform: rotate(45deg);
+}
+
+.cc-fab__actions {
+  position: absolute;
+  bottom: 64px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.cc-fab__action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: 24px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cc-text);
+  box-shadow: 0 2px 8px var(--cc-shadow);
+}
+
+.cc-fab__action:active {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-fab__action svg {
+  width: 16px;
+  height: 16px;
+  color: var(--cc-primary);
+  flex-shrink: 0;
+}
+
+.cc-fab__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  background: rgba(0, 0, 0, 0.15);
+}

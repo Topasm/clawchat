@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
 import apiClient from '../services/apiClient';
+import { openObsidianVault } from '../utils/openObsidian';
 import SettingsSection from '../components/shared/SettingsSection';
 import SettingsRow from '../components/shared/SettingsRow';
 import Toggle from '../components/shared/Toggle';
@@ -33,6 +34,10 @@ export default function SettingsPage() {
       window.electronAPI.server.getConfig().then((cfg) => {
         setObsidianVaultPath(cfg.obsidianVaultPath ?? '');
       });
+    } else {
+      apiClient.get('/obsidian/status').then((res) => {
+        setObsidianVaultPath(res.data?.vaultPath ?? '');
+      }).catch(() => {});
     }
   }, [isElectron]);
 
@@ -193,7 +198,7 @@ export default function SettingsPage() {
                   if (folder) {
                     setObsidianVaultPath(folder);
                     await window.electronAPI.server.updateConfig({ obsidianVaultPath: folder });
-                    addToast('success', 'Vault path saved. Restart the app for changes to take effect.');
+                    addToast('success', 'Vault path saved. Restarting server...');
                   }
                 }}
                 style={{ fontSize: 12, padding: '4px 10px' }}
@@ -229,6 +234,17 @@ export default function SettingsPage() {
               {obsidianSyncing ? 'Syncing...' : 'Sync Now'}
             </button>
           </div>
+        </SettingsRow>
+        <SettingsRow label="Open in Obsidian" sublabel="Launch Obsidian to your synced vault">
+          <button
+            type="button"
+            className="cc-btn cc-btn--secondary"
+            disabled={!obsidianVaultPath}
+            onClick={() => openObsidianVault(obsidianVaultPath)}
+            style={{ fontSize: 12, padding: '4px 10px' }}
+          >
+            Open
+          </button>
         </SettingsRow>
         {obsidianResult && (
           <SettingsRow label="">

@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
+import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useDebouncedPersist } from '../hooks/useDebouncedPersist';
 import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
 import TaskCard from '../components/shared/TaskCard';
 import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
-import QuickCaptureModal from '../components/shared/QuickCaptureModal';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
 import type { TodoResponse, TodoUpdate } from '../types/api';
@@ -27,7 +27,6 @@ export default function TaskDetailPage() {
 
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
-  const [showSubTaskCapture, setShowSubTaskCapture] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -186,15 +185,10 @@ export default function TaskDetailPage() {
           type="button"
           className="cc-btn cc-btn--ghost"
           style={{ fontSize: 12, marginTop: 4 }}
-          onClick={() => setShowSubTaskCapture(true)}
+          onClick={() => useQuickCaptureStore.getState().open({ defaultParentId: taskId })}
         >
           + Add sub-task
-        </button>
-        <QuickCaptureModal
-          isOpen={showSubTaskCapture}
-          onClose={() => setShowSubTaskCapture(false)}
-          defaultParentId={taskId}
-        />
+
       </div>
 
       {/* Relationships section */}

@@ -23,7 +23,7 @@ export function useTodosQuery() {
   const query = useQuery({
     queryKey: queryKeys.todos,
     queryFn: async () => {
-      const res = await apiClient.get('/todos');
+      const res = await apiClient.get('/todos', { params: { limit: 1000 } });
       const raw = res.data?.items ?? res.data ?? [];
       return z.array(TodoResponseSchema).parse(raw);
     },

@@ -62,8 +62,24 @@ export class ServerManager {
   }
 
   updateConfig(updates: Partial<Pick<ServerConfig, 'obsidianVaultPath'>>): void {
+    const vaultPathChanged = 'obsidianVaultPath' in updates
+      && updates.obsidianVaultPath !== this.config.obsidianVaultPath;
+
     Object.assign(this.config, updates);
     fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2), 'utf-8');
+
+    if (vaultPathChanged && this.status === 'ready') {
+      this.restartServer();
+    }
+  }
+
+  async restartServer(): Promise<void> {
+    await this.stop();
+    this.restartCount = 0;
+    this.stopping = false;
+    this.setStatus('starting');
+    this.spawnServer();
+    await this.waitForReady();
   }
 
   // ── Find system Python ────────────────────────────────────────────

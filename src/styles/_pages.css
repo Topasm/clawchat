@@ -654,7 +654,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .cc-briefing-card__icon {
   display: flex;
@@ -665,6 +665,41 @@
   font-weight: 600;
   font-size: 14px;
   color: var(--cc-text);
+}
+.cc-briefing-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.cc-briefing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.cc-briefing-pill--event {
+  background: color-mix(in srgb, var(--cc-primary) 12%, transparent);
+  color: var(--cc-primary);
+}
+.cc-briefing-pill--task {
+  background: color-mix(in srgb, var(--cc-success) 12%, transparent);
+  color: var(--cc-success);
+}
+.cc-briefing-pill--warning {
+  background: color-mix(in srgb, var(--cc-warning) 12%, transparent);
+  color: var(--cc-warning);
+}
+.cc-briefing-pill--progress {
+  background: color-mix(in srgb, var(--cc-secondary) 12%, transparent);
+  color: var(--cc-secondary);
+}
+.cc-briefing-pill--inbox {
+  background: color-mix(in srgb, var(--cc-text-secondary) 10%, transparent);
+  color: var(--cc-text-secondary);
 }
 .cc-briefing-card__content {
   font-size: 13px;

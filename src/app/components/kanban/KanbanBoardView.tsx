@@ -5,7 +5,6 @@ import KanbanColumn from './KanbanColumn';
 import KanbanColumnTabs from './KanbanColumnTabs';
 import KanbanFilterBar from './KanbanFilterBar';
 import BulkActionToolbar from './BulkActionToolbar';
-import QuickCaptureModal from '../shared/QuickCaptureModal';
 
 interface ColumnDef {
   status: KanbanStatus;
@@ -19,8 +18,6 @@ interface KanbanBoardViewProps {
   columnDefs: ColumnDef[];
   showSubTasks: boolean;
   isMobile: boolean;
-  showCapture: boolean;
-  onCloseCapture: () => void;
   onDragStart: () => void;
   onDragEnd: (result: DropResult) => void;
   onToggle: (id: string) => void;
@@ -39,8 +36,6 @@ export default function KanbanBoardView({
   columnDefs,
   showSubTasks,
   isMobile,
-  showCapture,
-  onCloseCapture,
   onDragStart,
   onDragEnd,
   onToggle,
@@ -62,11 +57,12 @@ export default function KanbanBoardView({
             {todos.length} task{todos.length !== 1 ? 's' : ''} organised by status
           </div>
         </div>
-        <button className="cc-btn cc-btn--primary" onClick={onNewTask}>
-          + New Task
-        </button>
+        {!isMobile && (
+          <button className="cc-btn cc-btn--primary" onClick={onNewTask}>
+            + New Task
+          </button>
+        )}
       </div>
-      <QuickCaptureModal isOpen={showCapture} onClose={onCloseCapture} />
       <KanbanFilterBar />
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
         {isMobile ? (
