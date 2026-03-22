@@ -7,6 +7,7 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.util.optimistic
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,7 @@ sealed interface TasksAction {
 @HiltViewModel
 class TasksViewModel @Inject constructor(
     private val todoRepository: TodoRepository,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TasksUiState())
@@ -44,6 +46,7 @@ class TasksViewModel @Inject constructor(
 
     init {
         doLoadTasks()
+        viewModelScope.launch { syncManager.todoChanged.collect { doLoadTasks() } }
     }
 
     fun onAction(action: TasksAction) {
@@ -66,6 +69,7 @@ class TasksViewModel @Inject constructor(
     fun createTask(title: String) = onAction(TasksAction.Create(title))
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
+    fun setDueToday(id: String) = updateTask(id, TodoUpdate(dueDate = java.time.LocalDate.now().toString()))
 
     private fun doLoadTasks() {
         viewModelScope.launch {

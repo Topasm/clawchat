@@ -1,17 +1,22 @@
 package com.clawchat.android.feature.tasks
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +44,8 @@ fun TasksScreen(
             statusFilter = state.statusFilter,
             onSelect = viewModel::selectTask,
             onToggle = viewModel::toggleComplete,
+            onDelete = viewModel::deleteTask,
+            onSetDueToday = viewModel::setDueToday,
             onSetFilter = viewModel::setStatusFilter,
             onRefresh = viewModel::loadTasks,
             onCreate = viewModel::createTask,
@@ -54,6 +61,8 @@ private fun TaskListView(
     statusFilter: String?,
     onSelect: (Todo) -> Unit,
     onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetDueToday: (String) -> Unit,
     onSetFilter: (String?) -> Unit,
     onRefresh: () -> Unit,
     onCreate: (String) -> Unit,
@@ -108,9 +117,11 @@ private fun TaskListView(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(filteredTasks, key = { it.id }) { task ->
-                        TaskRow(
+                        SwipeableTaskRow(
                             task = task,
                             onToggle = { onToggle(task.id) },
+                            onDelete = { onDelete(task.id) },
+                            onSetDueToday = { onSetDueToday(task.id) },
                             onClick = { onSelect(task) },
                         )
                     }
@@ -143,6 +154,70 @@ private fun TaskListView(
                 TextButton(onClick = { showCreateDialog = false; newTaskTitle = "" }) { Text("Cancel") }
             },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableTaskRow(
+    task: Todo,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+    onSetDueToday: () -> Unit,
+    onClick: () -> Unit,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
+                SwipeToDismissBoxValue.StartToEnd -> { onSetDueToday(); false }
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = { SwipeBackground(dismissState) },
+        enableDismissFromEndToStart = true,
+        enableDismissFromStartToEnd = true,
+    ) {
+        TaskRow(task = task, onToggle = onToggle, onClick = onClick)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
+    val color by animateColorAsState(
+        when (dismissState.targetValue) {
+            SwipeToDismissBoxValue.EndToStart -> Color(0xFFFF3B30)
+            SwipeToDismissBoxValue.StartToEnd -> Color(0xFF007AFF)
+            SwipeToDismissBoxValue.Settled -> Color.Transparent
+        },
+        label = "swipe_bg_color",
+    )
+    val alignment = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+        else -> Alignment.Center
+    }
+    val icon = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
+        SwipeToDismissBoxValue.StartToEnd -> Icons.Default.DateRange
+        else -> null
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color, RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp),
+        contentAlignment = alignment,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = Color.White)
+        }
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,7 @@ sealed interface InboxAction {
 @HiltViewModel
 class InboxViewModel @Inject constructor(
     private val todoRepository: TodoRepository,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InboxUiState())
@@ -39,6 +41,7 @@ class InboxViewModel @Inject constructor(
 
     init {
         doLoadInbox()
+        viewModelScope.launch { syncManager.todoChanged.collect { doLoadInbox() } }
     }
 
     fun onAction(action: InboxAction) {

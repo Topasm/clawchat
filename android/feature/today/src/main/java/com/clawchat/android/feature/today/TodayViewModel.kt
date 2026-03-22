@@ -9,6 +9,7 @@ import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.TodayRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.util.optimistic
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,8 @@ data class TodayUiState(
 
 sealed interface TodayAction {
     data class ToggleComplete(val todoId: String) : TodayAction
+    data class Delete(val todoId: String) : TodayAction
+    data class SetDueToday(val todoId: String) : TodayAction
     data class QuickAdd(val title: String) : TodayAction
     data object Refresh : TodayAction
 }
@@ -39,6 +42,7 @@ sealed interface TodayAction {
 class TodayViewModel @Inject constructor(
     private val todayRepository: TodayRepository,
     private val todoRepository: TodoRepository,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TodayUiState())
@@ -46,11 +50,15 @@ class TodayViewModel @Inject constructor(
 
     init {
         doRefresh()
+        viewModelScope.launch { syncManager.todoChanged.collect { doRefresh() } }
+        viewModelScope.launch { syncManager.eventChanged.collect { doRefresh() } }
     }
 
     fun onAction(action: TodayAction) {
         when (action) {
             is TodayAction.ToggleComplete -> doToggleComplete(action.todoId)
+            is TodayAction.Delete -> doDelete(action.todoId)
+            is TodayAction.SetDueToday -> doSetDueToday(action.todoId)
             is TodayAction.QuickAdd -> doQuickAdd(action.title)
             is TodayAction.Refresh -> doRefresh()
         }
@@ -59,6 +67,8 @@ class TodayViewModel @Inject constructor(
     // Public convenience methods — delegate to onAction for Screen composable compatibility
     fun refresh() = onAction(TodayAction.Refresh)
     fun toggleComplete(todoId: String) = onAction(TodayAction.ToggleComplete(todoId))
+    fun deleteTask(todoId: String) = onAction(TodayAction.Delete(todoId))
+    fun setDueToday(todoId: String) = onAction(TodayAction.SetDueToday(todoId))
     fun quickAdd(title: String) = onAction(TodayAction.QuickAdd(title))
 
     private fun doRefresh() {
@@ -129,6 +139,65 @@ class TodayViewModel @Inject constructor(
             } catch (_: Exception) {
                 // Rollback already handled by optimistic()
             }
+        }
+    }
+
+    private fun doDelete(todoId: String) {
+        viewModelScope.launch {
+            val originalToday = _uiState.value.todayTodos
+            val originalOverdue = _uiState.value.overdueTodos
+            try {
+                _uiState.optimistic(
+                    update = { state ->
+                        state.copy(
+                            todayTodos = state.todayTodos.filter { it.id != todoId },
+                            overdueTodos = state.overdueTodos.filter { it.id != todoId },
+                        )
+                    },
+                    rollback = { state ->
+                        state.copy(todayTodos = originalToday, overdueTodos = originalOverdue)
+                    },
+                ) {
+                    val result = todoRepository.deleteTodo(todoId)
+                    if (result is ApiResult.Error) throw Exception(result.message)
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    private fun doSetDueToday(todoId: String) {
+        viewModelScope.launch {
+            val today = java.time.LocalDate.now().toString()
+            val originalState = _uiState.value
+            try {
+                _uiState.optimistic(
+                    update = { state ->
+                        val overdueItem = state.overdueTodos.find { it.id == todoId }
+                        if (overdueItem != null) {
+                            val updated = overdueItem.copy(dueDate = today)
+                            state.copy(
+                                todayTodos = state.todayTodos + updated,
+                                overdueTodos = state.overdueTodos.filter { it.id != todoId },
+                            )
+                        } else {
+                            state.copy(
+                                todayTodos = state.todayTodos.map {
+                                    if (it.id == todoId) it.copy(dueDate = today) else it
+                                },
+                            )
+                        }
+                    },
+                    rollback = { _ ->
+                        originalState.copy(
+                            todayTodos = originalState.todayTodos,
+                            overdueTodos = originalState.overdueTodos,
+                        )
+                    },
+                ) {
+                    val result = todoRepository.updateTodo(todoId, TodoUpdate(dueDate = today))
+                    if (result is ApiResult.Error) throw Exception(result.message)
+                }
+            } catch (_: Exception) { }
         }
     }
 

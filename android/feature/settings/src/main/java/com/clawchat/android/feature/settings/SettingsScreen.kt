@@ -145,22 +145,27 @@ fun SettingsScreen(
 
             // Logout
             item {
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        viewModel.logout()
-                        onLoggedOut()
-                    },
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    ),
+                    horizontalArrangement = Arrangement.Start,
                 ) {
-                    Icon(ClawIcons.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Log Out", fontWeight = FontWeight.Medium)
+                    TextButton(
+                        onClick = {
+                            viewModel.logout()
+                            onLoggedOut()
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                    ) {
+                        Icon(ClawIcons.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Log Out", fontWeight = FontWeight.Medium)
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -299,6 +304,13 @@ private fun ServerInfoCard(
                     }
                 }
                 Spacer(Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF4CAF50)),
+                )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     "Connected",
                     style = MaterialTheme.typography.titleMedium,
@@ -312,11 +324,34 @@ private fun ServerInfoCard(
             aiProvider?.let { InfoRow("AI Provider", it) }
             aiModel?.let { InfoRow("Model", it) }
             aiConnected?.let {
-                InfoRow(
-                    "AI Status",
-                    if (it) "Connected" else "Disconnected",
-                    valueColor = if (it) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                )
+                val statusColor = if (it) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                val statusText = if (it) "Connected" else "Disconnected"
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "AI Status",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(statusColor),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            statusText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = statusColor,
+                        )
+                    }
+                }
             }
             if (authMode.isNotBlank()) { InfoRow("Auth Mode", authMode) }
         }

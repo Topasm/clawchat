@@ -2,6 +2,7 @@ package com.clawchat.android.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -86,16 +88,16 @@ fun HomeScreen(
             // ── Header ──────────────────────────────────────────────
             Text(
                 text = todayState.greeting.ifBlank { "My Day" },
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 4.dp),
+                modifier = Modifier.padding(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 0.dp),
             )
 
             // ── Pill tab row ────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 HomeTab.entries.forEach { tab ->
@@ -124,7 +126,7 @@ fun HomeScreen(
                         else MaterialTheme.colorScheme.onSurface,
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
@@ -188,6 +190,8 @@ fun HomeScreen(
                             todayEvents = todayState.todayEvents,
                             inboxPreview = todayState.inboxPreview,
                             onToggle = todayViewModel::toggleComplete,
+                            onDelete = todayViewModel::deleteTask,
+                            onSetDueToday = todayViewModel::setDueToday,
                             onInboxTabClick = { selectedTab = HomeTab.Inbox.name },
                         )
                         HomeTab.Inbox -> InboxContent(
@@ -199,6 +203,8 @@ fun HomeScreen(
                             tasks = tasksState.tasks,
                             statusFilter = tasksState.statusFilter,
                             onToggle = tasksViewModel::toggleComplete,
+                            onDelete = tasksViewModel::deleteTask,
+                            onSetDueToday = tasksViewModel::setDueToday,
                             onSelect = tasksViewModel::selectTask,
                             onSetFilter = tasksViewModel::setStatusFilter,
                         )
@@ -207,53 +213,63 @@ fun HomeScreen(
             }
 
             // ── Fixed bottom input bar ──────────────────────────────
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                TextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    placeholder = {
+                        Text(
+                            "Add a task\u2026",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        )
+                    },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    shape = RoundedCornerShape(22.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                )
+                Spacer(Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (inputText.isNotBlank()) {
+                            todayViewModel.quickAdd(inputText.trim())
+                            inputText = ""
+                        }
+                    },
+                    enabled = inputText.isNotBlank(),
+                    modifier = Modifier.size(36.dp),
                 ) {
-                    TextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        placeholder = {
-                            Text(
-                                "Add a task\u2026",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        shape = RoundedCornerShape(24.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                        ),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    FilledIconButton(
-                        onClick = {
-                            if (inputText.isNotBlank()) {
-                                todayViewModel.quickAdd(inputText.trim())
-                                inputText = ""
-                            }
-                        },
-                        enabled = inputText.isNotBlank(),
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(
+                                color = if (inputText.isNotBlank()) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = CircleShape,
+                            ),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Add")
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Add",
+                            modifier = Modifier.size(18.dp),
+                            tint = if (inputText.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -270,6 +286,8 @@ private fun TodayContent(
     todayEvents: List<Event>,
     inboxPreview: List<Todo>,
     onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetDueToday: (String) -> Unit,
     onInboxTabClick: () -> Unit,
 ) {
     if (todayTodos.isEmpty() && overdueTodos.isEmpty() && todayEvents.isEmpty() && inboxPreview.isEmpty()) {
@@ -278,10 +296,10 @@ private fun TodayContent(
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "All clear for today",
                     style = MaterialTheme.typography.titleMedium,
@@ -291,7 +309,7 @@ private fun TodayContent(
                 Text(
                     "Nothing on your schedule",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
             }
         }
@@ -306,7 +324,13 @@ private fun TodayContent(
         if (overdueTodos.isNotEmpty()) {
             item { SectionHeader("Overdue", isError = true) }
             items(overdueTodos, key = { it.id }) { todo ->
-                TodoRow(todo = todo, onToggle = { onToggle(todo.id) }, accentColor = MaterialTheme.colorScheme.error)
+                SwipeableTodoRow(
+                    todo = todo,
+                    onToggle = { onToggle(todo.id) },
+                    onDelete = { onDelete(todo.id) },
+                    onSetDueToday = { onSetDueToday(todo.id) },
+                    accentColor = MaterialTheme.colorScheme.error,
+                )
             }
             item { Spacer(Modifier.height(16.dp)) }
         }
@@ -316,7 +340,12 @@ private fun TodayContent(
                 item { SectionHeader("Today") }
             }
             items(todayTodos, key = { it.id }) { todo ->
-                TodoRow(todo = todo, onToggle = { onToggle(todo.id) })
+                SwipeableTodoRow(
+                    todo = todo,
+                    onToggle = { onToggle(todo.id) },
+                    onDelete = { onDelete(todo.id) },
+                    onSetDueToday = { onSetDueToday(todo.id) },
+                )
             }
             item { Spacer(Modifier.height(16.dp)) }
         }
@@ -368,10 +397,10 @@ private fun InboxContent(
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "Inbox is clear",
                     style = MaterialTheme.typography.titleMedium,
@@ -381,7 +410,7 @@ private fun InboxContent(
                 Text(
                     "All items have been processed",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
             }
         }
@@ -443,6 +472,8 @@ private fun TasksContent(
     tasks: List<Todo>,
     statusFilter: String?,
     onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetDueToday: (String) -> Unit,
     onSelect: (Todo) -> Unit,
     onSetFilter: (String?) -> Unit,
 ) {
@@ -491,14 +522,90 @@ private fun TasksContent(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 items(filteredTasks, key = { it.id }) { task ->
-                    TodoRow(
+                    SwipeableTodoRow(
                         todo = task,
                         onToggle = { onToggle(task.id) },
+                        onDelete = { onDelete(task.id) },
+                        onSetDueToday = { onSetDueToday(task.id) },
                         onClick = { onSelect(task) },
                         showDescription = true,
                     )
                 }
             }
+        }
+    }
+}
+
+// ── Swipeable wrapper ─────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableTodoRow(
+    todo: Todo,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+    onSetDueToday: () -> Unit,
+    onClick: (() -> Unit)? = null,
+    showDescription: Boolean = false,
+    accentColor: Color? = null,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
+                SwipeToDismissBoxValue.StartToEnd -> { onSetDueToday(); false }
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = { SwipeBackground(dismissState) },
+        enableDismissFromEndToStart = true,
+        enableDismissFromStartToEnd = true,
+    ) {
+        TodoRow(
+            todo = todo,
+            onToggle = onToggle,
+            onClick = onClick,
+            showDescription = showDescription,
+            accentColor = accentColor,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
+    val color by animateColorAsState(
+        when (dismissState.targetValue) {
+            SwipeToDismissBoxValue.EndToStart -> Color(0xFFFF3B30)
+            SwipeToDismissBoxValue.StartToEnd -> Color(0xFF007AFF)
+            SwipeToDismissBoxValue.Settled -> Color.Transparent
+        },
+        label = "swipe_bg_color",
+    )
+    val alignment = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+        else -> Alignment.Center
+    }
+    val icon = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
+        SwipeToDismissBoxValue.StartToEnd -> Icons.Default.DateRange
+        else -> null
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color, RoundedCornerShape(10.dp))
+            .padding(horizontal = 20.dp),
+        contentAlignment = alignment,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = Color.White)
         }
     }
 }

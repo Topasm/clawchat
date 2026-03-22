@@ -1,6 +1,9 @@
 package com.clawchat.android.navigation
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import com.clawchat.android.core.ui.icons.ClawIcons
@@ -11,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -48,8 +52,10 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 0.dp,
+                    modifier = Modifier.height(56.dp),
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                 ) {
                     bottomNavItems.forEach { item ->
                         val selected = currentRoute == item.route
@@ -58,13 +64,15 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
                                 Icon(
                                     item.icon,
                                     contentDescription = item.label,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             },
                             label = {
                                 Text(
                                     item.label,
-                                    style = MaterialTheme.typography.labelMedium,
+                                    fontSize = 11.sp,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    lineHeight = 11.sp,
                                 )
                             },
                             selected = selected,
@@ -82,7 +90,7 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
                                 selectedTextColor = MaterialTheme.colorScheme.primary,
                                 unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                indicatorColor = MaterialTheme.colorScheme.surface,
                             ),
                         )
                     }

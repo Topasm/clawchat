@@ -13,8 +13,19 @@ from schemas.task_relationship import (
     TaskRelationshipResponse,
 )
 from utils import make_id
+from ws.manager import ws_manager
 
 router = APIRouter()
+
+DEFAULT_USER_ID = "user"
+
+
+async def _notify_todo_change():
+    """Broadcast a module_data_changed event so all clients refresh todos."""
+    await ws_manager.send_json(DEFAULT_USER_ID, {
+        "type": "module_data_changed",
+        "data": {"module": "todos"},
+    })
 
 
 @router.get("", response_model=list[TaskRelationshipResponse])
@@ -64,6 +75,7 @@ async def create_relationship(
     db.add(rel)
     await db.commit()
     await db.refresh(rel)
+    await _notify_todo_change()
     return TaskRelationshipResponse.model_validate(rel)
 
 
@@ -78,3 +90,4 @@ async def delete_relationship(
         raise NotFoundError("Relationship not found")
     await db.delete(rel)
     await db.commit()
+    await _notify_todo_change()

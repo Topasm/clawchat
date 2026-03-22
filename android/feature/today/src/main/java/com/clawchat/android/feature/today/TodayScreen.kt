@@ -1,17 +1,23 @@
 package com.clawchat.android.feature.today
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,7 +65,12 @@ fun TodayScreen(
                         )
                     }
                     items(state.overdueTodos, key = { it.id }) { todo ->
-                        TodoCard(todo = todo, onToggle = { viewModel.toggleComplete(todo.id) })
+                        SwipeableTodoCard(
+                            todo = todo,
+                            onToggle = { viewModel.toggleComplete(todo.id) },
+                            onDelete = { viewModel.deleteTask(todo.id) },
+                            onSetDueToday = { viewModel.setDueToday(todo.id) },
+                        )
                     }
                     item { Spacer(Modifier.height(8.dp)) }
                 }
@@ -70,7 +81,12 @@ fun TodayScreen(
                         Text("Tasks", style = MaterialTheme.typography.titleSmall)
                     }
                     items(state.todayTodos, key = { it.id }) { todo ->
-                        TodoCard(todo = todo, onToggle = { viewModel.toggleComplete(todo.id) })
+                        SwipeableTodoCard(
+                            todo = todo,
+                            onToggle = { viewModel.toggleComplete(todo.id) },
+                            onDelete = { viewModel.deleteTask(todo.id) },
+                            onSetDueToday = { viewModel.setDueToday(todo.id) },
+                        )
                     }
                     item { Spacer(Modifier.height(8.dp)) }
                 }
@@ -154,6 +170,69 @@ fun TodayScreen(
                 TextButton(onClick = { showQuickAdd = false; quickAddText = "" }) { Text("Cancel") }
             },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableTodoCard(
+    todo: Todo,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit,
+    onSetDueToday: () -> Unit,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
+                SwipeToDismissBoxValue.StartToEnd -> { onSetDueToday(); false }
+                SwipeToDismissBoxValue.Settled -> false
+            }
+        },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = { SwipeBackground(dismissState) },
+        enableDismissFromEndToStart = true,
+        enableDismissFromStartToEnd = true,
+    ) {
+        TodoCard(todo = todo, onToggle = onToggle)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
+    val color by animateColorAsState(
+        when (dismissState.targetValue) {
+            SwipeToDismissBoxValue.EndToStart -> Color(0xFFFF3B30)
+            SwipeToDismissBoxValue.StartToEnd -> Color(0xFF007AFF)
+            SwipeToDismissBoxValue.Settled -> Color.Transparent
+        },
+        label = "swipe_bg_color",
+    )
+    val alignment = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+        else -> Alignment.Center
+    }
+    val icon = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
+        SwipeToDismissBoxValue.StartToEnd -> Icons.Default.DateRange
+        else -> null
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(color, RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp),
+        contentAlignment = alignment,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = Color.White)
+        }
     }
 }
 

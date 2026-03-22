@@ -172,3 +172,4 @@ async def delete_event_occurrence(
     """
     await calendar_service.delete_event_occurrence(db, event_id, date, mode)
     await db.commit()
+    await _notify_event_change()
