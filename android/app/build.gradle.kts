@@ -27,7 +27,6 @@ android {
         }
         release {
             isMinifyEnabled = true
-            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "DEBUG_SERVER_URL", "\"\"")
         }
@@ -54,6 +53,7 @@ dependencies {
     implementation(project(":feature:today"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:tasks"))
+    implementation(project(":feature:inbox"))
     implementation(project(":feature:settings"))
     implementation(project(":widget"))
 

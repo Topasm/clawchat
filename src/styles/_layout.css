@@ -120,6 +120,16 @@
   color: var(--cc-text);
 }
 
+/* Primary nav items (Today, Inbox, Projects) get stronger visual weight */
+.cc-nav-item--primary {
+  font-weight: 600;
+  color: var(--cc-text);
+}
+
+.cc-nav-item--primary .cc-nav-icon {
+  opacity: 0.85;
+}
+
 .cc-nav-item--active {
   color: var(--cc-primary);
   background: var(--cc-surface-secondary);
@@ -247,6 +257,17 @@
   font-weight: 700;
   line-height: 1;
   margin-left: 4px;
+}
+
+/* Divider between primary and secondary nav groups */
+.cc-sidebar__divider {
+  height: 1px;
+  background: var(--cc-border);
+  margin: 6px 12px;
+}
+
+.cc-sidebar--collapsed .cc-sidebar__divider {
+  margin: 6px 8px;
 }
 
 .cc-sidebar__spacer {

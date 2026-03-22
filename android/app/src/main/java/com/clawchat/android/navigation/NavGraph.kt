@@ -2,8 +2,11 @@ package com.clawchat.android.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Settings
-import com.clawchat.android.core.ui.icons.ClawIcons
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.clawchat.android.feature.chat.ChatScreen
+import com.clawchat.android.feature.inbox.InboxScreen
 import com.clawchat.android.feature.onboarding.OnboardingScreen
 import com.clawchat.android.feature.settings.SettingsScreen
 import com.clawchat.android.feature.tasks.TasksScreen
@@ -27,9 +31,10 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Today"),
-    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Chat"),
-    BottomNavItem(NavRoute.Tasks.route, ClawIcons.CheckCircle, "Tasks"),
+    BottomNavItem(NavRoute.Today.route, Icons.Default.Today, "Today"),
+    BottomNavItem(NavRoute.Inbox.route, Icons.Default.Email, "Inbox"),
+    BottomNavItem(NavRoute.Chat.route, Icons.Default.Folder, "Projects"),
+    BottomNavItem(NavRoute.Tasks.route, Icons.Default.CheckCircle, "Tasks"),
     BottomNavItem(NavRoute.Settings.route, Icons.Default.Settings, "Settings"),
 )
 
@@ -87,7 +92,20 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
                 )
             }
             composable(NavRoute.Today.route) {
-                TodayScreen()
+                TodayScreen(
+                    onNavigateToInbox = {
+                        navController.navigate(NavRoute.Inbox.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+            composable(NavRoute.Inbox.route) {
+                InboxScreen()
             }
             composable(NavRoute.Chat.route) {
                 ChatScreen()
