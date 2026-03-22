@@ -17,12 +17,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
   background: var(--cc-surface, #fff);
   border: 1px solid var(--cc-border, #e5e5e5);
-  border-left: 4px solid;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-left: 3px solid;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
   font-size: 13px;
   color: var(--cc-text, #1a1a1a);
   min-width: 260px;

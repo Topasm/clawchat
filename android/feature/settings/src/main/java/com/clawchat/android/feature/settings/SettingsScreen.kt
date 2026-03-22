@@ -3,10 +3,7 @@ package com.clawchat.android.feature.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.PhoneAndroid
+import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +16,7 @@ import com.clawchat.android.core.data.model.PairedDevice
 @Composable
 fun SettingsScreen(
     onLoggedOut: () -> Unit = {},
+    onSetupServer: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -31,16 +29,48 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Server setup prompt (when onboarding was skipped)
+            if (state.hostName.isBlank() && state.health == null) {
+                item {
+                    ElevatedCard(
+                        onClick = onSetupServer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                ClawIcons.Cloud,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Connect to Server", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Set up your ClawChat server connection",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Server info card
-            item {
-                ServerInfoCard(
-                    version = state.health?.version,
-                    aiProvider = state.health?.aiProvider,
-                    aiModel = state.health?.aiModel,
-                    aiConnected = state.health?.aiConnected,
-                    hostName = state.hostName,
-                    authMode = state.authMode,
-                )
+            if (state.hostName.isNotBlank() || state.health != null) {
+                item {
+                    ServerInfoCard(
+                        version = state.health?.version,
+                        aiProvider = state.health?.aiProvider,
+                        aiModel = state.health?.aiModel,
+                        aiConnected = state.health?.aiConnected,
+                        hostName = state.hostName,
+                        authMode = state.authMode,
+                    )
+                }
             }
 
             // Paired devices
@@ -69,7 +99,7 @@ fun SettingsScreen(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
                 ) {
-                    Icon(Icons.Default.Logout, contentDescription = null)
+                    Icon(ClawIcons.Logout, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Log Out")
                 }
@@ -90,7 +120,7 @@ private fun ServerInfoCard(
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(ClawIcons.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Text("Server", style = MaterialTheme.typography.titleMedium)
             }
@@ -130,7 +160,7 @@ private fun DeviceCard(device: PairedDevice, onRevoke: () -> Unit) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.PhoneAndroid, contentDescription = null)
+            Icon(ClawIcons.PhoneAndroid, contentDescription = null)
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(device.name, style = MaterialTheme.typography.bodyLarge)

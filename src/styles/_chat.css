@@ -1,9 +1,9 @@
 /* --- Chat Bubbles ----------------------------------------- */
 .cc-bubble {
   max-width: 70%;
-  padding: 8px 12px;
-  border-radius: 16px;
-  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 15px;
   line-height: 1.5;
   word-break: break-word;
   position: relative;
@@ -156,10 +156,10 @@
 
 .cc-chat-panel__messages {
   flex: 1;
-  padding: 8px 12px;
+  padding: 10px 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   overflow-y: auto;
   min-height: 0;
 }
@@ -169,7 +169,7 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-top: 1px solid var(--cc-border);
   background: var(--cc-surface);
   flex-shrink: 0;
@@ -179,9 +179,9 @@
   flex: 1;
   resize: none;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
   line-height: 1.4;
   color: var(--cc-text);
   background: var(--cc-background);

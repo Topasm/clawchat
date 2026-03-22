@@ -9,3 +9,7 @@ annotation class AuthenticatedClient
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class UnauthenticatedClient
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class DebugServerUrl

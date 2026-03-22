@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.clawchat.android.BuildConfig
+import com.clawchat.android.core.di.DebugServerUrl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,4 +23,10 @@ object DataModule {
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
         context.dataStore
+
+    @Provides
+    @Singleton
+    @DebugServerUrl
+    fun provideDebugServerUrl(): String =
+        if (BuildConfig.DEBUG) BuildConfig.DEBUG_SERVER_URL else ""
 }

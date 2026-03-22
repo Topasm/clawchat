@@ -2,6 +2,7 @@ package com.clawchat.android.core.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +25,7 @@ class SessionStore @Inject constructor(
         private val KEY_DEVICE_ID = stringPreferencesKey("device_id")
         private val KEY_HOST_NAME = stringPreferencesKey("host_name")
         private val KEY_AUTH_MODE = stringPreferencesKey("auth_mode") // "paired" | "manual"
+        private val KEY_ONBOARDING_SKIPPED = booleanPreferencesKey("onboarding_skipped")
     }
 
     val token: Flow<String?> = dataStore.data.map { it[KEY_TOKEN] }
@@ -32,6 +34,7 @@ class SessionStore @Inject constructor(
     val hostName: Flow<String?> = dataStore.data.map { it[KEY_HOST_NAME] }
     val authMode: Flow<String?> = dataStore.data.map { it[KEY_AUTH_MODE] }
     val isLoggedIn: Flow<Boolean> = dataStore.data.map { it[KEY_TOKEN] != null }
+    val onboardingSkipped: Flow<Boolean> = dataStore.data.map { it[KEY_ONBOARDING_SKIPPED] == true }
 
     /** Save session after successful pairing. */
     suspend fun savePairedSession(
@@ -58,6 +61,13 @@ class SessionStore @Inject constructor(
             prefs[KEY_TOKEN] = accessToken
             prefs[KEY_API_BASE_URL] = apiBaseUrl
             prefs[KEY_AUTH_MODE] = "manual"
+        }
+    }
+
+    /** Mark onboarding as skipped (set up server later). */
+    suspend fun markOnboardingSkipped() {
+        dataStore.edit { prefs ->
+            prefs[KEY_ONBOARDING_SKIPPED] = true
         }
     }
 

@@ -23,9 +23,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
+            val onboardingSkipped by sessionStore.onboardingSkipped.collectAsState(initial = false)
 
             ClawChatTheme {
-                ClawChatNavGraph(isLoggedIn = isLoggedIn)
+                ClawChatNavGraph(isLoggedIn = isLoggedIn, onboardingSkipped = onboardingSkipped)
             }
         }
     }

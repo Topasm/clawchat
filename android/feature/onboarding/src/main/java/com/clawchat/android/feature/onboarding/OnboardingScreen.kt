@@ -6,7 +6,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit,
+    onSkip: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -33,6 +33,10 @@ fun OnboardingScreen(
         when (step) {
             OnboardingStep.WELCOME -> WelcomeStep(
                 onNext = { viewModel.goToStep(OnboardingStep.SERVER) },
+                onSkip = {
+                    viewModel.skipOnboarding()
+                    onSkip()
+                },
             )
             OnboardingStep.SERVER -> ServerStep(
                 serverUrl = state.serverUrl,
@@ -43,6 +47,10 @@ fun OnboardingScreen(
                 onCheck = viewModel::checkServer,
                 onNext = { viewModel.goToStep(OnboardingStep.PAIRING) },
                 onManualLogin = { viewModel.goToStep(OnboardingStep.MANUAL_LOGIN) },
+                onSkip = {
+                    viewModel.skipOnboarding()
+                    onSkip()
+                },
             )
             OnboardingStep.PAIRING -> PairingStep(
                 code = state.pairingCode,
@@ -67,7 +75,7 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun WelcomeStep(onNext: () -> Unit) {
+private fun WelcomeStep(onNext: () -> Unit, onSkip: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -89,6 +97,16 @@ private fun WelcomeStep(onNext: () -> Unit) {
         Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
             Text("Get Started")
         }
+        Spacer(Modifier.height(16.dp))
+        TextButton(
+            onClick = onSkip,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                "Skip for now",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -102,6 +120,7 @@ private fun ServerStep(
     onCheck: () -> Unit,
     onNext: () -> Unit,
     onManualLogin: () -> Unit,
+    onSkip: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -159,6 +178,18 @@ private fun ServerStep(
             enabled = serverReachable == true,
         ) {
             Text("Log in with PIN instead")
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        TextButton(
+            onClick = onSkip,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                "Set up later",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

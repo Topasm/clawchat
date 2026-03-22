@@ -75,18 +75,18 @@
 .cc-segmented {
   display: flex;
   background: var(--cc-surface-secondary);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 2px;
   gap: 2px;
 }
 
 .cc-segmented__option {
   flex: 1;
-  padding: 6px 12px;
+  padding: 8px 14px;
   border: none;
   background: transparent;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   color: var(--cc-text-secondary);
@@ -112,7 +112,7 @@
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.6px;
   color: var(--cc-text-tertiary);
   padding: 0 0 8px 2px;
 }
@@ -121,7 +121,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 8px;
   min-height: 44px;
   transition: background 0.1s ease;
@@ -132,7 +132,7 @@
 }
 
 .cc-settings-row__label {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--cc-text);
   flex: 1;
 }

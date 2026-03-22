@@ -21,9 +21,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            val debugUrl = project.findProperty("DEBUG_SERVER_URL") as? String ?: "http://10.0.2.2:8000"
+            buildConfigField("String", "DEBUG_SERVER_URL", "\"$debugUrl\"")
+        }
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("String", "DEBUG_SERVER_URL", "\"\"")
         }
     }
 
@@ -38,6 +44,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

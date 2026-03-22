@@ -7,6 +7,7 @@ import com.clawchat.android.core.api.PairingApi
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.model.LoginRequest
 import com.clawchat.android.core.data.model.PairingClaimRequest
+import com.clawchat.android.core.di.DebugServerUrl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,9 +35,10 @@ data class OnboardingUiState(
 class OnboardingViewModel @Inject constructor(
     private val pairingApi: PairingApi,
     private val sessionStore: SessionStore,
+    @DebugServerUrl private val debugServerUrl: String,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(OnboardingUiState())
+    private val _uiState = MutableStateFlow(OnboardingUiState(serverUrl = debugServerUrl))
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     fun updateServerUrl(url: String) {
@@ -137,6 +139,13 @@ class OnboardingViewModel @Inject constructor(
                     it.copy(isLoggingIn = false, error = "Login failed: ${e.message}")
                 }
             }
+        }
+    }
+
+    /** Skip onboarding — set up server later. */
+    fun skipOnboarding() {
+        viewModelScope.launch {
+            sessionStore.markOnboardingSkipped()
         }
     }
 

@@ -2,10 +2,8 @@ package com.clawchat.android.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Today
+import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,17 +27,17 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(NavRoute.Today.route, Icons.Default.Today, "Today"),
-    BottomNavItem(NavRoute.Chat.route, Icons.Default.Chat, "Chat"),
-    BottomNavItem(NavRoute.Tasks.route, Icons.Default.CheckCircle, "Tasks"),
+    BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Today"),
+    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Chat"),
+    BottomNavItem(NavRoute.Tasks.route, ClawIcons.CheckCircle, "Tasks"),
     BottomNavItem(NavRoute.Settings.route, Icons.Default.Settings, "Settings"),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClawChatNavGraph(isLoggedIn: Boolean) {
+fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
     val navController = rememberNavController()
-    val startDestination = if (isLoggedIn) NavRoute.Today.route else NavRoute.Onboarding.route
+    val startDestination = if (isLoggedIn || onboardingSkipped) NavRoute.Today.route else NavRoute.Onboarding.route
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -81,6 +79,11 @@ fun ClawChatNavGraph(isLoggedIn: Boolean) {
                             popUpTo(NavRoute.Onboarding.route) { inclusive = true }
                         }
                     },
+                    onSkip = {
+                        navController.navigate(NavRoute.Today.route) {
+                            popUpTo(NavRoute.Onboarding.route) { inclusive = true }
+                        }
+                    },
                 )
             }
             composable(NavRoute.Today.route) {
@@ -95,6 +98,11 @@ fun ClawChatNavGraph(isLoggedIn: Boolean) {
             composable(NavRoute.Settings.route) {
                 SettingsScreen(
                     onLoggedOut = {
+                        navController.navigate(NavRoute.Onboarding.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onSetupServer = {
                         navController.navigate(NavRoute.Onboarding.route) {
                             popUpTo(0) { inclusive = true }
                         }

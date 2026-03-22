@@ -44,26 +44,26 @@ export interface ColorPalette {
 // ---- Light palette --------------------------------------------------------
 
 export const lightColors: ColorPalette = {
-  background: '#F2F2F7',
+  background: '#F5F5F5',
   surface: '#FFFFFF',
-  surfaceSecondary: '#F2F2F7',
+  surfaceSecondary: '#EEEEEE',
   text: '#1C1C1E',
-  textSecondary: '#8E8E93',
-  textTertiary: '#C7C7CC',
-  border: '#E5E5EA',
+  textSecondary: '#757575',
+  textTertiary: '#BDBDBD',
+  border: '#E0E0E0',
   disabled: '#BDBDBD',
 
-  primary: '#2196F3',
-  primaryLight: '#64B5F6',
-  primaryDark: '#1976D2',
+  primary: '#1976D2',
+  primaryLight: '#BBDEFB',
+  primaryDark: '#1565C0',
   secondary: '#26A69A',
 
   success: '#4CAF50',
   warning: '#FF9800',
   error: '#EF5350',
 
-  assistantBubble: '#F0F4F8',
-  userBubble: '#2196F3',
+  assistantBubble: '#F5F5F5',
+  userBubble: '#1976D2',
   streaming: '#26A69A',
   actionCard: '#FFF8E1',
 
@@ -79,22 +79,22 @@ export const lightColors: ColorPalette = {
 
   shadow: '#000000',
   deleteBackground: '#FFF0F0',
-  metaTagBackground: 'rgba(0,0,0,0.05)',
+  metaTagBackground: 'rgba(0,0,0,0.04)',
 };
 
 // ---- Dark palette ---------------------------------------------------------
 
 export const darkColors: ColorPalette = {
-  background: '#000000',
-  surface: '#1C1C1E',
-  surfaceSecondary: '#2C2C2E',
+  background: '#121212',
+  surface: '#1E1E1E',
+  surfaceSecondary: '#2A2A2A',
   text: '#FFFFFF',
   textSecondary: '#8E8E93',
   textTertiary: '#48484A',
-  border: '#38383A',
+  border: '#333333',
   disabled: '#48484A',
 
-  primary: '#0A84FF',
+  primary: '#42A5F5',
   primaryLight: '#409CFF',
   primaryDark: '#0064D2',
   secondary: '#64D2A6',
@@ -103,10 +103,10 @@ export const darkColors: ColorPalette = {
   warning: '#FF9F0A',
   error: '#FF453A',
 
-  assistantBubble: '#2C2C2E',
-  userBubble: '#0A84FF',
+  assistantBubble: '#2A2A2A',
+  userBubble: '#1976D2',
   streaming: '#64D2A6',
-  actionCard: '#2C2C2E',
+  actionCard: '#2A2A2A',
 
   todayBlue: '#0A84FF',
   inboxYellow: '#FFD60A',
