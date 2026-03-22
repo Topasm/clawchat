@@ -37,11 +37,47 @@ async def execute_agent_task(
     ai_service: AIService,
     agent_task: AgentTask,
 ) -> None:
-    """Execute a vault agent task based on its agent_type.
+    """Execute a vault agent task based on its agent_type or skill_chain.
 
-    Dispatches to the appropriate handler (planner, researcher, executor)
-    and updates the AgentTask record with results.
+    If the task has a skill_chain, dispatches via the skill executor.
+    Otherwise falls back to the legacy persona-based handlers.
     """
+    # Skill-chain path — preferred for new tasks.
+    if agent_task.skill_chain:
+        from skills.executor import _write_vault_document
+        from skills import get_skill
+        import json as _json
+
+        skill_ids = _json.loads(agent_task.skill_chain)
+        agent_task.status = "in_progress"
+        agent_task.started_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        try:
+            for skill_id in skill_ids:
+                skill = get_skill(skill_id)
+                if not skill:
+                    continue
+                result = await ai_service.generate_completion(
+                    skill.system_prompt,
+                    agent_task.instruction,
+                )
+                if skill.vault_template and agent_task.todo_id:
+                    await _write_vault_document(db, agent_task, skill_id, result)
+
+            agent_task.status = "completed"
+            agent_task.payload_json = json.dumps({"result": result}) if result else None
+            agent_task.completed_at = datetime.now(timezone.utc)
+            await db.commit()
+        except Exception as exc:
+            logger.exception("Skill-based vault task %s failed", agent_task.id)
+            agent_task.status = "failed"
+            agent_task.error = str(exc)
+            agent_task.completed_at = datetime.now(timezone.utc)
+            await db.commit()
+        return
+
+    # Legacy persona-based handlers.
     handlers = {
         "planner": _handle_planner,
         "researcher": _handle_researcher,

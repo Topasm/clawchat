@@ -40,6 +40,7 @@ class Todo(Base):
     source: Mapped[str | None] = mapped_column(String, nullable=True)
     source_id: Mapped[str | None] = mapped_column(String, nullable=True)
     assignee: Mapped[str | None] = mapped_column(String, nullable=True)
+    enabled_skills: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array
     inbox_state: Mapped[str] = mapped_column(String, nullable=False, default="none")
     estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     automation_error: Mapped[str | None] = mapped_column(Text, nullable=True)

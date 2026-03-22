@@ -125,6 +125,7 @@ async def get_agent_task_history(db: AsyncSession, limit: int = 50) -> list[dict
             "id": t.id,
             "task_type": t.task_type,
             "agent_type": t.agent_type or "general",
+            "skill_chain": t.skill_chain,
             "status": t.status,
             "instruction": (t.instruction or "")[:200],
             "result": (t.result[:200] if t.result else None),

@@ -23,6 +23,9 @@ def deserialize_tags(raw: str | None) -> list[str]:
         return []
 
 
+_JSON_LIST_FIELDS = {"tags", "enabled_skills"}
+
+
 def apply_model_updates(
     db_model, updates, tag_fields: set[str] = {"tags"}, timestamp=None
 ):
@@ -39,6 +42,8 @@ def apply_model_updates(
     for field, value in update_dict.items():
         if field in tag_fields:
             value = serialize_tags(value)
+        elif field in _JSON_LIST_FIELDS and isinstance(value, list):
+            value = json.dumps(value)
         setattr(db_model, field, value)
 
     if timestamp is not None:

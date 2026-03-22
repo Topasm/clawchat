@@ -119,10 +119,17 @@ _CLASSIFY_TOOLS = [
                         "type": "boolean",
                         "description": "True if task needs subtask breakdown",
                     },
-                    "suggested_assignee": {
-                        "type": "string",
-                        "enum": ["planner", "researcher", "executor"],
-                        "description": "Best agent persona",
+                    "suggested_skills": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "plan", "research", "summarize", "draft",
+                                "code_review", "data_analysis", "obsidian_sync",
+                                "prioritize",
+                            ],
+                        },
+                        "description": "Relevant skills for this task",
                     },
                 },
                 "required": ["priority", "tags", "needs_planning"],
@@ -185,11 +192,12 @@ async def _trigger_planning(db: AsyncSession, ai_service: AIService, todo: Todo)
     """Create a planner AgentTask and generate a subtask plan for the todo."""
     agent_task = AgentTask(
         id=make_id("task_"),
-        agent_type="planner",
+        agent_type="plan",
         task_type="plan_todo",
         todo_id=todo.id,
         instruction=f"Plan subtasks for: {todo.title}",
         status="queued",
+        skill_chain='["plan"]',
     )
     db.add(agent_task)
     await db.flush()

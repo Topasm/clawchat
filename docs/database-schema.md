@@ -71,7 +71,8 @@ Stores task/to-do items, created via conversation or direct API.
 | `tags` | JSON | NULLABLE | Array of string tags for categorization |
 | `parent_id` | TEXT (UUID) | FOREIGN KEY -> todos.id ON DELETE SET NULL, NULLABLE | Parent task ID for sub-task hierarchy |
 | `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Manual ordering within kanban columns |
-| `assignee` | TEXT | NULLABLE | Agent persona: 'planner', 'researcher', 'executor', 'openclaw', or null |
+| `assignee` | TEXT | NULLABLE | Legacy agent persona or first skill ID, for backward compat |
+| `enabled_skills` | JSON | NULLABLE | Array of skill IDs bound to this task (e.g. `["plan","research"]`) |
 | `inbox_state` | TEXT | NULLABLE | Inbox pipeline state: 'classifying', 'classified', null |
 | `estimated_minutes` | INTEGER | NULLABLE | AI-estimated time to complete |
 | `source` | TEXT | NULLABLE | Origin: 'obsidian', 'chat', 'api', or null |
@@ -135,6 +136,9 @@ Stores asynchronous AI agent tasks (research, summarization, etc.).
 | `status` | TEXT | NOT NULL, DEFAULT 'queued' | Status: 'queued', 'running', 'completed', 'failed' |
 | `result` | TEXT | NULLABLE | Agent's output/result text |
 | `error` | TEXT | NULLABLE | Error message if task failed |
+| `agent_type` | TEXT | NOT NULL, DEFAULT 'general' | Legacy agent type or first skill ID |
+| `skill_chain` | JSON | NULLABLE | Ordered array of skill IDs to execute (e.g. `["research","summarize"]`) |
+| `current_skill_index` | INTEGER | NOT NULL, DEFAULT 0 | Index of currently executing skill in the chain |
 | `conversation_id` | TEXT (UUID) | FOREIGN KEY -> conversations.id, NULLABLE | Conversation that triggered this task |
 | `message_id` | TEXT (UUID) | FOREIGN KEY -> messages.id, NULLABLE | Message that triggered this task |
 | `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | When the task was queued |

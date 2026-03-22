@@ -165,6 +165,13 @@ async def execute_task(
     session_factory=None,
 ) -> None:
     """Full pipeline: mark running -> execute -> mark completed/failed -> WS notify."""
+    # Skill-chain path — preferred for new tasks.
+    if task.skill_chain:
+        from skills.executor import execute_skill_chain
+        await execute_skill_chain(db, task, ai_service, ws_manager, user_id)
+        return
+
+    # Legacy paths below.
     if task.agent_type == "coordinator":
         await _execute_coordinator(db, task, ai_service, ws_manager, user_id, session_factory)
         return

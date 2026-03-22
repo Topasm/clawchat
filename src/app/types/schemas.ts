@@ -42,6 +42,7 @@ export const TodoResponseSchema = z.object({
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   assignee: z.string().nullable().optional(),
+  enabled_skills: z.array(z.string()).nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   estimated_minutes: z.number().nullable().optional(),
   next_action: z.string().nullable().optional(),
@@ -61,6 +62,7 @@ export const TodoCreateSchema = z.object({
   parent_id: z.string().nullable().optional(),
   sort_order: z.number().optional(),
   assignee: z.string().nullable().optional(),
+  enabled_skills: z.array(z.string()).nullable().optional(),
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
@@ -76,6 +78,7 @@ export const TodoUpdateSchema = z.object({
   parent_id: z.string().nullable().optional(),
   sort_order: z.number().optional(),
   assignee: z.string().nullable().optional(),
+  enabled_skills: z.array(z.string()).nullable().optional(),
 });
 
 export const ProjectTodoResponseSchema = z.object({
@@ -92,6 +95,7 @@ export const ProjectTodoResponseSchema = z.object({
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   assignee: z.string().nullable().optional(),
+  enabled_skills: z.array(z.string()).nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   estimated_minutes: z.number().nullable().optional(),
   created_at: z.string(),
@@ -424,6 +428,7 @@ export const AgentTaskSummarySchema = z.object({
   id: z.string(),
   task_type: z.string(),
   agent_type: z.string(),
+  skill_chain: z.array(z.string()).nullable().optional(),
   status: z.string(),
   instruction: z.string(),
   result: z.string().nullable().optional(),
@@ -441,6 +446,8 @@ export const AgentTaskResponseSchema = z.object({
   error: z.string().nullable().optional(),
   parent_task_id: z.string().nullable().optional(),
   agent_type: z.string().optional(),
+  skill_chain: z.array(z.string()).nullable().optional(),
+  current_skill_index: z.number().optional(),
   progress: z.number().optional(),
   progress_message: z.string().nullable().optional(),
   sub_task_count: z.number().optional(),
@@ -526,13 +533,26 @@ export const PlanResponseSchema = z.object({
   summary: z.string(),
   suggested_root_due_date: z.string().nullable().optional(),
   suggested_assignee: z.string().nullable().optional(),
+  suggested_skills: z.array(z.string()).nullable().optional(),
   suggested_project_title: z.string().nullable().optional(),
   subtasks: z.array(PlanSubtaskSchema).optional(),
   subtask_count: z.number().optional(),
   suggested_due_summary: z.string().nullable().optional(),
   suggested_assignee_label: z.string().nullable().optional(),
+  suggested_skills_labels: z.array(z.string()).nullable().optional(),
   suggested_project_label: z.string().nullable().optional(),
   created_at: z.string(),
+});
+
+export const SkillSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  tags: z.array(z.string()).optional(),
+});
+
+export const SkillsResponseSchema = z.object({
+  skills: z.array(SkillSchema),
 });
 
 export const PlanApplyResponseSchema = z.object({
@@ -561,6 +581,8 @@ export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
 export type PlanSubtask = z.infer<typeof PlanSubtaskSchema>;
 export type PlanResponse = z.infer<typeof PlanResponseSchema>;
 export type PlanApplyResponse = z.infer<typeof PlanApplyResponseSchema>;
+export type Skill = z.infer<typeof SkillSchema>;
+export type SkillsResponse = z.infer<typeof SkillsResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Obsidian vault integration

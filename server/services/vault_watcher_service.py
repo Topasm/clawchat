@@ -34,6 +34,7 @@ _PRIORITY_RE = re.compile(r"@(urgent|high|low)")
 _TAG_RE = re.compile(r"#(\w[\w/-]*)")
 _COMPLETED_RE = re.compile(r"@completed\((\d{4}-\d{2}-\d{2})\)")
 _AGENT_RE = re.compile(r"@agent\((\w+)\)")
+_SKILLS_RE = re.compile(r"@skills\(([^)]+)\)")
 
 
 @dataclass
@@ -286,7 +287,7 @@ def _parse_todo_line(line: str) -> dict:
         result["title"] = cb_match.group(2).strip()
         # Clean metadata from title
         title = result["title"]
-        for pattern in [_DUE_RE, _PRIORITY_RE, _COMPLETED_RE, _AGENT_RE, _TAG_RE, _MARKER_RE]:
+        for pattern in [_DUE_RE, _PRIORITY_RE, _COMPLETED_RE, _AGENT_RE, _SKILLS_RE, _TAG_RE, _MARKER_RE]:
             title = pattern.sub("", title)
         result["title"] = title.strip()
 
@@ -310,10 +311,18 @@ def _parse_todo_line(line: str) -> dict:
     if comp_match:
         result["completed_at"] = comp_match.group(1)
 
-    # Agent
-    agent_match = _AGENT_RE.search(line)
-    if agent_match:
-        result["assignee"] = agent_match.group(1)
+    # Skills (preferred) or legacy agent
+    skills_match = _SKILLS_RE.search(line)
+    if skills_match:
+        import json as _json
+        skills_csv = skills_match.group(1).strip()
+        skills_list = [s.strip() for s in skills_csv.split(",") if s.strip()]
+        result["enabled_skills"] = _json.dumps(skills_list)
+        result["assignee"] = skills_list[0] if skills_list else None
+    else:
+        agent_match = _AGENT_RE.search(line)
+        if agent_match:
+            result["assignee"] = agent_match.group(1)
 
     return result
 
@@ -369,7 +378,18 @@ def _diff_todo(db_todo: Todo, vault_data: dict) -> list[SyncChange]:
                 source_file="",
             ))
 
-    # Assignee
+    # Enabled skills (from @skills(...) in vault)
+    vault_enabled_skills = vault_data.get("enabled_skills")
+    if vault_enabled_skills and vault_enabled_skills != db_todo.enabled_skills:
+        changes.append(SyncChange(
+            todo_id=db_todo.id,
+            field="enabled_skills",
+            old_value=db_todo.enabled_skills,
+            new_value=vault_enabled_skills,
+            source_file="",
+        ))
+
+    # Assignee (legacy or derived from @skills)
     vault_assignee = vault_data.get("assignee")
     if vault_assignee and vault_assignee != db_todo.assignee:
         changes.append(SyncChange(
@@ -414,5 +434,8 @@ def _apply_change(todo: Todo, change: SyncChange) -> None:
 
     elif change.field == "assignee":
         todo.assignee = change.new_value
+
+    elif change.field == "enabled_skills":
+        todo.enabled_skills = change.new_value
 
     todo.updated_at = datetime.now(timezone.utc)

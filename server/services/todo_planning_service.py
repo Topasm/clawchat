@@ -25,7 +25,8 @@ _FALLBACK_PLAN: dict = {
     "summary": "Could not generate plan",
     "subtasks": [],
     "suggested_root_due_date": None,
-    "suggested_assignee": None,
+    "suggested_skills": [],
+    "suggested_assignee": None,  # legacy
     "suggested_project_title": None,
 }
 
@@ -43,7 +44,7 @@ Return ONLY a JSON object with this structure:
 {
   "summary": "Brief plan description",
   "suggested_root_due_date": "YYYY-MM-DD or null",
-  "suggested_assignee": "planner|researcher|executor or null",
+  "suggested_skills": ["plan", "research", "draft", "data_analysis", "code_review", "summarize", "obsidian_sync", "prioritize"],
   "suggested_project_title": "string or null",
   "subtasks": [
     {
@@ -192,7 +193,8 @@ async def generate_plan(
     plan.setdefault("summary", "")
     plan.setdefault("subtasks", [])
     plan.setdefault("suggested_root_due_date", None)
-    plan.setdefault("suggested_assignee", None)
+    plan.setdefault("suggested_skills", [])
+    plan.setdefault("suggested_assignee", None)  # legacy
     plan.setdefault("suggested_project_title", None)
 
     return plan

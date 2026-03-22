@@ -15,6 +15,7 @@ class TodoCreate(BaseModel):
     source: str | None = None
     source_id: str | None = None
     assignee: str | None = None
+    enabled_skills: list[str] | None = None
     inbox_state: str = "none"
     estimated_minutes: int | None = None
 
@@ -29,6 +30,7 @@ class TodoUpdate(BaseModel):
     parent_id: str | None = None
     sort_order: int | None = None
     assignee: str | None = None
+    enabled_skills: list[str] | None = None
     inbox_state: str | None = None
     estimated_minutes: int | None = None
     source: str | None = None
@@ -50,6 +52,7 @@ class ProjectTodoResponse(BaseModel):
     source: str | None = None
     source_id: str | None = None
     assignee: str | None = None
+    enabled_skills: list[str] | None = None
     inbox_state: str = "none"
     estimated_minutes: int | None = None
     created_at: datetime
@@ -63,6 +66,13 @@ class ProjectTodoResponse(BaseModel):
     @field_validator("tags", mode="before")
     @classmethod
     def _parse_tags(cls, v: object) -> list[str] | None:
+        if isinstance(v, str):
+            return json.loads(v)
+        return v  # type: ignore[return-value]
+
+    @field_validator("enabled_skills", mode="before")
+    @classmethod
+    def _parse_enabled_skills(cls, v: object) -> list[str] | None:
         if isinstance(v, str):
             return json.loads(v)
         return v  # type: ignore[return-value]
@@ -82,6 +92,7 @@ class TodoResponse(BaseModel):
     source: str | None = None
     source_id: str | None = None
     assignee: str | None = None
+    enabled_skills: list[str] | None = None
     inbox_state: str = "none"
     estimated_minutes: int | None = None
     created_at: datetime
@@ -98,6 +109,13 @@ class TodoResponse(BaseModel):
     @field_validator("tags", mode="before")
     @classmethod
     def _parse_tags(cls, v: object) -> list[str] | None:
+        if isinstance(v, str):
+            return json.loads(v)
+        return v  # type: ignore[return-value]
+
+    @field_validator("enabled_skills", mode="before")
+    @classmethod
+    def _parse_enabled_skills(cls, v: object) -> list[str] | None:
         if isinstance(v, str):
             return json.loads(v)
         return v  # type: ignore[return-value]

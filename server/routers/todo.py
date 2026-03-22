@@ -17,9 +17,10 @@ from models.task_relationship import TaskRelationship
 from models.todo import Todo
 from schemas.bulk import BulkTodoResponse, BulkTodoUpdate
 from schemas.common import PaginatedResponse
-from schemas.task import DelegateRequest, PlanApplyResponse, PlanResponse
+from schemas.task import DelegateRequest, PlanApplyResponse, PlanResponse, SkillResponse
 from schemas.todo import ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
 from services import inbox_pipeline_service
+from skills import SKILL_REGISTRY, PERSONA_TO_SKILL, get_skill
 from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
 from utils.inbox_display import get_next_action
 from config import settings
@@ -34,13 +35,21 @@ _ORDER_COLUMNS = {
     "priority": Todo.priority,
 }
 
-# -- Assignee display labels ---------------------------------------------------
+# -- Assignee / skill display labels -------------------------------------------
 
-_ASSIGNEE_LABELS = {
+_LEGACY_ASSIGNEE_LABELS = {
     "planner": "Planner",
     "researcher": "Researcher",
     "executor": "Executor",
 }
+
+
+def _skill_label(skill_id: str) -> str:
+    """Return a human-readable label for a skill or legacy persona."""
+    skill = get_skill(skill_id)
+    if skill:
+        return skill.name
+    return _LEGACY_ASSIGNEE_LABELS.get(skill_id, skill_id.replace("_", " ").title())
 
 
 def _humanize_folder_name(source_id: str | None) -> str | None:
@@ -426,10 +435,13 @@ async def get_latest_plan(
         else:
             suggested_due_summary = f"{sorted_dates[0]} \u2013 {sorted_dates[-1]}"
 
+    # Skill-based plan fields (preferred)
+    suggested_skills = payload.get("suggested_skills") or []
+    suggested_skills_labels = [_skill_label(s) for s in suggested_skills] if suggested_skills else None
+
+    # Legacy assignee (backward compat)
     assignee_raw = payload.get("suggested_assignee")
-    suggested_assignee_label = _ASSIGNEE_LABELS.get(
-        assignee_raw, assignee_raw.title() if assignee_raw else None
-    )
+    suggested_assignee_label = _skill_label(assignee_raw) if assignee_raw else None
 
     suggested_project_label = _humanize_folder_name(
         payload.get("suggested_project_title")
@@ -441,12 +453,14 @@ async def get_latest_plan(
         summary=payload.get("summary", ""),
         suggested_root_due_date=payload.get("suggested_root_due_date"),
         suggested_assignee=assignee_raw,
+        suggested_skills=suggested_skills or None,
         suggested_project_title=payload.get("suggested_project_title"),
         subtasks=subtask_list,
         created_at=task.created_at,
         subtask_count=len(subtask_list),
         suggested_due_summary=suggested_due_summary,
         suggested_assignee_label=suggested_assignee_label,
+        suggested_skills_labels=suggested_skills_labels,
         suggested_project_label=suggested_project_label,
     )
 
@@ -514,8 +528,11 @@ async def apply_plan(
                 db.add(rel)
                 relationship_count += 1
 
-    # Apply suggested assignee
-    if payload.get("suggested_assignee"):
+    # Apply suggested skills (preferred) or legacy assignee
+    if payload.get("suggested_skills"):
+        todo.enabled_skills = json.dumps(payload["suggested_skills"])
+        todo.assignee = payload["suggested_skills"][0]  # backward compat
+    elif payload.get("suggested_assignee"):
         todo.assignee = payload["suggested_assignee"]
 
     # Apply suggested root due date
@@ -589,8 +606,12 @@ async def delegate_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    if body.agent_type not in ("planner", "researcher", "executor"):
-        raise ValueError(f"Invalid agent_type: {body.agent_type}")
+    # Resolve skill_id — prefer skill_id, fall back to legacy agent_type mapping.
+    skill_id = body.skill_id
+    if not skill_id and body.agent_type:
+        skill_id = PERSONA_TO_SKILL.get(body.agent_type, body.agent_type)
+    if not skill_id or skill_id not in SKILL_REGISTRY:
+        raise ValueError(f"Unknown skill: {skill_id}")
 
     todo = await db.get(Todo, todo_id)
     if not todo:
@@ -598,20 +619,21 @@ async def delegate_todo(
 
     task = AgentTask(
         id=make_id("task_"),
-        agent_type=body.agent_type,
-        task_type=f"delegate_{body.agent_type}",
+        agent_type=skill_id,
+        task_type=f"delegate_{skill_id}",
         instruction=f"Handle: {todo.title}\n{todo.description or ''}",
         todo_id=todo.id,
+        skill_chain=json.dumps([skill_id]),
     )
     db.add(task)
     await db.flush()
 
     ai_service = request.app.state.ai_service
 
-    if body.agent_type == "planner":
+    if skill_id == "plan":
         await inbox_pipeline_service.process_todo(db, ai_service, todo_id)
     else:
-        # Use vault agent service for researcher/executor (creates vault documents)
+        # Use vault agent service (creates vault documents via skill template)
         try:
             from services.vault_agent_service import execute_agent_task
             await execute_agent_task(db, ai_service, task)
@@ -619,7 +641,37 @@ async def delegate_todo(
             from services.agent_task_service import execute_task
             await execute_task(db, ai_service, task.id)
 
-    todo.assignee = body.agent_type
+    # Update todo with skill assignment.
+    todo.assignee = skill_id  # backward compat
+    # Merge into enabled_skills (additive).
+    existing: list[str] = json.loads(todo.enabled_skills) if todo.enabled_skills else []
+    if skill_id not in existing:
+        existing.append(skill_id)
+    todo.enabled_skills = json.dumps(existing)
     await db.commit()
 
-    return {"status": "delegated", "task_id": task.id, "agent_type": body.agent_type}
+    return {
+        "status": "delegated",
+        "task_id": task.id,
+        "skill_id": skill_id,
+        "skill_chain": [skill_id],
+        "agent_type": skill_id,  # backward compat
+    }
+
+
+@router.get("/skills/list")
+async def list_skills(
+    _user: str = Depends(get_current_user),
+):
+    """Return all registered skills."""
+    return {
+        "skills": [
+            SkillResponse(
+                id=s.id,
+                name=s.name,
+                description=s.description,
+                tags=list(s.tags),
+            )
+            for s in sorted(SKILL_REGISTRY.values(), key=lambda s: s.id)
+        ]
+    }

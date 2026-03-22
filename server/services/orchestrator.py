@@ -147,9 +147,10 @@ class Orchestrator:
         instruction = params.get("instruction") or params.get("query") or content
         task_type = params.get("task_type", "research")
 
-        # Detect complexity to determine agent type
-        agent_type = agent_task_service.detect_agent_type(instruction)
-        is_multi_agent = agent_type == "coordinator"
+        # Use LLM-based skill selection (falls back to keyword heuristic).
+        from skills.selector import select_skills
+        skill_chain = await select_skills(self.ai, instruction)
+        agent_type = skill_chain[0] if skill_chain else "general"
 
         task = await agent_task_service.create_task(
             db,
@@ -159,12 +160,16 @@ class Orchestrator:
             message_id=message_id,
             agent_type=agent_type,
         )
+        # Set the skill chain on the new task.
+        task.skill_chain = json.dumps(skill_chain)
         await db.flush()
 
-        if is_multi_agent:
+        is_multi_skill = len(skill_chain) > 1
+        if is_multi_skill:
+            chain_label = " → ".join(skill_chain)
             msg = (
-                f"Got it! This looks like a complex task, so I'm coordinating multiple agents "
-                f"to work on it (ID: {task.id}). I'll keep you updated on progress."
+                f"Got it! I'll run a skill chain ({chain_label}) for this task "
+                f"(ID: {task.id}). I'll keep you updated on progress."
             )
         else:
             msg = (
@@ -182,7 +187,8 @@ class Orchestrator:
                 "action_type": "task_delegated",
                 "task_id": task.id,
                 "agent_type": agent_type,
-                "is_multi_agent": is_multi_agent,
+                "skill_chain": skill_chain,
+                "is_multi_agent": is_multi_skill,
             },
         )
 

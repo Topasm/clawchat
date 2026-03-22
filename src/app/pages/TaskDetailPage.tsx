@@ -17,6 +17,21 @@ import type { TodoResponse, TodoUpdate } from '../types/api';
 
 const PRIORITIES: Array<TodoResponse['priority']> = ['low', 'medium', 'high', 'urgent'];
 
+const SKILL_OPTIONS = [
+  { id: 'plan', label: 'Plan' },
+  { id: 'research', label: 'Research' },
+  { id: 'draft', label: 'Draft' },
+  { id: 'data_analysis', label: 'Analyze' },
+  { id: 'code_review', label: 'Review' },
+  { id: 'summarize', label: 'Summarize' },
+  { id: 'obsidian_sync', label: 'Sync' },
+  { id: 'prioritize', label: 'Prioritize' },
+] as const;
+
+const SKILL_LABELS: Record<string, string> = Object.fromEntries(
+  SKILL_OPTIONS.map(({ id, label }) => [id, label])
+);
+
 function getDueCountdown(dueDate: string): { label: string; variant: 'overdue' | 'today' | 'upcoming' } {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -142,10 +157,11 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handleDelegate = async (agentType: string) => {
+  const handleDelegate = async (skillId: string) => {
     try {
-      await apiClient.post(`/todos/${taskId}/delegate`, { agent_type: agentType });
-      useToastStore.getState().addToast('info', `Delegated to ${agentType}`);
+      await apiClient.post(`/todos/${taskId}/delegate`, { skill_id: skillId });
+      useToastStore.getState().addToast('info', `Delegated to ${skillId}`);
+      useModuleStore.getState().fetchTodos();
     } catch {
       useToastStore.getState().addToast('error', 'Failed to delegate');
     }
@@ -326,32 +342,39 @@ export default function TaskDetailPage() {
             </button>
           )}
 
-          {/* Delegate dropdown */}
+          {/* Skill delegate buttons */}
           <div className="cc-exec-panel__delegate">
-            <span className="cc-exec-panel__delegate-label">Delegate:</span>
-            {(['planner', 'researcher', 'executor'] as const).map((persona) => (
-              <button
-                key={persona}
-                type="button"
-                className={`cc-btn cc-btn--ghost cc-exec-panel__delegate-btn${task.assignee === persona ? ' cc-exec-panel__delegate-btn--active' : ''}`}
-                onClick={() => {
-                  if (task.assignee === persona) {
-                    persistField({ assignee: null });
-                  } else {
-                    persistField({ assignee: persona });
-                    handleDelegate(persona);
-                  }
-                }}
-              >
-                {persona === 'planner' ? 'Plan' : persona === 'researcher' ? 'Research' : 'Execute'}
-              </button>
-            ))}
+            <span className="cc-exec-panel__delegate-label">Skills:</span>
+            {SKILL_OPTIONS.map(({ id, label }) => {
+              const isActive = task.enabled_skills?.includes(id) || task.assignee === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`cc-btn cc-btn--ghost cc-exec-panel__delegate-btn${isActive ? ' cc-exec-panel__delegate-btn--active' : ''}`}
+                  onClick={() => {
+                    if (isActive) {
+                      const updated = (task.enabled_skills || []).filter((s) => s !== id);
+                      persistField({ enabled_skills: updated.length ? updated : null, assignee: updated[0] || null });
+                    } else {
+                      const updated = [...(task.enabled_skills || []), id];
+                      persistField({ enabled_skills: updated, assignee: id });
+                      handleDelegate(id);
+                    }
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
-          {task.assignee && ['planner', 'researcher', 'executor', 'openclaw'].includes(task.assignee) && (
+          {(task.enabled_skills?.length || (task.assignee && ['planner', 'researcher', 'executor', 'openclaw'].includes(task.assignee))) && (
             <div className="cc-exec-panel__agent-status">
               <span className="cc-exec-panel__agent-badge">
-                {task.assignee === 'openclaw' ? 'OpenClaw AI' : task.assignee}
+                {task.enabled_skills?.length
+                  ? task.enabled_skills.map((s) => SKILL_LABELS[s] || s).join(' → ')
+                  : task.assignee === 'openclaw' ? 'OpenClaw AI' : task.assignee}
               </span>
               <span className="cc-exec-panel__agent-state">
                 {task.inbox_state === 'planning' ? 'Planning in progress' :

@@ -52,7 +52,7 @@ export default function ActivityTab() {
                 {data.agent_tasks.map((t) => (
                   <tr key={t.id}>
                     <td>{t.task_type}</td>
-                    <td>{t.agent_type}</td>
+                    <td>{t.skill_chain ? JSON.parse(t.skill_chain).join(' → ') : t.agent_type}</td>
                     <td>
                       <span className="cc-admin-status">
                         <span className={`cc-admin-status__dot cc-admin-status__dot--${t.status === 'completed' ? 'ok' : 'error'}`} />

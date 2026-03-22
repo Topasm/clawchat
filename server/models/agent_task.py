@@ -20,6 +20,8 @@ class AgentTask(Base):
         String, ForeignKey("agent_tasks.id"), nullable=True
     )
     agent_type: Mapped[str] = mapped_column(String, nullable=False, default="general")
+    skill_chain: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array
+    current_skill_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     progress_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     sub_task_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

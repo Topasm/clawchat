@@ -3,6 +3,17 @@ import Checkbox from './Checkbox';
 import Badge from './Badge';
 import BlockerBadge from '../task-relationships/BlockerBadge';
 
+const SKILL_BADGE_LABELS: Record<string, string> = {
+  plan: 'Plan',
+  research: 'Research',
+  summarize: 'Sum',
+  draft: 'Draft',
+  code_review: 'Review',
+  data_analysis: 'Analyze',
+  obsidian_sync: 'Sync',
+  prioritize: 'Priority',
+};
+
 interface TaskCardProps {
   task: TodoResponse;
   onToggle: () => void;
@@ -37,11 +48,17 @@ export default function TaskCard({ task, onToggle, onClick, className, isSubTask
           {task.tags?.map((tag) => (
             <Badge key={tag} variant="tag">{tag}</Badge>
           ))}
-          {task.assignee && ['openclaw', 'planner', 'researcher', 'executor'].includes(task.assignee) && (
+          {task.enabled_skills?.length ? (
+            task.enabled_skills.map((s) => (
+              <span key={s} style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff' }}>
+                {SKILL_BADGE_LABELS[s] || s}
+              </span>
+            ))
+          ) : task.assignee && ['openclaw', 'planner', 'researcher', 'executor'].includes(task.assignee) ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff' }}>
               {task.assignee === 'openclaw' ? 'AI' : task.assignee === 'planner' ? 'Plan' : task.assignee === 'researcher' ? 'Research' : 'Exec'}
             </span>
-          )}
+          ) : null}
           {(blockerCount ?? 0) > 0 && <BlockerBadge count={blockerCount!} />}
           {(subTaskCount ?? 0) > 0 && (
             <span className="cc-badge cc-badge--count">{subTaskCount} sub-task{subTaskCount !== 1 ? 's' : ''}</span>

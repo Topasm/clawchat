@@ -684,22 +684,35 @@ GET    /api/todos/:id/plan/latest           # Get the latest plan for a todo
 POST   /api/todos/:id/plan/apply            # Apply a plan (create subtasks)
 ```
 
-### Delegate
+### Delegate / Skills
 
 ```
-POST   /api/todos/:id/delegate              # Assign to an agent persona
+POST   /api/todos/:id/delegate              # Assign a skill to a task
+GET    /api/todos/skills/list               # List available skills
 ```
 
 ```json
-// Request
+// POST delegate — Request
 {
-  "agent_type": "planner"    // "planner" | "researcher" | "executor"
+  "skill_id": "research"          // preferred (any registered skill ID)
+  // "agent_type": "planner"      // legacy fallback, mapped to skill ID
 }
 
-// Response 200
+// POST delegate — Response 200
 {
   "status": "delegated",
-  "agent_task_id": "at_abc123"
+  "task_id": "task_abc123",
+  "skill_id": "research",
+  "skill_chain": ["research"],
+  "agent_type": "research"
+}
+
+// GET skills/list — Response 200
+{
+  "skills": [
+    { "id": "plan", "name": "Plan", "description": "...", "tags": ["planning"] },
+    { "id": "research", "name": "Research", "description": "...", "tags": ["analysis"] }
+  ]
 }
 ```
 

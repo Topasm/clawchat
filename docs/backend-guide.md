@@ -70,13 +70,13 @@ server/
 │   ├── scheduling_service.py   # Event scheduling suggestions and conflict detection
 │   ├── search_service.py       # FTS5 full-text search
 │   ├── claude_code_provider.py # Claude Code integration provider
-│   ├── agent_task_service.py   # Background task execution pipeline
-│   ├── inbox_pipeline_service.py # Inbox classification + auto-assignment
+│   ├── agent_task_service.py   # Background task execution pipeline (routes to skill chain)
+│   ├── inbox_pipeline_service.py # Inbox classification + skill suggestion
 │   ├── obsidian_cli_service.py  # Obsidian CLI wrapper + write queue
 │   ├── obsidian_context_service.py # Vault project context for AI planning
 │   ├── obsidian_export_service.py  # Export todos/plans to vault markdown
 │   ├── obsidian_vault_indexer.py   # Vault file indexing + companion health
-│   ├── vault_agent_service.py      # AI agent for vault-aware planning
+│   ├── vault_agent_service.py      # AI agent for vault-aware planning (skill-chain aware)
 │   ├── vault_watcher_service.py   # Vault file watching service
 │   ├── briefing_service.py     # Daily briefing generation
 │   ├── admin_service.py        # Admin: table counts, storage, uptime, activity, purge, reindex, backup
@@ -174,7 +174,7 @@ query_events      → calendar_service.get_events()
 update_event      → calendar_service.update_event()
 delete_event      → calendar_service.delete_event()
 search            → search_service.search()
-delegate_task     → agent_task_service (planner/researcher/executor personas)
+delegate_task     → skills.selector → agent_task_service (skill chain execution)
 daily_briefing    → briefing_service.generate_briefing()
 suggest_time      → scheduling_service (time suggestion)
 check_conflicts   → scheduling_service (conflict detection)
@@ -202,16 +202,19 @@ obsidian command id=<command_id>              # Execute plugin command
 
 **Sync modes** (`OBSIDIAN_SYNC_MODE`): `filesystem` (direct file access), `livesync` (CouchDB + LiveSync plugin), or `disabled`.
 
-### Inbox Pipeline & Agent Personas
+### Inbox Pipeline & Skill-Based Agents
 
 New todos captured via quick-capture enter the inbox pipeline (`inbox_pipeline_service.py`):
-1. LLM classifies the todo and suggests an assignee persona
-2. Available personas: `planner` (creates plans/subtasks), `researcher` (investigates), `executor` (takes action)
-3. The `openclaw` assignee represents general AI assignment
+1. LLM classifies the todo and suggests relevant skills (`suggested_skills`)
+2. Built-in skills: `plan`, `research`, `summarize`, `draft`, `code_review`, `data_analysis`, `obsidian_sync`, `prioritize`
+3. Skills are registered in `server/skills/` (registry pattern via `SkillDef` dataclass)
+4. Projects bind skills via `Todo.enabled_skills` (JSON array), tasks execute them via `AgentTask.skill_chain`
 
 The `POST /api/todos/{id}/organize` endpoint triggers the pipeline as a background task with a fresh DB session (via `session_factory`, not the request-scoped session).
 
-Delegation: `POST /api/todos/{id}/delegate` assigns a todo to an agent persona and creates an `AgentTask` for background execution.
+Delegation: `POST /api/todos/{id}/delegate` accepts `{ "skill_id": "research" }`, creates an `AgentTask` with a `skill_chain`, and runs the skill executor. Legacy `agent_type` is still accepted for backward compatibility.
+
+Skills are executed sequentially in a chain — each skill's output feeds as context to the next (e.g. `research → summarize → draft`). LLM-based skill selection (`skills/selector.py`) replaces the old keyword-based `detect_agent_type()` heuristic.
 
 ### `services/intent_classifier.py` — Intent Classification
 

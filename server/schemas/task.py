@@ -15,6 +15,8 @@ class AgentTaskResponse(BaseModel):
     error: str | None = None
     parent_task_id: str | None = None
     agent_type: str = "general"
+    skill_chain: list[str] | None = None
+    current_skill_index: int = 0
     progress: int = 0
     progress_message: str | None = None
     sub_task_count: int = 0
@@ -40,6 +42,16 @@ class AgentTaskResponse(BaseModel):
                 return None
         return v  # type: ignore[return-value]
 
+    @field_validator("skill_chain", mode="before")
+    @classmethod
+    def _parse_skill_chain(cls, v: object) -> list[str] | None:
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v  # type: ignore[return-value]
+
 
 # -- Plan schemas ------------------------------------------------------------
 
@@ -58,7 +70,8 @@ class PlanResponse(BaseModel):
     todo_id: str
     summary: str
     suggested_root_due_date: str | None = None
-    suggested_assignee: str | None = None
+    suggested_assignee: str | None = None       # legacy
+    suggested_skills: list[str] | None = None   # new
     suggested_project_title: str | None = None
     subtasks: list[PlanSubtask] = []
     created_at: datetime
@@ -66,7 +79,8 @@ class PlanResponse(BaseModel):
     # Computed display fields
     subtask_count: int = 0
     suggested_due_summary: str | None = None
-    suggested_assignee_label: str | None = None
+    suggested_assignee_label: str | None = None   # legacy
+    suggested_skills_labels: list[str] | None = None  # new
     suggested_project_label: str | None = None
 
 
@@ -84,5 +98,14 @@ class OrganizeRequest(BaseModel):
 
 
 class DelegateRequest(BaseModel):
-    """Delegate a todo to an agent persona."""
-    agent_type: str  # planner | researcher | executor
+    """Delegate a todo to a skill (or legacy agent persona)."""
+    skill_id: str | None = None                     # preferred
+    agent_type: str | None = None                    # legacy fallback
+
+
+class SkillResponse(BaseModel):
+    """Public representation of a registered skill."""
+    id: str
+    name: str
+    description: str
+    tags: list[str] = []

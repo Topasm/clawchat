@@ -157,9 +157,19 @@ def _todo_to_md_line(todo: Todo) -> str:
             tag = f"#{tag}"
         parts.append(tag)
 
-    _AGENT_ROLES = {"planner", "researcher", "executor", "openclaw"}
-    if todo.assignee and todo.assignee in _AGENT_ROLES:
-        parts.append(f"@agent({todo.assignee})")
+    # Skill-based export (preferred) or legacy agent export.
+    if todo.enabled_skills:
+        import json as _json
+        try:
+            skills_list = _json.loads(todo.enabled_skills) if isinstance(todo.enabled_skills, str) else todo.enabled_skills
+            if skills_list:
+                parts.append(f"@skills({','.join(skills_list)})")
+        except (ValueError, TypeError):
+            pass
+    elif todo.assignee:
+        _AGENT_ROLES = {"planner", "researcher", "executor", "openclaw"}
+        if todo.assignee in _AGENT_ROLES:
+            parts.append(f"@agent({todo.assignee})")
 
     parts.append(f"<!-- claw:{todo.id} -->")
     return " ".join(parts)
