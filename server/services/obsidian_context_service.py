@@ -154,7 +154,7 @@ def _list_via_cli(vault_path: str, cli_command: str) -> list[dict[str, str]] | N
     """Use the configured CLI to list files, then filter for TODO.md entries."""
     try:
         proc = subprocess.run(
-            [cli_command, "list", vault_path],
+            [cli_command, "files", f"folder={vault_path}"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -197,7 +197,7 @@ def _list_files_via_cli(
     try:
         target = os.path.join(vault_path, folder)
         proc = subprocess.run(
-            [cli_command, "list", target],
+            [cli_command, "files", f"folder={target}"],
             capture_output=True,
             text=True,
             timeout=10,

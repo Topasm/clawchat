@@ -170,7 +170,7 @@ def refresh_index() -> VaultIndex:
         import subprocess
         try:
             proc = subprocess.run(
-                [cli_command, "--version"],
+                [cli_command, "version"],
                 capture_output=True,
                 text=True,
                 timeout=5,

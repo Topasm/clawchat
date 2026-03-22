@@ -145,17 +145,49 @@ Message CRUD:
 Routes classified intents to real service calls:
 
 ```
-general_chat  → LLM streaming via WebSocket
-create_todo   → todo_service.create_todo()
-query_todos   → todo_service.get_todos()
-create_event  → calendar_service.create_event()
-query_events  → calendar_service.get_events()
-create_memo   → memo_service.create_memo()
-query_memos   → memo_service.get_memos()
-search        → stub (coming soon)
-delegate_task → stub (coming soon)
-daily_briefing → stub (coming soon)
+general_chat   → LLM streaming via WebSocket
+create_todo    → todo_service.create_todo()
+query_todos    → todo_service.get_todos()
+create_event   → calendar_service.create_event()
+query_events   → calendar_service.get_events()
+create_memo    → memo_service.create_memo()
+query_memos    → memo_service.get_memos()
+search         → search_service.search()
+delegate_task  → agent_task_service (planner/researcher/executor personas)
+daily_briefing → briefing_service.generate_briefing()
 ```
+
+### Obsidian Vault Integration
+
+The server integrates with Obsidian vaults via the official Obsidian CLI (using `key=value` parameter syntax). All CLI operations fall back to direct filesystem access if the CLI is unavailable.
+
+**CLI command syntax** (matches [official Obsidian CLI](https://obsidian.md/help/Extending+Obsidian/Obsidian+CLI)):
+```
+obsidian version                              # Health check
+obsidian create path=<path> content=<text>    # Create document
+obsidian append path=<path> content=<text>    # Append to document
+obsidian rename path=<path> name=<name>       # Rename (updates internal links)
+obsidian move path=<path> to=<new_path>       # Move (updates internal links)
+obsidian search query=<text>                  # Full-text search
+obsidian files folder=<path>                  # List vault files
+obsidian commands                             # List plugin commands
+obsidian command id=<command_id>              # Execute plugin command
+```
+
+**Write queue**: Failed CLI operations are queued to `/data/obsidian_write_queue.json` and replayed when the Companion Node comes online. The scheduler periodically flushes the queue.
+
+**Sync modes** (`OBSIDIAN_SYNC_MODE`): `filesystem` (direct file access), `livesync` (CouchDB + LiveSync plugin), or `disabled`.
+
+### Inbox Pipeline & Agent Personas
+
+New todos captured via quick-capture enter the inbox pipeline (`inbox_pipeline_service.py`):
+1. LLM classifies the todo and suggests an assignee persona
+2. Available personas: `planner` (creates plans/subtasks), `researcher` (investigates), `executor` (takes action)
+3. The `openclaw` assignee represents general AI assignment
+
+The `POST /api/todos/{id}/organize` endpoint triggers the pipeline as a background task with a fresh DB session (via `session_factory`, not the request-scoped session).
+
+Delegation: `POST /api/todos/{id}/delegate` assigns a todo to an agent persona and creates an `AgentTask` for background execution.
 
 ### `services/intent_classifier.py` — Intent Classification
 
@@ -196,6 +228,13 @@ ENABLE_SCHEDULER=false
 BRIEFING_TIME=08:00                         # Daily briefing time (HH:MM)
 REMINDER_CHECK_INTERVAL=5                   # Minutes between reminder checks
 DEBUG=false
+
+# Obsidian Vault Integration (optional)
+OBSIDIAN_VAULT_PATH=                        # Absolute path to vault
+OBSIDIAN_CLI_COMMAND=                       # Path to obsidian CLI binary
+OBSIDIAN_SYNC_MODE=filesystem               # "livesync", "filesystem", or "disabled"
+OBSIDIAN_PROJECT_TODO_FILENAME=TODO.md      # Filename to scan for project todos
+OBSIDIAN_SCAN_INTERVAL_MINUTES=5            # Vault re-index interval
 ```
 
 ## Development Setup

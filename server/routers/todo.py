@@ -326,7 +326,13 @@ async def organize_todo(
     if not todo:
         raise NotFoundError("Todo not found")
     ai_service = request.app.state.ai_service
-    background_tasks.add_task(inbox_pipeline_service.process_todo, db, ai_service, todo_id)
+    session_factory = request.app.state.session_factory
+
+    async def _run_organize():
+        async with session_factory() as org_db:
+            await inbox_pipeline_service.process_todo(org_db, ai_service, todo_id)
+
+    background_tasks.add_task(_run_organize)
     return {"status": "processing", "todo_id": todo_id}
 
 

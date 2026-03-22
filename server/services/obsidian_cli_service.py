@@ -83,7 +83,7 @@ def is_cli_available() -> bool:
     """Check if the Obsidian CLI is configured and responsive."""
     if not settings.obsidian_cli_command:
         return False
-    result = _run_cli("--version", timeout=5)
+    result = _run_cli("version", timeout=5)
     return result is not None
 
 
@@ -110,7 +110,7 @@ def create_document(
 
     # Try CLI
     if use_cli:
-        result = _run_cli("create", vault_relative_path, "--content", content)
+        result = _run_cli("create", f"path={vault_relative_path}", f"content={content}")
         if result is not None:
             logger.debug("Created document via CLI: %s", vault_relative_path)
             return True
@@ -151,7 +151,7 @@ def append_to_document(
 
     # Try CLI
     if use_cli:
-        result = _run_cli("append", vault_relative_path, "--content", content)
+        result = _run_cli("append", f"path={vault_relative_path}", f"content={content}")
         if result is not None:
             logger.debug("Appended to document via CLI: %s", vault_relative_path)
             return True
@@ -188,7 +188,7 @@ def rename_document(
 
     # CLI is strongly preferred for rename — it updates internal links
     if use_cli:
-        result = _run_cli("rename", vault_relative_path, new_name)
+        result = _run_cli("rename", f"path={vault_relative_path}", f"name={new_name}")
         if result is not None:
             logger.debug("Renamed document via CLI: %s -> %s", vault_relative_path, new_name)
             return True
@@ -222,7 +222,7 @@ def move_document(
 
     # CLI preferred for move — updates internal links
     if use_cli:
-        result = _run_cli("move", vault_relative_path, new_path)
+        result = _run_cli("move", f"path={vault_relative_path}", f"to={new_path}")
         if result is not None:
             logger.debug("Moved document via CLI: %s -> %s", vault_relative_path, new_path)
             return True
@@ -251,7 +251,7 @@ def search_vault(query: str, max_results: int = 10) -> list[dict[str, str]]:
         return []
 
     # Try CLI search
-    result = _run_cli("search", query, timeout=10)
+    result = _run_cli("search", f"query={query}", timeout=10)
     if result is not None:
         matches = []
         for line in result.stdout.strip().splitlines()[:max_results]:

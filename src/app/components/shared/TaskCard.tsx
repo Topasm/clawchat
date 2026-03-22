@@ -37,8 +37,10 @@ export default function TaskCard({ task, onToggle, onClick, className, isSubTask
           {task.tags?.map((tag) => (
             <Badge key={tag} variant="tag">{tag}</Badge>
           ))}
-          {task.assignee === 'openclaw' && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff' }}>AI</span>
+          {task.assignee && ['openclaw', 'planner', 'researcher', 'executor'].includes(task.assignee) && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff' }}>
+              {task.assignee === 'openclaw' ? 'AI' : task.assignee === 'planner' ? 'Plan' : task.assignee === 'researcher' ? 'Research' : 'Exec'}
+            </span>
           )}
           {(blockerCount ?? 0) > 0 && <BlockerBadge count={blockerCount!} />}
           {(subTaskCount ?? 0) > 0 && (
