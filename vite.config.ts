@@ -52,7 +52,6 @@ export default defineConfig(async () => {
             // Rich-text / code editor — heaviest deps, rarely needed on first load
             'vendor-editor': [
               'lexical',
-              '@lexical/react',
               '@lexical/rich-text',
               '@lexical/list',
               '@lexical/link',

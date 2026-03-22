@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import type { TodoResponse, KanbanStatus } from '../../types/api';
 import KanbanColumn from './KanbanColumn';
 
 interface ColumnDef {
   status: KanbanStatus;
   title: string;
-  icon: string;
+  icon: ReactNode;
   tasks: TodoResponse[];
 }
 
