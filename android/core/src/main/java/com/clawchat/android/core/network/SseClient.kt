@@ -56,6 +56,7 @@ fun streamChat(
 
     val listener = object : EventSourceListener() {
         override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+            // When backend sends named event types, use them directly
             when (type) {
                 "meta" -> {
                     val obj = JSONObject(data)
@@ -63,19 +64,39 @@ fun streamChat(
                         conversationId = obj.optString("conversation_id", ""),
                         messageId = obj.optString("message_id", ""),
                     ))
+                    return
                 }
-                "token" -> trySend(SseEvent.Token(data))
-                "title_generated" -> trySend(SseEvent.TitleGenerated(data))
-                "done", null -> {
-                    if (data == "[DONE]" || type == "done") {
-                        trySend(SseEvent.Done)
-                        close()
-                    } else {
-                        // Default: treat as token
-                        trySend(SseEvent.Token(data))
+                "token" -> { trySend(SseEvent.Token(data)); return }
+                "title_generated" -> { trySend(SseEvent.TitleGenerated(data)); return }
+                "done" -> { trySend(SseEvent.Done); close(); return }
+            }
+
+            // No event type header — parse JSON to determine event kind
+            // (Backend sends `data: {"token": "..."}` without `event:` lines)
+            if (data == "[DONE]") {
+                trySend(SseEvent.Done)
+                close()
+                return
+            }
+
+            try {
+                val obj = JSONObject(data)
+                when {
+                    obj.has("token") -> trySend(SseEvent.Token(obj.getString("token")))
+                    obj.has("conversation_id") && obj.has("message_id") -> {
+                        trySend(SseEvent.Meta(
+                            conversationId = obj.getString("conversation_id"),
+                            messageId = obj.getString("message_id"),
+                        ))
                     }
+                    obj.has("title_generated") -> trySend(SseEvent.TitleGenerated(obj.getString("title_generated")))
+                    obj.has("done") -> { trySend(SseEvent.Done); close() }
+                    obj.has("error") -> trySend(SseEvent.Error(obj.getString("error")))
+                    else -> trySend(SseEvent.Token(data))
                 }
-                else -> trySend(SseEvent.Token(data))
+            } catch (_: Exception) {
+                // Not JSON — treat as raw token text
+                trySend(SseEvent.Token(data))
             }
         }
 

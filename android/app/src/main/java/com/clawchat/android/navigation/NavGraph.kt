@@ -29,7 +29,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Home"),
-    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Chat"),
+    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Projects"),
     BottomNavItem(NavRoute.Settings.route, Icons.Default.Settings, "Settings"),
 )
 
