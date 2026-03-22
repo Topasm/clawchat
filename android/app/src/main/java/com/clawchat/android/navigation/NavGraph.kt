@@ -2,8 +2,6 @@ package com.clawchat.android.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Settings
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
@@ -17,11 +15,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.clawchat.android.feature.chat.ChatScreen
-import com.clawchat.android.feature.inbox.InboxScreen
 import com.clawchat.android.feature.onboarding.OnboardingScreen
 import com.clawchat.android.feature.settings.SettingsScreen
-import com.clawchat.android.feature.tasks.TasksScreen
-import com.clawchat.android.feature.today.TodayScreen
+import com.clawchat.android.ui.HomeScreen
 
 data class BottomNavItem(
     val route: String,
@@ -30,10 +26,8 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Today"),
-    BottomNavItem(NavRoute.Inbox.route, Icons.Default.Email, "Inbox"),
+    BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Home"),
     BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Projects"),
-    BottomNavItem(NavRoute.Tasks.route, Icons.Default.CheckCircle, "Tasks"),
     BottomNavItem(NavRoute.Settings.route, Icons.Default.Settings, "Settings"),
 )
 
@@ -91,26 +85,10 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
                 )
             }
             composable(NavRoute.Today.route) {
-                TodayScreen(
-                    onNavigateToInbox = {
-                        navController.navigate(NavRoute.Inbox.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                )
-            }
-            composable(NavRoute.Inbox.route) {
-                InboxScreen()
+                HomeScreen()
             }
             composable(NavRoute.Chat.route) {
                 ChatScreen()
-            }
-            composable(NavRoute.Tasks.route) {
-                TasksScreen()
             }
             composable(NavRoute.Settings.route) {
                 SettingsScreen(
