@@ -59,9 +59,14 @@ async def get_status(
 
     last_export = get_last_export_time()
 
+    cli_command = settings.obsidian_cli_command
+    cli_available = bool(cli_command)
+
     return {
         "enabled": enabled,
         "vault_path": vault_path,
         "last_sync": last_export.isoformat() if last_export else None,
         "db_task_count": db_task_count,
+        "cli_available": cli_available,
+        "mode": "cli" if cli_available else ("filesystem" if enabled else "disabled"),
     }

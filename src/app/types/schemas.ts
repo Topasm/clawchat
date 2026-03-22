@@ -26,6 +26,7 @@ export const RefreshRequestSchema = z.object({
 
 const TodoStatusSchema = z.enum(['pending', 'completed']);
 const PrioritySchema = z.enum(['urgent', 'high', 'medium', 'low']);
+const InboxStateSchema = z.enum(['none', 'classifying', 'captured', 'planning', 'plan_ready', 'error']);
 
 export const TodoResponseSchema = z.object({
   id: z.string(),
@@ -41,6 +42,8 @@ export const TodoResponseSchema = z.object({
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   assignee: z.string().nullable().optional(),
+  inbox_state: InboxStateSchema.optional(),
+  estimated_minutes: z.number().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -54,6 +57,9 @@ export const TodoCreateSchema = z.object({
   parent_id: z.string().nullable().optional(),
   sort_order: z.number().optional(),
   assignee: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  source_id: z.string().nullable().optional(),
+  inbox_state: InboxStateSchema.optional(),
 });
 
 export const TodoUpdateSchema = z.object({
@@ -82,6 +88,8 @@ export const ProjectTodoResponseSchema = z.object({
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   assignee: z.string().nullable().optional(),
+  inbox_state: InboxStateSchema.optional(),
+  estimated_minutes: z.number().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
   conversation_id: z.string().nullable().optional(),
@@ -420,6 +428,28 @@ export const AgentTaskSummarySchema = z.object({
   completed_at: z.string().nullable().optional(),
 });
 
+export const AgentTaskResponseSchema = z.object({
+  id: z.string(),
+  task_type: z.string(),
+  instruction: z.string(),
+  status: z.string(),
+  result: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+  parent_task_id: z.string().nullable().optional(),
+  agent_type: z.string().optional(),
+  progress: z.number().optional(),
+  progress_message: z.string().nullable().optional(),
+  sub_task_count: z.number().optional(),
+  completed_sub_tasks: z.number().optional(),
+  todo_id: z.string().nullable().optional(),
+  payload: z.record(z.unknown()).nullable().optional(),
+  conversation_id: z.string().nullable().optional(),
+  message_id: z.string().nullable().optional(),
+  created_at: z.string(),
+  started_at: z.string().nullable().optional(),
+  completed_at: z.string().nullable().optional(),
+});
+
 export const ActivityResponseSchema = z.object({
   recent: z.array(RecentActivitySchema),
   agent_tasks: z.array(AgentTaskSummarySchema),
@@ -478,6 +508,32 @@ export const BackupResponseSchema = z.object({
   size_bytes: z.number(),
 });
 
+export const PlanSubtaskSchema = z.object({
+  title: z.string(),
+  description: z.string().nullable().optional(),
+  estimated_minutes: z.number().nullable().optional(),
+  due_date: z.string().nullable().optional(),
+  depends_on_indices: z.array(z.number()).optional(),
+});
+
+export const PlanResponseSchema = z.object({
+  task_id: z.string(),
+  todo_id: z.string(),
+  summary: z.string(),
+  suggested_root_due_date: z.string().nullable().optional(),
+  suggested_assignee: z.string().nullable().optional(),
+  suggested_project_title: z.string().nullable().optional(),
+  subtasks: z.array(PlanSubtaskSchema).optional(),
+  created_at: z.string(),
+});
+
+export const PlanApplyResponseSchema = z.object({
+  todo_id: z.string(),
+  created_subtask_ids: z.array(z.string()).optional(),
+  created_relationships: z.number().optional(),
+  project_folder_created: z.string().nullable().optional(),
+});
+
 export type AdminOverviewResponse = z.infer<typeof AdminOverviewResponseSchema>;
 export type AIConfigResponse = z.infer<typeof AIConfigResponseSchema>;
 export type AITestResponse = z.infer<typeof AITestResponseSchema>;
@@ -491,3 +547,9 @@ export type ModuleDataOverview = z.infer<typeof ModuleDataOverviewSchema>;
 export type PurgeResponse = z.infer<typeof PurgeResponseSchema>;
 export type ReindexResponse = z.infer<typeof ReindexResponseSchema>;
 export type BackupResponse = z.infer<typeof BackupResponseSchema>;
+
+export type InboxState = z.infer<typeof InboxStateSchema>;
+export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
+export type PlanSubtask = z.infer<typeof PlanSubtaskSchema>;
+export type PlanResponse = z.infer<typeof PlanResponseSchema>;
+export type PlanApplyResponse = z.infer<typeof PlanApplyResponseSchema>;

@@ -34,7 +34,8 @@ class ExportResult:
 def export_todo(vault_path: str, todo: Todo, project_name: str | None = None) -> None:
     """Export a single todo to the Obsidian vault (create or update)."""
     try:
-        abs_path = _get_file_path(vault_path, project_name)
+        _remove_all_markers(vault_path, todo.id)
+        abs_path = _get_file_path(vault_path, project_name, source_id=todo.source_id)
         line = _todo_to_md_line(todo)
         _upsert_line(abs_path, todo.id, line)
     except Exception:
@@ -64,20 +65,31 @@ def export_all_todos(vault_path: str, todos: list[Todo]) -> ExportResult:
     """
     result = ExportResult()
 
-    # Build a parent-id → title lookup and group todos by project name.
+    # Build a parent-id → title lookup.
     parent_titles: dict[str, str] = {}
     for t in todos:
         if t.parent_id is None:
             parent_titles[t.id] = t.title
 
-    grouped: dict[str | None, list[Todo]] = {}
+    # Group todos by resolved file path (source_id first, then parent title,
+    # then inbox).
+    grouped: dict[str, list[Todo]] = {}
     for t in todos:
-        project = parent_titles.get(t.parent_id) if t.parent_id else None  # type: ignore[arg-type]
-        grouped.setdefault(project, []).append(t)
+        if t.source_id:
+            project = None
+        else:
+            project = parent_titles.get(t.parent_id) if t.parent_id else None  # type: ignore[arg-type]
+        abs_path = _get_file_path(vault_path, project, source_id=t.source_id)
+        grouped.setdefault(abs_path, []).append(t)
+
+    # Remove existing markers for every todo before writing to prevent
+    # duplicates when todos move between folders.
+    for group in grouped.values():
+        for t in group:
+            _remove_all_markers(vault_path, t.id)
 
     files_written: set[str] = set()
-    for project_name, group in grouped.items():
-        abs_path = _get_file_path(vault_path, project_name)
+    for abs_path, group in grouped.items():
         try:
             _export_group(abs_path, group)
             files_written.add(abs_path)
@@ -187,6 +199,19 @@ def _remove_line(path: str, todo_id: str) -> bool:
             _write_lines(path, lines)
             return True
     return False
+
+
+def _remove_all_markers(vault_path: str, todo_id: str) -> None:
+    """Walk the entire vault and remove any line containing the marker for *todo_id*.
+
+    This prevents duplicate entries when a todo moves between folders.
+    """
+    for dirpath, _dirs, filenames in os.walk(vault_path):
+        for fname in filenames:
+            if not fname.endswith(".md"):
+                continue
+            abs_path = os.path.join(dirpath, fname)
+            _remove_line(abs_path, todo_id)
 
 
 def _ensure_section_header(path: str, lines: list[str]) -> None:

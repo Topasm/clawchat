@@ -1,10 +1,11 @@
 package com.clawchat.android.widget
 
+import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.glance.*
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -18,31 +19,23 @@ import java.time.format.DateTimeFormatter
 
 class TodayWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
         provideContent {
-            TodayWidgetContent(launchIntent)
+            TodayWidgetContent(mainActivity)
         }
     }
 }
 
 @Composable
-private fun TodayWidgetContent(launchIntent: Intent?) {
+private fun TodayWidgetContent(mainActivity: ComponentName) {
     val today = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMM d"))
 
-    val modifier = if (launchIntent != null) {
-        GlanceModifier
+    Column(
+        modifier = GlanceModifier
             .fillMaxSize()
             .padding(16.dp)
             .background(GlanceTheme.colors.surface)
-            .clickable(androidx.glance.action.actionStartActivity(launchIntent))
-    } else {
-        GlanceModifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .background(GlanceTheme.colors.surface)
-    }
-
-    Column(modifier = modifier,
+            .clickable(actionStartActivity(mainActivity)),
     ) {
         Text(
             text = today,

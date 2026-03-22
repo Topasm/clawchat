@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { parseNaturalInput } from '../../utils/naturalLanguageParser';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { hapticSuccess } from '../../utils/haptics';
 import Badge from './Badge';
 
@@ -54,18 +55,35 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
       });
       useToastStore.getState().addToast('success', 'Event created');
     } else {
-      useModuleStore.getState().addTodo({
-        id,
-        title: parsed.title,
-        status: 'pending',
-        priority: parsed.priority ?? undefined,
-        due_date: parsed.dueDate?.toISOString(),
-        tags: [],
-        parent_id: defaultParentId ?? null,
-        sort_order: 0,
-        created_at: now,
-        updated_at: now,
-      });
+      const isConnected = !!useAuthStore.getState().serverUrl;
+      if (isConnected) {
+        // Use server createTodo for inbox pipeline
+        useModuleStore.getState().createTodo({
+          title: parsed.title,
+          priority: parsed.priority ?? 'medium',
+          due_date: parsed.dueDate?.toISOString(),
+          tags: [],
+          parent_id: defaultParentId,
+          source: defaultParentId ? undefined : 'quick_capture',
+          inbox_state: defaultParentId ? 'none' : 'classifying',
+        }).catch(() => {});
+      } else {
+        // Offline: local-only creation
+        const now = new Date().toISOString();
+        const id = `local-${Date.now()}`;
+        useModuleStore.getState().addTodo({
+          id,
+          title: parsed.title,
+          status: 'pending',
+          priority: parsed.priority ?? undefined,
+          due_date: parsed.dueDate?.toISOString(),
+          tags: [],
+          parent_id: defaultParentId ?? null,
+          sort_order: 0,
+          created_at: now,
+          updated_at: now,
+        });
+      }
       useToastStore.getState().addToast('success', 'Task created');
     }
 

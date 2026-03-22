@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useModuleStore } from '../stores/useModuleStore';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
+import { useToastStore } from '../stores/useToastStore';
 import { useDebouncedPersist } from '../hooks/useDebouncedPersist';
+import apiClient from '../services/apiClient';
 import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
 import TaskCard from '../components/shared/TaskCard';
@@ -27,6 +29,8 @@ export default function TaskDetailPage() {
 
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
+  const [plan, setPlan] = useState<any>(null);
+  const [planLoading, setPlanLoading] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -34,6 +38,18 @@ export default function TaskDetailPage() {
       setDescription(task.description ?? '');
     }
   }, [task]);
+
+  useEffect(() => {
+    if (!taskId || task?.inbox_state !== 'plan_ready') {
+      setPlan(null);
+      return;
+    }
+    setPlanLoading(true);
+    apiClient.get(`/todos/${taskId}/plan/latest`)
+      .then((res) => setPlan(res.data))
+      .catch(() => setPlan(null))
+      .finally(() => setPlanLoading(false));
+  }, [taskId, task?.inbox_state]);
 
   const localUpdateTodo = useCallback((id: string, updates: TodoUpdate) => {
     useModuleStore.getState().updateTodo(id, updates as Partial<TodoResponse>);
@@ -108,6 +124,15 @@ export default function TaskDetailPage() {
         </div>
       )}
 
+      {task.estimated_minutes && (
+        <div className="cc-detail__field">
+          <span className="cc-detail__field-label">Estimate</span>
+          <div className="cc-detail__field-value">
+            <span style={{ fontSize: 13 }}>{task.estimated_minutes}m</span>
+          </div>
+        </div>
+      )}
+
       <div className="cc-detail__field">
         <span className="cc-detail__field-label">Status</span>
         <div className="cc-detail__field-value">
@@ -115,24 +140,47 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
+      {task.inbox_state && task.inbox_state !== 'none' && (
+        <div className="cc-detail__field">
+          <span className="cc-detail__field-label">Inbox</span>
+          <div className="cc-detail__field-value">
+            <Badge variant="status">{task.inbox_state}</Badge>
+          </div>
+        </div>
+      )}
+
       <div className="cc-detail__field">
         <span className="cc-detail__field-label">Assignee</span>
-        <div className="cc-detail__field-value">
-          <button
-            type="button"
-            className="cc-detail__field-btn"
-            onClick={() => {
-              const next = task.assignee === 'openclaw' ? null : 'openclaw';
-              persistField({ assignee: next });
-            }}
-            style={{ fontSize: 13 }}
-          >
-            {task.assignee === 'openclaw' ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff', fontSize: 12, fontWeight: 600 }}>OpenClaw AI</span>
-            ) : (
-              <span style={{ color: 'var(--cc-text-tertiary)', fontSize: 12 }}>Unassigned</span>
-            )}
-          </button>
+        <div className="cc-detail__field-value" style={{ display: 'flex', gap: 4 }}>
+          {(['planner', 'researcher', 'executor'] as const).map((persona) => (
+            <button
+              key={persona}
+              type="button"
+              className="cc-btn cc-btn--ghost"
+              style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                borderRadius: 4,
+                backgroundColor: task.assignee === persona ? '#6366F1' : 'transparent',
+                color: task.assignee === persona ? '#fff' : 'var(--cc-text-tertiary)',
+                fontWeight: task.assignee === persona ? 600 : 400,
+              }}
+              onClick={() => {
+                const next = task.assignee === persona ? null : persona;
+                persistField({ assignee: next });
+              }}
+            >
+              {persona}
+            </button>
+          ))}
+          {task.assignee === 'openclaw' && (
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, backgroundColor: '#6366F1', color: '#fff', fontWeight: 600 }}>
+              OpenClaw AI
+            </span>
+          )}
+          {!task.assignee && (
+            <span style={{ color: 'var(--cc-text-tertiary)', fontSize: 12 }}>Unassigned</span>
+          )}
         </div>
       </div>
 
@@ -164,6 +212,57 @@ export default function TaskDetailPage() {
           >
             {parentTask.title}
           </span>
+        </div>
+      )}
+
+      {/* Plan section */}
+      {plan && (
+        <div className="cc-detail__section">
+          <div className="cc-detail__section-title">Plan</div>
+          <p style={{ fontSize: 13, color: 'var(--cc-text-secondary)', margin: '0 0 8px' }}>
+            {plan.summary}
+          </p>
+          {plan.subtasks && plan.subtasks.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--cc-text-tertiary)' }}>
+              {plan.subtasks.map((s: any, i: number) => (
+                <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid var(--cc-border)' }}>
+                  <strong>{s.title}</strong>
+                  {s.estimated_minutes && <span style={{ marginLeft: 8 }}>{s.estimated_minutes}m</span>}
+                  {s.due_date && <span style={{ marginLeft: 8 }}>{s.due_date}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button
+              className="cc-btn cc-btn--primary"
+              style={{ fontSize: 12 }}
+              onClick={async () => {
+                try {
+                  await apiClient.post(`/todos/${taskId}/plan/apply`);
+                  useToastStore.getState().addToast('success', 'Plan applied');
+                  useModuleStore.getState().fetchTodos();
+                  setPlan(null);
+                } catch { useToastStore.getState().addToast('error', 'Failed to apply plan'); }
+              }}
+            >
+              Apply Plan
+            </button>
+            <button
+              className="cc-btn cc-btn--ghost"
+              style={{ fontSize: 12 }}
+              onClick={async () => {
+                try {
+                  await apiClient.post(`/todos/${taskId}/plan/dismiss`);
+                  useToastStore.getState().addToast('info', 'Plan dismissed');
+                  useModuleStore.getState().fetchTodos();
+                  setPlan(null);
+                } catch { useToastStore.getState().addToast('error', 'Failed to dismiss'); }
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
@@ -202,6 +301,49 @@ export default function TaskDetailPage() {
           <AttachmentList ownerId={taskId} ownerType="todo" />
         </div>
       )}
+
+      {/* Actions section */}
+      <div className="cc-detail__section">
+        <div className="cc-detail__section-title">Actions</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="cc-btn cc-btn--secondary"
+            style={{ fontSize: 12 }}
+            onClick={async () => {
+              try {
+                await apiClient.post(`/todos/${taskId}/organize`);
+                useToastStore.getState().addToast('info', 'Organizing...');
+              } catch { useToastStore.getState().addToast('error', 'Failed'); }
+            }}
+          >
+            Run Planner
+          </button>
+          <button
+            className="cc-btn cc-btn--secondary"
+            style={{ fontSize: 12 }}
+            onClick={async () => {
+              try {
+                await apiClient.post(`/todos/${taskId}/delegate`, { agent_type: 'researcher' });
+                useToastStore.getState().addToast('info', 'Delegated to researcher');
+              } catch { useToastStore.getState().addToast('error', 'Failed'); }
+            }}
+          >
+            Delegate: Researcher
+          </button>
+          <button
+            className="cc-btn cc-btn--secondary"
+            style={{ fontSize: 12 }}
+            onClick={async () => {
+              try {
+                await apiClient.post(`/todos/${taskId}/delegate`, { agent_type: 'executor' });
+                useToastStore.getState().addToast('info', 'Delegated to executor');
+              } catch { useToastStore.getState().addToast('error', 'Failed'); }
+            }}
+          >
+            Delegate: Executor
+          </button>
+        </div>
+      </div>
 
       <button type="button" className="cc-btn cc-btn--danger cc-detail__delete-btn" onClick={handleDelete}>
         Delete Task
