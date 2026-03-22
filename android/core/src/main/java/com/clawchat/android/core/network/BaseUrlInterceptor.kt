@@ -3,6 +3,7 @@ package com.clawchat.android.core.network
 import com.clawchat.android.core.data.SessionStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -14,21 +15,37 @@ import javax.inject.Singleton
  * using the server URL stored in [SessionStore]. This allows the
  * Retrofit instance to be created once with a placeholder URL,
  * then dynamically route to the actual server after pairing.
+ *
+ * Caches the parsed URL in-memory so only the first request
+ * (or after a session change) hits DataStore.
  */
 @Singleton
 class BaseUrlInterceptor @Inject constructor(
     private val sessionStore: SessionStore,
 ) : Interceptor {
 
+    @Volatile
+    private var cachedBaseUrl: HttpUrl? = null
+
+    @Volatile
+    private var baseUrlResolved = false
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
-        val baseUrl = runBlocking { sessionStore.apiBaseUrl.first() }
 
-        if (baseUrl.isNullOrBlank()) {
-            return chain.proceed(originalRequest)
+        val newBaseUrl = if (baseUrlResolved) {
+            cachedBaseUrl
+        } else {
+            val raw = runBlocking { sessionStore.apiBaseUrl.first() }
+            val parsed = raw?.trimEnd('/')?.toHttpUrlOrNull()
+            cachedBaseUrl = parsed
+            baseUrlResolved = true
+            parsed
         }
 
-        val newBaseUrl = baseUrl.trimEnd('/').toHttpUrlOrNull() ?: return chain.proceed(originalRequest)
+        if (newBaseUrl == null) {
+            return chain.proceed(originalRequest)
+        }
 
         val newUrl = originalRequest.url.newBuilder()
             .scheme(newBaseUrl.scheme)
@@ -41,5 +58,11 @@ class BaseUrlInterceptor @Inject constructor(
             .build()
 
         return chain.proceed(newRequest)
+    }
+
+    /** Called by SessionStore after login/logout to invalidate the cache. */
+    fun invalidateBaseUrl() {
+        baseUrlResolved = false
+        cachedBaseUrl = null
     }
 }

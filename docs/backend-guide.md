@@ -1,13 +1,11 @@
 # Backend Guide
 
-The ClawChat backend is a standalone Python FastAPI server in the **`clawchat_server`** repository. It handles REST API, SSE streaming, AI orchestration, and module CRUD.
-
-> **Note:** The server was previously embedded in `clawchat/server/`. It now lives in its own repo at `clawchat_server/server/` for independent deployment and development.
+The ClawChat backend is a Python FastAPI server in the `server/` directory of the main repository. It handles REST API, SSE streaming, AI orchestration, and module CRUD.
 
 ## Directory Structure
 
 ```
-clawchat_server/server/
+server/
 ├── main.py                     # FastAPI app entry point (async lifespan)
 ├── config.py                   # Pydantic Settings from .env
 ├── database.py                 # Async SQLAlchemy engine + session factory
@@ -20,14 +18,18 @@ clawchat_server/server/
 │   ├── __init__.py
 │   ├── auth.py                 # POST /api/auth/* (login, refresh, logout)
 │   ├── chat.py                 # SSE /stream, message CRUD, conversations
-│   ├── todo.py                 # Full CRUD /api/todos
+│   ├── todo.py                 # Full CRUD /api/todos + organize, delegate, plan
+│   ├── tasks.py                # Task management /api/tasks (planning, agent tasks)
+│   ├── task_relationship.py    # Task relationships /api/task-relationships
 │   ├── calendar.py             # Full CRUD /api/events
-│   ├── memo.py                 # Full CRUD /api/memos
 │   ├── attachment.py           # File upload/download /api/attachments
 │   ├── admin.py                # Admin dashboard /api/admin/* (11 endpoints)
-│   ├── search.py               # GET /api/search (stub)
+│   ├── obsidian.py             # Obsidian vault /api/obsidian/* (health, index, CLI, queue)
+│   ├── search.py               # GET /api/search
+│   ├── settings.py             # User settings /api/settings
 │   ├── tags.py                 # GET /api/tags (aggregated tags)
 │   ├── today.py                # GET /api/today (dashboard aggregation)
+│   ├── pairing.py              # Device pairing /api/pairing
 │   └── notifications.py        # POST /api/notifications/register-token
 ├── models/
 │   ├── __init__.py
@@ -35,9 +37,11 @@ clawchat_server/server/
 │   ├── message.py              # Message model (role, content, message_type, intent)
 │   ├── todo.py                 # Todo model (status, priority, completed_at, tags)
 │   ├── event.py                # Event model (start/end time, is_all_day, reminder, tags)
-│   ├── memo.py                 # Memo model (title, content, tags)
-│   ├── attachment.py           # Attachment model (filename, content_type, memo_id, todo_id)
-│   └── agent_task.py           # AgentTask model (queued async work)
+│   ├── attachment.py           # Attachment model (filename, content_type, todo_id)
+│   ├── agent_task.py           # AgentTask model (queued async work)
+│   ├── task_relationship.py    # TaskRelationship model (blocks, related, duplicate_of)
+│   ├── paired_device.py        # PairedDevice model (device pairing)
+│   └── user_settings.py        # UserSettings model
 ├── schemas/
 │   ├── __init__.py
 │   ├── common.py               # PaginatedResponse
@@ -45,26 +49,40 @@ clawchat_server/server/
 │   ├── chat.py                 # SendMessageRequest, MessageEditRequest, conversation/message responses
 │   ├── todo.py                 # TodoCreate, TodoUpdate, TodoResponse
 │   ├── calendar.py             # EventCreate, EventUpdate, EventResponse
-│   ├── memo.py                 # MemoCreate, MemoUpdate, MemoResponse
+│   ├── task.py                 # Task management schemas
+│   ├── task_relationship.py    # TaskRelationship schemas
+│   ├── bulk.py                 # Bulk operation schemas
 │   ├── attachment.py           # AttachmentResponse
 │   ├── admin.py                # Admin response models (overview, AI config, activity, sessions, config, data, purge, reindex, backup)
 │   ├── today.py                # TodayResponse
 │   ├── search.py               # SearchHit, search response schema
+│   ├── settings.py             # User settings schemas
+│   ├── pairing.py              # Device pairing schemas
+│   ├── claude_code.py          # Claude Code integration schemas
 ├── services/
 │   ├── __init__.py
 │   ├── ai_service.py           # LLM client (Ollama native + OpenAI-compatible)
 │   ├── intent_classifier.py    # Intent classification via function calling (16 intents)
 │   ├── orchestrator.py         # Routes intents to services, streams via WebSocket
 │   ├── todo_service.py         # Async todo CRUD with completed_at auto-set
+│   ├── todo_planning_service.py # Todo planning and subtask generation
 │   ├── calendar_service.py     # Async event CRUD with recurrence support
-│   ├── memo_service.py         # Async memo CRUD
+│   ├── scheduling_service.py   # Event scheduling suggestions and conflict detection
 │   ├── search_service.py       # FTS5 full-text search
+│   ├── claude_code_provider.py # Claude Code integration provider
 │   ├── agent_task_service.py   # Background task execution pipeline
+│   ├── inbox_pipeline_service.py # Inbox classification + auto-assignment
+│   ├── obsidian_cli_service.py  # Obsidian CLI wrapper + write queue
+│   ├── obsidian_context_service.py # Vault project context for AI planning
+│   ├── obsidian_export_service.py  # Export todos/plans to vault markdown
+│   ├── obsidian_vault_indexer.py   # Vault file indexing + companion health
+│   ├── vault_agent_service.py      # AI agent for vault-aware planning
+│   ├── vault_watcher_service.py   # Vault file watching service
 │   ├── briefing_service.py     # Daily briefing generation
 │   ├── admin_service.py        # Admin: table counts, storage, uptime, activity, purge, reindex, backup
 │   ├── reminder_service.py     # Event/todo reminder checks
 │   ├── recurrence_service.py   # Recurring event expansion
-│   └── scheduler.py            # Background loops (reminders, briefing)
+│   └── scheduler.py            # Background loops (reminders, briefing, queue flush)
 ├── ws/
 │   ├── __init__.py
 │   ├── manager.py              # WebSocket ConnectionManager
@@ -145,16 +163,22 @@ Message CRUD:
 Routes classified intents to real service calls:
 
 ```
-general_chat   → LLM streaming via WebSocket
-create_todo    → todo_service.create_todo()
-query_todos    → todo_service.get_todos()
-create_event   → calendar_service.create_event()
-query_events   → calendar_service.get_events()
-create_memo    → memo_service.create_memo()
-query_memos    → memo_service.get_memos()
-search         → search_service.search()
-delegate_task  → agent_task_service (planner/researcher/executor personas)
-daily_briefing → briefing_service.generate_briefing()
+general_chat      → LLM streaming via WebSocket
+create_todo       → todo_service.create_todo()
+query_todos       → todo_service.get_todos()
+update_todo       → todo_service.update_todo()
+delete_todo       → todo_service.delete_todo()
+complete_todo     → todo_service.complete_todo()
+create_event      → calendar_service.create_event()
+query_events      → calendar_service.get_events()
+update_event      → calendar_service.update_event()
+delete_event      → calendar_service.delete_event()
+search            → search_service.search()
+delegate_task     → agent_task_service (planner/researcher/executor personas)
+daily_briefing    → briefing_service.generate_briefing()
+suggest_time      → scheduling_service (time suggestion)
+check_conflicts   → scheduling_service (conflict detection)
+analyze_schedule  → scheduling_service (schedule analysis)
 ```
 
 ### Obsidian Vault Integration
@@ -241,7 +265,7 @@ OBSIDIAN_SCAN_INTERVAL_MINUTES=5            # Vault re-index interval
 
 ```bash
 # Navigate to server
-cd clawchat_server/server
+cd server
 
 # Create virtual environment
 python -m venv venv

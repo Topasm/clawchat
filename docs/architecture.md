@@ -8,7 +8,7 @@
 │   Platform Targets                                       │
 │   ├── Electron (Windows, macOS, Linux)                   │
 │   ├── Web Browser (Vite dev server / static build)       │
-│   └── Capacitor (iOS, Android) — planned                 │
+│   └── Capacitor (iOS, Android)                           │
 │                                                          │
 │   Pages                         State (Zustand)          │
 │   ├── TodayPage                 ├── useAuthStore         │
@@ -16,7 +16,7 @@
 │   ├── ChatListPage              │   (streaming + CRUD)   │
 │   ├── ChatPage                  ├── useModuleStore       │
 │   ├── AllTasksPage (Kanban)     │   (todos, events,      │
-│   ├── TaskDetailPage            │    memos, kanban)       │
+│   ├── TaskDetailPage            │    kanban)              │
 │   ├── EventDetailPage           └── useSettingsStore     │
 │   ├── SettingsPage                  (15+ settings)       │
 │   ├── SystemPromptPage                                   │
@@ -54,22 +54,32 @@
 ┌──────────────────────┼───────────────────────────────────┐
 │  Self-Hosted Server  │                                    │
 │                      │                                    │
-│  FastAPI Backend  (clawchat_server repo)                   │
-│  ├── Routers (chat, todo, calendar, memo, attachment,     │
-│  │           search, today, admin)                        │
-│  ├── Services (ai, orchestrator, todo, calendar, memo)    │
+│  FastAPI Backend  (server/)                                │
+│  ├── Routers (chat, todo, tasks, calendar, attachment,    │
+│  │           search, today, admin, obsidian, pairing,     │
+│  │           settings, task-relationships)                │
+│  ├── Services (ai, orchestrator, todo, calendar,          │
+│  │            scheduling, inbox pipeline, obsidian        │
+│  │            CLI/vault/export, claude code)              │
 │  └── Models & Schemas (SQLAlchemy async + Pydantic)       │
 │                                                           │
 │  SQLite Database                                          │
 │  ├── conversations, messages                              │
-│  ├── todos, events, memos, attachments                    │
-│  └── agent_tasks                                          │
+│  ├── todos, events, attachments, task_relationships       │
+│  └── agent_tasks, paired_devices, user_settings           │
 │                                                           │
 │  File Storage (data/uploads/)                             │
 │  └── Uploaded attachments (UUID-named files)              │
 │                                                           │
 │  LLM Provider                                             │
 │  └── Ollama (local) or OpenAI-compatible API (cloud)      │
+│                                                           │
+│  Obsidian Vault Integration (optional)                    │
+│  ├── CLI wrapper (official key=value syntax)              │
+│  ├── Vault indexer + project context                      │
+│  ├── Export service (todos → markdown with @agent tags)   │
+│  ├── Write queue (offline → replay on reconnect)          │
+│  └── Sync: filesystem or LiveSync (CouchDB replication)  │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -105,7 +115,7 @@ App ──POST /api/chat/stream──► FastAPI Router
                     ┌───────────────┼───────────────┐
                     ▼               ▼               ▼
               Module Service   General Chat    Agent Task
-              (todo/cal/memo)  (AI response)   (async work)
+              (todo/calendar)  (AI response)   (async work)
                     │               │               │
                     ▼               ▼               ▼
               Execute CRUD    Stream tokens    Queue task
@@ -115,6 +125,18 @@ App ──POST /api/chat/stream──► FastAPI Router
                             ▼
                     App renders response
                     in chat panel
+
+Inbox pipeline (new todos):
+    Quick capture → classify via LLM → suggest persona
+                                           │
+                    ┌──────────────────────┼──────────────┐
+                    ▼                      ▼              ▼
+                 Planner             Researcher       Executor
+              (break down)        (investigate)     (take action)
+                    │                      │              │
+                    ▼                      ▼              ▼
+              Create subtasks      Research report    Execute + update
+              Export to vault      Export to vault    Export to vault
 ```
 
 ## CSS Architecture
@@ -133,7 +155,7 @@ Five Zustand stores manage all client state:
 |-------|---------------|
 | `useAuthStore` | JWT tokens, server URL, login/logout (persisted to localStorage) |
 | `useChatStore` | Conversations, messages, SSE streaming, abort controller |
-| `useModuleStore` | Todos, events, memos, kanban statuses, kanban filters, CRUD + async API actions |
+| `useModuleStore` | Todos, events, kanban statuses, kanban filters, CRUD + async API actions |
 | `useSettingsStore` | Theme, chat behavior, LLM params, panel sizes, notifications (persisted to localStorage) |
 | `useToastStore` | Toast notification queue with auto-dismiss (success/error/info/warning) |
 

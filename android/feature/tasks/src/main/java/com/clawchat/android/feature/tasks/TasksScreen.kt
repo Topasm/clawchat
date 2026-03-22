@@ -25,12 +25,13 @@ fun TasksScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    if (state.selectedTask != null) {
+    val selectedTask = state.selectedTask
+    if (selectedTask != null) {
         TaskDetailView(
-            task = state.selectedTask!!,
+            task = selectedTask,
             onBack = { viewModel.selectTask(null) },
-            onToggle = { viewModel.toggleComplete(state.selectedTask!!.id) },
-            onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
+            onToggle = { viewModel.toggleComplete(selectedTask.id) },
+            onDelete = { viewModel.deleteTask(selectedTask.id) },
         )
     } else {
         TaskListView(
@@ -101,7 +102,7 @@ private fun TaskListView(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(tasks, key = { it.id }) { task ->
+                    items(tasks, key = { it.id }, contentType = { "task" }) { task ->
                         TaskRow(
                             task = task,
                             onToggle = { onToggle(task.id) },

@@ -9,7 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Stop
+import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -126,7 +126,7 @@ private fun ChatDetailView(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(messages, key = { it.id }) { msg ->
+                items(messages, key = { it.id }, contentType = { "message" }) { msg ->
                     MessageBubble(message = msg)
                 }
                 // Streaming message
@@ -159,7 +159,7 @@ private fun ChatDetailView(
                     Spacer(Modifier.width(8.dp))
                     if (isStreaming) {
                         IconButton(onClick = onStop) {
-                            Icon(Icons.Default.Stop, contentDescription = "Stop", tint = MaterialTheme.colorScheme.error)
+                            Icon(ClawIcons.Stop, contentDescription = "Stop", tint = MaterialTheme.colorScheme.error)
                         }
                     } else {
                         IconButton(

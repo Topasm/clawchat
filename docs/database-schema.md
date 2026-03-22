@@ -10,14 +10,14 @@ messages            N──1 conversations
 todos               (standalone, linked via conversation_id)
 todos               N──1 todos (self-ref via parent_id for sub-tasks)
 task_relationships  N──1 todos (source_todo_id, target_todo_id)
-attachments         N──1 memos (memo_id, CASCADE)
 attachments         N──1 todos (todo_id, CASCADE)
 events              (standalone, linked via conversation_id)
-memos               (standalone, linked via conversation_id)
 agent_tasks         (standalone, linked via conversation_id)
+paired_devices      (standalone)
+user_settings       (standalone)
 ```
 
-All module tables (`todos`, `events`, `memos`) link back to the `conversation_id` and `message_id` that created them, enabling full traceability.
+All module tables (`todos`, `events`) link back to the `conversation_id` and `message_id` that created them, enabling full traceability.
 
 ---
 
@@ -71,6 +71,10 @@ Stores task/to-do items, created via conversation or direct API.
 | `tags` | JSON | NULLABLE | Array of string tags for categorization |
 | `parent_id` | TEXT (UUID) | FOREIGN KEY -> todos.id ON DELETE SET NULL, NULLABLE | Parent task ID for sub-task hierarchy |
 | `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Manual ordering within kanban columns |
+| `assignee` | TEXT | NULLABLE | Agent persona: 'planner', 'researcher', 'executor', 'openclaw', or null |
+| `inbox_state` | TEXT | NULLABLE | Inbox pipeline state: 'classifying', 'classified', null |
+| `estimated_minutes` | INTEGER | NULLABLE | AI-estimated time to complete |
+| `source` | TEXT | NULLABLE | Origin: 'obsidian', 'chat', 'api', or null |
 
 ### `task_relationships`
 
@@ -107,7 +111,7 @@ Stores calendar events.
 
 ### `attachments`
 
-Stores file attachments linked to memos or todos.
+Stores file attachments linked to todos.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -116,24 +120,8 @@ Stores file attachments linked to memos or todos.
 | `stored_filename` | VARCHAR(255) | NOT NULL | UUID-based filename on disk |
 | `content_type` | VARCHAR(100) | NOT NULL | MIME type (e.g., `image/jpeg`) |
 | `size_bytes` | BIGINT | NOT NULL | File size in bytes |
-| `memo_id` | TEXT (UUID) | FOREIGN KEY -> memos.id ON DELETE CASCADE, NULLABLE | Linked memo |
 | `todo_id` | TEXT (UUID) | FOREIGN KEY -> todos.id ON DELETE CASCADE, NULLABLE | Linked todo |
 | `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Upload timestamp |
-
-### `memos`
-
-Stores notes and text snippets.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `id` | TEXT (UUID) | PRIMARY KEY | Unique memo identifier |
-| `title` | TEXT | NOT NULL | Memo title |
-| `content` | TEXT | NOT NULL | Memo body (plain text or markdown) |
-| `conversation_id` | TEXT (UUID) | FOREIGN KEY -> conversations.id, NULLABLE | Conversation that created this memo |
-| `message_id` | TEXT (UUID) | FOREIGN KEY -> messages.id, NULLABLE | Message that created this memo |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Last modification timestamp |
-| `tags` | JSON | NULLABLE | Array of string tags |
 
 ### `agent_tasks`
 
@@ -182,12 +170,7 @@ CREATE INDEX idx_events_start_time ON events(start_time);
 CREATE INDEX idx_events_end_time ON events(end_time);
 CREATE INDEX idx_events_conversation_id ON events(conversation_id);
 
--- Memo lookup
-CREATE INDEX idx_memos_conversation_id ON memos(conversation_id);
-CREATE INDEX idx_memos_updated_at ON memos(updated_at);
-
 -- Attachment lookup (by owner)
-CREATE INDEX idx_attachments_memo_id ON attachments(memo_id);
 CREATE INDEX idx_attachments_todo_id ON attachments(todo_id);
 
 -- Agent task status monitoring
@@ -203,7 +186,6 @@ SQLite's FTS5 extension enables full-text search across all content:
 CREATE VIRTUAL TABLE fts_messages USING fts5(content, content=messages, content_rowid=rowid);
 CREATE VIRTUAL TABLE fts_todos USING fts5(title, description, content=todos, content_rowid=rowid);
 CREATE VIRTUAL TABLE fts_events USING fts5(title, description, content=events, content_rowid=rowid);
-CREATE VIRTUAL TABLE fts_memos USING fts5(title, content, content=memos, content_rowid=rowid);
 ```
 
 FTS tables are kept in sync via SQLAlchemy event hooks or database triggers.

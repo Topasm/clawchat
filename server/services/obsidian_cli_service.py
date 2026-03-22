@@ -11,7 +11,9 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -20,6 +22,8 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 _QUEUE_FILE = "data/obsidian_write_queue.json"
+_DEAD_LETTER_FILE = "data/obsidian_dead_letter.json"
+MAX_RETRIES = 10
 
 
 @dataclass
@@ -34,6 +38,48 @@ class WriteOp:
 
 # In-memory write queue
 _write_queue: list[WriteOp] = []
+_dead_letter_queue: list[WriteOp] = []
+_flush_lock = threading.Lock()
+
+# CLI error tracking
+_cli_error_log: deque[dict] = deque(maxlen=50)
+_last_successful_cli_at: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Path normalization
+# ---------------------------------------------------------------------------
+
+
+def _normalize_vault_path(path: str) -> str:
+    """Normalize a vault-relative path for safe use.
+
+    - Rejects ``..`` traversal segments
+    - Strips leading ``/``
+    - Normalizes backslashes to forward slashes
+    """
+    # Normalize separators
+    path = path.replace("\\", "/")
+
+    # Strip leading slash
+    path = path.lstrip("/")
+
+    # Reject traversal
+    parts = path.split("/")
+    if ".." in parts:
+        raise ValueError(f"Path traversal not allowed: {path}")
+
+    return path
+
+
+# ---------------------------------------------------------------------------
+# Sync mode helper
+# ---------------------------------------------------------------------------
+
+
+def is_sync_enabled() -> bool:
+    """Return True if Obsidian sync is not disabled."""
+    return settings.obsidian_sync_mode != "disabled"
 
 
 # ---------------------------------------------------------------------------
@@ -45,12 +91,16 @@ def _run_cli(*args: str, timeout: int = 15) -> subprocess.CompletedProcess | Non
     """Run the configured Obsidian CLI with the given arguments.
 
     Returns the CompletedProcess on success, or None if the CLI is not
-    configured or the command fails.
+    configured or the command fails.  The working directory is set to the
+    vault root so the CLI can locate the vault automatically.
     """
+    global _last_successful_cli_at
+
     cli = settings.obsidian_cli_command
     if not cli:
         return None
 
+    vault_cwd = settings.obsidian_vault_path or None
     cmd = [cli, *args]
     try:
         proc = subprocess.run(
@@ -58,6 +108,7 @@ def _run_cli(*args: str, timeout: int = 15) -> subprocess.CompletedProcess | Non
             capture_output=True,
             text=True,
             timeout=timeout,
+            cwd=vault_cwd,
         )
         if proc.returncode != 0:
             logger.debug(
@@ -66,16 +117,41 @@ def _run_cli(*args: str, timeout: int = 15) -> subprocess.CompletedProcess | Non
                 " ".join(cmd),
                 proc.stderr.strip(),
             )
+            _cli_error_log.append({
+                "timestamp": time.time(),
+                "command": " ".join(args),
+                "error": proc.stderr.strip() or f"exit code {proc.returncode}",
+                "returncode": proc.returncode,
+            })
             return None
+        _last_successful_cli_at = time.time()
         return proc
     except FileNotFoundError:
         logger.warning("Obsidian CLI not found: %s", cli)
+        _cli_error_log.append({
+            "timestamp": time.time(),
+            "command": " ".join(args),
+            "error": f"CLI not found: {cli}",
+            "returncode": None,
+        })
         return None
     except subprocess.TimeoutExpired:
         logger.warning("Obsidian CLI timed out: %s", " ".join(cmd))
+        _cli_error_log.append({
+            "timestamp": time.time(),
+            "command": " ".join(args),
+            "error": f"Timeout after {timeout}s",
+            "returncode": None,
+        })
         return None
     except OSError as exc:
         logger.warning("Obsidian CLI error: %s", exc)
+        _cli_error_log.append({
+            "timestamp": time.time(),
+            "command": " ".join(args),
+            "error": str(exc),
+            "returncode": None,
+        })
         return None
 
 
@@ -85,6 +161,16 @@ def is_cli_available() -> bool:
         return False
     result = _run_cli("version", timeout=5)
     return result is not None
+
+
+def get_cli_error_log() -> list[dict]:
+    """Return the recent CLI error log (up to 50 entries, newest first)."""
+    return list(reversed(_cli_error_log))
+
+
+def get_last_successful_cli_at() -> float:
+    """Return the timestamp of the last successful CLI call."""
+    return _last_successful_cli_at
 
 
 # ---------------------------------------------------------------------------
@@ -104,9 +190,14 @@ def create_document(
     Tries CLI first (to get Obsidian metadata tracking), falls back to
     filesystem, and queues for later if both fail and companion is required.
     """
+    if not is_sync_enabled():
+        return False
+
     vault = settings.obsidian_vault_path
     if not vault:
         return False
+
+    vault_relative_path = _normalize_vault_path(vault_relative_path)
 
     # Try CLI
     if use_cli:
@@ -145,9 +236,14 @@ def append_to_document(
 
     Creates the file if it does not exist.
     """
+    if not is_sync_enabled():
+        return False
+
     vault = settings.obsidian_vault_path
     if not vault:
         return False
+
+    vault_relative_path = _normalize_vault_path(vault_relative_path)
 
     # Try CLI
     if use_cli:
@@ -182,9 +278,14 @@ def rename_document(
     use_cli: bool = True,
 ) -> bool:
     """Rename a document (CLI preferred to update internal links)."""
+    if not is_sync_enabled():
+        return False
+
     vault = settings.obsidian_vault_path
     if not vault:
         return False
+
+    vault_relative_path = _normalize_vault_path(vault_relative_path)
 
     # CLI is strongly preferred for rename — it updates internal links
     if use_cli:
@@ -213,10 +314,15 @@ def move_document(
     use_cli: bool = True,
 ) -> bool:
     """Move a document to a different folder (CLI preferred for link update)."""
+    if not is_sync_enabled():
+        return False
+
     vault = settings.obsidian_vault_path
     if not vault:
         return False
 
+    vault_relative_path = _normalize_vault_path(vault_relative_path)
+    new_folder = _normalize_vault_path(new_folder)
     filename = os.path.basename(vault_relative_path)
     new_path = os.path.join(new_folder, filename)
 
@@ -300,8 +406,10 @@ def _enqueue(op: WriteOp) -> None:
 
 def get_queue_status() -> dict:
     """Return the current write queue status."""
+    oldest = min((op.queued_at for op in _write_queue), default=0.0)
     return {
         "pending": len(_write_queue),
+        "oldest_age_seconds": round(time.time() - oldest, 1) if oldest else None,
         "operations": [
             {
                 "op": op.op,
@@ -316,34 +424,65 @@ def get_queue_status() -> dict:
 
 
 def flush_queue() -> dict:
-    """Attempt to replay all queued write operations.
+    """Attempt to replay queued write operations.
 
-    Returns a summary of results.
+    Applies exponential backoff per operation and moves operations exceeding
+    MAX_RETRIES to the dead letter queue.
     """
-    if not _write_queue:
-        return {"processed": 0, "succeeded": 0, "failed": 0}
+    with _flush_lock:
+        if not _write_queue:
+            return {"processed": 0, "succeeded": 0, "failed": 0, "dead_lettered": 0}
 
-    succeeded = 0
-    failed = 0
-    remaining: list[WriteOp] = []
+        now = time.time()
+        succeeded = 0
+        failed = 0
+        dead_lettered = 0
+        remaining: list[WriteOp] = []
 
-    for op in _write_queue:
-        ok = _replay_op(op)
-        if ok:
-            succeeded += 1
-        else:
-            op.retries += 1
-            remaining.append(op)
-            failed += 1
+        for op in _write_queue:
+            # Exponential backoff: min(60 * 2^retries, 3600) seconds
+            if op.retries > 0:
+                backoff = min(60 * (2 ** op.retries), 3600)
+                if (now - op.queued_at) < backoff and op.retries < MAX_RETRIES:
+                    # Not ready yet — keep in queue without incrementing retries
+                    remaining.append(op)
+                    continue
 
-    _write_queue.clear()
-    _write_queue.extend(remaining)
-    _persist_queue()
+            # Check if exceeded max retries
+            if op.retries >= MAX_RETRIES:
+                _dead_letter_queue.append(op)
+                dead_lettered += 1
+                logger.warning(
+                    "Dead-lettered operation after %d retries: %s %s",
+                    op.retries, op.op, op.args.get("path", "?"),
+                )
+                continue
 
-    total = succeeded + failed
-    logger.info("Flushed write queue: %d/%d succeeded", succeeded, total)
+            ok = _replay_op(op)
+            if ok:
+                succeeded += 1
+            else:
+                op.retries += 1
+                remaining.append(op)
+                failed += 1
 
-    return {"processed": total, "succeeded": succeeded, "failed": failed}
+        _write_queue.clear()
+        _write_queue.extend(remaining)
+        _persist_queue()
+
+        total = succeeded + failed + dead_lettered
+        if total:
+            logger.info(
+                "Flushed write queue: %d succeeded, %d failed, %d dead-lettered",
+                succeeded, failed, dead_lettered,
+            )
+
+        return {
+            "processed": total,
+            "succeeded": succeeded,
+            "failed": failed,
+            "dead_lettered": dead_lettered,
+        }
 
 
 def clear_queue() -> int:
@@ -352,6 +491,56 @@ def clear_queue() -> int:
     _write_queue.clear()
     _persist_queue()
     return count
+
+
+# ---------------------------------------------------------------------------
+# Dead letter queue management
+# ---------------------------------------------------------------------------
+
+
+def get_dead_letter_status() -> dict:
+    """Return the current dead letter queue status."""
+    return {
+        "count": len(_dead_letter_queue),
+        "operations": [
+            {
+                "op": op.op,
+                "path": op.args.get("path", ""),
+                "queued_at": op.queued_at,
+                "retries": op.retries,
+                "error": op.error,
+            }
+            for op in _dead_letter_queue
+        ],
+    }
+
+
+def retry_dead_letter() -> int:
+    """Move all dead letter items back to the main queue with reset retries.
+
+    Returns the number of items requeued.
+    """
+    count = len(_dead_letter_queue)
+    for op in _dead_letter_queue:
+        op.retries = 0
+        op.queued_at = time.time()
+        _write_queue.append(op)
+    _dead_letter_queue.clear()
+    _persist_queue()
+    return count
+
+
+def clear_dead_letter() -> int:
+    """Clear all dead letter operations. Returns the number cleared."""
+    count = len(_dead_letter_queue)
+    _dead_letter_queue.clear()
+    _persist_dead_letter()
+    return count
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 
 def _replay_op(op: WriteOp) -> bool:
@@ -398,16 +587,38 @@ def _persist_queue() -> None:
     except OSError:
         logger.debug("Could not persist write queue")
 
+    # Also persist dead letter
+    _persist_dead_letter()
 
-def load_queue() -> None:
-    """Load the write queue from disk on startup."""
-    global _write_queue
-    if not os.path.isfile(_QUEUE_FILE):
-        return
+
+def _persist_dead_letter() -> None:
+    """Save the dead letter queue to disk."""
     try:
-        with open(_QUEUE_FILE, "r", encoding="utf-8") as f:
+        data = [
+            {
+                "op": op.op,
+                "args": op.args,
+                "queued_at": op.queued_at,
+                "retries": op.retries,
+                "error": op.error,
+            }
+            for op in _dead_letter_queue
+        ]
+        os.makedirs(os.path.dirname(_DEAD_LETTER_FILE), exist_ok=True)
+        with open(_DEAD_LETTER_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except OSError:
+        logger.debug("Could not persist dead letter queue")
+
+
+def _load_ops_from_file(filepath: str) -> list[WriteOp]:
+    """Load WriteOp items from a JSON file."""
+    if not os.path.isfile(filepath):
+        return []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
-        _write_queue = [
+        return [
             WriteOp(
                 op=item["op"],
                 args=item["args"],
@@ -417,7 +628,20 @@ def load_queue() -> None:
             )
             for item in data
         ]
-        if _write_queue:
-            logger.info("Loaded %d queued write operations from disk", len(_write_queue))
     except (OSError, json.JSONDecodeError, KeyError):
-        logger.debug("Could not load write queue from disk")
+        return []
+
+
+def load_queue() -> None:
+    """Load the write queue and dead letter queue from disk on startup."""
+    global _write_queue, _dead_letter_queue
+
+    loaded = _load_ops_from_file(_QUEUE_FILE)
+    if loaded:
+        _write_queue = loaded
+        logger.info("Loaded %d queued write operations from disk", len(_write_queue))
+
+    dead = _load_ops_from_file(_DEAD_LETTER_FILE)
+    if dead:
+        _dead_letter_queue = dead
+        logger.info("Loaded %d dead letter operations from disk", len(_dead_letter_queue))

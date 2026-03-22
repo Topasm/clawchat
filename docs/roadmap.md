@@ -28,7 +28,7 @@ ClawChat development progress and planned work.
 - [x] Visual feedback: drag-over column highlights, card box-shadow + rotation
 - [x] Server-native `in_progress` status — no client-side mapping workaround needed
 - [x] Checkbox toggle moves tasks between Todo/Done, clears kanban overrides
-- [x] Quick capture modal with natural language input (tasks, events, memos)
+- [x] Quick capture modal with natural language input (tasks, events)
 - [x] Responsive kanban: columns stack vertically below 768px
 - [x] Task detail editing (title, priority, due date, tags, description)
 - [x] Today dashboard with greeting, task sections, overdue items
@@ -51,7 +51,7 @@ ClawChat development progress and planned work.
 ### State Management (Zustand)
 - [x] `useAuthStore` — JWT auth, server URL, token refresh, persisted
 - [x] `useChatStore` — Conversations, messages, dual-path streaming (SSE + WebSocket), abort, action metadata
-- [x] `useModuleStore` — Todos, events, memos, kanban statuses, async API actions
+- [x] `useModuleStore` — Todos, events, kanban statuses, async API actions
 - [x] `useSettingsStore` — 15+ settings, theme, LLM params, persisted
 - [x] Optimistic updates with server sync fallback
 
@@ -79,8 +79,7 @@ ClawChat development progress and planned work.
 ### UI Polish
 - [x] Keyboard shortcuts: Ctrl+K, ?, Ctrl+Shift+C, N, /, G+T/I/C/A/S (react-hotkeys-hook)
 - [x] Resizable sidebar via react-resizable-panels (fixed layout on mobile)
-- [x] Full-text search page across tasks, events, memos
-- [x] Memos page with CRUD and tagging
+- [x] Full-text search page across tasks, events, messages
 - [x] Toast feedback on task move, toggle, create
 
 ### Infrastructure
@@ -90,16 +89,14 @@ ClawChat development progress and planned work.
 - [x] TypeScript strict mode — zero type errors
 
 ### Server Alignment (v0.2.0)
-- [x] Standalone server (`clawchat_server`) fully aligned with client types
-- [x] Removed embedded `clawchat/server/` — standalone server is the only backend
+- [x] Server (`server/`) fully aligned with client types
 - [x] SSE streaming endpoint (`POST /api/chat/stream`) matching client's `sseClient.ts`
 - [x] Message edit (`PUT`) and delete (`DELETE`) endpoints
 - [x] Ollama native streaming support (`/api/chat` NDJSON)
-- [x] Client TS types match server Pydantic schemas (PaginatedResponse, ConversationResponse, TodoResponse, EventResponse, MemoResponse, MessageResponse with metadata)
+- [x] Client TS types match server Pydantic schemas (PaginatedResponse, ConversationResponse, TodoResponse, EventResponse, MessageResponse with metadata)
 - [x] Server todo status supports `in_progress` / `cancelled` — client kanban uses server status directly
-- [x] Async business services (todo, calendar, memo) in standalone server
+- [x] Async business services (todo, calendar) in server
 - [x] Orchestrator wired to real service calls (not stubs)
-- [x] Memo types include `title` field on both client and server
 
 ### Calendar & Events
 - [x] Event creation flow from UI (form + date picker)
@@ -153,7 +150,7 @@ ClawChat development progress and planned work.
 
 #### Zod Runtime Validation
 - [x] Install `zod` v3
-- [x] Add Zod schemas for all API response types (`TodoResponse`, `EventResponse`, `MemoResponse`, `MessageResponse`, etc.)
+- [x] Add Zod schemas for all API response types (`TodoResponse`, `EventResponse`, `MessageResponse`, etc.)
 - [x] Validate API responses at the boundary (in `apiClient.ts` or per-query)
 - [x] Add Zod schemas for form inputs (task creation, event creation, settings)
 - [x] Replace manual form validation with Zod `.safeParse()`
@@ -205,9 +202,9 @@ ClawChat development progress and planned work.
 
 #### Rich Text Editor (Lexical)
 - [x] Install `lexical` + `@lexical/react` + `@lexical/markdown`
-- [x] Replace plain textarea in Memos page with Lexical editor
+- [x] Lexical rich text editor component
 - [x] Support: bold, italic, headings, bullet lists, code blocks, links
-- [x] Markdown import/export (memos stored as markdown on server)
+- [x] Markdown import/export
 - [ ] Optional: use for task descriptions too
 
 #### CodeMirror for System Prompt Editor
@@ -219,7 +216,7 @@ ClawChat development progress and planned work.
 
 #### File Attachments
 - [x] Server: file upload endpoint (`POST /api/attachments`) with local storage
-- [x] UI: drag-and-drop file upload zone on task detail and memo pages
+- [x] UI: drag-and-drop file upload zone on task detail page
 - [x] Attachment list with preview (images) and download links
 - [x] Size limits and allowed file type validation
 
@@ -269,6 +266,26 @@ ClawChat development progress and planned work.
 - [x] Client: `/admin` route in `router.tsx` + nav item in `Layout.tsx`
 - [x] Destructive actions (purge, reindex) use `ConfirmDialog` before executing
 - [x] Typecheck passes, 146 tests pass
+
+### Phase 9: Obsidian Vault Integration & Agent Personas
+- [x] Obsidian CLI wrapper (`obsidian_cli_service.py`) using official `key=value` parameter syntax
+- [x] CLI operations: create, append, rename, move, search, files, commands
+- [x] Filesystem fallback when CLI is unavailable
+- [x] Write queue for offline operations (persist to disk, replay on reconnect)
+- [x] Vault indexer with periodic re-scan and companion node health check
+- [x] Obsidian context service: project folder discovery, related document loading
+- [x] Export service: todos → vault markdown with `@agent()` tags and `<!-- claw:id -->` markers
+- [x] Vault agent service: AI-powered vault-aware task planning
+- [x] Obsidian REST API: health, index, CLI commands, queue management
+- [x] LiveSync / CouchDB support (`OBSIDIAN_SYNC_MODE=livesync`)
+- [x] Inbox pipeline service: LLM-based todo classification and persona suggestion
+- [x] Agent personas: `planner` (subtask breakdown), `researcher` (investigation), `executor` (action)
+- [x] Task delegation endpoint (`POST /api/todos/:id/delegate`) with background execution
+- [x] Organize endpoint (`POST /api/todos/:id/organize`) with correct background session handling
+- [x] Plan API: generate, view latest, and apply plans as subtasks
+- [x] TaskCard persona badges: unified indigo badges (AI / Plan / Research / Exec) for all agent assignees
+- [x] TaskDetailPage: persona buttons, delegation actions, "Run Planner" button
+- [x] Obsidian export: `@agent(planner|researcher|executor|openclaw)` annotations in vault markdown
 
 ---
 

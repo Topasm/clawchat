@@ -5,6 +5,7 @@ import {
   useObsidianReindex,
   useObsidianScan,
   useObsidianFlushQueue,
+  useObsidianRetryDeadLetter,
 } from '../../hooks/queries/useObsidianQueries';
 import { useToastStore } from '../../stores/useToastStore';
 import SettingsRow from './SettingsRow';
@@ -13,8 +14,9 @@ import SettingsRow from './SettingsRow';
  * Obsidian vault status card for the Settings page.
  *
  * Shows: vault connection, CLI availability, companion node status,
- * sync mode, project count, write queue, and bidirectional sync status.
- * Provides actions: export, reindex, scan, flush queue.
+ * sync mode, project count, write queue, dead letter queue,
+ * CLI errors, stuck scan warnings, and bidirectional sync status.
+ * Provides actions: export, reindex, scan, flush queue, retry dead letter.
  */
 export default function ObsidianStatusCard() {
   const addToast = useToastStore((s) => s.addToast);
@@ -23,6 +25,8 @@ export default function ObsidianStatusCard() {
   const reindexMutation = useObsidianReindex();
   const scanMutation = useObsidianScan();
   const flushMutation = useObsidianFlushQueue();
+  const retryDeadLetterMutation = useObsidianRetryDeadLetter();
+  const [showErrors, setShowErrors] = useState(false);
 
   if (isLoading) {
     return (
@@ -44,7 +48,7 @@ export default function ObsidianStatusCard() {
   const companionText = health.companion_online ? 'Online' : 'Offline';
 
   const syncLag = health.bidirectional_sync?.sync_lag_seconds;
-  const formatLag = (seconds: number | null) => {
+  const formatLag = (seconds: number | null | undefined) => {
     if (seconds === null || seconds === undefined) return 'Never';
     if (seconds < 60) return `${Math.round(seconds)}s ago`;
     if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
@@ -52,6 +56,10 @@ export default function ObsidianStatusCard() {
   };
 
   const queueCount = health.write_queue?.pending ?? 0;
+  const deadLetterCount = health.dead_letter_count ?? 0;
+  const queueAge = health.queue_age_seconds;
+  const scanStuck = health.scan_stuck ?? health.bidirectional_sync?.scan_stuck;
+  const lastCliError = health.last_cli_error;
 
   return (
     <div className="cc-settings-section">
@@ -97,6 +105,14 @@ export default function ObsidianStatusCard() {
         </SettingsRow>
       )}
 
+      {scanStuck && (
+        <SettingsRow label="">
+          <span style={{ fontSize: 11, color: 'var(--cc-danger)', fontWeight: 500 }}>
+            Vault scan appears stuck (running &gt; 5m)
+          </span>
+        </SettingsRow>
+      )}
+
       <SettingsRow label="Last vault scan">
         <span style={{ fontSize: 12, opacity: 0.7 }}>
           {formatLag(syncLag)}
@@ -106,7 +122,7 @@ export default function ObsidianStatusCard() {
       {queueCount > 0 && (
         <SettingsRow
           label="Write queue"
-          sublabel={`${queueCount} pending operation${queueCount !== 1 ? 's' : ''}`}
+          sublabel={`${queueCount} pending${queueAge ? ` · oldest ${formatLag(queueAge)}` : ''}`}
         >
           <button
             type="button"
@@ -123,6 +139,61 @@ export default function ObsidianStatusCard() {
           >
             {flushMutation.isPending ? 'Flushing...' : 'Flush'}
           </button>
+        </SettingsRow>
+      )}
+
+      {deadLetterCount > 0 && (
+        <SettingsRow
+          label="Dead letter"
+          sublabel={`${deadLetterCount} failed operation${deadLetterCount !== 1 ? 's' : ''}`}
+        >
+          <button
+            type="button"
+            className="cc-btn cc-btn--secondary"
+            onClick={() => {
+              retryDeadLetterMutation.mutate(undefined, {
+                onSuccess: (data) =>
+                  addToast('success', `Requeued ${data.requeued} operations`),
+                onError: () => addToast('error', 'Retry failed'),
+              });
+            }}
+            disabled={retryDeadLetterMutation.isPending}
+            style={{ fontSize: 12, padding: '4px 10px' }}
+          >
+            {retryDeadLetterMutation.isPending ? 'Retrying...' : 'Retry all'}
+          </button>
+        </SettingsRow>
+      )}
+
+      {lastCliError && (
+        <SettingsRow label="Last CLI error">
+          <button
+            type="button"
+            onClick={() => setShowErrors((v) => !v)}
+            style={{
+              fontSize: 11,
+              color: 'var(--cc-danger)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              padding: 0,
+            }}
+          >
+            {lastCliError.error.slice(0, 60)}{lastCliError.error.length > 60 ? '...' : ''}
+            {showErrors ? ' (hide)' : ' (show)'}
+          </button>
+        </SettingsRow>
+      )}
+
+      {showErrors && lastCliError && (
+        <SettingsRow label="">
+          <div style={{ fontSize: 11, opacity: 0.7, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'auto' }}>
+            <div>Command: {lastCliError.command}</div>
+            <div>Error: {lastCliError.error}</div>
+            <div>Code: {lastCliError.returncode ?? 'N/A'}</div>
+            <div>Time: {new Date(lastCliError.timestamp * 1000).toLocaleString()}</div>
+          </div>
         </SettingsRow>
       )}
 

@@ -38,9 +38,6 @@ dependencies {
 
     // Data
     api(libs.datastore.preferences)
-    api(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
 
     // Serialization
     api(libs.kotlinx.serialization.json)

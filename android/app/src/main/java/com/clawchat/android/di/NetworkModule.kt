@@ -33,7 +33,10 @@ object NetworkModule {
     @Singleton
     fun provideLoggingInterceptor(): HttpLoggingInterceptor =
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
+            level = if (com.clawchat.android.BuildConfig.DEBUG)
+                HttpLoggingInterceptor.Level.BASIC
+            else
+                HttpLoggingInterceptor.Level.NONE
         }
 
     @Provides
@@ -61,6 +64,7 @@ object NetworkModule {
         .addInterceptor(loggingInterceptor)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
     @Provides

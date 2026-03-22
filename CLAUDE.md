@@ -47,7 +47,7 @@ Server config is via environment variables (see `.env.example`). Key vars: `AI_P
 
 - **Pages** (`src/app/pages/`): Today, Chat, Kanban, Calendar, Settings, Admin, etc.
 - **State**: Zustand stores (`src/app/stores/`) for auth, chat, modules (todos/events), settings, toasts. Server state via TanStack React Query (`src/app/hooks/`).
-- **API layer**: Axios client with JWT token refresh (`src/app/services/api.ts`), SSE client for streaming chat, WebSocket client for real-time.
+- **API layer**: Axios client with JWT token refresh (`src/app/services/apiClient.ts`), SSE client for streaming chat, WebSocket client for real-time.
 - **Styling**: Plain CSS with BEM naming using `.cc-` prefix. Theme via CSS custom properties. Files in `src/styles/`.
 - **TypeScript config**: Multi-project — `tsconfig.app.json` (frontend), `tsconfig.electron.json` (Electron main process). Root `tsconfig.json` is a project reference file only.
 - **Tests**: Vitest + jsdom + Testing Library. Tests live in `__tests__/` directories adjacent to source. Setup in `src/test/setup.ts`.
@@ -59,7 +59,10 @@ Server config is via environment variables (see `.env.example`). Key vars: `AI_P
   - `ai_service.py` — LLM client (Ollama or OpenAI-compatible)
   - `intent_classifier.py` — Classifies user intent via LLM function calling
   - `orchestrator.py` — Routes classified intents to appropriate service
-  - `scheduler.py` — Background tasks (reminders, daily briefing)
+  - `scheduler.py` — Background tasks (reminders, daily briefing, queue flush)
+  - `inbox_pipeline_service.py` — Inbox classification + agent persona suggestion
+  - `obsidian_cli_service.py` — Obsidian CLI wrapper (official `key=value` syntax) + write queue
+  - `obsidian_context_service.py` / `obsidian_export_service.py` / `obsidian_vault_indexer.py` — Vault integration
 - **Models** (`server/models/`): SQLAlchemy async ORM models (conversation, message, todo, event, attachment, etc.)
 - **Schemas** (`server/schemas/`): Pydantic request/response schemas with Zod equivalents on frontend (`src/app/types/`).
 - **Auth**: PIN-based login, JWT tokens (`server/auth/`).

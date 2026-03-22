@@ -44,6 +44,10 @@ export const TodoResponseSchema = z.object({
   assignee: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   estimated_minutes: z.number().nullable().optional(),
+  next_action: z.string().nullable().optional(),
+  plan_summary: z.string().nullable().optional(),
+  sync_status: z.string().nullable().optional(),
+  project_label: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -524,6 +528,10 @@ export const PlanResponseSchema = z.object({
   suggested_assignee: z.string().nullable().optional(),
   suggested_project_title: z.string().nullable().optional(),
   subtasks: z.array(PlanSubtaskSchema).optional(),
+  subtask_count: z.number().optional(),
+  suggested_due_summary: z.string().nullable().optional(),
+  suggested_assignee_label: z.string().nullable().optional(),
+  suggested_project_label: z.string().nullable().optional(),
   created_at: z.string(),
 });
 

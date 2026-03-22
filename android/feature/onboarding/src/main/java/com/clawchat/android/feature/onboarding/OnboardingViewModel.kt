@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class OnboardingStep { WELCOME, SERVER, PAIRING, MANUAL_LOGIN, READY }
+enum class OnboardingStep { WELCOME, SCAN_QR, SERVER, PAIRING, MANUAL_LOGIN, READY }
 
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.WELCOME,
@@ -29,6 +29,7 @@ data class OnboardingUiState(
     val isLoggingIn: Boolean = false,
     val error: String? = null,
     val serverVersion: String? = null,
+    val autoClaimAfterHealthCheck: Boolean = false,
 )
 
 @HiltViewModel
@@ -71,6 +72,10 @@ class OnboardingViewModel @Inject constructor(
                         serverReachable = true,
                         serverVersion = health.version,
                     )
+                }
+                if (_uiState.value.autoClaimAfterHealthCheck) {
+                    _uiState.update { it.copy(autoClaimAfterHealthCheck = false) }
+                    claimPairingCode()
                 }
             } catch (e: Exception) {
                 _uiState.update {
@@ -154,17 +159,16 @@ class OnboardingViewModel @Inject constructor(
         try {
             val obj = org.json.JSONObject(json)
             if (obj.optString("type") != "clawchat_pair") return
-            val host = obj.optString("host", "")
-            val port = obj.optInt("port", 8000)
+            val serverUrl = obj.optString("server_url", "")
             val code = obj.optString("code", "")
-            if (host.isNotBlank() && code.isNotBlank()) {
+            if (serverUrl.isNotBlank() && code.isNotBlank()) {
                 _uiState.update {
                     it.copy(
-                        serverUrl = "http://$host:$port",
+                        serverUrl = serverUrl,
                         pairingCode = code,
+                        autoClaimAfterHealthCheck = true,
                     )
                 }
-                // Auto-claim after QR scan
                 checkServer()
             }
         } catch (_: Exception) {

@@ -137,3 +137,16 @@ export function useObsidianFlushQueue() {
     },
   });
 }
+
+export function useObsidianRetryDeadLetter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.post('/obsidian/dead-letter/retry');
+      return res.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.obsidianHealth });
+    },
+  });
+}

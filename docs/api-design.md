@@ -270,34 +270,22 @@ DELETE /api/events/:id             # Delete an event
 
 ---
 
-## Memo Endpoints
-
-```
-GET    /api/memos                  # List memos (paginated, sorted by updated_at)
-POST   /api/memos                  # Create a memo
-GET    /api/memos/:id              # Get a specific memo
-PATCH  /api/memos/:id              # Update a memo
-DELETE /api/memos/:id              # Delete a memo
-```
-
----
-
 ## Attachment Endpoints
 
 ```
 POST   /api/attachments                    # Upload a file (multipart/form-data)
-GET    /api/attachments                    # List attachments (filter by memo_id or todo_id)
+GET    /api/attachments                    # List attachments (filter by todo_id)
 GET    /api/attachments/:id/download       # Download an attachment file
 DELETE /api/attachments/:id                # Delete an attachment (removes file + DB row)
 ```
 
 #### `POST /api/attachments`
 
-Upload a file attachment linked to a memo or todo.
+Upload a file attachment linked to a todo.
 
 ```
 Content-Type: multipart/form-data
-Query params: ?memo_id=memo_abc123  (or ?todo_id=todo_xyz789)
+Query params: ?todo_id=todo_xyz789
 Body: file (binary)
 ```
 
@@ -309,8 +297,7 @@ Body: file (binary)
   "stored_filename": "a1b2c3d4e5f6.png",
   "content_type": "image/png",
   "size_bytes": 102400,
-  "memo_id": "memo_abc123",
-  "todo_id": null,
+  "todo_id": "todo_xyz789",
   "url": "/api/attachments/att_abc123/download",
   "created_at": "2026-02-22T12:00:00Z"
 }
@@ -324,7 +311,7 @@ Body: file (binary)
 #### `GET /api/attachments`
 
 ```json
-// Query params: ?memo_id=memo_abc123 or ?todo_id=todo_xyz789
+// Query params: ?todo_id=todo_xyz789
 
 // Response 200
 [
@@ -334,8 +321,7 @@ Body: file (binary)
     "stored_filename": "a1b2c3d4e5f6.png",
     "content_type": "image/png",
     "size_bytes": 102400,
-    "memo_id": "memo_abc123",
-    "todo_id": null,
+    "todo_id": "todo_xyz789",
     "url": "/api/attachments/att_abc123/download",
     "created_at": "2026-02-22T12:00:00Z"
   }
@@ -346,7 +332,7 @@ Body: file (binary)
 
 Deletes the attachment file from disk and the DB row. Returns `204 No Content`.
 
-**Cascade behavior:** Deleting a memo or todo automatically deletes all associated attachment DB rows (via `ON DELETE CASCADE`). Orphaned files on disk are cleaned up by the delete endpoint.
+**Cascade behavior:** Deleting a todo automatically deletes all associated attachment DB rows (via `ON DELETE CASCADE`). Orphaned files on disk are cleaned up by the delete endpoint.
 
 ---
 
@@ -425,7 +411,7 @@ GET    /api/search                 # Full-text search across all data types
 #### `GET /api/search`
 
 ```json
-// Query params: ?q=VLA+model&types=todos,events,memos,messages&page=1&limit=20
+// Query params: ?q=VLA+model&types=todos,events,messages&page=1&limit=20
 
 // Response 200
 {
@@ -640,7 +626,6 @@ POST   /api/admin/db/purge                    # Purge old data (conversations, m
     "messages": 150,
     "todos": 25,
     "events": 8,
-    "memos": 5,
     "agent_tasks": 3,
     "attachments": 2,
     "task_relationships": 4
@@ -674,6 +659,84 @@ Valid targets: `conversations`, `messages`, `todos` (only completed todos are pu
 
 ---
 
+## Todo Task Management Endpoints
+
+### Organize (Inbox Pipeline)
+
+```
+POST   /api/todos/:id/organize              # Trigger inbox classification + persona suggestion
+```
+
+Runs the inbox pipeline as a background task. Classifies the todo and suggests an assignee persona.
+
+```json
+// Response 200
+{
+  "status": "processing",
+  "todo_id": "todo_001"
+}
+```
+
+### Plan
+
+```
+GET    /api/todos/:id/plan/latest           # Get the latest plan for a todo
+POST   /api/todos/:id/plan/apply            # Apply a plan (create subtasks)
+```
+
+### Delegate
+
+```
+POST   /api/todos/:id/delegate              # Assign to an agent persona
+```
+
+```json
+// Request
+{
+  "agent_type": "planner"    // "planner" | "researcher" | "executor"
+}
+
+// Response 200
+{
+  "status": "delegated",
+  "agent_task_id": "at_abc123"
+}
+```
+
+---
+
+## Obsidian Vault Endpoints
+
+All require JWT authentication.
+
+```
+GET    /api/obsidian/health                  # Vault status, CLI availability, write queue
+GET    /api/obsidian/index                   # Vault file index (cached)
+POST   /api/obsidian/index/refresh           # Trigger re-index
+GET    /api/obsidian/cli-commands            # List available Obsidian CLI commands
+POST   /api/obsidian/cli-commands/:id        # Execute an Obsidian CLI command
+GET    /api/obsidian/queue                   # Write queue status
+POST   /api/obsidian/queue/flush             # Replay queued write operations
+DELETE /api/obsidian/queue                   # Clear the write queue
+```
+
+#### `GET /api/obsidian/health`
+
+```json
+// Response 200
+{
+  "vault_path": "/path/to/vault",
+  "vault_accessible": true,
+  "cli_available": true,
+  "sync_mode": "filesystem",
+  "write_queue": {
+    "pending": 0
+  }
+}
+```
+
+---
+
 ## AI Intent Classification
 
 When a user message is sent via `POST /api/chat/send`, the backend classifies the intent before routing to the appropriate handler.
@@ -692,13 +755,12 @@ When a user message is sent via `POST /api/chat/send`, the backend classifies th
 | `query_events` | List or search events | Calendar Service |
 | `update_event` | Modify an existing event | Calendar Service |
 | `delete_event` | Remove an event | Calendar Service |
-| `create_memo` | Create a note | Memo Service |
-| `query_memos` | List or search notes | Memo Service |
-| `update_memo` | Modify an existing note | Memo Service |
-| `delete_memo` | Remove a note | Memo Service |
 | `search` | Full-text search across all data | Search Service |
 | `delegate_task` | Assign an async task to the AI agent | Agent Service |
 | `daily_briefing` | Request today's summary | Briefing Service |
+| `suggest_time` | Suggest available time slots | Scheduling Service |
+| `check_conflicts` | Check for scheduling conflicts | Scheduling Service |
+| `analyze_schedule` | Analyze schedule patterns | Scheduling Service |
 
 ---
 

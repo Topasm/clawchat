@@ -1,7 +1,7 @@
 """Obsidian vault integration endpoints.
 
 Provides export/sync, project listing, health checks, vault scanning,
-write queue management, and reindexing.
+write queue management, dead letter queue, CLI error log, and reindexing.
 """
 
 import logging
@@ -211,6 +211,59 @@ async def clear_write_queue(
 
     cleared = clear_queue()
     return {"cleared": cleared}
+
+
+# ---------------------------------------------------------------------------
+# Dead letter queue
+# ---------------------------------------------------------------------------
+
+
+@router.get("/dead-letter")
+async def get_dead_letter(
+    _user: str = Depends(get_current_user),
+):
+    """Return dead letter queue (operations that exceeded max retries)."""
+    from services.obsidian_cli_service import get_dead_letter_status
+
+    return get_dead_letter_status()
+
+
+@router.post("/dead-letter/retry")
+async def retry_dead_letter_queue(
+    _user: str = Depends(get_current_user),
+):
+    """Move all dead letter items back to the main queue with reset retries."""
+    from services.obsidian_cli_service import retry_dead_letter
+
+    requeued = retry_dead_letter()
+    return {"requeued": requeued}
+
+
+@router.delete("/dead-letter")
+async def clear_dead_letter_queue(
+    _user: str = Depends(get_current_user),
+):
+    """Clear all dead letter operations."""
+    from services.obsidian_cli_service import clear_dead_letter
+
+    cleared = clear_dead_letter()
+    return {"cleared": cleared}
+
+
+# ---------------------------------------------------------------------------
+# CLI error log
+# ---------------------------------------------------------------------------
+
+
+@router.get("/cli-errors")
+async def get_cli_errors(
+    _user: str = Depends(get_current_user),
+):
+    """Return recent CLI error log (up to 50 entries, newest first)."""
+    from services.obsidian_cli_service import get_cli_error_log
+
+    errors = get_cli_error_log()
+    return {"errors": errors, "total": len(errors)}
 
 
 # ---------------------------------------------------------------------------

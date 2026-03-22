@@ -39,8 +39,8 @@ class Scheduler:
             asyncio.create_task(self._midnight_reset_loop(), name="scheduler-midnight"),
         ]
 
-        # Vault integration tasks (only if vault path is configured)
-        if settings.obsidian_vault_path:
+        # Vault integration tasks (only if vault path is configured and sync enabled)
+        if settings.obsidian_vault_path and settings.obsidian_sync_mode != "disabled":
             self._tasks.append(
                 asyncio.create_task(self._vault_scan_loop(), name="scheduler-vault-scan")
             )

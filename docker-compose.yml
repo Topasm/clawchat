@@ -31,10 +31,33 @@ services:
     networks:
       - clawchat
 
+  couchdb:
+    image: couchdb:3
+    profiles:
+      - livesync
+    ports:
+      - "5984:5984"
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER:-admin}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:-clawchat}
+    volumes:
+      - couchdb-data:/opt/couchdb/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - clawchat
+
 volumes:
   clawchat-data:
     driver: local
   ollama-models:
+    driver: local
+  couchdb-data:
     driver: local
 
 networks:

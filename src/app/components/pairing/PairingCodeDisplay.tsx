@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import apiClient from '../../services/apiClient';
 
 interface PairingCodeDisplayProps {
@@ -18,6 +19,7 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
   const [copied, setCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initialDeviceCountRef = useRef<number | null>(null);
 
   const clearTimers = useCallback(() => {
     if (pollRef.current) {
@@ -37,6 +39,15 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
     setCopied(false);
 
     try {
+      // Capture current device count before generating code
+      try {
+        const devRes = await apiClient.get('/pairing/devices');
+        const devices = devRes.data?.items ?? devRes.data ?? [];
+        initialDeviceCountRef.current = devices.length;
+      } catch {
+        initialDeviceCountRef.current = 0;
+      }
+
       const res = await apiClient.post('/pairing/session');
       const data: PairingSession = {
         code: res.data.code,
@@ -65,7 +76,7 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
         try {
           const devRes = await apiClient.get('/pairing/devices');
           const devices = devRes.data?.items ?? devRes.data ?? [];
-          if (devices.length > 0) {
+          if (devices.length > (initialDeviceCountRef.current ?? 0)) {
             clearTimers();
             setState('paired');
             onPaired?.();
@@ -152,8 +163,14 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
         <div className="cc-pairing-code-display__header">
           <span className="cc-pairing-code-display__title">Pair a Mobile Device</span>
           <span className="cc-pairing-code-display__subtitle">
-            Enter this code on your mobile device to connect
+            Scan the QR code with the ClawChat mobile app, or enter the code manually
           </span>
+        </div>
+      )}
+
+      {session?.qrPayload && (
+        <div className="cc-pairing-code-display__qr-image">
+          <QRCodeSVG value={session.qrPayload} size={compact ? 160 : 200} />
         </div>
       )}
 
@@ -173,23 +190,6 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
           )}
         </div>
       </div>
-
-      {session?.qrPayload && (
-        <div className="cc-pairing-code-display__qr-section">
-          <label className="cc-pairing-code-display__qr-label">QR Payload</label>
-          <div className="cc-pairing-code-display__qr-row">
-            <code className="cc-pairing-code-display__qr-value">{session.qrPayload}</code>
-            <button
-              type="button"
-              className="cc-btn cc-btn--secondary"
-              onClick={handleCopyPayload}
-              style={{ fontSize: 12, padding: '4px 10px', flexShrink: 0 }}
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-        </div>
-      )}
 
       <button
         type="button"

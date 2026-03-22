@@ -206,7 +206,27 @@ def refresh_index() -> VaultIndex:
 
 def get_health_summary() -> dict:
     """Return a health summary dict suitable for API responses."""
+    from services.obsidian_cli_service import (
+        get_cli_error_log,
+        get_dead_letter_status,
+        get_last_successful_cli_at,
+        get_queue_status,
+    )
+    from services.vault_watcher_service import is_scan_stuck
+
     idx = _index
+
+    # Queue age
+    queue = get_queue_status()
+    queue_age = queue.get("oldest_age_seconds")
+
+    # Dead letter count
+    dead_letter = get_dead_letter_status()
+
+    # Last CLI error
+    error_log = get_cli_error_log()
+    last_cli_error = error_log[0] if error_log else None
+
     return {
         "vault_available": idx.is_available,
         "vault_path": idx.vault_path,
@@ -218,6 +238,13 @@ def get_health_summary() -> dict:
         "scan_duration_ms": idx.scan_duration_ms,
         "is_stale": is_stale(),
         "error": idx.error,
+        # Enriched fields
+        "queue_pending": queue["pending"],
+        "queue_age_seconds": queue_age,
+        "dead_letter_count": dead_letter["count"],
+        "last_cli_error": last_cli_error,
+        "last_successful_cli_at": get_last_successful_cli_at() or None,
+        "scan_stuck": is_scan_stuck(),
     }
 
 
@@ -234,9 +261,14 @@ def ensure_fresh(max_age_seconds: int | None = None) -> VaultIndex:
 
 
 def _check_companion_online(vault_path: str, cli_command: str) -> bool:
-    """Heuristic check: companion node is considered online if the CLI
-    responds and the vault's .obsidian directory has been modified recently
-    (within the last 10 minutes, suggesting an active Obsidian instance).
+    """Heuristic check for whether the companion node is online.
+
+    - In ``livesync`` mode: checks if the LiveSync plugin is configured
+      (``data.json`` exists in the plugin directory) as a proxy for CouchDB
+      connectivity.
+    - In ``filesystem`` mode: checks if ``.obsidian/workspace.json`` was
+      modified recently (within 10 minutes), suggesting an active Obsidian
+      instance.
     """
     if not cli_command:
         return False
@@ -245,6 +277,22 @@ def _check_companion_online(vault_path: str, cli_command: str) -> bool:
     if not os.path.isdir(obsidian_dir):
         return False
 
+    # LiveSync mode: check for LiveSync plugin configuration
+    if settings.obsidian_sync_mode == "livesync":
+        livesync_data = os.path.join(
+            obsidian_dir, "plugins", "obsidian-livesync", "data.json"
+        )
+        if os.path.isfile(livesync_data):
+            try:
+                mtime = os.path.getmtime(livesync_data)
+                age = time.time() - mtime
+                # LiveSync config exists and was touched in last hour
+                return age < 3600
+            except OSError:
+                pass
+        return False
+
+    # Filesystem mode: check workspace.json recency
     try:
         workspace_file = os.path.join(obsidian_dir, "workspace.json")
         if os.path.isfile(workspace_file):

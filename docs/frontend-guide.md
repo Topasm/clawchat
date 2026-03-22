@@ -18,7 +18,7 @@ src/
 │   ├── stores/
 │   │   ├── useAuthStore.ts           # Auth state: JWT, serverUrl, login/logout (persisted) + ConnectionStatus type (canonical)
 │   │   ├── useChatStore.ts           # Chat: conversations, messages, SSE streaming
-│   │   ├── useModuleStore.ts         # Modules: todos, events, memos, kanban statuses, filters
+│   │   ├── useModuleStore.ts         # Modules: todos, events, kanban statuses, filters
 │   │   ├── useSettingsStore.ts       # Settings: theme, LLM, chat, panel sizes (persisted)
 │   │   └── useToastStore.ts          # Toast notification queue with auto-dismiss
 │   ├── pages/
@@ -27,14 +27,15 @@ src/
 │   │   ├── ChatListPage.tsx          # Conversation history list
 │   │   ├── ChatPage.tsx              # Full-screen AI conversation
 │   │   ├── AllTasksPage.tsx          # Kanban board (renders KanbanBoard)
-│   │   ├── TaskDetailPage.tsx        # Task editing (title, priority, due date, tags)
+│   │   ├── TaskDetailPage.tsx        # Task editing + persona delegation (planner/researcher/executor)
+│   │   ├── CalendarPage.tsx          # Calendar view (week/month)
 │   │   ├── EventDetailPage.tsx       # Event editing (time, location)
-│   │   ├── MemosPage.tsx             # Memo CRUD with Lexical rich text + attachments
-│   │   ├── SearchPage.tsx            # Full-text search across tasks, events, memos
+│   │   ├── SearchPage.tsx            # Full-text search across tasks, events, messages
 │   │   ├── SettingsPage.tsx          # All settings (7 sections)
 │   │   ├── SystemPromptPage.tsx      # LLM system prompt editor (CodeMirror)
 │   │   ├── AdminPage.tsx             # Admin dashboard (7 tabs: overview, AI, DB, activity, sessions, config, data)
-│   │   └── LoginPage.tsx             # PIN-based authentication
+│   │   ├── LoginPage.tsx             # PIN-based authentication
+│   │   └── OnboardingPage.tsx        # Onboarding/setup flow
 │   ├── components/
 │   │   ├── Layout.tsx                # Sidebar + resizable panels + chat panel + shortcuts
 │   │   ├── kanban/
@@ -49,7 +50,7 @@ src/
 │   │   │   ├── MessageBubble.tsx     # User/assistant bubble with avatar icons and actions
 │   │   │   └── StreamingIndicator.tsx # Animated 3-dot typing indicator
 │   │   └── shared/
-│   │       ├── TaskCard.tsx          # Task row: checkbox + title + badge meta
+│   │       ├── TaskCard.tsx          # Task row: checkbox + title + badge meta + persona badges
 │   │       ├── Badge.tsx             # Pill badge with SVG priority icons
 │   │       ├── Checkbox.tsx          # Circular animated checkbox
 │   │       ├── SectionHeader.tsx     # Collapsible section with chevron + count
@@ -69,7 +70,7 @@ src/
 │   │       ├── ErrorBoundary.tsx     # App-level error boundary with fallback UI
 │   │       ├── Toast.tsx             # Single toast notification item
 │   │       ├── ToastContainer.tsx    # Fixed bottom-right toast container (React portal)
-│   │       ├── QuickCaptureModal.tsx # Natural language task/event/memo creation
+│   │       ├── QuickCaptureModal.tsx # Natural language task/event creation
 │   │       ├── RichTextEditor.tsx   # Lexical rich text editor (markdown round-trip)
 │   │       ├── CodeEditor.tsx       # CodeMirror wrapper with dark mode
 │   │       ├── FileDropZone.tsx     # Drag-and-drop file upload zone
@@ -79,19 +80,31 @@ src/
 │   │   ├── registry.ts              # Shortcut definitions with scopes
 │   │   └── hooks.ts                 # useGlobalShortcuts, useKanbanShortcuts, useNavigationShortcuts
 │   ├── hooks/
-│   │   ├── useTodayData.ts          # Today dashboard data aggregation
+│   │   ├── useAutoLogin.ts          # Electron auto-login from main process
+│   │   ├── useCalendarNavigation.ts # Calendar week/month navigation
 │   │   ├── useChatPanel.ts          # Chat panel open/close state
-│   │   ├── usePlatform.ts           # Platform detection (mobile/desktop/web)
-│   │   ├── useKanbanFilters.ts      # Kanban filter/sort via useMemo
 │   │   ├── useCommandPalette.ts     # Command palette open/close + Ctrl+K listener
-│   │   ├── useRegenerate.ts         # Chat message regeneration (shared by ChatPage + ChatPanel)
-│   │   ├── useDebouncedPersist.ts   # Debounced optimistic persist for detail pages
 │   │   ├── useDataSync.ts           # Centralized data sync on app startup
+│   │   ├── useDebouncedPersist.ts   # Debounced optimistic persist for detail pages
+│   │   ├── useKanbanDragDrop.ts     # Kanban drag-and-drop logic
+│   │   ├── useKanbanFilters.ts      # Kanban filter/sort via useMemo
+│   │   ├── useKanbanKeyboardNav.ts  # Kanban keyboard navigation
+│   │   ├── useNetworkStatus.ts      # Network connectivity detection
+│   │   ├── usePairing.ts           # Device pairing flow
+│   │   ├── usePlatform.ts           # Platform detection (mobile/desktop/web)
+│   │   ├── useRegenerate.ts         # Chat message regeneration (shared by ChatPage + ChatPanel)
+│   │   ├── useSettingsExportImport.ts # Settings JSON export/import
+│   │   ├── useTodayBriefing.ts      # Today AI briefing integration
+│   │   ├── useTodayData.ts          # Today dashboard data aggregation
+│   │   ├── useTodayHotkeys.ts       # Today page keyboard shortcuts
+│   │   ├── useTodayProgress.ts      # Today progress calculation
+│   │   ├── useTouchSelect.ts        # Touch-based multi-select
 │   │   ├── useWebSocket.ts          # WebSocket connection + real-time events
 │   │   └── queries/
 │   │       ├── useChatQueries.ts    # React Query hooks for chat data
-│   │       ├── useModuleQueries.ts  # React Query hooks for todos/events/memos
+│   │       ├── useModuleQueries.ts  # React Query hooks for todos/events
 │   │       ├── useAdminQueries.ts   # React Query hooks for admin dashboard (6 queries + 5 mutations)
+│   │       ├── useObsidianQueries.ts # React Query hooks for Obsidian vault
 │   │       ├── useTodayQuery.ts     # Today dashboard query with greeting
 │   │       └── queryKeys.ts         # Centralized React Query keys
 │   ├── services/
@@ -99,7 +112,11 @@ src/
 │   │   ├── sseClient.ts            # SSE streaming for chat responses
 │   │   ├── wsClient.ts             # WebSocket for real-time sync
 │   │   ├── platform.ts             # Platform detection + secure storage
-│   │   └── logger.ts               # Structured logging utility
+│   │   ├── logger.ts               # Structured logging utility
+│   │   ├── eventReminders.ts       # Client-side event reminder scheduling
+│   │   ├── offlineQueue.ts         # Offline action queue (sync on reconnect)
+│   │   ├── capacitor-init.ts       # Capacitor plugin initialization
+│   │   └── widgetSync.ts           # Android widget data sync
 │   ├── config/
 │   │   ├── theme.ts                # Color palettes (light/dark) + ColorPalette type
 │   │   ├── ThemeContext.tsx         # React context for theme colors
@@ -109,7 +126,7 @@ src/
 │   └── utils/
 │       ├── helpers.ts             # Shared utilities (isDemoMode, isTextInput)
 │       ├── formatters.ts          # Date/time formatting, greeting, formatShortDateTime
-│       └── naturalLanguageParser.ts # Parse natural input into task/event/memo
+│       └── naturalLanguageParser.ts # Parse natural input into task/event
 ├── styles/
 │   ├── index.css                     # Main entry: imports all partials
 │   ├── _reset.css                    # Box-sizing, scrollbar, font smoothing
@@ -139,18 +156,20 @@ React Router v6 with a nested layout route:
 
 ```
 / → redirect to /today
-/today         → TodayPage
-/inbox         → InboxPage
-/chats         → ChatListPage
-/chats/:id     → ChatPage (full screen, hides chat panel)
-/tasks         → AllTasksPage (Kanban board)
-/tasks/:id     → TaskDetailPage
-/events/:id    → EventDetailPage
-/memos         → MemosPage
-/search        → SearchPage
-/settings      → SettingsPage
+/today             → TodayPage
+/inbox             → InboxPage
+/chats             → ChatListPage
+/chats/:id         → ChatPage (full screen, hides chat panel)
+/tasks             → AllTasksPage (Kanban board)
+/tasks/:id         → TaskDetailPage
+/calendar          → CalendarPage (week/month view)
+/events/:id        → EventDetailPage
+/search            → SearchPage
+/settings          → SettingsPage
 /settings/system-prompt → SystemPromptPage
-/admin         → AdminPage
+/admin             → AdminPage
+/login             → LoginPage
+/onboarding        → OnboardingPage
 ```
 
 All routes are wrapped in `<Layout />` which provides the sidebar, resizable panels, chat panel, command palette, and toast container.
@@ -159,7 +178,7 @@ All routes are wrapped in `<Layout />` which provides the sidebar, resizable pan
 
 ### useModuleStore
 
-Manages todos, events, memos, kanban board state, and kanban filters:
+Manages todos, events, kanban board state, and kanban filters:
 
 ```typescript
 // Key state
@@ -167,7 +186,6 @@ todos: TodoResponse[]              // Seeded with 15 demo tasks
 kanbanStatuses: Record<string, KanbanStatus>  // Local in_progress overrides
 kanbanFilters: { searchQuery, priorities[], tags[], sortField, sortDirection }
 events: EventResponse[]
-memos: MemoResponse[]
 
 // Key actions
 setKanbanStatus(id, status)        // Move task between kanban columns (+ toast)
@@ -264,7 +282,7 @@ Shortcuts are defined in `keyboard/registry.ts` and wired via hooks in `keyboard
 ## Command Palette
 
 Opened with `Ctrl+K`, the command palette provides:
-- **Navigation** — Jump to any page (Today, Inbox, Chats, Tasks, Memos, Settings)
+- **Navigation** — Jump to any page (Today, Inbox, Chats, Tasks, Calendar, Settings)
 - **Actions** — Toggle dark/light theme
 - **Tasks** — Search across todo titles, click to navigate to task detail
 
@@ -324,8 +342,7 @@ TodoCreate      { title, description?, priority?, due_date?, tags? }
 EventResponse   { id, title, description, start_time, end_time, location, is_all_day, reminder_minutes, recurrence_rule, tags, created_at, updated_at }
 ConversationResponse { id, title, last_message, is_archived?, created_at, updated_at }
 MessageResponse { id, conversation_id, role, content, message_type?, created_at }
-MemoResponse    { id, title, content, tags, created_at, updated_at }
-AttachmentResponse { id, filename, stored_filename, content_type, size_bytes, memo_id, todo_id, url, created_at }
+AttachmentResponse { id, filename, stored_filename, content_type, size_bytes, todo_id, url, created_at }
 SearchResponse  { items: SearchHit[], total, page, limit }  // Paginated
 TodayResponse   { today_tasks, overdue_tasks, today_events, inbox_count, greeting, date }
 

@@ -56,7 +56,7 @@ fun TodayScreen(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    items(state.overdueTodos, key = { it.id }) { todo ->
+                    items(state.overdueTodos, key = { it.id }, contentType = { "todo" }) { todo ->
                         TodoCard(todo = todo, onToggle = { viewModel.toggleComplete(todo.id) })
                     }
                     item { Spacer(Modifier.height(8.dp)) }
@@ -67,7 +67,7 @@ fun TodayScreen(
                     item {
                         Text("Tasks", style = MaterialTheme.typography.titleSmall)
                     }
-                    items(state.todayTodos, key = { it.id }) { todo ->
+                    items(state.todayTodos, key = { it.id }, contentType = { "todo" }) { todo ->
                         TodoCard(todo = todo, onToggle = { viewModel.toggleComplete(todo.id) })
                     }
                     item { Spacer(Modifier.height(8.dp)) }
@@ -78,7 +78,7 @@ fun TodayScreen(
                     item {
                         Text("Events", style = MaterialTheme.typography.titleSmall)
                     }
-                    items(state.todayEvents, key = { it.id }) { event ->
+                    items(state.todayEvents, key = { it.id }, contentType = { "event" }) { event ->
                         EventCard(event = event)
                     }
                 }

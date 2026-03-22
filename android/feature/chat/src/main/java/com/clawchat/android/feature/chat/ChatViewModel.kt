@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 
+private const val TOKEN_BATCH_SIZE = 4
+
 data class ChatUiState(
     val conversations: List<Conversation> = emptyList(),
     val isLoadingConversations: Boolean = false,
@@ -37,6 +39,7 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var streamJob: Job? = null
+    private val streamBuffer = StringBuilder()
 
     init {
         loadConversations()
@@ -102,12 +105,20 @@ class ChatViewModel @Inject constructor(
         streamJob = viewModelScope.launch {
             val baseUrl = sessionStore.apiBaseUrl.first() ?: return@launch
             val token = sessionStore.token.first() ?: return@launch
+            streamBuffer.clear()
+            var tokenCount = 0
 
             streamChat(httpClient, baseUrl, conversationId, text, token)
                 .collect { event ->
                     when (event) {
                         is SseEvent.Token -> {
-                            _uiState.update { it.copy(streamingText = it.streamingText + event.text) }
+                            streamBuffer.append(event.text)
+                            tokenCount++
+                            // Batch UI updates to reduce recompositions
+                            if (tokenCount % TOKEN_BATCH_SIZE == 0) {
+                                val snapshot = streamBuffer.toString()
+                                _uiState.update { it.copy(streamingText = snapshot) }
+                            }
                         }
                         is SseEvent.TitleGenerated -> {
                             _uiState.update { state ->
@@ -119,9 +130,10 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is SseEvent.Done -> {
+                            val finalText = streamBuffer.toString()
                             val assistantMsg = Message(
                                 id = "stream-${System.currentTimeMillis()}",
-                                content = _uiState.value.streamingText,
+                                content = finalText,
                                 role = "assistant",
                                 createdAt = java.time.Instant.now().toString(),
                             )
@@ -145,7 +157,9 @@ class ChatViewModel @Inject constructor(
     fun stopStreaming() {
         streamJob?.cancel()
         streamJob = null
-        val finalText = _uiState.value.streamingText
+        // Use buffer directly — it may contain unflushed tokens
+        val finalText = streamBuffer.toString().ifBlank { _uiState.value.streamingText }
+        streamBuffer.clear()
         if (finalText.isNotBlank()) {
             val assistantMsg = Message(
                 id = "stopped-${System.currentTimeMillis()}",

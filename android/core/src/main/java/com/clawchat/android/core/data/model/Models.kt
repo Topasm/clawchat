@@ -1,5 +1,6 @@
 package com.clawchat.android.core.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -49,6 +50,7 @@ data class LoginResponse(
 
 // --- Todos ---
 
+@Immutable
 @Serializable
 data class Todo(
     val id: String,
@@ -90,6 +92,7 @@ data class TodoUpdate(
 
 // --- Events ---
 
+@Immutable
 @Serializable
 data class Event(
     val id: String,
@@ -106,6 +109,7 @@ data class Event(
 
 // --- Conversations ---
 
+@Immutable
 @Serializable
 data class Conversation(
     val id: String,
@@ -115,6 +119,7 @@ data class Conversation(
     @SerialName("project_todo_id") val projectTodoId: String? = null,
 )
 
+@Immutable
 @Serializable
 data class Message(
     val id: String,
@@ -147,6 +152,7 @@ data class TodayResponse(
 
 // --- Devices ---
 
+@Immutable
 @Serializable
 data class PairedDevice(
     val id: String,

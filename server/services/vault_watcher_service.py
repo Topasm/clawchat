@@ -9,6 +9,7 @@ This is NOT a real-time watcher (no inotify/fswatch); it is a periodic scanner
 invoked by the scheduler or on demand via API.
 """
 
+import hashlib
 import logging
 import os
 import re
@@ -61,6 +62,10 @@ class ScanResult:
 # Module-level state
 _last_scan: ScanResult | None = None
 _file_hashes: dict[str, str] = {}  # path -> content hash for change detection
+_scan_in_progress: bool = False
+_last_scan_start: float = 0.0
+
+_STUCK_TIMEOUT = 300  # 5 minutes
 
 
 # ---------------------------------------------------------------------------
@@ -73,15 +78,48 @@ async def scan_vault(db: AsyncSession) -> ScanResult:
 
     Returns a ScanResult with details of what was found and applied.
     """
-    global _last_scan
+    global _last_scan, _scan_in_progress, _last_scan_start
 
     vault_path = settings.obsidian_vault_path
     if not vault_path or not os.path.isdir(vault_path):
         return ScanResult(errors=1)
 
+    _scan_in_progress = True
+    _last_scan_start = time.monotonic()
     start = time.monotonic()
     result = ScanResult(scanned_at=time.time())
 
+    try:
+        result = await _do_scan(db, vault_path, result)
+    finally:
+        _scan_in_progress = False
+
+    result.duration_ms = round((time.monotonic() - start) * 1000, 1)
+    _last_scan = result
+
+    if result.changes_applied:
+        logger.info(
+            "Vault scan: %d files, %d markers, %d changes applied in %.0fms",
+            result.files_scanned,
+            result.markers_found,
+            result.changes_applied,
+            result.duration_ms,
+        )
+    else:
+        logger.debug(
+            "Vault scan: %d files, %d markers, no changes (%.0fms)",
+            result.files_scanned,
+            result.markers_found,
+            result.duration_ms,
+        )
+
+    return result
+
+
+async def _do_scan(
+    db: AsyncSession, vault_path: str, result: ScanResult
+) -> ScanResult:
+    """Core scan logic, separated for clean try/finally in caller."""
     # Find all TODO.md files in the vault
     todo_files: list[str] = []
     todo_filename = settings.obsidian_project_todo_filename
@@ -111,6 +149,12 @@ async def scan_vault(db: AsyncSession) -> ScanResult:
         except OSError:
             result.errors += 1
             continue
+
+        # File hash check — skip unchanged files
+        content_hash = hashlib.md5(content.encode()).hexdigest()
+        if _file_hashes.get(fpath) == content_hash:
+            continue
+        _file_hashes[fpath] = content_hash
 
         rel_path = os.path.relpath(fpath, vault_path)
 
@@ -167,25 +211,6 @@ async def scan_vault(db: AsyncSession) -> ScanResult:
                 result.errors += result.changes_applied
                 result.changes_applied = 0
 
-    result.duration_ms = round((time.monotonic() - start) * 1000, 1)
-    _last_scan = result
-
-    if result.changes_applied:
-        logger.info(
-            "Vault scan: %d files, %d markers, %d changes applied in %.0fms",
-            result.files_scanned,
-            result.markers_found,
-            result.changes_applied,
-            result.duration_ms,
-        )
-    else:
-        logger.debug(
-            "Vault scan: %d files, %d markers, no changes (%.0fms)",
-            result.files_scanned,
-            result.markers_found,
-            result.duration_ms,
-        )
-
     return result
 
 
@@ -200,6 +225,8 @@ def get_sync_status() -> dict:
             "changes_applied": 0,
             "errors": 0,
             "sync_lag_seconds": None,
+            "scan_in_progress": _scan_in_progress,
+            "scan_stuck": is_scan_stuck(),
         }
 
     lag = time.time() - scan.scanned_at if scan.scanned_at else None
@@ -213,6 +240,8 @@ def get_sync_status() -> dict:
         "errors": scan.errors,
         "duration_ms": scan.duration_ms,
         "sync_lag_seconds": round(lag, 1) if lag else None,
+        "scan_in_progress": _scan_in_progress,
+        "scan_stuck": is_scan_stuck(),
         "recent_changes": [
             {
                 "todo_id": c.todo_id,
@@ -231,6 +260,13 @@ def get_sync_lag() -> float | None:
     if not _last_scan or not _last_scan.scanned_at:
         return None
     return time.time() - _last_scan.scanned_at
+
+
+def is_scan_stuck(timeout_seconds: int = _STUCK_TIMEOUT) -> bool:
+    """Return True if a scan has been running longer than timeout."""
+    if not _scan_in_progress:
+        return False
+    return (time.monotonic() - _last_scan_start) > timeout_seconds
 
 
 # ---------------------------------------------------------------------------

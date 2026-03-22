@@ -8,13 +8,9 @@ hilt = "2.53.1"
 hilt-navigation-compose = "1.2.0"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
-room = "2.6.1"
 datastore = "1.1.1"
 workmanager = "2.10.0"
 glance = "1.1.1"
-camerax = "1.4.1"
-zxing = "3.5.3"
-coil = "2.7.0"
 kotlinx-serialization = "1.7.3"
 coroutines = "1.9.0"
 lifecycle = "2.8.7"
@@ -32,7 +28,7 @@ compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
-compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended" }
+compose-material-icons = { group = "androidx.compose.material", name = "material-icons-core" }
 compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
 
 # AndroidX
@@ -55,25 +51,12 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 okhttp-sse = { group = "com.squareup.okhttp3", name = "okhttp-sse", version.ref = "okhttp" }
 
 # Data
-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 # WorkManager & Glance
 workmanager = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }
 glance = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
-
-# Camera & QR
-camerax-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
-camerax-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
-camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
-camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
-zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
-
-# Image loading
-coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 # Serialization
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }

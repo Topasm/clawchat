@@ -154,10 +154,11 @@ def _list_via_cli(vault_path: str, cli_command: str) -> list[dict[str, str]] | N
     """Use the configured CLI to list files, then filter for TODO.md entries."""
     try:
         proc = subprocess.run(
-            [cli_command, "files", f"folder={vault_path}"],
+            [cli_command, "files"],
             capture_output=True,
             text=True,
             timeout=10,
+            cwd=vault_path,
         )
         if proc.returncode != 0:
             logger.debug("CLI list exited with %d: %s", proc.returncode, proc.stderr.strip())
@@ -195,12 +196,12 @@ def _list_files_via_cli(
 ) -> list[str] | None:
     """List ``.md`` files inside a specific folder via CLI."""
     try:
-        target = os.path.join(vault_path, folder)
         proc = subprocess.run(
-            [cli_command, "files", f"folder={target}"],
+            [cli_command, "files", f"folder={folder}"],
             capture_output=True,
             text=True,
             timeout=10,
+            cwd=vault_path,
         )
         if proc.returncode != 0:
             return None
