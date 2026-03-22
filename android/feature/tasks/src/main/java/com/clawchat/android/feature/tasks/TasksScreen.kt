@@ -156,9 +156,10 @@ private fun TaskRow(task: Todo, onToggle: () -> Unit, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (!task.description.isNullOrBlank()) {
+                val desc = task.description
+                if (!desc.isNullOrBlank()) {
                     Text(
-                        task.description,
+                        desc,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -206,10 +207,11 @@ private fun TaskDetailView(
 
             Spacer(Modifier.height(16.dp))
 
-            if (!task.description.isNullOrBlank()) {
+            val detailDesc = task.description
+            if (!detailDesc.isNullOrBlank()) {
                 Text("Description", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(4.dp))
-                Text(task.description, style = MaterialTheme.typography.bodyMedium)
+                Text(detailDesc, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(16.dp))
             }
 
@@ -226,12 +228,13 @@ private fun TaskDetailView(
                 }
             }
 
-            if (!task.tags.isNullOrEmpty()) {
+            val taskTags = task.tags
+            if (!taskTags.isNullOrEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 Text("Tags", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    task.tags.forEach { tag ->
+                    taskTags.forEach { tag ->
                         SuggestionChip(onClick = {}, label = { Text(tag) })
                     }
                 }
