@@ -39,3 +39,13 @@ export {
   usePurgeData,
   useDisconnectSession,
 } from './useAdminQueries';
+export {
+  useObsidianStatusQuery,
+  useObsidianHealthQuery,
+  useObsidianProjectsQuery,
+  useObsidianSyncStatusQuery,
+  useObsidianSync,
+  useObsidianReindex,
+  useObsidianScan,
+  useObsidianFlushQueue,
+} from './useObsidianQueries';

@@ -10,6 +10,7 @@ import apiClient from '../services/apiClient';
 import { openObsidianVault } from '../utils/openObsidian';
 import SettingsSection from '../components/shared/SettingsSection';
 import SettingsRow from '../components/shared/SettingsRow';
+import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import Toggle from '../components/shared/Toggle';
 import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
@@ -26,8 +27,6 @@ export default function SettingsPage() {
   const logout = useAuthStore((s) => s.logout);
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
   const addToast = useToastStore((s) => s.addToast);
-  const [obsidianSyncing, setObsidianSyncing] = useState(false);
-  const [obsidianResult, setObsidianResult] = useState<string | null>(null);
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
 
@@ -81,24 +80,6 @@ export default function SettingsPage() {
       }).catch(() => {});
     }
   }, [isElectron]);
-
-  const handleObsidianSync = async () => {
-    setObsidianSyncing(true);
-    setObsidianResult(null);
-    try {
-      const res = await apiClient.post('/obsidian/sync');
-      const d = res.data;
-      const msg = `Exported: ${d.exported ?? 0} tasks to ${d.file_count ?? 0} files`;
-      setObsidianResult(msg);
-      addToast('success', msg);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Obsidian export failed';
-      setObsidianResult(null);
-      addToast('error', message);
-    } finally {
-      setObsidianSyncing(false);
-    }
-  };
 
   return (
     <div style={{ maxWidth: 560 }}>
@@ -235,8 +216,10 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Obsidian Export">
-        {isElectron && (
+      <ObsidianStatusCard />
+
+      {isElectron && (
+        <SettingsSection title="Obsidian Desktop">
           <SettingsRow label="Vault path" sublabel={obsidianVaultPath || 'Not configured'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
@@ -270,37 +253,19 @@ export default function SettingsPage() {
               )}
             </div>
           </SettingsRow>
-        )}
-        <SettingsRow label="Export Now" sublabel="Export all tasks to Obsidian vault">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SettingsRow label="Open in Obsidian" sublabel="Launch Obsidian to view your vault">
             <button
               type="button"
               className="cc-btn cc-btn--secondary"
-              onClick={handleObsidianSync}
-              disabled={obsidianSyncing || (isElectron && !obsidianVaultPath)}
+              disabled={!obsidianVaultPath}
+              onClick={() => openObsidianVault(obsidianVaultPath)}
               style={{ fontSize: 12, padding: '4px 10px' }}
             >
-              {obsidianSyncing ? 'Exporting...' : 'Export Now'}
+              Open
             </button>
-          </div>
-        </SettingsRow>
-        <SettingsRow label="Open in Obsidian" sublabel="Launch Obsidian to view your vault">
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary"
-            disabled={!obsidianVaultPath}
-            onClick={() => openObsidianVault(obsidianVaultPath)}
-            style={{ fontSize: 12, padding: '4px 10px' }}
-          >
-            Open
-          </button>
-        </SettingsRow>
-        {obsidianResult && (
-          <SettingsRow label="">
-            <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>{obsidianResult}</span>
           </SettingsRow>
-        )}
-      </SettingsSection>
+        </SettingsSection>
+      )}
 
       {!isElectron && (
         <SettingsSection title="Server Connection">

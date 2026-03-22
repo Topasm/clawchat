@@ -442,7 +442,7 @@ export const AgentTaskResponseSchema = z.object({
   sub_task_count: z.number().optional(),
   completed_sub_tasks: z.number().optional(),
   todo_id: z.string().nullable().optional(),
-  payload: z.record(z.unknown()).nullable().optional(),
+  payload: z.record(z.string(), z.unknown()).nullable().optional(),
   conversation_id: z.string().nullable().optional(),
   message_id: z.string().nullable().optional(),
   created_at: z.string(),
@@ -553,3 +553,78 @@ export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
 export type PlanSubtask = z.infer<typeof PlanSubtaskSchema>;
 export type PlanResponse = z.infer<typeof PlanResponseSchema>;
 export type PlanApplyResponse = z.infer<typeof PlanApplyResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Obsidian vault integration
+// ---------------------------------------------------------------------------
+
+export const ObsidianStatusSchema = z.object({
+  enabled: z.boolean(),
+  vault_path: z.string(),
+  last_sync: z.string().nullable(),
+  db_task_count: z.number(),
+  cli_available: z.boolean(),
+  mode: z.enum(['cli', 'filesystem', 'disabled']),
+});
+
+export const ObsidianHealthSchema = z.object({
+  vault_available: z.boolean(),
+  vault_path: z.string(),
+  cli_available: z.boolean(),
+  companion_online: z.boolean(),
+  sync_mode: z.string(),
+  project_count: z.number(),
+  last_scan: z.number().nullable(),
+  scan_duration_ms: z.number(),
+  is_stale: z.boolean(),
+  error: z.string().nullable(),
+  write_queue: z.object({
+    pending: z.number(),
+    operations: z.array(z.object({
+      op: z.string(),
+      path: z.string(),
+      queued_at: z.number(),
+      retries: z.number(),
+      error: z.string().nullable(),
+    })),
+  }),
+  bidirectional_sync: z.object({
+    last_scan: z.number().nullable(),
+    files_scanned: z.number(),
+    markers_found: z.number(),
+    changes_detected: z.number().optional(),
+    changes_applied: z.number(),
+    errors: z.number(),
+    duration_ms: z.number().optional(),
+    sync_lag_seconds: z.number().nullable(),
+  }),
+});
+
+export const ObsidianProjectSchema = z.object({
+  folder: z.string(),
+  name: z.string(),
+  todo_md_preview: z.string(),
+  doc_count: z.number(),
+  last_modified: z.number().nullable(),
+});
+
+export const ObsidianProjectsResponseSchema = z.object({
+  projects: z.array(ObsidianProjectSchema),
+  total: z.number(),
+  index_age_seconds: z.number().nullable(),
+});
+
+export const ObsidianScanResultSchema = z.object({
+  files_scanned: z.number(),
+  markers_found: z.number(),
+  changes_detected: z.number(),
+  changes_applied: z.number(),
+  errors: z.number(),
+  duration_ms: z.number(),
+});
+
+export type ObsidianStatus = z.infer<typeof ObsidianStatusSchema>;
+export type ObsidianHealth = z.infer<typeof ObsidianHealthSchema>;
+export type ObsidianProject = z.infer<typeof ObsidianProjectSchema>;
+export type ObsidianProjectsResponse = z.infer<typeof ObsidianProjectsResponseSchema>;
+export type ObsidianScanResult = z.infer<typeof ObsidianScanResultSchema>;

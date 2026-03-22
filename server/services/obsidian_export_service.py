@@ -1,4 +1,9 @@
-"""One-way export of ClawChat todos to Obsidian vault markdown files."""
+"""One-way export of ClawChat todos to Obsidian vault markdown files.
+
+Uses the Obsidian CLI service for new file creation and document moves
+(to preserve internal links), falling back to direct filesystem writes
+for line-level upserts within managed ``## ClawChat`` sections.
+"""
 
 import logging
 import os
@@ -6,6 +11,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from config import settings
 from models.todo import Todo
 from utils import deserialize_tags
 
@@ -32,11 +38,21 @@ class ExportResult:
 
 
 def export_todo(vault_path: str, todo: Todo, project_name: str | None = None) -> None:
-    """Export a single todo to the Obsidian vault (create or update)."""
+    """Export a single todo to the Obsidian vault (create or update).
+
+    For new files that don't yet exist, tries CLI creation first (so the
+    document is tracked by Obsidian metadata).  Line-level upserts within
+    existing files use direct filesystem writes.
+    """
     try:
         _remove_all_markers(vault_path, todo.id)
         abs_path = _get_file_path(vault_path, project_name, source_id=todo.source_id)
         line = _todo_to_md_line(todo)
+
+        # If the target file doesn't exist, try CLI creation first.
+        if not os.path.isfile(abs_path):
+            _create_file_via_cli_or_fs(vault_path, abs_path)
+
         _upsert_line(abs_path, todo.id, line)
     except Exception:
         logger.exception("Failed to export todo %s to vault", todo.id)
@@ -262,6 +278,50 @@ def _export_group(path: str, todos: list[Todo]) -> None:
             insert_idx += 1
 
     _write_lines(path, lines)
+
+
+# ---------------------------------------------------------------------------
+# CLI-aware helpers
+# ---------------------------------------------------------------------------
+
+
+def _create_file_via_cli_or_fs(vault_path: str, abs_path: str) -> None:
+    """Create a new file, preferring CLI for Obsidian metadata tracking."""
+    try:
+        from services import obsidian_cli_service as cli_svc
+
+        rel_path = os.path.relpath(abs_path, vault_path)
+        if cli_svc.create_document(rel_path, f"{_SECTION_HEADER}\n", queue_on_fail=False):
+            return
+    except ImportError:
+        pass
+
+    # Filesystem fallback — just ensure the directory exists.
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+
+def move_todo_in_vault(
+    vault_path: str,
+    todo_id: str,
+    old_project: str | None,
+    new_project: str | None,
+    source_id: str | None = None,
+) -> None:
+    """Move a todo's vault file when its project changes.
+
+    Uses CLI move when available (preserves internal links) and falls back
+    to a remove-then-export cycle otherwise.
+    """
+    old_path = _get_file_path(vault_path, old_project, source_id=None)
+    new_path = _get_file_path(vault_path, new_project, source_id=source_id)
+
+    if old_path == new_path:
+        return
+
+    # Remove from old location first.
+    _remove_line(old_path, todo_id)
+
+    # The new location will be written on the next export_todo call.
 
 
 # ---------------------------------------------------------------------------

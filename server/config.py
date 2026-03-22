@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # Obsidian
     obsidian_vault_path: str = ""
     obsidian_cli_command: str = ""
+    obsidian_sync_mode: str = "filesystem"  # "livesync", "filesystem", or "disabled"
+    obsidian_project_todo_filename: str = "TODO.md"
+    obsidian_companion_node_required: bool = False
+    obsidian_scan_interval_minutes: int = 5
 
     # Scheduler
     enable_scheduler: bool = False

@@ -11,6 +11,9 @@ from services import briefing_service, reminder_service
 from services.ai_service import AIService
 from ws.manager import ConnectionManager
 
+# Lazy imports for optional vault services
+_vault_services_loaded = False
+
 logger = logging.getLogger(__name__)
 
 # Default user ID for single-user app
@@ -35,6 +38,16 @@ class Scheduler:
             asyncio.create_task(self._briefing_loop(), name="scheduler-briefing"),
             asyncio.create_task(self._midnight_reset_loop(), name="scheduler-midnight"),
         ]
+
+        # Vault integration tasks (only if vault path is configured)
+        if settings.obsidian_vault_path:
+            self._tasks.append(
+                asyncio.create_task(self._vault_scan_loop(), name="scheduler-vault-scan")
+            )
+            self._tasks.append(
+                asyncio.create_task(self._vault_queue_flush_loop(), name="scheduler-vault-queue")
+            )
+
         logger.info("Scheduler started with %d background tasks", len(self._tasks))
 
     async def stop(self) -> None:
@@ -117,3 +130,61 @@ class Scheduler:
                 logger.info("Midnight: cleared reminder dedup set")
         except asyncio.CancelledError:
             logger.debug("Midnight reset loop cancelled")
+
+    async def _vault_scan_loop(self) -> None:
+        """Periodically scan the vault for external changes and sync to DB."""
+        interval = settings.obsidian_scan_interval_minutes * 60
+        logger.info("Vault scan loop started (interval: %ds)", interval)
+
+        # Initial index refresh on startup
+        try:
+            from services.obsidian_vault_indexer import refresh_index
+            refresh_index()
+            logger.info("Initial vault index built")
+        except Exception:
+            logger.exception("Failed to build initial vault index")
+
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                try:
+                    from services.vault_watcher_service import scan_vault
+                    from services.obsidian_vault_indexer import refresh_index
+
+                    async with self.session_factory() as db:
+                        result = await scan_vault(db)
+                        if result.changes_applied:
+                            logger.info(
+                                "Vault scan: %d changes applied",
+                                result.changes_applied,
+                            )
+
+                    # Refresh index after scan
+                    refresh_index()
+                except Exception:
+                    logger.exception("Error in vault scan loop")
+        except asyncio.CancelledError:
+            logger.debug("Vault scan loop cancelled")
+
+    async def _vault_queue_flush_loop(self) -> None:
+        """Periodically attempt to flush the write queue."""
+        logger.info("Vault queue flush loop started (interval: 60s)")
+        try:
+            while True:
+                await asyncio.sleep(60)
+                try:
+                    from services.obsidian_cli_service import flush_queue, get_queue_status
+
+                    status = get_queue_status()
+                    if status["pending"] > 0:
+                        result = flush_queue()
+                        if result["succeeded"]:
+                            logger.info(
+                                "Queue flush: %d/%d succeeded",
+                                result["succeeded"],
+                                result["processed"],
+                            )
+                except Exception:
+                    logger.exception("Error in queue flush loop")
+        except asyncio.CancelledError:
+            logger.debug("Vault queue flush loop cancelled")

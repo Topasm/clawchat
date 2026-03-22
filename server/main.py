@@ -64,6 +64,27 @@ async def lifespan(app: FastAPI):
     app.state.claude_code_version = claude_code_version
     logger.info(f"Claude Code status: {claude_code_status.value}, version: {claude_code_version}")
 
+    # Initialize vault services if configured
+    if settings.obsidian_vault_path:
+        try:
+            from services.obsidian_cli_service import load_queue
+            load_queue()
+            logger.info("Obsidian CLI write queue loaded")
+        except Exception:
+            logger.debug("Could not load Obsidian CLI write queue")
+
+        try:
+            from services.obsidian_vault_indexer import refresh_index
+            idx = refresh_index()
+            logger.info(
+                "Obsidian vault index: %d projects (CLI=%s, companion=%s)",
+                len(idx.projects),
+                idx.cli_available,
+                idx.companion_online,
+            )
+        except Exception:
+            logger.debug("Could not build initial vault index")
+
     # Start background scheduler if enabled
     if settings.enable_scheduler:
         scheduler = Scheduler(

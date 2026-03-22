@@ -523,8 +523,13 @@ async def delegate_todo(
     if body.agent_type == "planner":
         await inbox_pipeline_service.process_todo(db, ai_service, todo_id)
     else:
-        from services.agent_task_service import execute_task
-        await execute_task(db, ai_service, task.id)
+        # Use vault agent service for researcher/executor (creates vault documents)
+        try:
+            from services.vault_agent_service import execute_agent_task
+            await execute_agent_task(db, ai_service, task)
+        except ImportError:
+            from services.agent_task_service import execute_task
+            await execute_task(db, ai_service, task.id)
 
     todo.assignee = body.agent_type
     await db.commit()
