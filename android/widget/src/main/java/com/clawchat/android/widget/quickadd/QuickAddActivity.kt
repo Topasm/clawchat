@@ -1,5 +1,6 @@
 package com.clawchat.android.widget.quickadd
 
+import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -33,6 +34,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.di.WidgetEntryPoint
@@ -122,8 +124,7 @@ class QuickAddActivity : ComponentActivity() {
                                                         "Added to inbox",
                                                         Toast.LENGTH_SHORT,
                                                     ).show()
-                                                    InboxQuickAddWidget().updateAll(this@QuickAddActivity)
-                                                    TodoTrackingWidget().updateAll(this@QuickAddActivity)
+                                                    updateAllWidgets(this@QuickAddActivity)
                                                     finish()
                                                 }
                                                 is ApiResult.Error -> {
@@ -152,5 +153,15 @@ class QuickAddActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+private suspend fun updateAllWidgets(context: Context) {
+    val manager = GlanceAppWidgetManager(context)
+    for (id in manager.getGlanceIds(InboxQuickAddWidget::class.java)) {
+        InboxQuickAddWidget().update(context, id)
+    }
+    for (id in manager.getGlanceIds(TodoTrackingWidget::class.java)) {
+        TodoTrackingWidget().update(context, id)
     }
 }

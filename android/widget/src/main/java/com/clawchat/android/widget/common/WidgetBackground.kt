@@ -1,6 +1,7 @@
 package com.clawchat.android.widget.common
 
 import android.os.Build
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceModifier
@@ -10,6 +11,7 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import com.clawchat.android.widget.R
 
+@Composable
 fun GlanceModifier.widgetBackground(): GlanceModifier =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         this.background(GlanceTheme.colors.widgetBackground)
@@ -21,6 +23,7 @@ fun GlanceModifier.widgetBackground(): GlanceModifier =
         )
     }
 
+@Composable
 fun GlanceModifier.widgetItemBackground(completed: Boolean): GlanceModifier =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         this.cornerRadius(16.dp)

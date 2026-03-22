@@ -2,7 +2,6 @@ package com.clawchat.android.widget.quickadd
 
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
@@ -74,9 +73,7 @@ private fun InboxQuickAddContent(
     inboxCount: Int?,
 ) {
     val context = LocalContext.current
-    val quickAddIntent = Intent(context, QuickAddActivity::class.java).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-    }
+    val quickAddActivity = ComponentName(context.packageName, QuickAddActivity::class.java.name)
     val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
 
     Row(
@@ -110,7 +107,7 @@ private fun InboxQuickAddContent(
                 )
                 .padding(horizontal = 12.dp, vertical = 10.dp)
                 .clickable(
-                    if (isLoggedIn) actionStartActivity(quickAddIntent)
+                    if (isLoggedIn) actionStartActivity(quickAddActivity)
                     else actionStartActivity(mainActivity)
                 ),
             contentAlignment = Alignment.CenterStart,
