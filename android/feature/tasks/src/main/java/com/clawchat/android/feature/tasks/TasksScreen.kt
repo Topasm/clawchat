@@ -25,13 +25,12 @@ fun TasksScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    val selectedTask = state.selectedTask
-    if (selectedTask != null) {
+    if (state.selectedTask != null) {
         TaskDetailView(
-            task = selectedTask,
+            task = state.selectedTask!!,
             onBack = { viewModel.selectTask(null) },
-            onToggle = { viewModel.toggleComplete(selectedTask.id) },
-            onDelete = { viewModel.deleteTask(selectedTask.id) },
+            onToggle = { viewModel.toggleComplete(state.selectedTask!!.id) },
+            onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
         )
     } else {
         TaskListView(
@@ -93,6 +92,12 @@ private fun TaskListView(
                 )
             }
 
+            // Filter out tasks that belong in the Inbox (inbox_state != "none" and not null)
+            val filteredTasks = tasks.filter { task ->
+                val state = task.inboxState
+                state == null || state == "none"
+            }
+
             if (isLoading && tasks.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -102,7 +107,7 @@ private fun TaskListView(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(tasks, key = { it.id }, contentType = { "task" }) { task ->
+                    items(filteredTasks, key = { it.id }) { task ->
                         TaskRow(
                             task = task,
                             onToggle = { onToggle(task.id) },
@@ -168,7 +173,30 @@ private fun TaskRow(task: Todo, onToggle: () -> Unit, onClick: () -> Unit) {
                     )
                 }
             }
+            // Show inbox state badge when applicable
+            val inboxLabel = inboxStateLabel(task.inboxState)
+            if (inboxLabel != null) {
+                Spacer(Modifier.width(8.dp))
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text(inboxLabel, style = MaterialTheme.typography.labelSmall) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        labelColor = MaterialTheme.colorScheme.tertiary,
+                    ),
+                )
+            }
         }
+    }
+}
+
+private fun inboxStateLabel(inboxState: String?): String? {
+    return when (inboxState) {
+        null, "none" -> null
+        "classifying", "planning" -> "Planning"
+        "plan_ready" -> "Review"
+        "captured" -> "Organize"
+        "error" -> "Failed"
+        else -> inboxState.replaceFirstChar { it.uppercase() }
     }
 }
 

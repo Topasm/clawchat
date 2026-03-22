@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -22,6 +23,7 @@ import com.clawchat.android.core.data.model.Todo
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
+    onNavigateToInbox: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     var showQuickAdd by remember { mutableStateOf(false) }
@@ -56,7 +58,7 @@ fun TodayScreen(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    items(state.overdueTodos, key = { it.id }, contentType = { "todo" }) { todo ->
+                    items(state.overdueTodos, key = { it.id }) { todo ->
                         TodoCard(todo = todo, onToggle = { viewModel.toggleComplete(todo.id) })
                     }
                     item { Spacer(Modifier.height(8.dp)) }
@@ -67,7 +69,7 @@ fun TodayScreen(
                     item {
                         Text("Tasks", style = MaterialTheme.typography.titleSmall)
                     }
-                    items(state.todayTodos, key = { it.id }, contentType = { "todo" }) { todo ->
+                    items(state.todayTodos, key = { it.id }) { todo ->
                         TodoCard(todo = todo, onToggle = { viewModel.toggleComplete(todo.id) })
                     }
                     item { Spacer(Modifier.height(8.dp)) }
@@ -78,13 +80,38 @@ fun TodayScreen(
                     item {
                         Text("Events", style = MaterialTheme.typography.titleSmall)
                     }
-                    items(state.todayEvents, key = { it.id }, contentType = { "event" }) { event ->
+                    items(state.todayEvents, key = { it.id }) { event ->
                         EventCard(event = event)
+                    }
+                    item { Spacer(Modifier.height(8.dp)) }
+                }
+
+                // Needs review section (inbox preview)
+                if (state.inboxPreview.isNotEmpty()) {
+                    item {
+                        Text("Needs review", style = MaterialTheme.typography.titleSmall)
+                    }
+                    items(state.inboxPreview, key = { "inbox-${it.id}" }) { todo ->
+                        InboxPreviewCard(todo = todo)
+                    }
+                    item {
+                        TextButton(
+                            onClick = onNavigateToInbox,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("See all in Inbox")
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                     }
                 }
 
                 // Empty state
-                if (state.todayTodos.isEmpty() && state.overdueTodos.isEmpty() && state.todayEvents.isEmpty() && !state.isRefreshing) {
+                if (state.todayTodos.isEmpty() && state.overdueTodos.isEmpty() && state.todayEvents.isEmpty() && state.inboxPreview.isEmpty() && !state.isRefreshing) {
                     item {
                         Box(
                             modifier = Modifier.fillParentMaxSize(),
@@ -178,6 +205,49 @@ private fun EventCard(event: Event) {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun InboxPreviewCard(todo: Todo) {
+    val stateLabel = when (todo.inboxState) {
+        "plan_ready" -> "Review"
+        "captured" -> "Organize"
+        else -> todo.inboxState ?: ""
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    todo.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val summary = todo.planSummary
+                if (!summary.isNullOrBlank()) {
+                    Text(
+                        summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            SuggestionChip(
+                onClick = {},
+                label = { Text(stateLabel, style = MaterialTheme.typography.labelSmall) },
+                colors = SuggestionChipDefaults.suggestionChipColors(
+                    labelColor = MaterialTheme.colorScheme.tertiary,
+                ),
+            )
         }
     }
 }

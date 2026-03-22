@@ -29,6 +29,7 @@ import type { HealthResponse } from '../types/api';
 import {
   SunIcon, InboxIcon, ChatIcon,
   TasksIcon, GearIcon, SearchIcon, AdminIcon,
+  NavCalendarIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
@@ -75,15 +76,22 @@ const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
   reconnecting: 'Reconnecting...',
 };
 
-const navItems = [
+const primaryNavItems = [
   { to: '/today', label: 'Today', Icon: SunIcon },
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
   { to: '/chats', label: 'Projects', Icon: ChatIcon },
+];
+
+const secondaryNavItems = [
   { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
   { to: '/search', label: 'Search', Icon: SearchIcon },
+  { to: '/calendar', label: 'Calendar', Icon: NavCalendarIcon },
   { to: '/settings', label: 'Settings', Icon: GearIcon },
   { to: '/admin', label: 'Admin', Icon: AdminIcon },
 ];
+
+// Flat list for backward compatibility (used in swipe navigation, etc.)
+const navItems = [...primaryNavItems, ...secondaryNavItems];
 
 export default function Layout() {
   const { colors } = useTheme();
@@ -211,7 +219,24 @@ export default function Layout() {
           <span className="cc-sidebar__label">AI: {healthData.ai_connected ? healthData.ai_model : 'Offline'}</span>
         </div>
       )}
-      {navItems.map((item) => (
+      {primaryNavItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) =>
+            `cc-nav-item cc-nav-item--primary${isActive ? ' cc-nav-item--active' : ''}`
+          }
+          title={sidebarCollapsed ? item.label : undefined}
+        >
+          <item.Icon />
+          <span className="cc-sidebar__label">{item.label}</span>
+          {item.to === '/inbox' && inboxCount > 0 && (
+            <span className="cc-nav-badge">{inboxCount}</span>
+          )}
+        </NavLink>
+      ))}
+      <div className="cc-sidebar__divider" />
+      {secondaryNavItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -222,9 +247,6 @@ export default function Layout() {
         >
           <item.Icon />
           <span className="cc-sidebar__label">{item.label}</span>
-          {item.to === '/inbox' && inboxCount > 0 && (
-            <span className="cc-nav-badge">{inboxCount}</span>
-          )}
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />

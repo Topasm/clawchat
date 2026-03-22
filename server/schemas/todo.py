@@ -87,6 +87,12 @@ class TodoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Computed/display fields
+    next_action: str | None = None
+    plan_summary: str | None = None
+    sync_status: str | None = None
+    project_label: str | None = None
+
     model_config = {"from_attributes": True}
 
     @field_validator("tags", mode="before")

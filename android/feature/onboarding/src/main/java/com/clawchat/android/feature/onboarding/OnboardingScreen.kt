@@ -1,6 +1,7 @@
 package com.clawchat.android.feature.onboarding
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,11 +33,19 @@ fun OnboardingScreen(
     ) { step ->
         when (step) {
             OnboardingStep.WELCOME -> WelcomeStep(
-                onNext = { viewModel.goToStep(OnboardingStep.SERVER) },
+                onScanQr = { viewModel.goToStep(OnboardingStep.SCAN_QR) },
+                onManualConnect = { viewModel.goToStep(OnboardingStep.SERVER) },
                 onSkip = {
                     viewModel.skipOnboarding()
                     onSkip()
                 },
+            )
+            OnboardingStep.SCAN_QR -> ScanQrStep(
+                isConnecting = state.isCheckingServer || state.isPairing,
+                error = state.error,
+                onQrScanned = viewModel::handleQrPayload,
+                onCancel = { viewModel.goToStep(OnboardingStep.WELCOME) },
+                onManualEntry = { viewModel.goToStep(OnboardingStep.SERVER) },
             )
             OnboardingStep.SERVER -> ServerStep(
                 serverUrl = state.serverUrl,
@@ -75,7 +84,11 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun WelcomeStep(onNext: () -> Unit, onSkip: () -> Unit) {
+private fun WelcomeStep(
+    onScanQr: () -> Unit,
+    onManualConnect: () -> Unit,
+    onSkip: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -88,14 +101,18 @@ private fun WelcomeStep(onNext: () -> Unit, onSkip: () -> Unit) {
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "Your personal productivity hub with AI-powered chat, tasks, and calendar.",
+            "Open ClawChat on your desktop and go to Settings to display the QR code.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(48.dp))
-        Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
-            Text("Get Started")
+        Button(onClick = onScanQr, modifier = Modifier.fillMaxWidth()) {
+            Text("Scan QR Code")
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = onManualConnect, modifier = Modifier.fillMaxWidth()) {
+            Text("Connect manually")
         }
         Spacer(Modifier.height(16.dp))
         TextButton(
@@ -106,6 +123,62 @@ private fun WelcomeStep(onNext: () -> Unit, onSkip: () -> Unit) {
                 "Skip for now",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun ScanQrStep(
+    isConnecting: Boolean,
+    error: String?,
+    onQrScanned: (String) -> Unit,
+    onCancel: () -> Unit,
+    onManualEntry: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        QrScannerScreen(
+            onQrScanned = onQrScanned,
+            onCancel = onCancel,
+            onManualEntry = onManualEntry,
+        )
+
+        if (isConnecting) {
+            // Loading overlay while health check + auto-claim runs
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Connecting...",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+        }
+
+        error?.let {
+            // Error snackbar at the top
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .padding(16.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Text(
+                    it,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }

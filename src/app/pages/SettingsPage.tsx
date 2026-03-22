@@ -14,7 +14,7 @@ import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import Toggle from '../components/shared/Toggle';
 import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
-import MobileConnectionPanel from '../components/shared/MobileConnectionPanel';
+import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import { IS_CAPACITOR } from '../types/platform';
 
 export default function SettingsPage() {
@@ -279,9 +279,9 @@ export default function SettingsPage() {
           </SettingsRow>
         </SettingsSection>
       )}
-      {isElectron && (
+      {isElectron && token && (
         <SettingsSection title="Connect Mobile Device">
-          <MobileConnectionPanel />
+          <PairingCodeDisplay />
         </SettingsSection>
       )}
       {isElectron && token && (

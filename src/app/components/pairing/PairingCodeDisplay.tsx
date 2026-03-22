@@ -16,7 +16,6 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
   const [state, setState] = useState<DisplayState>('loading');
   const [error, setError] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [copied, setCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initialDeviceCountRef = useRef<number | null>(null);
@@ -36,7 +35,6 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
     clearTimers();
     setState('loading');
     setError('');
-    setCopied(false);
 
     try {
       // Capture current device count before generating code
@@ -95,17 +93,6 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
     generateCode();
     return clearTimers;
   }, [generateCode, clearTimers]);
-
-  const handleCopyPayload = async () => {
-    if (!session) return;
-    try {
-      await navigator.clipboard.writeText(session.qrPayload);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard not available
-    }
-  };
 
   const formatTime = (seconds: number): string => {
     const m = Math.floor(seconds / 60);

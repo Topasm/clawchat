@@ -45,47 +45,13 @@ export default function InboxPage() {
     }
   };
 
-  const handleApplyPlan = async (id: string) => {
+  const handleRetry = async (id: string) => {
     try {
-      await apiClient.post(`/todos/${id}/plan/apply`);
-      addToast('success', 'Plan applied');
-      useModuleStore.getState().fetchTodos();
+      await apiClient.post(`/todos/${id}/organize`);
+      addToast('info', 'Retrying...');
     } catch {
-      addToast('error', 'Failed to apply plan');
+      addToast('error', 'Failed to retry');
     }
-  };
-
-  const handleDismissPlan = async (id: string) => {
-    try {
-      await apiClient.post(`/todos/${id}/plan/dismiss`);
-      addToast('info', 'Plan dismissed');
-      useModuleStore.getState().fetchTodos();
-    } catch {
-      addToast('error', 'Failed to dismiss plan');
-    }
-  };
-
-  const renderTaskWithChildren = (task: typeof todos[0]) => {
-    const children = todos.filter((t) => t.parent_id === task.id);
-    return (
-      <div key={task.id}>
-        <TaskCard
-          task={task}
-          onToggle={() => handleToggle(task.id)}
-          onClick={() => navigate(`/tasks/${task.id}`)}
-          subTaskCount={children.length}
-        />
-        {children.map((child) => (
-          <TaskCard
-            key={child.id}
-            task={child}
-            onToggle={() => handleToggle(child.id)}
-            onClick={() => navigate(`/tasks/${child.id}`)}
-            isSubTask
-          />
-        ))}
-      </div>
-    );
   };
 
   return (
@@ -112,11 +78,12 @@ export default function InboxPage() {
         )}
       </div>
 
-      {/* Processing */}
+      {/* Planning now (classifying/planning) */}
       {processing.length > 0 && (
-        <SectionHeader title="Processing" count={processing.length} variant="default" defaultOpen>
+        <SectionHeader title="Planning now" count={processing.length} variant="default" defaultOpen>
           {processing.map((task) => (
-            <div key={task.id} style={{ opacity: 0.7 }}>
+            <div key={task.id} className="cc-inbox-card cc-inbox-card--planning">
+              <div className="cc-inbox-card__spinner" />
               <TaskCard
                 task={task}
                 onToggle={() => handleToggle(task.id)}
@@ -127,39 +94,23 @@ export default function InboxPage() {
         </SectionHeader>
       )}
 
-      {/* Plan ready */}
+      {/* Review suggestion (plan_ready) */}
       {planReady.length > 0 && (
-        <SectionHeader title="Plan ready" count={planReady.length} variant="accent" defaultOpen>
+        <SectionHeader title="Review suggestion" count={planReady.length} variant="accent" defaultOpen>
           {planReady.map((task) => (
-            <div key={task.id}>
-              {renderTaskWithChildren(task)}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                  padding: '4px 0 12px 36px',
-                }}
-              >
-                <button
-                  className="cc-btn cc-btn--ghost"
-                  style={{ fontSize: 12 }}
-                  onClick={() => navigate(`/tasks/${task.id}`)}
-                >
-                  View Plan
-                </button>
+            <div key={task.id} className="cc-inbox-card cc-inbox-card--review">
+              <TaskCard
+                task={task}
+                onToggle={() => handleToggle(task.id)}
+                onClick={() => navigate(`/tasks/${task.id}`)}
+              />
+              <div className="cc-inbox-card__actions">
                 <button
                   className="cc-btn cc-btn--primary"
                   style={{ fontSize: 12 }}
-                  onClick={() => handleApplyPlan(task.id)}
+                  onClick={() => navigate(`/tasks/${task.id}`)}
                 >
-                  Apply
-                </button>
-                <button
-                  className="cc-btn cc-btn--ghost"
-                  style={{ fontSize: 12 }}
-                  onClick={() => handleDismissPlan(task.id)}
-                >
-                  Dismiss
+                  Review
                 </button>
               </div>
             </div>
@@ -167,46 +118,54 @@ export default function InboxPage() {
         </SectionHeader>
       )}
 
-      {/* Needs organising */}
+      {/* Needs organizing (captured) */}
       {needsOrganising.length > 0 && (
         <SectionHeader
-          title="Needs organising"
+          title="Needs organizing"
           count={needsOrganising.length}
           variant="accent"
           defaultOpen
         >
-          {needsOrganising.map((task) => (
-            <div key={task.id}>
-              {renderTaskWithChildren(task)}
-              <div style={{ padding: '2px 0 8px 36px' }}>
-                <button
-                  className="cc-btn cc-btn--ghost"
-                  style={{ fontSize: 11 }}
-                  onClick={() => handleOrganize(task.id)}
-                >
-                  Organize
-                </button>
+          {needsOrganising.map((task) => {
+            const children = todos.filter((t) => t.parent_id === task.id);
+            return (
+              <div key={task.id} className="cc-inbox-card">
+                <TaskCard
+                  task={task}
+                  onToggle={() => handleToggle(task.id)}
+                  onClick={() => navigate(`/tasks/${task.id}`)}
+                  subTaskCount={children.length}
+                />
+                <div className="cc-inbox-card__actions">
+                  <button
+                    className="cc-btn cc-btn--secondary"
+                    style={{ fontSize: 12 }}
+                    onClick={() => handleOrganize(task.id)}
+                  >
+                    Organize
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </SectionHeader>
       )}
 
-      {/* Errors */}
+      {/* Failed (error) */}
       {errors.length > 0 && (
-        <SectionHeader title="Errors" count={errors.length} variant="warning" defaultOpen={false}>
+        <SectionHeader title="Failed" count={errors.length} variant="warning" defaultOpen={false}>
           {errors.map((task) => (
-            <div key={task.id}>
+            <div key={task.id} className="cc-inbox-card cc-inbox-card--error">
               <TaskCard
                 task={task}
                 onToggle={() => handleToggle(task.id)}
                 onClick={() => navigate(`/tasks/${task.id}`)}
               />
-              <div style={{ padding: '2px 0 8px 36px' }}>
+              <div className="cc-inbox-card__actions">
                 <button
-                  className="cc-btn cc-btn--ghost"
-                  style={{ fontSize: 11 }}
-                  onClick={() => handleOrganize(task.id)}
+                  className="cc-btn cc-btn--danger"
+                  style={{ fontSize: 12 }}
+                  onClick={() => handleRetry(task.id)}
                 >
                   Retry
                 </button>

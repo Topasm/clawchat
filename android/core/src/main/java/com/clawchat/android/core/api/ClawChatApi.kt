@@ -1,6 +1,7 @@
 package com.clawchat.android.core.api
 
 import com.clawchat.android.core.data.model.*
+import retrofit2.Response
 import retrofit2.http.*
 
 /**
@@ -32,6 +33,9 @@ interface ClawChatApi {
 
     @DELETE("api/todos/{id}")
     suspend fun deleteTodo(@Path("id") id: String)
+
+    @POST("api/todos/{todoId}/organize")
+    suspend fun organizeTodo(@Path("todoId") todoId: String): Response<Unit>
 
     // --- Events ---
 

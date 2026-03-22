@@ -59,9 +59,39 @@
     color: var(--cc-primary);
   }
 
+  /* Primary bottom nav items (Today, Inbox, Projects) get bolder weight */
+  .cc-root--mobile .cc-bottom-nav__item--primary {
+    font-weight: 600;
+  }
+
   .cc-root--mobile .cc-bottom-nav__icon {
     width: 22px;
     height: 22px;
+  }
+
+  /* Icon wrapper for badge positioning */
+  .cc-root--mobile .cc-bottom-nav__icon-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Badge on bottom nav items (e.g., Inbox count) */
+  .cc-root--mobile .cc-bottom-nav__badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    background: var(--cc-primary);
+    color: #fff;
   }
 
   /* Chat panel becomes full screen on mobile */

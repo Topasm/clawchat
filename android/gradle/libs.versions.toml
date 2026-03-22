@@ -16,6 +16,8 @@ coroutines = "1.9.0"
 lifecycle = "2.8.7"
 activity-compose = "1.9.3"
 core-ktx = "1.15.0"
+camerax = "1.4.1"
+mlkit-barcode = "17.3.0"
 junit = "4.13.2"
 mockk = "1.13.13"
 turbine = "1.2.0"
@@ -49,6 +51,13 @@ retrofit-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "con
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 okhttp-sse = { group = "com.squareup.okhttp3", name = "okhttp-sse", version.ref = "okhttp" }
+
+# CameraX
+camerax-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+camerax-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+mlkit-barcode = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkit-barcode" }
 
 # Data
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }

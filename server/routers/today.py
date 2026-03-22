@@ -13,6 +13,7 @@ from schemas.today import TodayResponse
 from schemas.todo import TodoResponse
 from services.briefing_service import generate_briefing
 from utils import deserialize_tags
+from utils.inbox_display import get_next_action
 
 router = APIRouter(tags=["today"])
 
@@ -30,6 +31,17 @@ def _todo_to_response(todo: Todo) -> TodoResponse:
     resp = TodoResponse.model_validate(todo)
     if todo.tags:
         resp.tags = deserialize_tags(todo.tags)
+    resp.next_action = get_next_action(
+        todo.inbox_state or "none", todo.status or "pending"
+    )
+    if todo.source == "obsidian_project":
+        resp.sync_status = "synced"
+    elif todo.source and todo.source.startswith("obsidian"):
+        resp.sync_status = "linked"
+    if todo.source_id:
+        resp.project_label = (
+            todo.source_id.replace("_", " ").replace("-", " ").strip().title()
+        )
     return resp
 
 
@@ -110,10 +122,20 @@ async def get_today(
     )
     inbox_count = (await db.execute(inbox_q)).scalar() or 0
 
+    # Needs review: plan_ready or captured items (limit 5)
+    needs_review_q = (
+        select(Todo)
+        .where(Todo.inbox_state.in_(["plan_ready", "captured"]))
+        .order_by(Todo.updated_at.desc())
+        .limit(5)
+    )
+    needs_review_todos = (await db.execute(needs_review_q)).scalars().all()
+
     return TodayResponse(
         today_tasks=[_todo_to_response(t) for t in all_today],
         overdue_tasks=[_todo_to_response(t) for t in overdue_tasks],
         today_events=[_event_to_response(e) for e in today_events],
+        needs_review=[_todo_to_response(t) for t in needs_review_todos],
         inbox_count=inbox_count,
         greeting=_get_greeting(),
         date=today,

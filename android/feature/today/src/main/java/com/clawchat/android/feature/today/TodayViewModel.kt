@@ -21,6 +21,7 @@ data class TodayUiState(
     val overdueTodos: List<Todo> = emptyList(),
     val todayEvents: List<Event> = emptyList(),
     val inboxCount: Int = 0,
+    val inboxPreview: List<Todo> = emptyList(),
     val isRefreshing: Boolean = false,
     val error: String? = null,
 )
@@ -42,6 +43,13 @@ class TodayViewModel @Inject constructor(
             _uiState.update { it.copy(isRefreshing = true, error = null) }
             try {
                 val today = api.getToday()
+                // Fetch inbox preview: items with plan_ready or captured state (up to 3)
+                val allTodos = api.listTodos(mapOf("limit" to "200"))
+                val inboxPreviewItems = allTodos.items
+                    .filter { todo ->
+                        todo.inboxState == "plan_ready" || todo.inboxState == "captured"
+                    }
+                    .take(3)
                 _uiState.update {
                     it.copy(
                         greeting = today.greeting,
@@ -49,6 +57,7 @@ class TodayViewModel @Inject constructor(
                         overdueTodos = today.overdueTodos,
                         todayEvents = today.todayEvents,
                         inboxCount = today.inboxCount,
+                        inboxPreview = inboxPreviewItems,
                         isRefreshing = false,
                     )
                 }

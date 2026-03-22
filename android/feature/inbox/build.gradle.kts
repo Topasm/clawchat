@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.clawchat.android.feature.onboarding"
+    namespace = "com.clawchat.android.feature.inbox"
     compileSdk = 35
 
     defaultConfig {
@@ -50,13 +50,6 @@ dependencies {
 
     // Navigation
     implementation(libs.navigation.compose)
-
-    // CameraX + ML Kit (QR scanning)
-    implementation(libs.camerax.core)
-    implementation(libs.camerax.camera2)
-    implementation(libs.camerax.lifecycle)
-    implementation(libs.camerax.view)
-    implementation(libs.mlkit.barcode)
 
     // Testing
     testImplementation(libs.junit)

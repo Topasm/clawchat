@@ -1,13 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import usePlatform from '../hooks/usePlatform';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore } from '../stores/useChatStore';
+import { useModuleStore } from '../stores/useModuleStore';
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
+import Badge from '../components/shared/Badge';
 import { ChatBubbleIcon } from '../components/shared/Icons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
+import type { ProjectTodoResponse } from '../types/api';
+
+function getNextDueDate(project: ProjectTodoResponse, todos: ReturnType<typeof useModuleStore.getState>['todos']): string | null {
+  const children = todos.filter((t) => t.parent_id === project.id && t.status !== 'completed' && t.due_date);
+  if (children.length === 0) return null;
+  children.sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+  return children[0].due_date!;
+}
+
+function getSyncBadge(project: ProjectTodoResponse): { label: string; variant: 'synced' | 'linked' | 'none' } {
+  if (project.source === 'obsidian_project' || project.source === 'obsidian') {
+    return { label: 'Synced', variant: 'synced' };
+  }
+  if (project.source_id) {
+    return { label: 'Linked folder', variant: 'linked' };
+  }
+  return { label: '', variant: 'none' };
+}
 
 export default function ChatListPage() {
   const navigate = useNavigate();
@@ -19,6 +39,7 @@ export default function ChatListPage() {
   const deleteConversation = useChatStore((s) => s.deleteConversation);
   const fetchProjects = useChatStore((s) => s.fetchProjects);
   const getOrCreateProjectConversation = useChatStore((s) => s.getOrCreateProjectConversation);
+  const todos = useModuleStore((s) => s.todos);
   const { isMobile } = usePlatform();
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -32,6 +53,21 @@ export default function ChatListPage() {
 
   // Quick chats = conversations without a project_todo_id
   const quickChats = conversations.filter((c) => !c.project_todo_id);
+
+  // Compute per-project metadata
+  const projectMeta = useMemo(() => {
+    const meta: Record<string, { nextDue: string | null; openCount: number; totalCount: number }> = {};
+    for (const project of projects) {
+      const children = todos.filter((t) => t.parent_id === project.id);
+      const openCount = children.filter((t) => t.status !== 'completed').length;
+      meta[project.id] = {
+        nextDue: getNextDueDate(project, todos),
+        openCount,
+        totalCount: project.subtask_count ?? children.length,
+      };
+    }
+    return meta;
+  }, [projects, todos]);
 
   const handleNewChat = async () => {
     try {
@@ -62,7 +98,7 @@ export default function ChatListPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile ? 12 : 16 }}>
         <div className="cc-page-header" style={{ marginBottom: 0 }}>
           <div className="cc-page-header__title">Projects</div>
-          {!isMobile && <div className="cc-page-header__subtitle">Project conversations &amp; quick chats</div>}
+          {!isMobile && <div className="cc-page-header__subtitle">Your project workspaces</div>}
         </div>
         {!isMobile && (
           <button type="button" className="cc-btn cc-btn--primary" onClick={handleNewChat}>
@@ -75,94 +111,90 @@ export default function ChatListPage() {
 
       {/* Projects Section */}
       {projects.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cc-text-secondary)', marginBottom: 8 }}>
-            Projects
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {projects.map((project) => (
+        <div className="cc-projects-grid">
+          {projects.map((project) => {
+            const meta = projectMeta[project.id];
+            const sync = getSyncBadge(project);
+            const completedCount = project.completed_subtask_count ?? 0;
+            const totalCount = meta?.totalCount ?? 0;
+
+            return (
               <button
                 key={project.id}
                 type="button"
-                className="cc-project-item"
+                className="cc-project-card"
                 onClick={() => handleProjectClick(project.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 16px',
-                  background: 'var(--cc-surface)',
-                  border: '1px solid var(--cc-border)',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  width: '100%',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--cc-surface-secondary)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--cc-surface)'; }}
               >
-                <div style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: 'var(--cc-primary-light)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  fontSize: 20,
-                  lineHeight: 1,
-                }}>
-                  {getProjectIcon(project.id)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 500, color: 'var(--cc-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {project.title}
+                <div className="cc-project-card__header">
+                  <div className="cc-project-card__icon">
+                    {getProjectIcon(project.id)}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--cc-text-tertiary)', marginTop: 2 }}>
-                    {project.description
-                      ? project.description.slice(0, 60) + (project.description.length > 60 ? '...' : '')
-                      : 'No description'}
-                    {project.subtask_count != null && project.subtask_count > 0 && (
-                      <span style={{ marginLeft: 8 }}>
-                        {project.completed_subtask_count ?? 0}/{project.subtask_count} tasks
-                      </span>
+                  <div className="cc-project-card__title-area">
+                    <div className="cc-project-card__title">{project.title}</div>
+                    {project.description && (
+                      <div className="cc-project-card__desc">
+                        {project.description.slice(0, 80)}{project.description.length > 80 ? '...' : ''}
+                      </div>
                     )}
                   </div>
                 </div>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--cc-text-tertiary)" strokeWidth="1.5" style={{ flexShrink: 0 }}>
+
+                <div className="cc-project-card__meta">
+                  {totalCount > 0 && (
+                    <span className="cc-project-card__tasks">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M13 5l-7 7L3 8.5" />
+                      </svg>
+                      {meta?.openCount ?? 0}/{totalCount} tasks
+                    </span>
+                  )}
+                  {meta?.nextDue && (
+                    <Badge variant="due" dueDate={meta.nextDue} />
+                  )}
+                  {sync.variant !== 'none' && (
+                    <span className={`cc-project-card__sync cc-project-card__sync--${sync.variant}`}>
+                      {sync.variant === 'synced' && (
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M13.5 5l-7 7L3 8.5" />
+                        </svg>
+                      )}
+                      {sync.variant === 'linked' && (
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 13V3a1 1 0 011-1h4l2 2h4a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1z" />
+                        </svg>
+                      )}
+                      {sync.label}
+                    </span>
+                  )}
+                </div>
+
+                {totalCount > 0 && (
+                  <div className="cc-project-card__progress-track">
+                    <div
+                      className="cc-project-card__progress-bar"
+                      style={{ width: `${totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}%` }}
+                    />
+                  </div>
+                )}
+
+                <svg className="cc-project-card__chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--cc-text-tertiary)" strokeWidth="1.5">
                   <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Quick Chats Section */}
+      {/* Quick Conversations Section */}
       {!loading && projects.length === 0 && quickChats.length === 0 ? (
         <EmptyState icon={<ChatBubbleIcon size={20} />} message={isMobile ? 'No projects yet.' : 'No projects or conversations yet. Create a root-level todo to start a project!'} />
       ) : quickChats.length > 0 ? (
-        <div>
+        <div className="cc-quick-chats">
           <button
             type="button"
+            className="cc-quick-chats__toggle"
             onClick={() => setQuickChatsOpen(!quickChatsOpen)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: 'var(--cc-text-secondary)',
-              marginBottom: 8,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-            }}
           >
             <svg
               width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"
@@ -170,10 +202,10 @@ export default function ChatListPage() {
             >
               <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Quick Chats ({quickChats.length})
+            Quick conversations ({quickChats.length})
           </button>
           {quickChatsOpen && (
-            <div style={{ height: isMobile ? 'calc(100vh - 340px)' : 'calc(100vh - 360px)', overflowY: 'auto' }}>
+            <div className="cc-quick-chats__list" style={{ height: isMobile ? 'calc(100vh - 340px)' : 'calc(100vh - 360px)', overflowY: 'auto' }}>
               {quickChats.map((convo) => (
                 <ConversationItem
                   key={convo.id}

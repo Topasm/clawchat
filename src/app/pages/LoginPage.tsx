@@ -58,10 +58,44 @@ export default function LoginPage() {
     setShowScanner(false);
     try {
       const parsed = JSON.parse(data);
-      if (parsed.serverUrl && parsed.pin) {
+      if (parsed.type === 'clawchat_pair' && parsed.server_url && parsed.code) {
+        // Unified pairing flow: claim the pairing code for a device token
+        const pairUrl = parsed.server_url.replace(/\/+$/, '');
+        setServerUrl(pairUrl);
+        setLoading(true);
+        setError('');
+        try {
+          const res = await fetch(`${pairUrl}/api/pairing/claim`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: parsed.code,
+              device_name: navigator.userAgent.includes('iPhone') ? 'iPhone' : 'Mobile Device',
+              device_type: navigator.userAgent.includes('iPhone') ? 'ios' : 'android',
+            }),
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData?.detail || 'Pairing failed');
+          }
+          const result = await res.json();
+          // Store device token as access token and set server URL
+          useAuthStore.setState({
+            token: result.device_token,
+            refreshToken: null,
+            serverUrl: result.api_base_url || pairUrl,
+            isLoading: false,
+          });
+          navigate('/today');
+        } catch (err) {
+          setError((err as Error).message);
+        } finally {
+          setLoading(false);
+        }
+      } else if (parsed.serverUrl && parsed.pin) {
+        // Legacy PIN-based QR
         setServerUrl(parsed.serverUrl);
         setPin(parsed.pin);
-        // Auto-login
         setLoading(true);
         setError('');
         try {

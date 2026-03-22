@@ -21,6 +21,7 @@ from schemas.task import DelegateRequest, PlanApplyResponse, PlanResponse
 from schemas.todo import ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
 from services import inbox_pipeline_service
 from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
+from utils.inbox_display import get_next_action
 from config import settings
 from services.obsidian_export_service import export_todo, remove_todo_from_vault
 
@@ -32,6 +33,69 @@ _ORDER_COLUMNS = {
     "sort_order": Todo.sort_order,
     "priority": Todo.priority,
 }
+
+# -- Assignee display labels ---------------------------------------------------
+
+_ASSIGNEE_LABELS = {
+    "planner": "Planner",
+    "researcher": "Researcher",
+    "executor": "Executor",
+}
+
+
+def _humanize_folder_name(source_id: str | None) -> str | None:
+    """Derive a human-readable project label from source_id (folder name)."""
+    if not source_id:
+        return None
+    return source_id.replace("_", " ").replace("-", " ").strip().title()
+
+
+def _compute_sync_status(source: str | None) -> str | None:
+    """Derive Obsidian sync status from source field."""
+    if source == "obsidian_project":
+        return "synced"
+    if source and source.startswith("obsidian"):
+        return "linked"
+    return None
+
+
+async def _enrich_todo_response(
+    todo: Todo, db: AsyncSession, *, include_plan_summary: bool = True
+) -> TodoResponse:
+    """Build a TodoResponse with computed display fields."""
+    resp = TodoResponse.model_validate(todo)
+    if todo.tags:
+        resp.tags = deserialize_tags(todo.tags)
+
+    # next_action
+    resp.next_action = get_next_action(
+        todo.inbox_state or "none", todo.status or "pending"
+    )
+
+    # sync_status
+    resp.sync_status = _compute_sync_status(todo.source)
+
+    # project_label
+    resp.project_label = _humanize_folder_name(todo.source_id)
+
+    # plan_summary — only fetch when inbox_state is plan_ready
+    if include_plan_summary and todo.inbox_state == "plan_ready":
+        plan_q = (
+            sa_select(AgentTask)
+            .where(
+                AgentTask.todo_id == todo.id,
+                AgentTask.task_type == "plan_todo",
+                AgentTask.status == "completed",
+            )
+            .order_by(AgentTask.created_at.desc())
+            .limit(1)
+        )
+        plan_task = (await db.execute(plan_q)).scalar()
+        if plan_task and plan_task.payload_json:
+            payload = json.loads(plan_task.payload_json)
+            resp.plan_summary = payload.get("summary")
+
+    return resp
 
 
 @router.get("/projects", response_model=list[ProjectTodoResponse])
@@ -135,9 +199,7 @@ async def list_todos(
 
     items = []
     for row in rows:
-        resp = TodoResponse.model_validate(row)
-        if row.tags:
-            resp.tags = deserialize_tags(row.tags)
+        resp = await _enrich_todo_response(row, db, include_plan_summary=False)
         items.append(resp)
 
     return PaginatedResponse(items=items, total=total, page=page, limit=limit)
@@ -239,10 +301,7 @@ async def create_todo(
                 project_name = parent.title
         export_todo(settings.obsidian_vault_path, todo, project_name)
 
-    resp = TodoResponse.model_validate(todo)
-    if todo.tags:
-        resp.tags = deserialize_tags(todo.tags)
-    return resp
+    return await _enrich_todo_response(todo, db)
 
 
 @router.get("/{todo_id}", response_model=TodoResponse)
@@ -254,10 +313,7 @@ async def get_todo(
     todo = await db.get(Todo, todo_id)
     if not todo:
         raise NotFoundError("Todo not found")
-    resp = TodoResponse.model_validate(todo)
-    if todo.tags:
-        resp.tags = deserialize_tags(todo.tags)
-    return resp
+    return await _enrich_todo_response(todo, db)
 
 
 @router.patch("/{todo_id}", response_model=TodoResponse)
@@ -291,10 +347,7 @@ async def update_todo(
                 project_name = parent.title
         export_todo(settings.obsidian_vault_path, todo, project_name)
 
-    resp = TodoResponse.model_validate(todo)
-    if todo.tags:
-        resp.tags = deserialize_tags(todo.tags)
-    return resp
+    return await _enrich_todo_response(todo, db)
 
 
 @router.delete("/{todo_id}", status_code=204)
@@ -357,15 +410,44 @@ async def get_latest_plan(
         raise NotFoundError("No plan found")
 
     payload = json.loads(task.payload_json) if task.payload_json else {}
+    subtask_list = payload.get("subtasks", [])
+
+    # Compute suggested_due_summary from subtask due dates
+    due_dates: list[str] = []
+    for st in subtask_list:
+        dd = st.get("due_date")
+        if dd:
+            due_dates.append(dd)
+    suggested_due_summary = None
+    if due_dates:
+        sorted_dates = sorted(due_dates)
+        if sorted_dates[0] == sorted_dates[-1]:
+            suggested_due_summary = sorted_dates[0]
+        else:
+            suggested_due_summary = f"{sorted_dates[0]} \u2013 {sorted_dates[-1]}"
+
+    assignee_raw = payload.get("suggested_assignee")
+    suggested_assignee_label = _ASSIGNEE_LABELS.get(
+        assignee_raw, assignee_raw.title() if assignee_raw else None
+    )
+
+    suggested_project_label = _humanize_folder_name(
+        payload.get("suggested_project_title")
+    )
+
     return PlanResponse(
         task_id=task.id,
         todo_id=todo_id,
         summary=payload.get("summary", ""),
         suggested_root_due_date=payload.get("suggested_root_due_date"),
-        suggested_assignee=payload.get("suggested_assignee"),
+        suggested_assignee=assignee_raw,
         suggested_project_title=payload.get("suggested_project_title"),
-        subtasks=payload.get("subtasks", []),
+        subtasks=subtask_list,
         created_at=task.created_at,
+        subtask_count=len(subtask_list),
+        suggested_due_summary=suggested_due_summary,
+        suggested_assignee_label=suggested_assignee_label,
+        suggested_project_label=suggested_project_label,
     )
 
 

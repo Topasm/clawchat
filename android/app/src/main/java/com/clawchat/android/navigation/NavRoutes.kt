@@ -8,6 +8,7 @@ sealed class NavRoute(val route: String) {
     data object ChatDetail : NavRoute("chat/{conversationId}") {
         fun create(conversationId: String) = "chat/$conversationId"
     }
+    data object Inbox : NavRoute("inbox")
     data object Tasks : NavRoute("tasks")
     data object TaskDetail : NavRoute("tasks/{taskId}") {
         fun create(taskId: String) = "tasks/$taskId"

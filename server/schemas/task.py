@@ -63,6 +63,12 @@ class PlanResponse(BaseModel):
     subtasks: list[PlanSubtask] = []
     created_at: datetime
 
+    # Computed display fields
+    subtask_count: int = 0
+    suggested_due_summary: str | None = None
+    suggested_assignee_label: str | None = None
+    suggested_project_label: str | None = None
+
 
 class PlanApplyResponse(BaseModel):
     """Result of applying a plan to a todo."""
