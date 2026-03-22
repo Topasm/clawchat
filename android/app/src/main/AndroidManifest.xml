@@ -27,6 +27,32 @@
             </intent-filter>
         </activity>
 
+        <!-- Widget: Todo Tracking -->
+        <receiver
+            android:name="com.clawchat.android.widget.tracking.TodoTrackingWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_todo_tracking_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/todo_tracking_widget_info" />
+        </receiver>
+
+        <!-- Widget: Inbox Quick Add -->
+        <receiver
+            android:name="com.clawchat.android.widget.quickadd.InboxQuickAddWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_inbox_quick_add_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/inbox_quick_add_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>
