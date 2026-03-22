@@ -26,6 +26,7 @@ class WSClient {
   private livenessTimer: ReturnType<typeof setInterval> | null = null;
   private lastMessageTime: number = 0;
   onDisconnect: (() => void) | null = null;
+  onAuthFailure: (() => void) | null = null;
 
   onStatusChange(callback: StatusChangeHandler): () => void {
     this.statusListeners.add(callback);
@@ -105,10 +106,20 @@ class WSClient {
         }
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
         this._stopKeepalive();
         this._stopLivenessCheck();
         this.ws = null;
+
+        // Server rejected auth (code 4001) — stop reconnecting and notify
+        if (event.code === 4001) {
+          this.shouldReconnect = false;
+          this.stopWatchdog();
+          this._emitStatus('disconnected');
+          this.onAuthFailure?.();
+          return;
+        }
+
         this.onDisconnect?.();
         if (this.shouldReconnect) {
           this._scheduleReconnect();

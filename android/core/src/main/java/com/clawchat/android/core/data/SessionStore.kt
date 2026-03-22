@@ -26,6 +26,7 @@ class SessionStore @Inject constructor(
         private val KEY_HOST_NAME = stringPreferencesKey("host_name")
         private val KEY_AUTH_MODE = stringPreferencesKey("auth_mode") // "paired" | "manual"
         private val KEY_ONBOARDING_SKIPPED = booleanPreferencesKey("onboarding_skipped")
+        private val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
     }
 
     val token: Flow<String?> = dataStore.data.map { it[KEY_TOKEN] }
@@ -35,6 +36,7 @@ class SessionStore @Inject constructor(
     val authMode: Flow<String?> = dataStore.data.map { it[KEY_AUTH_MODE] }
     val isLoggedIn: Flow<Boolean> = dataStore.data.map { it[KEY_TOKEN] != null }
     val onboardingSkipped: Flow<Boolean> = dataStore.data.map { it[KEY_ONBOARDING_SKIPPED] == true }
+    val accentColor: Flow<String> = dataStore.data.map { it[KEY_ACCENT_COLOR] ?: "system" }
 
     /** Save session after successful pairing. */
     suspend fun savePairedSession(
@@ -71,8 +73,20 @@ class SessionStore @Inject constructor(
         }
     }
 
-    /** Clear all session data (logout). */
+    /** Set accent color preference. */
+    suspend fun setAccentColor(key: String) {
+        dataStore.edit { prefs -> prefs[KEY_ACCENT_COLOR] = key }
+    }
+
+    /** Clear session data (logout). Preserves user preferences like accent color. */
     suspend fun clearSession() {
-        dataStore.edit { it.clear() }
+        dataStore.edit { prefs ->
+            prefs.remove(KEY_TOKEN)
+            prefs.remove(KEY_API_BASE_URL)
+            prefs.remove(KEY_DEVICE_ID)
+            prefs.remove(KEY_HOST_NAME)
+            prefs.remove(KEY_AUTH_MODE)
+            prefs.remove(KEY_ONBOARDING_SKIPPED)
+        }
     }
 }

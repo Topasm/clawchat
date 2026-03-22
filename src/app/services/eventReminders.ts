@@ -114,12 +114,14 @@ async function scheduleViaLocalNotifications(toSchedule: ScheduleEntry[]): Promi
     return;
   }
 
+  const soundEnabled = useSettingsStore.getState().reminderSound;
   const notifications = toSchedule.map(({ event, fireAt, reminderMinutes }) => ({
     id: eventIdToNotificationId(event.id),
     title: event.title,
     body: `Starting in ${reminderMinutes} minute${reminderMinutes === 1 ? '' : 's'}`,
     schedule: { at: new Date(fireAt) },
     smallIcon: 'ic_stat_clawchat',
+    sound: soundEnabled ? undefined : '', // empty string = silent
     extra: { eventId: event.id },
   }));
 

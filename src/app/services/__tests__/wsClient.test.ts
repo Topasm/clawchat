@@ -12,7 +12,7 @@ class MockWebSocket {
 
   readyState = MockWebSocket.CONNECTING;
   onopen: (() => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: { code: number; reason: string }) => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
 
@@ -24,9 +24,9 @@ class MockWebSocket {
     }, 0);
   }
 
-  close() {
+  close(code = 1000, reason = '') {
     this.readyState = MockWebSocket.CLOSED;
-    setTimeout(() => this.onclose?.(), 0);
+    setTimeout(() => this.onclose?.({ code, reason }), 0);
   }
 
   send(_data: string) {}
@@ -136,7 +136,7 @@ describe('wsClient', () => {
 
     // Simulate unexpected close (shouldReconnect is still true)
     const ws = (wsClient as any).ws as MockWebSocket;
-    ws.onclose?.();
+    ws.onclose?.({ code: 1006, reason: '' });
 
     expect(statusCb).toHaveBeenCalledWith('reconnecting');
   });

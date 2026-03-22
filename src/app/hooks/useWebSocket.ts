@@ -6,6 +6,9 @@ import { useChatStore, clearPendingRunTimeout, type ChatMessage } from '../store
 import { useToastStore } from '../stores/useToastStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { notify } from '../services/platform';
+import { playReminderSound } from '../services/reminderSound';
+import { IS_ELECTRON } from '../types/platform';
+import apiClient from '../services/apiClient';
 import { queryKeys } from './queries';
 import type { ConversationResponse } from '../types/api';
 
@@ -27,6 +30,12 @@ export default function useWebSocket(): void {
     const unsubStatus = wsClient.onStatusChange((status) => {
       useAuthStore.getState().setConnectionStatus(status);
     });
+
+    // Auth failure (server rejected token) — log out immediately
+    wsClient.onAuthFailure = () => {
+      useToastStore.getState().addToast('error', 'Session expired. Please log in again.');
+      useAuthStore.getState().logout();
+    };
 
     // Fail pending streaming state on disconnect so the UI doesn't get stuck
     wsClient.onDisconnect = () => {
@@ -52,11 +61,17 @@ export default function useWebSocket(): void {
     };
 
     const handleReminder = (data: unknown) => {
-      const d = data as { title?: string; message?: string };
+      const d = data as { title?: string; message?: string; item_type?: 'todo' | 'event'; item_id?: string };
       const message = d.message ?? `Reminder: ${d.title ?? 'Upcoming event'}`;
       useToastStore.getState().addToast('warning', message, { duration: 10000 });
-      if (useSettingsStore.getState().notificationsEnabled) {
-        void notify('Reminder', message);
+      const settings = useSettingsStore.getState();
+      if (settings.notificationsEnabled) {
+        if (settings.reminderSound) playReminderSound();
+        void notify('Reminder', message, {
+          silent: !settings.reminderSound,
+          itemType: d.item_type,
+          itemId: d.item_id,
+        });
       }
     };
 
@@ -163,6 +178,30 @@ export default function useWebSocket(): void {
       }
     };
 
+    // Electron: handle "Mark Done" action from desktop notification
+    let unsubNotifAction: (() => void) | undefined;
+    let unsubNotifNav: (() => void) | undefined;
+    if (IS_ELECTRON && window.electronAPI?.on) {
+      unsubNotifAction = window.electronAPI.on('notification:action', async (...args: unknown[]) => {
+        const d = args[0] as { action?: string; itemType?: string; itemId?: string };
+        if (d.action === 'mark_done' && d.itemId) {
+          try {
+            if (d.itemType === 'todo') {
+              await apiClient.patch(`/todos/${d.itemId}`, { status: 'completed' });
+              queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+              queryClient.invalidateQueries({ queryKey: queryKeys.today });
+            }
+          } catch {
+            // Best-effort
+          }
+        }
+      });
+      unsubNotifNav = window.electronAPI.on('navigate', (...args: unknown[]) => {
+        const route = args[0] as string;
+        if (route) window.dispatchEvent(new CustomEvent('navigate', { detail: route }));
+      });
+    }
+
     // Server liveness signals — wsClient already tracked lastMessageTime; ignore here
     const handleLivenessNoop = () => {};
     wsClient.on('tick', handleLivenessNoop);
@@ -182,6 +221,8 @@ export default function useWebSocket(): void {
     wsClient.on('conversation_updated', handleConversationUpdated);
 
     return () => {
+      unsubNotifAction?.();
+      unsubNotifNav?.();
       unsubStatus();
       wsClient.off('tick', handleLivenessNoop);
       wsClient.off('heartbeat', handleLivenessNoop);
@@ -197,6 +238,7 @@ export default function useWebSocket(): void {
       wsClient.off('stream_error', handleStreamError);
       wsClient.off('stream_aborted', handleStreamAborted);
       wsClient.off('conversation_updated', handleConversationUpdated);
+      wsClient.onAuthFailure = null;
       wsClient.onDisconnect = null;
       wsClient.disconnect();
     };

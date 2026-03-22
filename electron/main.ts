@@ -98,12 +98,45 @@ ipcMain.handle('obsidian:open-vault', async () => {
   }
 });
 
+// ── IPC handler for app icon badge ────────────────────────────────────
+ipcMain.on('badge:set', (_event, count: number) => {
+  app.setBadgeCount(count);
+});
+
 // ── IPC handler for desktop notifications ────────────────────────────
-ipcMain.on('notification:show', (_event, title: string, body: string) => {
-  const notification = new Notification({ title, body, silent: false });
+ipcMain.on('notification:show', (
+  _event,
+  title: string,
+  body: string,
+  options?: { silent?: boolean; itemType?: string; itemId?: string },
+) => {
+  const notification = new Notification({
+    title,
+    body,
+    silent: options?.silent ?? false,
+    // Electron supports actions on macOS
+    ...(options?.itemId && process.platform === 'darwin' ? {
+      actions: [{ type: 'button' as const, text: 'Mark Done' }],
+      hasReply: false,
+    } : {}),
+  });
+  notification.on('action', (_actionEvent, actionIndex) => {
+    if (actionIndex === 0 && options?.itemId) {
+      // "Mark Done" action — send to renderer to handle API call
+      mainWindow?.webContents.send('notification:action', {
+        action: 'mark_done',
+        itemType: options.itemType,
+        itemId: options.itemId,
+      });
+    }
+  });
   notification.on('click', () => {
     mainWindow?.show();
     mainWindow?.focus();
+    if (options?.itemId && options?.itemType) {
+      const route = options.itemType === 'todo' ? `/tasks/${options.itemId}` : `/events/${options.itemId}`;
+      mainWindow?.webContents.send('navigate', route);
+    }
   });
   notification.show();
 });

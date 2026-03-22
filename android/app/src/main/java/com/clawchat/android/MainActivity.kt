@@ -24,8 +24,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
             val onboardingSkipped by sessionStore.onboardingSkipped.collectAsState(initial = false)
+            val accentColor by sessionStore.accentColor.collectAsState(initial = "system")
 
-            ClawChatTheme {
+            ClawChatTheme(accentColorKey = accentColor) {
                 ClawChatNavGraph(isLoggedIn = isLoggedIn, onboardingSkipped = onboardingSkipped)
             }
         }

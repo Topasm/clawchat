@@ -1,35 +1,49 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { IS_ELECTRON } from '../types/platform';
 
 /**
  * Auto-login on Electron by reading server config from the main process.
- * Always runs on Electron when there's no valid token — clears stale auth and logs in fresh.
+ * Listens for server status events and retries login when the server becomes ready.
  */
 export function useAutoLogin() {
   const token = useAuthStore((s) => s.token);
   const isLoading = useAuthStore((s) => s.isLoading);
   const login = useAuthStore((s) => s.login);
-  const attempted = useRef(false);
+  const loginInFlight = useRef(false);
+
+  const tryLogin = useCallback(async () => {
+    // Skip if already logged in or a login attempt is in progress
+    if (useAuthStore.getState().token || loginInFlight.current) return;
+
+    loginInFlight.current = true;
+    try {
+      // Clear any stale auth state before fresh login
+      useAuthStore.setState({ serverUrl: null, token: null, refreshToken: null });
+
+      const config = await window.electronAPI.server.getConfig();
+      const url = `http://localhost:${config.port}`;
+      await login(url, config.pin);
+    } catch (err) {
+      console.error('Auto-login failed:', err);
+    } finally {
+      loginInFlight.current = false;
+    }
+  }, [login]);
 
   useEffect(() => {
-    if (!IS_ELECTRON || isLoading || token || attempted.current) return;
+    if (!IS_ELECTRON || isLoading || token) return;
 
-    attempted.current = true;
+    // Try immediately — server may already be running
+    tryLogin();
 
-    (async () => {
-      try {
-        // Clear any stale auth state before fresh login
-        useAuthStore.setState({ serverUrl: null, token: null, refreshToken: null });
-
-        const config = await window.electronAPI.server.getConfig();
-        const url = `http://localhost:${config.port}`;
-        await login(url, config.pin);
-      } catch (err) {
-        console.error('Auto-login failed:', err);
-        // Reset so user sees login page instead of stuck splash
-        useAuthStore.setState({ serverUrl: null });
+    // Also listen for server becoming ready (in case server wasn't up yet)
+    const cleanup = window.electronAPI.server.onStatusChange((status) => {
+      if (status.state === 'running' && !useAuthStore.getState().token) {
+        tryLogin();
       }
-    })();
-  }, [isLoading, token, login]);
+    });
+
+    return cleanup;
+  }, [isLoading, token, tryLogin]);
 }

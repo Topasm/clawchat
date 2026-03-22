@@ -3,6 +3,7 @@ import { syncWidgetData } from './widgetSync';
 import { scheduleEventReminders } from './eventReminders';
 import { useModuleStore } from '../stores/useModuleStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import apiClient from './apiClient';
 
 function getTodayEvents() {
   const { events } = useModuleStore.getState();
@@ -30,11 +31,53 @@ export async function initCapacitor(): Promise<void> {
     await LocalNotifications.requestPermissions();
   }
 
-  // Navigate to event detail when notification is tapped
-  LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-    const eventId = action.notification?.extra?.eventId;
+  // Register action types for "Mark Done" button on reminder notifications
+  await LocalNotifications.registerActionTypes({
+    types: [
+      {
+        id: 'REMINDER_ACTIONS',
+        actions: [
+          {
+            id: 'mark_done',
+            title: 'Mark Done',
+          },
+          {
+            id: 'open',
+            title: 'Open',
+          },
+        ],
+      },
+    ],
+  });
+
+  // Handle notification actions (tap or "Mark Done" button)
+  LocalNotifications.addListener('localNotificationActionPerformed', async (action) => {
+    const extra = action.notification?.extra;
+    const actionId = action.actionId;
+
+    // Handle "Mark Done" action from reminder notification
+    if (actionId === 'mark_done' && extra?.itemId) {
+      try {
+        if (extra.itemType === 'todo') {
+          await apiClient.patch(`/todos/${extra.itemId}`, { status: 'completed' });
+        }
+        // Trigger data refresh
+        window.dispatchEvent(new CustomEvent('app:resume'));
+      } catch {
+        // Best-effort — user can open the app to complete the action
+      }
+      return;
+    }
+
+    // Default tap action: navigate to the item
+    const eventId = extra?.eventId;
+    const itemId = extra?.itemId;
+    const itemType = extra?.itemType;
     if (eventId) {
       window.dispatchEvent(new CustomEvent('navigate', { detail: `/events/${eventId}` }));
+    } else if (itemId && itemType) {
+      const route = itemType === 'todo' ? `/tasks/${itemId}` : `/events/${itemId}`;
+      window.dispatchEvent(new CustomEvent('navigate', { detail: route }));
     }
   });
 

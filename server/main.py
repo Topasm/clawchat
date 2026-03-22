@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -53,29 +54,27 @@ async def lifespan(app: FastAPI):
 
     app.state.session_factory = async_session_factory
 
-    # Check AI connectivity
-    app.state.ai_connected = await ai_service.health_check()
+    # Run slow startup checks concurrently instead of sequentially
+    async def _check_ai() -> bool:
+        return await ai_service.health_check()
 
-    # Initialize Claude Code provider
-    claude_code = ClaudeCodeProvider()
-    app.state.claude_code = claude_code
-    claude_code_status, claude_code_version = await claude_code.check_availability()
-    app.state.claude_code_status = claude_code_status.value
-    app.state.claude_code_version = claude_code_version
-    logger.info(f"Claude Code status: {claude_code_status.value}, version: {claude_code_version}")
+    async def _check_claude_code():
+        cc = ClaudeCodeProvider()
+        status, version = await cc.check_availability()
+        return cc, status, version
 
-    # Initialize vault services if configured
-    if settings.obsidian_vault_path:
+    async def _init_vault():
+        if not settings.obsidian_vault_path:
+            return
         try:
             from services.obsidian_cli_service import load_queue
             load_queue()
             logger.info("Obsidian CLI write queue loaded")
         except Exception:
             logger.debug("Could not load Obsidian CLI write queue")
-
         try:
             from services.obsidian_vault_indexer import refresh_index
-            idx = refresh_index()
+            idx = await asyncio.to_thread(refresh_index)
             logger.info(
                 "Obsidian vault index: %d projects (CLI=%s, companion=%s)",
                 len(idx.projects),
@@ -84,6 +83,16 @@ async def lifespan(app: FastAPI):
             )
         except Exception:
             logger.debug("Could not build initial vault index")
+
+    ai_connected, (claude_code, claude_code_status, claude_code_version), _ = (
+        await asyncio.gather(_check_ai(), _check_claude_code(), _init_vault())
+    )
+
+    app.state.ai_connected = ai_connected
+    app.state.claude_code = claude_code
+    app.state.claude_code_status = claude_code_status.value
+    app.state.claude_code_version = claude_code_version
+    logger.info(f"Claude Code status: {claude_code_status.value}, version: {claude_code_version}")
 
     # Start background scheduler if enabled
     if settings.enable_scheduler:

@@ -7,7 +7,13 @@ import * as http from 'http';
 const SERVER_PORT = 8000;
 const HEALTH_URL = `http://127.0.0.1:${SERVER_PORT}/api/health`;
 const MAX_HEALTH_RETRIES = 30;
-const HEALTH_RETRY_INTERVAL_MS = 500;
+// Progressive intervals: fast at first, then back off
+// First 5 attempts at 150ms, next 5 at 300ms, rest at 500ms
+function getRetryInterval(attempt: number): number {
+  if (attempt <= 5) return 150;
+  if (attempt <= 10) return 300;
+  return 500;
+}
 
 // ── Status types ─────────────────────────────────────────────────────
 
@@ -148,7 +154,7 @@ function waitForHealth(): Promise<boolean> {
         if (res.statusCode === 200) {
           resolve(true);
         } else if (attempts < MAX_HEALTH_RETRIES) {
-          setTimeout(check, HEALTH_RETRY_INTERVAL_MS);
+          setTimeout(check, getRetryInterval(attempts));
         } else {
           resolve(false);
         }
@@ -156,7 +162,7 @@ function waitForHealth(): Promise<boolean> {
 
       req.on('error', () => {
         if (attempts < MAX_HEALTH_RETRIES) {
-          setTimeout(check, HEALTH_RETRY_INTERVAL_MS);
+          setTimeout(check, getRetryInterval(attempts));
         } else {
           resolve(false);
         }

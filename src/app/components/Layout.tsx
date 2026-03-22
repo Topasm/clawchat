@@ -20,6 +20,7 @@ import QuickCaptureModal from './shared/QuickCaptureModal';
 import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
+import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
@@ -169,8 +170,10 @@ export default function Layout() {
   const inboxCount = useModuleStore((s) =>
     (s.todos ?? []).filter((t) => !t.due_date && t.status !== 'completed').length,
   );
-  // Badge removed: conversations.length is total count, not unread count.
-  // There is no unread tracking in the data model, so showing a badge is misleading.
+  // Sync inbox count to native app icon badge
+  useEffect(() => {
+    void setAppBadge(inboxCount);
+  }, [inboxCount]);
 
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
@@ -325,6 +328,13 @@ export default function Layout() {
 
       {isMobile ? (
         <>
+          {connectionStatus !== 'connected' && (
+            <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
+              <span className="cc-mobile-status-bar__dot" />
+              <span>{isFlushing ? 'Syncing...' : CONNECTION_LABELS[connectionStatus]}</span>
+              {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
+            </div>
+          )}
           <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{mainContent}</div>
           <FloatingActionButton />
           <BottomNav />

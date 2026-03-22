@@ -1,4 +1,5 @@
 import type { StreamEventMeta } from '../types/api';
+import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from './logger';
 
 const SSE_TIMEOUT_MS = 60_000;
@@ -74,7 +75,10 @@ export function connectSSE(
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('Unauthorized');
+          logger.warn('SSE received 401, logging out');
+          useAuthStore.getState().logout();
+          onError?.(new Error('Session expired'));
+          return;
         }
         const errorText = await response.text().catch(() => 'Unknown error');
         throw new Error(`HTTP ${response.status}: ${errorText}`);

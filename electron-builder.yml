@@ -21,6 +21,10 @@ win:
 mac:
   target:
     - dmg
+  category: public.app-category.productivity
+  identity: null
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 linux:
   target:
     - AppImage

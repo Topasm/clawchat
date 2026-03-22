@@ -134,6 +134,44 @@
   }
 }
 
+/* --- Mobile connection status bar ----------------------------- */
+.cc-mobile-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.cc-mobile-status-bar__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cc-mobile-status-bar--disconnected {
+  background: var(--cc-error);
+  color: #fff;
+}
+
+.cc-mobile-status-bar--disconnected .cc-mobile-status-bar__dot {
+  background: #fff;
+}
+
+.cc-mobile-status-bar--reconnecting {
+  background: var(--cc-warning);
+  color: #fff;
+}
+
+.cc-mobile-status-bar--reconnecting .cc-mobile-status-bar__dot {
+  background: #fff;
+  animation: cc-pulse 1.5s ease-in-out infinite;
+}
+
 /* Disable hover effects on touch devices */
 @media (hover: none) {
   .cc-card:hover {

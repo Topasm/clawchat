@@ -38,10 +38,10 @@ export default function OnboardingPage() {
     if (!IS_ELECTRON) return;
     try {
       const status = await window.electronAPI.server.getStatus();
-      setElectronServerStatus(status);
-      if (status === 'running') {
+      setElectronServerStatus(status.state);
+      if (status.state === 'running') {
         setServerStatus('online');
-      } else if (status === 'starting') {
+      } else if (status.state === 'starting') {
         setServerStatus('checking');
       } else {
         setServerStatus('offline');
@@ -77,11 +77,11 @@ export default function OnboardingPage() {
     if (IS_ELECTRON) {
       checkElectronServer();
       // Listen for status changes
-      const unsub = window.electronAPI.server.onStatusChange((status: string) => {
-        setElectronServerStatus(status);
-        if (status === 'running') {
+      const unsub = window.electronAPI.server.onStatusChange((status) => {
+        setElectronServerStatus(status.state);
+        if (status.state === 'running') {
           setServerStatus('online');
-        } else if (status === 'starting') {
+        } else if (status.state === 'starting') {
           setServerStatus('checking');
         } else {
           setServerStatus('offline');

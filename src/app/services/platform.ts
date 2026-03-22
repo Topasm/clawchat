@@ -1,14 +1,27 @@
 import { IS_CAPACITOR, IS_ELECTRON } from '../types/platform';
 
+export interface NotifyOptions {
+  /** Silent notification (no sound). Defaults to false. */
+  silent?: boolean;
+  /** Item type for action buttons (todo or event). */
+  itemType?: 'todo' | 'event';
+  /** Item ID for action buttons — enables "Mark Done" action. */
+  itemId?: string;
+}
+
 /**
- * Cross-platform desktop notification.
+ * Cross-platform desktop notification with optional action buttons.
  * - Electron: uses native Notification via IPC
- * - Capacitor: uses LocalNotifications plugin
+ * - Capacitor: uses LocalNotifications plugin with actionTypeId
  * - Web: uses the browser Notification API
+ *
+ * When itemType + itemId are provided, a "Mark Done" action button is shown.
  */
-export async function notify(title: string, body: string): Promise<void> {
+export async function notify(title: string, body: string, options: NotifyOptions = {}): Promise<void> {
+  const { silent = false, itemType, itemId } = options;
+
   if (IS_ELECTRON) {
-    window.electronAPI?.showNotification(title, body);
+    window.electronAPI?.showNotification(title, body, { silent, itemType, itemId });
   } else if (IS_CAPACITOR) {
     const { LocalNotifications } = await import('@capacitor/local-notifications');
     const perm = await LocalNotifications.checkPermissions();
@@ -17,18 +30,43 @@ export async function notify(title: string, body: string): Promise<void> {
       notifications: [{
         title,
         body,
-        id: Date.now(),
+        id: Date.now() % 100000,
         schedule: { at: new Date(Date.now() + 100) },
         smallIcon: 'ic_stat_clawchat',
+        ...(itemId ? {
+          actionTypeId: 'REMINDER_ACTIONS',
+          extra: { itemType, itemId },
+        } : {}),
       }],
     });
   } else if (typeof Notification !== 'undefined') {
     if (Notification.permission === 'granted') {
-      new Notification(title, { body });
+      showWebNotification(title, body, { silent, itemType, itemId });
     } else if (Notification.permission !== 'denied') {
       const perm = await Notification.requestPermission();
-      if (perm === 'granted') new Notification(title, { body });
+      if (perm === 'granted') showWebNotification(title, body, { silent, itemType, itemId });
     }
+  }
+}
+
+function showWebNotification(
+  title: string,
+  body: string,
+  opts: { silent?: boolean; itemType?: string; itemId?: string },
+) {
+  const n = new Notification(title, {
+    body,
+    silent: opts.silent,
+    tag: opts.itemId ? `${opts.itemType}-${opts.itemId}` : undefined,
+  });
+  // Web Notification API doesn't support action buttons in most browsers,
+  // but we can navigate on click
+  if (opts.itemId && opts.itemType) {
+    n.onclick = () => {
+      window.focus();
+      const route = opts.itemType === 'todo' ? `/tasks/${opts.itemId}` : `/events/${opts.itemId}`;
+      window.dispatchEvent(new CustomEvent('navigate', { detail: route }));
+    };
   }
 }
 

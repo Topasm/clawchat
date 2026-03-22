@@ -22,6 +22,7 @@ data class SettingsUiState(
     val devices: List<PairedDevice> = emptyList(),
     val hostName: String = "",
     val authMode: String = "",
+    val accentColor: String = "system",
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -46,7 +47,8 @@ class SettingsViewModel @Inject constructor(
 
             val hostName = sessionStore.hostName.first() ?: ""
             val authMode = sessionStore.authMode.first() ?: ""
-            _uiState.update { it.copy(hostName = hostName, authMode = authMode) }
+            val accentColor = sessionStore.accentColor.first()
+            _uiState.update { it.copy(hostName = hostName, authMode = authMode, accentColor = accentColor) }
 
             when (val result = settingsRepository.health()) {
                 is ApiResult.Success -> _uiState.update { it.copy(health = result.data) }
@@ -73,6 +75,13 @@ class SettingsViewModel @Inject constructor(
                 is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
                 is ApiResult.Loading -> { /* not used here */ }
             }
+        }
+    }
+
+    fun setAccentColor(key: String) {
+        viewModelScope.launch {
+            sessionStore.setAccentColor(key)
+            _uiState.update { it.copy(accentColor = key) }
         }
     }
 

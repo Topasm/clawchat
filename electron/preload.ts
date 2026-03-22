@@ -21,8 +21,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener(channel, listener);
     };
   },
-  showNotification: (title: string, body: string) => {
-    ipcRenderer.send('notification:show', title, body);
+  showNotification: (title: string, body: string, options?: { silent?: boolean; itemType?: string; itemId?: string }) => {
+    ipcRenderer.send('notification:show', title, body, options);
+  },
+  setBadgeCount: (count: number) => {
+    ipcRenderer.send('badge:set', count);
   },
   secureStore: {
     get: (key: string) => ipcRenderer.invoke('secure-store:get', key),

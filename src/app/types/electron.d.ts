@@ -6,14 +6,21 @@ export interface ElectronUpdater {
   onUpdateDownloaded: (cb: () => void) => () => void;
 }
 
+export interface ServerStatus {
+  state: 'starting' | 'running' | 'stopped' | 'error';
+  port: number;
+  pid?: number;
+  error?: string;
+}
+
 export interface ElectronServerAPI {
-  getStatus: () => Promise<string>;
+  getStatus: () => Promise<ServerStatus>;
   getConfig: () => Promise<{ port: number; pin: string; obsidianVaultPath: string }>;
   getNetworkInfo: () => Promise<{ addresses: { ip: string; name: string; networkType?: string }[] }>;
   updateConfig: (updates: Record<string, unknown>) => Promise<void>;
   selectFolder: () => Promise<string | null>;
   openObsidianVault: () => Promise<void>;
-  onStatusChange: (cb: (status: string) => void) => () => void;
+  onStatusChange: (cb: (status: ServerStatus) => void) => () => void;
 }
 
 export interface ElectronAPI {
@@ -21,7 +28,8 @@ export interface ElectronAPI {
   appVersion: string;
   send: (channel: string, ...args: unknown[]) => void;
   on: (channel: string, callback: (...args: unknown[]) => void) => () => void;
-  showNotification: (title: string, body: string) => void;
+  showNotification: (title: string, body: string, options?: { silent?: boolean; itemType?: string; itemId?: string }) => void;
+  setBadgeCount: (count: number) => void;
   updater: ElectronUpdater;
   server: ElectronServerAPI;
 }
