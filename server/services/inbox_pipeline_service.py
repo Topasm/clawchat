@@ -12,12 +12,20 @@ from services.ai_service import AIService
 from services.obsidian_context_service import list_project_folders, resolve_project_folder
 from config import settings
 from utils import make_id, serialize_tags
+from ws.manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
+
+async def _notify_todo_change():
+    await ws_manager.send_json("user", {
+        "type": "module_data_changed",
+        "data": {"module": "todos"},
+    })
 
 
 async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) -> None:
@@ -62,10 +70,12 @@ async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) ->
         if classification.get("needs_planning"):
             todo.inbox_state = "planning"
             await db.commit()
+            await _notify_todo_change()
             await _trigger_planning(db, ai_service, todo)
         else:
             todo.inbox_state = "captured"
             await db.commit()
+            await _notify_todo_change()
 
     except Exception as exc:
         logger.exception("Inbox pipeline failed for todo %s", todo_id)
@@ -212,6 +222,7 @@ async def _trigger_planning(db: AsyncSession, ai_service: AIService, todo: Todo)
 
         todo.inbox_state = "plan_ready"
         await db.commit()
+        await _notify_todo_change()
 
     except Exception as exc:
         logger.exception("Planning failed for todo %s", todo.id)
@@ -222,3 +233,4 @@ async def _trigger_planning(db: AsyncSession, ai_service: AIService, todo: Todo)
         todo.inbox_state = "error"
         todo.automation_error = str(exc)
         await db.commit()
+        await _notify_todo_change()

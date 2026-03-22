@@ -17,6 +17,13 @@ import SegmentedControl from '../components/shared/SegmentedControl';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import { IS_CAPACITOR } from '../types/platform';
 
+interface AIProviderState {
+  active_provider: string;
+  openclaw_connected: boolean;
+  claude_code_status: string;
+  claude_code_version: string | null;
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { mode, setMode } = useTheme();
@@ -29,6 +36,9 @@ export default function SettingsPage() {
   const addToast = useToastStore((s) => s.addToast);
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
+  const [aiProviderSwitching, setAiProviderSwitching] = useState(false);
+  const [claudeCodeChecking, setClaudeCodeChecking] = useState(false);
 
   useEffect(() => {
     if (IS_CAPACITOR) {
@@ -68,6 +78,40 @@ export default function SettingsPage() {
       addToast('success', 'Biometric lock disabled');
     }
   }, [settings, addToast]);
+
+  // Fetch AI provider status on mount
+  useEffect(() => {
+    apiClient.get('/admin/ai/provider').then((res) => {
+      setAiProvider(res.data);
+    }).catch(() => {});
+  }, []);
+
+  const handleSwitchProvider = useCallback(async (provider: string) => {
+    setAiProviderSwitching(true);
+    try {
+      const res = await apiClient.post('/admin/ai/provider', { provider });
+      setAiProvider(res.data);
+      addToast('success', `Switched to ${provider === 'claude_code' ? 'Claude Code' : 'OpenClaw'}`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to switch provider';
+      addToast('error', msg);
+    } finally {
+      setAiProviderSwitching(false);
+    }
+  }, [addToast]);
+
+  const handleRecheckClaudeCode = useCallback(async () => {
+    setClaudeCodeChecking(true);
+    try {
+      const res = await apiClient.post('/admin/ai/claude-code/check');
+      setAiProvider((prev) => prev ? { ...prev, claude_code_status: res.data.status, claude_code_version: res.data.version } : prev);
+      addToast('success', `Claude Code: ${res.data.status}${res.data.version ? ` (${res.data.version})` : ''}`);
+    } catch {
+      addToast('error', 'Failed to check Claude Code status');
+    } finally {
+      setClaudeCodeChecking(false);
+    }
+  }, [addToast]);
 
   useEffect(() => {
     if (isElectron) {
@@ -118,6 +162,56 @@ export default function SettingsPage() {
             Edit
           </button>
         </SettingsRow>
+        {aiProvider && (
+          <>
+            <SettingsRow
+              label="AI Provider"
+              sublabel={aiProvider.active_provider === 'claude_code' ? 'Using Claude Code CLI' : 'Using OpenClaw gateway'}
+            >
+              <SegmentedControl
+                options={[
+                  { label: 'OpenClaw', value: 'openclaw' },
+                  { label: 'Claude Code', value: 'claude_code' },
+                ]}
+                value={aiProvider.active_provider}
+                onChange={(v) => !aiProviderSwitching && handleSwitchProvider(v)}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Claude Code CLI"
+              sublabel={
+                aiProvider.claude_code_status === 'available'
+                  ? `Installed${aiProvider.claude_code_version ? ` — ${aiProvider.claude_code_version}` : ''}`
+                  : aiProvider.claude_code_status === 'not_installed'
+                    ? 'Not installed'
+                    : aiProvider.claude_code_status === 'not_authenticated'
+                      ? 'Not authenticated — run `claude login`'
+                      : `Status: ${aiProvider.claude_code_status}`
+              }
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: aiProvider.claude_code_status === 'available' ? 'var(--cc-success)' : 'var(--cc-text-tertiary)',
+                  }}
+                />
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--secondary"
+                  onClick={handleRecheckClaudeCode}
+                  disabled={claudeCodeChecking}
+                  style={{ fontSize: 12, padding: '4px 10px' }}
+                >
+                  {claudeCodeChecking ? 'Checking...' : 'Recheck'}
+                </button>
+              </div>
+            </SettingsRow>
+          </>
+        )}
       </SettingsSection>
 
       <SettingsSection title="Workspace">

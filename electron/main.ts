@@ -1,256 +1,229 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain, Notification, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import path from 'node:path';
+import { ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
-import { startServer, stopServer, restartServer, getServerStatus } from './server-manager';
-
-// Suppress EPIPE errors when the parent process pipe closes (e.g. dev server stops)
-process.stdout?.on?.('error', () => {});
-process.stderr?.on?.('error', () => {});
-
-// ── Secure store helpers ──────────────────────────────────────────────
-function getStorePath(): string {
-  return path.join(app.getPath('userData'), 'secure-store.json');
-}
-
-function readStore(): Record<string, string> {
-  try {
-    const raw = fs.readFileSync(getStorePath(), 'utf-8');
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
-function writeStore(data: Record<string, string>): void {
-  fs.writeFileSync(getStorePath(), JSON.stringify(data, null, 2), 'utf-8');
-}
-
-// ── Server config helpers ─────────────────────────────────────────────
-function getConfigPath(): string {
-  return path.join(app.getPath('userData'), 'server-config.json');
-}
-
-function readConfig(): Record<string, unknown> {
-  try {
-    return JSON.parse(fs.readFileSync(getConfigPath(), 'utf-8'));
-  } catch {
-    return {};
-  }
-}
-
-function writeConfig(data: Record<string, unknown>): void {
-  fs.writeFileSync(getConfigPath(), JSON.stringify(data, null, 2), 'utf-8');
-}
-
-// ── IPC handlers for encrypted storage ────────────────────────────────
-const canEncrypt = safeStorage.isEncryptionAvailable();
-
-ipcMain.handle('secure-store:set', (_event, key: string, value: string) => {
-  const store = readStore();
-  if (canEncrypt) {
-    const encrypted = safeStorage.encryptString(value);
-    store[key] = encrypted.toString('base64');
-  } else {
-    // Fallback: store plaintext when Keychain is unavailable (e.g. SSH/CI)
-    store[key] = 'plain:' + Buffer.from(value, 'utf-8').toString('base64');
-  }
-  writeStore(store);
-});
-
-ipcMain.handle('secure-store:get', (_event, key: string): string | null => {
-  const store = readStore();
-  const raw = store[key];
-  if (!raw) return null;
-  if (raw.startsWith('plain:')) {
-    return Buffer.from(raw.slice(6), 'base64').toString('utf-8');
-  }
-  if (canEncrypt) {
-    return safeStorage.decryptString(Buffer.from(raw, 'base64'));
-  }
-  return null;
-});
-
-ipcMain.handle('secure-store:delete', (_event, key: string) => {
-  const store = readStore();
-  delete store[key];
-  writeStore(store);
-});
-
-// ── IPC handler for opening Obsidian vault ───────────────────────────
-ipcMain.handle('obsidian:open-vault', async () => {
-  const config = readConfig();
-
-  const vaultPath = (config.obsidianVaultPath as string) ?? '';
-  if (!vaultPath) {
-    dialog.showErrorBox('Obsidian', 'No Obsidian vault path is configured. Set it in Settings first.');
-    return;
-  }
-
-  const vaultName = path.basename(vaultPath);
-  const uri = `obsidian://open?vault=${encodeURIComponent(vaultName)}`;
-
-  try {
-    await shell.openExternal(uri);
-  } catch {
-    dialog.showErrorBox('Obsidian', 'Could not open Obsidian. Make sure it is installed.');
-  }
-});
-
-// ── IPC handler for app icon badge ────────────────────────────────────
-ipcMain.on('badge:set', (_event, count: number) => {
-  app.setBadgeCount(count);
-});
-
-// ── IPC handler for desktop notifications ────────────────────────────
-ipcMain.on('notification:show', (
-  _event,
-  title: string,
-  body: string,
-  options?: { silent?: boolean; itemType?: string; itemId?: string },
-) => {
-  const notification = new Notification({
-    title,
-    body,
-    silent: options?.silent ?? false,
-    // Electron supports actions on macOS
-    ...(options?.itemId && process.platform === 'darwin' ? {
-      actions: [{ type: 'button' as const, text: 'Mark Done' }],
-      hasReply: false,
-    } : {}),
-  });
-  notification.on('action', (_actionEvent, actionIndex) => {
-    if (actionIndex === 0 && options?.itemId) {
-      // "Mark Done" action — send to renderer to handle API call
-      mainWindow?.webContents.send('notification:action', {
-        action: 'mark_done',
-        itemType: options.itemType,
-        itemId: options.itemId,
-      });
-    }
-  });
-  notification.on('click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
-    if (options?.itemId && options?.itemType) {
-      const route = options.itemType === 'todo' ? `/tasks/${options.itemId}` : `/events/${options.itemId}`;
-      mainWindow?.webContents.send('navigate', route);
-    }
-  });
-  notification.show();
-});
+import path from 'node:path';
 
 let mainWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
+let serverProcess: ChildProcess | null = null;
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+const DIST = path.join(__dirname, '../dist');
+const SERVER_DIR = path.join(__dirname, '../server');
+
+// ── Server config (persisted to JSON) ─────────────────────────────────
+
+interface ServerConfig {
+  port: number;
+  pin: string;
+  obsidianVaultPath: string;
+}
+
+const CONFIG_PATH = path.join(app.getPath('userData'), 'server-config.json');
+
+function loadConfig(): ServerConfig {
+  const defaults: ServerConfig = { port: 8000, pin: '123456', obsidianVaultPath: '' };
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      return { ...defaults, ...JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) };
+    }
+  } catch { /* use defaults */ }
+  return defaults;
+}
+
+function saveConfig(updates: Partial<ServerConfig>) {
+  const current = loadConfig();
+  const merged = { ...current, ...updates };
+  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
+  return merged;
+}
+
+// ── Server status ─────────────────────────────────────────────────────
+
+type ServerState = 'starting' | 'running' | 'stopped' | 'error';
+
+let serverStatus: { state: ServerState; port: number; pid?: number; error?: string } = {
+  state: 'stopped',
+  port: 8000,
+};
+
+function setServerStatus(state: ServerState, extra?: { pid?: number; error?: string }) {
+  serverStatus = { state, port: loadConfig().port, ...extra };
+  mainWindow?.webContents.send('server-status-change', serverStatus);
+}
+
+// ── Spawn the Python backend ──────────────────────────────────────────
+
+function findPython(): string {
+  // Check for venv inside server dir first
+  const venvPython = process.platform === 'win32'
+    ? path.join(SERVER_DIR, 'venv', 'Scripts', 'python.exe')
+    : path.join(SERVER_DIR, 'venv', 'bin', 'python');
+  if (fs.existsSync(venvPython)) return venvPython;
+  // Fallback to system python
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
+
+function startServer() {
+  if (serverProcess) return; // already running
+
+  const config = loadConfig();
+  const python = findPython();
+
+  setServerStatus('starting');
+
+  // Build .env content for the server
+  const envVars: Record<string, string> = {
+    ...process.env as Record<string, string>,
+    HOST: '0.0.0.0',
+    PORT: String(config.port),
+    PIN: config.pin,
+  };
+  if (config.obsidianVaultPath) {
+    envVars.OBSIDIAN_VAULT_PATH = config.obsidianVaultPath;
+  }
+
+  // Auto-detect Obsidian CLI path if not explicitly set
+  if (!envVars.OBSIDIAN_CLI_COMMAND) {
+    const obsidianExe = process.platform === 'win32'
+      ? path.join(process.env.LOCALAPPDATA || '', 'Programs', 'obsidian', 'Obsidian.exe')
+      : process.platform === 'darwin'
+        ? '/Applications/Obsidian.app/Contents/MacOS/Obsidian'
+        : 'obsidian';
+    if (fs.existsSync(obsidianExe)) {
+      envVars.OBSIDIAN_CLI_COMMAND = obsidianExe;
+    }
+  }
+
+  const uvicornArgs = ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', String(config.port)];
+  if (VITE_DEV_SERVER_URL) uvicornArgs.push('--reload');
+
+  serverProcess = spawn(python, uvicornArgs, {
+    cwd: SERVER_DIR,
+    env: envVars,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  serverProcess.stdout?.on('data', (data: Buffer) => {
+    const text = data.toString();
+    console.log('[server]', text);
+    // uvicorn prints "Uvicorn running on ..." when ready
+    if (text.includes('Uvicorn running') || text.includes('Application startup complete')) {
+      setServerStatus('running', { pid: serverProcess?.pid });
+    }
+  });
+
+  serverProcess.stderr?.on('data', (data: Buffer) => {
+    const text = data.toString();
+    console.error('[server]', text);
+    // uvicorn often logs startup to stderr
+    if (text.includes('Uvicorn running') || text.includes('Application startup complete')) {
+      setServerStatus('running', { pid: serverProcess?.pid });
+    }
+  });
+
+  serverProcess.on('error', (err) => {
+    console.error('[server] Failed to start:', err.message);
+    setServerStatus('error', { error: err.message });
+    serverProcess = null;
+  });
+
+  serverProcess.on('exit', (code) => {
+    console.log('[server] Exited with code', code);
+    if (serverStatus.state !== 'error') {
+      setServerStatus('stopped');
+    }
+    serverProcess = null;
+  });
+}
+
+function stopServer() {
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
+    setServerStatus('stopped');
+  }
+}
+
+// ── Window ────────────────────────────────────────────────────────────
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    minWidth: 800,
+    minWidth: 480,
     minHeight: 600,
+    title: 'ClawChat',
+    icon: path.join(__dirname, '../build/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
-    show: false,
   });
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
   });
 
   if (VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(VITE_DEV_SERVER_URL);
-    mainWindow.webContents.openDevTools({ mode: 'bottom' });
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadFile(path.join(DIST, 'index.html'));
   }
+}
 
-  mainWindow.on('close', (e) => {
-    if (tray && !app.isQuitting) {
-      e.preventDefault();
-      mainWindow?.hide();
+// ── IPC handlers ──────────────────────────────────────────────────────
+
+ipcMain.on('show-notification', (_e, title: string, body: string, opts?: { silent?: boolean }) => {
+  const n = new Notification({ title, body, silent: opts?.silent });
+  n.show();
+});
+
+ipcMain.on('set-badge-count', (_e, count: number) => {
+  app.setBadgeCount(count);
+});
+
+// Server management IPC
+ipcMain.handle('server:getStatus', () => serverStatus);
+ipcMain.handle('server:getConfig', () => loadConfig());
+ipcMain.handle('server:updateConfig', (_e, updates: Partial<ServerConfig>) => {
+  saveConfig(updates);
+  // Restart server with new config
+  stopServer();
+  startServer();
+});
+ipcMain.handle('server:getNetworkInfo', async () => {
+  const { networkInterfaces } = await import('node:os');
+  const nets = networkInterfaces();
+  const addresses: { ip: string; name: string }[] = [];
+  for (const [name, ifaces] of Object.entries(nets)) {
+    for (const iface of ifaces || []) {
+      if ((iface.family === 'IPv4' || (iface.family as unknown) === 4) && !iface.internal && !iface.address.startsWith('169.254.')) {
+        addresses.push({ ip: iface.address, name });
+      }
     }
-  });
+  }
+  return { addresses };
+});
+ipcMain.handle('server:selectFolder', async () => {
+  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+  return result.canceled ? null : result.filePaths[0];
+});
+ipcMain.handle('server:openObsidianVault', () => {
+  const config = loadConfig();
+  if (config.obsidianVaultPath) {
+    const vaultName = path.basename(config.obsidianVaultPath);
+    shell.openExternal(`obsidian://open?vault=${encodeURIComponent(vaultName)}`);
+  }
+});
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-}
+// ── Auto-updater ──────────────────────────────────────────────────────
 
-function createTray() {
-  const icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
-  tray.setToolTip('ClawChat');
-
-  updateTrayMenu();
-
-  tray.on('double-click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
-  });
-}
-
-function updateTrayMenu() {
-  if (!tray) return;
-
-  const serverStatus = getServerStatus();
-  const serverRunning = serverStatus.state === 'running';
-
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Open',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-        } else {
-          createWindow();
-        }
-      },
-    },
-    { type: 'separator' },
-    {
-      label: serverRunning ? 'Restart local server' : 'Start local server',
-      click: async () => {
-        if (serverRunning) {
-          await restartServer();
-        } else {
-          await startServer();
-        }
-        updateTrayMenu();
-      },
-    },
-    {
-      label: 'Stop local server',
-      enabled: serverRunning,
-      click: async () => {
-        await stopServer();
-        updateTrayMenu();
-      },
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit UI',
-      click: () => {
-        app.isQuitting = true;
-        app.quit();
-      },
-    },
-  ]);
-
-  tray.setContextMenu(contextMenu);
-}
-
-// ── Auto-updater setup ─────────────────────────────────────────────
 function setupAutoUpdater() {
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('update-available', (info) => {
     mainWindow?.webContents.send('update-available', {
@@ -263,118 +236,32 @@ function setupAutoUpdater() {
     mainWindow?.webContents.send('update-downloaded');
   });
 
-  autoUpdater.on('error', (err) => {
-    mainWindow?.webContents.send('update-error', err.message);
-  });
-
-  // IPC handlers for renderer control
-  ipcMain.handle('update:check', () => autoUpdater.checkForUpdates());
-  ipcMain.handle('update:download', () => autoUpdater.downloadUpdate());
-  ipcMain.handle('update:install', () => autoUpdater.quitAndInstall());
-
-  // Check on startup and every 4 hours
-  autoUpdater.checkForUpdates().catch(() => {});
-  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 60 * 60 * 1000);
-}
-
-// ── IPC: server management ───────────────────────────────────────────
-
-function registerServerIpc() {
-  ipcMain.handle('server:status', () => getServerStatus());
-
-  ipcMain.handle('server:restart', async () => {
-    const status = await restartServer();
-    updateTrayMenu();
-    return status;
-  });
-
-  ipcMain.handle('server:config', () => readConfig());
-
-  ipcMain.handle('server:update-config', (_event, updates: Record<string, unknown>) => {
-    const config = readConfig();
-    Object.assign(config, updates);
-    writeConfig(config);
-    return config;
-  });
-
-  ipcMain.handle('server:select-folder', async () => {
-    const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
-    if (!win) return null;
-    const result = await dialog.showOpenDialog(win, {
-      properties: ['openDirectory'],
-    });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    return result.filePaths[0];
-  });
-
-  ipcMain.handle('server:network-info', () => {
-    const interfaces = os.networkInterfaces();
-    const addresses: { ip: string; name: string; networkType?: string }[] = [];
-
-    for (const [name, nets] of Object.entries(interfaces)) {
-      if (!nets) continue;
-      for (const net of nets) {
-        // Skip internal (loopback) and link-local addresses
-        if (net.internal) continue;
-        if (net.family === 'IPv6' && net.scopeid !== 0) continue;
-
-        let networkType: string | undefined;
-        if (net.address.startsWith('100.')) {
-          networkType = 'Tailscale';
-        } else if (name.startsWith('wg') || name.startsWith('tun')) {
-          networkType = 'VPN';
-        }
-
-        addresses.push({ ip: net.address, name, networkType });
-      }
-    }
-
-    return { addresses };
+  ipcMain.handle('updater:check', () => autoUpdater.checkForUpdates());
+  ipcMain.handle('updater:download', () => autoUpdater.downloadUpdate());
+  ipcMain.handle('updater:install', () => {
+    autoUpdater.quitAndInstall(false, true);
   });
 }
 
-// ── App lifecycle ────────────────────────────────────────────────────
+// ── App lifecycle ─────────────────────────────────────────────────────
 
-app.whenReady().then(async () => {
-  registerServerIpc();
-
-  // Create window immediately — don't block on server
+app.whenReady().then(() => {
   createWindow();
-  createTray();
+  startServer();
   setupAutoUpdater();
 
-  // Start server in background; UI receives status via IPC events
-  startServer().then(() => {
-    updateTrayMenu();
-  }).catch((err) => {
-    console.error('[main] Server start error:', err);
-  });
-
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    } else {
-      mainWindow?.show();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    // On non-macOS, closing all windows quits the UI but server keeps running
+    stopServer();
     app.quit();
   }
 });
 
-// Server intentionally NOT stopped on quit — it survives for mobile/LAN access.
-// Users explicitly stop it via tray menu "Stop local server".
 app.on('before-quit', () => {
-  app.isQuitting = true;
+  stopServer();
 });
-
-// Augment Electron.App to include isQuitting
-declare module 'electron' {
-  interface App {
-    isQuitting?: boolean;
-  }
-}

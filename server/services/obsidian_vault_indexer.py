@@ -214,7 +214,8 @@ def get_health_summary() -> dict:
     )
     from services.vault_watcher_service import is_scan_stuck
 
-    idx = _index
+    # Ensure the index is populated on first health check
+    idx = ensure_fresh()
 
     # Queue age
     queue = get_queue_status()

@@ -29,6 +29,9 @@ from schemas.admin import (
     PurgeResponse,
     ReindexResponse,
     BackupResponse,
+    ClaudeCodeStatusResponse,
+    AIProviderResponse,
+    SwitchProviderRequest,
 )
 from services import admin_service
 from ws.manager import ws_manager
@@ -52,13 +55,16 @@ async def get_overview(
 
     scheduler = getattr(request.app.state, "scheduler", None)
 
+    active_provider = getattr(request.app.state, "active_ai_provider", "openclaw")
+    ai_model = "claude (via CLI)" if active_provider == "claude_code" else settings.ai_model
+
     server = ServerOverview(
         uptime_seconds=admin_service.get_uptime_seconds(),
         version="0.1.0",
-        ai_backend="openclaw",
-        ai_model=settings.ai_model,
-        ai_base_url=settings.ai_base_url,
-        ai_connected=getattr(request.app.state, "ai_connected", False),
+        ai_backend=active_provider,
+        ai_model=ai_model,
+        ai_base_url=settings.ai_base_url if active_provider == "openclaw" else "local CLI",
+        ai_connected=getattr(request.app.state, "ai_connected", False) if active_provider == "openclaw" else getattr(request.app.state, "claude_code_status", "") == "available",
         active_ws_connections=len(ws_manager.active_connections),
         scheduler_enabled=settings.enable_scheduler,
         scheduler_running=scheduler is not None,
@@ -244,3 +250,96 @@ async def purge_data(
 
     count = await admin_service.purge_old_data(db, body.target, body.older_than_days)
     return PurgeResponse(deleted_count=count, target=body.target)
+
+
+# --- AI Provider Management ---
+
+
+@router.get("/ai/provider", response_model=AIProviderResponse)
+async def get_ai_provider(
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Get current AI provider status and which one is active."""
+    return AIProviderResponse(
+        active_provider=getattr(request.app.state, "active_ai_provider", "openclaw"),
+        openclaw_connected=getattr(request.app.state, "ai_connected", False),
+        claude_code_status=getattr(request.app.state, "claude_code_status", "unknown"),
+        claude_code_version=getattr(request.app.state, "claude_code_version", None),
+    )
+
+
+@router.post("/ai/provider", response_model=AIProviderResponse)
+async def switch_ai_provider(
+    body: SwitchProviderRequest,
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Switch between AI providers at runtime."""
+    if body.provider not in ("openclaw", "claude_code"):
+        raise ValidationError(f"Invalid provider: {body.provider}. Use 'openclaw' or 'claude_code'.")
+
+    if body.provider == "claude_code":
+        claude_code = getattr(request.app.state, "claude_code", None)
+        if not claude_code:
+            raise ValidationError("Claude Code provider not initialized.")
+        # Re-check availability
+        from services.claude_code_provider import ClaudeCodeStatus
+        status, version = await claude_code.check_availability()
+        request.app.state.claude_code_status = status.value
+        request.app.state.claude_code_version = version
+        if status != ClaudeCodeStatus.AVAILABLE:
+            raise ValidationError(
+                f"Claude Code is not available (status: {status.value}). "
+                "Make sure it's installed and authenticated."
+            )
+        request.app.state.active_ai = claude_code
+        request.app.state.active_ai_provider = "claude_code"
+        logger.info("Switched active AI provider to Claude Code")
+    else:
+        request.app.state.active_ai = request.app.state.ai_service
+        request.app.state.active_ai_provider = "openclaw"
+        logger.info("Switched active AI provider to OpenClaw")
+
+    return AIProviderResponse(
+        active_provider=request.app.state.active_ai_provider,
+        openclaw_connected=getattr(request.app.state, "ai_connected", False),
+        claude_code_status=getattr(request.app.state, "claude_code_status", "unknown"),
+        claude_code_version=getattr(request.app.state, "claude_code_version", None),
+    )
+
+
+@router.get("/ai/claude-code", response_model=ClaudeCodeStatusResponse)
+async def get_claude_code_status(
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Get Claude Code CLI status and version."""
+    return ClaudeCodeStatusResponse(
+        status=getattr(request.app.state, "claude_code_status", "unknown"),
+        version=getattr(request.app.state, "claude_code_version", None),
+        active=getattr(request.app.state, "active_ai_provider", "openclaw") == "claude_code",
+    )
+
+
+@router.post("/ai/claude-code/check", response_model=ClaudeCodeStatusResponse)
+async def recheck_claude_code(
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Re-check Claude Code CLI availability."""
+    claude_code = getattr(request.app.state, "claude_code", None)
+    if not claude_code:
+        from services.claude_code_provider import ClaudeCodeProvider
+        claude_code = ClaudeCodeProvider()
+        request.app.state.claude_code = claude_code
+
+    status, version = await claude_code.check_availability()
+    request.app.state.claude_code_status = status.value
+    request.app.state.claude_code_version = version
+
+    return ClaudeCodeStatusResponse(
+        status=status.value,
+        version=version,
+        active=getattr(request.app.state, "active_ai_provider", "openclaw") == "claude_code",
+    )

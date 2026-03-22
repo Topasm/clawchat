@@ -159,3 +159,23 @@ class ReindexResponse(BaseModel):
 class BackupResponse(BaseModel):
     filename: str
     size_bytes: int
+
+
+# --- Claude Code / AI Provider ---
+
+
+class ClaudeCodeStatusResponse(BaseModel):
+    status: str  # available, not_installed, not_authenticated, error
+    version: str | None = None
+    active: bool  # True if Claude Code is the current active provider
+
+
+class AIProviderResponse(BaseModel):
+    active_provider: str  # "openclaw" or "claude_code"
+    openclaw_connected: bool
+    claude_code_status: str
+    claude_code_version: str | None = None
+
+
+class SwitchProviderRequest(BaseModel):
+    provider: str  # "openclaw" or "claude_code"

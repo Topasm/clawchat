@@ -52,10 +52,10 @@ async def websocket_endpoint(websocket: WebSocket):
             else:
                 logger.warning("Unknown WS message type: %s", msg_type)
     except WebSocketDisconnect:
-        ws_manager.disconnect(user_id)
+        ws_manager.disconnect(user_id, websocket)
         logger.info("WebSocket disconnected: %s", user_id)
     except Exception:
-        ws_manager.disconnect(user_id)
+        ws_manager.disconnect(user_id, websocket)
         logger.exception("WebSocket error for user %s", user_id)
     finally:
         heartbeat_task.cancel()

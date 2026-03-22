@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import com.clawchat.android.core.ui.icons.ClawIcons
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.PairedDevice
@@ -32,36 +34,66 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsState()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Settings") }) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "Settings",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Server setup prompt (when onboarding was skipped)
             if (state.hostName.isBlank() && state.health == null) {
                 item {
-                    ElevatedCard(
+                    Surface(
                         onClick = onSetupServer,
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                ClawIcons.Cloud,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(Modifier.width(12.dp))
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                modifier = Modifier.size(44.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        ClawIcons.Cloud,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(14.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Connect to Server", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Connect to Server",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
                                 Text(
                                     "Set up your ClawChat server connection",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                                 )
                             }
                         }
@@ -72,59 +104,90 @@ fun SettingsScreen(
             // Server info card
             if (state.hostName.isNotBlank() || state.health != null) {
                 item {
-                    ServerInfoCard(
-                        version = state.health?.version,
-                        aiProvider = state.health?.aiProvider,
-                        aiModel = state.health?.aiModel,
-                        aiConnected = state.health?.aiConnected,
-                        hostName = state.hostName,
-                        authMode = state.authMode,
-                    )
+                    SettingsSection(title = "Server") {
+                        ServerInfoCard(
+                            version = state.health?.version,
+                            aiProvider = state.health?.aiProvider,
+                            aiModel = state.health?.aiModel,
+                            aiConnected = state.health?.aiConnected,
+                            hostName = state.hostName,
+                            authMode = state.authMode,
+                        )
+                    }
                 }
             }
 
             // Appearance
             item {
-                AccentColorCard(
-                    selectedKey = state.accentColor,
-                    onSelect = { viewModel.setAccentColor(it) },
-                )
+                SettingsSection(title = "Appearance") {
+                    AccentColorCard(
+                        selectedKey = state.accentColor,
+                        onSelect = { viewModel.setAccentColor(it) },
+                    )
+                }
             }
 
             // Paired devices
             if (state.devices.isNotEmpty()) {
                 item {
-                    Text("Paired Devices", style = MaterialTheme.typography.titleMedium)
-                }
-                items(state.devices, key = { it.id }) { device ->
-                    DeviceCard(
-                        device = device,
-                        onRevoke = { viewModel.revokeDevice(device.id) },
-                    )
+                    SettingsSection(title = "Paired Devices") {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            state.devices.forEach { device ->
+                                DeviceCard(
+                                    device = device,
+                                    onRevoke = { viewModel.revokeDevice(device.id) },
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
             // Logout
             item {
-                Spacer(Modifier.height(16.dp))
-                OutlinedButton(
+                Spacer(Modifier.height(8.dp))
+                Button(
                     onClick = {
                         viewModel.logout()
                         onLoggedOut()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     ),
                 ) {
-                    Icon(ClawIcons.Logout, contentDescription = null)
+                    Icon(ClawIcons.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Log Out")
+                    Text("Log Out", fontWeight = FontWeight.Medium)
                 }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
 }
+
+// ── Section wrapper ──────────────────────────────────────────────────────────
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        content()
+    }
+}
+
+// ── Accent color picker ──────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -132,19 +195,22 @@ private fun AccentColorCard(
     selectedKey: String,
     onSelect: (String) -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Appearance", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
             Text(
                 "Accent Color",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 AccentColor.entries.forEach { accent ->
                     AccentSwatch(
@@ -173,12 +239,12 @@ private fun AccentSwatch(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(40.dp)
+                .size(36.dp)
                 .clip(CircleShape)
                 .background(color)
                 .then(
-                    if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                    else Modifier
+                    if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    else Modifier,
                 )
                 .clickable(role = Role.RadioButton, onClick = onClick),
         ) {
@@ -187,7 +253,7 @@ private fun AccentSwatch(
                     Icons.Default.Check,
                     contentDescription = "Selected",
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
@@ -200,6 +266,8 @@ private fun AccentSwatch(
     }
 }
 
+// ── Server info ──────────────────────────────────────────────────────────────
+
 @Composable
 private fun ServerInfoCard(
     version: String?,
@@ -209,61 +277,118 @@ private fun ServerInfoCard(
     hostName: String,
     authMode: String,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(ClawIcons.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            ClawIcons.Cloud,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
                 Spacer(Modifier.width(12.dp))
-                Text("Server", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Connected",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
-            if (hostName.isNotBlank()) {
-                InfoRow("Host", hostName)
-            }
+            if (hostName.isNotBlank()) { InfoRow("Host", hostName) }
             version?.let { InfoRow("Version", it) }
             aiProvider?.let { InfoRow("AI Provider", it) }
             aiModel?.let { InfoRow("Model", it) }
             aiConnected?.let {
-                InfoRow("AI Status", if (it) "Connected" else "Disconnected")
+                InfoRow(
+                    "AI Status",
+                    if (it) "Connected" else "Disconnected",
+                    valueColor = if (it) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                )
             }
-            if (authMode.isNotBlank()) {
-                InfoRow("Auth Mode", authMode)
-            }
+            if (authMode.isNotBlank()) { InfoRow("Auth Mode", authMode) }
         }
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+private fun InfoRow(label: String, value: String, valueColor: Color? = null) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
+// ── Device card ──────────────────────────────────────────────────────────────
+
 @Composable
 private fun DeviceCard(device: PairedDevice, onRevoke: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(ClawIcons.PhoneAndroid, contentDescription = null)
-            Spacer(Modifier.width(12.dp))
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        ClawIcons.PhoneAndroid,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(device.name, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "${device.deviceType} · Last seen ${device.lastSeen}",
+                    device.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "${device.deviceType} \u00b7 Last seen ${device.lastSeen}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = onRevoke, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                Text("Revoke")
+            TextButton(
+                onClick = onRevoke,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) {
+                Text("Revoke", style = MaterialTheme.typography.labelLarge)
             }
         }
     }

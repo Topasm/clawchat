@@ -1,34 +1,29 @@
-appId: com.clawchat.app
+appId: com.clawchat.desktop
 productName: ClawChat
 directories:
-  buildResources: build
   output: release
+  buildResources: build
 files:
-  - dist-electron
-  - dist
-extraResources:
-  - from: "server"
-    to: "server"
-    filter:
-      - "**/*"
-      - "!__pycache__/**"
-      - "!venv/**"
-      - "!data/**"
-      - "!*.log"
+  - dist/**/*
+  - dist-electron/**/*
 win:
   target:
-    - nsis
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
 mac:
   target:
-    - dmg
-  category: public.app-category.productivity
-  identity: null
+    - target: dmg
+      arch:
+        - x64
+        - arm64
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
 linux:
   target:
     - AppImage
-publish:
-  - provider: github
-    owner: Topasm
-    repo: clawchat
+  category: Utility

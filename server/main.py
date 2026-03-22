@@ -24,7 +24,7 @@ from routers import obsidian as obsidian_router
 from routers import pairing as pairing_router
 from routers import todo as todo_router
 from services.ai_service import AIService
-from services.claude_code_provider import ClaudeCodeProvider
+from services.claude_code_provider import ClaudeCodeProvider, ClaudeCodeStatus, _find_claude_cli
 from services.orchestrator import Orchestrator
 from services.scheduler import Scheduler
 from ws.handler import websocket_endpoint
@@ -45,11 +45,12 @@ async def lifespan(app: FastAPI):
     )
     app.state.ai_service = ai_service
 
-    # Create orchestrator
+    # Create orchestrator (receives app_state so it can resolve the active AI provider at runtime)
     app.state.orchestrator = Orchestrator(
         ai_service=ai_service,
         ws_manager=ws_manager,
         session_factory=async_session_factory,
+        app_state=app.state,
     )
 
     app.state.session_factory = async_session_factory
@@ -59,9 +60,21 @@ async def lifespan(app: FastAPI):
         return await ai_service.health_check()
 
     async def _check_claude_code():
+        import subprocess as _sp
         cc = ClaudeCodeProvider()
-        status, version = await cc.check_availability()
-        return cc, status, version
+        cli = _find_claude_cli()
+        if not cli:
+            return cc, ClaudeCodeStatus.NOT_INSTALLED, None
+        cc._cli_path = cli
+        try:
+            result = _sp.run([cli, "--version"], capture_output=True, text=True, timeout=10)
+            if result.returncode != 0:
+                return cc, ClaudeCodeStatus.ERROR, None
+            version = result.stdout.strip()
+            return cc, ClaudeCodeStatus.AVAILABLE, version
+        except Exception as e:
+            logger.warning("Claude Code startup check failed: %s", e)
+            return cc, ClaudeCodeStatus.ERROR, None
 
     async def _init_vault():
         if not settings.obsidian_vault_path:
@@ -93,6 +106,24 @@ async def lifespan(app: FastAPI):
     app.state.claude_code_status = claude_code_status.value
     app.state.claude_code_version = claude_code_version
     logger.info(f"Claude Code status: {claude_code_status.value}, version: {claude_code_version}")
+
+    # Determine the active AI provider — Claude Code takes priority when
+    # configured AND available; otherwise fall back to OpenClaw/OpenAI.
+    if (
+        settings.ai_provider == "claude_code"
+        and claude_code_status == ClaudeCodeStatus.AVAILABLE
+    ):
+        app.state.active_ai = claude_code
+        app.state.active_ai_provider = "claude_code"
+        logger.info("Active AI provider: Claude Code CLI")
+    else:
+        app.state.active_ai = ai_service
+        app.state.active_ai_provider = "openclaw"
+        if settings.ai_provider == "claude_code":
+            logger.warning(
+                "ai_provider=claude_code but CLI is %s — falling back to OpenClaw",
+                claude_code_status.value,
+            )
 
     # Start background scheduler if enabled
     if settings.enable_scheduler:
@@ -151,12 +182,21 @@ app.websocket("/ws")(websocket_endpoint)
 @app.get("/api/health")
 async def health():
     ai_connected = getattr(app.state, "ai_connected", False)
+    active_provider = getattr(app.state, "active_ai_provider", "openclaw")
+    claude_code_status = getattr(app.state, "claude_code_status", "unknown")
+    # If Claude Code is the active provider, consider AI connected when CLI is available
+    effective_connected = (
+        ai_connected if active_provider == "openclaw"
+        else claude_code_status == "available"
+    )
+    # Show the actual model name based on active provider
+    ai_model = "claude (via CLI)" if active_provider == "claude_code" else settings.ai_model
     return {
-        "status": "ok" if ai_connected else "degraded",
+        "status": "ok" if effective_connected else "degraded",
         "version": "0.1.0",
-        "ai_provider": settings.ai_provider,
-        "ai_model": settings.ai_model,
-        "ai_connected": ai_connected,
-        "claude_code_status": getattr(app.state, "claude_code_status", "unknown"),
+        "ai_provider": active_provider,
+        "ai_model": ai_model,
+        "ai_connected": effective_connected,
+        "claude_code_status": claude_code_status,
         "claude_code_version": getattr(app.state, "claude_code_version", None),
     }

@@ -60,10 +60,19 @@ class Orchestrator:
         ai_service: AIService,
         ws_manager: ConnectionManager,
         session_factory: async_sessionmaker[AsyncSession],
+        app_state=None,
     ):
         self.ai = ai_service
         self.ws = ws_manager
         self.session_factory = session_factory
+        self._app_state = app_state
+
+    @property
+    def active_ai(self):
+        """Return the currently active AI provider (Claude Code or OpenClaw)."""
+        if self._app_state:
+            return getattr(self._app_state, "active_ai", self.ai)
+        return self.ai
 
     async def handle_message(
         self,
@@ -74,8 +83,8 @@ class Orchestrator:
     ):
         async with self.session_factory() as db:
             try:
-                # 1. Classify intent
-                intent_result = await classify_intent(content, self.ai)
+                # 1. Classify intent (uses the active AI provider)
+                intent_result = await classify_intent(content, self.active_ai)
                 intent = intent_result.intent
                 params = intent_result.params
 
@@ -149,7 +158,7 @@ class Orchestrator:
 
         # Use LLM-based skill selection (falls back to keyword heuristic).
         from skills.selector import select_skills
-        skill_chain = await select_skills(self.ai, instruction)
+        skill_chain = await select_skills(self.active_ai, instruction)
         agent_type = skill_chain[0] if skill_chain else "general"
 
         task = await agent_task_service.create_task(
@@ -198,7 +207,7 @@ class Orchestrator:
                 t = await task_db.get(AgentTask, task.id)
                 if t:
                     await agent_task_service.execute_task(
-                        task_db, t, self.ai, self.ws, user_id,
+                        task_db, t, self.active_ai, self.ws, user_id,
                         session_factory=self.session_factory,
                     )
 
@@ -210,7 +219,7 @@ class Orchestrator:
         user_id: str,
         conversation_id: str,
     ):
-        briefing = await briefing_service.generate_briefing(db, self.ai)
+        briefing = await briefing_service.generate_briefing(db, self.active_ai)
         await self._send_assistant_message(
             db, user_id, conversation_id, "daily_briefing", briefing
         )
@@ -243,13 +252,13 @@ class Orchestrator:
         # Create assistant message placeholder
         assistant_msg_id = make_id("msg_")
 
-        # Stream response via WebSocket
+        # Stream response via WebSocket (uses the active AI provider)
         try:
             full_content = await self.ws.stream_to_user(
                 user_id=user_id,
                 message_id=assistant_msg_id,
                 conversation_id=conversation_id,
-                token_iterator=self.ai.stream_completion(messages),
+                token_iterator=self.active_ai.stream_completion(messages),
             )
         except Exception:
             # Send stream_end for the orphaned stream_start so the client doesn't hang
@@ -509,7 +518,7 @@ class Orchestrator:
                 if params.get("preferred_date"):
                     preferred = datetime.fromisoformat(params["preferred_date"])
                 suggestions = await scheduling_service.suggest_best_time(
-                    db, self.ai, title, int(duration), preferred,
+                    db, self.active_ai, title, int(duration), preferred,
                 )
                 if not suggestions:
                     return "I couldn't find any available time slots in the next week. Your schedule looks quite full!", None
@@ -559,7 +568,7 @@ class Orchestrator:
                     st = e["start_time"] if isinstance(e, dict) else e.start_time
                     event_lines.append(f"- {t} at {st}")
                 event_summary = "\n".join(event_lines)
-                analysis = await self.ai.generate_completion(
+                analysis = await self.active_ai.generate_completion(
                     system_prompt="You are a scheduling analyst. Summarize the user's week concisely — highlight busy days, free days, and any potential issues like back-to-back meetings.",
                     user_message=f"Here are my events for the next 7 days:\n{event_summary}",
                 )
@@ -605,7 +614,7 @@ class Orchestrator:
     ):
         """Auto-generate a conversation title from the first user message."""
         try:
-            title = await self.ai.generate_title(user_message)
+            title = await self.active_ai.generate_title(user_message)
             conv.title = title
             # Notify client of title update via WS
             await self.ws.send_json(user_id, {

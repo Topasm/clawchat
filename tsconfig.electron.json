@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist-electron",
     "rootDir": "electron",
-    "types": ["node"]
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
   "include": ["electron/**/*.ts"]
 }

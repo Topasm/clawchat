@@ -1,12 +1,44 @@
 import asyncio
 import json
 import logging
+import os
 import shutil
+import subprocess
+import sys
+import threading
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from enum import Enum
-from typing import AsyncIterator, Optional
+from pathlib import Path
+from queue import Empty, Queue
+from typing import Optional
+
+from exceptions import AIUnavailableError
 
 logger = logging.getLogger(__name__)
+
+
+def _find_claude_cli() -> Optional[str]:
+    """Locate the claude CLI, checking PATH and common install locations."""
+    found = shutil.which("claude")
+    if found:
+        return found
+
+    # Common install locations that might not be on the server's PATH
+    home = Path.home()
+    candidates = [
+        home / ".local" / "bin" / ("claude.exe" if sys.platform == "win32" else "claude"),
+        home / ".local" / "bin" / "claude.EXE",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "claude" / "claude.exe",
+        home / ".claude" / "bin" / "claude",
+        Path("/usr/local/bin/claude"),
+        Path("/opt/homebrew/bin/claude"),
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+
+    return None
 
 
 class ClaudeCodeStatus(str, Enum):
@@ -24,56 +56,72 @@ class ClaudeCodeError(Exception):
     recoverable: bool
 
 
+def _run_cli_sync(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess:
+    """Run a CLI command synchronously (safe for any event loop)."""
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        timeout=timeout,
+        text=True,
+    )
+
+
+def _stream_cli_lines(cmd: list[str], queue: Queue, timeout: int = 180):
+    """Run CLI and push stdout lines to a queue. Runs in a thread."""
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for line in proc.stdout:
+            queue.put(("line", line.rstrip()))
+        proc.wait()
+        if proc.returncode != 0:
+            stderr = proc.stderr.read()
+            queue.put(("error", (proc.returncode, stderr)))
+        queue.put(("done", None))
+    except Exception as exc:
+        queue.put(("error", (1, str(exc))))
+        queue.put(("done", None))
+
+
 class ClaudeCodeProvider:
     """Wraps the `claude` CLI as an AI provider for ClawChat.
 
-    Uses `claude --print --output-format stream-json` for streaming responses.
+    Uses subprocess.run / subprocess.Popen (via threads) to avoid
+    Windows SelectorEventLoop incompatibility with asyncio subprocesses.
     """
 
     def __init__(self):
-        self._active_processes: dict[str, asyncio.subprocess.Process] = {}
         self._cli_path: Optional[str] = None
 
     async def check_availability(self) -> tuple[ClaudeCodeStatus, Optional[str]]:
-        """Check if claude CLI is installed and authenticated.
+        """Check if claude CLI is installed.
         Returns (status, version_string_or_none).
         """
-        cli = shutil.which("claude")
+        cli = _find_claude_cli()
         if not cli:
+            logger.warning("Claude Code CLI not found in PATH or common locations")
             return ClaudeCodeStatus.NOT_INSTALLED, None
         self._cli_path = cli
+        logger.info("Found Claude Code CLI at: %s", cli)
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                cli, "--version",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            result = await asyncio.to_thread(
+                _run_cli_sync, [cli, "--version"], 10
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-            if proc.returncode != 0:
+            if result.returncode != 0:
+                logger.error("claude --version failed (rc=%d): %s", result.returncode, result.stderr)
                 return ClaudeCodeStatus.ERROR, None
-            version = stdout.decode().strip()
-
-            # Check auth by running a trivial command
-            proc = await asyncio.create_subprocess_exec(
-                cli, "--print", "-p", "respond with ok",
-                "--output-format", "text",
-                "--max-turns", "1",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-            if proc.returncode != 0:
-                err_text = stderr.decode().lower()
-                if "auth" in err_text or "login" in err_text or "api key" in err_text:
-                    return ClaudeCodeStatus.NOT_AUTHENTICATED, version
-                return ClaudeCodeStatus.ERROR, version
-
+            version = result.stdout.strip()
             return ClaudeCodeStatus.AVAILABLE, version
-        except asyncio.TimeoutError:
+        except subprocess.TimeoutExpired:
+            logger.error("Claude Code --version timed out")
             return ClaudeCodeStatus.ERROR, None
-        except Exception as e:
-            logger.error(f"Claude Code availability check failed: {e}")
+        except Exception:
+            logger.exception("Claude Code availability check failed")
             return ClaudeCodeStatus.ERROR, None
 
     async def stream_response(
@@ -84,9 +132,9 @@ class ClaudeCodeProvider:
     ) -> AsyncIterator[str]:
         """Stream a response from Claude Code CLI.
 
-        Uses `claude --print --output-format stream-json` and yields text deltas.
+        Uses subprocess.Popen in a thread and yields text deltas.
         """
-        cli = self._cli_path or shutil.which("claude")
+        cli = self._cli_path or _find_claude_cli()
         if not cli:
             raise ClaudeCodeError(
                 status=ClaudeCodeStatus.NOT_INSTALLED,
@@ -104,75 +152,52 @@ class ClaudeCodeProvider:
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
 
-        # If we have a session/conversation continuation, cancel any previous run
-        if session_id and session_id in self._active_processes:
-            await self.cancel_run(session_id)
-
         cmd.extend(["-p", message])
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        queue: Queue = Queue()
+        thread = threading.Thread(target=_stream_cli_lines, args=(cmd, queue), daemon=True)
+        thread.start()
 
-        if session_id:
-            self._active_processes[session_id] = proc
-
+        has_streamed = False
         try:
-            async for line in proc.stdout:
-                decoded = line.decode().strip()
-                if not decoded:
-                    continue
+            while True:
+                # Poll the queue, yielding control to the event loop between checks
                 try:
-                    event = json.loads(decoded)
-                    # stream-json format emits objects with "type" field
-                    if event.get("type") == "assistant" and "message" in event:
-                        # Extract text content from the message
-                        msg = event["message"]
-                        if isinstance(msg, str):
-                            yield msg
-                        elif isinstance(msg, dict):
-                            for block in msg.get("content", []):
-                                if isinstance(block, dict) and block.get("type") == "text":
-                                    yield block.get("text", "")
-                    elif event.get("type") == "content_block_delta":
-                        delta = event.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            yield delta.get("text", "")
-                    elif event.get("type") == "result":
-                        # Final result message
-                        result_text = event.get("result", "")
-                        if result_text:
-                            yield result_text
-                except json.JSONDecodeError:
-                    # Non-JSON line, might be raw text output
-                    if decoded:
-                        yield decoded
+                    kind, data = await asyncio.to_thread(queue.get, True, 0.1)
+                except Empty:
+                    continue
 
-            await proc.wait()
-
-            if proc.returncode != 0:
-                stderr_output = await proc.stderr.read()
-                error_text = stderr_output.decode().strip()
-                mapped = self.map_error(proc.returncode, error_text)
-                raise mapped
-
+                if kind == "done":
+                    break
+                if kind == "error":
+                    rc, stderr = data
+                    mapped = self.map_error(rc, stderr)
+                    raise mapped
+                if kind == "line":
+                    decoded = data.strip()
+                    if not decoded:
+                        continue
+                    try:
+                        event = json.loads(decoded)
+                        event_type = event.get("type", "")
+                        if event_type == "content_block_delta":
+                            delta = event.get("delta", {})
+                            if delta.get("type") == "text_delta":
+                                text = delta.get("text", "")
+                                if text:
+                                    has_streamed = True
+                                    yield text
+                        elif event_type == "result":
+                            if not has_streamed:
+                                result_text = event.get("result", "")
+                                if result_text:
+                                    yield result_text
+                    except json.JSONDecodeError:
+                        if decoded:
+                            has_streamed = True
+                            yield decoded
         finally:
-            if session_id:
-                self._active_processes.pop(session_id, None)
-
-    async def cancel_run(self, session_id: str) -> bool:
-        """Cancel an active Claude Code run."""
-        proc = self._active_processes.pop(session_id, None)
-        if proc and proc.returncode is None:
-            try:
-                proc.terminate()
-                await asyncio.wait_for(proc.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                proc.kill()
-            return True
-        return False
+            thread.join(timeout=5)
 
     def map_error(self, return_code: int, stderr: str) -> ClaudeCodeError:
         """Map CLI errors to structured error types."""
@@ -205,3 +230,144 @@ class ClaudeCodeProvider:
         """Quick check if Claude Code is available."""
         status, _ = await self.check_availability()
         return status == ClaudeCodeStatus.AVAILABLE
+
+    # ── AIService-compatible interface ────────────────────────────────
+    # These methods let ClaudeCodeProvider be used as a drop-in
+    # replacement for AIService in the chat router and orchestrator.
+
+    async def _run_text(self, prompt: str, system_prompt: str | None = None) -> str:
+        """Non-streaming call: runs claude --print --output-format text."""
+        cli = self._cli_path or _find_claude_cli()
+        if not cli:
+            raise AIUnavailableError("Claude Code CLI not found")
+
+        cmd = [
+            cli, "--print",
+            "--output-format", "text",
+            "--max-turns", "1",
+        ]
+        if system_prompt:
+            cmd.extend(["--system-prompt", system_prompt])
+        cmd.extend(["-p", prompt])
+
+        try:
+            result = await asyncio.to_thread(_run_cli_sync, cmd, 120)
+            if result.returncode != 0:
+                raise AIUnavailableError(f"Claude Code error: {result.stderr[:200]}")
+            return result.stdout.strip()
+        except subprocess.TimeoutExpired:
+            raise AIUnavailableError("Claude Code timed out")
+
+    async def stream_completion(self, messages: list[dict]) -> AsyncIterator[str]:
+        """AIService-compatible streaming: converts messages list to a prompt."""
+        system_prompt = None
+        user_parts: list[str] = []
+
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "system":
+                system_prompt = content
+            elif role == "user":
+                user_parts.append(content)
+            elif role == "assistant":
+                user_parts.append(f"[Assistant]: {content}")
+
+        prompt = "\n\n".join(user_parts) if user_parts else "Hello"
+
+        async for token in self.stream_response(
+            message=prompt,
+            system_prompt=system_prompt,
+        ):
+            yield token
+
+    async def generate_completion(self, system_prompt: str, user_message: str) -> str:
+        """Non-streaming completion, matching AIService interface."""
+        return await self._run_text(user_message, system_prompt=system_prompt)
+
+    async def generate_title(self, user_message: str) -> str:
+        """Generate a short conversation title."""
+        system = (
+            "Generate a short title (max 6 words) for a conversation that starts with "
+            "the following user message. Reply with ONLY the title, no quotes or punctuation "
+            "at the start/end."
+        )
+        try:
+            title = await self._run_text(user_message, system_prompt=system)
+            return title[:60] if title else "New Conversation"
+        except Exception:
+            logger.warning("Claude Code title generation failed, using fallback")
+            return "New Conversation"
+
+    async def function_call(
+        self,
+        system_prompt: str,
+        user_message: str,
+        tools: list[dict],
+        tool_choice: dict | str = "auto",
+    ) -> dict:
+        """Emulate OpenAI function calling by asking Claude to output JSON.
+
+        Returns a dict shaped like an OpenAI chat completion with tool_calls.
+        """
+        func_schemas = []
+        for tool in tools:
+            if tool.get("type") == "function":
+                func_schemas.append(tool["function"])
+
+        func_name = ""
+        if isinstance(tool_choice, dict):
+            func_name = tool_choice.get("function", {}).get("name", "")
+        if not func_name and func_schemas:
+            func_name = func_schemas[0].get("name", "classify")
+
+        params_schema = func_schemas[0].get("parameters", {}) if func_schemas else {}
+
+        json_system = (
+            f"{system_prompt}\n\n"
+            f"You MUST respond with ONLY a valid JSON object matching this schema:\n"
+            f"{json.dumps(params_schema, indent=2)}\n\n"
+            f"No explanation, no markdown fences, just the raw JSON object."
+        )
+
+        try:
+            raw = await self._run_text(user_message, system_prompt=json_system)
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                cleaned = "\n".join(cleaned.split("\n")[1:])
+            if cleaned.endswith("```"):
+                cleaned = "\n".join(cleaned.split("\n")[:-1])
+            cleaned = cleaned.strip()
+
+            args = json.loads(cleaned)
+
+            return {
+                "choices": [{
+                    "message": {
+                        "tool_calls": [{
+                            "function": {
+                                "name": func_name,
+                                "arguments": json.dumps(args),
+                            }
+                        }]
+                    }
+                }]
+            }
+        except (json.JSONDecodeError, Exception) as exc:
+            logger.warning("Claude Code function_call JSON parse failed: %s", exc)
+            return {
+                "choices": [{
+                    "message": {
+                        "tool_calls": [{
+                            "function": {
+                                "name": func_name,
+                                "arguments": json.dumps({"intent": "general_chat"}),
+                            }
+                        }]
+                    }
+                }]
+            }
+
+    async def close(self):
+        """No-op — thread-based subprocesses clean up automatically."""
+        pass

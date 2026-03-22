@@ -1,13 +1,18 @@
 package com.clawchat.android.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,9 +27,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.Todo
@@ -71,20 +79,23 @@ fun HomeScreen(
         HomeTab.Tasks -> tasksState.isLoading && tasksState.tasks.isNotEmpty()
     }
 
-    Scaffold { padding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             // ── Header ──────────────────────────────────────────────
             Text(
                 text = todayState.greeting.ifBlank { "My Day" },
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 4.dp),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 4.dp),
             )
 
-            // ── Tab row ─────────────────────────────────────────────
+            // ── Pill tab row ────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 HomeTab.entries.forEach { tab ->
@@ -104,24 +115,52 @@ fun HomeScreen(
                         else -> null
                     }
 
-                    FilterChip(
-                        selected = isSelected,
+                    Surface(
                         onClick = { selectedTab = tab.name },
-                        label = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(tab.label)
-                                if (badge != null) {
-                                    Spacer(Modifier.width(4.dp))
-                                    Badge(
-                                        containerColor = if (tab == HomeTab.Today) MaterialTheme.colorScheme.error
-                                        else MaterialTheme.colorScheme.primary,
-                                    ) {
-                                        Text("$badge")
-                                    }
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                tab.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                            AnimatedVisibility(
+                                visible = badge != null,
+                                enter = scaleIn() + fadeIn(),
+                                exit = scaleOut() + fadeOut(),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (tab == HomeTab.Today) MaterialTheme.colorScheme.error
+                                            else if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                                            else MaterialTheme.colorScheme.primary,
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        "${badge ?: 0}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp,
+                                        color = if (tab == HomeTab.Today) Color.White
+                                        else if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else Color.White,
+                                    )
                                 }
                             }
-                        },
-                    )
+                        }
+                    }
                 }
             }
 
@@ -168,25 +207,36 @@ fun HomeScreen(
             }
 
             // ── Fixed bottom input bar ──────────────────────────────
-            Surface(tonalElevation = 1.dp) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedTextField(
+                    TextField(
                         value = inputText,
                         onValueChange = { inputText = it },
-                        placeholder = { Text("Add a task\u2026") },
+                        placeholder = {
+                            Text(
+                                "Add a task\u2026",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         shape = RoundedCornerShape(24.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
                         ),
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
                     FilledIconButton(
                         onClick = {
                             if (inputText.isNotBlank()) {
@@ -195,6 +245,13 @@ fun HomeScreen(
                             }
                         },
                         enabled = inputText.isNotBlank(),
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Add")
                     }
@@ -221,14 +278,20 @@ private fun TodayContent(
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    modifier = Modifier.size(56.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(
                     "All clear for today",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Nothing on your schedule",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
             }
         }
@@ -237,14 +300,15 @@ private fun TodayContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (overdueTodos.isNotEmpty()) {
             item { SectionHeader("Overdue", isError = true) }
             items(overdueTodos, key = { it.id }) { todo ->
-                TodoRow(todo = todo, onToggle = { onToggle(todo.id) })
+                TodoRow(todo = todo, onToggle = { onToggle(todo.id) }, accentColor = MaterialTheme.colorScheme.error)
             }
-            item { Spacer(Modifier.height(12.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
 
         if (todayTodos.isNotEmpty()) {
@@ -254,7 +318,7 @@ private fun TodayContent(
             items(todayTodos, key = { it.id }) { todo ->
                 TodoRow(todo = todo, onToggle = { onToggle(todo.id) })
             }
-            item { Spacer(Modifier.height(12.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
 
         if (todayEvents.isNotEmpty()) {
@@ -262,7 +326,7 @@ private fun TodayContent(
             items(todayEvents, key = { it.id }) { event ->
                 EventRow(event = event)
             }
-            item { Spacer(Modifier.height(12.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
 
         if (inboxPreview.isNotEmpty()) {
@@ -273,7 +337,7 @@ private fun TodayContent(
             item {
                 TextButton(
                     onClick = onInboxTabClick,
-                    modifier = Modifier.padding(start = 4.dp),
+                    modifier = Modifier.padding(top = 4.dp),
                 ) { Text("See all in Inbox") }
             }
         }
@@ -293,7 +357,7 @@ private fun InboxContent(
 
     if (state.isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(strokeWidth = 3.dp)
         }
         return
     }
@@ -304,14 +368,20 @@ private fun InboxContent(
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    modifier = Modifier.size(56.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
                 Text(
                     "Inbox is clear",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "All items have been processed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
             }
         }
@@ -320,14 +390,15 @@ private fun InboxContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (state.planningNow.isNotEmpty()) {
             item { SectionHeader("Planning now") }
             items(state.planningNow, key = { it.id }) { todo ->
                 InboxItemRow(todo = todo, showSpinner = true)
             }
-            item { Spacer(Modifier.height(12.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
         if (state.reviewSuggestion.isNotEmpty()) {
             item { SectionHeader("Review suggestion") }
@@ -338,7 +409,7 @@ private fun InboxContent(
                     onAction = { onOrganize(todo.id) },
                 )
             }
-            item { Spacer(Modifier.height(12.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
         if (state.needsOrganizing.isNotEmpty()) {
             item { SectionHeader("Needs organizing") }
@@ -349,7 +420,7 @@ private fun InboxContent(
                     onAction = { onOrganize(todo.id) },
                 )
             }
-            item { Spacer(Modifier.height(12.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
         if (state.failed.isNotEmpty()) {
             item { SectionHeader("Failed", isError = true) }
@@ -381,23 +452,43 @@ private fun TasksContent(
     }
 
     Column {
-        // Filter chips
+        // Fluent-style pill filter row
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilterChip(selected = statusFilter == null, onClick = { onSetFilter(null) }, label = { Text("All") })
-            FilterChip(selected = statusFilter == "pending", onClick = { onSetFilter("pending") }, label = { Text("Pending") })
-            FilterChip(selected = statusFilter == "completed", onClick = { onSetFilter("completed") }, label = { Text("Done") })
+            listOf("All" to null, "Pending" to "pending", "Done" to "completed").forEach { (label, filter) ->
+                val isSelected = statusFilter == filter
+                Surface(
+                    onClick = { onSetFilter(filter) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                    else Color.Transparent,
+                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                ) {
+                    Text(
+                        label,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                    )
+                }
+            }
         }
 
         if (filteredTasks.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No tasks", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "No tasks",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 items(filteredTasks, key = { it.id }) { task ->
                     TodoRow(
@@ -412,7 +503,7 @@ private fun TasksContent(
     }
 }
 
-// ── Shared row components (MS Todo-style: clean, minimal) ────────────────────
+// ── Shared row components (Fluent-style: flat, clean, with accent strip) ─────
 
 @Composable
 private fun TodoRow(
@@ -420,30 +511,54 @@ private fun TodoRow(
     onToggle: () -> Unit,
     onClick: (() -> Unit)? = null,
     showDescription: Boolean = false,
+    accentColor: Color? = null,
 ) {
     val isCompleted = todo.status == "completed"
+    val priorityColor = when (todo.priority) {
+        "urgent" -> MaterialTheme.colorScheme.error
+        "high" -> Color(0xFFF57C00)
+        else -> null
+    }
+    val stripColor = accentColor ?: priorityColor
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(12.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
     ) {
         Row(
-            modifier = Modifier.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier.height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Left accent strip
+            if (stripColor != null) {
+                Box(
+                    modifier = Modifier
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(stripColor, RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp)),
+                )
+            }
+
+            // Checkbox
             Checkbox(
                 checked = isCompleted,
                 onCheckedChange = { onToggle() },
+                modifier = Modifier.padding(start = if (stripColor != null) 8.dp else 4.dp),
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary,
+                    uncheckedColor = MaterialTheme.colorScheme.outline,
                 ),
             )
-            Column(modifier = Modifier.weight(1f)) {
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 16.dp, top = 10.dp, bottom = 10.dp),
+            ) {
                 Text(
                     todo.title,
                     style = MaterialTheme.typography.bodyLarge,
@@ -463,14 +578,15 @@ private fun TodoRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                // Due date or priority hint
+                // Due date / priority metadata
                 val meta = buildList {
                     if (todo.dueDate != null) add(todo.dueDate)
                     if (todo.priority == "high" || todo.priority == "urgent") add(todo.priority)
                 }
                 if (meta.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        meta.joinToString(" · "),
+                        meta.joinToString(" \u00b7 "),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (todo.priority == "high" || todo.priority == "urgent")
                             MaterialTheme.colorScheme.error
@@ -487,21 +603,39 @@ private fun EventRow(event: Event) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(event.title, style = MaterialTheme.typography.bodyLarge)
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            // Left accent strip — primary color for events
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(
+                        MaterialTheme.colorScheme.primary,
+                        RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp),
+                    ),
+            )
+            Column(
+                modifier = Modifier.padding(start = 14.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+            ) {
+                Text(
+                    event.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(Modifier.height(2.dp))
                 Text(
                     event.startTime,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 event.location?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -519,7 +653,7 @@ private fun InboxPreviewRow(todo: Todo) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -534,6 +668,7 @@ private fun InboxPreviewRow(todo: Todo) {
                 )
                 val summary = todo.planSummary
                 if (!summary.isNullOrBlank()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         summary,
                         style = MaterialTheme.typography.bodySmall,
@@ -544,10 +679,17 @@ private fun InboxPreviewRow(todo: Todo) {
                 }
             }
             Spacer(Modifier.width(8.dp))
-            SuggestionChip(
-                onClick = {},
-                label = { Text(stateLabel, style = MaterialTheme.typography.labelSmall) },
-            )
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+            ) {
+                Text(
+                    stateLabel,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
         }
     }
 }
@@ -563,14 +705,18 @@ private fun InboxItemRow(
     Surface(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showSpinner) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Spacer(Modifier.width(12.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -582,6 +728,7 @@ private fun InboxItemRow(
                 )
                 val summary = todo.planSummary
                 if (!summary.isNullOrBlank()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         summary,
                         style = MaterialTheme.typography.bodySmall,
@@ -592,6 +739,7 @@ private fun InboxItemRow(
                 }
                 val errMsg = todo.automationError
                 if (isError && !errMsg.isNullOrBlank()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         errMsg,
                         style = MaterialTheme.typography.bodySmall,
@@ -606,7 +754,8 @@ private fun InboxItemRow(
                 if (isError) {
                     FilledTonalButton(
                         onClick = onAction,
-                        contentPadding = PaddingValues(horizontal = 12.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -614,13 +763,16 @@ private fun InboxItemRow(
                     ) {
                         Icon(Icons.Default.Refresh, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(actionLabel)
+                        Text(actionLabel, style = MaterialTheme.typography.labelMedium)
                     }
                 } else {
                     FilledTonalButton(
                         onClick = onAction,
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                    ) { Text(actionLabel) }
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text(actionLabel, style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }
@@ -632,12 +784,13 @@ private fun SectionHeader(title: String, isError: Boolean = false) {
     Text(
         title,
         style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
         color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 6.dp),
     )
 }
 
-// ── Task detail (kept from TasksScreen) ──────────────────────────────────────
+// ── Task detail ──────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -650,7 +803,7 @@ private fun TaskDetailView(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Task") },
+                title = { Text("Task", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -661,49 +814,113 @@ private fun TaskDetailView(
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
         },
+        containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Text(task.title, style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.height(8.dp))
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp)) {
+            Text(
+                task.title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(16.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = task.status == "completed", onCheckedChange = { onToggle() })
-                Text(if (task.status == "completed") "Completed" else "Pending")
+            // Status row
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = task.status == "completed",
+                        onCheckedChange = { onToggle() },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                            uncheckedColor = MaterialTheme.colorScheme.outline,
+                        ),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (task.status == "completed") "Completed" else "Pending",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
             val detailDesc = task.description
             if (!detailDesc.isNullOrBlank()) {
-                Text("Description", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                Text(detailDesc, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(16.dp))
+                Text("Description", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    detailDesc,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(20.dp))
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Metadata row
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column {
                     Text("Priority", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(task.priority)
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = when (task.priority) {
+                            "urgent" -> MaterialTheme.colorScheme.errorContainer
+                            "high" -> Color(0xFFFFF3E0)
+                            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                    ) {
+                        Text(
+                            task.priority.replaceFirstChar { it.uppercase() },
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = when (task.priority) {
+                                "urgent" -> MaterialTheme.colorScheme.error
+                                "high" -> Color(0xFFF57C00)
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
+                        )
+                    }
                 }
                 task.dueDate?.let {
                     Column {
                         Text("Due", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(it)
+                        Spacer(Modifier.height(4.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
 
             val taskTags = task.tags
             if (!taskTags.isNullOrEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                Text("Tags", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(20.dp))
+                Text("Tags", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     taskTags.forEach { tag ->
-                        SuggestionChip(onClick = {}, label = { Text(tag) })
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            Text(
+                                tag,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
                     }
                 }
             }

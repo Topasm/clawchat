@@ -16,6 +16,10 @@ export function useAutoLogin() {
     // Skip if already logged in or a login attempt is in progress
     if (useAuthStore.getState().token || loginInFlight.current) return;
 
+    // Skip auto-login if no embedded server (dev mode)
+    const status = await window.electronAPI.server.getStatus();
+    if (status.state === 'stopped' || status.state === 'error') return;
+
     loginInFlight.current = true;
     try {
       // Clear any stale auth state before fresh login

@@ -242,7 +242,7 @@ async def stream_chat(
         messages.append({"role": msg.role, "content": msg.content})
 
     assistant_msg_id = make_id("msg_")
-    ai_service = request.app.state.ai_service
+    ai_service = getattr(request.app.state, "active_ai", request.app.state.ai_service)
     session_factory = request.app.state.session_factory
 
     async def event_generator():

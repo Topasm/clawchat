@@ -25,8 +25,19 @@ from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
 from utils.inbox_display import get_next_action
 from config import settings
 from services.obsidian_export_service import export_todo, remove_todo_from_vault
+from ws.manager import ws_manager
 
 router = APIRouter()
+
+DEFAULT_USER_ID = "user"
+
+
+async def _notify_todo_change():
+    """Broadcast a module_data_changed event so all clients refresh todos."""
+    await ws_manager.send_json(DEFAULT_USER_ID, {
+        "type": "module_data_changed",
+        "data": {"module": "todos"},
+    })
 
 _ORDER_COLUMNS = {
     "created_at": Todo.created_at,
@@ -112,49 +123,61 @@ async def list_projects(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    """List root todos (projects) with their conversation IDs and subtask counts."""
+    """List root todos that qualify as projects.
+
+    A root todo is a project if it has subtasks, a linked conversation, or
+    an explicit source (e.g. obsidian_project).  Simple inbox captures and
+    standalone tasks are excluded.
+    """
     q = (
         select(Todo)
         .where(Todo.parent_id.is_(None))
         .order_by(Todo.updated_at.desc())
     )
-    projects = (await db.execute(q)).scalars().all()
+    root_todos = (await db.execute(q)).scalars().all()
 
     items = []
-    for project in projects:
+    for todo in root_todos:
         # Get associated conversation
         conv_q = select(Conversation.id).where(
-            Conversation.project_todo_id == project.id,
+            Conversation.project_todo_id == todo.id,
             Conversation.is_archived == False,  # noqa: E712
         ).limit(1)
         conv_id = (await db.execute(conv_q)).scalar()
 
         # Count subtasks
-        subtask_q = select(func.count(Todo.id)).where(Todo.parent_id == project.id)
+        subtask_q = select(func.count(Todo.id)).where(Todo.parent_id == todo.id)
         subtask_count = (await db.execute(subtask_q)).scalar() or 0
 
         completed_q = select(func.count(Todo.id)).where(
-            Todo.parent_id == project.id,
+            Todo.parent_id == todo.id,
             Todo.status == "completed",
         )
         completed_count = (await db.execute(completed_q)).scalar() or 0
 
+        # Only include as a project if it has subtasks, a conversation, or a source
+        has_subtasks = subtask_count > 0
+        has_conversation = conv_id is not None
+        has_source = bool(todo.source)
+        if not (has_subtasks or has_conversation or has_source):
+            continue
+
         resp = ProjectTodoResponse(
-            id=project.id,
-            title=project.title,
-            description=project.description,
-            status=project.status,
-            priority=project.priority,
-            due_date=project.due_date,
-            completed_at=project.completed_at,
-            tags=deserialize_tags(project.tags) if project.tags else None,
-            parent_id=project.parent_id,
-            sort_order=project.sort_order,
-            source=project.source,
-            source_id=project.source_id,
-            assignee=project.assignee,
-            created_at=project.created_at,
-            updated_at=project.updated_at,
+            id=todo.id,
+            title=todo.title,
+            description=todo.description,
+            status=todo.status,
+            priority=todo.priority,
+            due_date=todo.due_date,
+            completed_at=todo.completed_at,
+            tags=deserialize_tags(todo.tags) if todo.tags else None,
+            parent_id=todo.parent_id,
+            sort_order=todo.sort_order,
+            source=todo.source,
+            source_id=todo.source_id,
+            assignee=todo.assignee,
+            created_at=todo.created_at,
+            updated_at=todo.updated_at,
             conversation_id=conv_id,
             subtask_count=subtask_count,
             completed_subtask_count=completed_count,
@@ -261,6 +284,7 @@ async def bulk_update_todos(
                     project_name = parent.title
             export_todo(settings.obsidian_vault_path, todo, project_name)
 
+    await _notify_todo_change()
     return BulkTodoResponse(updated=updated, deleted=deleted, errors=errors)
 
 
@@ -310,6 +334,7 @@ async def create_todo(
                 project_name = parent.title
         export_todo(settings.obsidian_vault_path, todo, project_name)
 
+    await _notify_todo_change()
     return await _enrich_todo_response(todo, db)
 
 
@@ -356,6 +381,7 @@ async def update_todo(
                 project_name = parent.title
         export_todo(settings.obsidian_vault_path, todo, project_name)
 
+    await _notify_todo_change()
     return await _enrich_todo_response(todo, db)
 
 
@@ -374,6 +400,8 @@ async def delete_todo(
 
     if settings.obsidian_vault_path:
         remove_todo_from_vault(settings.obsidian_vault_path, deleted_id)
+
+    await _notify_todo_change()
 
 
 @router.post("/{todo_id}/organize")
@@ -576,6 +604,7 @@ async def apply_plan(
         for child in created_todos:
             export_todo(settings.obsidian_vault_path, child, project_name)
 
+    await _notify_todo_change()
     return PlanApplyResponse(
         todo_id=todo_id,
         created_subtask_ids=created_ids,
@@ -595,6 +624,7 @@ async def dismiss_plan(
         raise NotFoundError("Todo not found")
     todo.inbox_state = "none"
     await db.commit()
+    await _notify_todo_change()
     return {"status": "dismissed", "todo_id": todo_id}
 
 

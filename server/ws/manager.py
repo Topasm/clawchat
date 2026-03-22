@@ -8,23 +8,40 @@ logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[str, WebSocket] = {}
+        self.active_connections: dict[str, list[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
         await websocket.accept()
-        self.active_connections[user_id] = websocket
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
 
-    def disconnect(self, user_id: str):
-        self.active_connections.pop(user_id, None)
+    def disconnect(self, user_id: str, websocket: WebSocket | None = None):
+        conns = self.active_connections.get(user_id)
+        if not conns:
+            return
+        if websocket:
+            conns[:] = [ws for ws in conns if ws is not websocket]
+            if not conns:
+                del self.active_connections[user_id]
+        else:
+            del self.active_connections[user_id]
 
     async def send_json(self, user_id: str, data: dict):
-        ws = self.active_connections.get(user_id)
-        if ws:
+        conns = self.active_connections.get(user_id)
+        if not conns:
+            return
+        dead: list[WebSocket] = []
+        for ws in conns:
             try:
                 await ws.send_json(data)
             except Exception:
                 logger.warning("Failed to send WS message to %s, removing connection", user_id)
-                self.disconnect(user_id)
+                dead.append(ws)
+        if dead:
+            conns[:] = [ws for ws in conns if ws not in dead]
+            if not conns:
+                del self.active_connections[user_id]
 
     async def stream_to_user(
         self,

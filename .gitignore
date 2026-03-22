@@ -10,8 +10,17 @@ release
 *.keystore
 keystore_base64.txt
 
-# Capacitor
-android/app/build
+# Android
+android/.gradle/
+android/.kotlin/
+android/build/
+android/*/build/
+android/*/*/build/
+android/app/build/
+android/local.properties
+android/gradle/wrapper/gradle-wrapper.jar
+
+# Capacitor / iOS
 ios/App/Pods
 
 # IDE

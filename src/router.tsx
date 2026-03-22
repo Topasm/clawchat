@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './app/stores/useAuthStore';
 import { useAutoLogin } from './app/hooks/useAutoLogin';
-import { IS_ELECTRON } from './app/types/platform';
 import ErrorBoundary from './app/components/shared/ErrorBoundary';
 import Layout from './app/components/Layout';
 import LoginPage from './app/pages/LoginPage';
@@ -49,19 +48,6 @@ export default function AppRouter() {
   if (isLoading) return null;
 
   const isAuthenticated = !!token;
-
-  // On Electron, show splash while server is starting and auto-login hasn't completed
-  if (IS_ELECTRON && !isAuthenticated) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh', flexDirection: 'column', gap: 12,
-      }}>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>ClawChat</div>
-        <div style={{ fontSize: 13, color: 'var(--cc-text-secondary)' }}>Starting server...</div>
-      </div>
-    );
-  }
 
   if (!isAuthenticated) {
     return (

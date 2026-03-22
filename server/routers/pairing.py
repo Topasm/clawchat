@@ -1,10 +1,11 @@
 import json
 import random
+import socket
 import string
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,28 @@ from schemas.pairing import (
 router = APIRouter()
 
 PAIRING_EXPIRY_MINUTES = 5
+
+
+def _get_local_ip() -> str:
+    """Get the machine's LAN IP address."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def _get_base_url(request: Request | None = None) -> str:
+    """Build the base URL for pairing, preferring public_url, then LAN IP."""
+    if settings.public_url:
+        return settings.public_url
+    host = settings.host
+    if host == "0.0.0.0":
+        host = _get_local_ip()
+    return f"http://{host}:{settings.port}"
 
 
 def _generate_code() -> str:
@@ -58,7 +81,7 @@ async def create_pairing_session(
     code = _generate_code()
     expires_at = now + timedelta(minutes=PAIRING_EXPIRY_MINUTES)
 
-    base_url = settings.public_url or f"http://{settings.host}:{settings.port}"
+    base_url = _get_base_url()
     qr_payload = json.dumps({
         "type": "clawchat_pair",
         "code": code,
@@ -117,7 +140,7 @@ async def claim_pairing_session(
 
     await db.commit()
 
-    api_base_url = settings.public_url or f"http://{settings.host}:{settings.port}"
+    api_base_url = _get_base_url()
 
     return PairingClaimResponse(
         device_id=device_id,

@@ -11,8 +11,18 @@ from schemas.calendar import EventCreate, EventResponse, EventUpdate
 from schemas.common import PaginatedResponse
 from services import calendar_service
 from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
+from ws.manager import ws_manager
 
 router = APIRouter()
+
+DEFAULT_USER_ID = "user"
+
+
+async def _notify_event_change():
+    await ws_manager.send_json(DEFAULT_USER_ID, {
+        "type": "module_data_changed",
+        "data": {"module": "events"},
+    })
 
 
 def _event_to_response(row) -> EventResponse:
@@ -90,6 +100,7 @@ async def create_event(
     resp = EventResponse.model_validate(event)
     if event.tags:
         resp.tags = deserialize_tags(event.tags)
+    await _notify_event_change()
     return resp
 
 
@@ -127,6 +138,7 @@ async def update_event(
     resp = EventResponse.model_validate(event)
     if event.tags:
         resp.tags = deserialize_tags(event.tags)
+    await _notify_event_change()
     return resp
 
 
@@ -141,6 +153,7 @@ async def delete_event(
         raise NotFoundError("Event not found")
     await db.delete(event)
     await db.commit()
+    await _notify_event_change()
 
 
 @router.delete("/{event_id}/occurrences/{date}", status_code=204)

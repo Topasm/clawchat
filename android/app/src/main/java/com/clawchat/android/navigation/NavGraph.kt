@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -27,7 +29,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Home"),
-    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Projects"),
+    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Chat"),
     BottomNavItem(NavRoute.Settings.route, Icons.Default.Settings, "Settings"),
 )
 
@@ -42,14 +44,30 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 0.dp,
+                ) {
                     bottomNavItems.forEach { item ->
+                        val selected = currentRoute == item.route
                         NavigationBarItem(
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) },
-                            selected = currentRoute == item.route,
+                            icon = {
+                                Icon(
+                                    item.icon,
+                                    contentDescription = item.label,
+                                )
+                            },
+                            label = {
+                                Text(
+                                    item.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            },
+                            selected = selected,
                             onClick = {
                                 navController.navigate(item.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
@@ -59,6 +77,13 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
                                     restoreState = true
                                 }
                             },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            ),
                         )
                     }
                 }
