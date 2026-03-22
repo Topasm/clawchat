@@ -149,9 +149,10 @@ private fun TodoCard(todo: Todo, onToggle: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (todo.dueDate != null) {
+                val dueDate = todo.dueDate
+                if (dueDate != null) {
                     Text(
-                        todo.dueDate,
+                        dueDate,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
