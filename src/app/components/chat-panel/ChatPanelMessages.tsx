@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useChatStore } from '../../stores/useChatStore';
-import { useRegenerate } from '../../hooks/useRegenerate';
+import type { ChatMessage } from '../../stores/useChatStore';
 import MessageBubble from './MessageBubble';
 import StreamingIndicator from './StreamingIndicator';
 
 interface ChatPanelMessagesProps {
   conversationId: string | null;
+  messages: ChatMessage[];
   onEditMessage?: (messageId: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
+  onRegenerateMessage?: (messageId: string) => void;
 }
 
-export default function ChatPanelMessages({ conversationId, onEditMessage }: ChatPanelMessagesProps) {
-  const messages = useChatStore((s) => s.messages);
+export default function ChatPanelMessages({ conversationId, messages, onEditMessage, onDeleteMessage, onRegenerateMessage }: ChatPanelMessagesProps) {
   const isStreaming = useChatStore((s) => s.isStreaming);
-  const deleteMessage = useChatStore((s) => s.deleteMessage);
-  const handleRegenerate = useRegenerate(conversationId);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const chronological = useMemo(() => [...messages].reverse(), [messages]);
@@ -30,10 +30,10 @@ export default function ChatPanelMessages({ conversationId, onEditMessage }: Cha
         <MessageBubble
           key={msg._id}
           message={msg}
-          onDelete={conversationId ? () => deleteMessage(conversationId, msg._id) : undefined}
+          onDelete={onDeleteMessage ? () => onDeleteMessage(msg._id) : undefined}
           onRegenerate={
-            msg.user._id === 'assistant' && conversationId
-              ? () => handleRegenerate(msg._id)
+            msg.user._id === 'assistant' && onRegenerateMessage
+              ? () => onRegenerateMessage(msg._id)
               : undefined
           }
           onEdit={msg.user._id === 'user' ? onEditMessage : undefined}

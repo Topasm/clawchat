@@ -7,9 +7,11 @@ export {
   useDeleteTodo,
   useToggleTodoComplete,
   useSetKanbanStatus,
+  useReorderTodos,
   useCreateEvent,
   useUpdateEvent,
   useDeleteEvent,
+  useDeleteEventOccurrence,
   useTaskRelationshipsQuery,
   useCreateTaskRelationship,
   useDeleteTaskRelationship,
@@ -24,6 +26,12 @@ export {
   useMessagesQuery,
   useCreateConversation,
   useDeleteConversation,
+  useGetOrCreateProjectConversation,
+  useDeleteMessage,
+  useEditMessage,
+  useRegenerateMessage,
+  useUpdateConversationTitle,
+  useFetchMessages,
 } from './useChatQueries';
 export { default as useTodayData } from './useTodayQuery';
 export {

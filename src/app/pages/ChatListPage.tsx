@@ -1,8 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import usePlatform from '../hooks/usePlatform';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore } from '../stores/useChatStore';
-import { useModuleStore } from '../stores/useModuleStore';
+import {
+  useConversationsQuery,
+  useProjectsQuery,
+  useTodosQuery,
+  useCreateConversation,
+  useDeleteConversation,
+  useGetOrCreateProjectConversation,
+} from '../hooks/queries';
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
 import Badge from '../components/shared/Badge';
@@ -10,9 +17,9 @@ import { ChatBubbleIcon } from '../components/shared/Icons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
-import type { ProjectTodoResponse } from '../types/api';
+import type { ProjectTodoResponse, TodoResponse } from '../types/api';
 
-function getNextDueDate(project: ProjectTodoResponse, todos: ReturnType<typeof useModuleStore.getState>['todos']): string | null {
+function getNextDueDate(project: ProjectTodoResponse, todos: TodoResponse[]): string | null {
   const children = todos.filter((t) => t.parent_id === project.id && t.status !== 'completed' && t.due_date);
   if (children.length === 0) return null;
   children.sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
@@ -31,25 +38,18 @@ function getSyncBadge(project: ProjectTodoResponse): { label: string; variant: '
 
 export default function ChatListPage() {
   const navigate = useNavigate();
-  const conversations = useChatStore((s) => s.conversations);
-  const conversationsLoaded = useChatStore((s) => s.conversationsLoaded);
-  const projects = useChatStore((s) => s.projects);
-  const projectsLoaded = useChatStore((s) => s.projectsLoaded);
-  const createConversation = useChatStore((s) => s.createConversation);
-  const deleteConversation = useChatStore((s) => s.deleteConversation);
-  const fetchProjects = useChatStore((s) => s.fetchProjects);
-  const getOrCreateProjectConversation = useChatStore((s) => s.getOrCreateProjectConversation);
-  const todos = useModuleStore((s) => s.todos);
+  const { data: conversations = [], isLoading: convsLoading } = useConversationsQuery();
+  const { data: projects = [], isLoading: projsLoading } = useProjectsQuery();
+  const { data: todos = [] } = useTodosQuery();
+  const createConversationMutation = useCreateConversation();
+  const deleteConversationMutation = useDeleteConversation();
+  const getOrCreateProjectConvMutation = useGetOrCreateProjectConversation();
   const { isMobile } = usePlatform();
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [quickChatsOpen, setQuickChatsOpen] = useState(false);
 
-  useEffect(() => {
-    if (!projectsLoaded) fetchProjects();
-  }, [projectsLoaded, fetchProjects]);
-
-  const loading = !conversationsLoaded || !projectsLoaded;
+  const loading = convsLoading || projsLoading;
 
   // Quick chats = conversations without a project_todo_id
   const quickChats = conversations.filter((c) => !c.project_todo_id);
@@ -71,7 +71,7 @@ export default function ChatListPage() {
 
   const handleNewChat = async () => {
     try {
-      const convo = await createConversation();
+      const convo = await createConversationMutation.mutateAsync({});
       navigate(`/chats/${convo.id}`);
     } catch {
       // Stay on list page
@@ -80,7 +80,7 @@ export default function ChatListPage() {
 
   const handleProjectClick = async (todoId: string) => {
     try {
-      const convo = await getOrCreateProjectConversation(todoId);
+      const convo = await getOrCreateProjectConvMutation.mutateAsync(todoId);
       navigate(`/chats/${convo.id}`);
     } catch {
       // Stay on list page
@@ -89,7 +89,7 @@ export default function ChatListPage() {
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
-    await deleteConversation(deleteTarget);
+    deleteConversationMutation.mutate(deleteTarget);
     setDeleteTarget(null);
   };
 

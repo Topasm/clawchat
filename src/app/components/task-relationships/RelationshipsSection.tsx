@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useModuleStore } from '../../stores/useModuleStore';
-import { useTaskRelationshipsQuery, useCreateTaskRelationship, useDeleteTaskRelationship } from '../../hooks/queries';
+import { useTodosQuery, useTaskRelationshipsQuery, useCreateTaskRelationship, useDeleteTaskRelationship } from '../../hooks/queries';
 import type { RelationshipType, TaskRelationshipResponse } from '../../types/api';
 
 interface RelationshipsSectionProps {
@@ -19,7 +18,7 @@ const RELATIONSHIP_TYPES: RelationshipType[] = ['blocks', 'blocked_by', 'related
 
 export default function RelationshipsSection({ taskId }: RelationshipsSectionProps) {
   const navigate = useNavigate();
-  const todos = useModuleStore((s) => s.todos);
+  const { data: todos = [] } = useTodosQuery();
   const { data: relationships = [] } = useTaskRelationshipsQuery(taskId);
   const createRelationship = useCreateTaskRelationship();
   const deleteRelationship = useDeleteTaskRelationship();

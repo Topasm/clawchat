@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Dialog from './Dialog';
 import Toggle from './Toggle';
 import RecurrenceSelector from './RecurrenceSelector';
-import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
+import { queryKeys } from '../../hooks/queries/queryKeys';
+import type { EventResponse } from '../../types/api';
 
 interface EventCreateDialogProps {
   open: boolean;
@@ -42,7 +44,7 @@ export default function EventCreateDialog({
   initialDate,
   initialTime,
 }: EventCreateDialogProps) {
-  const addEvent = useModuleStore((s) => s.addEvent);
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -101,7 +103,7 @@ export default function EventCreateDialog({
       .map((t) => t.trim())
       .filter(Boolean);
 
-    addEvent({
+    const newEvent: EventResponse = {
       id,
       title: title.trim(),
       description: description.trim() || undefined,
@@ -114,7 +116,8 @@ export default function EventCreateDialog({
       tags: tags.length > 0 ? tags : undefined,
       created_at: now,
       updated_at: now,
-    });
+    };
+    queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [newEvent, ...(old ?? [])]);
 
     useToastStore.getState().addToast('success', 'Event created');
     onOpenChange(false);

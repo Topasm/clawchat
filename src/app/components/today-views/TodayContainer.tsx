@@ -3,7 +3,7 @@ import useTodayData from '../../hooks/queries/useTodayQuery';
 import useTodayProgress from '../../hooks/useTodayProgress';
 import useTodayBriefing from '../../hooks/useTodayBriefing';
 import useTodayHotkeys from '../../hooks/useTodayHotkeys';
-import { useModuleStore } from '../../stores/useModuleStore';
+import { useTodosQuery } from '../../hooks/queries';
 import TodayView from './TodayView';
 
 const NEEDS_REVIEW_LIMIT = 5;
@@ -14,7 +14,7 @@ export default function TodayContainer() {
   const { briefingData, briefingLoading } = useTodayBriefing();
   useTodayHotkeys();
 
-  const allTodos = useModuleStore((s) => s.todos);
+  const { data: allTodos = [] } = useTodosQuery();
 
   const needsReviewItems = useMemo(() => {
     return allTodos

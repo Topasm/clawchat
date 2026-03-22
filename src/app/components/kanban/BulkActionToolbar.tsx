@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useModuleStore } from '../../stores/useModuleStore';
+import { useBulkUpdateTodos } from '../../hooks/queries';
 import type { TodoResponse } from '../../types/api';
 
 export default function BulkActionToolbar() {
   const selectedIds = useModuleStore((s) => s.selectedTodoIds);
   const clearSelection = useModuleStore((s) => s.clearTodoSelection);
-  const bulkUpdate = useModuleStore((s) => s.bulkUpdateTodos);
+  const bulkUpdateMutation = useBulkUpdateTodos();
+  const bulkUpdate = (data: Parameters<typeof bulkUpdateMutation.mutate>[0]) => bulkUpdateMutation.mutate(data);
 
   const count = selectedIds.size;
   const ids = Array.from(selectedIds);

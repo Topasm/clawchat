@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { useModuleStore } from '../../stores/useModuleStore';
 import { TodayResponseSchema, TodoResponseSchema, EventResponseSchema } from '../../types/schemas';
 import { getGreeting } from '../../utils/formatters';
 import type { TodoResponse, EventResponse } from '../../types/api';
@@ -22,11 +22,13 @@ interface TodayData {
 }
 
 /**
- * Derive today-page data from the Zustand store (used in demo mode and as
- * a fallback when the server is unreachable).
+ * Derive today-page data from the TanStack Query cache (used in demo mode
+ * and as a fallback when the server is unreachable).
  */
-function deriveTodayFromStore(): Omit<TodayData, 'isLoading' | 'refresh'> {
-  const { todos, events } = useModuleStore.getState();
+function deriveTodayFromCache(
+  todos: TodoResponse[],
+  events: EventResponse[],
+): Omit<TodayData, 'isLoading' | 'refresh'> {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart);
@@ -71,9 +73,7 @@ interface TodayQueryResult {
 
 export default function useTodayData(): TodayData {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-  // Subscribe to store changes so demo mode stays reactive
-  const storeTodos = useModuleStore((s) => s.todos);
-  const storeEvents = useModuleStore((s) => s.events);
+  const queryClient = useQueryClient();
 
   const query = useQuery<TodayQueryResult>({
     queryKey: queryKeys.today,
@@ -127,12 +127,20 @@ export default function useTodayData(): TodayData {
     refetchOnWindowFocus: true,
   });
 
-  // In demo mode (no serverUrl), derive from store
+  // Side effects: sync widget data and schedule event reminders
+  // These run in a useEffect that depends on query.data rather than during render
+  useEffect(() => {
+    if (query.data) {
+      syncWidgetData();
+      scheduleEventReminders(query.data.todayEvents);
+    }
+  }, [query.data]);
+
+  // In demo mode (no serverUrl), derive from cache
   if (!serverUrl) {
-    // Use storeTodos/storeEvents to ensure reactivity (they trigger re-renders)
-    void storeTodos;
-    void storeEvents;
-    const derived = deriveTodayFromStore();
+    const cachedTodos = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos) ?? [];
+    const cachedEvents = queryClient.getQueryData<EventResponse[]>(queryKeys.events) ?? [];
+    const derived = deriveTodayFromCache(cachedTodos, cachedEvents);
     return {
       ...derived,
       isLoading: false,
@@ -140,12 +148,9 @@ export default function useTodayData(): TodayData {
     };
   }
 
-  // Server mode: use query data or fallback to store-derived data
+  // Server mode: use query data or fallback to cache-derived data
   const data = query.data;
   if (data) {
-    // Sync widget and schedule event reminders with fresh server data
-    syncWidgetData();
-    scheduleEventReminders(data.todayEvents);
     return {
       ...data,
       isLoading: query.isLoading,
@@ -153,8 +158,10 @@ export default function useTodayData(): TodayData {
     };
   }
 
-  // While loading or on error, use store-derived fallback
-  const fallback = deriveTodayFromStore();
+  // While loading or on error, use cache-derived fallback
+  const cachedTodos = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos) ?? [];
+  const cachedEvents = queryClient.getQueryData<EventResponse[]>(queryKeys.events) ?? [];
+  const fallback = deriveTodayFromCache(cachedTodos, cachedEvents);
   return {
     ...fallback,
     isLoading: query.isLoading,

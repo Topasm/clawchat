@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useModuleStore } from '../stores/useModuleStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
 import { useDebouncedPersist } from '../hooks/useDebouncedPersist';
+import { useTodosQuery, useUpdateTodo, useDeleteTodo, useToggleTodoComplete, queryKeys } from '../hooks/queries';
 import apiClient from '../services/apiClient';
 import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
@@ -35,10 +36,11 @@ function getDueCountdown(dueDate: string): { label: string; variant: 'overdue' |
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
-  const todos = useModuleStore((s) => s.todos);
-  const serverUpdateTodo = useModuleStore((s) => s.serverUpdateTodo);
-  const deleteTodo = useModuleStore((s) => s.deleteTodo);
-  const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
+  const queryClient = useQueryClient();
+  const { data: todos = [] } = useTodosQuery();
+  const updateTodoMutation = useUpdateTodo();
+  const deleteTodoMutation = useDeleteTodo();
+  const toggleCompleteMutation = useToggleTodoComplete();
 
   const task = todos.find((t) => t.id === taskId);
   const childTasks = todos.filter((t) => t.parent_id === taskId);
@@ -71,9 +73,18 @@ export default function TaskDetailPage() {
       .finally(() => setPlanLoading(false));
   }, [taskId, task?.inbox_state]);
 
+  const serverUpdateTodo = useCallback((id: string, data: TodoUpdate) => {
+    updateTodoMutation.mutate({ id, data });
+  }, [updateTodoMutation]);
+
   const localUpdateTodo = useCallback((id: string, updates: TodoUpdate) => {
-    useModuleStore.getState().updateTodo(id, updates as Partial<TodoResponse>);
-  }, []);
+    // Optimistic local update in the query cache
+    queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
+      (old ?? []).map((t) =>
+        t.id === id ? { ...t, ...updates } as TodoResponse : t,
+      ),
+    );
+  }, [queryClient]);
 
   const persistField = useDebouncedPersist<TodoUpdate>(taskId, serverUpdateTodo, localUpdateTodo);
 
@@ -96,9 +107,14 @@ export default function TaskDetailPage() {
 
   const handleDelete = async () => {
     if (!taskId) return;
-    await deleteTodo(taskId);
+    deleteTodoMutation.mutate(taskId);
     navigate('/tasks');
   };
+
+  const handleToggle = useCallback((id: string) => {
+    const todo = todos.find((t) => t.id === id);
+    if (todo) toggleCompleteMutation.mutate({ id, currentStatus: todo.status });
+  }, [todos, toggleCompleteMutation]);
 
   const handleApplyPlan = async (selectedIndices?: number[]) => {
     try {
@@ -108,7 +124,7 @@ export default function TaskDetailPage() {
         await apiClient.post(`/todos/${taskId}/plan/apply`);
       }
       useToastStore.getState().addToast('success', 'Plan applied');
-      useModuleStore.getState().fetchTodos();
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       setPlan(null);
     } catch {
       useToastStore.getState().addToast('error', 'Failed to apply plan');
@@ -119,7 +135,7 @@ export default function TaskDetailPage() {
     try {
       await apiClient.post(`/todos/${taskId}/plan/dismiss`);
       useToastStore.getState().addToast('info', 'Plan dismissed');
-      useModuleStore.getState().fetchTodos();
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       setPlan(null);
     } catch {
       useToastStore.getState().addToast('error', 'Failed to dismiss');
@@ -163,7 +179,7 @@ export default function TaskDetailPage() {
         <div className="cc-exec-panel__top-row">
           <Checkbox
             checked={task.status === 'completed'}
-            onChange={() => toggleTodoComplete(task.id)}
+            onChange={() => handleToggle(task.id)}
           />
           <input
             className="cc-detail__title-input"
@@ -198,7 +214,7 @@ export default function TaskDetailPage() {
           <div className="cc-exec-panel__next-step">
             <TaskCard
               task={nextSubtask}
-              onToggle={() => toggleTodoComplete(nextSubtask.id)}
+              onToggle={() => handleToggle(nextSubtask.id)}
               onClick={() => navigate(`/tasks/${nextSubtask.id}`)}
               isSubTask
             />
@@ -406,7 +422,7 @@ export default function TaskDetailPage() {
               <TaskCard
                 key={child.id}
                 task={child}
-                onToggle={() => toggleTodoComplete(child.id)}
+                onToggle={() => handleToggle(child.id)}
                 onClick={() => navigate(`/tasks/${child.id}`)}
                 isSubTask
               />

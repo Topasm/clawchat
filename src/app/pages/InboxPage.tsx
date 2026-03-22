@@ -1,8 +1,9 @@
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useModuleStore } from '../stores/useModuleStore';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
 import usePlatform from '../hooks/usePlatform';
+import { useTodosQuery, useToggleTodoComplete } from '../hooks/queries';
 import TaskCard from '../components/shared/TaskCard';
 import SectionHeader from '../components/shared/SectionHeader';
 import EmptyState from '../components/shared/EmptyState';
@@ -11,13 +12,15 @@ import apiClient from '../services/apiClient';
 
 export default function InboxPage() {
   const navigate = useNavigate();
-  const todos = useModuleStore((s) => s.todos);
+  const { data: todos = [] } = useTodosQuery();
   const { isMobile } = usePlatform();
   const addToast = useToastStore((s) => s.addToast);
+  const toggleMutation = useToggleTodoComplete();
 
-  const handleToggle = (id: string) => {
-    useModuleStore.getState().toggleTodoComplete(id).catch(() => {});
-  };
+  const handleToggle = useCallback((id: string) => {
+    const todo = todos.find((t) => t.id === id);
+    if (todo) toggleMutation.mutate({ id, currentStatus: todo.status });
+  }, [todos, toggleMutation]);
 
   // Group by inbox_state
   const processing = todos.filter(

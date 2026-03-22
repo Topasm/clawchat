@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useChatStore } from '../../stores/useChatStore';
+import type { ChatMessage } from '../../stores/useChatStore';
+import { useMessagesQuery, useCreateConversation, useEditMessage, useDeleteMessage, useRegenerateMessage, queryKeys } from '../../hooks/queries';
 import ChatPanelMessages from './ChatPanelMessages';
 import ChatInput from './ChatInput';
 
@@ -14,22 +17,47 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConversationId }: ChatPanelProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isStreaming = useChatStore((s) => s.isStreaming);
   const stopGeneration = useChatStore((s) => s.stopGeneration);
   const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
-  const addMessage = useChatStore((s) => s.addMessage);
-  const createConversation = useChatStore((s) => s.createConversation);
-  const editMessage = useChatStore((s) => s.editMessage);
-  const messages = useChatStore((s) => s.messages);
+  const addStreamingMessage = useChatStore((s) => s.addStreamingMessage);
+  const streamingMessages = useChatStore((s) => s.streamingMessages);
+  const clearStreamingMessages = useChatStore((s) => s.clearStreamingMessages);
   const setCurrentConversationId = useChatStore((s) => s.setCurrentConversationId);
+  const createConversationMutation = useCreateConversation();
+  const editMessageMutation = useEditMessage();
+  const deleteMessageMutation = useDeleteMessage();
+  const regenerateMutation = useRegenerateMessage();
+  const { data: queryMessages = [] } = useMessagesQuery(conversationId);
+
+  // Merge query messages with streaming messages
+  const messages: ChatMessage[] = useMemo(() => {
+    const queryIds = new Set(queryMessages.map((m) => m._id));
+    const onlyStreaming = streamingMessages.filter((m) => !queryIds.has(m._id));
+    return [...onlyStreaming, ...queryMessages];
+  }, [queryMessages, streamingMessages]);
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
 
   useEffect(() => {
     setCurrentConversationId(conversationId);
+    if (conversationId) clearStreamingMessages();
     return () => setCurrentConversationId(null);
-  }, [conversationId, setCurrentConversationId]);
+  }, [conversationId, setCurrentConversationId, clearStreamingMessages]);
+
+  // Clear streaming messages when streaming ends and refetch
+  useEffect(() => {
+    if (!isStreaming && streamingMessages.length > 0 && conversationId) {
+      const timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+        clearStreamingMessages();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming, streamingMessages.length, conversationId, queryClient, clearStreamingMessages]);
 
   const handleStartEdit = useCallback((messageId: string) => {
     const msg = messages.find((m) => m._id === messageId);
@@ -47,7 +75,7 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
   const handleSend = useCallback(async (text: string) => {
     // If in edit mode, call editMessage instead
     if (editingMessageId && conversationId) {
-      await editMessage(conversationId, editingMessageId, text);
+      await editMessageMutation.mutateAsync({ conversationId, messageId: editingMessageId, newText: text });
       setEditingMessageId(null);
       setEditingText('');
       return;
@@ -56,13 +84,13 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
     let cid = conversationId;
     if (!cid) {
       // Create conversation on the server first
-      const convo = await createConversation(text.slice(0, 40));
+      const convo = await createConversationMutation.mutateAsync({ title: text.slice(0, 40) });
       cid = convo.id;
       onSetConversationId(cid);
       setCurrentConversationId(cid);
     }
 
-    addMessage({
+    addStreamingMessage({
       _id: crypto.randomUUID(),
       text,
       createdAt: new Date(),
@@ -74,7 +102,7 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
     } catch {
       // Error handled in store
     }
-  }, [conversationId, editingMessageId, onSetConversationId, createConversation, addMessage, sendMessageStreaming, editMessage, setCurrentConversationId]);
+  }, [conversationId, editingMessageId, onSetConversationId, createConversationMutation, addStreamingMessage, sendMessageStreaming, editMessageMutation, setCurrentConversationId]);
 
   const handlePopOut = () => {
     if (conversationId) {
@@ -105,7 +133,23 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
               </svg>
             </button>
           </div>
-          <ChatPanelMessages conversationId={conversationId} onEditMessage={handleStartEdit} />
+          <ChatPanelMessages
+            conversationId={conversationId}
+            messages={messages}
+            onEditMessage={handleStartEdit}
+            onDeleteMessage={(messageId) => conversationId && deleteMessageMutation.mutate({ conversationId, messageId })}
+            onRegenerateMessage={async (messageId) => {
+              if (!conversationId) return;
+              const userText = await regenerateMutation.mutateAsync({ conversationId, assistantMessageId: messageId });
+              if (userText) {
+                try {
+                  await sendMessageStreaming(conversationId, userText);
+                } catch {
+                  // handled in store
+                }
+              }
+            }}
+          />
           <ChatInput
             onSend={handleSend}
             isStreaming={isStreaming}

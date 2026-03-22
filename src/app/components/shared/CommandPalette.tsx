@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
 import * as RadixDialog from '@radix-ui/react-dialog';
-import { useModuleStore } from '../../stores/useModuleStore';
+import { useTodosQuery } from '../../hooks/queries';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 
 interface CommandPaletteProps {
@@ -11,7 +11,7 @@ interface CommandPaletteProps {
 
 export default function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate();
-  const todos = useModuleStore((s) => s.todos);
+  const { data: todos = [] } = useTodosQuery();
   const setTheme = useSettingsStore((s) => s.setTheme);
   const theme = useSettingsStore((s) => s.theme);
 

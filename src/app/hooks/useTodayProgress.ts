@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useModuleStore } from '../stores/useModuleStore';
+import { useTodosQuery } from './queries';
 import { useSettingsStore } from '../stores/useSettingsStore';
 
 function getTodayISO(): string {
@@ -14,7 +14,7 @@ function getYesterdayISO(): string {
 }
 
 export default function useTodayProgress() {
-  const allTodos = useModuleStore((s) => s.todos);
+  const { data: allTodos = [] } = useTodosQuery();
   const streak = useSettingsStore((s) => s.streak);
   const setStreak = useSettingsStore((s) => s.setStreak);
 

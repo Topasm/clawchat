@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 
 /**
  * Central data-sync hook.
- * Activates React Query hooks that fetch + validate + sync to Zustand.
+ * Activates React Query hooks that fetch + validate data.
  * Queries are disabled when serverUrl is not set.
  */
 export function useDataSync() {

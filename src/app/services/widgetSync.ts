@@ -1,6 +1,17 @@
 import { IS_ANDROID } from '../types/platform';
+import { queryClient } from '../config/queryClient';
 import { useModuleStore } from '../stores/useModuleStore';
 import { useAuthStore } from '../stores/useAuthStore';
+import { queryKeys } from '../hooks/queries/queryKeys';
+import type { TodoResponse, EventResponse } from '../types/api';
+
+function getCachedTodos(): TodoResponse[] {
+  return queryClient.getQueryData<TodoResponse[]>(queryKeys.todos) ?? [];
+}
+
+function getCachedEvents(): EventResponse[] {
+  return queryClient.getQueryData<EventResponse[]>(queryKeys.events) ?? [];
+}
 
 interface WidgetTask {
   id: string;
@@ -35,7 +46,7 @@ function formatWidgetTime(isoString: string): string {
 }
 
 function buildWidgetData(): WidgetData {
-  const { todos } = useModuleStore.getState();
+  const todos = getCachedTodos();
 
   // All pending root-level tasks, newest first
   const pendingTasks = todos
@@ -55,7 +66,7 @@ function buildWidgetData(): WidgetData {
 }
 
 function buildCalendarWidgetData(): CalendarWidgetData {
-  const { events } = useModuleStore.getState();
+  const events = getCachedEvents();
   const now = new Date();
   const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -77,14 +88,17 @@ function buildCalendarWidgetData(): CalendarWidgetData {
 }
 
 function buildKanbanWidgetData(): KanbanWidgetData {
+  const todos = getCachedTodos();
   const store = useModuleStore.getState();
-  const { todos } = store;
 
   // Only root-level tasks (no subtasks)
   const rootTasks = todos.filter((t) => !t.parent_id);
 
-  // Use getKanbanStatus which includes kanban overrides
-  const getStatus = (t: { id: string; status: string }) => store.getKanbanStatus(t.id);
+  // Use kanban overrides from the store
+  const getStatus = (t: { id: string; status: string }) => {
+    const kanbanStatus = store.kanbanStatuses[t.id];
+    return kanbanStatus ?? t.status;
+  };
 
   const todoCount = rootTasks.filter((t) => getStatus(t) === 'pending').length;
   const progressCount = rootTasks.filter((t) => getStatus(t) === 'in_progress').length;

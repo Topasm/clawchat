@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useModuleStore } from '../../stores/useModuleStore';
+import { useTodosQuery } from '../../hooks/queries';
 
 const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 const SORT_OPTIONS = [
@@ -20,7 +21,7 @@ export default function KanbanFilterBar() {
   const setSort = useModuleStore((s) => s.setKanbanSort);
   const clearFilters = useModuleStore((s) => s.clearKanbanFilters);
   const toggleSubTasks = useModuleStore((s) => s.toggleShowSubTasks);
-  const todos = useModuleStore((s) => s.todos);
+  const { data: todos = [] } = useTodosQuery();
 
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();

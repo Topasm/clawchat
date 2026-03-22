@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { parseNaturalInput } from '../../utils/naturalLanguageParser';
-import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { useTodosQuery, useCreateTodo, queryKeys } from '../../hooks/queries';
 import { hapticSuccess } from '../../utils/haptics';
 import Badge from './Badge';
+import type { EventResponse, TodoResponse } from '../../types/api';
 
 interface QuickCaptureModalProps {
   isOpen: boolean;
@@ -25,6 +27,9 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
   const inputRef = useRef<HTMLInputElement>(null);
   const receiptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { data: todos = [] } = useTodosQuery();
+  const createTodoMutation = useCreateTodo();
 
   useEffect(() => {
     if (isOpen) {
@@ -51,13 +56,13 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
   const parsed = text.trim() ? parseNaturalInput(text) : null;
   const isConnected = !!useAuthStore.getState().serverUrl;
 
-  // Resolve parent title for display
-  const resolvedParentTitle = (() => {
+  // Resolve parent title for display using query data
+  const resolvedParentTitle = useMemo(() => {
     if (!defaultParentId) return null;
     if (parentTitle) return parentTitle;
-    const parent = useModuleStore.getState().todos.find((t) => t.id === defaultParentId);
+    const parent = todos.find((t) => t.id === defaultParentId);
     return parent?.title ?? 'parent task';
-  })();
+  }, [defaultParentId, parentTitle, todos]);
 
   const showReceipt = (message: ReceiptMessage) => {
     setReceipt(message);
@@ -96,18 +101,20 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
 
     if (parsed.type === 'event') {
       const start = parsed.startTime || parsed.dueDate || new Date();
-      useModuleStore.getState().addEvent({
+      // Add event optimistically to query cache
+      const optimisticEvent: EventResponse = {
         id,
         title: parsed.title,
         start_time: start.toISOString(),
         created_at: now,
         updated_at: now,
-      });
+      };
+      queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [optimisticEvent, ...(old ?? [])]);
       showReceipt('Saved to Inbox');
     } else {
       if (isConnected) {
-        // Use server createTodo for inbox pipeline
-        useModuleStore.getState().createTodo({
+        // Use server createTodo mutation for inbox pipeline
+        createTodoMutation.mutate({
           title: parsed.title,
           priority: parsed.priority ?? 'medium',
           due_date: parsed.dueDate?.toISOString(),
@@ -115,11 +122,11 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
           parent_id: defaultParentId,
           source: defaultParentId ? undefined : 'quick_capture',
           inbox_state: defaultParentId ? 'none' : 'classifying',
-        }).catch(() => {});
+        });
         showReceipt(defaultParentId ? 'Added as subtask' : 'Saved to Inbox');
       } else {
-        // Offline: local-only creation
-        useModuleStore.getState().addTodo({
+        // Offline: local-only creation in query cache
+        const optimisticTodo: TodoResponse = {
           id,
           title: parsed.title,
           status: 'pending',
@@ -130,7 +137,8 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
           sort_order: 0,
           created_at: now,
           updated_at: now,
-        });
+        };
+        queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) => [optimisticTodo, ...(old ?? [])]);
         showReceipt('Saved locally');
       }
     }

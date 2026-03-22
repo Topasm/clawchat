@@ -7,6 +7,7 @@ import { useToastStore } from '../stores/useToastStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { notify } from '../services/platform';
 import { queryKeys } from './queries';
+import type { ConversationResponse } from '../types/api';
 
 /**
  * Connects to the server WebSocket on mount and wires up event handlers
@@ -99,7 +100,7 @@ export default function useWebSocket(): void {
         createdAt: new Date(),
         user: { _id: 'assistant', name: 'ClawChat' },
       };
-      chatStore.addMessage(placeholder);
+      chatStore.addStreamingMessage(placeholder);
       chatStore.setStreamingState(true);
     };
 
@@ -114,9 +115,11 @@ export default function useWebSocket(): void {
       const chatStore = useChatStore.getState();
       chatStore.finalizeStreamMessage(d.message_id, d.full_content, d.metadata);
       chatStore.setStreamingState(false);
+      // Invalidate messages query to pick up finalized message from server
       const conversationId = d.conversation_id || chatStore.currentConversationId;
       if (conversationId) {
-        useChatStore.getState().fetchMessages(conversationId);
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
       }
     };
 
@@ -132,7 +135,7 @@ export default function useWebSocket(): void {
       useToastStore.getState().addToast('error', errorMsg);
       // Reload messages to get authoritative server state
       if (conversationId) {
-        useChatStore.getState().fetchMessages(conversationId);
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
       }
     };
 
@@ -146,14 +149,17 @@ export default function useWebSocket(): void {
       });
       // Reload messages to get authoritative server state
       if (conversationId) {
-        useChatStore.getState().fetchMessages(conversationId);
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
       }
     };
 
     const handleConversationUpdated = (data: unknown) => {
       const d = data as { conversation_id: string; title?: string };
       if (d.title) {
-        useChatStore.getState().updateConversationTitle(d.conversation_id, d.title);
+        // Update conversation title in query cache
+        queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) =>
+          (old ?? []).map((c) => (c.id === d.conversation_id ? { ...c, title: d.title! } : c)),
+        );
       }
     };
 

@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
-import { useModuleStore } from '../stores/useModuleStore';
+import { useTodosQuery, useEventsQuery, useToggleTodoComplete } from '../hooks/queries';
 import apiClient from '../services/apiClient';
 import TaskCard from '../components/shared/TaskCard';
 import EventCard from '../components/shared/EventCard';
@@ -19,9 +19,9 @@ interface ServerResults {
 export default function SearchPage() {
   const navigate = useNavigate();
   const serverUrl = useAuthStore((s) => s.serverUrl);
-  const todos = useModuleStore((s) => s.todos);
-  const events = useModuleStore((s) => s.events);
-  const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
+  const { data: todos = [] } = useTodosQuery();
+  const { data: events = [] } = useEventsQuery();
+  const toggleMutation = useToggleTodoComplete();
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ResultType>('all');
@@ -98,6 +98,11 @@ export default function SearchPage() {
   const results = serverResults ?? clientResults;
   const totalCount = results.tasks.length + results.events.length;
 
+  const handleToggle = useCallback((id: string) => {
+    const todo = todos.find((t) => t.id === id);
+    if (todo) toggleMutation.mutate({ id, currentStatus: todo.status });
+  }, [todos, toggleMutation]);
+
   const filters: { value: ResultType; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'tasks', label: 'Tasks' },
@@ -153,7 +158,7 @@ export default function SearchPage() {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onToggle={() => toggleTodoComplete(task.id)}
+                  onToggle={() => handleToggle(task.id)}
                   onClick={() => navigate(`/tasks/${task.id}`)}
                 />
               ))}

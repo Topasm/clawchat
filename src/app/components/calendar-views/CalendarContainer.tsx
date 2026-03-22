@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useModuleStore } from '../../stores/useModuleStore';
+import { useEventsQuery } from '../../hooks/queries';
 import useCalendarNavigation from '../../hooks/useCalendarNavigation';
 import { indexEventsByDate } from '../../utils/calendarUtils';
 import type { EventResponse } from '../../types/api';
@@ -11,7 +11,7 @@ import WeekView from './WeekView';
 
 export default function CalendarContainer() {
   const navigate = useNavigate();
-  const events = useModuleStore((s) => s.events);
+  const { data: events = [] } = useEventsQuery();
 
   const {
     today,

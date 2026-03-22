@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useModuleStore } from '../stores/useModuleStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDebouncedPersist } from '../hooks/useDebouncedPersist';
+import { useEventsQuery, useUpdateEvent, useDeleteEvent, useDeleteEventOccurrence, queryKeys } from '../hooks/queries';
 import { formatDateTime } from '../utils/formatters';
 import type { EventResponse, EventUpdate } from '../types/api';
 
@@ -19,10 +20,11 @@ function describeRecurrence(rule: string): string {
 export default function EventDetailPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
-  const events = useModuleStore((s) => s.events);
-  const serverUpdateEvent = useModuleStore((s) => s.serverUpdateEvent);
-  const deleteEvent = useModuleStore((s) => s.deleteEvent);
-  const deleteEventOccurrence = useModuleStore((s) => s.deleteEventOccurrence);
+  const queryClient = useQueryClient();
+  const { data: events = [] } = useEventsQuery();
+  const updateEventMutation = useUpdateEvent();
+  const deleteEventMutation = useDeleteEvent();
+  const deleteOccurrenceMutation = useDeleteEventOccurrence();
 
   const event = events.find((e) => e.id === eventId);
 
@@ -39,9 +41,17 @@ export default function EventDetailPage() {
     }
   }, [event]);
 
+  const serverUpdateEvent = useCallback((id: string, data: EventUpdate) => {
+    updateEventMutation.mutate({ id, data });
+  }, [updateEventMutation]);
+
   const localUpdateEvent = useCallback((id: string, updates: EventUpdate) => {
-    useModuleStore.getState().updateEvent(id, updates as Partial<EventResponse>);
-  }, []);
+    queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) =>
+      (old ?? []).map((e) =>
+        e.id === id ? { ...e, ...updates } as EventResponse : e,
+      ),
+    );
+  }, [queryClient]);
 
   const persistField = useDebouncedPersist<EventUpdate>(eventId, serverUpdateEvent, localUpdateEvent);
 
@@ -66,7 +76,7 @@ export default function EventDetailPage() {
       setShowDeleteMode(true);
       return;
     }
-    await deleteEvent(eventId);
+    deleteEventMutation.mutate(eventId);
     navigate('/today');
   };
 
@@ -74,10 +84,10 @@ export default function EventDetailPage() {
     if (!eventId || !event) return;
     setShowDeleteMode(false);
     if (mode === 'all') {
-      await deleteEvent(eventId);
+      deleteEventMutation.mutate(eventId);
     } else {
       const occDate = event.occurrence_date ?? new Date(event.start_time).toISOString().slice(0, 10);
-      await deleteEventOccurrence(eventId, occDate, mode);
+      deleteOccurrenceMutation.mutate({ eventId, date: occDate, mode });
     }
     navigate('/today');
   };

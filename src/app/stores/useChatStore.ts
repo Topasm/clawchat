@@ -4,7 +4,7 @@ import { useToastStore } from './useToastStore';
 import { connectSSE } from '../services/sseClient';
 import apiClient from '../services/apiClient';
 import { logger } from '../services/logger';
-import type { ConversationResponse, ProjectTodoResponse, StreamEventMeta } from '../types/api';
+import type { StreamEventMeta } from '../types/api';
 
 const MAX_MESSAGES = 500;
 
@@ -76,107 +76,67 @@ function dedupeMessages(msgs: ChatMessage[]): ChatMessage[] {
 }
 
 interface ChatState {
-  conversations: ConversationResponse[];
-  projects: ProjectTodoResponse[];
-  projectsLoaded: boolean;
-  messages: ChatMessage[];
+  // Streaming messages are ephemeral UI state — they live here until finalized
+  streamingMessages: ChatMessage[];
   currentConversationId: string | null;
   isStreaming: boolean;
   streamAbortController: AbortController | null;
-  conversationsLoaded: boolean;
   taskProgress: Record<string, TaskProgressData>;
 
-  setConversations: (conversations: ConversationResponse[]) => void;
-  setMessages: (messages: ChatMessage[]) => void;
   setCurrentConversationId: (id: string | null) => void;
-  addMessage: (message: ChatMessage) => void;
-  appendToLastMessage: (content: string) => void;
+  addStreamingMessage: (message: ChatMessage) => void;
   appendToMessage: (messageId: string, content: string) => void;
   finalizeStreamMessage: (messageId: string, fullContent: string, metadata?: Record<string, unknown>) => void;
-  updateConversationTitle: (conversationId: string, title: string) => void;
+  clearStreamingMessages: () => void;
+  updateStreamingMessageId: (oldId: string, newId: string) => void;
   setStreamingState: (streaming: boolean) => void;
-  addConversation: (conversation: ConversationResponse) => void;
-  removeConversation: (id: string) => void;
   updateTaskProgress: (taskId: string, data: Partial<TaskProgressData>) => void;
-
-  fetchConversations: () => Promise<void>;
-  createConversation: (title?: string, projectTodoId?: string) => Promise<ConversationResponse>;
-  deleteConversation: (id: string) => Promise<void>;
-  fetchMessages: (conversationId: string) => Promise<void>;
-  fetchProjects: () => Promise<void>;
-  getOrCreateProjectConversation: (todoId: string) => Promise<ConversationResponse>;
 
   resetToDemo: () => void;
 
   sendMessageStreaming: (conversationId: string, text: string) => Promise<void>;
   clearStreamingState: () => void;
   stopGeneration: () => void;
-  deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
-  regenerateMessage: (conversationId: string, assistantMessageId: string) => string | null;
-  editMessage: (conversationId: string, messageId: string, newText: string) => Promise<string | null>;
 }
 
 export const useChatStore = create<ChatState>()((set, get) => ({
-  conversations: [],
-  projects: [],
-  projectsLoaded: false,
-  messages: [],
+  streamingMessages: [],
   currentConversationId: null,
   isStreaming: false,
   streamAbortController: null,
-  conversationsLoaded: false,
   taskProgress: {},
 
-  setConversations: (conversations) => set({ conversations }),
-  setMessages: (messages) => set({ messages: trimMessages(messages) }),
   setCurrentConversationId: (id) => set({ currentConversationId: id }),
 
-  addMessage: (message) =>
+  addStreamingMessage: (message) =>
     set((state) => ({
-      messages: trimMessages(dedupeMessages([message, ...state.messages])),
+      streamingMessages: trimMessages(dedupeMessages([message, ...state.streamingMessages])),
     })),
-
-  appendToLastMessage: (content) =>
-    set((state) => {
-      const updated = [...state.messages];
-      if (updated.length > 0) {
-        updated[0] = { ...updated[0], text: updated[0].text + content };
-      }
-      return { messages: updated };
-    }),
 
   appendToMessage: (messageId, content) =>
     set((state) => ({
-      messages: state.messages.map((m) =>
+      streamingMessages: state.streamingMessages.map((m) =>
         m._id === messageId ? { ...m, text: m.text + content } : m,
       ),
     })),
 
   finalizeStreamMessage: (messageId, fullContent, metadata) =>
     set((state) => ({
-      messages: state.messages.map((m) =>
+      streamingMessages: state.streamingMessages.map((m) =>
         m._id === messageId ? { ...m, text: fullContent, metadata } : m,
       ),
     })),
 
-  updateConversationTitle: (conversationId, title) =>
+  clearStreamingMessages: () => set({ streamingMessages: [] }),
+
+  updateStreamingMessageId: (oldId, newId) =>
     set((state) => ({
-      conversations: state.conversations.map((c) =>
-        c.id === conversationId ? { ...c, title } : c,
+      streamingMessages: state.streamingMessages.map((m) =>
+        m._id === oldId ? { ...m, _id: newId } : m,
       ),
     })),
 
   setStreamingState: (streaming) => set({ isStreaming: streaming }),
-
-  addConversation: (conversation) =>
-    set((state) => ({
-      conversations: [conversation, ...state.conversations],
-    })),
-
-  removeConversation: (id) =>
-    set((state) => ({
-      conversations: state.conversations.filter((c) => c.id !== id),
-    })),
 
   updateTaskProgress: (taskId, data) =>
     set((state) => ({
@@ -188,116 +148,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   resetToDemo: () =>
     set({
-      conversations: [],
-      projects: [],
-      projectsLoaded: false,
-      messages: [],
+      streamingMessages: [],
       currentConversationId: null,
-      conversationsLoaded: false,
       isStreaming: false,
       streamAbortController: null,
       taskProgress: {},
     }),
 
-  // --- Async conversation actions ---
-
-  fetchConversations: async () => {
-    try {
-      const res = await apiClient.get('/chat/conversations');
-      const items: ConversationResponse[] = res.data?.items ?? res.data ?? [];
-      set({ conversations: items, conversationsLoaded: true });
-    } catch (err) {
-      logger.warn('Failed to fetch conversations:', err);
-      // Keep existing data
-    }
-  },
-
-  createConversation: async (title?: string, projectTodoId?: string) => {
-    const convoTitle = title || 'New Conversation';
-
-    try {
-      const payload: Record<string, string> = { title: convoTitle };
-      if (projectTodoId) payload.project_todo_id = projectTodoId;
-      const res = await apiClient.post('/chat/conversations', payload);
-      const convo: ConversationResponse = res.data;
-      get().addConversation(convo);
-      return convo;
-    } catch (err) {
-      logger.warn('Failed to create conversation on server:', err);
-      const localConvo: ConversationResponse = {
-        id: `local-conv-${Date.now()}`,
-        title: convoTitle,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      get().addConversation(localConvo);
-      useToastStore.getState().addToast('warning', 'Created locally, server sync failed');
-      return localConvo;
-    }
-  },
-
-  deleteConversation: async (id) => {
-    const { conversations } = get();
-    const existing = conversations.find((c) => c.id === id);
-    // Optimistic remove
-    get().removeConversation(id);
-    useToastStore.getState().addToast('success', 'Conversation deleted');
-
-    try {
-      await apiClient.delete(`/chat/conversations/${id}`);
-    } catch (err) {
-      logger.warn('Failed to delete conversation on server:', err);
-      if (existing) get().addConversation(existing);
-      useToastStore.getState().addToast('error', 'Failed to delete conversation on server');
-    }
-  },
-
-  fetchMessages: async (conversationId) => {
-    try {
-      const res = await apiClient.get(`/chat/conversations/${conversationId}/messages`);
-      const rawMessages: Array<{
-        id: string; content: string; role: string; created_at: string;
-        intent?: string; metadata?: Record<string, unknown>;
-      }> = res.data?.items ?? res.data ?? [];
-      const msgs: ChatMessage[] = rawMessages.map((m) => ({
-        _id: m.id,
-        text: m.content,
-        createdAt: new Date(m.created_at),
-        user: { _id: m.role, name: m.role === 'user' ? 'You' : 'ClawChat' },
-        ...(m.metadata ? { metadata: m.metadata } : {}),
-      }));
-      set({ messages: trimMessages(dedupeMessages(msgs.reverse())) });
-    } catch (err) {
-      logger.warn('Failed to fetch messages:', err);
-      // Keep existing messages
-    }
-  },
-
-  fetchProjects: async () => {
-    try {
-      const res = await apiClient.get('/todos/projects');
-      const items: ProjectTodoResponse[] = res.data ?? [];
-      set({ projects: items, projectsLoaded: true });
-    } catch (err) {
-      logger.warn('Failed to fetch projects:', err);
-    }
-  },
-
-  getOrCreateProjectConversation: async (todoId: string) => {
-    try {
-      const res = await apiClient.get(`/chat/conversations/by-project/${todoId}`);
-      const convo: ConversationResponse = res.data;
-      // Add to conversations list if not already present
-      const exists = get().conversations.some((c) => c.id === convo.id);
-      if (!exists) get().addConversation(convo);
-      return convo;
-    } catch (err) {
-      logger.warn('Failed to get/create project conversation:', err);
-      throw err;
-    }
-  },
-
-  // --- Streaming / message actions ---
+  // --- Streaming ---
 
   sendMessageStreaming: async (conversationId, text) => {
     const idempotencyKey = crypto.randomUUID();
@@ -340,7 +198,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       };
 
       set((state) => ({
-        messages: [assistantMessage, ...state.messages],
+        streamingMessages: [assistantMessage, ...state.streamingMessages],
         isStreaming: true,
       }));
       armPendingRunTimeout();
@@ -353,26 +211,26 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           onMeta: (meta: StreamEventMeta) => {
             streamingMessageId = meta.message_id;
             set((state) => {
-              const updated = state.messages.map((msg) =>
+              const updated = state.streamingMessages.map((msg) =>
                 msg._id === assistantPlaceholderId
                   ? { ...msg, _id: meta.message_id }
                   : msg,
               );
-              return { messages: updated };
+              return { streamingMessages: updated };
             });
           },
           onToken: (tokenText: string) => {
             const targetId = streamingMessageId ?? assistantPlaceholderId;
             set((state) => ({
-              messages: state.messages.map((msg) =>
+              streamingMessages: state.streamingMessages.map((msg) =>
                 msg._id === targetId
                   ? { ...msg, text: msg.text + tokenText }
                   : msg,
               ),
             }));
           },
-          onTitleGenerated: (title: string) => {
-            get().updateConversationTitle(conversationId, title);
+          onTitleGenerated: (_title: string) => {
+            // Title updates will be handled by query invalidation after stream completes
           },
           onDone: () => {
             clearPendingRunTimeout();
@@ -383,7 +241,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             clearPendingRunTimeout();
             const targetId = streamingMessageId ?? assistantPlaceholderId;
             set((state) => ({
-              messages: state.messages.map((msg) =>
+              streamingMessages: state.streamingMessages.map((msg) =>
                 msg._id === targetId && !msg.text
                   ? { ...msg, text: 'Sorry, an error occurred while generating a response.' }
                   : msg,
@@ -405,7 +263,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (streamAbortController) {
       streamAbortController.abort();
     }
-    set({ isStreaming: false, streamAbortController: null });
+    set({ isStreaming: false, streamAbortController: null, streamingMessages: [] });
   },
 
   stopGeneration: () => {
@@ -415,95 +273,5 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       streamAbortController.abort();
       set({ isStreaming: false, streamAbortController: null });
     }
-  },
-
-  deleteMessage: async (conversationId, messageId) => {
-    const { messages } = get();
-    const deletedIndex = messages.findIndex((m) => m._id === messageId);
-    const deletedMessage = deletedIndex !== -1 ? messages[deletedIndex] : null;
-
-    set((state) => ({
-      messages: state.messages.filter((m) => m._id !== messageId),
-    }));
-
-    try {
-      await apiClient.delete(`/chat/conversations/${conversationId}/messages/${messageId}`);
-    } catch (error) {
-      logger.warn('Failed to delete message on server:', error);
-      if (deletedMessage) {
-        set((state) => {
-          const updated = [...state.messages];
-          const insertAt = Math.min(deletedIndex, updated.length);
-          updated.splice(insertAt, 0, deletedMessage);
-          return { messages: updated };
-        });
-      }
-      useToastStore.getState().addToast('error', 'Failed to delete message on server');
-    }
-  },
-
-  regenerateMessage: (conversationId, assistantMessageId) => {
-    const { messages } = get();
-    const assistantIndex = messages.findIndex((m) => m._id === assistantMessageId);
-    if (assistantIndex === -1) return null;
-
-    let userMessage: ChatMessage | null = null;
-    for (let i = assistantIndex + 1; i < messages.length; i++) {
-      if (messages[i].user?._id === 'user') {
-        userMessage = messages[i];
-        break;
-      }
-    }
-    if (!userMessage) return null;
-
-    set((state) => ({
-      messages: state.messages.filter((m) => m._id !== assistantMessageId),
-    }));
-
-    apiClient
-      .delete(`/chat/conversations/${conversationId}/messages/${assistantMessageId}`)
-      .catch((err) => logger.warn('Failed to delete assistant message on server:', err));
-
-    return userMessage.text;
-  },
-
-  editMessage: async (conversationId, messageId, newText) => {
-    const { messages } = get();
-    const msgIndex = messages.findIndex((m) => m._id === messageId);
-    if (msgIndex === -1) return null;
-
-    set((state) => {
-      const updated = [...state.messages];
-      updated[msgIndex] = { ...updated[msgIndex], text: newText };
-      return { messages: updated };
-    });
-
-    const assistantMessagesToRemove: string[] = [];
-    for (let i = msgIndex - 1; i >= 0; i--) {
-      if (messages[i].user?._id === 'assistant') {
-        assistantMessagesToRemove.push(messages[i]._id);
-      } else {
-        break;
-      }
-    }
-
-    if (assistantMessagesToRemove.length > 0) {
-      set((state) => ({
-        messages: state.messages.filter((m) => !assistantMessagesToRemove.includes(m._id)),
-      }));
-      for (const id of assistantMessagesToRemove) {
-        apiClient
-          .delete(`/chat/conversations/${conversationId}/messages/${id}`)
-          .catch((err) => logger.warn('Failed to delete old assistant message:', err));
-      }
-    }
-
-    try {
-      await apiClient.put(`/chat/conversations/${conversationId}/messages/${messageId}`, { content: newText });
-    } catch (error) {
-      logger.warn('Failed to edit message on server:', error);
-    }
-
-    return newText;
   },
 }));

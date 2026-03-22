@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
-import { useChatStore } from '../../stores/useChatStore';
+import apiClient from '../../services/apiClient';
+import { queryClient } from '../../config/queryClient';
+import { queryKeys } from '../../hooks/queries/queryKeys';
 import { hapticMedium } from '../../utils/haptics';
+import type { ConversationResponse } from '../../types/api';
 
 interface FabAction {
   label: string;
@@ -74,7 +77,9 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
         icon: <ChatIcon />,
         onClick: async () => {
           try {
-            const convo = await useChatStore.getState().createConversation();
+            const res = await apiClient.post('/chat/conversations', { title: 'New Conversation' });
+            const convo = res.data as ConversationResponse;
+            queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) => [convo, ...(old ?? [])]);
             navigate(`/chats/${convo.id}`);
           } catch { /* stay on list page */ }
         },

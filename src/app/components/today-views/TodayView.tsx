@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useModuleStore } from '../../stores/useModuleStore';
+import { useToggleTodoComplete } from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
 import { formatDate } from '../../utils/formatters';
 import SectionHeader from '../shared/SectionHeader';
@@ -43,8 +43,14 @@ export default function TodayView({
   needsReviewItems,
 }: TodayViewProps) {
   const navigate = useNavigate();
-  const toggleTodoComplete = useModuleStore((s) => s.toggleTodoComplete);
+  const toggleMutation = useToggleTodoComplete();
   const { isMobile } = usePlatform();
+
+  const toggleTodoComplete = useCallback((id: string) => {
+    // Find the task status from the props to determine the toggle direction
+    const task = [...todayTasks, ...overdueTasks].find((t) => t.id === id);
+    if (task) toggleMutation.mutate({ id, currentStatus: task.status });
+  }, [todayTasks, overdueTasks, toggleMutation]);
   const [briefingOpen, setBriefingOpen] = useState(false);
 
   const totalTasks = todayTasks.length + overdueTasks.length;

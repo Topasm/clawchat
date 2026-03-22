@@ -1,12 +1,13 @@
 import { useChatStore } from '../stores/useChatStore';
+import { useRegenerateMessage } from './queries';
 
 export function useRegenerate(conversationId: string | null | undefined) {
-  const regenerateMessage = useChatStore((s) => s.regenerateMessage);
   const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
+  const regenerateMutation = useRegenerateMessage();
 
-  const handleRegenerate = (msgId: string) => {
+  const handleRegenerate = async (msgId: string) => {
     if (!conversationId) return;
-    const userText = regenerateMessage(conversationId, msgId);
+    const userText = await regenerateMutation.mutateAsync({ conversationId, assistantMessageId: msgId });
     if (userText) {
       sendMessageStreaming(conversationId, userText);
     }
