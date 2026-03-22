@@ -173,14 +173,16 @@ def refresh_index() -> VaultIndex:
                 [cli_command, "version"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=5,
             )
             cli_ok = proc.returncode == 0
         except (OSError, subprocess.TimeoutExpired):
             cli_ok = False
 
-    # Check companion node
-    companion_online = _check_companion_online(vault_path, cli_command) if settings.obsidian_companion_node_required else True
+    # Check companion node (always check for accurate health reporting)
+    companion_online = _check_companion_online(vault_path, cli_command)
 
     _index = VaultIndex(
         projects=projects,
@@ -266,14 +268,11 @@ def _check_companion_online(vault_path: str, cli_command: str) -> bool:
 
     - In ``livesync`` mode: checks if the LiveSync plugin is configured
       (``data.json`` exists in the plugin directory) as a proxy for CouchDB
-      connectivity.
+      connectivity.  Requires ``cli_command`` to be set.
     - In ``filesystem`` mode: checks if ``.obsidian/workspace.json`` was
       modified recently (within 10 minutes), suggesting an active Obsidian
-      instance.
+      instance.  Does NOT require the CLI.
     """
-    if not cli_command:
-        return False
-
     obsidian_dir = os.path.join(vault_path, ".obsidian")
     if not os.path.isdir(obsidian_dir):
         return False

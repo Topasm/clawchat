@@ -63,6 +63,8 @@ def _run_cli_sync(cmd: list[str], timeout: int = 120) -> subprocess.CompletedPro
         capture_output=True,
         timeout=timeout,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
 
@@ -74,6 +76,8 @@ def _stream_cli_lines(cmd: list[str], queue: Queue, timeout: int = 180):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         for line in proc.stdout:
             queue.put(("line", line.rstrip()))

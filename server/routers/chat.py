@@ -1,7 +1,10 @@
 import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
@@ -256,9 +259,10 @@ async def stream_chat(
             async for token in ai_service.stream_completion(messages):
                 accumulated += token
                 yield f"data: {json.dumps({'token': token})}\n\n"
-        except Exception:
+        except Exception as exc:
+            logger.exception("Chat stream error: %s", exc)
             if not accumulated:
-                error_text = "Sorry, an error occurred while generating a response."
+                error_text = f"Sorry, an error occurred while generating a response: {exc}"
                 accumulated = error_text
                 yield f"data: {json.dumps({'token': error_text})}\n\n"
 

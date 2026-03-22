@@ -157,6 +157,8 @@ def _list_via_cli(vault_path: str, cli_command: str) -> list[dict[str, str]] | N
             [cli_command, "files"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
             cwd=vault_path,
         )
@@ -200,6 +202,8 @@ def _list_files_via_cli(
             [cli_command, "files", f"folder={folder}"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
             cwd=vault_path,
         )
