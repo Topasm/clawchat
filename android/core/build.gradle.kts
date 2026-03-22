@@ -33,7 +33,7 @@ dependencies {
     api(libs.retrofit)
     api(libs.retrofit.kotlinx.serialization)
     api(libs.okhttp)
-    implementation(libs.okhttp.logging)
+    api(libs.okhttp.logging)
     api(libs.okhttp.sse)
 
     // Data
