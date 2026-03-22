@@ -1,26 +1,3 @@
-// --- Connection State ---
-export type ConnectionStatus =
-  | 'offline'              // no network
-  | 'relay_connecting'     // connecting via relay
-  | 'host_unreachable'     // relay ok but host is down
-  | 'host_online'          // connected to host
-  | 'claude_unavailable';  // host online but Claude Code not available
-
-// --- Claude Code Status ---
-export type ClaudeCodeStatus =
-  | 'available'
-  | 'not_installed'
-  | 'not_authenticated'
-  | 'busy'
-  | 'error'
-  | 'unknown';
-
-export interface ClaudeCodeInfo {
-  status: ClaudeCodeStatus;
-  version: string | null;
-  message?: string;
-}
-
 // --- Device Pairing ---
 export interface PairingSession {
   code: string;
@@ -50,21 +27,3 @@ export interface PairedDevice {
   isActive: boolean;
 }
 
-// --- Host Info (from health endpoint) ---
-export interface HostHealth {
-  status: 'ok' | 'degraded';
-  version: string;
-  aiProvider: string;
-  aiModel: string;
-  aiConnected: boolean;
-  claudeCodeStatus: ClaudeCodeStatus;
-  claudeCodeVersion: string | null;
-}
-
-// --- Server Status (Electron IPC) ---
-export interface ServerStatus {
-  running: boolean;
-  port: number;
-  pid?: number;
-  error?: string;
-}

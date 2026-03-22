@@ -55,40 +55,16 @@ volumes:
 
 ### With Ollama (local LLM)
 
-```yaml
-# docker-compose.ollama.yml
-version: "3.8"
+The Ollama service is defined in the same `docker-compose.yml` using a [Docker Compose profile](https://docs.docker.com/compose/how-tos/profiles/). Activate it with `--profile ollama`:
 
-services:
-  server:
-    build: ./server
-    ports:
-      - "${PORT:-8000}:8000"
-    volumes:
-      - clawchat-data:/app/data
-    env_file:
-      - .env
-    environment:
-      - AI_PROVIDER=ollama
-      - AI_BASE_URL=http://ollama:11434
-    depends_on:
-      - ollama
-    restart: unless-stopped
+```bash
+docker compose --profile ollama up --build -d
 
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-models:/root/.ollama
-    restart: unless-stopped
-
-volumes:
-  clawchat-data:
-    driver: local
-  ollama-models:
-    driver: local
+# Pull a model (first time only)
+docker compose exec ollama ollama pull llama3.2
 ```
+
+Set `AI_PROVIDER=ollama` and `AI_BASE_URL=http://ollama:11434` in `.env`.
 
 ## Environment Variables
 

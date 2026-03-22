@@ -72,9 +72,13 @@ User message → SSE stream to `/api/chat/stream` → intent classification via 
 
 Main process (`main.ts`) + preload script (`preload.ts`) with IPC bridge for secure storage, Obsidian vault access, and desktop notifications.
 
-### Mobile (`android/`, `ios/`)
+### Android (`android/`)
 
-Capacitor wraps the web build. Android uses Gradle (`android/build.gradle`). Capacitor plugins: local notifications, keyboard, preferences, splash screen.
+Native Kotlin + Jetpack Compose app. Multi-module Gradle project (app, core, feature modules, widget). Uses Hilt DI, Retrofit/OkHttp, DataStore, Navigation Compose. Connects to the backend via REST + SSE. Pairs with desktop via 6-digit code or QR, or falls back to PIN login.
+
+### iOS (`ios/`)
+
+Capacitor wraps the web build. Capacitor plugins: local notifications, keyboard, preferences, splash screen.
 
 ## Key Conventions
 
