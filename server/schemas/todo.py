@@ -15,6 +15,8 @@ class TodoCreate(BaseModel):
     source: str | None = None
     source_id: str | None = None
     assignee: str | None = None
+    inbox_state: str = "none"
+    estimated_minutes: int | None = None
 
 
 class TodoUpdate(BaseModel):
@@ -27,6 +29,10 @@ class TodoUpdate(BaseModel):
     parent_id: str | None = None
     sort_order: int | None = None
     assignee: str | None = None
+    inbox_state: str | None = None
+    estimated_minutes: int | None = None
+    source: str | None = None
+    source_id: str | None = None
 
 
 class ProjectTodoResponse(BaseModel):
@@ -44,6 +50,8 @@ class ProjectTodoResponse(BaseModel):
     source: str | None = None
     source_id: str | None = None
     assignee: str | None = None
+    inbox_state: str = "none"
+    estimated_minutes: int | None = None
     created_at: datetime
     updated_at: datetime
     conversation_id: str | None = None
@@ -74,6 +82,8 @@ class TodoResponse(BaseModel):
     source: str | None = None
     source_id: str | None = None
     assignee: str | None = None
+    inbox_state: str = "none"
+    estimated_minutes: int | None = None
     created_at: datetime
     updated_at: datetime
 

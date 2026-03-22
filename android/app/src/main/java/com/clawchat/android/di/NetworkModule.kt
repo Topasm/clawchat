@@ -2,6 +2,8 @@ package com.clawchat.android.di
 
 import com.clawchat.android.core.api.ClawChatApi
 import com.clawchat.android.core.api.PairingApi
+import com.clawchat.android.core.di.AuthenticatedClient
+import com.clawchat.android.core.di.UnauthenticatedClient
 import com.clawchat.android.core.network.AuthInterceptor
 import com.clawchat.android.core.network.BaseUrlInterceptor
 import dagger.Module
@@ -15,16 +17,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
-import javax.inject.Qualifier
 import javax.inject.Singleton
-
-@Qualifier
-@Retention(AnnotationRetention.BINARY)
-annotation class AuthenticatedClient
-
-@Qualifier
-@Retention(AnnotationRetention.BINARY)
-annotation class UnauthenticatedClient
 
 @Module
 @InstallIn(SingletonComponent::class)

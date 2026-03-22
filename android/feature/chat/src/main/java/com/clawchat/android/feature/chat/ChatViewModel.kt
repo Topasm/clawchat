@@ -30,7 +30,7 @@ data class ChatUiState(
 class ChatViewModel @Inject constructor(
     private val api: ClawChatApi,
     private val sessionStore: SessionStore,
-    @com.clawchat.android.di.AuthenticatedClient private val httpClient: OkHttpClient,
+    @com.clawchat.android.core.di.AuthenticatedClient private val httpClient: OkHttpClient,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())

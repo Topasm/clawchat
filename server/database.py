@@ -100,6 +100,11 @@ async def init_db():
             "ALTER TABLE todos ADD COLUMN source_id TEXT",
             "ALTER TABLE todos ADD COLUMN assignee TEXT",
             "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+            "ALTER TABLE todos ADD COLUMN inbox_state TEXT NOT NULL DEFAULT 'none'",
+            "ALTER TABLE todos ADD COLUMN estimated_minutes INTEGER",
+            "ALTER TABLE todos ADD COLUMN automation_error TEXT",
+            "ALTER TABLE agent_tasks ADD COLUMN todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+            "ALTER TABLE agent_tasks ADD COLUMN payload_json TEXT",
         ]
         for stmt in _ALTER_TABLE_STMTS:
             try:

@@ -36,6 +36,7 @@ class Settings(BaseSettings):
 
     # Obsidian
     obsidian_vault_path: str = ""
+    obsidian_cli_command: str = ""
 
     # Scheduler
     enable_scheduler: bool = False

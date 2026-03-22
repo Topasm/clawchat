@@ -100,7 +100,13 @@ def _sanitize_name(name: str) -> str:
     return re.sub(r'[<>:"/\\|?*]', "_", name).strip().rstrip(".")
 
 
-def _get_file_path(vault_path: str, project_name: str | None) -> str:
+def _get_file_path(
+    vault_path: str,
+    project_name: str | None,
+    source_id: str | None = None,
+) -> str:
+    if source_id:
+        return os.path.join(vault_path, source_id, "TODO.md")
     if project_name:
         return os.path.join(vault_path, _sanitize_name(project_name), "TODO.md")
     return os.path.join(vault_path, "00_Inbox", "TODO.md")
@@ -122,6 +128,10 @@ def _todo_to_md_line(todo: Todo) -> str:
         if not tag.startswith("#"):
             tag = f"#{tag}"
         parts.append(tag)
+
+    _AGENT_ROLES = {"planner", "researcher", "executor", "openclaw"}
+    if todo.assignee and todo.assignee in _AGENT_ROLES:
+        parts.append(f"@agent({todo.assignee})")
 
     parts.append(f"<!-- claw:{todo.id} -->")
     return " ".join(parts)

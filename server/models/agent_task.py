@@ -24,6 +24,10 @@ class AgentTask(Base):
     progress_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     sub_task_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completed_sub_tasks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    todo_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("todos.id", ondelete="SET NULL"), nullable=True
+    )
+    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     conversation_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("conversations.id"), nullable=True
     )
