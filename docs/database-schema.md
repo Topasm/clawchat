@@ -1,6 +1,6 @@
 # Database Schema
 
-ClawChat uses a single SQLite database storing all user data on the self-hosted server. The schema is managed via SQLAlchemy models with Alembic migrations.
+ClawChat uses a single SQLite database storing all user data on the self-hosted server. The schema is managed via SQLAlchemy ORM models with idempotent startup corrections (see [Migration Strategy](#migration-strategy)).
 
 ## Entity Relationship Overview
 
@@ -194,28 +194,27 @@ FTS tables are kept in sync via SQLAlchemy event hooks or database triggers.
 
 ## Migration Strategy
 
-Migrations are managed with **Alembic** (SQLAlchemy's migration tool).
+ClawChat does **not** use Alembic or any external migration framework. Instead, `server/database.py` applies schema changes automatically at startup using an idempotent, additive approach.
 
-### Setup
+### How it works
 
-```bash
-# Initialize Alembic (one-time)
-alembic init alembic
+On every server start, `init_db()` runs through these phases:
 
-# Generate migration from model changes
-alembic revision --autogenerate -m "description of change"
+1. **`_ensure_data_dir()`** -- Creates the SQLite data directory and upload directory if they don't exist.
+2. **`Base.metadata.create_all`** -- SQLAlchemy creates any tables that are missing (no-op for tables that already exist).
+3. **`_apply_schema_corrections(session)`** -- Runs `ALTER TABLE ... ADD COLUMN` statements for columns that may be absent in older databases. Each statement is wrapped in a try/except that silently ignores "duplicate column" errors, making the entire list idempotent.
+4. **`_run_data_migrations(session)`** -- One-time data transforms (e.g., back-filling a new column from legacy values). Each statement uses a `WHERE ... IS NULL` guard so it only applies once.
+5. **`_setup_fts(session)`** -- Creates FTS5 virtual tables (`IF NOT EXISTS`), sync triggers (`IF NOT EXISTS`), and backfills any rows missing from the FTS indexes.
 
-# Apply migrations
-alembic upgrade head
+### Adding a new column
 
-# Rollback one step
-alembic downgrade -1
-```
+1. Add the column to the SQLAlchemy model in `server/models/`.
+2. Append an `ALTER TABLE ... ADD COLUMN` statement to the `corrections` list in `_apply_schema_corrections()`.
+3. If the column needs back-filling from existing data, add an idempotent `UPDATE` statement to `_run_data_migrations()`.
 
 ### Conventions
 
-- Migration files live in `server/alembic/versions/`
-- Each migration has a descriptive message (e.g., `"add_tags_column_to_todos"`)
-- The initial migration creates all tables from scratch
-- Subsequent migrations handle additive schema changes (new columns, indexes)
-- Destructive changes (column removal, type changes) require a two-step migration: add new -> migrate data -> remove old
+- All corrections are **additive** -- columns are only added, never removed or renamed in-place.
+- Each `ALTER TABLE` is individually wrapped so one failure doesn't block the rest.
+- Destructive changes (column removal, type changes) require a two-step approach: add the new column, migrate data in `_run_data_migrations()`, then stop using the old column in application code (the old column stays in SQLite since `ALTER TABLE DROP COLUMN` has limited support).
+- Tests in `server/tests/test_schema_corrections.py` verify idempotency and correctness of all phases.

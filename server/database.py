@@ -1,6 +1,7 @@
 import os
 
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -78,8 +79,12 @@ _FTS5_BACKFILL = [
 ]
 
 
-async def init_db():
-    # Ensure the data directory exists for SQLite
+# ---------------------------------------------------------------------------
+# Database initialization helpers
+# ---------------------------------------------------------------------------
+
+def _ensure_data_dir():
+    """Create the data and upload directories if they don't exist."""
     db_path = settings.database_url.split("///")[-1]
     db_dir = os.path.dirname(db_path)
     if db_dir:
@@ -88,33 +93,82 @@ async def init_db():
     from config import settings as app_settings
     os.makedirs(app_settings.upload_dir, exist_ok=True)
 
+
+async def _apply_schema_corrections(session: AsyncSession):
+    """Add columns that may be missing from older schemas.
+
+    Each statement is idempotent -- duplicate column errors are silently ignored.
+    Grouped by table for readability.
+    """
+    corrections = [
+        # -- todos --
+        "ALTER TABLE todos ADD COLUMN parent_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+        "ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE todos ADD COLUMN source TEXT",
+        "ALTER TABLE todos ADD COLUMN source_id TEXT",
+        "ALTER TABLE todos ADD COLUMN assignee TEXT",
+        "ALTER TABLE todos ADD COLUMN inbox_state TEXT NOT NULL DEFAULT 'none'",
+        "ALTER TABLE todos ADD COLUMN estimated_minutes INTEGER",
+        "ALTER TABLE todos ADD COLUMN automation_error TEXT",
+        "ALTER TABLE todos ADD COLUMN enabled_skills TEXT",
+
+        # -- conversations --
+        "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+
+        # -- agent_tasks --
+        "ALTER TABLE agent_tasks ADD COLUMN todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+        "ALTER TABLE agent_tasks ADD COLUMN payload_json TEXT",
+        "ALTER TABLE agent_tasks ADD COLUMN skill_chain TEXT",
+        "ALTER TABLE agent_tasks ADD COLUMN current_skill_index INTEGER NOT NULL DEFAULT 0",
+    ]
+
+    for stmt in corrections:
+        try:
+            await session.execute(text(stmt))
+        except (OperationalError, Exception):
+            pass  # column already exists
+    await session.commit()
+
+
+async def _run_data_migrations(session: AsyncSession):
+    """One-time data transforms. Each is idempotent (WHERE ... IS NULL guards)."""
+    migrations = [
+        "UPDATE todos SET enabled_skills = '[\"plan\"]' WHERE assignee = 'planner' AND enabled_skills IS NULL",
+        "UPDATE todos SET enabled_skills = '[\"research\"]' WHERE assignee = 'researcher' AND enabled_skills IS NULL",
+        "UPDATE todos SET enabled_skills = '[\"obsidian_sync\"]' WHERE assignee = 'executor' AND enabled_skills IS NULL",
+    ]
+
+    for stmt in migrations:
+        try:
+            await session.execute(text(stmt))
+        except OperationalError:
+            pass
+    await session.commit()
+
+
+async def _setup_fts(session: AsyncSession):
+    """Create FTS5 virtual tables, sync triggers, and backfill missing rows."""
+    for stmt in _FTS5_VIRTUAL_TABLES:
+        await session.execute(text(stmt))
+    for stmt in _FTS5_TRIGGERS:
+        await session.execute(text(stmt))
+    for stmt in _FTS5_BACKFILL:
+        await session.execute(text(stmt))
+    await session.commit()
+
+
+async def init_db():
+    """Initialize database: create tables, apply corrections, setup FTS."""
+    _ensure_data_dir()
+
     async with engine.begin() as conn:
         from models import _register_all  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)
 
-        # Migrate existing DBs: add new columns (safe if already present)
-        _ALTER_TABLE_STMTS = [
-            "ALTER TABLE todos ADD COLUMN parent_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
-            "ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE todos ADD COLUMN source TEXT",
-            "ALTER TABLE todos ADD COLUMN source_id TEXT",
-            "ALTER TABLE todos ADD COLUMN assignee TEXT",
-            "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
-            "ALTER TABLE todos ADD COLUMN inbox_state TEXT NOT NULL DEFAULT 'none'",
-            "ALTER TABLE todos ADD COLUMN estimated_minutes INTEGER",
-            "ALTER TABLE todos ADD COLUMN automation_error TEXT",
-            "ALTER TABLE agent_tasks ADD COLUMN todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
-            "ALTER TABLE agent_tasks ADD COLUMN payload_json TEXT",
-        ]
-        for stmt in _ALTER_TABLE_STMTS:
-            try:
-                await conn.execute(text(stmt))
-            except Exception:
-                pass  # column already exists
-
-        # Create FTS5 virtual tables, triggers, and backfill existing data
-        for stmt in _FTS5_VIRTUAL_TABLES + _FTS5_TRIGGERS + _FTS5_BACKFILL:
-            await conn.execute(text(stmt))
+    async with AsyncSession(engine) as session:
+        await _apply_schema_corrections(session)
+        await _run_data_migrations(session)
+        await _setup_fts(session)
 
 
 async def get_db():

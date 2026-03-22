@@ -20,9 +20,9 @@ COPY . .
 # Create data directory for SQLite
 RUN mkdir -p /app/data
 
-# Run migrations and start server
+# Start server (init_db runs automatically in FastAPI lifespan)
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ## Docker Compose
