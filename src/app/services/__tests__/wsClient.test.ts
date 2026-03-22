@@ -5,10 +5,12 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 // Since wsClient uses WebSocket, we need to mock it.
 
 class MockWebSocket {
+  static CONNECTING = 0;
   static OPEN = 1;
+  static CLOSING = 2;
   static CLOSED = 3;
 
-  readyState = MockWebSocket.OPEN;
+  readyState = MockWebSocket.CONNECTING;
   onopen: (() => void) | null = null;
   onclose: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
@@ -16,7 +18,10 @@ class MockWebSocket {
 
   constructor(public url: string) {
     // Simulate async open
-    setTimeout(() => this.onopen?.(), 0);
+    setTimeout(() => {
+      this.readyState = MockWebSocket.OPEN;
+      this.onopen?.();
+    }, 0);
   }
 
   close() {

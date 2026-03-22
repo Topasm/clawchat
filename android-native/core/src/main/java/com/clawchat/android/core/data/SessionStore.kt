@@ -1,0 +1,68 @@
+package com.clawchat.android.core.data
+
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Stores session data (device token, server URL, device ID) in
+ * DataStore Preferences. This is the single source of truth for
+ * the app's connection state.
+ */
+@Singleton
+class SessionStore @Inject constructor(
+    private val dataStore: DataStore<Preferences>,
+) {
+    companion object {
+        private val KEY_TOKEN = stringPreferencesKey("device_token")
+        private val KEY_API_BASE_URL = stringPreferencesKey("api_base_url")
+        private val KEY_DEVICE_ID = stringPreferencesKey("device_id")
+        private val KEY_HOST_NAME = stringPreferencesKey("host_name")
+        private val KEY_AUTH_MODE = stringPreferencesKey("auth_mode") // "paired" | "manual"
+    }
+
+    val token: Flow<String?> = dataStore.data.map { it[KEY_TOKEN] }
+    val apiBaseUrl: Flow<String?> = dataStore.data.map { it[KEY_API_BASE_URL] }
+    val deviceId: Flow<String?> = dataStore.data.map { it[KEY_DEVICE_ID] }
+    val hostName: Flow<String?> = dataStore.data.map { it[KEY_HOST_NAME] }
+    val authMode: Flow<String?> = dataStore.data.map { it[KEY_AUTH_MODE] }
+    val isLoggedIn: Flow<Boolean> = dataStore.data.map { it[KEY_TOKEN] != null }
+
+    /** Save session after successful pairing. */
+    suspend fun savePairedSession(
+        deviceId: String,
+        deviceToken: String,
+        apiBaseUrl: String,
+        hostName: String,
+    ) {
+        dataStore.edit { prefs ->
+            prefs[KEY_DEVICE_ID] = deviceId
+            prefs[KEY_TOKEN] = deviceToken
+            prefs[KEY_API_BASE_URL] = apiBaseUrl
+            prefs[KEY_HOST_NAME] = hostName
+            prefs[KEY_AUTH_MODE] = "paired"
+        }
+    }
+
+    /** Save session after manual login (URL + PIN). */
+    suspend fun saveManualSession(
+        accessToken: String,
+        apiBaseUrl: String,
+    ) {
+        dataStore.edit { prefs ->
+            prefs[KEY_TOKEN] = accessToken
+            prefs[KEY_API_BASE_URL] = apiBaseUrl
+            prefs[KEY_AUTH_MODE] = "manual"
+        }
+    }
+
+    /** Clear all session data (logout). */
+    suspend fun clearSession() {
+        dataStore.edit { it.clear() }
+    }
+}

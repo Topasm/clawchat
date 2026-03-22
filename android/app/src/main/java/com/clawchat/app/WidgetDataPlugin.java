@@ -49,12 +49,48 @@ public class WidgetDataPlugin extends Plugin {
         call.resolve();
     }
 
+    @PluginMethod
+    public void setCalendarWidgetData(PluginCall call) {
+        String json = call.getString("data");
+        if (json == null) {
+            call.reject("Missing 'data' parameter");
+            return;
+        }
+
+        Context ctx = getContext();
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString("calendar_widget_json", json).apply();
+
+        refreshWidgetClass(ctx, CalendarWidgetProvider.class);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setKanbanWidgetData(PluginCall call) {
+        String json = call.getString("data");
+        if (json == null) {
+            call.reject("Missing 'data' parameter");
+            return;
+        }
+
+        Context ctx = getContext();
+        SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString("kanban_widget_json", json).apply();
+
+        refreshWidgetClass(ctx, KanbanWidgetProvider.class);
+        call.resolve();
+    }
+
     private void refreshWidget(Context ctx) {
+        refreshWidgetClass(ctx, TodayWidgetProvider.class);
+    }
+
+    private void refreshWidgetClass(Context ctx, Class<?> widgetClass) {
         AppWidgetManager manager = AppWidgetManager.getInstance(ctx);
-        ComponentName widget = new ComponentName(ctx, TodayWidgetProvider.class);
+        ComponentName widget = new ComponentName(ctx, widgetClass);
         int[] ids = manager.getAppWidgetIds(widget);
         if (ids.length > 0) {
-            Intent intent = new Intent(ctx, TodayWidgetProvider.class);
+            Intent intent = new Intent(ctx, widgetClass);
             intent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
             intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
             ctx.sendBroadcast(intent);

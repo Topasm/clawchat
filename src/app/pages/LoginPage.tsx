@@ -1,7 +1,8 @@
-import { useState, type FormEvent, useCallback } from 'react';
+import { useState, useEffect, type FormEvent, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import { IS_ELECTRON, IS_CAPACITOR } from '../types/platform';
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 import QRScanner from '../components/shared/QRScanner';
@@ -20,6 +21,38 @@ export default function LoginPage() {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
   const [showServerUrl, setShowServerUrl] = useState(!IS_ELECTRON);
   const [showScanner, setShowScanner] = useState(false);
+  const biometricAttempted = useRef(false);
+
+  // Attempt biometric login on mount if enabled and token exists
+  useEffect(() => {
+    if (biometricAttempted.current) return;
+    biometricAttempted.current = true;
+
+    const biometricEnabled = useSettingsStore.getState().biometricEnabled;
+    const storedToken = useAuthStore.getState().token;
+
+    if (!IS_CAPACITOR || !biometricEnabled || !storedToken) return;
+
+    (async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        const Biometric = Capacitor.Plugins['Biometric'] as {
+          authenticate(opts: { title: string; subtitle: string }): Promise<{ success: boolean }>;
+        } | undefined;
+        if (!Biometric) return;
+
+        const result = await Biometric.authenticate({
+          title: 'Unlock ClawChat',
+          subtitle: 'Verify your identity to continue',
+        });
+        if (result.success) {
+          navigate('/today');
+        }
+      } catch {
+        // Biometric failed — fall through to PIN login
+      }
+    })();
+  }, [navigate]);
 
   const handleQRScan = async (data: string) => {
     setShowScanner(false);
@@ -161,7 +194,7 @@ export default function LoginPage() {
               }}
             />
             <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}>
-              When ClawChat is opened through Tailscale or a reverse proxy, leaving this as the current site URL is usually correct.
+              When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current site URL is usually correct.
             </div>
           </>
         ) : (

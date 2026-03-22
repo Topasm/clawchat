@@ -1,10 +1,10 @@
-version: "3.8"
-
 services:
   server:
     build:
-      context: ../clawchat_server
+      context: ./server
       dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
     volumes:
       - clawchat-data:/app/data
     env_file:
@@ -19,21 +19,22 @@ services:
     networks:
       - clawchat
 
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ollama
     ports:
-      - "${PORT:-80}:80"
-    depends_on:
-      server:
-        condition: service_healthy
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
     restart: unless-stopped
     networks:
       - clawchat
 
 volumes:
   clawchat-data:
+    driver: local
+  ollama-models:
     driver: local
 
 networks:

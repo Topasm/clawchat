@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
 import { useChatStore } from '../../stores/useChatStore';
+import { hapticMedium } from '../../utils/haptics';
 
 interface FabAction {
   label: string;
@@ -111,6 +112,7 @@ export default function FloatingActionButton() {
   if (hidden || actions.length === 0) return null;
 
   const handleAction = (action: FabAction) => {
+    hapticMedium();
     setExpanded(false);
     action.onClick();
   };

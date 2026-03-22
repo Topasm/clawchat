@@ -35,20 +35,21 @@ describe('useDataSync logic (store-level)', () => {
       refreshToken: null,
       serverUrl: null,
       isLoading: false,
-      connectionStatus: 'demo',
+      connectionStatus: 'disconnected',
     });
     useModuleStore.getState().resetToDemo();
     useChatStore.getState().resetToDemo();
   });
 
-  it('fetch methods are no-ops in demo mode', async () => {
+  it('fetch methods call API (no demo guard in stores)', async () => {
     const apiClient = (await import('../../services/apiClient')).default;
 
     await useModuleStore.getState().fetchTodos();
     await useModuleStore.getState().fetchEvents();
     await useChatStore.getState().fetchConversations();
 
-    expect(apiClient.get).not.toHaveBeenCalled();
+    // Stores call apiClient regardless — apiClient handles missing auth
+    expect(apiClient.get).toHaveBeenCalled();
   });
 
   it('fetch methods call API when serverUrl is set', async () => {
@@ -68,9 +69,8 @@ describe('useDataSync logic (store-level)', () => {
     expect(useModuleStore.getState().kanbanStatuses).toEqual({});
   });
 
-  it('demo data is preserved when no server', () => {
+  it('starts with empty data when no server', () => {
     const todos = useModuleStore.getState().todos;
-    expect(todos.length).toBeGreaterThan(0);
-    expect(todos[0].id).toContain('demo');
+    expect(todos).toHaveLength(0);
   });
 });

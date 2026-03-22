@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { IS_ELECTRON } from '../../types/platform';
+import { DEFAULT_SERVER_URL } from '../../config/constants';
 
 interface NetworkAddress {
   ip: string;
   name: string;
-  isTailscale: boolean;
+  networkType?: string;
 }
 
 interface ServerConfig {
@@ -33,8 +34,10 @@ export default function MobileConnectionPanel() {
 
   if (!config) return null;
 
+  const configuredUrl = DEFAULT_SERVER_URL.startsWith('https://') ? DEFAULT_SERVER_URL : null;
   const bestAddr = addresses[0];
-  const bestUrl = bestAddr ? `http://${bestAddr.ip}:${config.port}` : `http://localhost:${config.port}`;
+  const localUrl = bestAddr ? `http://${bestAddr.ip}:${config.port}` : `http://localhost:${config.port}`;
+  const bestUrl = configuredUrl ?? localUrl;
   const qrData = JSON.stringify({ serverUrl: bestUrl, pin: config.pin });
 
   const copyPin = async () => {
@@ -66,9 +69,14 @@ export default function MobileConnectionPanel() {
           wordBreak: 'break-all',
         }}>
           {bestUrl}
-          {bestAddr?.isTailscale && (
+          {configuredUrl && (
             <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--cc-success)' }}>
-              Tailscale
+              Remote
+            </span>
+          )}
+          {!configuredUrl && bestAddr?.networkType && (
+            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--cc-success)' }}>
+              {bestAddr.networkType}
             </span>
           )}
         </code>
@@ -125,8 +133,8 @@ export default function MobileConnectionPanel() {
               }}>
                 <span style={{ fontFamily: 'monospace' }}>http://{a.ip}:{config.port}</span>
                 <span style={{ color: 'var(--cc-text-tertiary)' }}>({a.name})</span>
-                {a.isTailscale && (
-                  <span style={{ fontSize: 10, color: 'var(--cc-success)' }}>Tailscale</span>
+                {a.networkType && (
+                  <span style={{ fontSize: 10, color: 'var(--cc-success)' }}>{a.networkType}</span>
                 )}
               </div>
             ))}

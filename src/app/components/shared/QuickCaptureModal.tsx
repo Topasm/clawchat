@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { parseNaturalInput } from '../../utils/naturalLanguageParser';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
+import { hapticSuccess } from '../../utils/haptics';
 import Badge from './Badge';
 
 interface QuickCaptureModalProps {
@@ -68,6 +69,7 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
       useToastStore.getState().addToast('success', 'Task created');
     }
 
+    hapticSuccess();
     onClose();
   };
 

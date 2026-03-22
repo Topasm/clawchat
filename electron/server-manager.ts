@@ -1,330 +1,376 @@
-import { app, dialog, ipcMain } from 'electron';
-import { execFile, spawn, ChildProcess } from 'node:child_process';
-import path from 'node:path';
-import fs from 'node:fs';
-import crypto from 'node:crypto';
-import os from 'node:os';
-import http from 'node:http';
+import { ChildProcess, spawn } from 'child_process';
+import { app, BrowserWindow } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as http from 'http';
 
-export type ServerStatus = 'initializing' | 'installing' | 'starting' | 'ready' | 'error';
+const SERVER_PORT = 8000;
+const HEALTH_URL = `http://127.0.0.1:${SERVER_PORT}/api/health`;
+const MAX_HEALTH_RETRIES = 30;
+const HEALTH_RETRY_INTERVAL_MS = 500;
 
-interface ServerConfig {
-  jwtSecret: string;
-  pin: string;
+// ── Status types ─────────────────────────────────────────────────────
+
+export type ServerState = 'starting' | 'running' | 'stopped' | 'error';
+
+export interface ServerStatus {
+  state: ServerState;
   port: number;
-  obsidianVaultPath?: string;
+  pid?: number;
+  error?: string;
 }
 
-interface NetworkAddress {
-  ip: string;
-  name: string;
-  isTailscale: boolean;
+// ── Internal state ───────────────────────────────────────────────────
+
+let managedProcess: ChildProcess | null = null;
+let currentStatus: ServerStatus = { state: 'stopped', port: SERVER_PORT };
+
+// ── Path helpers ─────────────────────────────────────────────────────
+
+function getPidFilePath(): string {
+  return path.join(app.getPath('userData'), 'server.pid');
 }
 
-export class ServerManager {
-  private process: ChildProcess | null = null;
-  private status: ServerStatus = 'initializing';
-  private config!: ServerConfig;
-  private pythonPath: string | null = null;
-  private venvPython: string | null = null;
-  private restartCount = 0;
-  private maxRestarts = 5;
-  private stopping = false;
-  private statusListener: ((status: ServerStatus) => void) | null = null;
-  private logStream: fs.WriteStream | null = null;
+function getLockFilePath(): string {
+  return path.join(app.getPath('userData'), 'server.lock');
+}
 
-  private get userDataPath() { return app.getPath('userData'); }
-  private get serverDataPath() { return path.join(this.userDataPath, 'server-data'); }
-  private get venvPath() { return path.join(this.userDataPath, 'server-venv'); }
-  private get configPath() { return path.join(this.userDataPath, 'server-config.json'); }
-  private get logPath() { return path.join(this.userDataPath, 'server.log'); }
-
-  private get serverSourcePath(): string {
-    if (process.env.VITE_DEV_SERVER_URL) {
-      // Dev mode: server source is in the repo root
-      return path.resolve(__dirname, '../server');
-    }
-    return path.join(process.resourcesPath!, 'server');
+function findPython(): string {
+  const serverDir = getServerDir();
+  const venvPaths = [
+    path.join(serverDir, 'venv', 'bin', 'python'),       // macOS/Linux
+    path.join(serverDir, 'venv', 'Scripts', 'python.exe'), // Windows
+  ];
+  for (const p of venvPaths) {
+    if (fs.existsSync(p)) return p;
   }
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
 
-  onStatusChange(cb: (status: ServerStatus) => void) {
-    this.statusListener = cb;
+function getServerDir(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'server');
   }
+  return path.join(app.getAppPath(), 'server');
+}
 
-  private setStatus(status: ServerStatus) {
-    this.status = status;
-    this.statusListener?.(status);
+function getDataDir(): string {
+  const dataDir = path.join(app.getPath('userData'), 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
   }
+  return dataDir;
+}
 
-  getStatus(): ServerStatus { return this.status; }
-  getConfig(): { port: number; pin: string; obsidianVaultPath: string } {
-    return { port: this.config.port, pin: this.config.pin, obsidianVaultPath: this.config.obsidianVaultPath ?? '' };
-  }
+// ── Status broadcasting ──────────────────────────────────────────────
 
-  updateConfig(updates: Partial<Pick<ServerConfig, 'obsidianVaultPath'>>): void {
-    const vaultPathChanged = 'obsidianVaultPath' in updates
-      && updates.obsidianVaultPath !== this.config.obsidianVaultPath;
-
-    Object.assign(this.config, updates);
-    fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2), 'utf-8');
-
-    if (vaultPathChanged && this.status === 'ready') {
-      this.restartServer();
+function setStatus(status: ServerStatus): void {
+  currentStatus = status;
+  // Broadcast to all renderer windows
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send('server:status-changed', status);
     }
   }
+}
 
-  async restartServer(): Promise<void> {
-    await this.stop();
-    this.restartCount = 0;
-    this.stopping = false;
-    this.setStatus('starting');
-    this.spawnServer();
-    await this.waitForReady();
+// ── PID file management ──────────────────────────────────────────────
+
+function writePidFile(pid: number): void {
+  try {
+    fs.writeFileSync(getPidFilePath(), String(pid), 'utf-8');
+  } catch {
+    // Non-fatal — we can still track via managedProcess
   }
+}
 
-  // ── Find system Python ────────────────────────────────────────────
+function readPidFile(): number | null {
+  try {
+    const raw = fs.readFileSync(getPidFilePath(), 'utf-8').trim();
+    const pid = parseInt(raw, 10);
+    return Number.isFinite(pid) ? pid : null;
+  } catch {
+    return null;
+  }
+}
 
-  private async findPython(): Promise<string> {
-    const candidates = process.platform === 'win32'
-      ? ['py', 'python3.13', 'python3.12', 'python3.11', 'python3', 'python']
-      : ['python3.13', 'python3.12', 'python3.11', 'python3', 'python'];
+function removePidFile(): void {
+  try {
+    fs.unlinkSync(getPidFilePath());
+  } catch {
+    // Already gone
+  }
+}
 
-    for (const cmd of candidates) {
-      try {
-        const version = await this.execCmd(cmd, ['--version']);
-        const match = version.match(/Python (\d+)\.(\d+)/);
-        if (match) {
-          const [, major, minor] = match.map(Number);
-          if (major >= 3 && minor >= 11) return cmd;
+function removeLockFile(): void {
+  try {
+    fs.unlinkSync(getLockFilePath());
+  } catch {
+    // Already gone
+  }
+}
+
+/**
+ * Check whether a process with the given PID is alive.
+ */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // signal 0 = existence check only
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── Health check ─────────────────────────────────────────────────────
+
+function checkHealth(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(HEALTH_URL, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+function waitForHealth(): Promise<boolean> {
+  return new Promise((resolve) => {
+    let attempts = 0;
+
+    const check = () => {
+      attempts++;
+      const req = http.get(HEALTH_URL, (res) => {
+        if (res.statusCode === 200) {
+          resolve(true);
+        } else if (attempts < MAX_HEALTH_RETRIES) {
+          setTimeout(check, HEALTH_RETRY_INTERVAL_MS);
+        } else {
+          resolve(false);
         }
-      } catch { /* try next */ }
-    }
+      });
 
-    dialog.showErrorBox(
-      'Python Not Found',
-      'ClawChat requires Python 3.11 or later.\n\nPlease install Python from https://python.org and restart the app.',
-    );
-    throw new Error('Python >= 3.11 not found');
-  }
+      req.on('error', () => {
+        if (attempts < MAX_HEALTH_RETRIES) {
+          setTimeout(check, HEALTH_RETRY_INTERVAL_MS);
+        } else {
+          resolve(false);
+        }
+      });
 
-  // ── Virtual environment ───────────────────────────────────────────
-
-  private async ensureVenv(): Promise<void> {
-    const isWin = process.platform === 'win32';
-    this.venvPython = isWin
-      ? path.join(this.venvPath, 'Scripts', 'python.exe')
-      : path.join(this.venvPath, 'bin', 'python');
-
-    if (!fs.existsSync(this.venvPython)) {
-      this.setStatus('installing');
-      await this.execCmd(this.pythonPath!, ['-m', 'venv', this.venvPath]);
-    }
-
-    // Always run pip install (fast when up-to-date)
-    this.setStatus('installing');
-    const reqPath = path.join(this.serverSourcePath, 'requirements.txt');
-    await this.execCmd(this.venvPython, ['-m', 'pip', 'install', '-r', reqPath, '--quiet'], 300_000);
-  }
-
-  // ── Configuration ─────────────────────────────────────────────────
-
-  private ensureConfig(): void {
-    let config: ServerConfig;
-    try {
-      config = JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
-    } catch {
-      config = {
-        jwtSecret: crypto.randomBytes(32).toString('hex'),
-        pin: String(Math.floor(100000 + Math.random() * 900000)),
-        port: 8000,
-      };
-      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), 'utf-8');
-    }
-    this.config = config;
-  }
-
-  // ── Start server ──────────────────────────────────────────────────
-
-  async start(): Promise<void> {
-    this.stopping = false;
-    this.setStatus('initializing');
-
-    // Ensure data directories exist
-    fs.mkdirSync(this.serverDataPath, { recursive: true });
-    fs.mkdirSync(path.join(this.serverDataPath, 'uploads'), { recursive: true });
-
-    this.ensureConfig();
-    this.pythonPath = await this.findPython();
-    await this.ensureVenv();
-
-    this.setStatus('starting');
-    this.spawnServer();
-  }
-
-  private spawnServer(): void {
-    if (this.stopping) return;
-
-    // Open log file for appending
-    this.logStream = fs.createWriteStream(this.logPath, { flags: 'a' });
-    this.logStream.write(`\n--- Server starting at ${new Date().toISOString()} ---\n`);
-
-    const dbPath = path.join(this.serverDataPath, 'clawchat.db');
-    const uploadDir = path.join(this.serverDataPath, 'uploads');
-
-    const env: Record<string, string> = {
-      ...process.env as Record<string, string>,
-      DATABASE_URL: `sqlite+aiosqlite:///${dbPath}`,
-      JWT_SECRET: this.config.jwtSecret,
-      PIN: this.config.pin,
-      UPLOAD_DIR: uploadDir,
-      PORT: String(this.config.port),
-      ...(this.config.obsidianVaultPath ? { OBSIDIAN_VAULT_PATH: this.config.obsidianVaultPath } : {}),
+      req.end();
     };
 
-    this.process = spawn(
-      this.venvPython!,
-      ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', String(this.config.port)],
-      { cwd: this.serverSourcePath, env, stdio: ['ignore', 'pipe', 'pipe'] },
+    check();
+  });
+}
+
+// ── Core lifecycle ───────────────────────────────────────────────────
+
+/**
+ * Start the server. If a detached server from a previous UI session is
+ * still alive and healthy, reuse it instead of spawning a new one.
+ */
+export async function startServer(): Promise<ServerStatus> {
+  // 1. Already managed by this process?
+  if (managedProcess && managedProcess.exitCode === null) {
+    const healthy = await checkHealth();
+    if (healthy) {
+      const status: ServerStatus = { state: 'running', port: SERVER_PORT, pid: managedProcess.pid };
+      setStatus(status);
+      return status;
+    }
+  }
+
+  // 2. Detached server from a previous session still alive?
+  const existingPid = readPidFile();
+  if (existingPid && isProcessAlive(existingPid)) {
+    const healthy = await checkHealth();
+    if (healthy) {
+      console.log(`[server-manager] Reusing existing server (PID ${existingPid})`);
+      const status: ServerStatus = { state: 'running', port: SERVER_PORT, pid: existingPid };
+      setStatus(status);
+      return status;
+    }
+    // Process alive but unhealthy — kill the stale process
+    console.log(`[server-manager] Stale server (PID ${existingPid}), killing`);
+    try { process.kill(existingPid, 'SIGKILL'); } catch { /* already gone */ }
+    removePidFile();
+  } else if (existingPid) {
+    // Stale PID file, process dead
+    removePidFile();
+  }
+
+  // 3. Maybe another process already started serving (race condition guard)
+  const alreadyHealthy = await checkHealth();
+  if (alreadyHealthy) {
+    console.log('[server-manager] Server already healthy on port (external)');
+    const status: ServerStatus = { state: 'running', port: SERVER_PORT };
+    setStatus(status);
+    return status;
+  }
+
+  // 4. Spawn a new detached server
+  setStatus({ state: 'starting', port: SERVER_PORT });
+
+  const python = findPython();
+  const serverDir = getServerDir();
+  const dataDir = getDataDir();
+
+  console.log(`[server-manager] Starting server from ${serverDir}`);
+  console.log(`[server-manager] Python: ${python}`);
+  console.log(`[server-manager] Data dir: ${dataDir}`);
+
+  const env = {
+    ...process.env,
+    HOST: '127.0.0.1',
+    PORT: String(SERVER_PORT),
+    DATABASE_URL: `sqlite+aiosqlite:///${path.join(dataDir, 'clawchat.db')}`,
+    UPLOAD_DIR: path.join(dataDir, 'uploads'),
+  };
+
+  try {
+    managedProcess = spawn(
+      python,
+      ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', String(SERVER_PORT)],
+      {
+        cwd: serverDir,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true, // survive UI close
+      }
     );
 
-    this.process.stdout?.pipe(this.logStream, { end: false });
-    this.process.stderr?.pipe(this.logStream, { end: false });
+    // Allow the Electron process to exit without waiting for this child
+    managedProcess.unref();
 
-    this.process.on('exit', (code) => {
-      this.logStream?.write(`--- Server exited with code ${code} at ${new Date().toISOString()} ---\n`);
-      this.logStream?.end();
-      this.logStream = null;
-
-      if (!this.stopping && this.restartCount < this.maxRestarts) {
-        this.restartCount++;
-        const delay = Math.min(1000 * Math.pow(2, this.restartCount - 1), 30000);
-        this.setStatus('starting');
-        setTimeout(() => this.spawnServer(), delay);
-      } else if (!this.stopping) {
-        this.setStatus('error');
-      }
-    });
-  }
-
-  // ── Wait for ready ────────────────────────────────────────────────
-
-  async waitForReady(timeout = 30000): Promise<void> {
-    // Use longer timeout if venv was just created (pip install)
-    const actualTimeout = !fs.existsSync(
-      path.join(this.serverDataPath, 'clawchat.db'),
-    ) ? 120000 : timeout;
-
-    const start = Date.now();
-    while (Date.now() - start < actualTimeout) {
-      try {
-        await this.healthCheck();
-        this.restartCount = 0;
-        this.setStatus('ready');
-        return;
-      } catch { /* keep polling */ }
-      await this.sleep(500);
-    }
-    this.setStatus('error');
-    throw new Error('Server did not become ready in time');
-  }
-
-  private healthCheck(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const req = http.get(
-        `http://127.0.0.1:${this.config.port}/api/health`,
-        { timeout: 2000 },
-        (res) => {
-          if (res.statusCode === 200) resolve();
-          else reject(new Error(`Health check returned ${res.statusCode}`));
-          res.resume();
-        },
-      );
-      req.on('error', reject);
-      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
-    });
-  }
-
-  // ── Stop server ───────────────────────────────────────────────────
-
-  async stop(): Promise<void> {
-    this.stopping = true;
-    if (!this.process) return;
-
-    const proc = this.process;
-    this.process = null;
-
-    if (process.platform === 'win32') {
-      // On Windows, use taskkill to kill process tree
-      try {
-        await this.execCmd('taskkill', ['/pid', String(proc.pid), '/T', '/F']);
-      } catch { /* already dead */ }
-    } else {
-      proc.kill('SIGTERM');
-      // Wait up to 5s, then SIGKILL
-      const killed = await Promise.race([
-        new Promise<boolean>((resolve) => proc.on('exit', () => resolve(true))),
-        this.sleep(5000).then(() => false),
-      ]);
-      if (!killed) proc.kill('SIGKILL');
-    }
-  }
-
-  // ── Network info ──────────────────────────────────────────────────
-
-  getNetworkInfo(): { addresses: NetworkAddress[] } {
-    const interfaces = os.networkInterfaces();
-    const addresses: NetworkAddress[] = [];
-
-    for (const [name, addrs] of Object.entries(interfaces)) {
-      if (!addrs) continue;
-      for (const addr of addrs) {
-        if (addr.family !== 'IPv4' || addr.internal) continue;
-        const isTailscale = (
-          addr.address.startsWith('100.') &&
-          (name.startsWith('utun') || name.startsWith('tailscale') || name === 'Tailscale')
-        );
-        addresses.push({ ip: addr.address, name, isTailscale });
-      }
+    if (managedProcess.pid) {
+      writePidFile(managedProcess.pid);
     }
 
-    // Sort: Tailscale first, then by interface name
-    addresses.sort((a, b) => {
-      if (a.isTailscale !== b.isTailscale) return a.isTailscale ? -1 : 1;
-      return a.name.localeCompare(b.name);
+    managedProcess.stdout?.on('data', (data: Buffer) => {
+      console.log(`[server] ${data.toString().trim()}`);
     });
 
-    return { addresses };
+    managedProcess.stderr?.on('data', (data: Buffer) => {
+      console.error(`[server] ${data.toString().trim()}`);
+    });
+
+    managedProcess.on('exit', (code, signal) => {
+      console.log(`[server-manager] Server exited with code=${code} signal=${signal}`);
+      removePidFile();
+      managedProcess = null;
+      setStatus({ state: 'stopped', port: SERVER_PORT });
+    });
+
+    managedProcess.on('error', (err) => {
+      console.error(`[server-manager] Failed to start server:`, err);
+      removePidFile();
+      managedProcess = null;
+      setStatus({ state: 'error', port: SERVER_PORT, error: err.message });
+    });
+
+    // Wait for health check
+    const healthy = await waitForHealth();
+    if (!healthy) {
+      throw new Error('Server failed health check after startup');
+    }
+
+    console.log(`[server-manager] Server is healthy on port ${SERVER_PORT}`);
+    const status: ServerStatus = { state: 'running', port: SERVER_PORT, pid: managedProcess?.pid };
+    setStatus(status);
+    return status;
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[server-manager] Start failed: ${message}`);
+    const status: ServerStatus = { state: 'error', port: SERVER_PORT, error: message };
+    setStatus(status);
+    return status;
+  }
+}
+
+/**
+ * Stop the server explicitly. Only called from the tray "Stop local server" action.
+ */
+export async function stopServer(): Promise<void> {
+  // Try managed process first
+  if (managedProcess && managedProcess.exitCode === null) {
+    console.log('[server-manager] Stopping managed server...');
+    await killProcess(managedProcess);
+    managedProcess = null;
+    removePidFile();
+    removeLockFile();
+    setStatus({ state: 'stopped', port: SERVER_PORT });
+    return;
   }
 
-  // ── IPC registration ──────────────────────────────────────────────
-
-  registerIPC(): void {
-    ipcMain.handle('server:status', () => this.status);
-    ipcMain.handle('server:config', () => this.getConfig());
-    ipcMain.handle('server:network-info', () => this.getNetworkInfo());
-    ipcMain.handle('server:update-config', (_event, updates: Partial<Pick<ServerConfig, 'obsidianVaultPath'>>) => {
-      this.updateConfig(updates);
-    });
-    ipcMain.handle('server:select-folder', async () => {
-      const { dialog: dlg } = await import('electron');
-      const result = await dlg.showOpenDialog({ properties: ['openDirectory'] });
-      if (result.canceled || !result.filePaths.length) return null;
-      return result.filePaths[0];
-    });
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────
-
-  private execCmd(cmd: string, args: string[], timeout = 60000): Promise<string> {
-    return new Promise((resolve, reject) => {
-      execFile(cmd, args, { timeout }, (err, stdout, stderr) => {
-        if (err) reject(new Error(`${cmd} failed: ${stderr || err.message}`));
-        else resolve((stdout + stderr).trim());
+  // Fall back to PID file (detached from previous session)
+  const pid = readPidFile();
+  if (pid && isProcessAlive(pid)) {
+    console.log(`[server-manager] Stopping detached server (PID ${pid})...`);
+    try {
+      process.kill(pid, 'SIGTERM');
+      // Give it a moment to shut down gracefully
+      await new Promise<void>((resolve) => {
+        let waited = 0;
+        const interval = setInterval(() => {
+          waited += 200;
+          if (!isProcessAlive(pid) || waited >= 5000) {
+            clearInterval(interval);
+            if (isProcessAlive(pid)) {
+              try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ }
+            }
+            resolve();
+          }
+        }, 200);
       });
-    });
+    } catch {
+      // Already gone
+    }
+    removePidFile();
+    removeLockFile();
+    setStatus({ state: 'stopped', port: SERVER_PORT });
+    return;
   }
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
-  }
+  removePidFile();
+  removeLockFile();
+  setStatus({ state: 'stopped', port: SERVER_PORT });
+}
+
+function killProcess(proc: ChildProcess): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timeout = setTimeout(() => {
+      console.log('[server-manager] Force-killing server');
+      proc.kill('SIGKILL');
+      resolve();
+    }, 5000);
+
+    proc.on('exit', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+
+    proc.kill('SIGTERM');
+  });
+}
+
+/**
+ * Get current server status.
+ */
+export function getServerStatus(): ServerStatus {
+  return { ...currentStatus };
+}
+
+/**
+ * Restart: stop then start.
+ */
+export async function restartServer(): Promise<ServerStatus> {
+  await stopServer();
+  return startServer();
 }

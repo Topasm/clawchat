@@ -37,6 +37,9 @@ interface SettingsState {
   saveHistory: boolean;
   analyticsEnabled: boolean;
 
+  // Security
+  biometricEnabled: boolean;
+
   // Streak
   streak: StreakData;
 
@@ -59,6 +62,7 @@ interface SettingsState {
   setReminderSound: (v: boolean) => void;
   setSaveHistory: (v: boolean) => void;
   setAnalyticsEnabled: (v: boolean) => void;
+  setBiometricEnabled: (v: boolean) => void;
   setStreak: (v: StreakData) => void;
 
   // Actions
@@ -94,6 +98,8 @@ const DEFAULT_SETTINGS = {
 
   saveHistory: true,
   analyticsEnabled: false,
+
+  biometricEnabled: false,
 
   streak: { lastCompletedDate: '', currentStreak: 0 },
 } as const;
@@ -136,6 +142,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       setSaveHistory: (saveHistory) => { set({ saveHistory }); scheduleSave(); },
       setAnalyticsEnabled: (analyticsEnabled) => { set({ analyticsEnabled }); scheduleSave(); },
+      setBiometricEnabled: (biometricEnabled) => set({ biometricEnabled }),
       setStreak: (streak) => set({ streak }),
 
       resetToDefaults: () => {

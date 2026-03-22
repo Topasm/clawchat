@@ -45,6 +45,41 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // Rich-text / code editor — heaviest deps, rarely needed on first load
+            'vendor-editor': [
+              'lexical',
+              '@lexical/react',
+              '@lexical/rich-text',
+              '@lexical/list',
+              '@lexical/link',
+              '@lexical/code',
+              '@lexical/markdown',
+              '@lexical/utils',
+              '@uiw/react-codemirror',
+              '@codemirror/lang-markdown',
+              '@codemirror/theme-one-dark',
+            ],
+            // Drag-and-drop
+            'vendor-dnd': ['@hello-pangea/dnd'],
+            // Data fetching / API layer
+            'vendor-query': ['@tanstack/react-query', 'axios'],
+            // QR, animation, dialog — used in pairing / modals
+            'vendor-ui-extras': [
+              'qrcode.react',
+              'framer-motion',
+              '@radix-ui/react-dialog',
+              'cmdk',
+            ],
+            // Virtual scrolling
+            'vendor-virtuoso': ['react-virtuoso'],
+          },
+        },
+      },
+    },
     server: {
       watch: {
         ignored: ['**/server/**'],

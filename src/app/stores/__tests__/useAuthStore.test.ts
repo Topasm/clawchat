@@ -18,16 +18,16 @@ describe('useAuthStore', () => {
       refreshToken: null,
       serverUrl: null,
       isLoading: false,
-      connectionStatus: 'demo',
+      connectionStatus: 'disconnected',
     });
   });
 
-  it('starts with null auth values and demo connection status', () => {
+  it('starts with null auth values and disconnected connection status', () => {
     const state = useAuthStore.getState();
     expect(state.token).toBeNull();
     expect(state.refreshToken).toBeNull();
     expect(state.serverUrl).toBeNull();
-    expect(state.connectionStatus).toBe('demo');
+    expect(state.connectionStatus).toBe('disconnected');
   });
 
   it('login sets token, refreshToken, and serverUrl', async () => {
@@ -65,7 +65,7 @@ describe('useAuthStore', () => {
     vi.restoreAllMocks();
   });
 
-  it('logout clears auth state and resets connectionStatus to demo', async () => {
+  it('logout clears auth state and resets connectionStatus to disconnected', async () => {
     // Set up logged-in state
     useAuthStore.setState({
       token: 'test-token',
@@ -80,7 +80,7 @@ describe('useAuthStore', () => {
     expect(state.token).toBeNull();
     expect(state.refreshToken).toBeNull();
     expect(state.serverUrl).toBeNull();
-    expect(state.connectionStatus).toBe('demo');
+    expect(state.connectionStatus).toBe('disconnected');
   });
 
   it('setToken updates only the token', () => {

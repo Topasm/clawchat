@@ -3,7 +3,7 @@ import logging
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from auth.jwt import decode_token
+from auth.jwt import decode_token_any
 from exceptions import UnauthorizedError
 from ws.manager import ws_manager
 
@@ -20,7 +20,7 @@ async def websocket_endpoint(websocket: WebSocket):
         return
 
     try:
-        payload = decode_token(token, expected_type="access")
+        payload = decode_token_any(token)
         user_id = payload["sub"]
     except UnauthorizedError:
         await websocket.close(code=4001, reason="Invalid or expired token")

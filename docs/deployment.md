@@ -108,6 +108,8 @@ volumes:
 | `UPLOAD_DIR` | `data/uploads` | Directory for uploaded attachment files |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Maximum file upload size in MB |
 | `ALLOWED_EXTENSIONS` | `jpg,jpeg,...,zip` | Comma-separated allowed file extensions |
+| `PUBLIC_URL` | *(empty)* | Public-facing URL for reverse proxy deployments (used in pairing QR codes) |
+| `VITE_DEFAULT_SERVER_URL` | *(empty)* | Build-time frontend default server URL (login page, Capacitor app) |
 | `ENABLE_SCHEDULER` | `true` | Enable background scheduler |
 | `BRIEFING_TIME` | `08:00` | Daily briefing time (HH:MM, 24h) |
 | `REMINDER_CHECK_INTERVAL` | `60` | Seconds between reminder checks |
@@ -123,6 +125,10 @@ AI_BASE_URL=http://ollama:11434
 AI_MODEL=llama3.2
 ENABLE_SCHEDULER=true
 BRIEFING_TIME=08:00
+
+# Remote access (set when using Cloudflare Tunnel or reverse proxy)
+# PUBLIC_URL=https://clawchat.example.com
+# VITE_DEFAULT_SERVER_URL=https://clawchat.example.com
 ```
 
 ## Volume Management
@@ -144,6 +150,8 @@ docker volume ls | grep clawchat
 ## Local Network Setup
 
 For the mobile app to reach the server on a local network:
+
+> **Note:** The Electron desktop app binds the embedded server to `127.0.0.1` (loopback only) for security. Direct LAN access (`http://192.168.x.x:8000`) only works with Docker or manual `uvicorn --host 0.0.0.0` deployments. For Electron, use a reverse proxy + Cloudflare Tunnel or Tailscale instead (see [Remote Access](#remote-access)).
 
 1. **Find the server's local IP**: Run `ip addr` (Linux) or `ipconfig` (Windows) on the host machine
 2. **Configure the firewall**: Allow inbound TCP on port 8000
@@ -177,30 +185,35 @@ your-domain.com {
 }
 ```
 
-## Same-Mac Tailscale Setup
+## Remote Access
 
-For a private remote-access setup on one Mac, keep all services local and publish only the reverse proxy through Tailscale Serve:
+ClawChat supports two remote access methods. In both cases only the reverse proxy (`127.0.0.1:8080`) is exposed; the FastAPI server and any AI gateway remain loopback-only.
 
-- `OpenClaw` on `127.0.0.1:18789`
-- `clawchat_server` on `127.0.0.1:8000`
-- `Caddy` on `127.0.0.1:8080`
-- `Tailscale Serve` on `https://<machine>.<tailnet>.ts.net/`
+| Method | Audience | Requires |
+|--------|----------|----------|
+| **Cloudflare Tunnel** (recommended) | Public HTTPS, any device | Cloudflare account + domain |
+| **Tailscale Serve** | Tailnet-only (private) | Tailscale on both host and client |
 
-In this mode, ClawChat does not use Telegram at all. Telegram is only for a separate OpenClaw bot channel, if enabled.
+Set `PUBLIC_URL` and `VITE_DEFAULT_SERVER_URL` in `.env` to the public hostname so pairing QR codes, login defaults, and API responses use the correct address:
 
-See [Same-Mac Remote Access Runbook](./remote-access-runbook.md) for the full launchd + userspace Tailscale setup.
+```bash
+PUBLIC_URL=https://clawchat.example.com
+VITE_DEFAULT_SERVER_URL=https://clawchat.example.com
+```
+
+Rebuild the frontend (`npm run build`) after changing `VITE_DEFAULT_SERVER_URL`.
+
+See the [Remote Access Runbook](./remote-access-runbook.md) for step-by-step setup of both options.
 
 ## Mobile Access Checklist
 
 When testing from a phone or tablet:
 
-1. Install the Tailscale app on the mobile device.
-2. Log in with the same tailnet account that can reach `clawchat-mac.tailaa7944.ts.net`.
-3. Open `https://clawchat-mac.tailaa7944.ts.net/` in the mobile browser.
-4. Leave the `Server URL` field as the prefilled site URL unless you intentionally changed it.
-5. Enter the ClawChat PIN and confirm the health indicator shows the server is reachable.
-6. If the app loads but login fails, confirm `serve status` on the Mac and verify `/api/health` still works locally.
-7. If the site name does not resolve on mobile, confirm the mobile device is actually connected to the same tailnet and that MagicDNS is enabled in Tailscale admin.
+1. Open the ClawChat URL in the mobile browser (e.g. `https://clawchat.example.com/`).
+2. Leave the `Server URL` field as the prefilled site URL unless you intentionally changed it.
+3. Enter the ClawChat PIN and confirm the health indicator shows the server is reachable.
+4. If the app loads but login fails, verify the reverse proxy and tunnel are running on the host, and that `curl http://127.0.0.1:8080/api/health` succeeds locally.
+5. For Tailscale: ensure the mobile device is connected to the same tailnet and MagicDNS is enabled.
 
 ## Dev vs Production
 
@@ -225,7 +238,7 @@ cp .env.example .env
 # Edit .env with your JWT_SECRET and PIN
 
 # 3. Launch (with local Ollama)
-docker compose -f docker-compose.ollama.yml up -d
+docker compose --profile ollama up -d
 
 # 4. Pull an AI model (first time only)
 docker compose exec ollama ollama pull llama3.2

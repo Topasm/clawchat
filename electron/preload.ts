@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+export interface ServerStatus {
+  state: 'starting' | 'running' | 'stopped' | 'error';
+  port: number;
+  pid?: number;
+  error?: string;
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   appVersion: process.env.npm_package_version ?? '0.1.0',
@@ -38,14 +45,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   server: {
-    getStatus: () => ipcRenderer.invoke('server:status'),
-    getConfig: () => ipcRenderer.invoke('server:config'),
-    getNetworkInfo: () => ipcRenderer.invoke('server:network-info'),
-    updateConfig: (updates: Record<string, unknown>) => ipcRenderer.invoke('server:update-config', updates),
-    selectFolder: () => ipcRenderer.invoke('server:select-folder'),
+    getStatus: (): Promise<ServerStatus> => ipcRenderer.invoke('server:status'),
+    restart: (): Promise<ServerStatus> => ipcRenderer.invoke('server:restart'),
+    getConfig: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('server:config'),
+    getNetworkInfo: (): Promise<{ addresses: { ip: string; name: string; networkType?: string }[] }> =>
+      ipcRenderer.invoke('server:network-info'),
+    updateConfig: (updates: Record<string, unknown>): Promise<Record<string, unknown>> =>
+      ipcRenderer.invoke('server:update-config', updates),
+    selectFolder: (): Promise<string | null> => ipcRenderer.invoke('server:select-folder'),
     openObsidianVault: () => ipcRenderer.invoke('obsidian:open-vault'),
-    onStatusChange: (cb: (status: string) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, status: string) => cb(status);
+    onStatusChange: (cb: (status: ServerStatus) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: ServerStatus) => cb(status);
       ipcRenderer.on('server:status-changed', listener);
       return () => ipcRenderer.removeListener('server:status-changed', listener);
     },

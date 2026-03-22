@@ -9,7 +9,7 @@ export interface ElectronUpdater {
 export interface ElectronServerAPI {
   getStatus: () => Promise<string>;
   getConfig: () => Promise<{ port: number; pin: string; obsidianVaultPath: string }>;
-  getNetworkInfo: () => Promise<{ addresses: { ip: string; name: string; isTailscale: boolean }[] }>;
+  getNetworkInfo: () => Promise<{ addresses: { ip: string; name: string; networkType?: string }[] }>;
   updateConfig: (updates: Record<string, unknown>) => Promise<void>;
   selectFolder: () => Promise<string | null>;
   openObsidianVault: () => Promise<void>;

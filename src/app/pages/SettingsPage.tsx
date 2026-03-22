@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import usePlatform from '../hooks/usePlatform';
@@ -14,6 +14,7 @@ import Toggle from '../components/shared/Toggle';
 import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import MobileConnectionPanel from '../components/shared/MobileConnectionPanel';
+import { IS_CAPACITOR } from '../types/platform';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -28,6 +29,46 @@ export default function SettingsPage() {
   const [obsidianSyncing, setObsidianSyncing] = useState(false);
   const [obsidianResult, setObsidianResult] = useState<string | null>(null);
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+  useEffect(() => {
+    if (IS_CAPACITOR) {
+      import('@capacitor/core').then(({ Capacitor }) => {
+        const Biometric = Capacitor.Plugins['Biometric'] as {
+          isAvailable(): Promise<{ available: boolean }>;
+        } | undefined;
+        if (Biometric) {
+          Biometric.isAvailable().then((res) => setBiometricAvailable(res.available));
+        }
+      });
+    }
+  }, []);
+
+  const handleBiometricToggle = useCallback(async (enabled: boolean) => {
+    if (enabled) {
+      // Verify identity before enabling
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        const Biometric = Capacitor.Plugins['Biometric'] as {
+          authenticate(opts: { title: string; subtitle: string }): Promise<{ success: boolean }>;
+        } | undefined;
+        if (!Biometric) return;
+        const result = await Biometric.authenticate({
+          title: 'Enable Biometric Lock',
+          subtitle: 'Verify your identity to enable',
+        });
+        if (result.success) {
+          settings.setBiometricEnabled(true);
+          addToast('success', 'Biometric lock enabled');
+        }
+      } catch {
+        addToast('error', 'Biometric verification failed');
+      }
+    } else {
+      settings.setBiometricEnabled(false);
+      addToast('success', 'Biometric lock disabled');
+    }
+  }, [settings, addToast]);
 
   useEffect(() => {
     if (isElectron) {
@@ -136,6 +177,14 @@ export default function SettingsPage() {
           <Toggle checked={settings.reminderSound} onChange={settings.setReminderSound} />
         </SettingsRow>
       </SettingsSection>
+
+      {biometricAvailable && (
+        <SettingsSection title="Security">
+          <SettingsRow label="Biometric lock" sublabel="Require fingerprint or face to open app">
+            <Toggle checked={settings.biometricEnabled} onChange={handleBiometricToggle} />
+          </SettingsRow>
+        </SettingsSection>
+      )}
 
       <SettingsSection title="Privacy & Storage">
         <SettingsRow label="Save history">

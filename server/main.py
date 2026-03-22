@@ -20,8 +20,10 @@ from routers import today as today_router
 from routers import task_relationship as task_relationship_router
 from routers import attachment as attachment_router
 from routers import obsidian as obsidian_router
+from routers import pairing as pairing_router
 from routers import todo as todo_router
 from services.ai_service import AIService
+from services.claude_code_provider import ClaudeCodeProvider
 from services.orchestrator import Orchestrator
 from services.scheduler import Scheduler
 from ws.handler import websocket_endpoint
@@ -53,6 +55,14 @@ async def lifespan(app: FastAPI):
 
     # Check AI connectivity
     app.state.ai_connected = await ai_service.health_check()
+
+    # Initialize Claude Code provider
+    claude_code = ClaudeCodeProvider()
+    app.state.claude_code = claude_code
+    claude_code_status, claude_code_version = await claude_code.check_availability()
+    app.state.claude_code_status = claude_code_status.value
+    app.state.claude_code_version = claude_code_version
+    logger.info(f"Claude Code status: {claude_code_status.value}, version: {claude_code_version}")
 
     # Start background scheduler if enabled
     if settings.enable_scheduler:
@@ -103,6 +113,7 @@ app.include_router(task_relationship_router.router, prefix="/api/task-relationsh
 app.include_router(attachment_router.router, prefix="/api/attachments", tags=["attachments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
 app.include_router(obsidian_router.router, prefix="/api/obsidian", tags=["obsidian"])
+app.include_router(pairing_router.router, prefix="/api/pairing", tags=["pairing"])
 
 app.websocket("/ws")(websocket_endpoint)
 
@@ -113,7 +124,9 @@ async def health():
     return {
         "status": "ok" if ai_connected else "degraded",
         "version": "0.1.0",
-        "ai_backend": "openclaw",
+        "ai_provider": settings.ai_provider,
         "ai_model": settings.ai_model,
         "ai_connected": ai_connected,
+        "claude_code_status": getattr(app.state, "claude_code_status", "unknown"),
+        "claude_code_version": getattr(app.state, "claude_code_version", None),
     }

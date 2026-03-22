@@ -2,7 +2,8 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, safeStorage, ipcMain, Noti
 import { autoUpdater } from 'electron-updater';
 import path from 'node:path';
 import fs from 'node:fs';
-import { ServerManager } from './server-manager';
+import os from 'node:os';
+import { startServer, stopServer, restartServer, getServerStatus } from './server-manager';
 
 // Suppress EPIPE errors when the parent process pipe closes (e.g. dev server stops)
 process.stdout?.on?.('error', () => {});
@@ -24,6 +25,23 @@ function readStore(): Record<string, string> {
 
 function writeStore(data: Record<string, string>): void {
   fs.writeFileSync(getStorePath(), JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// ── Server config helpers ─────────────────────────────────────────────
+function getConfigPath(): string {
+  return path.join(app.getPath('userData'), 'server-config.json');
+}
+
+function readConfig(): Record<string, unknown> {
+  try {
+    return JSON.parse(fs.readFileSync(getConfigPath(), 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeConfig(data: Record<string, unknown>): void {
+  fs.writeFileSync(getConfigPath(), JSON.stringify(data, null, 2), 'utf-8');
 }
 
 // ── IPC handlers for encrypted storage ────────────────────────────────
@@ -62,16 +80,9 @@ ipcMain.handle('secure-store:delete', (_event, key: string) => {
 
 // ── IPC handler for opening Obsidian vault ───────────────────────────
 ipcMain.handle('obsidian:open-vault', async () => {
-  const config = (() => {
-    try {
-      const configPath = path.join(app.getPath('userData'), 'server-config.json');
-      return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    } catch {
-      return {};
-    }
-  })();
+  const config = readConfig();
 
-  const vaultPath: string = config.obsidianVaultPath ?? '';
+  const vaultPath = (config.obsidianVaultPath as string) ?? '';
   if (!vaultPath) {
     dialog.showErrorBox('Obsidian', 'No Obsidian vault path is configured. Set it in Settings first.');
     return;
@@ -99,7 +110,6 @@ ipcMain.on('notification:show', (_event, title: string, body: string) => {
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-const serverManager = new ServerManager();
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
@@ -145,17 +155,55 @@ function createTray() {
   tray = new Tray(icon);
   tray.setToolTip('ClawChat');
 
+  updateTrayMenu();
+
+  tray.on('double-click', () => {
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+
+  const serverStatus = getServerStatus();
+  const serverRunning = serverStatus.state === 'running';
+
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show',
+      label: 'Open',
       click: () => {
-        mainWindow?.show();
-        mainWindow?.focus();
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        } else {
+          createWindow();
+        }
       },
     },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: serverRunning ? 'Restart local server' : 'Start local server',
+      click: async () => {
+        if (serverRunning) {
+          await restartServer();
+        } else {
+          await startServer();
+        }
+        updateTrayMenu();
+      },
+    },
+    {
+      label: 'Stop local server',
+      enabled: serverRunning,
+      click: async () => {
+        await stopServer();
+        updateTrayMenu();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit UI',
       click: () => {
         app.isQuitting = true;
         app.quit();
@@ -164,11 +212,6 @@ function createTray() {
   ]);
 
   tray.setContextMenu(contextMenu);
-
-  tray.on('double-click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
-  });
 }
 
 // ── Auto-updater setup ─────────────────────────────────────────────
@@ -201,29 +244,78 @@ function setupAutoUpdater() {
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 4 * 60 * 60 * 1000);
 }
 
-app.whenReady().then(async () => {
-  // Register server IPC handlers before window creation
-  serverManager.registerIPC();
+// ── IPC: server management ───────────────────────────────────────────
 
-  // Push status changes to renderer
-  serverManager.onStatusChange((status) => {
-    mainWindow?.webContents.send('server:status-changed', status);
+function registerServerIpc() {
+  ipcMain.handle('server:status', () => getServerStatus());
+
+  ipcMain.handle('server:restart', async () => {
+    const status = await restartServer();
+    updateTrayMenu();
+    return status;
   });
 
-  // Start server, then create window
-  try {
-    await serverManager.start();
-    await serverManager.waitForReady();
-  } catch (err) {
-    dialog.showErrorBox(
-      'Server Error',
-      `Failed to start the ClawChat server.\n\n${err instanceof Error ? err.message : String(err)}\n\nThe app will launch but may not function correctly.`,
-    );
-  }
+  ipcMain.handle('server:config', () => readConfig());
 
+  ipcMain.handle('server:update-config', (_event, updates: Record<string, unknown>) => {
+    const config = readConfig();
+    Object.assign(config, updates);
+    writeConfig(config);
+    return config;
+  });
+
+  ipcMain.handle('server:select-folder', async () => {
+    const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+    if (!win) return null;
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle('server:network-info', () => {
+    const interfaces = os.networkInterfaces();
+    const addresses: { ip: string; name: string; networkType?: string }[] = [];
+
+    for (const [name, nets] of Object.entries(interfaces)) {
+      if (!nets) continue;
+      for (const net of nets) {
+        // Skip internal (loopback) and link-local addresses
+        if (net.internal) continue;
+        if (net.family === 'IPv6' && net.scopeid !== 0) continue;
+
+        let networkType: string | undefined;
+        if (net.address.startsWith('100.')) {
+          networkType = 'Tailscale';
+        } else if (name.startsWith('wg') || name.startsWith('tun')) {
+          networkType = 'VPN';
+        }
+
+        addresses.push({ ip: net.address, name, networkType });
+      }
+    }
+
+    return { addresses };
+  });
+}
+
+// ── App lifecycle ────────────────────────────────────────────────────
+
+app.whenReady().then(async () => {
+  registerServerIpc();
+
+  // Create window immediately — don't block on server
   createWindow();
   createTray();
   setupAutoUpdater();
+
+  // Start server in background; UI receives status via IPC events
+  startServer().then(() => {
+    updateTrayMenu();
+  }).catch((err) => {
+    console.error('[main] Server start error:', err);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -236,13 +328,15 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    // On non-macOS, closing all windows quits the UI but server keeps running
     app.quit();
   }
 });
 
-app.on('before-quit', async () => {
+// Server intentionally NOT stopped on quit — it survives for mobile/LAN access.
+// Users explicitly stop it via tray menu "Stop local server".
+app.on('before-quit', () => {
   app.isQuitting = true;
-  await serverManager.stop();
 });
 
 // Augment Electron.App to include isQuitting

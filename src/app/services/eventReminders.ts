@@ -1,4 +1,4 @@
-import { IS_CAPACITOR } from '../types/platform';
+import { IS_CAPACITOR, IS_ANDROID } from '../types/platform';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import type { EventResponse } from '../types/api';
 
@@ -16,21 +16,16 @@ function eventIdToNotificationId(eventId: string): number {
 
 let previouslyScheduledIds: number[] = [];
 
+/**
+ * On Android: uses the native AlarmScheduler plugin (AlarmManager) for reliable
+ * delivery even when the app is killed or device reboots.
+ * On iOS/other: falls back to Capacitor LocalNotifications.
+ */
 export async function scheduleEventReminders(events: EventResponse[]): Promise<void> {
   if (!IS_CAPACITOR) return;
   if (!useSettingsStore.getState().notificationsEnabled) return;
 
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
-
-    // Cancel previously scheduled reminders
-    if (previouslyScheduledIds.length > 0) {
-      await LocalNotifications.cancel({
-        notifications: previouslyScheduledIds.map((id) => ({ id })),
-      });
-      previouslyScheduledIds = [];
-    }
-
     const now = Date.now();
 
     const toSchedule = events
@@ -46,26 +41,88 @@ export async function scheduleEventReminders(events: EventResponse[]): Promise<v
 
     if (toSchedule.length === 0) return;
 
-    const perm = await LocalNotifications.checkPermissions();
-    if (perm.display === 'prompt') {
-      const result = await LocalNotifications.requestPermissions();
-      if (result.display !== 'granted') return;
-    } else if (perm.display !== 'granted') {
-      return;
+    if (IS_ANDROID) {
+      await scheduleViaAlarmManager(toSchedule);
+    } else {
+      await scheduleViaLocalNotifications(toSchedule);
     }
-
-    const notifications = toSchedule.map(({ event, fireAt, reminderMinutes }) => ({
-      id: eventIdToNotificationId(event.id),
-      title: event.title,
-      body: `Starting in ${reminderMinutes} minute${reminderMinutes === 1 ? '' : 's'}`,
-      schedule: { at: new Date(fireAt) },
-      smallIcon: 'ic_stat_clawchat',
-      extra: { eventId: event.id },
-    }));
-
-    await LocalNotifications.schedule({ notifications });
-    previouslyScheduledIds = notifications.map((n) => n.id);
   } catch {
     // Reminder scheduling is best-effort
   }
+}
+
+interface ScheduleEntry {
+  event: EventResponse;
+  fireAt: number;
+  reminderMinutes: number;
+}
+
+async function scheduleViaAlarmManager(toSchedule: ScheduleEntry[]): Promise<void> {
+  const { Capacitor } = await import('@capacitor/core');
+  const AlarmScheduler = Capacitor.Plugins['AlarmScheduler'] as {
+    scheduleReminder(opts: {
+      id: number;
+      title: string;
+      body: string;
+      triggerAt: number;
+      type: string;
+      itemId: string;
+      route: string;
+    }): Promise<void>;
+    cancelReminder(opts: { id: number }): Promise<void>;
+  } | undefined;
+
+  if (!AlarmScheduler) return;
+
+  // Cancel previously scheduled reminders
+  for (const id of previouslyScheduledIds) {
+    await AlarmScheduler.cancelReminder({ id });
+  }
+  previouslyScheduledIds = [];
+
+  for (const { event, fireAt, reminderMinutes } of toSchedule) {
+    const id = eventIdToNotificationId(event.id);
+    await AlarmScheduler.scheduleReminder({
+      id,
+      title: event.title,
+      body: `Starting in ${reminderMinutes} minute${reminderMinutes === 1 ? '' : 's'}`,
+      triggerAt: fireAt,
+      type: 'event',
+      itemId: event.id,
+      route: `/events/${event.id}`,
+    });
+    previouslyScheduledIds.push(id);
+  }
+}
+
+async function scheduleViaLocalNotifications(toSchedule: ScheduleEntry[]): Promise<void> {
+  const { LocalNotifications } = await import('@capacitor/local-notifications');
+
+  // Cancel previously scheduled reminders
+  if (previouslyScheduledIds.length > 0) {
+    await LocalNotifications.cancel({
+      notifications: previouslyScheduledIds.map((id) => ({ id })),
+    });
+    previouslyScheduledIds = [];
+  }
+
+  const perm = await LocalNotifications.checkPermissions();
+  if (perm.display === 'prompt') {
+    const result = await LocalNotifications.requestPermissions();
+    if (result.display !== 'granted') return;
+  } else if (perm.display !== 'granted') {
+    return;
+  }
+
+  const notifications = toSchedule.map(({ event, fireAt, reminderMinutes }) => ({
+    id: eventIdToNotificationId(event.id),
+    title: event.title,
+    body: `Starting in ${reminderMinutes} minute${reminderMinutes === 1 ? '' : 's'}`,
+    schedule: { at: new Date(fireAt) },
+    smallIcon: 'ic_stat_clawchat',
+    extra: { eventId: event.id },
+  }));
+
+  await LocalNotifications.schedule({ notifications });
+  previouslyScheduledIds = notifications.map((n) => n.id);
 }

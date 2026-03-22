@@ -34,17 +34,16 @@ describe('useChatStore', () => {
       refreshToken: null,
       serverUrl: null,
       isLoading: false,
-      connectionStatus: 'demo',
+      connectionStatus: 'disconnected',
     });
     // Reset chat store to demo
     useChatStore.getState().resetToDemo();
   });
 
-  describe('demo data seeding', () => {
-    it('starts with demo conversations', () => {
+  describe('initial state', () => {
+    it('starts with empty conversations', () => {
       const { conversations } = useChatStore.getState();
-      expect(conversations.length).toBe(2);
-      expect(conversations[0].id).toMatch(/^demo-conv-/);
+      expect(conversations).toHaveLength(0);
     });
 
     it('starts with empty messages', () => {
@@ -58,10 +57,10 @@ describe('useChatStore', () => {
   });
 
   describe('resetToDemo', () => {
-    it('restores demo conversations and clears messages', () => {
+    it('clears conversations and messages', () => {
       // Mutate state
       useChatStore.setState({
-        conversations: [],
+        conversations: [{ id: 'test-1', title: 'Test', created_at: '', updated_at: '' }],
         messages: [{ _id: 'x', text: 'hi', createdAt: new Date(), user: { _id: 'user', name: 'You' } }],
         currentConversationId: 'some-id',
         conversationsLoaded: true,
@@ -70,8 +69,7 @@ describe('useChatStore', () => {
       useChatStore.getState().resetToDemo();
 
       const state = useChatStore.getState();
-      expect(state.conversations.length).toBe(2);
-      expect(state.conversations[0].id).toMatch(/^demo-conv-/);
+      expect(state.conversations).toHaveLength(0);
       expect(state.messages).toHaveLength(0);
       expect(state.currentConversationId).toBeNull();
       expect(state.conversationsLoaded).toBe(false);
@@ -80,13 +78,6 @@ describe('useChatStore', () => {
   });
 
   describe('fetchConversations', () => {
-    it('seeds demo conversations in demo mode', async () => {
-      await useChatStore.getState().fetchConversations();
-      const state = useChatStore.getState();
-      expect(state.conversations.length).toBe(2);
-      expect(state.conversationsLoaded).toBe(true);
-    });
-
     it('fetches from server when logged in', async () => {
       const apiClient = (await import('../../services/apiClient')).default;
       const mockConvos = [{ id: 'srv-conv-1', title: 'Server Convo', created_at: '', updated_at: '' }];
@@ -102,28 +93,21 @@ describe('useChatStore', () => {
     });
   });
 
-  describe('fetchMessages — demo mode', () => {
-    it('loads demo messages for known conversation', async () => {
-      await useChatStore.getState().fetchMessages('demo-conv-1');
+  describe('fetchMessages', () => {
+    it('fetches messages from server when logged in', async () => {
+      const apiClient = (await import('../../services/apiClient')).default;
+      const mockMessages = [
+        { id: 'msg-1', content: 'Hello', role: 'user', created_at: '2026-01-01T00:00:00Z' },
+        { id: 'msg-2', content: 'Hi there', role: 'assistant', created_at: '2026-01-01T00:01:00Z' },
+      ];
+      (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: { items: mockMessages } });
+
+      useAuthStore.setState({ serverUrl: 'http://localhost:3000', token: 'tok' });
+
+      await useChatStore.getState().fetchMessages('conv-1');
+
       const { messages } = useChatStore.getState();
       expect(messages.length).toBe(2);
-      expect(messages[0]._id).toMatch(/^demo-msg-/);
-    });
-
-    it('loads empty for unknown conversation', async () => {
-      await useChatStore.getState().fetchMessages('unknown');
-      expect(useChatStore.getState().messages).toHaveLength(0);
-    });
-  });
-
-  describe('sendMessageStreaming — demo mode', () => {
-    it('appends a demo response message', async () => {
-      useChatStore.setState({ messages: [] });
-      await useChatStore.getState().sendMessageStreaming('demo-conv-1', 'Hello');
-      const { messages } = useChatStore.getState();
-      expect(messages.length).toBe(1);
-      expect(messages[0].user._id).toBe('assistant');
-      expect(messages[0].text).toContain('demo');
     });
   });
 
@@ -148,9 +132,15 @@ describe('useChatStore', () => {
     });
 
     it('removeConversation removes by id', () => {
-      const initial = useChatStore.getState().conversations.length;
-      useChatStore.getState().removeConversation('demo-conv-1');
-      expect(useChatStore.getState().conversations.length).toBe(initial - 1);
+      useChatStore.setState({
+        conversations: [
+          { id: 'conv-1', title: 'A', created_at: '', updated_at: '' },
+          { id: 'conv-2', title: 'B', created_at: '', updated_at: '' },
+        ],
+      });
+      useChatStore.getState().removeConversation('conv-1');
+      expect(useChatStore.getState().conversations.length).toBe(1);
+      expect(useChatStore.getState().conversations[0].id).toBe('conv-2');
     });
   });
 

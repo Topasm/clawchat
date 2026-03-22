@@ -33,5 +33,23 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
     return payload
 
 
+def decode_token_any(token: str, allowed_types: set[str] | None = None) -> dict:
+    """Decode a token accepting multiple types (access, device)."""
+    if allowed_types is None:
+        allowed_types = {"access", "device"}
+    try:
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[ALGORITHM],
+            options={"verify_exp": True, "require": []},
+        )
+    except JWTError:
+        raise UnauthorizedError("Invalid or expired token")
+    if payload.get("type") not in allowed_types:
+        raise UnauthorizedError(f"Expected one of {allowed_types} token types")
+    return payload
+
+
 def verify_pin(pin: str) -> bool:
     return pin == settings.pin

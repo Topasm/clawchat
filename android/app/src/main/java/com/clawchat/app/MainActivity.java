@@ -3,6 +3,7 @@ package com.clawchat.app;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -31,6 +32,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WidgetDataPlugin.class);
+        registerPlugin(AlarmSchedulerPlugin.class);
+        registerPlugin(BiometricPlugin.class);
         super.onCreate(savedInstanceState);
 
         WebView webView = getBridge().getWebView();
@@ -39,6 +42,7 @@ public class MainActivity extends BridgeActivity {
 
         handleWidgetRoute(getIntent());
         handleShareIntent(getIntent());
+        handleDeepLink(getIntent());
     }
 
     @Override
@@ -46,6 +50,7 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         handleWidgetRoute(intent);
         handleShareIntent(intent);
+        handleDeepLink(intent);
     }
 
     private void handleWidgetRoute(Intent intent) {
@@ -60,6 +65,36 @@ public class MainActivity extends BridgeActivity {
             });
             intent.removeExtra("widget_route");
         }
+    }
+
+    private void handleDeepLink(Intent intent) {
+        if (intent == null) return;
+        if (!Intent.ACTION_VIEW.equals(intent.getAction())) return;
+
+        Uri uri = intent.getData();
+        if (uri == null || !"clawchat".equals(uri.getScheme())) return;
+
+        // Convert clawchat://tasks/abc123 -> /tasks/abc123
+        String host = uri.getHost();
+        String path = uri.getPath();
+        if (host == null) return;
+
+        String route = "/" + host;
+        if (path != null && !path.isEmpty() && !"/".equals(path)) {
+            route += path;
+        }
+
+        final String finalRoute = route;
+        getBridge().getWebView().post(() -> {
+            getBridge().getWebView().evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('deeplink:navigate', { detail: '" + finalRoute + "' }));",
+                null
+            );
+        });
+
+        // Clear to prevent re-processing
+        intent.setAction(null);
+        intent.setData(null);
     }
 
     private void handleShareIntent(Intent intent) {

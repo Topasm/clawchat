@@ -1,0 +1,17 @@
+# Cloudflare Tunnel configuration for ClawChat
+#
+# Copy this file to ~/.cloudflared/config.yml and replace the placeholder values.
+# See docs/remote-access-runbook.md for the full setup walkthrough.
+
+tunnel: <TUNNEL_UUID>                          # from `cloudflared tunnel create clawchat`
+credentials-file: /home/<you>/.cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  # Route your ClawChat subdomain to the local reverse proxy.
+  # The reverse proxy (Caddy/Nginx on :8080) serves the SPA and proxies
+  # /api/* and /ws to the FastAPI backend on :8000.
+  - hostname: clawchat.example.com
+    service: http://127.0.0.1:8080
+
+  # Catch-all: return 404 for unmatched hostnames.
+  - service: http_status:404

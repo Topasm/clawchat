@@ -1,24 +1,29 @@
 import { IS_ANDROID } from '../types/platform';
 import { useModuleStore } from '../stores/useModuleStore';
 import { useAuthStore } from '../stores/useAuthStore';
-import { getGreeting } from '../utils/formatters';
 
 interface WidgetTask {
+  id: string;
   title: string;
   priority: string;
 }
 
-interface WidgetEvent {
-  time: string;
-  title: string;
+interface WidgetData {
+  tasks: WidgetTask[];
+  total: number;
 }
 
-interface WidgetData {
-  greeting: string;
-  date: string;
-  tasks: WidgetTask[];
-  extraTasks: number;
-  events: WidgetEvent[];
+interface CalendarWidgetData {
+  month: string;
+  events: { time: string; title: string }[];
+  totalEvents: number;
+}
+
+interface KanbanWidgetData {
+  todoCount: number;
+  progressCount: number;
+  doneCount: number;
+  topTasks: { title: string; priority: string }[];
 }
 
 function formatWidgetTime(isoString: string): string {
@@ -30,55 +35,91 @@ function formatWidgetTime(isoString: string): string {
 }
 
 function buildWidgetData(): WidgetData {
-  const { todos, events } = useModuleStore.getState();
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayEnd = new Date(todayStart);
-  todayEnd.setDate(todayEnd.getDate() + 1);
+  const { todos } = useModuleStore.getState();
 
-  // Today + overdue tasks, incomplete only
-  const allTasks = todos.filter((t) => {
-    if (t.status === 'completed') return false;
-    if (!t.due_date) return false;
-    return new Date(t.due_date) < todayEnd;
-  });
+  // All pending root-level tasks, newest first
+  const pendingTasks = todos
+    .filter((t) => t.status !== 'completed' && !t.parent_id)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const todayEvents = events
-    .filter((e) => {
-      const d = new Date(e.start_time);
-      return d >= todayStart && d < todayEnd;
-    })
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  const displayTasks = allTasks.slice(0, 3).map((t) => ({
+  const displayTasks = pendingTasks.slice(0, 5).map((t) => ({
+    id: t.id,
     title: t.title,
     priority: t.priority ?? '',
   }));
 
-  const displayEvents = todayEvents.slice(0, 2).map((e) => ({
+  return {
+    tasks: displayTasks,
+    total: pendingTasks.length,
+  };
+}
+
+function buildCalendarWidgetData(): CalendarWidgetData {
+  const { events } = useModuleStore.getState();
+  const now = new Date();
+  const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Upcoming events from now onwards, sorted by start time
+  const upcoming = events
+    .filter((e) => new Date(e.start_time).getTime() >= now.getTime())
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+  const displayEvents = upcoming.slice(0, 3).map((e) => ({
     time: formatWidgetTime(e.start_time),
     title: e.title,
   }));
 
-  const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
   return {
-    greeting: getGreeting(),
-    date: dateStr,
-    tasks: displayTasks,
-    extraTasks: Math.max(0, allTasks.length - 3),
+    month: monthName,
     events: displayEvents,
+    totalEvents: upcoming.length,
   };
 }
+
+function buildKanbanWidgetData(): KanbanWidgetData {
+  const store = useModuleStore.getState();
+  const { todos } = store;
+
+  // Only root-level tasks (no subtasks)
+  const rootTasks = todos.filter((t) => !t.parent_id);
+
+  // Use getKanbanStatus which includes kanban overrides
+  const getStatus = (t: { id: string; status: string }) => store.getKanbanStatus(t.id);
+
+  const todoCount = rootTasks.filter((t) => getStatus(t) === 'pending').length;
+  const progressCount = rootTasks.filter((t) => getStatus(t) === 'in_progress').length;
+  const doneCount = rootTasks.filter((t) => getStatus(t) === 'completed').length;
+
+  // Top 3 priority pending tasks (high > medium > low > none)
+  const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const topTasks = rootTasks
+    .filter((t) => getStatus(t) !== 'completed')
+    .sort((a, b) => {
+      const pa = priorityOrder[a.priority ?? ''] ?? 3;
+      const pb = priorityOrder[b.priority ?? ''] ?? 3;
+      return pa - pb;
+    })
+    .slice(0, 3)
+    .map((t) => ({
+      title: t.title,
+      priority: t.priority ?? '',
+    }));
+
+  return { todoCount, progressCount, doneCount, topTasks };
+}
+
+type WidgetPluginType = {
+  setWidgetData(opts: { data: string; serverUrl?: string; token?: string }): Promise<void>;
+  setCalendarWidgetData?(opts: { data: string }): Promise<void>;
+  setKanbanWidgetData?(opts: { data: string }): Promise<void>;
+};
 
 export async function syncWidgetData(): Promise<void> {
   if (!IS_ANDROID) return;
 
   try {
     const { Capacitor } = await import('@capacitor/core');
-    const WidgetData = Capacitor.Plugins['WidgetData'] as {
-      setWidgetData(opts: { data: string; serverUrl?: string; token?: string }): Promise<void>;
-    } | undefined;
+    const WidgetData = Capacitor.Plugins['WidgetData'] as WidgetPluginType | undefined;
 
     if (!WidgetData) return;
 
@@ -89,6 +130,18 @@ export async function syncWidgetData(): Promise<void> {
       serverUrl: serverUrl ?? '',
       token: token ?? '',
     });
+
+    // Sync calendar widget
+    if (WidgetData.setCalendarWidgetData) {
+      const calendarData = buildCalendarWidgetData();
+      await WidgetData.setCalendarWidgetData({ data: JSON.stringify(calendarData) });
+    }
+
+    // Sync kanban widget
+    if (WidgetData.setKanbanWidgetData) {
+      const kanbanData = buildKanbanWidgetData();
+      await WidgetData.setKanbanWidgetData({ data: JSON.stringify(kanbanData) });
+    }
   } catch {
     // Widget sync is best-effort; don't crash the app
   }
