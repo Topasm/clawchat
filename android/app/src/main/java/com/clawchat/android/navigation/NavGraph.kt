@@ -4,9 +4,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Today
+import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,9 +30,9 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(NavRoute.Today.route, Icons.Default.Today, "Today"),
+    BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Today"),
     BottomNavItem(NavRoute.Inbox.route, Icons.Default.Email, "Inbox"),
-    BottomNavItem(NavRoute.Chat.route, Icons.Default.Folder, "Projects"),
+    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Projects"),
     BottomNavItem(NavRoute.Tasks.route, Icons.Default.CheckCircle, "Tasks"),
     BottomNavItem(NavRoute.Settings.route, Icons.Default.Settings, "Settings"),
 )
