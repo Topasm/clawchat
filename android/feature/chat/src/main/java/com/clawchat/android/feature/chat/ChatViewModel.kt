@@ -2,10 +2,11 @@ package com.clawchat.android.feature.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clawchat.android.core.api.ClawChatApi
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
+import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.SseEvent
 import com.clawchat.android.core.network.streamChat
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,7 +31,7 @@ data class ChatUiState(
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val api: ClawChatApi,
+    private val conversationRepository: ConversationRepository,
     private val sessionStore: SessionStore,
     @com.clawchat.android.core.di.AuthenticatedClient private val httpClient: OkHttpClient,
 ) : ViewModel() {
@@ -48,11 +49,10 @@ class ChatViewModel @Inject constructor(
     fun loadConversations() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingConversations = true) }
-            try {
-                val resp = api.listConversations()
-                _uiState.update { it.copy(conversations = resp.items, isLoadingConversations = false) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoadingConversations = false, error = e.message) }
+            when (val result = conversationRepository.listConversations()) {
+                is ApiResult.Success -> _uiState.update { it.copy(conversations = result.data.items, isLoadingConversations = false) }
+                is ApiResult.Error -> _uiState.update { it.copy(isLoadingConversations = false, error = result.message) }
+                is ApiResult.Loading -> { /* not used here */ }
             }
         }
     }
@@ -61,28 +61,29 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(selectedConversationId = id, messages = emptyList()) }
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMessages = true) }
-            try {
-                val resp = api.getMessages(id)
-                _uiState.update { it.copy(messages = resp.items.reversed(), isLoadingMessages = false) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoadingMessages = false, error = e.message) }
+            when (val result = conversationRepository.getMessages(id)) {
+                is ApiResult.Success -> _uiState.update { it.copy(messages = result.data.items.reversed(), isLoadingMessages = false) }
+                is ApiResult.Error -> _uiState.update { it.copy(isLoadingMessages = false, error = result.message) }
+                is ApiResult.Loading -> { /* not used here */ }
             }
         }
     }
 
     fun createConversation() {
         viewModelScope.launch {
-            try {
-                val convo = api.createConversation(mapOf("title" to "New Conversation"))
-                _uiState.update {
-                    it.copy(
-                        conversations = listOf(convo) + it.conversations,
-                        selectedConversationId = convo.id,
-                        messages = emptyList(),
-                    )
+            when (val result = conversationRepository.createConversation(mapOf("title" to "New Conversation"))) {
+                is ApiResult.Success -> {
+                    val convo = result.data
+                    _uiState.update {
+                        it.copy(
+                            conversations = listOf(convo) + it.conversations,
+                            selectedConversationId = convo.id,
+                            messages = emptyList(),
+                        )
+                    }
                 }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                is ApiResult.Loading -> { /* not used here */ }
             }
         }
     }

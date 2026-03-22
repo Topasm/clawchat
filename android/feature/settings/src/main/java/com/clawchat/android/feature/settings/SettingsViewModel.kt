@@ -2,10 +2,12 @@ package com.clawchat.android.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clawchat.android.core.api.ClawChatApi
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.model.HealthResponse
 import com.clawchat.android.core.data.model.PairedDevice
+import com.clawchat.android.core.data.repository.DeviceRepository
+import com.clawchat.android.core.data.repository.SettingsRepository
+import com.clawchat.android.core.network.ApiResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +28,8 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val api: ClawChatApi,
+    private val settingsRepository: SettingsRepository,
+    private val deviceRepository: DeviceRepository,
     private val sessionStore: SessionStore,
 ) : ViewModel() {
 
@@ -45,15 +48,15 @@ class SettingsViewModel @Inject constructor(
             val authMode = sessionStore.authMode.first() ?: ""
             _uiState.update { it.copy(hostName = hostName, authMode = authMode) }
 
-            try {
-                val health = api.health()
-                _uiState.update { it.copy(health = health) }
-            } catch (_: Exception) { /* Ignore */ }
+            when (val result = settingsRepository.health()) {
+                is ApiResult.Success -> _uiState.update { it.copy(health = result.data) }
+                else -> { /* Ignore */ }
+            }
 
-            try {
-                val resp = api.listDevices()
-                _uiState.update { it.copy(devices = resp.devices) }
-            } catch (_: Exception) { /* Ignore — might not have user-level auth */ }
+            when (val result = deviceRepository.listDevices()) {
+                is ApiResult.Success -> _uiState.update { it.copy(devices = result.data.devices) }
+                else -> { /* Ignore — might not have user-level auth */ }
+            }
 
             _uiState.update { it.copy(isLoading = false) }
         }
@@ -61,13 +64,14 @@ class SettingsViewModel @Inject constructor(
 
     fun revokeDevice(deviceId: String) {
         viewModelScope.launch {
-            try {
-                api.revokeDevice(deviceId)
-                _uiState.update { state ->
-                    state.copy(devices = state.devices.filter { it.id != deviceId })
+            when (val result = deviceRepository.revokeDevice(deviceId)) {
+                is ApiResult.Success -> {
+                    _uiState.update { state ->
+                        state.copy(devices = state.devices.filter { it.id != deviceId })
+                    }
                 }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                is ApiResult.Loading -> { /* not used here */ }
             }
         }
     }
