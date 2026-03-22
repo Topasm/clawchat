@@ -23,6 +23,7 @@ interface KanbanColumnProps {
   isMobile?: boolean;
   onMove?: (id: string, status: KanbanStatus) => void;
   onComplete?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const variantMap: Record<KanbanStatus, string> = {
@@ -48,6 +49,7 @@ export default function KanbanColumn({
   isMobile,
   onMove,
   onComplete,
+  onDelete,
 }: KanbanColumnProps) {
   const variant = variantMap[status];
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
@@ -73,6 +75,7 @@ export default function KanbanColumn({
       index={idx}
       onToggle={() => onToggle(task.id)}
       onClick={() => onClickTask(task.id)}
+      onDelete={onDelete ? () => onDelete(task.id) : undefined}
       isFocused={focusedTaskId === task.id}
       onFocus={() => onFocusTask?.(task.id)}
       isSelected={selectedIds?.has(task.id)}

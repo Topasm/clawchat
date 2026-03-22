@@ -9,6 +9,7 @@ interface KanbanCardProps {
   index: number;
   onToggle: () => void;
   onClick: () => void;
+  onDelete?: () => void;
   isFocused?: boolean;
   onFocus?: () => void;
   isSelected?: boolean;
@@ -21,7 +22,7 @@ interface KanbanCardProps {
   isCompletedOverride?: boolean;
 }
 
-export default function KanbanCard({ task, index, onToggle, onClick, isFocused, onFocus, isSelected, onSelect, onSelectTouch, isSubTask, subTaskCount, isDragDisabled, isMobile, isCompletedOverride }: KanbanCardProps) {
+export default function KanbanCard({ task, index, onToggle, onClick, onDelete, isFocused, onFocus, isSelected, onSelect, onSelectTouch, isSubTask, subTaskCount, isDragDisabled, isMobile, isCompletedOverride }: KanbanCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const touchSelectHandlers = useTouchSelect({
@@ -74,6 +75,7 @@ export default function KanbanCard({ task, index, onToggle, onClick, isFocused, 
             task={task}
             onToggle={onToggle}
             onClick={onClick}
+            onDelete={onDelete}
             isSubTask={isSubTask}
             subTaskCount={subTaskCount}
             isCompletedOverride={isCompletedOverride}

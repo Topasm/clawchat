@@ -83,6 +83,8 @@ data class TodoCreate(
     @SerialName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
     @SerialName("parent_id") val parentId: String? = null,
+    val source: String? = null,
+    @SerialName("inbox_state") val inboxState: String? = null,
 )
 
 @Serializable

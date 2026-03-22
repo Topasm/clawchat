@@ -117,6 +117,7 @@ export default function KanbanBoard() {
       onSelect={toggleTodoSelection}
       isMultiSelectMode={isMultiSelectMode}
       onMove={handleMove}
+      onDelete={handleDelete}
     />
   );
 }

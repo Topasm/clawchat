@@ -23,6 +23,7 @@ interface KanbanColumnTabsProps {
   isMultiSelectMode: boolean;
   onMove: (id: string, status: KanbanStatus) => void;
   onComplete: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const SWIPE_THRESHOLD = 50; // px delta-X to trigger tab switch
@@ -40,6 +41,7 @@ export default function KanbanColumnTabs({
   isMultiSelectMode,
   onMove,
   onComplete,
+  onDelete,
 }: KanbanColumnTabsProps) {
   const [activeIdx, setActiveIdx] = useState(0);
   const touchStartX = useRef(0);
@@ -95,6 +97,7 @@ export default function KanbanColumnTabs({
           isMobile
           onMove={onMove}
           onComplete={onComplete}
+          onDelete={onDelete}
         />
       </div>
     </div>

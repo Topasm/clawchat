@@ -115,7 +115,11 @@ class TasksViewModel @Inject constructor(
     private fun doCreateTask(title: String) {
         if (title.isBlank()) return
         viewModelScope.launch {
-            when (val result = todoRepository.createTodo(TodoCreate(title = title))) {
+            when (val result = todoRepository.createTodo(TodoCreate(
+                title = title,
+                source = "quick_capture",
+                inboxState = "classifying",
+            ))) {
                 is ApiResult.Success -> _uiState.update { it.copy(tasks = listOf(result.data) + it.tasks) }
                 is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
                 is ApiResult.Loading -> { /* not used here */ }

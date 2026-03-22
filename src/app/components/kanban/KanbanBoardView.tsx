@@ -29,6 +29,7 @@ interface KanbanBoardViewProps {
   onSelect: (id: string) => void;
   isMultiSelectMode: boolean;
   onMove: (id: string, status: KanbanStatus) => void;
+  onDelete?: (id: string) => void;
 }
 
 export default function KanbanBoardView({
@@ -47,6 +48,7 @@ export default function KanbanBoardView({
   onSelect,
   isMultiSelectMode,
   onMove,
+  onDelete,
 }: KanbanBoardViewProps) {
   return (
     <div>
@@ -79,6 +81,7 @@ export default function KanbanBoardView({
             isMultiSelectMode={isMultiSelectMode}
             onMove={onMove}
             onComplete={onToggle}
+            onDelete={onDelete}
           />
         ) : (
           <div className="cc-kanban">
@@ -98,6 +101,7 @@ export default function KanbanBoardView({
                 selectedIds={selectedIds}
                 onSelect={onSelect}
                 isMultiSelectMode={isMultiSelectMode}
+                onDelete={onDelete}
               />
             ))}
           </div>

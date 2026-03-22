@@ -135,7 +135,11 @@ class TodayViewModel @Inject constructor(
     private fun doQuickAdd(title: String) {
         if (title.isBlank()) return
         viewModelScope.launch {
-            when (todoRepository.createTodo(TodoCreate(title = title))) {
+            when (todoRepository.createTodo(TodoCreate(
+                title = title,
+                source = "quick_capture",
+                inboxState = "classifying",
+            ))) {
                 is ApiResult.Success -> doRefresh()
                 else -> { /* Silently fail — user can retry */ }
             }

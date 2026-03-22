@@ -523,3 +523,39 @@
 .cc-tag-autocomplete__suggestion:hover {
   background: var(--cc-surface-secondary);
 }
+
+/* --- Context Menu ----------------------------------------- */
+.cc-context-menu {
+  background: var(--cc-surface-primary);
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  min-width: 140px;
+  animation: cc-fade-in 0.1s ease;
+}
+.cc-context-menu__item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--cc-text-primary);
+}
+.cc-context-menu__item:hover {
+  background: var(--cc-surface-secondary);
+}
+.cc-context-menu__item--danger {
+  color: var(--cc-danger);
+}
+.cc-context-menu__item--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+@keyframes cc-fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}

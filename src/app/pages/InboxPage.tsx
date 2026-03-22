@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
 import usePlatform from '../hooks/usePlatform';
-import { useTodosQuery, useToggleTodoComplete } from '../hooks/queries';
+import { useTodosQuery, useToggleTodoComplete, useDeleteTodo } from '../hooks/queries';
 import TaskCard from '../components/shared/TaskCard';
 import SectionHeader from '../components/shared/SectionHeader';
 import EmptyState from '../components/shared/EmptyState';
@@ -16,6 +16,11 @@ export default function InboxPage() {
   const { isMobile } = usePlatform();
   const addToast = useToastStore((s) => s.addToast);
   const toggleMutation = useToggleTodoComplete();
+  const deleteMutation = useDeleteTodo();
+
+  const handleDelete = useCallback((id: string) => {
+    deleteMutation.mutate(id);
+  }, [deleteMutation]);
 
   const handleToggle = useCallback((id: string) => {
     const todo = todos.find((t) => t.id === id);
@@ -91,6 +96,7 @@ export default function InboxPage() {
                 task={task}
                 onToggle={() => handleToggle(task.id)}
                 onClick={() => navigate(`/tasks/${task.id}`)}
+                onDelete={() => handleDelete(task.id)}
               />
             </div>
           ))}
@@ -106,6 +112,7 @@ export default function InboxPage() {
                 task={task}
                 onToggle={() => handleToggle(task.id)}
                 onClick={() => navigate(`/tasks/${task.id}`)}
+                onDelete={() => handleDelete(task.id)}
               />
               <div className="cc-inbox-card__actions">
                 <button
@@ -137,6 +144,7 @@ export default function InboxPage() {
                   task={task}
                   onToggle={() => handleToggle(task.id)}
                   onClick={() => navigate(`/tasks/${task.id}`)}
+                  onDelete={() => handleDelete(task.id)}
                   subTaskCount={children.length}
                 />
                 <div className="cc-inbox-card__actions">
@@ -163,6 +171,7 @@ export default function InboxPage() {
                 task={task}
                 onToggle={() => handleToggle(task.id)}
                 onClick={() => navigate(`/tasks/${task.id}`)}
+                onDelete={() => handleDelete(task.id)}
               />
               <div className="cc-inbox-card__actions">
                 <button
