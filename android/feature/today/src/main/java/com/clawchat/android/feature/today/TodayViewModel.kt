@@ -237,7 +237,7 @@ class TodayViewModel @Inject constructor(
                 inboxState = "classifying",
             ))) {
                 is ApiResult.Success -> doRefresh()
-                is ApiResult.Error -> Log.w(TAG, "Quick add failed: ${it.message}")
+                is ApiResult.Error -> Log.w(TAG, "Quick add failed")
                 is ApiResult.Loading -> { /* not used here */ }
             }
         }

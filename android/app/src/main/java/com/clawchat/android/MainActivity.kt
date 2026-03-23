@@ -105,10 +105,13 @@ class MainActivity : ComponentActivity() {
                     inboxState = "classifying",
                 )
             )
-            result.fold(
-                onSuccess = { Toast.makeText(this@MainActivity, "Saved to inbox", Toast.LENGTH_SHORT).show() },
-                onFailure = { Toast.makeText(this@MainActivity, "Failed to save", Toast.LENGTH_SHORT).show() },
-            )
+            when (result) {
+                is com.clawchat.android.core.network.ApiResult.Success ->
+                    Toast.makeText(this@MainActivity, "Saved to inbox", Toast.LENGTH_SHORT).show()
+                is com.clawchat.android.core.network.ApiResult.Error ->
+                    Toast.makeText(this@MainActivity, "Failed to save", Toast.LENGTH_SHORT).show()
+                is com.clawchat.android.core.network.ApiResult.Loading -> {}
+            }
         }
     }
 }
