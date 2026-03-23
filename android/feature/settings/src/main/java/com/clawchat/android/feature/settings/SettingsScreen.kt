@@ -1,19 +1,43 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.clawchat.android.feature.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import com.clawchat.android.core.ui.icons.ClawIcons
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,7 +47,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.PairedDevice
+import com.clawchat.android.core.ui.ClawListItemSurface
+import com.clawchat.android.core.ui.ClawSectionCard
+import com.clawchat.android.core.ui.ClawSectionHeader
+import com.clawchat.android.core.ui.ClawStatusChip
+import com.clawchat.android.core.ui.ClawTone
+import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.theme.AccentColor
+import com.clawchat.android.core.ui.theme.ThemeMode
+import com.clawchat.android.core.ui.icons.ClawIcons
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -36,12 +68,13 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsState()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         "Settings",
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.headlineSmall,
                     )
                 },
@@ -53,68 +86,52 @@ fun SettingsScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+                colors = ClawTopBarColors(),
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Server setup prompt (when onboarding was skipped)
-            if (state.hostName.isBlank() && state.health == null) {
-                item {
-                    Surface(
-                        onClick = onSetupServer,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                modifier = Modifier.size(44.dp),
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        ClawIcons.Cloud,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(22.dp),
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Connect to Server",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                                Text(
-                                    "Set up your ClawChat server connection",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                                )
-                            }
-                        }
-                    }
+            item {
+                ClawSectionCard {
+                    ClawStatusChip(
+                        text = "Appearance",
+                        tone = ClawTone.Primary,
+                    )
+                    Text(
+                        text = "Choose the calmer, lighter presentation you want across the app.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ThemeModeCard(
+                        selectedKey = state.themeMode,
+                        onSelect = viewModel::setThemeMode,
+                    )
+                    AccentColorCard(
+                        selectedKey = state.accentColor,
+                        onSelect = viewModel::setAccentColor,
+                    )
                 }
             }
 
-            // Server info card
+            if (state.hostName.isBlank() && state.health == null) {
+                item {
+                    ConnectServerCard(onSetupServer = onSetupServer)
+                }
+            }
+
             if (state.hostName.isNotBlank() || state.health != null) {
                 item {
-                    SettingsSection(title = "Server") {
+                    ClawSectionCard {
+                        ClawSectionHeader(
+                            title = "Server",
+                            subtitle = "Connection and AI status.",
+                        )
                         ServerInfoCard(
                             version = state.health?.version,
                             aiProvider = state.health?.aiProvider,
@@ -127,21 +144,15 @@ fun SettingsScreen(
                 }
             }
 
-            // Appearance
-            item {
-                SettingsSection(title = "Appearance") {
-                    AccentColorCard(
-                        selectedKey = state.accentColor,
-                        onSelect = { viewModel.setAccentColor(it) },
-                    )
-                }
-            }
-
-            // Paired devices
             if (state.devices.isNotEmpty()) {
                 item {
-                    SettingsSection(title = "Paired Devices") {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ClawSectionCard {
+                        ClawSectionHeader(
+                            title = "Paired devices",
+                            subtitle = "Active mobile connections.",
+                            count = state.devices.size,
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             state.devices.forEach { device ->
                                 DeviceCard(
                                     device = device,
@@ -153,16 +164,13 @@ fun SettingsScreen(
                 }
             }
 
-            // Logout
             item {
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
-                ) {
+                ClawSectionCard {
+                    ClawSectionHeader(
+                        title = "Account",
+                        subtitle = "Sign out while keeping your visual preferences.",
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     TextButton(
                         onClick = {
                             viewModel.logout()
@@ -177,64 +185,159 @@ fun SettingsScreen(
                         Text("Log Out", fontWeight = FontWeight.Medium)
                     }
                 }
-                Spacer(Modifier.height(16.dp))
             }
         }
     }
 }
 
-// ── Section wrapper ──────────────────────────────────────────────────────────
-
 @Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-        )
-        content()
+private fun ConnectServerCard(onSetupServer: () -> Unit) {
+    ClawSectionCard(tone = ClawTone.Primary, onClick = onSetupServer) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        ClawIcons.Cloud,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Connect to Server",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Set up your ClawChat server connection.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
-// ── Accent color picker ──────────────────────────────────────────────────────
+@Composable
+private fun ThemeModeCard(
+    selectedKey: String,
+    onSelect: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Theme mode",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ThemeMode.entries.forEach { mode ->
+                ThemeModeOption(
+                    mode = mode,
+                    isSelected = selectedKey == mode.key,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(mode.key) },
+                )
+            }
+        }
+    }
+}
 
-@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ThemeModeOption(
+    mode: ThemeMode,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+
+    Surface(
+        modifier = modifier,
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = containerColor,
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 42.dp, height = 26.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(
+                        when (mode) {
+                            ThemeMode.Light -> Color(0xFFF9F7F3)
+                            ThemeMode.Dark -> Color(0xFF252320)
+                            ThemeMode.System -> Color(0xFFE7E1D8)
+                        },
+                    )
+                    .border(
+                        1.dp,
+                        when (mode) {
+                            ThemeMode.Light -> Color(0xFFE0D9CF)
+                            ThemeMode.Dark -> Color(0xFF555049)
+                            ThemeMode.System -> Color(0xFFD2CBC2)
+                        },
+                        MaterialTheme.shapes.medium,
+                    ),
+            )
+            Text(
+                text = mode.label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
 @Composable
 private fun AccentColorCard(
     selectedKey: String,
     onSelect: (String) -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Accent Color",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(14.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                AccentColor.entries.forEach { accent ->
-                    AccentSwatch(
-                        color = Color(accent.swatchArgb),
-                        label = accent.label,
-                        isSelected = accent.key == selectedKey,
-                        onClick = { onSelect(accent.key) },
-                    )
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "Accent color",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            AccentColor.entries.forEach { accent ->
+                AccentSwatch(
+                    color = Color(accent.swatchArgb),
+                    label = accent.label,
+                    isSelected = accent.key == selectedKey,
+                    onClick = { onSelect(accent.key) },
+                )
             }
         }
     }
@@ -258,8 +361,11 @@ private fun AccentSwatch(
                 .clip(CircleShape)
                 .background(color)
                 .then(
-                    if (isSelected) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                    else Modifier,
+                    if (isSelected) {
+                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    } else {
+                        Modifier
+                    },
                 )
                 .clickable(role = Role.RadioButton, onClick = onClick),
         ) {
@@ -281,8 +387,6 @@ private fun AccentSwatch(
     }
 }
 
-// ── Server info ──────────────────────────────────────────────────────────────
-
 @Composable
 private fun ServerInfoCard(
     version: String?,
@@ -292,86 +396,58 @@ private fun ServerInfoCard(
     hostName: String,
     authMode: String,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            ClawIcons.Cloud,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.width(12.dp))
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondary),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Connected",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-
-            if (hostName.isNotBlank()) { InfoRow("Host", hostName) }
-            version?.let { InfoRow("Version", it) }
-            aiProvider?.let { InfoRow("AI Provider", it) }
-            aiModel?.let { InfoRow("Model", it) }
-            aiConnected?.let {
-                val statusColor = if (it) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
-                val statusText = if (it) "Connected" else "Disconnected"
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "AI Status",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    ClawListItemSurface {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                modifier = Modifier.size(36.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        ClawIcons.Cloud,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(statusColor),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            statusText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = statusColor,
-                        )
-                    }
                 }
             }
-            if (authMode.isNotBlank()) { InfoRow("Auth Mode", authMode) }
+            Spacer(Modifier.width(12.dp))
+            val aiOk = aiConnected == true
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (aiOk) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (aiOk) "Connected" else "Connection details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+            )
         }
+
+        if (hostName.isNotBlank()) InfoRow("Host", hostName)
+        version?.let { InfoRow("Version", it) }
+        aiProvider?.let { InfoRow("AI Provider", it) }
+        aiModel?.let { InfoRow("Model", it) }
+        aiConnected?.let {
+            val statusColor = if (it) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
+            InfoRow(
+                label = "AI Status",
+                value = if (it) "Connected" else "Disconnected",
+                valueColor = statusColor,
+            )
+        }
+        if (authMode.isNotBlank()) InfoRow("Auth Mode", authMode)
     }
 }
 
 @Composable
 private fun InfoRow(label: String, value: String, valueColor: Color? = null) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
@@ -388,22 +464,15 @@ private fun InfoRow(label: String, value: String, valueColor: Color? = null) {
     }
 }
 
-// ── Device card ──────────────────────────────────────────────────────────────
-
 @Composable
 private fun DeviceCard(device: PairedDevice, onRevoke: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
+    ClawListItemSurface {
         Row(
-            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier.size(40.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {

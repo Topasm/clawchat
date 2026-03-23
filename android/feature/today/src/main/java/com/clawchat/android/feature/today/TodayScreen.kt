@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -55,11 +56,13 @@ import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawMetricPill
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
+import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
@@ -84,6 +87,7 @@ fun TodayScreen(
         state.inboxPreview.isNotEmpty()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             LargeTopAppBar(
                 title = {
@@ -100,6 +104,7 @@ fun TodayScreen(
                         )
                     }
                 },
+                colors = ClawTopBarColors(),
             )
         },
         floatingActionButton = {
@@ -108,6 +113,8 @@ fun TodayScreen(
                 onClick = { showQuickAdd = true },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("Capture") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             )
         },
     ) { padding ->
@@ -239,7 +246,11 @@ private fun TodayHeroCard(
         else -> "Use chat or quick capture to shape the rest of your day."
     }
 
-    ClawSectionCard(tone = ClawTone.Primary) {
+    ClawSectionCard {
+        ClawStatusChip(
+            text = "Today at a glance",
+            tone = ClawTone.Primary,
+        )
         Text(
             text = greeting,
             style = MaterialTheme.typography.headlineSmall,
@@ -248,7 +259,7 @@ private fun TodayHeroCard(
         Text(
             text = summary,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -277,6 +288,10 @@ private fun TodayHeroCard(
             FilledTonalButton(
                 modifier = Modifier.weight(1f),
                 onClick = onQuickAdd,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
             ) {
                 Text("Quick capture")
             }
@@ -343,14 +358,10 @@ private fun TodoRow(
     val isCompleted = todo.status == "completed"
     val view = LocalView.current
 
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-    ) {
+    ClawListItemSurface {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp)
                 .alpha(if (isCompleted) 0.65f else 1f),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -420,21 +431,17 @@ private fun EventSectionCard(events: List<Event>) {
 
 @Composable
 private fun EventRow(event: Event) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-    ) {
+    ClawListItemSurface {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
                 modifier = Modifier.size(44.dp),
                 shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -493,28 +500,23 @@ private fun InboxPreviewSection(
         )
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             todos.forEach { todo ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
+                ClawListItemSurface {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                            .fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Surface(
                             modifier = Modifier.size(40.dp),
                             shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     ClawIcons.Inbox,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    tint = MaterialTheme.colorScheme.primary,
                                 )
                             }
                         }
@@ -588,12 +590,8 @@ private fun BriefingSection(briefing: BriefingResponse) {
         if (briefing.highlights.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 briefing.highlights.take(3).forEach { highlight ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = MaterialTheme.shapes.large,
-                    ) {
+                    ClawListItemSurface {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -624,14 +622,10 @@ private fun BriefingSection(briefing: BriefingResponse) {
 
 @Composable
 private fun SuggestionActionCard(suggestion: BriefingSuggestion) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-    ) {
+    ClawListItemSurface {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

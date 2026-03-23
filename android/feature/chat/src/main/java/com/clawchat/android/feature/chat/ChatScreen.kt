@@ -60,9 +60,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
+import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.icons.ClawIcons
 import java.time.Duration
@@ -144,6 +146,7 @@ private fun ConversationListView(
                         subtitle = "Conversation is the primary interface.",
                     )
                 },
+                colors = ClawTopBarColors(),
             )
         },
         floatingActionButton = {
@@ -152,9 +155,11 @@ private fun ConversationListView(
                 onClick = onCreate,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("New chat") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (isLoading && conversations.isEmpty()) {
             Box(
@@ -215,23 +220,19 @@ private fun ConversationCard(
     conversation: Conversation,
     onClick: () -> Unit,
 ) {
-    Surface(
+    ClawListItemSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 0.dp,
+        onClick = onClick,
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
                 modifier = Modifier.size(46.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -319,6 +320,7 @@ private fun ChatDetailView(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                colors = ClawTopBarColors(),
             )
         },
         bottomBar = {
@@ -343,7 +345,7 @@ private fun ChatDetailView(
                 },
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (isLoadingMessages && messages.isEmpty()) {
             Box(
@@ -369,7 +371,8 @@ private fun ChatDetailView(
             ) {
                 if (messages.isEmpty() && streamingText.isBlank()) {
                     item {
-                        ClawSectionCard(tone = ClawTone.Primary) {
+                        ClawSectionCard {
+                            ClawStatusChip(text = "Start here", tone = ClawTone.Primary)
                             Text(
                                 text = "Start the conversation",
                                 style = MaterialTheme.typography.titleLarge,
@@ -378,7 +381,7 @@ private fun ChatDetailView(
                             Text(
                                 text = "Try asking what is due today, add a task in natural language, or request a summary of pending work.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -417,7 +420,7 @@ private fun ChatComposer(
     Surface(
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.background,
     ) {
         Row(
             modifier = Modifier
@@ -431,7 +434,8 @@ private fun ChatComposer(
             Surface(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 TextField(
                     value = inputText,
@@ -459,7 +463,8 @@ private fun ChatComposer(
             Surface(
                 modifier = Modifier.size(50.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Box(
                     modifier = Modifier
@@ -479,12 +484,13 @@ private fun ChatComposer(
                 modifier = Modifier.size(50.dp),
                 shape = CircleShape,
                 color = if (isStreaming) {
-                    MaterialTheme.colorScheme.errorContainer
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
                 } else if (inputText.isNotBlank()) {
                     MaterialTheme.colorScheme.primary
                 } else {
-                    MaterialTheme.colorScheme.surfaceContainerHighest
+                    MaterialTheme.colorScheme.surface
                 },
+                border = if (isStreaming || inputText.isNotBlank()) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Box(
                     modifier = Modifier
@@ -526,12 +532,12 @@ private fun MessageBubble(
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
     val bubbleColor = if (isUser) {
-        MaterialTheme.colorScheme.primary
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
     } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
+        MaterialTheme.colorScheme.surface
     }
     val contentColor = if (isUser) {
-        MaterialTheme.colorScheme.onPrimary
+        MaterialTheme.colorScheme.onSurface
     } else {
         MaterialTheme.colorScheme.onSurface
     }
@@ -555,6 +561,10 @@ private fun MessageBubble(
                 RoundedCornerShape(24.dp, 24.dp, 24.dp, 8.dp)
             },
             color = bubbleColor,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.outlineVariant,
+            ),
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),

@@ -37,11 +37,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawMetricPill
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
+import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.icons.ClawIcons
 
@@ -55,6 +57,7 @@ fun InboxScreen(
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             LargeTopAppBar(
                 title = {
@@ -63,6 +66,7 @@ fun InboxScreen(
                         subtitle = "Capture first, decide with context.",
                     )
                 },
+                colors = ClawTopBarColors(),
             )
         },
     ) { padding ->
@@ -219,7 +223,11 @@ private fun InboxSummaryCard(
     reviewSuggestion: Int,
     failed: Int,
 ) {
-    ClawSectionCard(tone = ClawTone.Primary) {
+    ClawSectionCard {
+        ClawStatusChip(
+            text = "Review queue",
+            tone = ClawTone.Primary,
+        )
         Text(
             text = if (totalItems == 0) "Nothing waiting right now" else "$totalItems item${if (totalItems == 1) "" else "s"} need attention",
             style = MaterialTheme.typography.headlineSmall,
@@ -228,7 +236,7 @@ private fun InboxSummaryCard(
         Text(
             text = "Use this queue to confirm AI suggestions, fix failures, and turn captures into structured work.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -319,15 +327,10 @@ private fun InboxItemCard(
     onClick: () -> Unit = {},
     isError: Boolean = false,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-    ) {
+    ClawListItemSurface {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp)
                 .clickable(onClick = onClick),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

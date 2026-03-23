@@ -34,8 +34,8 @@ import android.view.HapticFeedbackConstants
 fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
     val color by animateColorAsState(
         when (dismissState.targetValue) {
-            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
-            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error.copy(alpha = 0.14f)
+            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             SwipeToDismissBoxValue.Settled -> Color.Transparent
         },
         label = "swipe_bg_color",
@@ -54,7 +54,7 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(color, RoundedCornerShape(12.dp))
+            .background(color, RoundedCornerShape(24.dp))
             .padding(horizontal = 20.dp),
         contentAlignment = alignment,
     ) {
@@ -63,8 +63,8 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
                 icon,
                 contentDescription = null,
                 tint = when (dismissState.dismissDirection) {
-                    SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.onErrorContainer
-                    SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onPrimaryContainer
+                    SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
+                    SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary
                     else -> Color.White
                 },
             )

@@ -57,11 +57,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawMetricPill
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
+import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
@@ -118,6 +120,7 @@ private fun TaskListView(
     val completedCount = filteredTasks.count { it.status == "completed" }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             LargeTopAppBar(
                 title = {
@@ -126,6 +129,7 @@ private fun TaskListView(
                         subtitle = "Keep active work readable and focused.",
                     )
                 },
+                colors = ClawTopBarColors(),
             )
         },
         floatingActionButton = {
@@ -134,6 +138,8 @@ private fun TaskListView(
                 onClick = { showCreateSheet = true },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text("New task") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             )
         },
     ) { padding ->
@@ -215,7 +221,11 @@ private fun TaskSummaryCard(
     statusFilter: String?,
     onSetFilter: (String?) -> Unit,
 ) {
-    ClawSectionCard(tone = ClawTone.Primary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    ClawSectionCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        ClawStatusChip(
+            text = "Active work",
+            tone = ClawTone.Primary,
+        )
         Text(
             text = if (totalCount == 0) "Nothing scheduled yet" else "$completedCount of $totalCount tasks complete",
             style = MaterialTheme.typography.headlineSmall,
@@ -224,7 +234,7 @@ private fun TaskSummaryCard(
         Text(
             text = "Swipe for quick actions and keep the current focus visible.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -284,7 +294,7 @@ private fun TaskFilterChip(
         onClick = onClick,
         label = { Text(label) },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = MaterialTheme.colorScheme.surface,
+            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
             selectedLabelColor = MaterialTheme.colorScheme.primary,
         ),
     )
@@ -318,17 +328,12 @@ private fun TaskRow(
         label = "task_alpha",
     )
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ClawListItemSurface(
+        modifier = Modifier.clickable(onClick = onClick),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp)
                 .alpha(completionAlpha),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -417,6 +422,7 @@ private fun TaskDetailView(
     onDelete: () -> Unit,
 ) {
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             LargeTopAppBar(
                 title = {
@@ -439,6 +445,7 @@ private fun TaskDetailView(
                         )
                     }
                 },
+                colors = ClawTopBarColors(),
             )
         },
     ) { padding ->
@@ -450,7 +457,7 @@ private fun TaskDetailView(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                ClawSectionCard(tone = ClawTone.Primary) {
+                ClawSectionCard {
                     Text(
                         text = task.title,
                         style = MaterialTheme.typography.headlineSmall,

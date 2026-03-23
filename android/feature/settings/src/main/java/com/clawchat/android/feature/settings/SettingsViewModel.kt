@@ -23,6 +23,7 @@ data class SettingsUiState(
     val hostName: String = "",
     val authMode: String = "",
     val accentColor: String = "system",
+    val themeMode: String = "light",
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -48,7 +49,15 @@ class SettingsViewModel @Inject constructor(
             val hostName = sessionStore.hostName.first() ?: ""
             val authMode = sessionStore.authMode.first() ?: ""
             val accentColor = sessionStore.accentColor.first()
-            _uiState.update { it.copy(hostName = hostName, authMode = authMode, accentColor = accentColor) }
+            val themeMode = sessionStore.themeMode.first()
+            _uiState.update {
+                it.copy(
+                    hostName = hostName,
+                    authMode = authMode,
+                    accentColor = accentColor,
+                    themeMode = themeMode,
+                )
+            }
 
             when (val result = settingsRepository.health()) {
                 is ApiResult.Success -> _uiState.update { it.copy(health = result.data) }
@@ -82,6 +91,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             sessionStore.setAccentColor(key)
             _uiState.update { it.copy(accentColor = key) }
+        }
+    }
+
+    fun setThemeMode(key: String) {
+        viewModelScope.launch {
+            sessionStore.setThemeMode(key)
+            _uiState.update { it.copy(themeMode = key) }
         }
     }
 

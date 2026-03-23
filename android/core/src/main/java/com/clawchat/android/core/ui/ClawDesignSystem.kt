@@ -13,15 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarColors
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,44 +49,62 @@ data class ClawToneColors(
 @Composable
 fun rememberClawToneColors(tone: ClawTone): ClawToneColors {
     val scheme = MaterialTheme.colorScheme
+    val baseSurface = scheme.surfaceContainerLowest
+
+    fun overlay(color: Color, alpha: Float): Color = color.copy(alpha = alpha).compositeOver(baseSurface)
+
     return when (tone) {
         ClawTone.Default -> ClawToneColors(
-            container = scheme.surfaceContainerLow,
+            container = baseSurface,
             onContainer = scheme.onSurface,
             outline = scheme.outlineVariant,
         )
+
         ClawTone.Primary -> ClawToneColors(
-            container = scheme.primaryContainer,
-            onContainer = scheme.onPrimaryContainer,
-            outline = scheme.primary.copy(alpha = 0.2f),
+            container = overlay(scheme.primary, 0.06f),
+            onContainer = scheme.onSurface,
+            outline = scheme.primary.copy(alpha = 0.18f),
         )
+
         ClawTone.Success -> ClawToneColors(
-            container = scheme.secondaryContainer,
-            onContainer = scheme.onSecondaryContainer,
+            container = overlay(scheme.secondary, 0.06f),
+            onContainer = scheme.onSurface,
             outline = scheme.secondary.copy(alpha = 0.18f),
         )
+
         ClawTone.Warning -> ClawToneColors(
-            container = scheme.tertiaryContainer,
-            onContainer = scheme.onTertiaryContainer,
-            outline = scheme.tertiary.copy(alpha = 0.22f),
+            container = overlay(scheme.tertiary, 0.06f),
+            onContainer = scheme.onSurface,
+            outline = scheme.tertiary.copy(alpha = 0.18f),
         )
+
         ClawTone.Error -> ClawToneColors(
-            container = scheme.errorContainer,
-            onContainer = scheme.onErrorContainer,
+            container = overlay(scheme.error, 0.05f),
+            onContainer = scheme.onSurface,
             outline = scheme.error.copy(alpha = 0.16f),
         )
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ClawTopBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
+    containerColor = Color.Transparent,
+    scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+    titleContentColor = MaterialTheme.colorScheme.onSurface,
+    actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
 
 @Composable
 fun ClawTopBarTitle(
     title: String,
     subtitle: String? = null,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
         if (!subtitle.isNullOrBlank()) {
@@ -115,8 +137,32 @@ fun ClawSectionCard(
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+fun ClawListItemSurface(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content,
         )
     }
@@ -139,7 +185,7 @@ fun ClawSectionHeader(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             if (!subtitle.isNullOrBlank()) {
@@ -180,7 +226,7 @@ fun ClawStatusChip(
         border = BorderStroke(1.dp, colors.outline),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -188,7 +234,7 @@ fun ClawStatusChip(
                 Box(
                     modifier = Modifier
                         .size(14.dp)
-                        .background(colors.onContainer.copy(alpha = 0.12f), CircleShape),
+                        .background(colors.outline.copy(alpha = 0.35f), CircleShape),
                 )
             }
             Text(
@@ -218,7 +264,7 @@ fun ClawMetricPill(
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
@@ -260,7 +306,7 @@ fun ClawEmptyState(
             }
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
             )
