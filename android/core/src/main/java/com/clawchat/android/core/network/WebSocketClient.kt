@@ -185,7 +185,7 @@ class WebSocketClient @Inject constructor(
                     val data = json.optJSONObject("data") ?: return
                     val title = data.optString("title", "")
                     val message = data.optString("message", "")
-                    val todoId = data.optString("todo_id", null)
+                    val todoId: String? = if (data.has("todo_id")) data.optString("todo_id") else null
                     Log.d(TAG, "Nudge: $title")
                     _events.tryEmit(SyncEvent.Nudge(title, message, todoId))
                 }
