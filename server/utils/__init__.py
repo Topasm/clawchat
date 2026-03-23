@@ -23,7 +23,7 @@ def deserialize_tags(raw: str | None) -> list[str]:
         return []
 
 
-_JSON_LIST_FIELDS = {"tags", "enabled_skills"}
+_JSON_LIST_FIELDS = {"tags", "enabled_skills", "depends_on"}
 
 
 def apply_model_updates(

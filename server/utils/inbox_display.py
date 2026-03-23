@@ -2,6 +2,7 @@
 
 INBOX_STATE_LABELS = {
     "classifying": "Planning now",
+    "questioning": "Answer questions",
     "planning": "Planning now",
     "plan_ready": "Review suggestion",
     "captured": "Needs organizing",
@@ -11,6 +12,7 @@ INBOX_STATE_LABELS = {
 
 INBOX_STATE_ACTIONS = {
     "classifying": "wait",
+    "questioning": "answer",
     "planning": "wait",
     "plan_ready": "review",
     "captured": "organize",
