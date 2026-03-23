@@ -1,7 +1,9 @@
 package com.clawchat.android.feature.today
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clawchat.android.core.data.model.BriefingResponse
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
@@ -19,6 +21,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val TAG = "TodayViewModel"
+
 data class TodayUiState(
     val greeting: String = "",
     val todayTodos: List<Todo> = emptyList(),
@@ -26,6 +30,8 @@ data class TodayUiState(
     val todayEvents: List<Event> = emptyList(),
     val inboxCount: Int = 0,
     val inboxPreview: List<Todo> = emptyList(),
+    val briefing: BriefingResponse? = null,
+    val isBriefingLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val error: String? = null,
 )
@@ -50,6 +56,7 @@ class TodayViewModel @Inject constructor(
 
     init {
         doRefresh()
+        fetchBriefing()
         viewModelScope.launch { syncManager.todoChanged.collect { doRefresh() } }
         viewModelScope.launch { syncManager.eventChanged.collect { doRefresh() } }
     }
@@ -136,8 +143,8 @@ class TodayViewModel @Inject constructor(
                     val result = todoRepository.updateTodo(todoId, TodoUpdate(status = newStatus))
                     if (result is ApiResult.Error) throw Exception(result.message)
                 }
-            } catch (_: Exception) {
-                // Rollback already handled by optimistic()
+            } catch (e: Exception) {
+                Log.w(TAG, "Optimistic update failed", e)
             }
         }
     }
@@ -161,7 +168,9 @@ class TodayViewModel @Inject constructor(
                     val result = todoRepository.deleteTodo(todoId)
                     if (result is ApiResult.Error) throw Exception(result.message)
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                Log.w(TAG, "Optimistic update failed", e)
+            }
         }
     }
 
@@ -197,7 +206,25 @@ class TodayViewModel @Inject constructor(
                     val result = todoRepository.updateTodo(todoId, TodoUpdate(dueDate = today))
                     if (result is ApiResult.Error) throw Exception(result.message)
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                Log.w(TAG, "Optimistic update failed", e)
+            }
+        }
+    }
+
+    private fun fetchBriefing() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBriefingLoading = true) }
+            when (val result = todayRepository.getBriefing()) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(briefing = result.data, isBriefingLoading = false)
+                }
+                is ApiResult.Error -> {
+                    Log.w(TAG, "Briefing fetch failed: ${result.message}")
+                    _uiState.update { it.copy(isBriefingLoading = false) }
+                }
+                is ApiResult.Loading -> { /* not used here */ }
+            }
         }
     }
 
@@ -210,7 +237,8 @@ class TodayViewModel @Inject constructor(
                 inboxState = "classifying",
             ))) {
                 is ApiResult.Success -> doRefresh()
-                else -> { /* Silently fail — user can retry */ }
+                is ApiResult.Error -> Log.w(TAG, "Quick add failed: ${it.message}")
+                is ApiResult.Loading -> { /* not used here */ }
             }
         }
     }

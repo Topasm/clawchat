@@ -169,6 +169,85 @@ object ClawIcons {
         }.build()
     }
 
+    val Inbox: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Inbox",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(19f, 3f)
+                horizontalLineTo(4.99f)
+                curveTo(3.88f, 3f, 3.01f, 3.89f, 3.01f, 5f)
+                lineTo(3f, 19f)
+                curveTo(3f, 20.1f, 3.89f, 21f, 5f, 21f)
+                horizontalLineTo(19f)
+                curveTo(20.1f, 21f, 21f, 20.1f, 21f, 19f)
+                verticalLineTo(5f)
+                curveTo(21f, 3.89f, 20.1f, 3f, 19f, 3f)
+                close()
+                moveTo(19f, 15f)
+                horizontalLineTo(15f)
+                curveTo(15f, 16.66f, 13.65f, 18f, 12f, 18f)
+                curveTo(10.35f, 18f, 9f, 16.66f, 9f, 15f)
+                horizontalLineTo(4.99f)
+                verticalLineTo(5f)
+                horizontalLineTo(19f)
+                verticalLineTo(15f)
+                close()
+            }
+        }.build()
+    }
+
+    val Checklist: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Checklist",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(19f, 3f)
+                horizontalLineTo(14.82f)
+                curveTo(14.4f, 1.84f, 13.3f, 1f, 12f, 1f)
+                curveTo(10.7f, 1f, 9.6f, 1.84f, 9.18f, 3f)
+                horizontalLineTo(5f)
+                curveTo(3.9f, 3f, 3f, 3.9f, 3f, 5f)
+                verticalLineTo(19f)
+                curveTo(3f, 20.1f, 3.9f, 21f, 5f, 21f)
+                horizontalLineTo(19f)
+                curveTo(20.1f, 21f, 21f, 20.1f, 21f, 19f)
+                verticalLineTo(5f)
+                curveTo(21f, 3.9f, 20.1f, 3f, 19f, 3f)
+                close()
+                moveTo(12f, 3f)
+                curveTo(12.55f, 3f, 13f, 3.45f, 13f, 4f)
+                curveTo(13f, 4.55f, 12.55f, 5f, 12f, 5f)
+                curveTo(11.45f, 5f, 11f, 4.55f, 11f, 4f)
+                curveTo(11f, 3.45f, 11.45f, 3f, 12f, 3f)
+                close()
+                moveTo(14f, 17f)
+                horizontalLineTo(7f)
+                verticalLineTo(15f)
+                horizontalLineTo(14f)
+                close()
+                moveTo(17f, 13f)
+                horizontalLineTo(7f)
+                verticalLineTo(11f)
+                horizontalLineTo(17f)
+                close()
+                moveTo(17f, 9f)
+                horizontalLineTo(7f)
+                verticalLineTo(7f)
+                horizontalLineTo(17f)
+                close()
+            }
+        }.build()
+    }
+
     val Today: ImageVector by lazy {
         ImageVector.Builder(
             name = "Today",

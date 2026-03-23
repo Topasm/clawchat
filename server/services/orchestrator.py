@@ -114,6 +114,10 @@ class Orchestrator:
                     await self._handle_daily_briefing(
                         db, user_id, conversation_id
                     )
+                elif intent == "weekly_review":
+                    await self._handle_weekly_review(
+                        db, user_id, conversation_id
+                    )
                 else:
                     # Fallback to general chat
                     await self._handle_general_chat(
@@ -222,6 +226,18 @@ class Orchestrator:
         briefing = await briefing_service.generate_briefing(db, self.active_ai)
         await self._send_assistant_message(
             db, user_id, conversation_id, "daily_briefing", briefing
+        )
+
+    async def _handle_weekly_review(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        conversation_id: str,
+    ):
+        from services import weekly_review_service
+        review = await weekly_review_service.generate_weekly_review(db, self.active_ai)
+        await self._send_assistant_message(
+            db, user_id, conversation_id, "weekly_review", review
         )
 
     async def _handle_general_chat(
@@ -359,6 +375,8 @@ class Orchestrator:
                     description=params.get("description"),
                     priority=params.get("priority", "medium"),
                     parent_id=parent_id,
+                    due_date=params.get("due_date"),
+                    recurrence_rule=params.get("recurrence_rule"),
                 )
                 return (
                     f"Created task: '{todo.title}' with {todo.priority} priority.",

@@ -111,6 +111,10 @@ async def _apply_schema_corrections(session: AsyncSession):
         "ALTER TABLE todos ADD COLUMN estimated_minutes INTEGER",
         "ALTER TABLE todos ADD COLUMN automation_error TEXT",
         "ALTER TABLE todos ADD COLUMN enabled_skills TEXT",
+        "ALTER TABLE todos ADD COLUMN recurrence_rule TEXT",
+        "ALTER TABLE todos ADD COLUMN recurrence_end DATETIME",
+        "ALTER TABLE todos ADD COLUMN recurrence_exceptions TEXT",
+        "ALTER TABLE todos ADD COLUMN recurring_source_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
 
         # -- conversations --
         "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",

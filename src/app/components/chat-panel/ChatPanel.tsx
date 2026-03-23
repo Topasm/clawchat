@@ -13,9 +13,11 @@ interface ChatPanelProps {
   conversationId: string | null;
   onToggle: () => void;
   onSetConversationId: (id: string | null) => void;
+  /** "bottom" (default, mobile) renders with motion height animation; "side" renders as a full-height side panel */
+  variant?: 'bottom' | 'side';
 }
 
-export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConversationId }: ChatPanelProps) {
+export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConversationId, variant = 'bottom' }: ChatPanelProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isStreaming = useChatStore((s) => s.isStreaming);
@@ -112,72 +114,90 @@ export default function ChatPanel({ isOpen, conversationId, onToggle, onSetConve
     }
   };
 
+  const openContent = (
+    <>
+      <div className="cc-chat-panel__header">
+        <span className="cc-chat-panel__header-title">Quick Chat</span>
+        <button type="button" className="cc-chat-panel__header-btn" onClick={handlePopOut} title="Open full view">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M8 1h5v5M13 1L7 7M6 2H2.5A1.5 1.5 0 001 3.5v8A1.5 1.5 0 002.5 13h8a1.5 1.5 0 001.5-1.5V8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button type="button" className="cc-chat-panel__header-btn" onClick={onToggle} title={variant === 'side' ? 'Close' : 'Minimize'}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+            {variant === 'side' ? (
+              <path d="M3 3l8 8M11 3l-8 8" strokeLinecap="round" />
+            ) : (
+              <path d="M3 7h8" strokeLinecap="round" />
+            )}
+          </svg>
+        </button>
+      </div>
+      <ChatPanelMessages
+        conversationId={conversationId}
+        messages={messages}
+        onEditMessage={handleStartEdit}
+        onDeleteMessage={(messageId) => conversationId && deleteMessageMutation.mutate({ conversationId, messageId })}
+        onRegenerateMessage={async (messageId) => {
+          if (!conversationId) return;
+          const userText = await regenerateMutation.mutateAsync({ conversationId, assistantMessageId: messageId });
+          if (userText) {
+            try {
+              await sendMessageStreaming(conversationId, userText);
+            } catch {
+              // handled in store
+            }
+          }
+        }}
+      />
+      <ChatInput
+        onSend={handleSend}
+        isStreaming={isStreaming}
+        onStop={stopGeneration}
+        editingMessageId={editingMessageId}
+        editingText={editingText}
+        onCancelEdit={handleCancelEdit}
+      />
+    </>
+  );
+
+  const closedContent = (
+    <div
+      className="cc-chat-input"
+      onClick={onToggle}
+      style={{ cursor: 'pointer' }}
+    >
+      <div
+        className="cc-chat-input__textarea"
+        style={{ pointerEvents: 'none', display: 'flex', alignItems: 'center', color: 'var(--cc-text-tertiary)' }}
+      >
+        Ask ClawChat anything...
+      </div>
+      <button type="button" className="cc-chat-input__btn cc-chat-input__btn--send" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M14 2L7 9M14 2L9.5 14L7 9M14 2L2 6.5L7 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </div>
+  );
+
+  // Side variant: full-height panel, no motion animation
+  if (variant === 'side') {
+    return (
+      <div className="cc-chat-panel cc-chat-panel--side">
+        {isOpen ? openContent : closedContent}
+      </div>
+    );
+  }
+
+  // Bottom variant (default): motion-animated height
   return (
     <motion.div
       className="cc-chat-panel"
       animate={{ height: isOpen ? 360 : 52 }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
     >
-      {isOpen ? (
-        <>
-          <div className="cc-chat-panel__header">
-            <span className="cc-chat-panel__header-title">Quick Chat</span>
-            <button type="button" className="cc-chat-panel__header-btn" onClick={handlePopOut} title="Open full view">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M8 1h5v5M13 1L7 7M6 2H2.5A1.5 1.5 0 001 3.5v8A1.5 1.5 0 002.5 13h8a1.5 1.5 0 001.5-1.5V8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button type="button" className="cc-chat-panel__header-btn" onClick={onToggle} title="Minimize">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M3 7h8" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-          <ChatPanelMessages
-            conversationId={conversationId}
-            messages={messages}
-            onEditMessage={handleStartEdit}
-            onDeleteMessage={(messageId) => conversationId && deleteMessageMutation.mutate({ conversationId, messageId })}
-            onRegenerateMessage={async (messageId) => {
-              if (!conversationId) return;
-              const userText = await regenerateMutation.mutateAsync({ conversationId, assistantMessageId: messageId });
-              if (userText) {
-                try {
-                  await sendMessageStreaming(conversationId, userText);
-                } catch {
-                  // handled in store
-                }
-              }
-            }}
-          />
-          <ChatInput
-            onSend={handleSend}
-            isStreaming={isStreaming}
-            onStop={stopGeneration}
-            editingMessageId={editingMessageId}
-            editingText={editingText}
-            onCancelEdit={handleCancelEdit}
-          />
-        </>
-      ) : (
-        <div
-          className="cc-chat-input"
-          onClick={onToggle}
-          style={{ cursor: 'pointer' }}
-        >
-          <div
-            className="cc-chat-input__textarea"
-            style={{ pointerEvents: 'none', display: 'flex', alignItems: 'center', color: 'var(--cc-text-tertiary)' }}
-          >
-            Ask ClawChat anything...
-          </div>
-          <button type="button" className="cc-chat-input__btn cc-chat-input__btn--send" disabled>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M14 2L7 9M14 2L9.5 14L7 9M14 2L2 6.5L7 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
-      )}
+      {isOpen ? openContent : closedContent}
     </motion.div>
   );
 }

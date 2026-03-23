@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Notification, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -250,6 +250,16 @@ app.whenReady().then(() => {
   startServer();
   setupAutoUpdater();
 
+  // Global shortcut for quick capture (Cmd/Ctrl+Shift+Space)
+  globalShortcut.register('CommandOrControl+Shift+Space', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('open-quick-capture');
+    }
+  });
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -263,5 +273,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  globalShortcut.unregisterAll();
   stopServer();
 });

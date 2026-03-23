@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
-import { useTodosQuery, useToggleTodoComplete, useDeleteTodo, useSetKanbanStatus, useReorderTodos } from '../../hooks/queries';
+import { useTodosQuery, useToggleTodoComplete, useDeleteTodo, useSetKanbanStatus, useReorderTodos, useUpdateTodo } from '../../hooks/queries';
 import useKanbanFilters from '../../hooks/useKanbanFilters';
 import usePlatform from '../../hooks/usePlatform';
 import useKanbanKeyboardNav from '../../hooks/useKanbanKeyboardNav';
@@ -27,6 +27,7 @@ export default function KanbanBoard() {
   const deleteMutation = useDeleteTodo();
   const setKanbanStatusMutation = useSetKanbanStatus();
   const reorderMutation = useReorderTodos();
+  const updateTodoMutation = useUpdateTodo();
 
   const isMultiSelectMode = selectedTodoIds.size > 0;
 
@@ -86,9 +87,30 @@ export default function KanbanBoard() {
     reorderMutation.mutate({ updates });
   }, [todos, kanbanStatuses, reorderMutation]);
 
+  const handleSetParent = useCallback((childId: string, parentId: string) => {
+    updateTodoMutation.mutate({ id: childId, data: { parent_id: parentId } });
+  }, [updateTodoMutation]);
+
+  const handleClearParent = useCallback((childId: string) => {
+    updateTodoMutation.mutate({ id: childId, data: { parent_id: null } });
+  }, [updateTodoMutation]);
+
+  const getParentId = useCallback((todoId: string) => {
+    const todo = todos.find((t) => t.id === todoId);
+    return todo?.parent_id ?? null;
+  }, [todos]);
+
+  const getChildIds = useCallback((todoId: string) => {
+    return todos.filter((t) => t.parent_id === todoId).map((t) => t.id);
+  }, [todos]);
+
   const { handleDragStart, handleDragEnd } = useKanbanDragDrop({
     setKanbanStatus: handleSetKanbanStatus,
     reorderTodoInColumn: handleReorder,
+    setParent: handleSetParent,
+    clearParent: handleClearParent,
+    getParentId,
+    getChildIds,
   });
 
   const handleClickTask = (id: string) => navigate(`/tasks/${id}`);

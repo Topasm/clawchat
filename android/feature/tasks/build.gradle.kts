@@ -51,6 +51,9 @@ dependencies {
     // Navigation
     implementation(libs.navigation.compose)
 
+    // Drag-and-drop reordering
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

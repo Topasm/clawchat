@@ -140,6 +140,16 @@
   background: color-mix(in srgb, var(--cc-primary) 8%, transparent);
 }
 
+/* -- Card drop-target (parent assignment via DnD) ----------- */
+
+.cc-kanban-card--drop-target {
+  outline: 2px dashed var(--cc-primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--cc-primary) 8%, transparent);
+  transition: outline 0.15s, background 0.15s;
+}
+
 .cc-kanban__card--subtask {
   margin-left: 20px;
   position: relative;

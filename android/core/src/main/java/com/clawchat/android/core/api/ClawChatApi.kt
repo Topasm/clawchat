@@ -20,6 +20,9 @@ interface ClawChatApi {
     @GET("api/today")
     suspend fun getToday(): TodayResponse
 
+    @GET("api/today/briefing")
+    suspend fun getBriefing(): BriefingResponse
+
     // --- Todos ---
 
     @GET("api/todos")
@@ -36,11 +39,6 @@ interface ClawChatApi {
 
     @POST("api/todos/{todoId}/organize")
     suspend fun organizeTodo(@Path("todoId") todoId: String): Response<Unit>
-
-    // --- Events ---
-
-    @GET("api/events")
-    suspend fun listEvents(@QueryMap params: Map<String, String> = emptyMap()): PaginatedResponse<Event>
 
     // --- Conversations ---
 

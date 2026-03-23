@@ -182,12 +182,25 @@ async def check_overdue_todos(
 
 
 async def run_all_checks(
-    db: AsyncSession, ws_manager: ConnectionManager, user_id: str
+    db: AsyncSession,
+    ws_manager: ConnectionManager,
+    user_id: str,
+    push_service=None,
 ) -> int:
     total = 0
     total += await check_event_reminders(db, ws_manager, user_id)
     total += await check_todo_reminders(db, ws_manager, user_id)
     total += await check_overdue_todos(db, ws_manager, user_id)
+
+    # Also send via push notifications if service is available and reminders were sent
+    if total > 0 and push_service and push_service.enabled:
+        await push_service.send_to_all_devices(
+            db,
+            title="ClawChat Reminder",
+            body=f"You have {total} upcoming reminder{'s' if total != 1 else ''}",
+            data={"type": "reminder"},
+        )
+
     return total
 
 

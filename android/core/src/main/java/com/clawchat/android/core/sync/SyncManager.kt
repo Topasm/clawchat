@@ -29,6 +29,15 @@ class SyncManager @Inject constructor(
     private val _eventChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val eventChanged: SharedFlow<Unit> = _eventChanged.asSharedFlow()
 
+    private val _reminder = MutableSharedFlow<SyncEvent.Reminder>(extraBufferCapacity = 16)
+    val reminder: SharedFlow<SyncEvent.Reminder> = _reminder.asSharedFlow()
+
+    private val _nudge = MutableSharedFlow<SyncEvent.Nudge>(extraBufferCapacity = 16)
+    val nudge: SharedFlow<SyncEvent.Nudge> = _nudge.asSharedFlow()
+
+    private val _weeklyReview = MutableSharedFlow<SyncEvent.WeeklyReview>(extraBufferCapacity = 16)
+    val weeklyReview: SharedFlow<SyncEvent.WeeklyReview> = _weeklyReview.asSharedFlow()
+
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
@@ -41,6 +50,9 @@ class SyncManager @Inject constructor(
                         "todos" -> _todoChanged.tryEmit(Unit)
                         "events" -> _eventChanged.tryEmit(Unit)
                     }
+                    is SyncEvent.Reminder -> _reminder.tryEmit(event)
+                    is SyncEvent.Nudge -> _nudge.tryEmit(event)
+                    is SyncEvent.WeeklyReview -> _weeklyReview.tryEmit(event)
                     is SyncEvent.Connected -> _isConnected.value = true
                     is SyncEvent.Disconnected -> _isConnected.value = false
                 }
@@ -50,6 +62,7 @@ class SyncManager @Inject constructor(
 
     fun stop() {
         webSocketClient.disconnect()
+        scope.cancel()
         _isConnected.value = false
     }
 }

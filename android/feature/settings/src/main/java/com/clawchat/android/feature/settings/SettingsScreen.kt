@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
@@ -27,6 +28,7 @@ import com.clawchat.android.core.ui.theme.AccentColor
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
+    onBack: () -> Unit = {},
     onLoggedOut: () -> Unit = {},
     onSetupServer: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
@@ -42,6 +44,14 @@ fun SettingsScreen(
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.headlineSmall,
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -308,7 +318,7 @@ private fun ServerInfoCard(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF4CAF50)),
+                        .background(MaterialTheme.colorScheme.secondary),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -324,7 +334,7 @@ private fun ServerInfoCard(
             aiProvider?.let { InfoRow("AI Provider", it) }
             aiModel?.let { InfoRow("Model", it) }
             aiConnected?.let {
-                val statusColor = if (it) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                val statusColor = if (it) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
                 val statusText = if (it) "Connected" else "Disconnected"
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),

@@ -85,6 +85,8 @@ async def create_todo(
     source: str | None = None,
     source_id: str | None = None,
     assignee: str | None = None,
+    recurrence_rule: str | None = None,
+    recurrence_end: datetime | None = None,
 ) -> Todo:
     todo = Todo(
         id=make_id("todo_"),
@@ -98,6 +100,8 @@ async def create_todo(
         source=source,
         source_id=source_id,
         assignee=assignee,
+        recurrence_rule=recurrence_rule,
+        recurrence_end=recurrence_end,
     )
     db.add(todo)
     await db.flush()

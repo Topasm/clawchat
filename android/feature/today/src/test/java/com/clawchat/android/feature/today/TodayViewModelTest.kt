@@ -8,6 +8,7 @@ import com.clawchat.android.core.data.model.TodayResponse
 import com.clawchat.android.core.data.repository.TodayRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -29,6 +30,7 @@ class TodayViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var todayRepository: TodayRepository
     private lateinit var todoRepository: TodoRepository
+    private lateinit var syncManager: SyncManager
     private lateinit var viewModel: TodayViewModel
 
     private val sampleTodo = Todo(
@@ -56,6 +58,7 @@ class TodayViewModelTest {
         Dispatchers.setMain(testDispatcher)
         todayRepository = mockk()
         todoRepository = mockk()
+        syncManager = mockk(relaxed = true)
     }
 
     @After
@@ -64,7 +67,7 @@ class TodayViewModelTest {
     }
 
     private fun createViewModel(): TodayViewModel {
-        return TodayViewModel(todayRepository, todoRepository)
+        return TodayViewModel(todayRepository, todoRepository, syncManager)
     }
 
     @Test

@@ -1491,3 +1491,55 @@
   gap: 6px;
   padding: 2px 0 8px 36px;
 }
+
+/* --- Inbox Questionnaire Card ------------------------------------------- */
+.cc-inbox-card--questioning {
+  border-left: 3px solid var(--cc-primary);
+  padding: 12px 14px;
+  margin-bottom: 6px;
+}
+
+.cc-inbox-card__questioning-header {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: var(--cc-text-primary);
+}
+
+.cc-inbox-card__questioning-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cc-inbox-card__question-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-inbox-card__question-label {
+  font-size: 13px;
+  color: var(--cc-text-secondary);
+}
+
+.cc-inbox-card__question-input {
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  background: var(--cc-bg-secondary);
+  color: var(--cc-text-primary);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.cc-inbox-card__question-input:focus {
+  border-color: var(--cc-primary);
+}
+
+.cc-inbox-card__question-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -1,5 +1,6 @@
 package com.clawchat.android.feature.tasks
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.Todo
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val TAG = "TasksViewModel"
+
 data class TasksUiState(
     val tasks: List<Todo> = emptyList(),
     val isLoading: Boolean = false,
@@ -33,6 +36,7 @@ sealed interface TasksAction {
     data class Create(val title: String) : TasksAction
     data class Update(val id: String, val update: TodoUpdate) : TasksAction
     data class Delete(val id: String) : TasksAction
+    data class ReorderTasks(val reorderedTasks: List<Todo>) : TasksAction
 }
 
 @HiltViewModel
@@ -58,6 +62,7 @@ class TasksViewModel @Inject constructor(
             is TasksAction.Create -> doCreateTask(action.title)
             is TasksAction.Update -> doUpdateTask(action.id, action.update)
             is TasksAction.Delete -> doDeleteTask(action.id)
+            is TasksAction.ReorderTasks -> doReorderTasks(action.reorderedTasks)
         }
     }
 
@@ -70,6 +75,16 @@ class TasksViewModel @Inject constructor(
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
     fun setDueToday(id: String) = updateTask(id, TodoUpdate(dueDate = java.time.LocalDate.now().toString()))
+    fun reorderTasks(reordered: List<Todo>) = onAction(TasksAction.ReorderTasks(reordered))
+
+    private fun doReorderTasks(reordered: List<Todo>) {
+        _uiState.update { it.copy(tasks = reordered) }
+        viewModelScope.launch {
+            reordered.forEachIndexed { index, todo ->
+                todoRepository.updateTodo(todo.id, TodoUpdate(sortOrder = index))
+            }
+        }
+    }
 
     private fun doLoadTasks() {
         viewModelScope.launch {
@@ -110,8 +125,8 @@ class TasksViewModel @Inject constructor(
                     val result = todoRepository.updateTodo(todoId, TodoUpdate(status = newStatus))
                     if (result is ApiResult.Error) throw Exception(result.message)
                 }
-            } catch (_: Exception) {
-                // Rollback already handled by optimistic()
+            } catch (e: Exception) {
+                Log.w(TAG, "Optimistic update failed", e)
             }
         }
     }

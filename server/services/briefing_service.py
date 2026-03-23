@@ -1,7 +1,8 @@
 """Async service for generating daily briefings."""
 
+import json
 import logging
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
     today = date.today()
     today_start = datetime.combine(today, time.min, tzinfo=timezone.utc)
     today_end = datetime.combine(today, time.max, tzinfo=timezone.utc)
+    upcoming_end = datetime.combine(today + timedelta(days=3), time.max, tzinfo=timezone.utc)
 
     # Today's events
     events_q = (
@@ -27,6 +29,14 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         .order_by(Event.start_time.asc())
     )
     events = list((await db.execute(events_q)).scalars().all())
+
+    # Upcoming events (next 3 days, excluding today)
+    upcoming_events_q = (
+        select(Event)
+        .where(Event.start_time > today_end, Event.start_time <= upcoming_end)
+        .order_by(Event.start_time.asc())
+    )
+    upcoming_events = list((await db.execute(upcoming_events_q)).scalars().all())
 
     # Pending todos due today
     pending_q = (
@@ -39,6 +49,18 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         .order_by(Todo.created_at.asc())
     )
     pending_todos = list((await db.execute(pending_q)).scalars().all())
+
+    # Upcoming todos (next 3 days)
+    upcoming_todos_q = (
+        select(Todo)
+        .where(
+            Todo.due_date > today_end,
+            Todo.due_date <= upcoming_end,
+            Todo.status.notin_(["completed", "cancelled"]),
+        )
+        .order_by(Todo.due_date.asc())
+    )
+    upcoming_todos = list((await db.execute(upcoming_todos_q)).scalars().all())
 
     # Overdue todos
     overdue_q = (
@@ -62,6 +84,11 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
     )
     in_progress = list((await db.execute(in_progress_q)).scalars().all())
 
+    # High/urgent priority tasks due today or overdue
+    high_priority_count = sum(
+        1 for t in pending_todos + overdue_todos if t.priority in ("high", "urgent")
+    )
+
     # Inbox count (no due date, pending)
     inbox_q = select(func.count(Todo.id)).where(
         Todo.due_date == None,  # noqa: E711
@@ -75,9 +102,12 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
 
     return {
         "events": events,
+        "upcoming_events": upcoming_events,
         "pending_todos": pending_todos,
+        "upcoming_todos": upcoming_todos,
         "overdue_todos": overdue_todos,
         "in_progress": in_progress,
+        "high_priority_count": high_priority_count,
         "inbox_count": inbox_count,
         "agent_tasks": agent_tasks,
         "date": today,
@@ -98,20 +128,34 @@ def _format_briefing_prompt(data: dict) -> str:
     if data["pending_todos"]:
         lines.append("## Tasks Due Today")
         for t in data["pending_todos"]:
-            lines.append(f"- [{t.priority}] {t.title}")
+            lines.append(f"- [{t.priority}] {t.title} (id: {t.id})")
         lines.append("")
 
     if data["overdue_todos"]:
         lines.append("## Overdue Tasks")
         for t in data["overdue_todos"]:
             due = t.due_date.strftime("%b %d") if t.due_date else "unknown"
-            lines.append(f"- {t.title} (was due {due})")
+            lines.append(f"- {t.title} (was due {due}, id: {t.id})")
         lines.append("")
 
     if data["in_progress"]:
         lines.append("## In Progress")
         for t in data["in_progress"]:
-            lines.append(f"- {t.title}")
+            lines.append(f"- {t.title} (id: {t.id})")
+        lines.append("")
+
+    if data.get("upcoming_todos"):
+        lines.append("## Upcoming (next 3 days)")
+        for t in data["upcoming_todos"][:5]:
+            due = t.due_date.strftime("%b %d") if t.due_date else ""
+            lines.append(f"- [{t.priority}] {t.title} (due {due})")
+        lines.append("")
+
+    if data.get("upcoming_events"):
+        lines.append("## Upcoming Events (next 3 days)")
+        for e in data["upcoming_events"][:5]:
+            t = e.start_time.strftime("%a %H:%M") if e.start_time else "all day"
+            lines.append(f"- {t}: {e.title}")
         lines.append("")
 
     if data["inbox_count"] > 0:
@@ -122,7 +166,35 @@ def _format_briefing_prompt(data: dict) -> str:
         lines.append(f"Background tasks: {len(data['agent_tasks'])} queued/running.")
         lines.append("")
 
+    total_items = len(data["events"]) + len(data["pending_todos"]) + len(data["overdue_todos"])
+    lines.append(f"Load: {len(data['events'])} meetings + {len(data['pending_todos'])} tasks due + {len(data['overdue_todos'])} overdue. High/urgent items: {data.get('high_priority_count', 0)}.")
+
     return "\n".join(lines)
+
+
+_BRIEFING_SYSTEM_PROMPT = """\
+You are a personal assistant generating an actionable daily briefing.
+Analyze the user's schedule and tasks, then respond with ONLY a JSON object (no markdown fences):
+
+{
+  "summary": "2-3 sentence friendly overview of the day",
+  "highlights": ["key point 1", "key point 2", "..."],
+  "suggestions": [
+    {"action": "start_with", "todo_id": "...", "title": "...", "reason": "..."},
+    {"action": "move_to_tomorrow", "todo_id": "...", "title": "...", "reason": "..."},
+    {"action": "reschedule", "todo_id": "...", "title": "...", "reason": "..."}
+  ],
+  "load_assessment": "light|moderate|heavy",
+  "load_message": "Short description of day's intensity"
+}
+
+Rules:
+- "start_with": suggest the most important task to start the day with
+- "move_to_tomorrow": suggest moving a lower-priority task if the day is heavy
+- Only include suggestions that reference actual todo_ids from the data
+- Keep suggestions to 1-3 items max
+- load_assessment: "light" (0-3 items), "moderate" (4-7), "heavy" (8+)
+- Always respond with valid JSON only"""
 
 
 async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
@@ -135,6 +207,9 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
         "in_progress": len(data["in_progress"]),
         "inbox": data["inbox_count"],
         "agent_tasks": len(data["agent_tasks"]),
+        "high_priority": data.get("high_priority_count", 0),
+        "upcoming_tasks": len(data.get("upcoming_todos", [])),
+        "upcoming_events": len(data.get("upcoming_events", [])),
     }
 
     # Nothing to brief
@@ -143,21 +218,67 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
         return {
             "summary": "Your schedule is clear today. No tasks, events, or pending items.",
             "stats": stats,
+            "suggestions": [],
+            "load_assessment": "light",
+            "load_message": "Nothing on the agenda today.",
         }
 
     prompt_text = _format_briefing_prompt(data)
 
     try:
-        summary = await ai_service.generate_completion(
-            system_prompt=(
-                "You are a personal assistant generating a daily briefing. "
-                "Summarize the user's day in a friendly, concise way. "
-                "Highlight urgent items. Use bullet points for clarity."
-            ),
+        raw = await ai_service.generate_completion(
+            system_prompt=_BRIEFING_SYSTEM_PROMPT,
             user_message=prompt_text,
         )
+        # Try parsing as JSON for structured response
+        parsed = _parse_briefing_json(raw)
+        if parsed:
+            return {
+                "summary": parsed.get("summary", raw),
+                "highlights": parsed.get("highlights", []),
+                "suggestions": parsed.get("suggestions", []),
+                "load_assessment": parsed.get("load_assessment", "moderate"),
+                "load_message": parsed.get("load_message", ""),
+                "stats": stats,
+            }
+        # Fallback: LLM didn't return valid JSON
+        return {
+            "summary": raw,
+            "stats": stats,
+            "suggestions": [],
+            "load_assessment": _compute_load(stats),
+            "load_message": "",
+        }
     except AIUnavailableError:
         logger.warning("LLM unavailable for briefing, using plain text fallback")
-        summary = _format_briefing_prompt(data)
+        return {
+            "summary": _format_briefing_prompt(data),
+            "stats": stats,
+            "suggestions": [],
+            "load_assessment": _compute_load(stats),
+            "load_message": "",
+        }
 
-    return {"summary": summary, "stats": stats}
+
+def _parse_briefing_json(raw: str) -> dict | None:
+    """Try to parse the LLM response as JSON. Strip markdown fences if present."""
+    text = raw.strip()
+    if text.startswith("```"):
+        # Remove markdown code fences
+        lines = text.split("\n")
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def _compute_load(stats: dict) -> str:
+    """Compute load assessment from stats when LLM is unavailable."""
+    total = stats.get("events", 0) + stats.get("tasks_due", 0) + stats.get("overdue", 0)
+    if total <= 3:
+        return "light"
+    if total <= 7:
+        return "moderate"
+    return "heavy"

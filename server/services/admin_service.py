@@ -16,7 +16,6 @@ from models.todo import Todo
 from models.event import Event
 from models.agent_task import AgentTask
 from models.attachment import Attachment
-from models.task_relationship import TaskRelationship
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,6 @@ async def get_table_counts(db: AsyncSession) -> dict[str, int]:
         "events": Event,
         "agent_tasks": AgentTask,
         "attachments": Attachment,
-        "task_relationships": TaskRelationship,
     }
     counts = {}
     for name, model in tables.items():

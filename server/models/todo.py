@@ -44,6 +44,17 @@ class Todo(Base):
     inbox_state: Mapped[str] = mapped_column(String, nullable=False, default="none")
     estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     automation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    clarification_questions: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array of strings
+    clarification_answers: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON object {index: answer}
+    depends_on: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array of todo IDs
+
+    # Recurrence fields (mirrors event recurrence pattern)
+    recurrence_rule: Mapped[str | None] = mapped_column(Text, nullable=True)  # RRULE string
+    recurrence_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recurrence_exceptions: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array of ISO dates
+    recurring_source_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("todos.id", ondelete="SET NULL"), nullable=True
+    )  # links occurrences back to the series
 
     __table_args__ = (
         Index("idx_todos_status", "status"),
@@ -52,4 +63,5 @@ class Todo(Base):
         Index("idx_todos_parent_id", "parent_id"),
         Index("idx_todos_sort_order", "sort_order"),
         Index("idx_todos_source", "source"),
+        Index("idx_todos_recurrence_rule", "recurrence_rule"),
     )

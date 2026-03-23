@@ -9,10 +9,22 @@ export interface BriefingStats {
   in_progress: number;
   inbox: number;
   agent_tasks: number;
+  [key: string]: number;
+}
+
+export interface BriefingSuggestion {
+  action: string;
+  todo_id: string;
+  title: string;
+  reason: string;
 }
 
 export interface BriefingData {
   summary: string;
+  highlights?: string[];
+  suggestions?: BriefingSuggestion[];
+  load_assessment?: 'light' | 'moderate' | 'heavy';
+  load_message?: string;
   stats: BriefingStats;
   date: string;
 }

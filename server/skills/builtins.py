@@ -186,4 +186,32 @@ _BUILTINS: list[SkillDef] = [
         output_format="checklist",
         tags=["planning"],
     ),
+
+    # -- Weekly Review ---------------------------------------------------
+    SkillDef(
+        id="weekly_review",
+        name="Weekly Review",
+        description=(
+            "Conduct a GTD-style weekly review of all projects, tasks, "
+            "and inbox items."
+        ),
+        system_prompt=(
+            "You are a weekly review assistant following GTD methodology.\n"
+            "Given the user's task data, generate a structured review:\n\n"
+            "1. **Wins**: What was completed this week\n"
+            "2. **Stale items**: Tasks with no update in 7+ days — "
+            "suggest archive, reschedule, or break down\n"
+            "3. **Upcoming deadlines**: Next 7 days\n"
+            "4. **Inbox cleanup**: Uncategorized items that need attention\n"
+            "5. **Suggestions**: Specific actionable suggestions\n\n"
+            "Format suggestions as a JSON array at the end under "
+            "a `## Suggestions` heading:\n"
+            "```json\n"
+            '[{"action": "archive|reschedule|break_down|prioritize", '
+            '"todo_id": "...", "title": "...", "reason": "..."}]\n'
+            "```"
+        ),
+        output_format="markdown",
+        tags=["planning", "review"],
+    ),
 ]

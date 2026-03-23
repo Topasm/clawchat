@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
+import type { PanelSize } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useModuleStore } from '../stores/useModuleStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import apiClient from '../services/apiClient';
 import ChatPanel from './chat-panel/ChatPanel';
 import ErrorBoundary from './shared/ErrorBoundary';
@@ -17,9 +20,11 @@ import ToastContainer from './shared/ToastContainer';
 import CommandPalette from './shared/CommandPalette';
 import ShortcutsHelp from './shared/ShortcutsHelp';
 import QuickCaptureModal from './shared/QuickCaptureModal';
+import OfflineIndicator from './shared/OfflineIndicator';
 import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
+import { useCapabilitiesQuery } from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
@@ -107,6 +112,25 @@ export default function Layout() {
   const touchStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const quickCapture = useQuickCaptureStore();
+  const { data: capabilities } = useCapabilitiesQuery();
+
+  // Conditionally filter nav items based on server capabilities
+  const filteredPrimaryNavItems = useMemo(() => {
+    if (!capabilities) return primaryNavItems;
+    return primaryNavItems.filter((item) => {
+      if (item.to === '/inbox' && !capabilities.features.inbox_pipeline) return false;
+      return true;
+    });
+  }, [capabilities]);
+
+  const filteredSecondaryNavItems = useMemo(() => {
+    if (!capabilities) return secondaryNavItems;
+    return secondaryNavItems.filter((item) => {
+      // Hide obsidian-related items when obsidian is not configured
+      // (Currently no dedicated obsidian nav item, but future-proof)
+      return true;
+    });
+  }, [capabilities]);
 
   // Widget deep-link navigation
   useEffect(() => {
@@ -116,6 +140,30 @@ export default function Layout() {
     window.addEventListener('navigate', handler);
     return () => window.removeEventListener('navigate', handler);
   }, [navigate]);
+
+  // Electron: global shortcut opens quick capture (Cmd/Ctrl+Shift+Space)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.electronAPI?.on) {
+      const unsub = window.electronAPI.on('open-quick-capture', () => {
+        quickCapture.open();
+      });
+      return () => unsub();
+    }
+  }, [quickCapture]);
+
+  // Web: keyboard shortcut 'Q' opens quick capture (when no input is focused)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'q' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+        e.preventDefault();
+        quickCapture.open();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [quickCapture]);
 
   // Central data sync: fetches all data from server on mount (no-op in demo mode)
   const { refresh } = useDataSync();
@@ -222,7 +270,7 @@ export default function Layout() {
           <span className="cc-sidebar__label">AI: {healthData.ai_connected ? healthData.ai_model : 'Offline'}</span>
         </div>
       )}
-      {primaryNavItems.map((item) => (
+      {filteredPrimaryNavItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -239,7 +287,7 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="cc-sidebar__divider" />
-      {secondaryNavItems.map((item) => (
+      {filteredSecondaryNavItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -294,14 +342,31 @@ export default function Layout() {
 
   const handleRefresh = useCallback(() => { refresh(); }, [refresh]);
 
-  const mainContent = (
+  // Persisted panel sizes
+  const sidebarSize = useSettingsStore((s) => s.sidebarSize);
+  const chatPanelSize = useSettingsStore((s) => s.chatPanelSize);
+  const setSidebarSize = useSettingsStore((s) => s.setSidebarSize);
+  const setChatPanelSize = useSettingsStore((s) => s.setChatPanelSize);
+
+  const handleSidebarResize = useCallback((size: PanelSize) => {
+    setSidebarSize(size.asPercentage);
+    setSidebarCollapsed(size.asPercentage <= 4);
+  }, [setSidebarSize]);
+
+  const handleChatPanelResize = useCallback((size: PanelSize) => {
+    setChatPanelSize(size.asPercentage);
+  }, [setChatPanelSize]);
+
+  const showChatPanel = !onChatPage && chatPanel.isOpen;
+
+  const mobileMainContent = (
     <>
       <div className="cc-content" ref={contentRef}>
         <ErrorBoundary name="PageContent">
           <AnimatedOutlet />
         </ErrorBoundary>
       </div>
-      {isMobile && <PullToRefresh contentRef={contentRef} onRefresh={handleRefresh} disabled={onChatPage} />}
+      <PullToRefresh contentRef={contentRef} onRefresh={handleRefresh} disabled={onChatPage} />
       {!onChatPage && (
         <ChatPanel
           isOpen={chatPanel.isOpen}
@@ -317,6 +382,7 @@ export default function Layout() {
     <div className={`cc-root${isMobile ? ' cc-root--mobile' : ''}`} style={cssVars(colors)}>
       <UpdateNotification />
       <ToastContainer />
+      <OfflineIndicator />
       <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
       <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
       <QuickCaptureModal
@@ -335,15 +401,62 @@ export default function Layout() {
               {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
             </div>
           )}
-          <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{mainContent}</div>
+          <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{mobileMainContent}</div>
           <FloatingActionButton />
           <BottomNav />
         </>
       ) : (
-        <>
-          {sidebar}
-          <div className="cc-main">{mainContent}</div>
-        </>
+        <PanelGroup orientation="horizontal" id="cc-layout">
+          <Panel
+            id="sidebar"
+            defaultSize={`${sidebarSize}%`}
+            minSize="48px"
+            maxSize="250px"
+            collapsible
+            collapsedSize="48px"
+            onResize={handleSidebarResize}
+          >
+            {sidebar}
+          </Panel>
+          <PanelResizeHandle className="cc-resize-handle" />
+          <Panel id="content" minSize="30%">
+            <div className="cc-main">
+              <div className="cc-content" ref={contentRef}>
+                <ErrorBoundary name="PageContent">
+                  <AnimatedOutlet />
+                </ErrorBoundary>
+              </div>
+              {!onChatPage && !chatPanel.isOpen && (
+                <ChatPanel
+                  isOpen={false}
+                  conversationId={chatPanel.conversationId}
+                  onToggle={chatPanel.toggle}
+                  onSetConversationId={chatPanel.setConversationId}
+                />
+              )}
+            </div>
+          </Panel>
+          {showChatPanel && (
+            <>
+              <PanelResizeHandle className="cc-resize-handle" />
+              <Panel
+                id="chat-panel"
+                defaultSize={`${chatPanelSize}%`}
+                minSize="250px"
+                maxSize="450px"
+                onResize={handleChatPanelResize}
+              >
+                <ChatPanel
+                  isOpen={true}
+                  conversationId={chatPanel.conversationId}
+                  onToggle={chatPanel.toggle}
+                  onSetConversationId={chatPanel.setConversationId}
+                  variant="side"
+                />
+              </Panel>
+            </>
+          )}
+        </PanelGroup>
       )}
     </div>
   );

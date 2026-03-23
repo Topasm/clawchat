@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
@@ -72,6 +73,20 @@ async def list_events(
     items = [_event_to_response(row) for row in rows]
 
     return PaginatedResponse(items=items, total=total, page=page, limit=limit)
+
+
+@router.get("/export.ics")
+async def export_ics(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Export all events as an iCalendar (.ics) file."""
+    ics_data = await calendar_service.export_events_ical(db)
+    return Response(
+        content=ics_data,
+        media_type="text/calendar",
+        headers={"Content-Disposition": 'attachment; filename="clawchat.ics"'},
+    )
 
 
 @router.post("", response_model=EventResponse, status_code=201)

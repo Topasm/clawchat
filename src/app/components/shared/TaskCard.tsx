@@ -2,8 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { TodoResponse } from '../../types/api';
 import Checkbox from './Checkbox';
 import Badge from './Badge';
-import BlockerBadge from '../task-relationships/BlockerBadge';
-
 const SKILL_BADGE_LABELS: Record<string, string> = {
   plan: 'Plan',
   research: 'Research',
@@ -23,11 +21,10 @@ interface TaskCardProps {
   className?: string;
   isSubTask?: boolean;
   subTaskCount?: number;
-  blockerCount?: number;
   isCompletedOverride?: boolean;
 }
 
-export default function TaskCard({ task, onToggle, onClick, onDelete, className, isSubTask, subTaskCount, blockerCount, isCompletedOverride }: TaskCardProps) {
+export default function TaskCard({ task, onToggle, onClick, onDelete, className, isSubTask, subTaskCount, isCompletedOverride }: TaskCardProps) {
   const isCompleted = isCompletedOverride ?? (task.status === 'completed');
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -97,6 +94,13 @@ export default function TaskCard({ task, onToggle, onClick, onDelete, className,
             )}
           </div>
           <div className="cc-card__meta">
+            {task.is_recurring && (
+              <span title="Recurring" style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px', borderRadius: 4, backgroundColor: 'var(--cc-color-info, #3B82F6)', color: '#fff' }}>
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 2 }}>
+                  <path d="M1 4v6h6" /><path d="M3.51 14.49A8 8 0 0 0 15 8" /><path d="M15 12V6H9" /><path d="M12.49 1.51A8 8 0 0 0 1 8" />
+                </svg>
+              </span>
+            )}
             {task.priority && task.priority !== 'medium' && (
               <Badge variant="priority" level={task.priority} />
             )}
@@ -117,7 +121,11 @@ export default function TaskCard({ task, onToggle, onClick, onDelete, className,
                 {task.assignee === 'openclaw' ? 'AI' : task.assignee === 'planner' ? 'Plan' : task.assignee === 'researcher' ? 'Research' : 'Exec'}
               </span>
             ) : null}
-            {(blockerCount ?? 0) > 0 && <BlockerBadge count={blockerCount!} />}
+            {(task.depends_on?.length ?? 0) > 0 && (
+              <span className="cc-badge cc-badge--blocker" title={`Depends on ${task.depends_on!.length} task(s)`}>
+                {task.depends_on!.length} dep{task.depends_on!.length !== 1 ? 's' : ''}
+              </span>
+            )}
             {(subTaskCount ?? 0) > 0 && (
               <span className="cc-badge cc-badge--count">{subTaskCount} sub-task{subTaskCount !== 1 ? 's' : ''}</span>
             )}

@@ -25,7 +25,6 @@ class TableCounts(BaseModel):
     events: int
     agent_tasks: int
     attachments: int
-    task_relationships: int
 
 
 class StorageStats(BaseModel):

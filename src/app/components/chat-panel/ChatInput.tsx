@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from 'react';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useAuthStore } from '../../stores/useAuthStore';
+import useVoiceInput from '../../hooks/useVoiceInput';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -26,6 +27,19 @@ export default function ChatInput({
   const sendOnEnter = useSettingsStore((s) => s.sendOnEnter);
   const healthOK = useAuthStore((s) => s.healthOK);
   const isEditing = !!editingMessageId;
+  const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput();
+
+  // Append voice transcript to text when available
+  useEffect(() => {
+    if (transcript) {
+      setText((prev) => (prev ? prev + ' ' + transcript : transcript));
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 96) + 'px';
+      }
+    }
+  }, [transcript]);
 
   // Pre-fill textarea when entering edit mode
   useEffect(() => {
@@ -116,6 +130,21 @@ export default function ChatInput({
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M3 3l8 8M11 3l-8 8" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+          {voiceSupported && (
+            <button
+              type="button"
+              className={`cc-chat-input__btn cc-chat-input__btn--mic${isListening ? ' cc-chat-input__btn--active' : ''}`}
+              onClick={isListening ? stopListening : startListening}
+              title={isListening ? 'Stop listening' : 'Voice input'}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="1" width="6" height="9" rx="3" />
+                <path d="M3 7a5 5 0 0 0 10 0" />
+                <line x1="8" y1="12" x2="8" y2="15" />
+                <line x1="5" y1="15" x2="11" y2="15" />
               </svg>
             </button>
           )}

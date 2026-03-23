@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,9 +19,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.clawchat.android.feature.chat.ChatScreen
+import com.clawchat.android.feature.inbox.InboxScreen
 import com.clawchat.android.feature.onboarding.OnboardingScreen
 import com.clawchat.android.feature.settings.SettingsScreen
-import com.clawchat.android.ui.HomeScreen
+import com.clawchat.android.feature.tasks.TasksScreen
+import com.clawchat.android.feature.today.TodayScreen
 
 data class BottomNavItem(
     val route: String,
@@ -32,9 +32,10 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Home"),
-    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Projects"),
-    BottomNavItem(NavRoute.Settings.route, Icons.Default.Settings, "Settings"),
+    BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Today"),
+    BottomNavItem(NavRoute.Inbox.route, ClawIcons.Inbox, "Inbox"),
+    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Chat"),
+    BottomNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, "Tasks"),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,13 +119,33 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
                 )
             }
             composable(NavRoute.Today.route) {
-                HomeScreen()
+                TodayScreen(
+                    onNavigateToInbox = {
+                        navController.navigate(NavRoute.Inbox.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(NavRoute.Settings.route)
+                    },
+                )
+            }
+            composable(NavRoute.Inbox.route) {
+                InboxScreen()
             }
             composable(NavRoute.Chat.route) {
                 ChatScreen()
             }
+            composable(NavRoute.Tasks.route) {
+                TasksScreen()
+            }
             composable(NavRoute.Settings.route) {
                 SettingsScreen(
+                    onBack = { navController.popBackStack() },
                     onLoggedOut = {
                         navController.navigate(NavRoute.Onboarding.route) {
                             popUpTo(0) { inclusive = true }

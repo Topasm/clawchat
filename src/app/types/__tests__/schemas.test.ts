@@ -14,11 +14,8 @@ import {
   TodayResponseSchema,
   HealthResponseSchema,
   KanbanStatusSchema,
-  TaskRelationshipResponseSchema,
-  TaskRelationshipCreateSchema,
   BulkTodoUpdateSchema,
   BulkTodoResponseSchema,
-  RelationshipTypeSchema,
   AttachmentResponseSchema,
 } from '../schemas';
 
@@ -220,55 +217,6 @@ describe('Zod schemas', () => {
     it('parses todo without sort_order (optional)', () => {
       const result = TodoResponseSchema.parse(base);
       expect(result.sort_order).toBeUndefined();
-    });
-  });
-
-  // -- TaskRelationshipResponseSchema ----------------------------------------
-  describe('TaskRelationshipResponseSchema', () => {
-    const validRel = {
-      id: 'trel_1',
-      source_todo_id: 'todo_a',
-      target_todo_id: 'todo_b',
-      relationship_type: 'blocks' as const,
-      created_at: now,
-    };
-
-    it('parses valid relationship', () => {
-      expect(TaskRelationshipResponseSchema.parse(validRel)).toEqual(validRel);
-    });
-
-    it('rejects invalid relationship_type', () => {
-      expect(() =>
-        TaskRelationshipResponseSchema.parse({ ...validRel, relationship_type: 'depends_on' }),
-      ).toThrow(ZodError);
-    });
-  });
-
-  // -- TaskRelationshipCreateSchema ------------------------------------------
-  describe('TaskRelationshipCreateSchema', () => {
-    it('parses valid create', () => {
-      const data = { source_todo_id: 'a', target_todo_id: 'b', relationship_type: 'related' as const };
-      expect(TaskRelationshipCreateSchema.parse(data)).toEqual(data);
-    });
-
-    it('rejects invalid type', () => {
-      expect(() =>
-        TaskRelationshipCreateSchema.parse({ source_todo_id: 'a', target_todo_id: 'b', relationship_type: 'invalid' }),
-      ).toThrow(ZodError);
-    });
-  });
-
-  // -- RelationshipTypeSchema ------------------------------------------------
-  describe('RelationshipTypeSchema', () => {
-    it('accepts all valid types', () => {
-      expect(RelationshipTypeSchema.parse('blocks')).toBe('blocks');
-      expect(RelationshipTypeSchema.parse('blocked_by')).toBe('blocked_by');
-      expect(RelationshipTypeSchema.parse('related')).toBe('related');
-      expect(RelationshipTypeSchema.parse('duplicate_of')).toBe('duplicate_of');
-    });
-
-    it('rejects invalid type', () => {
-      expect(() => RelationshipTypeSchema.parse('depends_on')).toThrow(ZodError);
     });
   });
 

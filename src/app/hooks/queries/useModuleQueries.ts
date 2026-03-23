@@ -8,10 +8,9 @@ import { logger } from '../../services/logger';
 import {
   TodoResponseSchema,
   EventResponseSchema,
-  TaskRelationshipResponseSchema,
   AttachmentResponseSchema,
 } from '../../types/schemas';
-import type { TodoResponse, TodoCreate, TodoUpdate, EventResponse, EventCreate, EventUpdate, KanbanStatus, TaskRelationshipCreate, BulkTodoUpdate } from '../../types/api';
+import type { TodoResponse, TodoCreate, TodoUpdate, EventResponse, EventCreate, EventUpdate, KanbanStatus, BulkTodoUpdate } from '../../types/api';
 import { queryKeys } from './queryKeys';
 
 // ---------------------------------------------------------------------------
@@ -456,50 +455,6 @@ export function useDeleteEventOccurrence() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Task Relationships
-// ---------------------------------------------------------------------------
-
-export function useTaskRelationshipsQuery(todoId: string) {
-  const serverUrl = useAuthStore((s) => s.serverUrl);
-
-  return useQuery({
-    queryKey: queryKeys.taskRelationships(todoId),
-    queryFn: async () => {
-      const res = await apiClient.get('/task-relationships', { params: { todo_id: todoId } });
-      return z.array(TaskRelationshipResponseSchema).parse(res.data);
-    },
-    enabled: !!serverUrl && !!todoId,
-  });
-}
-
-export function useCreateTaskRelationship() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: TaskRelationshipCreate) => {
-      const res = await apiClient.post('/task-relationships', data);
-      return res.data;
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships(variables.source_todo_id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships(variables.target_todo_id) });
-    },
-  });
-}
-
-export function useDeleteTaskRelationship() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, sourceTodoId, targetTodoId }: { id: string; sourceTodoId: string; targetTodoId: string }) => {
-      await apiClient.delete(`/task-relationships/${id}`);
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships(variables.sourceTodoId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships(variables.targetTodoId) });
     },
   });
 }

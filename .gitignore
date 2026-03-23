@@ -40,3 +40,6 @@ server/venv/
 server/*.log
 *.pyc
 .claude/worktrees/
+
+# Generated API client (Orval)
+src/app/generated/

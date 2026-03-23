@@ -11,6 +11,7 @@ from exceptions import AppError, app_error_handler
 from routers import admin as admin_router
 from routers import auth as auth_router
 from routers import calendar as calendar_router
+from routers import capabilities as capabilities_router
 from routers import chat as chat_router
 from routers import notifications as notifications_router
 from routers import search as search_router
@@ -18,11 +19,11 @@ from routers import settings as settings_router
 from routers import tags as tags_router
 from routers import tasks as tasks_router
 from routers import today as today_router
-from routers import task_relationship as task_relationship_router
 from routers import attachment as attachment_router
 from routers import obsidian as obsidian_router
 from routers import pairing as pairing_router
 from routers import todo as todo_router
+from routers import voice as voice_router
 from services.ai_service import AIService
 from services.claude_code_provider import ClaudeCodeProvider, ClaudeCodeStatus, _find_claude_cli
 from services.orchestrator import Orchestrator
@@ -125,12 +126,18 @@ async def lifespan(app: FastAPI):
                 claude_code_status.value,
             )
 
+    # Initialize push notification service (no-op if not configured)
+    from services.push_service import PushService
+    push_service = PushService(settings.firebase_credentials_path)
+    app.state.push_service = push_service
+
     # Start background scheduler if enabled
     if settings.enable_scheduler:
         scheduler = Scheduler(
             session_factory=async_session_factory,
             ai_service=ai_service,
             ws_manager=ws_manager,
+            push_service=push_service,
         )
         scheduler.start()
         app.state.scheduler = scheduler
@@ -170,11 +177,12 @@ app.include_router(notifications_router.router, prefix="/api/notifications", tag
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(tags_router.router, prefix="/api/tags", tags=["tags"])
 app.include_router(tasks_router.router, prefix="/api/tasks", tags=["tasks"])
-app.include_router(task_relationship_router.router, prefix="/api/task-relationships", tags=["task-relationships"])
 app.include_router(attachment_router.router, prefix="/api/attachments", tags=["attachments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
 app.include_router(obsidian_router.router, prefix="/api/obsidian", tags=["obsidian"])
 app.include_router(pairing_router.router, prefix="/api/pairing", tags=["pairing"])
+app.include_router(capabilities_router.router, prefix="/api/capabilities", tags=["capabilities"])
+app.include_router(voice_router.router, prefix="/api/voice", tags=["voice"])
 
 app.websocket("/ws")(websocket_endpoint)
 

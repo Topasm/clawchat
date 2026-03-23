@@ -1,8 +1,5 @@
 package com.clawchat.android.feature.today
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,8 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -22,14 +19,18 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.clawchat.android.core.data.model.BriefingResponse
+import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.ui.SwipeToDismissCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     onNavigateToInbox: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     var showQuickAdd by remember { mutableStateOf(false) }
@@ -37,7 +38,18 @@ fun TodayScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(state.greeting.ifBlank { "Today" }) })
+            TopAppBar(
+                title = { Text(state.greeting.ifBlank { "Today" }) },
+                actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                },
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showQuickAdd = true }) {
@@ -55,6 +67,24 @@ fun TodayScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // Briefing section
+                val briefing = state.briefing
+                if (briefing != null) {
+                    item(key = "briefing") {
+                        BriefingSection(briefing = briefing)
+                    }
+                    item { Spacer(Modifier.height(8.dp)) }
+                } else if (state.isBriefingLoading) {
+                    item(key = "briefing-loading") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
+                    }
+                }
+
                 // Overdue section
                 if (state.overdueTodos.isNotEmpty()) {
                     item {
@@ -173,7 +203,6 @@ fun TodayScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeableTodoCard(
     todo: Todo,
@@ -181,58 +210,8 @@ private fun SwipeableTodoCard(
     onDelete: () -> Unit,
     onSetDueToday: () -> Unit,
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
-                SwipeToDismissBoxValue.StartToEnd -> { onSetDueToday(); false }
-                SwipeToDismissBoxValue.Settled -> false
-            }
-        },
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        backgroundContent = { SwipeBackground(dismissState) },
-        enableDismissFromEndToStart = true,
-        enableDismissFromStartToEnd = true,
-    ) {
+    SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
         TodoCard(todo = todo, onToggle = onToggle)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
-    val color by animateColorAsState(
-        when (dismissState.targetValue) {
-            SwipeToDismissBoxValue.EndToStart -> Color(0xFFFF3B30)
-            SwipeToDismissBoxValue.StartToEnd -> Color(0xFF007AFF)
-            SwipeToDismissBoxValue.Settled -> Color.Transparent
-        },
-        label = "swipe_bg_color",
-    )
-    val alignment = when (dismissState.dismissDirection) {
-        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-        else -> Alignment.Center
-    }
-    val icon = when (dismissState.dismissDirection) {
-        SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
-        SwipeToDismissBoxValue.StartToEnd -> Icons.Default.DateRange
-        else -> null
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(color, RoundedCornerShape(12.dp))
-            .padding(horizontal = 20.dp),
-        contentAlignment = alignment,
-    ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White)
-        }
     }
 }
 
@@ -248,13 +227,25 @@ private fun TodoCard(todo: Todo, onToggle: () -> Unit) {
             Checkbox(checked = isCompleted, onCheckedChange = { onToggle() })
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    todo.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        todo.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (todo.isRecurring) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Recurring",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 val dueDate = todo.dueDate
                 if (dueDate != null) {
                     Text(
@@ -283,6 +274,25 @@ private fun EventCard(event: Event) {
                 event.location?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+            event.reminderMinutes?.let { minutes ->
+                val label = when (minutes) {
+                    5 -> "5m"
+                    10 -> "10m"
+                    15 -> "15m"
+                    30 -> "30m"
+                    60 -> "1h"
+                    120 -> "2h"
+                    1440 -> "1d"
+                    else -> "${minutes}m"
+                }
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        labelColor = MaterialTheme.colorScheme.primary,
+                    ),
+                )
             }
         }
     }
@@ -326,6 +336,120 @@ private fun InboxPreviewCard(todo: Todo) {
                 colors = SuggestionChipDefaults.suggestionChipColors(
                     labelColor = MaterialTheme.colorScheme.tertiary,
                 ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BriefingSection(briefing: BriefingResponse) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Load assessment badge + title
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("Daily Briefing", style = MaterialTheme.typography.titleSmall)
+                LoadAssessmentChip(briefing.loadAssessment)
+            }
+
+            // Summary text
+            if (briefing.summary.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    briefing.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Load message
+            if (briefing.loadMessage.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    briefing.loadMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Highlights
+            if (briefing.highlights.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                briefing.highlights.forEach { highlight ->
+                    Text(
+                        "\u2022 $highlight",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // Suggestion cards
+            if (briefing.suggestions.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text("Suggestions", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(4.dp))
+                briefing.suggestions.forEach { suggestion ->
+                    SuggestionActionCard(suggestion = suggestion)
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadAssessmentChip(loadAssessment: String) {
+    val (label, color) = when (loadAssessment) {
+        "light" -> "Light" to Color(0xFF4CAF50)
+        "heavy" -> "Heavy" to MaterialTheme.colorScheme.error
+        else -> "Moderate" to Color(0xFFFFA726)
+    }
+    SuggestionChip(
+        onClick = {},
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        colors = SuggestionChipDefaults.suggestionChipColors(
+            containerColor = color.copy(alpha = 0.12f),
+            labelColor = color,
+        ),
+    )
+}
+
+@Composable
+private fun SuggestionActionCard(suggestion: BriefingSuggestion) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    suggestion.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (suggestion.reason.isNotBlank()) {
+                    Text(
+                        suggestion.reason,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            SuggestionChip(
+                onClick = {},
+                label = {
+                    Text(
+                        suggestion.action.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
             )
         }
     }

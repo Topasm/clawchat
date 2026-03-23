@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   on(channel: string, callback: (...args: unknown[]) => void) {
-    const allowed = ['update-available', 'update-downloaded'];
+    const allowed = ['update-available', 'update-downloaded', 'open-quick-capture', 'notification:action', 'navigate'];
     if (!allowed.includes(channel)) return () => {};
 
     const listener = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...args);

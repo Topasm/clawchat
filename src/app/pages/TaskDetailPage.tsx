@@ -10,6 +10,7 @@ import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
 import TaskCard from '../components/shared/TaskCard';
 import PlanReviewDiff from '../components/shared/PlanReviewDiff';
+import RecurrenceSelector from '../components/shared/RecurrenceSelector';
 import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
@@ -251,8 +252,8 @@ export default function TaskDetailPage() {
         )}
       </div>
 
-      {/* Section 2: Due / Estimate / Blockers */}
-      {(dueInfo || task.estimated_minutes || blockedByRelationships.length > 0) && (
+      {/* Section 2: Due / Estimate / Recurrence / Blockers */}
+      {(dueInfo || task.estimated_minutes || task.is_recurring || blockedByRelationships.length > 0) && (
         <div className="cc-exec-panel__section">
           <div className="cc-exec-panel__section-title">Due / Estimate / Blockers</div>
           <div className="cc-exec-panel__info-grid">
@@ -271,6 +272,15 @@ export default function TaskDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Section 2b: Recurrence */}
+      <div className="cc-exec-panel__section">
+        <div className="cc-exec-panel__section-title">Repeat</div>
+        <RecurrenceSelector
+          value={task.recurrence_rule ?? undefined}
+          onChange={(rule) => persistField({ recurrence_rule: rule ?? null })}
+        />
+      </div>
 
       {/* Section 3: Project context */}
       {(isProject || task.parent_id || task.assignee) && (

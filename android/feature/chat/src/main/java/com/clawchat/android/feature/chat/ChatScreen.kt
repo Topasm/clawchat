@@ -1,7 +1,11 @@
 package com.clawchat.android.feature.chat
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Mic
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -255,6 +260,19 @@ private fun ChatDetailView(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+            if (spokenText != null) {
+                inputText = if (inputText.isBlank()) spokenText else "$inputText $spokenText"
+            }
+        }
+    }
+
     // Auto-scroll to bottom on new messages
     LaunchedEffect(messages.size, streamingText) {
         if (messages.isNotEmpty()) {
@@ -348,7 +366,26 @@ private fun ChatDetailView(
                         disabledIndicatorColor = Color.Transparent,
                     ),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(4.dp))
+                IconButton(
+                    onClick = {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                        }
+                        speechLauncher.launch(intent)
+                    },
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = "Voice input",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
                 if (isStreaming) {
                     IconButton(
                         onClick = onStop,

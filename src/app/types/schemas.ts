@@ -26,7 +26,7 @@ export const RefreshRequestSchema = z.object({
 
 const TodoStatusSchema = z.enum(['pending', 'completed']);
 const PrioritySchema = z.enum(['urgent', 'high', 'medium', 'low']);
-const InboxStateSchema = z.enum(['none', 'classifying', 'captured', 'planning', 'plan_ready', 'error']);
+const InboxStateSchema = z.enum(['none', 'classifying', 'captured', 'questioning', 'planning', 'plan_ready', 'error']);
 
 export const TodoResponseSchema = z.object({
   id: z.string(),
@@ -45,10 +45,17 @@ export const TodoResponseSchema = z.object({
   enabled_skills: z.array(z.string()).nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   estimated_minutes: z.number().nullable().optional(),
+  recurrence_rule: z.string().nullable().optional(),
+  recurrence_end: z.string().nullable().optional(),
+  is_recurring: z.boolean().optional(),
+  recurring_source_id: z.string().nullable().optional(),
   next_action: z.string().nullable().optional(),
   plan_summary: z.string().nullable().optional(),
   sync_status: z.string().nullable().optional(),
   project_label: z.string().nullable().optional(),
+  depends_on: z.array(z.string()).nullable().optional(),
+  clarification_questions: z.array(z.string()).nullable().optional(),
+  clarification_answers: z.record(z.string(), z.string()).nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -63,9 +70,12 @@ export const TodoCreateSchema = z.object({
   sort_order: z.number().optional(),
   assignee: z.string().nullable().optional(),
   enabled_skills: z.array(z.string()).nullable().optional(),
+  depends_on: z.array(z.string()).nullable().optional(),
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
+  recurrence_rule: z.string().nullable().optional(),
+  recurrence_end: z.string().nullable().optional(),
 });
 
 export const TodoUpdateSchema = z.object({
@@ -79,6 +89,9 @@ export const TodoUpdateSchema = z.object({
   sort_order: z.number().optional(),
   assignee: z.string().nullable().optional(),
   enabled_skills: z.array(z.string()).nullable().optional(),
+  depends_on: z.array(z.string()).nullable().optional(),
+  recurrence_rule: z.string().nullable().optional(),
+  recurrence_end: z.string().nullable().optional(),
 });
 
 export const ProjectTodoResponseSchema = z.object({
@@ -98,6 +111,7 @@ export const ProjectTodoResponseSchema = z.object({
   enabled_skills: z.array(z.string()).nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   estimated_minutes: z.number().nullable().optional(),
+  depends_on: z.array(z.string()).nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
   conversation_id: z.string().nullable().optional(),
@@ -262,6 +276,29 @@ export const HealthResponseSchema = z.object({
   ai_connected: z.boolean(),
 });
 
+// -- Capabilities -----------------------------------------------------------
+
+export const AICapabilitySchema = z.object({
+  provider: z.string().nullable(),
+  model: z.string(),
+  available: z.boolean(),
+});
+
+export const FeaturesCapabilitySchema = z.object({
+  obsidian: z.boolean(),
+  calendar: z.boolean(),
+  kanban: z.boolean(),
+  inbox_pipeline: z.boolean(),
+  skills: z.array(z.string()),
+  agent_tasks: z.boolean(),
+});
+
+export const CapabilitiesResponseSchema = z.object({
+  ai: AICapabilitySchema,
+  features: FeaturesCapabilitySchema,
+  version: z.string(),
+});
+
 // -- Tags -------------------------------------------------------------------
 
 export const TagsResponseSchema = z.object({
@@ -270,8 +307,21 @@ export const TagsResponseSchema = z.object({
 
 // -- Briefing ---------------------------------------------------------------
 
+export const BriefingSuggestionSchema = z.object({
+  action: z.string(),
+  todo_id: z.string(),
+  title: z.string(),
+  reason: z.string(),
+});
+
 export const BriefingResponseSchema = z.object({
-  briefing: z.string(),
+  summary: z.string().optional(),
+  briefing: z.string().optional(), // backward compat
+  highlights: z.array(z.string()).optional(),
+  suggestions: z.array(BriefingSuggestionSchema).optional(),
+  load_assessment: z.enum(['light', 'moderate', 'heavy']).optional(),
+  load_message: z.string().optional(),
+  stats: z.record(z.string(), z.number()).optional(),
   date: z.string(),
 });
 
@@ -308,26 +358,9 @@ export type TodayResponse = z.infer<typeof TodayResponseSchema>;
 export type SettingsPayload = z.infer<typeof SettingsPayloadSchema>;
 export type SettingsResponse = z.infer<typeof SettingsResponseSchema>;
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
+export type CapabilitiesResponse = z.infer<typeof CapabilitiesResponseSchema>;
 export type TagsResponse = z.infer<typeof TagsResponseSchema>;
 export type BriefingResponse = z.infer<typeof BriefingResponseSchema>;
-
-// -- Task Relationships -----------------------------------------------------
-
-export const RelationshipTypeSchema = z.enum(['blocks', 'blocked_by', 'related', 'duplicate_of']);
-
-export const TaskRelationshipResponseSchema = z.object({
-  id: z.string(),
-  source_todo_id: z.string(),
-  target_todo_id: z.string(),
-  relationship_type: RelationshipTypeSchema,
-  created_at: z.string(),
-});
-
-export const TaskRelationshipCreateSchema = z.object({
-  source_todo_id: z.string(),
-  target_todo_id: z.string(),
-  relationship_type: RelationshipTypeSchema,
-});
 
 // -- Bulk Operations --------------------------------------------------------
 
@@ -345,9 +378,6 @@ export const BulkTodoResponseSchema = z.object({
   errors: z.array(z.string()),
 });
 
-export type RelationshipType = z.infer<typeof RelationshipTypeSchema>;
-export type TaskRelationshipResponse = z.infer<typeof TaskRelationshipResponseSchema>;
-export type TaskRelationshipCreate = z.infer<typeof TaskRelationshipCreateSchema>;
 export type BulkTodoUpdate = z.infer<typeof BulkTodoUpdateSchema>;
 export type BulkTodoResponse = z.infer<typeof BulkTodoResponseSchema>;
 
@@ -387,7 +417,6 @@ export const TableCountsSchema = z.object({
   events: z.number(),
   agent_tasks: z.number(),
   attachments: z.number(),
-  task_relationships: z.number(),
 });
 
 export const StorageStatsSchema = z.object({

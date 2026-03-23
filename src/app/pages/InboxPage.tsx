@@ -1,14 +1,94 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
 import usePlatform from '../hooks/usePlatform';
 import { useTodosQuery, useToggleTodoComplete, useDeleteTodo } from '../hooks/queries';
+import { queryKeys } from '../hooks/queries';
 import TaskCard from '../components/shared/TaskCard';
 import SectionHeader from '../components/shared/SectionHeader';
 import EmptyState from '../components/shared/EmptyState';
 import { InboxTrayIcon } from '../components/shared/Icons';
 import apiClient from '../services/apiClient';
+import type { TodoResponse } from '../types/schemas';
+
+function QuestionnaireCard({ task }: { task: TodoResponse }) {
+  const questions = task.clarification_questions ?? [];
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const addToast = useToastStore((s) => s.addToast);
+  const queryClient = useQueryClient();
+
+  const handleAnswerChange = (index: number, value: string) => {
+    setAnswers((prev) => ({ ...prev, [String(index)]: value }));
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await apiClient.post(`/todos/${task.id}/answer-questions`, { answers });
+      addToast('info', 'Planning with your answers...');
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+    } catch {
+      addToast('error', 'Failed to submit answers');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setSubmitting(true);
+    try {
+      await apiClient.post(`/todos/${task.id}/skip-questions`);
+      addToast('info', 'Skipping questions, planning...');
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+    } catch {
+      addToast('error', 'Failed to skip questions');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="cc-inbox-card cc-inbox-card--questioning">
+      <div className="cc-inbox-card__questioning-header">{task.title}</div>
+      <div className="cc-inbox-card__questioning-body">
+        {questions.map((question, index) => (
+          <div key={index} className="cc-inbox-card__question-row">
+            <label className="cc-inbox-card__question-label">{question}</label>
+            <input
+              className="cc-inbox-card__question-input"
+              type="text"
+              placeholder="Your answer..."
+              value={answers[String(index)] ?? ''}
+              onChange={(e) => handleAnswerChange(index, e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="cc-inbox-card__actions">
+        <button
+          className="cc-btn cc-btn--primary"
+          style={{ fontSize: 12 }}
+          onClick={handleSubmit}
+          disabled={submitting}
+        >
+          Submit Answers
+        </button>
+        <button
+          className="cc-btn cc-btn--secondary"
+          style={{ fontSize: 12 }}
+          onClick={handleSkip}
+          disabled={submitting}
+        >
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function InboxPage() {
   const navigate = useNavigate();
@@ -31,6 +111,7 @@ export default function InboxPage() {
   const processing = todos.filter(
     (t) => t.inbox_state === 'classifying' || t.inbox_state === 'planning',
   );
+  const questioning = todos.filter((t) => t.inbox_state === 'questioning');
   const planReady = todos.filter((t) => t.inbox_state === 'plan_ready');
   const errors = todos.filter((t) => t.inbox_state === 'error');
   const needsOrganising = todos.filter(
@@ -42,7 +123,7 @@ export default function InboxPage() {
         !t.parent_id),
   );
 
-  const totalItems = processing.length + planReady.length + needsOrganising.length + errors.length;
+  const totalItems = processing.length + questioning.length + planReady.length + needsOrganising.length + errors.length;
 
   const handleOrganize = async (id: string) => {
     try {
@@ -99,6 +180,15 @@ export default function InboxPage() {
                 onDelete={() => handleDelete(task.id)}
               />
             </div>
+          ))}
+        </SectionHeader>
+      )}
+
+      {/* Answer questions (questioning) */}
+      {questioning.length > 0 && (
+        <SectionHeader title="Answer questions" count={questioning.length} variant="accent" defaultOpen>
+          {questioning.map((task) => (
+            <QuestionnaireCard key={task.id} task={task} />
           ))}
         </SectionHeader>
       )}

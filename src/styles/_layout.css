@@ -1,20 +1,49 @@
+/* --- Resize Handle --------------------------------------- */
+.cc-resize-handle {
+  width: 4px;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+  cursor: col-resize;
+  transition: background 0.15s ease;
+}
+
+.cc-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 1px;
+  width: 2px;
+  background: var(--cc-border);
+  transition: background 0.15s ease;
+}
+
+.cc-resize-handle:hover,
+.cc-resize-handle[data-separator="active"] {
+  background: var(--cc-primary-light);
+}
+
+.cc-resize-handle:hover::after,
+.cc-resize-handle[data-separator="active"]::after {
+  background: var(--cc-primary);
+}
+
 /* --- Sidebar ---------------------------------------------- */
 .cc-sidebar {
-  width: 240px;
+  width: 100%;
   height: 100%;
   background: var(--cc-surface);
-  border-right: 1px solid var(--cc-border);
   display: flex;
   flex-direction: column;
   padding: 16px 0;
   user-select: none;
   overflow: hidden;
   flex-shrink: 0;
-  transition: width 0.2s ease;
 }
 
 .cc-sidebar--collapsed {
-  width: 48px;
+  /* Width is now controlled by the panel; keep icon-only styling */
 }
 
 .cc-sidebar__header {

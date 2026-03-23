@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useToggleTodoComplete } from '../../hooks/queries';
+import { useToggleTodoComplete, useUpdateTodo } from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
 import { formatDate } from '../../utils/formatters';
 import SectionHeader from '../shared/SectionHeader';
@@ -44,6 +44,7 @@ export default function TodayView({
 }: TodayViewProps) {
   const navigate = useNavigate();
   const toggleMutation = useToggleTodoComplete();
+  const updateTodoMutation = useUpdateTodo();
   const { isMobile } = usePlatform();
 
   const toggleTodoComplete = useCallback((id: string) => {
@@ -243,6 +244,11 @@ export default function TodayView({
             </svg>
             <ClipboardIcon size={16} />
             <span className="cc-briefing-collapsible__title">Daily Briefing</span>
+            {briefingData.load_assessment && (
+              <span className={`cc-briefing-pill cc-briefing-pill--${briefingData.load_assessment === 'heavy' ? 'warning' : briefingData.load_assessment === 'moderate' ? 'task' : 'event'}`} style={{ marginLeft: 8, fontSize: 11 }}>
+                {briefingData.load_assessment}
+              </span>
+            )}
             {Object.values(briefingData.stats).some(v => v > 0) && (
               <span className="cc-briefing-collapsible__badge">
                 {briefingData.stats.events + briefingData.stats.tasks_due + briefingData.stats.overdue} items
@@ -281,6 +287,50 @@ export default function TodayView({
                 </div>
               )}
               <div className="cc-briefing-card__content">{briefingData.summary}</div>
+              {briefingData.suggestions && briefingData.suggestions.length > 0 && (
+                <div className="cc-briefing-card__suggestions" style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {briefingData.suggestions.map((s, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'var(--cc-color-surface-raised, rgba(255,255,255,0.06))' }}>
+                      <span style={{ flex: 1, fontSize: 13 }}>
+                        <strong>{s.title}</strong>{' '}
+                        <span style={{ opacity: 0.7 }}>{s.reason}</span>
+                      </span>
+                      {s.action === 'move_to_tomorrow' && (
+                        <button
+                          type="button"
+                          className="cc-btn cc-btn--sm cc-btn--ghost"
+                          onClick={() => {
+                            const tomorrow = new Date();
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            tomorrow.setHours(23, 59, 0, 0);
+                            updateTodoMutation.mutate({ id: s.todo_id, data: { due_date: tomorrow.toISOString() } });
+                          }}
+                        >
+                          Move to tomorrow
+                        </button>
+                      )}
+                      {s.action === 'start_with' && (
+                        <button
+                          type="button"
+                          className="cc-btn cc-btn--sm cc-btn--ghost"
+                          onClick={() => navigate(`/tasks/${s.todo_id}`)}
+                        >
+                          Start
+                        </button>
+                      )}
+                      {s.action === 'reschedule' && (
+                        <button
+                          type="button"
+                          className="cc-btn cc-btn--sm cc-btn--ghost"
+                          onClick={() => navigate(`/tasks/${s.todo_id}`)}
+                        >
+                          Reschedule
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

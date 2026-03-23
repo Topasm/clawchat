@@ -5,6 +5,7 @@ import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -25,6 +26,7 @@ class InboxViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var todoRepository: TodoRepository
+    private lateinit var syncManager: SyncManager
     private lateinit var viewModel: InboxViewModel
 
     private val capturedTodo = Todo(
@@ -68,6 +70,7 @@ class InboxViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         todoRepository = mockk()
+        syncManager = mockk(relaxed = true)
     }
 
     @After
@@ -76,7 +79,7 @@ class InboxViewModelTest {
     }
 
     private fun createViewModel(): InboxViewModel {
-        return InboxViewModel(todoRepository)
+        return InboxViewModel(todoRepository, syncManager)
     }
 
     @Test

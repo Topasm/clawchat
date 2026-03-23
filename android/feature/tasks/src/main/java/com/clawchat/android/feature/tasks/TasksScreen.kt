@@ -1,27 +1,29 @@
 package com.clawchat.android.feature.tasks
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.ui.SwipeToDismissCard
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +51,7 @@ fun TasksScreen(
             onSetFilter = viewModel::setStatusFilter,
             onRefresh = viewModel::loadTasks,
             onCreate = viewModel::createTask,
+            onReorder = viewModel::reorderTasks,
         )
     }
 }
@@ -66,6 +69,7 @@ private fun TaskListView(
     onSetFilter: (String?) -> Unit,
     onRefresh: () -> Unit,
     onCreate: (String) -> Unit,
+    onReorder: (List<Todo>) -> Unit,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
@@ -112,18 +116,30 @@ private fun TaskListView(
                     CircularProgressIndicator()
                 }
             } else {
+                val lazyListState = rememberLazyListState()
+                val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                    val reordered = filteredTasks.toMutableList().apply {
+                        add(to.index, removeAt(from.index))
+                    }
+                    onReorder(reordered.mapIndexed { index, task -> task.copy(sortOrder = index) })
+                }
+
                 LazyColumn(
+                    state = lazyListState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(filteredTasks, key = { it.id }) { task ->
-                        SwipeableTaskRow(
-                            task = task,
-                            onToggle = { onToggle(task.id) },
-                            onDelete = { onDelete(task.id) },
-                            onSetDueToday = { onSetDueToday(task.id) },
-                            onClick = { onSelect(task) },
-                        )
+                        ReorderableItem(reorderableState, key = task.id) {
+                            SwipeableTaskRow(
+                                task = task,
+                                onToggle = { onToggle(task.id) },
+                                onDelete = { onDelete(task.id) },
+                                onSetDueToday = { onSetDueToday(task.id) },
+                                onClick = { onSelect(task) },
+                                dragModifier = Modifier.draggableHandle(),
+                            )
+                        }
                     }
                 }
             }
@@ -157,7 +173,6 @@ private fun TaskListView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeableTaskRow(
     task: Todo,
@@ -165,78 +180,48 @@ private fun SwipeableTaskRow(
     onDelete: () -> Unit,
     onSetDueToday: () -> Unit,
     onClick: () -> Unit,
+    dragModifier: Modifier = Modifier,
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
-                SwipeToDismissBoxValue.StartToEnd -> { onSetDueToday(); false }
-                SwipeToDismissBoxValue.Settled -> false
-            }
-        },
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        backgroundContent = { SwipeBackground(dismissState) },
-        enableDismissFromEndToStart = true,
-        enableDismissFromStartToEnd = true,
-    ) {
-        TaskRow(task = task, onToggle = onToggle, onClick = onClick)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
-    val color by animateColorAsState(
-        when (dismissState.targetValue) {
-            SwipeToDismissBoxValue.EndToStart -> Color(0xFFFF3B30)
-            SwipeToDismissBoxValue.StartToEnd -> Color(0xFF007AFF)
-            SwipeToDismissBoxValue.Settled -> Color.Transparent
-        },
-        label = "swipe_bg_color",
-    )
-    val alignment = when (dismissState.dismissDirection) {
-        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-        else -> Alignment.Center
-    }
-    val icon = when (dismissState.dismissDirection) {
-        SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
-        SwipeToDismissBoxValue.StartToEnd -> Icons.Default.DateRange
-        else -> null
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(color, RoundedCornerShape(12.dp))
-            .padding(horizontal = 20.dp),
-        contentAlignment = alignment,
-    ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White)
-        }
+    SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
+        TaskRow(task = task, onToggle = onToggle, onClick = onClick, dragModifier = dragModifier)
     }
 }
 
 @Composable
-private fun TaskRow(task: Todo, onToggle: () -> Unit, onClick: () -> Unit) {
+private fun TaskRow(task: Todo, onToggle: () -> Unit, onClick: () -> Unit, dragModifier: Modifier = Modifier) {
     val isCompleted = task.status == "completed"
 
     ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.DragHandle,
+                contentDescription = "Reorder",
+                modifier = dragModifier,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(4.dp))
             Checkbox(checked = isCompleted, onCheckedChange = { onToggle() })
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    task.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        task.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (task.isRecurring) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Recurring",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 val desc = task.description
                 if (!desc.isNullOrBlank()) {
                     Text(

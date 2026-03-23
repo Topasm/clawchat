@@ -202,6 +202,35 @@ export default function useWebSocket(): void {
       });
     }
 
+    const handleNudge = (data: unknown) => {
+      const d = data as { title?: string; message?: string; todo_id?: string; suggested_action?: string };
+      const message = d.message ?? 'You have a task that needs attention';
+      useToastStore.getState().addToast('info', message, { duration: 15000 });
+      const settings = useSettingsStore.getState();
+      if (settings.notificationsEnabled) {
+        void notify('Nudge', message, { itemType: 'todo', itemId: d.todo_id });
+      }
+    };
+
+    const handleWeeklyReview = (data: unknown) => {
+      const d = data as { content?: string };
+      useToastStore.getState().addToast('info', 'Weekly review is ready! Check your chat.', { duration: 15000 });
+      const settings = useSettingsStore.getState();
+      if (settings.notificationsEnabled) {
+        void notify('Weekly Review', d.content?.slice(0, 100) ?? 'Your weekly review is ready');
+      }
+    };
+
+    const handleDailyBriefing = (data: unknown) => {
+      const d = data as { content?: string };
+      useToastStore.getState().addToast('info', 'Morning briefing is ready!', { duration: 10000 });
+      queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      const settings = useSettingsStore.getState();
+      if (settings.notificationsEnabled) {
+        void notify('Daily Briefing', d.content?.slice(0, 100) ?? 'Your daily briefing is ready');
+      }
+    };
+
     // Server liveness signals — wsClient already tracked lastMessageTime; ignore here
     const handleLivenessNoop = () => {};
     wsClient.on('tick', handleLivenessNoop);
@@ -210,6 +239,9 @@ export default function useWebSocket(): void {
 
     wsClient.on('module_data_changed', handleModuleChange);
     wsClient.on('reminder', handleReminder);
+    wsClient.on('nudge', handleNudge);
+    wsClient.on('weekly_review', handleWeeklyReview);
+    wsClient.on('daily_briefing', handleDailyBriefing);
     wsClient.on('task_completed', handleTaskCompleted);
     wsClient.on('task_failed', handleTaskFailed);
     wsClient.on('task_progress', handleTaskProgress);
@@ -229,6 +261,9 @@ export default function useWebSocket(): void {
       wsClient.off('pong', handleLivenessNoop);
       wsClient.off('module_data_changed', handleModuleChange);
       wsClient.off('reminder', handleReminder);
+      wsClient.off('nudge', handleNudge);
+      wsClient.off('weekly_review', handleWeeklyReview);
+      wsClient.off('daily_briefing', handleDailyBriefing);
       wsClient.off('task_completed', handleTaskCompleted);
       wsClient.off('task_failed', handleTaskFailed);
       wsClient.off('task_progress', handleTaskProgress);

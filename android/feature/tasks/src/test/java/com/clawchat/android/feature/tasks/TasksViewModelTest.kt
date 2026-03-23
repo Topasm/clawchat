@@ -7,6 +7,7 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -27,6 +28,7 @@ class TasksViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var todoRepository: TodoRepository
+    private lateinit var syncManager: SyncManager
     private lateinit var viewModel: TasksViewModel
 
     private val sampleTodo = Todo(
@@ -44,6 +46,7 @@ class TasksViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         todoRepository = mockk()
+        syncManager = mockk(relaxed = true)
     }
 
     @After
@@ -52,7 +55,7 @@ class TasksViewModelTest {
     }
 
     private fun createViewModel(): TasksViewModel {
-        return TasksViewModel(todoRepository)
+        return TasksViewModel(todoRepository, syncManager)
     }
 
     @Test

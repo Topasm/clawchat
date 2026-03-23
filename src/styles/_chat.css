@@ -120,6 +120,14 @@
   flex-shrink: 0;
 }
 
+/* Side variant: full-height right panel (desktop resizable layout) */
+.cc-chat-panel--side {
+  border-top: none;
+  height: 100%;
+  flex-shrink: 1;
+  min-height: 0;
+}
+
 .cc-chat-panel__header {
   display: flex;
   align-items: center;

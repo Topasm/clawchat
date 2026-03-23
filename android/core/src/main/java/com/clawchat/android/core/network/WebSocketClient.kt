@@ -31,6 +31,25 @@ sealed interface SyncEvent {
 
     /** A server-side module changed (e.g. todos, events, conversations). */
     data class ModuleChanged(val module: String) : SyncEvent
+
+    /** A reminder notification from the server. */
+    data class Reminder(
+        val reminderType: String,
+        val itemId: String,
+        val title: String,
+        val message: String,
+        val minutesUntil: Int,
+    ) : SyncEvent
+
+    /** A nudge notification from the server. */
+    data class Nudge(
+        val title: String,
+        val message: String,
+        val todoId: String?,
+    ) : SyncEvent
+
+    /** A weekly review summary from the server. */
+    data class WeeklyReview(val content: String) : SyncEvent
 }
 
 /**
@@ -149,6 +168,32 @@ class WebSocketClient @Inject constructor(
                     val module = json.optJSONObject("data")?.optString("module") ?: return
                     Log.d(TAG, "Module changed: $module")
                     _events.tryEmit(SyncEvent.ModuleChanged(module))
+                }
+                "reminder" -> {
+                    val data = json.optJSONObject("data") ?: return
+                    val reminderType = data.optString("reminder_type", "")
+                    val itemId = data.optString("item_id", "")
+                    val title = data.optString("title", "")
+                    val message = data.optString("message", "")
+                    val minutesUntil = data.optInt("minutes_until", 0)
+                    Log.d(TAG, "Reminder: $title ($reminderType)")
+                    _events.tryEmit(
+                        SyncEvent.Reminder(reminderType, itemId, title, message, minutesUntil)
+                    )
+                }
+                "nudge" -> {
+                    val data = json.optJSONObject("data") ?: return
+                    val title = data.optString("title", "")
+                    val message = data.optString("message", "")
+                    val todoId = data.optString("todo_id", null)
+                    Log.d(TAG, "Nudge: $title")
+                    _events.tryEmit(SyncEvent.Nudge(title, message, todoId))
+                }
+                "weekly_review" -> {
+                    val data = json.optJSONObject("data") ?: return
+                    val content = data.optString("content", "")
+                    Log.d(TAG, "Weekly review received")
+                    _events.tryEmit(SyncEvent.WeeklyReview(content))
                 }
                 else -> {
                     Log.d(TAG, "Unhandled message type: $type")

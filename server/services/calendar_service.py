@@ -1,8 +1,9 @@
 """Async service layer for calendar event CRUD operations."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+from icalendar import Alarm, Calendar, Event as ICalEvent
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -149,3 +150,76 @@ async def delete_event_occurrence(
     event.recurrence_exceptions = json.dumps(exceptions)
     event.updated_at = datetime.now(timezone.utc)
     await db.flush()
+
+
+async def export_events_ical(db: AsyncSession) -> str:
+    """Export all events as an iCalendar (.ics) string."""
+    q = select(Event).order_by(Event.start_time.asc())
+    rows = (await db.execute(q)).scalars().all()
+
+    cal = Calendar()
+    cal.add("prodid", "-//ClawChat//EN")
+    cal.add("version", "2.0")
+    cal.add("calscale", "GREGORIAN")
+
+    for event in rows:
+        vevent = ICalEvent()
+        vevent.add("uid", event.id)
+        vevent.add("summary", event.title)
+        vevent.add("dtstamp", datetime.now(timezone.utc))
+
+        if event.is_all_day:
+            vevent.add("dtstart", event.start_time.date())
+            if event.end_time:
+                vevent.add("dtend", event.end_time.date())
+        else:
+            vevent.add("dtstart", event.start_time)
+            if event.end_time:
+                vevent.add("dtend", event.end_time)
+
+        if event.description:
+            vevent.add("description", event.description)
+        if event.location:
+            vevent.add("location", event.location)
+
+        if event.recurrence_rule:
+            # recurrence_rule is stored as an RRULE string like "FREQ=WEEKLY;BYDAY=MO"
+            params: dict[str, str | list[str]] = {}
+            for part in event.recurrence_rule.split(";"):
+                if "=" not in part:
+                    continue
+                key, val = part.split("=", 1)
+                # BYDAY etc. can have multiple values
+                if "," in val:
+                    params[key] = val.split(",")
+                else:
+                    params[key] = val
+            vevent.add("rrule", params)
+
+        if event.recurrence_exceptions:
+            try:
+                exception_dates = json.loads(event.recurrence_exceptions)
+                for exc_date_str in exception_dates:
+                    exc_dt = datetime.fromisoformat(exc_date_str)
+                    if event.is_all_day:
+                        vevent.add("exdate", exc_dt.date())
+                    else:
+                        if exc_dt.tzinfo is None:
+                            exc_dt = exc_dt.replace(tzinfo=timezone.utc)
+                        vevent.add("exdate", exc_dt)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        if event.reminder_minutes is not None:
+            alarm = Alarm()
+            alarm.add("action", "DISPLAY")
+            alarm.add("description", f"Reminder: {event.title}")
+            alarm.add("trigger", timedelta(minutes=-event.reminder_minutes))
+            vevent.add_component(alarm)
+
+        vevent.add("created", event.created_at)
+        vevent.add("last-modified", event.updated_at)
+
+        cal.add_component(vevent)
+
+    return cal.to_ical().decode("utf-8")

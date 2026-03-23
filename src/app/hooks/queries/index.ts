@@ -12,9 +12,6 @@ export {
   useUpdateEvent,
   useDeleteEvent,
   useDeleteEventOccurrence,
-  useTaskRelationshipsQuery,
-  useCreateTaskRelationship,
-  useDeleteTaskRelationship,
   useBulkUpdateTodos,
   useAttachmentsQuery,
   useUploadAttachment,
@@ -47,6 +44,7 @@ export {
   usePurgeData,
   useDisconnectSession,
 } from './useAdminQueries';
+export { useCapabilitiesQuery } from './useCapabilitiesQuery';
 export {
   useObsidianStatusQuery,
   useObsidianHealthQuery,

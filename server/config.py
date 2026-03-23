@@ -42,10 +42,28 @@ class Settings(BaseSettings):
     obsidian_companion_node_required: bool = False
     obsidian_scan_interval_minutes: int = 5
 
+    # Push notifications (FCM)
+    firebase_credentials_path: str = ""
+
+    # Voice input
+    voice_provider: str = "browser"  # "browser" (client-side) or "whisper_api"
+    whisper_api_key: str = ""
+
     # Scheduler
     enable_scheduler: bool = False
     briefing_time: str = "08:00"
     reminder_check_interval: int = 5
+
+    # Proactive nudges
+    enable_nudges: bool = False
+    nudge_interval_hours: int = 4
+    nudge_quiet_hours: str = "22:00-07:00"
+
+    # Weekly review
+    enable_weekly_review: bool = False
+    weekly_review_day: str = "sunday"
+    weekly_review_time: str = "09:00"
+
     debug: bool = False
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

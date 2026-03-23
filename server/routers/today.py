@@ -60,7 +60,15 @@ async def get_briefing(
 ):
     ai_service = request.app.state.ai_service
     result = await generate_briefing(db, ai_service)
-    return {"summary": result["summary"], "stats": result["stats"], "date": str(date.today())}
+    return {
+        "summary": result.get("summary", ""),
+        "highlights": result.get("highlights", []),
+        "suggestions": result.get("suggestions", []),
+        "load_assessment": result.get("load_assessment", "moderate"),
+        "load_message": result.get("load_message", ""),
+        "stats": result.get("stats", {}),
+        "date": str(date.today()),
+    }
 
 
 @router.get("", response_model=TodayResponse)

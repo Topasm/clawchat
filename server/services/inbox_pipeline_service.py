@@ -66,12 +66,21 @@ async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) ->
             todo.source = "obsidian_project"
             todo.source_id = matched_folder
 
-        # Step 5 — planning or captured
+        # Step 5 — questioning, planning, or captured
         if classification.get("needs_planning"):
-            todo.inbox_state = "planning"
-            await db.commit()
-            await _notify_todo_change()
-            await _trigger_planning(db, ai_service, todo)
+            # If task description is short (< 30 words), ask clarifying questions first
+            task_text = (todo.title or "") + " " + (todo.description or "")
+            word_count = len(task_text.split())
+            if word_count < 30:
+                todo.inbox_state = "questioning"
+                await db.commit()
+                await _notify_todo_change()
+                await _generate_clarification_questions(db, ai_service, todo)
+            else:
+                todo.inbox_state = "planning"
+                await db.commit()
+                await _notify_todo_change()
+                await _trigger_planning(db, ai_service, todo)
         else:
             todo.inbox_state = "captured"
             await db.commit()
@@ -82,6 +91,83 @@ async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) ->
         todo.inbox_state = "error"
         todo.automation_error = str(exc)
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Resume pipeline after user answers clarification questions
+# ---------------------------------------------------------------------------
+
+
+async def resume_after_answers(db: AsyncSession, ai_service: AIService, todo_id: str) -> None:
+    """Transition a todo from questioning to planning, using Q&A context."""
+    todo = await db.get(Todo, todo_id)
+    if not todo:
+        logger.warning("resume_after_answers called with unknown todo_id=%s", todo_id)
+        return
+
+    try:
+        todo.inbox_state = "planning"
+        await db.commit()
+        await _notify_todo_change()
+        await _trigger_planning(db, ai_service, todo)
+    except Exception as exc:
+        logger.exception("Planning after answers failed for todo %s", todo_id)
+        todo.inbox_state = "error"
+        todo.automation_error = str(exc)
+        await db.commit()
+        await _notify_todo_change()
+
+
+# ---------------------------------------------------------------------------
+# Clarification question generation
+# ---------------------------------------------------------------------------
+
+_QUESTION_SYSTEM_PROMPT = (
+    "You are a task planning assistant. Given a task title, generate 3-5 short "
+    "clarifying questions that would help decompose this into specific subtasks. "
+    "Return ONLY a JSON array of strings, e.g. [\"Question 1?\", \"Question 2?\"]."
+)
+
+
+async def _generate_clarification_questions(
+    db: AsyncSession, ai_service: AIService, todo: Todo
+) -> None:
+    """Generate clarifying questions via LLM and save them on the todo."""
+    task_text = todo.title
+    if todo.description:
+        task_text += f"\nDescription: {todo.description}"
+
+    try:
+        raw_response = await ai_service.generate_completion(
+            _QUESTION_SYSTEM_PROMPT,
+            f"Task: {task_text}",
+        )
+        from utils import strip_markdown_fences
+        cleaned = strip_markdown_fences(raw_response)
+        questions = json.loads(cleaned)
+
+        if not isinstance(questions, list) or not questions:
+            questions = [
+                "What is the desired outcome or goal?",
+                "What are the key steps involved?",
+                "Are there any deadlines or time constraints?",
+            ]
+
+        todo.clarification_questions = json.dumps(questions)
+        await db.commit()
+        await _notify_todo_change()
+
+    except Exception:
+        logger.exception("Failed to generate clarification questions for todo %s", todo.id)
+        # Fallback: provide default questions
+        fallback = [
+            "What is the desired outcome or goal?",
+            "What are the key steps involved?",
+            "Are there any deadlines or time constraints?",
+        ]
+        todo.clarification_questions = json.dumps(fallback)
+        await db.commit()
+        await _notify_todo_change()
 
 
 # ---------------------------------------------------------------------------

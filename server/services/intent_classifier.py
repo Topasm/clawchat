@@ -26,6 +26,7 @@ Intents:
 - suggest_time: User wants scheduling suggestions (e.g., "when should I schedule a team meeting?")
 - check_conflicts: User wants to check for scheduling conflicts (e.g., "do I have anything at 3pm?")
 - analyze_schedule: User wants schedule analysis (e.g., "how busy am I this week?")
+- weekly_review: User wants to do a weekly review of tasks and projects (e.g., "let's do a weekly review", "review my week")
 
 Extract relevant parameters from the message when applicable."""
 
@@ -57,6 +58,7 @@ INTENT_TOOLS_SCHEMA = [
                             "suggest_time",
                             "check_conflicts",
                             "analyze_schedule",
+                            "weekly_review",
                         ],
                         "description": "The classified intent of the user's message",
                     },
@@ -100,6 +102,10 @@ INTENT_TOOLS_SCHEMA = [
                     "preferred_date": {
                         "type": "string",
                         "description": "Preferred date in ISO 8601 format for scheduling",
+                    },
+                    "recurrence_rule": {
+                        "type": "string",
+                        "description": "RRULE string for recurring tasks/events, e.g. 'FREQ=DAILY', 'FREQ=WEEKLY;BYDAY=MO,WE,FR', 'FREQ=MONTHLY;BYMONTHDAY=1'",
                     },
                 },
                 "required": ["intent"],

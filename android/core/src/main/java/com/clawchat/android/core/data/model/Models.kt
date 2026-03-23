@@ -71,6 +71,8 @@ data class Todo(
     @SerialName("plan_summary") val planSummary: String? = null,
     @SerialName("sync_status") val syncStatus: String? = null,
     @SerialName("project_label") val projectLabel: String? = null,
+    @SerialName("is_recurring") val isRecurring: Boolean = false,
+    @SerialName("recurrence_rule") val recurrenceRule: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = "",
 )
@@ -153,6 +155,26 @@ data class TodayResponse(
     @SerialName("overdue_todos") val overdueTodos: List<Todo> = emptyList(),
     @SerialName("today_events") val todayEvents: List<Event> = emptyList(),
     @SerialName("inbox_count") val inboxCount: Int = 0,
+)
+
+// --- Briefing ---
+
+@Serializable
+data class BriefingSuggestion(
+    val action: String = "",
+    @SerialName("todo_id") val todoId: String? = null,
+    val title: String = "",
+    val reason: String = "",
+)
+
+@Serializable
+data class BriefingResponse(
+    val summary: String = "",
+    val suggestions: List<BriefingSuggestion> = emptyList(),
+    @SerialName("load_assessment") val loadAssessment: String = "moderate",
+    @SerialName("load_message") val loadMessage: String = "",
+    val highlights: List<String> = emptyList(),
+    val date: String = "",
 )
 
 // --- Devices ---

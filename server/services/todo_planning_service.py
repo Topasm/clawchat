@@ -123,6 +123,21 @@ async def generate_plan(
     if todo.description:
         parts.append(f"Description: {todo.description}")
 
+    # Clarification Q&A context (if user answered questions)
+    if todo.clarification_questions and todo.clarification_answers:
+        try:
+            questions = json.loads(todo.clarification_questions)
+            answers = json.loads(todo.clarification_answers)
+            qa_lines: list[str] = []
+            for idx, question in enumerate(questions):
+                answer = answers.get(str(idx))
+                if answer:
+                    qa_lines.append(f"Q: {question}\nA: {answer}")
+            if qa_lines:
+                parts.append(f"Additional context from user Q&A:\n" + "\n".join(qa_lines))
+        except (json.JSONDecodeError, TypeError):
+            logger.debug("Failed to parse clarification Q&A for todo=%s", todo.id)
+
     # Existing subtasks
     if child_todos:
         child_lines = "\n".join(f"- {c.title}" for c in child_todos)

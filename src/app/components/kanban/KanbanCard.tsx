@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Draggable } from '@hello-pangea/dnd';
+import { Draggable, Droppable } from '@hello-pangea/dnd';
 import type { TodoResponse } from '../../types/api';
 import TaskCard from '../shared/TaskCard';
 import useTouchSelect from '../../hooks/useTouchSelect';
@@ -59,27 +59,39 @@ export default function KanbanCard({ task, index, onToggle, onClick, onDelete, i
           onClick={handleClick}
           {...touchSelectHandlers}
         >
-          {isMobile && (
-            <div className="cc-kanban__drag-handle" {...provided.dragHandleProps}>
-              <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
-                <circle cx="2" cy="2" r="1.5" />
-                <circle cx="8" cy="2" r="1.5" />
-                <circle cx="2" cy="8" r="1.5" />
-                <circle cx="8" cy="8" r="1.5" />
-                <circle cx="2" cy="14" r="1.5" />
-                <circle cx="8" cy="14" r="1.5" />
-              </svg>
-            </div>
-          )}
-          <TaskCard
-            task={task}
-            onToggle={onToggle}
-            onClick={onClick}
-            onDelete={onDelete}
-            isSubTask={isSubTask}
-            subTaskCount={subTaskCount}
-            isCompletedOverride={isCompletedOverride}
-          />
+          <Droppable droppableId={`card-drop-${task.id}`}>
+            {(dropProvided, dropSnapshot) => (
+              <div
+                ref={dropProvided.innerRef}
+                {...dropProvided.droppableProps}
+                className={dropSnapshot.isDraggingOver ? 'cc-kanban-card--drop-target' : ''}
+              >
+                {isMobile && (
+                  <div className="cc-kanban__drag-handle" {...provided.dragHandleProps}>
+                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+                      <circle cx="2" cy="2" r="1.5" />
+                      <circle cx="8" cy="2" r="1.5" />
+                      <circle cx="2" cy="8" r="1.5" />
+                      <circle cx="8" cy="8" r="1.5" />
+                      <circle cx="2" cy="14" r="1.5" />
+                      <circle cx="8" cy="14" r="1.5" />
+                    </svg>
+                  </div>
+                )}
+                <TaskCard
+                  task={task}
+                  onToggle={onToggle}
+                  onClick={onClick}
+                  onDelete={onDelete}
+                  isSubTask={isSubTask}
+                  subTaskCount={subTaskCount}
+                  isCompletedOverride={isCompletedOverride}
+                />
+                {/* Hidden placeholder — cards are not list containers */}
+                <div style={{ display: 'none' }}>{dropProvided.placeholder}</div>
+              </div>
+            )}
+          </Droppable>
         </div>
       )}
     </Draggable>

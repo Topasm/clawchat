@@ -21,7 +21,8 @@
     "dist:android:prod": "cd android && chmod +x ./gradlew && ./gradlew assembleRelease",
     "install:android": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "cap:ios": "npx cap open ios",
-    "package": "npm run build:electron && electron-builder"
+    "package": "npm run build:electron && electron-builder",
+    "generate:api": "orval"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.1",
@@ -75,6 +76,7 @@
     "electron": "^33.3.1",
     "electron-builder": "^25.1.8",
     "jsdom": "^28.1.0",
+    "orval": "^7.13.2",
     "typescript": "^5.6.3",
     "vite": "^6.0.7",
     "vite-plugin-electron": "^0.28.8",

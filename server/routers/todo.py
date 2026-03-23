@@ -13,12 +13,11 @@ from database import get_db
 from exceptions import NotFoundError
 from models.agent_task import AgentTask
 from models.conversation import Conversation
-from models.task_relationship import TaskRelationship
 from models.todo import Todo
 from schemas.bulk import BulkTodoResponse, BulkTodoUpdate
 from schemas.common import PaginatedResponse
 from schemas.task import DelegateRequest, PlanApplyResponse, PlanResponse, SkillResponse
-from schemas.todo import ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
+from schemas.todo import AnswerQuestionsRequest, ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
 from services import inbox_pipeline_service
 from skills import SKILL_REGISTRY, PERSONA_TO_SKILL, get_skill
 from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
@@ -86,6 +85,9 @@ async def _enrich_todo_response(
     resp = TodoResponse.model_validate(todo)
     if todo.tags:
         resp.tags = deserialize_tags(todo.tags)
+
+    # is_recurring
+    resp.is_recurring = bool(todo.recurrence_rule)
 
     # next_action
     resp.next_action = get_next_action(
@@ -310,6 +312,9 @@ async def create_todo(
         assignee=body.assignee,
         inbox_state=body.inbox_state,
         estimated_minutes=body.estimated_minutes,
+        depends_on=json.dumps(body.depends_on) if body.depends_on else None,
+        recurrence_rule=body.recurrence_rule,
+        recurrence_end=body.recurrence_end,
     )
     db.add(todo)
     await db.commit()
@@ -373,6 +378,15 @@ async def update_todo(
     await db.commit()
     await db.refresh(todo)
 
+    # Spawn next occurrence for recurring tasks on completion
+    next_todo_id = None
+    if "status" in data and data["status"] == "completed" and todo.recurrence_rule:
+        from services.todo_recurrence_service import spawn_next_occurrence
+        next_todo = await spawn_next_occurrence(db, todo)
+        if next_todo:
+            next_todo_id = next_todo.id
+            await db.commit()
+
     if settings.obsidian_vault_path:
         project_name = None
         if todo.parent_id:
@@ -382,7 +396,11 @@ async def update_todo(
         export_todo(settings.obsidian_vault_path, todo, project_name)
 
     await _notify_todo_change()
-    return await _enrich_todo_response(todo, db)
+    resp = await _enrich_todo_response(todo, db)
+    # Include next occurrence ID in response headers for client to pick up
+    if next_todo_id:
+        resp.next_action = f"Next occurrence created: {next_todo_id}"
+    return resp
 
 
 @router.delete("/{todo_id}", status_code=204)
@@ -423,6 +441,73 @@ async def organize_todo(
             await inbox_pipeline_service.process_todo(org_db, ai_service, todo_id)
 
     background_tasks.add_task(_run_organize)
+    return {"status": "processing", "todo_id": todo_id}
+
+
+@router.post("/{todo_id}/answer-questions")
+async def answer_questions(
+    todo_id: str,
+    body: AnswerQuestionsRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Accept user answers to clarification questions and trigger planning."""
+    todo = await db.get(Todo, todo_id)
+    if not todo:
+        raise NotFoundError("Todo not found")
+
+    if todo.inbox_state != "questioning":
+        return {"status": "invalid_state", "todo_id": todo_id, "inbox_state": todo.inbox_state}
+
+    # Save answers
+    todo.clarification_answers = json.dumps(body.answers)
+    todo.inbox_state = "planning"
+    await db.commit()
+    await _notify_todo_change()
+
+    # Trigger planning in background with Q&A context
+    ai_service = request.app.state.ai_service
+    session_factory = request.app.state.session_factory
+
+    async def _run_planning():
+        async with session_factory() as pipeline_db:
+            await inbox_pipeline_service.resume_after_answers(pipeline_db, ai_service, todo_id)
+
+    background_tasks.add_task(_run_planning)
+    return {"status": "processing", "todo_id": todo_id}
+
+
+@router.post("/{todo_id}/skip-questions")
+async def skip_questions(
+    todo_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Skip clarification questions and proceed directly to planning."""
+    todo = await db.get(Todo, todo_id)
+    if not todo:
+        raise NotFoundError("Todo not found")
+
+    if todo.inbox_state != "questioning":
+        return {"status": "invalid_state", "todo_id": todo_id, "inbox_state": todo.inbox_state}
+
+    todo.inbox_state = "planning"
+    await db.commit()
+    await _notify_todo_change()
+
+    # Trigger planning in background without Q&A context
+    ai_service = request.app.state.ai_service
+    session_factory = request.app.state.session_factory
+
+    async def _run_planning():
+        async with session_factory() as pipeline_db:
+            await inbox_pipeline_service.resume_after_answers(pipeline_db, ai_service, todo_id)
+
+    background_tasks.add_task(_run_planning)
     return {"status": "processing", "todo_id": todo_id}
 
 
@@ -542,19 +627,15 @@ async def apply_plan(
 
     await db.flush()
 
-    # Create dependency relationships
-    relationship_count = 0
+    # Store dependency links as depends_on on each child todo
     for index, subtask in enumerate(subtasks):
-        for dep_index in subtask.get("depends_on_indices", []):
-            if 0 <= dep_index < len(created_ids):
-                rel = TaskRelationship(
-                    id=make_id("trel_"),
-                    source_todo_id=created_ids[index],
-                    target_todo_id=created_ids[dep_index],
-                    relationship_type="blocked_by",
-                )
-                db.add(rel)
-                relationship_count += 1
+        dep_ids = [
+            created_ids[dep_index]
+            for dep_index in subtask.get("depends_on_indices", [])
+            if 0 <= dep_index < len(created_ids)
+        ]
+        if dep_ids:
+            created_todos[index].depends_on = json.dumps(dep_ids)
 
     # Apply suggested skills (preferred) or legacy assignee
     if payload.get("suggested_skills"):
