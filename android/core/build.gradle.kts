@@ -34,6 +34,10 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.animation:animation")
 
     // Hilt
     implementation(libs.hilt.android)
@@ -48,6 +52,9 @@ dependencies {
 
     // Data
     api(libs.datastore.preferences)
+
+    // WorkManager
+    implementation(libs.workmanager)
 
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
