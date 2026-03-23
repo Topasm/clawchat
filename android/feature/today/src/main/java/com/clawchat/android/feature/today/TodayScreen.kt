@@ -19,11 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -67,6 +63,7 @@ import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
+import com.clawchat.android.core.ui.icons.ClawIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,7 +215,7 @@ fun TodayScreen(
         TaskCreateSheet(
             onDismiss = { showQuickAdd = false },
             onCreate = { data ->
-                viewModel.quickAdd(data.title)
+                viewModel.createTask(data)
                 showQuickAdd = false
             },
         )
@@ -441,7 +438,7 @@ private fun EventRow(event: Event) {
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        Icons.Default.Event,
+                        ClawIcons.Today,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
@@ -461,9 +458,10 @@ private fun EventRow(event: Event) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (!event.location.isNullOrBlank()) {
+                val location = event.location
+                if (!location.isNullOrBlank()) {
                     Text(
-                        text = event.location,
+                        text = location,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -514,7 +512,7 @@ private fun InboxPreviewSection(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    Icons.Default.Inbox,
+                                    ClawIcons.Inbox,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.tertiary,
                                 )
@@ -531,9 +529,10 @@ private fun InboxPreviewSection(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (!todo.planSummary.isNullOrBlank()) {
+                            val planSummary = todo.planSummary
+                            if (!planSummary.isNullOrBlank()) {
                                 Text(
-                                    text = todo.planSummary,
+                                    text = planSummary,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 2,
@@ -599,7 +598,7 @@ private fun BriefingSection(briefing: BriefingResponse) {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
-                                Icons.Default.CalendarToday,
+                                ClawIcons.Today,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                             )

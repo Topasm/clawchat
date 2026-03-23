@@ -13,11 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -47,6 +43,7 @@ import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarTitle
+import com.clawchat.android.core.ui.icons.ClawIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,7 +106,7 @@ fun InboxScreen(
                                 subtitle = "The assistant is actively classifying or planning these items.",
                                 tone = ClawTone.Primary,
                                 icon = {
-                                    Icon(Icons.Default.HourglassTop, contentDescription = null)
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
                                 },
                                 items = state.planningNow,
                                 actionLabel = null,
@@ -128,7 +125,7 @@ fun InboxScreen(
                                 subtitle = "AI has a recommendation ready for your confirmation.",
                                 tone = ClawTone.Warning,
                                 icon = {
-                                    Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null)
                                 },
                                 items = state.reviewSuggestion,
                                 actionLabel = "Review",
@@ -147,7 +144,7 @@ fun InboxScreen(
                                 subtitle = "Captured items that still need structure or routing.",
                                 tone = ClawTone.Default,
                                 icon = {
-                                    Icon(Icons.Default.Inbox, contentDescription = null)
+                                    Icon(ClawIcons.Inbox, contentDescription = null)
                                 },
                                 items = state.needsOrganizing,
                                 actionLabel = "Organize",
@@ -166,7 +163,7 @@ fun InboxScreen(
                                 subtitle = "These items need another attempt or a manual check.",
                                 tone = ClawTone.Error,
                                 icon = {
-                                    Icon(Icons.Default.ErrorOutline, contentDescription = null)
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
                                 },
                                 items = state.failed,
                                 actionLabel = "Retry",
@@ -374,9 +371,10 @@ private fun InboxItemCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    if (isError && !todo.automationError.isNullOrBlank()) {
+                    val automationError = todo.automationError
+                    if (isError && !automationError.isNullOrBlank()) {
                         Text(
-                            text = todo.automationError,
+                            text = automationError,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             maxLines = 2,

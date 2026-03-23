@@ -12,6 +12,8 @@ keystore_base64.txt
 
 # Android
 android/.gradle/
+android/.gradle-user-home/
+android/.android-user-home/
 android/.kotlin/
 android/build/
 android/*/build/

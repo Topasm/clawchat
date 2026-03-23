@@ -1,10 +1,10 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.dagger.hilt.android")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -31,30 +31,30 @@ android {
 
 dependencies {
     // Compose
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.material3)
-    implementation(libs.compose.material.icons)
+    implementation(platform("androidx.compose:compose-bom:2025.01.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
 
     // Hilt
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
+    implementation("com.google.dagger:hilt-android:2.53.1")
+    ksp("com.google.dagger:hilt-android-compiler:2.53.1")
 
     // Network
-    api(libs.retrofit)
-    api(libs.retrofit.kotlinx.serialization)
-    api(libs.okhttp)
-    api(libs.okhttp.logging)
-    api(libs.okhttp.sse)
+    api("com.squareup.retrofit2:retrofit:2.11.0")
+    api("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
+    api("com.squareup.okhttp3:okhttp:4.12.0")
+    api("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    api("com.squareup.okhttp3:okhttp-sse:4.12.0")
 
     // Data
-    api(libs.datastore.preferences)
+    api("androidx.datastore:datastore-preferences:1.1.1")
 
     // WorkManager
-    implementation(libs.workmanager)
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
@@ -62,17 +62,17 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     // Serialization
-    api(libs.kotlinx.serialization.json)
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Coroutines
-    api(libs.kotlinx.coroutines.android)
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // AndroidX
-    implementation(libs.core.ktx)
+    implementation("androidx.core:core-ktx:1.15.0")
 
     // Testing
-    testImplementation(libs.junit)
-    testImplementation(libs.mockk)
-    testImplementation(libs.turbine)
-    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.13.13")
+    testImplementation("app.cash.turbine:turbine:1.2.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

@@ -26,8 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -57,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawMetricPill
 import com.clawchat.android.core.ui.ClawSectionCard
@@ -66,8 +65,6 @@ import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun TasksScreen(
@@ -93,8 +90,7 @@ fun TasksScreen(
             onSetDueToday = viewModel::setDueToday,
             onSetFilter = viewModel::setStatusFilter,
             onRefresh = viewModel::loadTasks,
-            onCreate = { title -> viewModel.createTask(title) },
-            onReorder = viewModel::reorderTasks,
+            onCreate = viewModel::createTask,
         )
     }
 }
@@ -111,8 +107,7 @@ private fun TaskListView(
     onSetDueToday: (String) -> Unit,
     onSetFilter: (String?) -> Unit,
     onRefresh: () -> Unit,
-    onCreate: (String) -> Unit,
-    onReorder: (List<Todo>) -> Unit,
+    onCreate: (TodoCreate) -> Unit,
 ) {
     var showCreateSheet by remember { mutableStateOf(false) }
 
@@ -128,7 +123,7 @@ private fun TaskListView(
                 title = {
                     ClawTopBarTitle(
                         title = "Tasks",
-                        subtitle = "Keep active work readable and reorderable.",
+                        subtitle = "Keep active work readable and focused.",
                     )
                 },
             )
@@ -180,19 +175,7 @@ private fun TaskListView(
                     )
                 }
             } else {
-                val reorderView = LocalView.current
                 val lazyListState = rememberLazyListState()
-                val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                        reorderView.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
-                    } else {
-                        reorderView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    }
-                    val reordered = filteredTasks.toMutableList().apply {
-                        add(to.index, removeAt(from.index))
-                    }
-                    onReorder(reordered.mapIndexed { index, task -> task.copy(sortOrder = index) })
-                }
 
                 LazyColumn(
                     state = lazyListState,
@@ -200,16 +183,13 @@ private fun TaskListView(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(filteredTasks, key = { it.id }) { task ->
-                        ReorderableItem(reorderableState, key = task.id) {
-                            SwipeableTaskRow(
-                                task = task,
-                                onToggle = { onToggle(task.id) },
-                                onDelete = { onDelete(task.id) },
-                                onSetDueToday = { onSetDueToday(task.id) },
-                                onClick = { onSelect(task) },
-                                dragModifier = Modifier.draggableHandle(),
-                            )
-                        }
+                        SwipeableTaskRow(
+                            task = task,
+                            onToggle = { onToggle(task.id) },
+                            onDelete = { onDelete(task.id) },
+                            onSetDueToday = { onSetDueToday(task.id) },
+                            onClick = { onSelect(task) },
+                        )
                     }
                 }
             }
@@ -220,7 +200,7 @@ private fun TaskListView(
         TaskCreateSheet(
             onDismiss = { showCreateSheet = false },
             onCreate = { data ->
-                onCreate(data.title)
+                onCreate(data)
                 showCreateSheet = false
             },
         )
@@ -242,7 +222,7 @@ private fun TaskSummaryCard(
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Swipe for quick actions, drag to reorder, and keep the current focus visible.",
+            text = "Swipe for quick actions and keep the current focus visible.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
         )
@@ -317,10 +297,9 @@ private fun SwipeableTaskRow(
     onDelete: () -> Unit,
     onSetDueToday: () -> Unit,
     onClick: () -> Unit,
-    dragModifier: Modifier = Modifier,
 ) {
     SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
-        TaskRow(task = task, onToggle = onToggle, onClick = onClick, dragModifier = dragModifier)
+        TaskRow(task = task, onToggle = onToggle, onClick = onClick)
     }
 }
 
@@ -330,7 +309,6 @@ private fun TaskRow(
     task: Todo,
     onToggle: () -> Unit,
     onClick: () -> Unit,
-    dragModifier: Modifier = Modifier,
 ) {
     val isCompleted = task.status == "completed"
     val view = LocalView.current
@@ -358,12 +336,6 @@ private fun TaskRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                Icon(
-                    Icons.Default.DragHandle,
-                    contentDescription = "Reorder",
-                    modifier = dragModifier,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 Checkbox(
                     checked = isCompleted,
                     onCheckedChange = {
@@ -392,18 +364,11 @@ private fun TaskRow(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
-                        if (task.isRecurring) {
-                            Icon(
-                                imageVector = Icons.Default.Repeat,
-                                contentDescription = "Recurring",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
                     }
-                    if (!task.description.isNullOrBlank()) {
+                    val description = task.description
+                    if (!description.isNullOrBlank()) {
                         Text(
-                            text = task.description,
+                            text = description,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
@@ -507,7 +472,8 @@ private fun TaskDetailView(
                 }
             }
 
-            if (!task.description.isNullOrBlank()) {
+            val description = task.description
+            if (!description.isNullOrBlank()) {
                 item {
                     ClawSectionCard {
                         ClawSectionHeader(
@@ -515,7 +481,7 @@ private fun TaskDetailView(
                             subtitle = "Notes and supporting detail.",
                         )
                         Text(
-                            text = task.description,
+                            text = description,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -546,7 +512,8 @@ private fun TaskDetailView(
                 }
             }
 
-            if (!task.tags.isNullOrEmpty()) {
+            val tags = task.tags
+            if (!tags.isNullOrEmpty()) {
                 item {
                     ClawSectionCard {
                         ClawSectionHeader(
@@ -557,7 +524,7 @@ private fun TaskDetailView(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            task.tags.forEach { tag ->
+                            tags.forEach { tag ->
                                 ClawStatusChip(text = tag, tone = ClawTone.Default)
                             }
                         }
