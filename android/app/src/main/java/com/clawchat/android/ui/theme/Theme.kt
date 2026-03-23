@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clawchat.android.core.ui.theme.AccentColor
 
-// ── Material 3 color palette tuned for a productivity app ───────────────────
+// Material 3 color palette tuned for a productivity app.
 private val ClawPrimary = Color(0xFF246BFD)
 private val ClawSecondary = Color(0xFF0B8F6A)
 private val ClawTertiary = Color(0xFF8B5CF6)
@@ -76,7 +76,7 @@ private val DarkColorScheme = darkColorScheme(
     onErrorContainer = Color(0xFFFFDAD6),
 )
 
-// ── Typography — slightly roomier mobile hierarchy ───────────────────────────
+// Typography with a slightly roomier mobile hierarchy.
 private val ClawTypography = Typography(
     displayLarge = TextStyle(
         fontSize = 34.sp,
@@ -170,7 +170,7 @@ private val ClawTypography = Typography(
     ),
 )
 
-// ── Shapes — Material 3 mobile-friendly rounding ─────────────────────────────
+// Shapes with mobile-friendly Material 3 rounding.
 private val ClawShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
