@@ -10,7 +10,9 @@ import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -47,6 +49,7 @@ class TasksViewModelTest {
         Dispatchers.setMain(testDispatcher)
         todoRepository = mockk()
         syncManager = mockk(relaxed = true)
+        every { syncManager.todoChanged } returns MutableSharedFlow()
     }
 
     @After
@@ -169,16 +172,67 @@ class TasksViewModelTest {
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
         val newTodo = Todo(id = "new", title = "New task", status = "pending")
         coEvery { todoRepository.createTodo(any()) } returns ApiResult.Success(newTodo)
+        val input = TodoCreate(
+            title = "New task",
+            description = "Notes",
+            priority = "high",
+            dueDate = "2026-03-23",
+            source = "quick_capture",
+            inboxState = "classifying",
+        )
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.onAction(TasksAction.Create("New task"))
+        viewModel.onAction(TasksAction.Create(input))
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(1, viewModel.uiState.value.tasks.size)
         assertEquals("New task", viewModel.uiState.value.tasks.first().title)
-        coVerify { todoRepository.createTodo(TodoCreate(title = "New task")) }
+        coVerify { todoRepository.createTodo(input) }
+    }
+
+    @Test
+    fun `createTask with blank title is ignored`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(
+            TasksAction.Create(
+                TodoCreate(
+                    title = "   ",
+                    source = "quick_capture",
+                    inboxState = "classifying",
+                ),
+            ),
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 0) { todoRepository.createTodo(any()) }
+    }
+
+    @Test
+    fun `setDueToday sends current date update`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { todoRepository.updateTodo("1", any()) } returns
+            ApiResult.Success(sampleTodo.copy(dueDate = java.time.LocalDate.now().toString()))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.setDueToday("1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            todoRepository.updateTodo(
+                "1",
+                TodoUpdate(dueDate = java.time.LocalDate.now().toString()),
+            )
+        }
     }
 
     @Test

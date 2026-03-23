@@ -1,11 +1,11 @@
 package com.clawchat.android.feature.tasks
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -16,12 +16,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.os.Build
+import android.view.HapticFeedbackConstants
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.ui.TaskCreateSheet
+import com.clawchat.android.core.ui.performTaskToggleHaptic
+import com.clawchat.android.core.ui.rememberTaskCompletionUiState
 import com.clawchat.android.core.ui.SwipeToDismissCard
+import java.time.LocalDate
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -68,16 +76,15 @@ private fun TaskListView(
     onSetDueToday: (String) -> Unit,
     onSetFilter: (String?) -> Unit,
     onRefresh: () -> Unit,
-    onCreate: (String) -> Unit,
+    onCreate: (TodoCreate) -> Unit,
     onReorder: (List<Todo>) -> Unit,
 ) {
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var newTaskTitle by remember { mutableStateOf("") }
+    var showCreateSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Tasks") }) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreateDialog = true }) {
+            FloatingActionButton(onClick = { showCreateSheet = true }) {
                 Icon(Icons.Default.Add, contentDescription = "New task")
             }
         },
@@ -116,8 +123,14 @@ private fun TaskListView(
                     CircularProgressIndicator()
                 }
             } else {
+                val reorderView = LocalView.current
                 val lazyListState = rememberLazyListState()
                 val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                        reorderView.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+                    } else {
+                        reorderView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    }
                     val reordered = filteredTasks.toMutableList().apply {
                         add(to.index, removeAt(from.index))
                     }
@@ -135,7 +148,7 @@ private fun TaskListView(
                                 task = task,
                                 onToggle = { onToggle(task.id) },
                                 onDelete = { onDelete(task.id) },
-                                onSetDueToday = { onSetDueToday(task.id) },
+                                onSetDueToday = if (task.isDueToday()) null else { { onSetDueToday(task.id) } },
                                 onClick = { onSelect(task) },
                                 dragModifier = Modifier.draggableHandle(),
                             )
@@ -146,28 +159,12 @@ private fun TaskListView(
         }
     }
 
-    if (showCreateDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false; newTaskTitle = "" },
-            title = { Text("New Task") },
-            text = {
-                OutlinedTextField(
-                    value = newTaskTitle,
-                    onValueChange = { newTaskTitle = it },
-                    placeholder = { Text("Task title...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    onCreate(newTaskTitle)
-                    newTaskTitle = ""
-                    showCreateDialog = false
-                }) { Text("Create") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false; newTaskTitle = "" }) { Text("Cancel") }
+    if (showCreateSheet) {
+        TaskCreateSheet(
+            onDismiss = { showCreateSheet = false },
+            onCreate = { input ->
+                onCreate(input.asQuickCaptureTodoCreate())
+                showCreateSheet = false
             },
         )
     }
@@ -178,7 +175,7 @@ private fun SwipeableTaskRow(
     task: Todo,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
-    onSetDueToday: () -> Unit,
+    onSetDueToday: (() -> Unit)?,
     onClick: () -> Unit,
     dragModifier: Modifier = Modifier,
 ) {
@@ -190,9 +187,11 @@ private fun SwipeableTaskRow(
 @Composable
 private fun TaskRow(task: Todo, onToggle: () -> Unit, onClick: () -> Unit, dragModifier: Modifier = Modifier) {
     val isCompleted = task.status == "completed"
+    val view = LocalView.current
+    val completionUi = rememberTaskCompletionUiState(isCompleted)
 
     ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(12.dp).alpha(completionUi.alpha), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Icons.Default.DragHandle,
                 contentDescription = "Reorder",
@@ -200,14 +199,18 @@ private fun TaskRow(task: Todo, onToggle: () -> Unit, onClick: () -> Unit, dragM
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(4.dp))
-            Checkbox(checked = isCompleted, onCheckedChange = { onToggle() })
+            Checkbox(checked = isCompleted, onCheckedChange = {
+                performTaskToggleHaptic(view)
+                onToggle()
+            })
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         task.title,
                         style = MaterialTheme.typography.bodyLarge,
-                        textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                        textDecoration = completionUi.textDecoration,
+                        color = completionUi.titleColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -268,6 +271,9 @@ private fun TaskDetailView(
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val view = LocalView.current
+    val completionUi = rememberTaskCompletionUiState(task.status == "completed")
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -286,48 +292,73 @@ private fun TaskDetailView(
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Text(task.title, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                task.title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = completionUi.titleColor,
+                textDecoration = completionUi.textDecoration,
+                modifier = Modifier.alpha(completionUi.alpha),
+            )
             Spacer(Modifier.height(8.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = task.status == "completed", onCheckedChange = { onToggle() })
-                Text(if (task.status == "completed") "Completed" else "Pending")
+                Checkbox(
+                    checked = task.status == "completed",
+                    onCheckedChange = {
+                        performTaskToggleHaptic(view)
+                        onToggle()
+                    },
+                )
+                Text(
+                    if (task.status == "completed") "Completed" else "Pending",
+                    color = completionUi.titleColor,
+                )
             }
 
             Spacer(Modifier.height(16.dp))
 
-            val detailDesc = task.description
-            if (!detailDesc.isNullOrBlank()) {
-                Text("Description", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                Text(detailDesc, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(16.dp))
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column {
-                    Text("Priority", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(task.priority)
+            Column(modifier = Modifier.alpha(completionUi.alpha)) {
+                val detailDesc = task.description
+                if (!detailDesc.isNullOrBlank()) {
+                    Text("Description", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Text(detailDesc, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(16.dp))
                 }
-                task.dueDate?.let {
+
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column {
-                        Text("Due", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(it)
+                        Text("Priority", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(task.priority)
+                    }
+                    task.dueDate?.let {
+                        Column {
+                            Text("Due", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(it)
+                        }
                     }
                 }
-            }
 
-            val taskTags = task.tags
-            if (!taskTags.isNullOrEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                Text("Tags", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    taskTags.forEach { tag ->
-                        SuggestionChip(onClick = {}, label = { Text(tag) })
+                val taskTags = task.tags
+                if (!taskTags.isNullOrEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("Tags", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        taskTags.forEach { tag ->
+                            SuggestionChip(onClick = {}, label = { Text(tag) })
+                        }
                     }
                 }
             }
         }
     }
 }
+
+private fun Todo.isDueToday(): Boolean {
+    val today = LocalDate.now().toString()
+    return dueDate?.startsWith(today) == true
+}
+
+private fun TodoCreate.asQuickCaptureTodoCreate(): TodoCreate =
+    copy(source = "quick_capture", inboxState = "classifying")

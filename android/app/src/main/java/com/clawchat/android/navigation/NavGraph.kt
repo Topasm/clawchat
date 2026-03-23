@@ -2,6 +2,7 @@ package com.clawchat.android.navigation
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import com.clawchat.android.core.ui.icons.ClawIcons
@@ -53,10 +54,10 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     tonalElevation = 0.dp,
-                    modifier = Modifier.height(56.dp),
-                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    modifier = Modifier.height(72.dp),
+                    windowInsets = WindowInsets.navigationBars,
                 ) {
                     bottomNavItems.forEach { item ->
                         val selected = currentRoute == item.route
@@ -91,7 +92,7 @@ fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
                                 selectedTextColor = MaterialTheme.colorScheme.primary,
                                 unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                indicatorColor = MaterialTheme.colorScheme.surface,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                             ),
                         )
                     }

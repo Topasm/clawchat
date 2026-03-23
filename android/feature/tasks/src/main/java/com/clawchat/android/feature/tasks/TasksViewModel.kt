@@ -33,7 +33,7 @@ sealed interface TasksAction {
     data class SetFilter(val status: String?) : TasksAction
     data class SelectTask(val task: Todo?) : TasksAction
     data object Refresh : TasksAction
-    data class Create(val title: String) : TasksAction
+    data class Create(val input: TodoCreate) : TasksAction
     data class Update(val id: String, val update: TodoUpdate) : TasksAction
     data class Delete(val id: String) : TasksAction
     data class ReorderTasks(val reorderedTasks: List<Todo>) : TasksAction
@@ -59,7 +59,7 @@ class TasksViewModel @Inject constructor(
             is TasksAction.SetFilter -> doSetStatusFilter(action.status)
             is TasksAction.SelectTask -> _uiState.update { it.copy(selectedTask = action.task) }
             is TasksAction.Refresh -> doLoadTasks()
-            is TasksAction.Create -> doCreateTask(action.title)
+            is TasksAction.Create -> doCreateTask(action.input)
             is TasksAction.Update -> doUpdateTask(action.id, action.update)
             is TasksAction.Delete -> doDeleteTask(action.id)
             is TasksAction.ReorderTasks -> doReorderTasks(action.reorderedTasks)
@@ -71,7 +71,7 @@ class TasksViewModel @Inject constructor(
     fun selectTask(task: Todo?) = onAction(TasksAction.SelectTask(task))
     fun toggleComplete(todoId: String) = onAction(TasksAction.ToggleComplete(todoId))
     fun setStatusFilter(status: String?) = onAction(TasksAction.SetFilter(status))
-    fun createTask(title: String) = onAction(TasksAction.Create(title))
+    fun createTask(input: TodoCreate) = onAction(TasksAction.Create(input))
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
     fun setDueToday(id: String) = updateTask(id, TodoUpdate(dueDate = java.time.LocalDate.now().toString()))
@@ -131,14 +131,16 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    private fun doCreateTask(title: String) {
+    private fun doCreateTask(input: TodoCreate) {
+        val title = input.title.trim()
         if (title.isBlank()) return
+
+        val body = input.copy(
+            title = title,
+            description = input.description?.trim()?.takeIf { it.isNotEmpty() },
+        )
         viewModelScope.launch {
-            when (val result = todoRepository.createTodo(TodoCreate(
-                title = title,
-                source = "quick_capture",
-                inboxState = "classifying",
-            ))) {
+            when (val result = todoRepository.createTodo(body)) {
                 is ApiResult.Success -> _uiState.update { it.copy(tasks = listOf(result.data) + it.tasks) }
                 is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
                 is ApiResult.Loading -> { /* not used here */ }

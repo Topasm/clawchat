@@ -3,6 +3,7 @@ package com.clawchat.android.feature.today
 import app.cash.turbine.test
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.model.TodayResponse
 import com.clawchat.android.core.data.repository.TodayRepository
@@ -11,7 +12,9 @@ import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -59,6 +62,9 @@ class TodayViewModelTest {
         todayRepository = mockk()
         todoRepository = mockk()
         syncManager = mockk(relaxed = true)
+        every { syncManager.todoChanged } returns MutableSharedFlow()
+        every { syncManager.eventChanged } returns MutableSharedFlow()
+        coEvery { todayRepository.getBriefing() } returns ApiResult.Error("Unavailable")
     }
 
     @After
@@ -77,25 +83,15 @@ class TodayViewModelTest {
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
 
         viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.uiState.test {
-            // Initial empty
-            val initial = awaitItem()
-            assertEquals("", initial.greeting)
-
-            // Refreshing
-            val refreshing = awaitItem()
-            assertEquals(true, refreshing.isRefreshing)
-
-            // Loaded
-            val loaded = awaitItem()
-            assertEquals("Good morning!", loaded.greeting)
-            assertEquals(1, loaded.todayTodos.size)
-            assertEquals(1, loaded.overdueTodos.size)
-            assertEquals(3, loaded.inboxCount)
-            assertEquals(false, loaded.isRefreshing)
-            assertNull(loaded.error)
-        }
+        val state = viewModel.uiState.value
+        assertEquals("Good morning!", state.greeting)
+        assertEquals(1, state.todayTodos.size)
+        assertEquals(1, state.overdueTodos.size)
+        assertEquals(3, state.inboxCount)
+        assertEquals(false, state.isRefreshing)
+        assertNull(state.error)
     }
 
     @Test
@@ -103,14 +99,11 @@ class TodayViewModelTest {
         coEvery { todayRepository.getToday() } returns ApiResult.Error("Connection refused")
 
         viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.uiState.test {
-            awaitItem() // initial
-            awaitItem() // refreshing
-            val errorState = awaitItem()
-            assertEquals(false, errorState.isRefreshing)
-            assertEquals("Connection refused", errorState.error)
-        }
+        val state = viewModel.uiState.value
+        assertEquals(false, state.isRefreshing)
+        assertEquals("Connection refused", state.error)
     }
 
     @Test
@@ -185,25 +178,33 @@ class TodayViewModelTest {
     }
 
     @Test
-    fun `quickAdd triggers refresh on success`() = runTest {
+    fun `createTask triggers refresh on success`() = runTest {
         coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
         coEvery { todoRepository.createTodo(any()) } returns
             ApiResult.Success(Todo(id = "new", title = "Quick", status = "pending"))
+        val input = TodoCreate(
+            title = "Quick",
+            description = "From sheet",
+            priority = "high",
+            dueDate = "2026-03-23",
+            source = "quick_capture",
+            inboxState = "classifying",
+        )
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.onAction(TodayAction.QuickAdd("Quick"))
+        viewModel.onAction(TodayAction.Create(input))
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // createTodo called, then refresh (getToday) called again
+        coVerify { todoRepository.createTodo(input) }
         coVerify(atLeast = 2) { todayRepository.getToday() }
     }
 
     @Test
-    fun `quickAdd with blank title is ignored`() = runTest {
+    fun `createTask with blank title is ignored`() = runTest {
         coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
@@ -211,9 +212,44 @@ class TodayViewModelTest {
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.onAction(TodayAction.QuickAdd("  "))
+        viewModel.onAction(
+            TodayAction.Create(
+                TodoCreate(
+                    title = "  ",
+                    source = "quick_capture",
+                    inboxState = "classifying",
+                ),
+            ),
+        )
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify(exactly = 0) { todoRepository.createTodo(any()) }
+    }
+
+    @Test
+    fun `setDueToday moves overdue todo into today list`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
+        coEvery { todoRepository.updateTodo("2", any()) } returns
+            ApiResult.Success(sampleOverdueTodo.copy(dueDate = java.time.LocalDate.now().toString()))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.setDueToday("2")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updated = viewModel.uiState.value
+        assertEquals(0, updated.overdueTodos.size)
+        assertEquals(2, updated.todayTodos.size)
+        assertEquals("2", updated.todayTodos.last().id)
+
+        coVerify {
+            todoRepository.updateTodo(
+                "2",
+                TodoUpdate(dueDate = java.time.LocalDate.now().toString()),
+            )
+        }
     }
 }

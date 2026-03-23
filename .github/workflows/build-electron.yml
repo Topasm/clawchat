@@ -15,6 +15,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build server binary
+        run: |
+          cd server
+          pip install -r requirements.txt pyinstaller
+          pyinstaller run_server.py \
+            --name clawchat-server \
+            --onedir \
+            --noconfirm \
+            --hidden-import aiosqlite \
+            --hidden-import sqlalchemy.dialects.sqlite \
+            --collect-submodules uvicorn \
+            --collect-submodules jose \
+            --paths .
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -44,6 +60,14 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build server binary
+        run: |
+          cd server
+          pip install -r requirements.txt pyinstaller
+          pyinstaller run_server.py --name clawchat-server --onedir --noconfirm --hidden-import aiosqlite --hidden-import sqlalchemy.dialects.sqlite --collect-submodules uvicorn --collect-submodules jose --paths .
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -57,8 +81,13 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: ClawChat-windows
-          path: release/*.exe
+          name: ClawChat-windows-installer
+          path: release/*Setup*.exe
+      - name: Upload portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClawChat-windows-portable
+          path: release/*portable*.exe
       - name: Attach to Nightly Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -66,13 +95,31 @@ jobs:
           tag_name: nightly
           name: 'Nightly Build'
           prerelease: true
-          files: release/*.exe
+          files: |
+            release/*Setup*.exe
+            release/*portable*.exe
 
   mac:
     name: macOS
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build server binary
+        run: |
+          cd server
+          pip install -r requirements.txt pyinstaller
+          pyinstaller run_server.py \
+            --name clawchat-server \
+            --onedir \
+            --noconfirm \
+            --hidden-import aiosqlite \
+            --hidden-import sqlalchemy.dialects.sqlite \
+            --collect-submodules uvicorn \
+            --collect-submodules jose \
+            --paths .
       - uses: actions/setup-node@v4
         with:
           node-version: 20

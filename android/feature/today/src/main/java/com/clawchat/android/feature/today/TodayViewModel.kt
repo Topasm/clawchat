@@ -40,7 +40,7 @@ sealed interface TodayAction {
     data class ToggleComplete(val todoId: String) : TodayAction
     data class Delete(val todoId: String) : TodayAction
     data class SetDueToday(val todoId: String) : TodayAction
-    data class QuickAdd(val title: String) : TodayAction
+    data class Create(val input: TodoCreate) : TodayAction
     data object Refresh : TodayAction
 }
 
@@ -66,7 +66,7 @@ class TodayViewModel @Inject constructor(
             is TodayAction.ToggleComplete -> doToggleComplete(action.todoId)
             is TodayAction.Delete -> doDelete(action.todoId)
             is TodayAction.SetDueToday -> doSetDueToday(action.todoId)
-            is TodayAction.QuickAdd -> doQuickAdd(action.title)
+            is TodayAction.Create -> doCreateTask(action.input)
             is TodayAction.Refresh -> doRefresh()
         }
     }
@@ -76,7 +76,7 @@ class TodayViewModel @Inject constructor(
     fun toggleComplete(todoId: String) = onAction(TodayAction.ToggleComplete(todoId))
     fun deleteTask(todoId: String) = onAction(TodayAction.Delete(todoId))
     fun setDueToday(todoId: String) = onAction(TodayAction.SetDueToday(todoId))
-    fun quickAdd(title: String) = onAction(TodayAction.QuickAdd(title))
+    fun createTask(input: TodoCreate) = onAction(TodayAction.Create(input))
 
     private fun doRefresh() {
         viewModelScope.launch {
@@ -228,14 +228,16 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    private fun doQuickAdd(title: String) {
+    private fun doCreateTask(input: TodoCreate) {
+        val title = input.title.trim()
         if (title.isBlank()) return
+
+        val body = input.copy(
+            title = title,
+            description = input.description?.trim()?.takeIf { it.isNotEmpty() },
+        )
         viewModelScope.launch {
-            when (todoRepository.createTodo(TodoCreate(
-                title = title,
-                source = "quick_capture",
-                inboxState = "classifying",
-            ))) {
+            when (todoRepository.createTodo(body)) {
                 is ApiResult.Success -> doRefresh()
                 is ApiResult.Error -> Log.w(TAG, "Quick add failed")
                 is ApiResult.Loading -> { /* not used here */ }

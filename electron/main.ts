@@ -55,13 +55,18 @@ function setServerStatus(state: ServerState, extra?: { pid?: number; error?: str
 
 // ── Spawn the Python backend ──────────────────────────────────────────
 
+function findServerBinary(): string | null {
+  if (!app.isPackaged) return null;
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const binary = path.join(process.resourcesPath, 'server-bin', `clawchat-server${ext}`);
+  return fs.existsSync(binary) ? binary : null;
+}
+
 function findPython(): string {
-  // Check for venv inside server dir first
   const venvPython = process.platform === 'win32'
     ? path.join(SERVER_DIR, 'venv', 'Scripts', 'python.exe')
     : path.join(SERVER_DIR, 'venv', 'bin', 'python');
   if (fs.existsSync(venvPython)) return venvPython;
-  // Fallback to system python
   return process.platform === 'win32' ? 'python' : 'python3';
 }
 
@@ -69,17 +74,16 @@ function startServer() {
   if (serverProcess) return; // already running
 
   const config = loadConfig();
-  const python = findPython();
-
   setServerStatus('starting');
 
-  // Build .env content for the server
+  // Build environment variables for the server
   const envVars: Record<string, string> = {
     ...process.env as Record<string, string>,
     HOST: '0.0.0.0',
     PORT: String(config.port),
     PIN: config.pin,
   };
+
   if (config.obsidianVaultPath) {
     envVars.OBSIDIAN_VAULT_PATH = config.obsidianVaultPath;
   }
@@ -96,14 +100,36 @@ function startServer() {
     }
   }
 
-  const uvicornArgs = ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', String(config.port)];
-  if (VITE_DEV_SERVER_URL) uvicornArgs.push('--reload');
+  // In packaged mode, use a writable data directory for DB + uploads
+  let cwd: string;
+  const binary = findServerBinary();
 
-  serverProcess = spawn(python, uvicornArgs, {
-    cwd: SERVER_DIR,
-    env: envVars,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  if (binary) {
+    // Packaged mode — data goes to user data dir, server is a standalone binary
+    const dataDir = path.join(app.getPath('userData'), 'server-data');
+    fs.mkdirSync(path.join(dataDir, 'data', 'uploads'), { recursive: true });
+    envVars.DATABASE_URL = `sqlite+aiosqlite:///${path.join(dataDir, 'data', 'clawchat.db')}`;
+    envVars.UPLOAD_DIR = path.join(dataDir, 'data', 'uploads');
+    cwd = dataDir;
+
+    serverProcess = spawn(binary, [], {
+      cwd,
+      env: envVars,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } else {
+    // Dev mode — use Python + uvicorn with source
+    const python = findPython();
+    cwd = SERVER_DIR;
+    const uvicornArgs = ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', String(config.port)];
+    if (VITE_DEV_SERVER_URL) uvicornArgs.push('--reload');
+
+    serverProcess = spawn(python, uvicornArgs, {
+      cwd,
+      env: envVars,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  }
 
   serverProcess.stdout?.on('data', (data: Buffer) => {
     const text = data.toString();

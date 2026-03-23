@@ -37,6 +37,10 @@ server/__pycache__
 server/**/__pycache__
 server/data/
 server/venv/
+server/vendor/
+server/dist/
+server/build/
+server/*.spec
 server/*.log
 *.pyc
 .claude/worktrees/

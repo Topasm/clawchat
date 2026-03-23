@@ -21,7 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import android.view.HapticFeedbackConstants
 
 /**
  * Shared swipe-to-dismiss background used across Today and Tasks screens.
@@ -32,8 +34,8 @@ import androidx.compose.ui.unit.dp
 fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
     val color by animateColorAsState(
         when (dismissState.targetValue) {
-            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
-            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary
+            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
             SwipeToDismissBoxValue.Settled -> Color.Transparent
         },
         label = "swipe_bg_color",
@@ -57,7 +59,15 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
         contentAlignment = alignment,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Color.White)
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = when (dismissState.dismissDirection) {
+                    SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.onErrorContainer
+                    SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> Color.White
+                },
+            )
         }
     }
 }
@@ -69,14 +79,27 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
 @Composable
 fun SwipeToDismissCard(
     onDelete: () -> Unit,
-    onSetDueToday: () -> Unit,
+    onSetDueToday: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val view = LocalView.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
-                SwipeToDismissBoxValue.EndToStart -> { onDelete(); true }
-                SwipeToDismissBoxValue.StartToEnd -> { onSetDueToday(); false }
+                SwipeToDismissBoxValue.EndToStart -> {
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    onDelete()
+                    true
+                }
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    if (onSetDueToday == null) {
+                        false
+                    } else {
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        onSetDueToday()
+                        false
+                    }
+                }
                 SwipeToDismissBoxValue.Settled -> false
             }
         },
@@ -86,7 +109,7 @@ fun SwipeToDismissCard(
         state = dismissState,
         backgroundContent = { SwipeBackground(dismissState) },
         enableDismissFromEndToStart = true,
-        enableDismissFromStartToEnd = true,
+        enableDismissFromStartToEnd = onSetDueToday != null,
     ) {
         content()
     }
