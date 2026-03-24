@@ -226,12 +226,11 @@ export default function Layout() {
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
 
-  const activeMobileTabIndex = useMemo(() => {
-    const idx = mobileTabs.findIndex((tab) => location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`));
-    return idx >= 0 ? idx : 0;
-  }, [location.pathname]);
+  const activeMobileTabIndex = useMemo(() => (
+    mobileTabs.findIndex((tab) => location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`))
+  ), [location.pathname]);
 
-  const canSwipeTabs = isMobile && !onChatPage;
+  const canSwipeTabs = isMobile && !onChatPage && activeMobileTabIndex >= 0;
   const isDetailPage = isMobile && (/^\/(tasks|chats|events)\/[^/]+/.test(location.pathname)
     || location.pathname === '/settings/system-prompt');
 

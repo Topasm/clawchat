@@ -1,3 +1,5 @@
+export type AppMode = 'client' | 'host';
+
 export interface ElectronUpdater {
   checkForUpdates: () => Promise<void>;
   downloadUpdate: () => Promise<void>;
@@ -13,13 +15,24 @@ export interface ServerStatus {
   error?: string;
 }
 
+export interface ServerConfig {
+  appMode: AppMode;
+  port: number;
+  pin: string;
+  obsidianVaultPath: string;
+  hostServerUrl: string;
+  autoStartHost: boolean;
+}
+
 export interface ElectronServerAPI {
   getStatus: () => Promise<ServerStatus>;
-  getConfig: () => Promise<{ port: number; pin: string; obsidianVaultPath: string }>;
+  getConfig: () => Promise<ServerConfig>;
   getNetworkInfo: () => Promise<{ addresses: { ip: string; name: string; networkType?: string }[] }>;
-  updateConfig: (updates: Record<string, unknown>) => Promise<void>;
+  updateConfig: (updates: Partial<ServerConfig>) => Promise<ServerConfig>;
   selectFolder: () => Promise<string | null>;
   openObsidianVault: () => Promise<void>;
+  setAppMode: (mode: AppMode) => Promise<ServerConfig>;
+  getAppMode: () => Promise<AppMode>;
   onStatusChange: (cb: (status: ServerStatus) => void) => () => void;
 }
 

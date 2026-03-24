@@ -278,6 +278,67 @@
   margin: 0 auto 16px;
 }
 
+/* --- Role Selection Cards -------------------------------- */
+.cc-onboarding__role-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cc-onboarding__role-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 2px solid var(--cc-border);
+  border-radius: 10px;
+  background: var(--cc-surface-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cc-onboarding__role-card:hover {
+  border-color: var(--cc-primary);
+  background: color-mix(in srgb, var(--cc-primary) 4%, var(--cc-surface-secondary));
+}
+
+.cc-onboarding__role-card--selected {
+  border-color: var(--cc-primary);
+  background: color-mix(in srgb, var(--cc-primary) 8%, var(--cc-surface));
+}
+
+.cc-onboarding__role-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cc-primary) 10%, transparent);
+  color: var(--cc-primary);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.cc-onboarding__role-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-onboarding__role-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cc-text);
+  margin: 0 0 4px;
+}
+
+.cc-onboarding__role-description {
+  font-size: 13px;
+  color: var(--cc-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
 /* --- Responsive ------------------------------------------ */
 @media (max-width: 540px) {
   .cc-onboarding {

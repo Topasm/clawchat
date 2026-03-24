@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     obsidian_project_todo_filename: str = "TODO.md"
     obsidian_companion_node_required: bool = False
     obsidian_scan_interval_minutes: int = 5
+    obsidian_watch_enabled: bool = False  # opt-in: enable periodic vault scanning
 
     # Push notifications (FCM)
     firebase_credentials_path: str = ""

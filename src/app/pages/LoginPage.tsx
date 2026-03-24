@@ -19,9 +19,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
-  const [showServerUrl, setShowServerUrl] = useState(!IS_ELECTRON);
+  const [showServerUrl, setShowServerUrl] = useState(!IS_ELECTRON && !IS_CAPACITOR);
   const [showScanner, setShowScanner] = useState(false);
+  const [electronClientMode, setElectronClientMode] = useState(false);
   const biometricAttempted = useRef(false);
+  const isPairingFirstMobile = IS_CAPACITOR;
 
   // Attempt biometric login on mount if enabled and token exists
   useEffect(() => {
@@ -53,6 +55,22 @@ export default function LoginPage() {
       }
     })();
   }, [navigate]);
+
+  // On Electron client mode: show server URL + QR, pre-fill from stored hostServerUrl
+  useEffect(() => {
+    if (!IS_ELECTRON) return;
+    window.electronAPI.server.getAppMode().then((mode) => {
+      if (mode === 'client') {
+        setElectronClientMode(true);
+        setShowServerUrl(true);
+        window.electronAPI.server.getConfig().then((cfg) => {
+          if (cfg.hostServerUrl) {
+            setServerUrl(cfg.hostServerUrl);
+          }
+        });
+      }
+    });
+  }, []);
 
   const handleQRScan = async (data: string) => {
     setShowScanner(false);
@@ -200,6 +218,60 @@ export default function LoginPage() {
           ClawChat
         </h1>
 
+        {isPairingFirstMobile && !showServerUrl && (
+          <div
+            style={{
+              marginBottom: 20,
+              padding: '14px 16px',
+              borderRadius: 10,
+              background: colors.background,
+              border: `1px solid ${colors.border}`,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 6 }}>
+              Connect to your host desktop
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: colors.textSecondary, marginBottom: 14 }}>
+              Scan the QR code shown on your main desktop. Manual server login is still available if you need it.
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowScanner(true)}
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                background: colors.primary,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Scan Host QR
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowServerUrl(true)}
+              style={{
+                width: '100%',
+                padding: '10px 0',
+                marginTop: 10,
+                background: 'transparent',
+                color: colors.textSecondary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Use Server URL Instead
+            </button>
+          </div>
+        )}
+
         {showServerUrl ? (
           <>
             <label style={{ display: 'flex', alignItems: 'center', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
@@ -230,8 +302,27 @@ export default function LoginPage() {
             <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}>
               When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current site URL is usually correct.
             </div>
+            {isPairingFirstMobile && (
+              <button
+                type="button"
+                onClick={() => setShowServerUrl(false)}
+                style={{
+                  marginTop: -4,
+                  marginBottom: 16,
+                  padding: 0,
+                  background: 'none',
+                  border: 'none',
+                  color: colors.textSecondary,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Back to QR pairing
+              </button>
+            )}
           </>
-        ) : (
+        ) : !isPairingFirstMobile ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <span style={{ fontSize: 12, color: colors.textTertiary }}>
               Server: {serverUrl}
@@ -244,54 +335,62 @@ export default function LoginPage() {
               Change
             </button>
           </div>
+        ) : null}
+
+        {(!isPairingFirstMobile || showServerUrl) && (
+          <>
+            <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
+              PIN
+            </label>
+            <input
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="Enter your PIN"
+              required={!isPairingFirstMobile || showServerUrl}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                marginBottom: 20,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+                fontSize: 14,
+                background: colors.background,
+                color: colors.text,
+                boxSizing: 'border-box',
+                outline: 'none',
+              }}
+            />
+
+            {error && (
+              <div style={{ color: colors.error, fontSize: 13, marginBottom: 16 }}>{error}</div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                background: loading ? colors.disabled : colors.primary,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {loading ? 'Connecting...' : 'Login'}
+            </button>
+          </>
         )}
 
-        <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
-          PIN
-        </label>
-        <input
-          type="password"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="Enter your PIN"
-          required
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            marginBottom: 20,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 8,
-            fontSize: 14,
-            background: colors.background,
-            color: colors.text,
-            boxSizing: 'border-box',
-            outline: 'none',
-          }}
-        />
-
-        {error && (
-          <div style={{ color: colors.error, fontSize: 13, marginBottom: 16 }}>{error}</div>
+        {error && isPairingFirstMobile && !showServerUrl && (
+          <div style={{ color: colors.error, fontSize: 13, marginTop: 16 }}>{error}</div>
         )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '12px 0',
-            background: loading ? colors.disabled : colors.primary,
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {loading ? 'Connecting...' : 'Login'}
-        </button>
-
-        {!IS_ELECTRON && (
+        {(!IS_ELECTRON || electronClientMode) && !isPairingFirstMobile && (
           <button
             type="button"
             onClick={() => setShowScanner(true)}

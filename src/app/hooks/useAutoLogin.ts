@@ -3,26 +3,24 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { IS_ELECTRON } from '../types/platform';
 
 /**
- * Auto-login on Electron by reading server config from the main process.
- * Listens for server status events and retries login when the server becomes ready.
+ * Auto-login on Electron in host mode by reading server config from the main process.
+ * In client mode, the user logs in manually — auto-login is skipped.
  */
 export function useAutoLogin() {
   const token = useAuthStore((s) => s.token);
   const isLoading = useAuthStore((s) => s.isLoading);
   const login = useAuthStore((s) => s.login);
   const loginInFlight = useRef(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   const tryLogin = useCallback(async () => {
-    // Skip if already logged in or a login attempt is in progress
     if (useAuthStore.getState().token || loginInFlight.current) return;
 
-    // Skip auto-login if no embedded server (dev mode)
     const status = await window.electronAPI.server.getStatus();
     if (status.state === 'stopped' || status.state === 'error') return;
 
     loginInFlight.current = true;
     try {
-      // Clear any stale auth state before fresh login
       useAuthStore.setState({ serverUrl: null, token: null, refreshToken: null });
 
       const config = await window.electronAPI.server.getConfig();
@@ -38,16 +36,23 @@ export function useAutoLogin() {
   useEffect(() => {
     if (!IS_ELECTRON || isLoading || token) return;
 
-    // Try immediately — server may already be running
-    tryLogin();
+    // Only auto-login in host mode (local server available)
+    window.electronAPI.server.getAppMode().then((mode) => {
+      if (mode !== 'host') return;
 
-    // Also listen for server becoming ready (in case server wasn't up yet)
-    const cleanup = window.electronAPI.server.onStatusChange((status) => {
-      if (status.state === 'running' && !useAuthStore.getState().token) {
-        tryLogin();
-      }
+      tryLogin();
+
+      const cleanup = window.electronAPI.server.onStatusChange((status) => {
+        if (status.state === 'running' && !useAuthStore.getState().token) {
+          tryLogin();
+        }
+      });
+      cleanupRef.current = cleanup;
     });
 
-    return cleanup;
+    return () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
   }, [isLoading, token, tryLogin]);
 }

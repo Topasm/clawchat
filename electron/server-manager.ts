@@ -4,15 +4,20 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
 
-const SERVER_PORT = 8000;
-const HEALTH_URL = `http://127.0.0.1:${SERVER_PORT}/api/health`;
 const MAX_HEALTH_RETRIES = 30;
-// Progressive intervals: fast at first, then back off
-// First 5 attempts at 150ms, next 5 at 300ms, rest at 500ms
+
 function getRetryInterval(attempt: number): number {
   if (attempt <= 5) return 150;
   if (attempt <= 10) return 300;
   return 500;
+}
+
+// ── Config passed by main.ts ────────────────────────────────────────
+
+export interface ServerManagerConfig {
+  port: number;
+  pin: string;
+  obsidianVaultPath: string;
 }
 
 // ── Status types ─────────────────────────────────────────────────────
@@ -29,7 +34,8 @@ export interface ServerStatus {
 // ── Internal state ───────────────────────────────────────────────────
 
 let managedProcess: ChildProcess | null = null;
-let currentStatus: ServerStatus = { state: 'stopped', port: SERVER_PORT };
+let currentStatus: ServerStatus = { state: 'stopped', port: 8000 };
+let activePort = 8000;
 
 // ── Path helpers ─────────────────────────────────────────────────────
 
@@ -41,18 +47,6 @@ function getLockFilePath(): string {
   return path.join(app.getPath('userData'), 'server.lock');
 }
 
-function findPython(): string {
-  const serverDir = getServerDir();
-  const venvPaths = [
-    path.join(serverDir, 'venv', 'bin', 'python'),       // macOS/Linux
-    path.join(serverDir, 'venv', 'Scripts', 'python.exe'), // Windows
-  ];
-  for (const p of venvPaths) {
-    if (fs.existsSync(p)) return p;
-  }
-  return process.platform === 'win32' ? 'python' : 'python3';
-}
-
 function getServerDir(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'server');
@@ -61,21 +55,55 @@ function getServerDir(): string {
 }
 
 function getDataDir(): string {
-  const dataDir = path.join(app.getPath('userData'), 'data');
+  const dataDir = path.join(app.getPath('userData'), 'server-data', 'data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
   return dataDir;
 }
 
+function findPython(): string {
+  const serverDir = getServerDir();
+  const venvPaths = [
+    path.join(serverDir, 'venv', 'bin', 'python'),
+    path.join(serverDir, 'venv', 'Scripts', 'python.exe'),
+  ];
+  for (const p of venvPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
+
+function findServerBinary(): string | null {
+  if (!app.isPackaged) return null;
+  const ext = process.platform === 'win32' ? '.exe' : '';
+  const binary = path.join(process.resourcesPath, 'server-bin', `clawchat-server${ext}`);
+  return fs.existsSync(binary) ? binary : null;
+}
+
+function findObsidianCli(): string | undefined {
+  if (process.env.OBSIDIAN_CLI_COMMAND) return process.env.OBSIDIAN_CLI_COMMAND;
+  const candidates: string[] = [];
+  if (process.platform === 'win32') {
+    candidates.push(path.join(process.env.LOCALAPPDATA || '', 'Programs', 'obsidian', 'Obsidian.exe'));
+  } else if (process.platform === 'darwin') {
+    candidates.push('/Applications/Obsidian.app/Contents/MacOS/Obsidian');
+  } else {
+    candidates.push('obsidian');
+  }
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return undefined;
+}
+
 // ── Status broadcasting ──────────────────────────────────────────────
 
 function setStatus(status: ServerStatus): void {
   currentStatus = status;
-  // Broadcast to all renderer windows
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
-      win.webContents.send('server:status-changed', status);
+      win.webContents.send('server-status-change', status);
     }
   }
 }
@@ -85,9 +113,7 @@ function setStatus(status: ServerStatus): void {
 function writePidFile(pid: number): void {
   try {
     fs.writeFileSync(getPidFilePath(), String(pid), 'utf-8');
-  } catch {
-    // Non-fatal — we can still track via managedProcess
-  }
+  } catch { /* non-fatal */ }
 }
 
 function readPidFile(): number | null {
@@ -101,27 +127,16 @@ function readPidFile(): number | null {
 }
 
 function removePidFile(): void {
-  try {
-    fs.unlinkSync(getPidFilePath());
-  } catch {
-    // Already gone
-  }
+  try { fs.unlinkSync(getPidFilePath()); } catch { /* already gone */ }
 }
 
 function removeLockFile(): void {
-  try {
-    fs.unlinkSync(getLockFilePath());
-  } catch {
-    // Already gone
-  }
+  try { fs.unlinkSync(getLockFilePath()); } catch { /* already gone */ }
 }
 
-/**
- * Check whether a process with the given PID is alive.
- */
 function isProcessAlive(pid: number): boolean {
   try {
-    process.kill(pid, 0); // signal 0 = existence check only
+    process.kill(pid, 0);
     return true;
   } catch {
     return false;
@@ -130,9 +145,13 @@ function isProcessAlive(pid: number): boolean {
 
 // ── Health check ─────────────────────────────────────────────────────
 
-function checkHealth(): Promise<boolean> {
+function getHealthUrl(port: number): string {
+  return `http://127.0.0.1:${port}/api/health`;
+}
+
+function checkHealth(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = http.get(HEALTH_URL, (res) => {
+    const req = http.get(getHealthUrl(port), (res) => {
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
@@ -144,13 +163,13 @@ function checkHealth(): Promise<boolean> {
   });
 }
 
-function waitForHealth(): Promise<boolean> {
+function waitForHealth(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     let attempts = 0;
 
     const check = () => {
       attempts++;
-      const req = http.get(HEALTH_URL, (res) => {
+      const req = http.get(getHealthUrl(port), (res) => {
         if (res.statusCode === 200) {
           resolve(true);
         } else if (attempts < MAX_HEALTH_RETRIES) {
@@ -177,16 +196,15 @@ function waitForHealth(): Promise<boolean> {
 
 // ── Core lifecycle ───────────────────────────────────────────────────
 
-/**
- * Start the server. If a detached server from a previous UI session is
- * still alive and healthy, reuse it instead of spawning a new one.
- */
-export async function startServer(): Promise<ServerStatus> {
+export async function startServer(config: ServerManagerConfig): Promise<ServerStatus> {
+  const port = config.port;
+  activePort = port;
+
   // 1. Already managed by this process?
   if (managedProcess && managedProcess.exitCode === null) {
-    const healthy = await checkHealth();
+    const healthy = await checkHealth(port);
     if (healthy) {
-      const status: ServerStatus = { state: 'running', port: SERVER_PORT, pid: managedProcess.pid };
+      const status: ServerStatus = { state: 'running', port, pid: managedProcess.pid };
       setStatus(status);
       return status;
     }
@@ -195,63 +213,87 @@ export async function startServer(): Promise<ServerStatus> {
   // 2. Detached server from a previous session still alive?
   const existingPid = readPidFile();
   if (existingPid && isProcessAlive(existingPid)) {
-    const healthy = await checkHealth();
+    const healthy = await checkHealth(port);
     if (healthy) {
       console.log(`[server-manager] Reusing existing server (PID ${existingPid})`);
-      const status: ServerStatus = { state: 'running', port: SERVER_PORT, pid: existingPid };
+      const status: ServerStatus = { state: 'running', port, pid: existingPid };
       setStatus(status);
       return status;
     }
-    // Process alive but unhealthy — kill the stale process
     console.log(`[server-manager] Stale server (PID ${existingPid}), killing`);
     try { process.kill(existingPid, 'SIGKILL'); } catch { /* already gone */ }
     removePidFile();
   } else if (existingPid) {
-    // Stale PID file, process dead
     removePidFile();
   }
 
-  // 3. Maybe another process already started serving (race condition guard)
-  const alreadyHealthy = await checkHealth();
+  // 3. Maybe another process already started serving
+  const alreadyHealthy = await checkHealth(port);
   if (alreadyHealthy) {
     console.log('[server-manager] Server already healthy on port (external)');
-    const status: ServerStatus = { state: 'running', port: SERVER_PORT };
+    const status: ServerStatus = { state: 'running', port };
     setStatus(status);
     return status;
   }
 
   // 4. Spawn a new detached server
-  setStatus({ state: 'starting', port: SERVER_PORT });
+  setStatus({ state: 'starting', port });
 
-  const python = findPython();
-  const serverDir = getServerDir();
   const dataDir = getDataDir();
+  const uploadsDir = path.join(dataDir, 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
 
-  console.log(`[server-manager] Starting server from ${serverDir}`);
-  console.log(`[server-manager] Python: ${python}`);
-  console.log(`[server-manager] Data dir: ${dataDir}`);
-
-  const env = {
-    ...process.env,
-    HOST: '127.0.0.1',
-    PORT: String(SERVER_PORT),
+  const env: Record<string, string> = {
+    ...process.env as Record<string, string>,
+    HOST: '0.0.0.0',
+    PORT: String(port),
+    PIN: config.pin,
     DATABASE_URL: `sqlite+aiosqlite:///${path.join(dataDir, 'clawchat.db')}`,
-    UPLOAD_DIR: path.join(dataDir, 'uploads'),
+    UPLOAD_DIR: uploadsDir,
   };
 
+  if (config.obsidianVaultPath) {
+    env.OBSIDIAN_VAULT_PATH = config.obsidianVaultPath;
+  }
+
+  const obsidianCli = findObsidianCli();
+  if (obsidianCli) {
+    env.OBSIDIAN_CLI_COMMAND = obsidianCli;
+  }
+
+  const binary = findServerBinary();
+  const serverDir = getServerDir();
+
+  console.log(`[server-manager] Starting server on port ${port}`);
+  console.log(`[server-manager] Data dir: ${dataDir}`);
+
   try {
-    managedProcess = spawn(
-      python,
-      ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', String(SERVER_PORT)],
-      {
+    if (binary) {
+      // Packaged mode
+      managedProcess = spawn(binary, [], {
+        cwd: path.dirname(dataDir),
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+      });
+    } else {
+      // Dev mode
+      const python = findPython();
+      const uvicornArgs = ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', String(port)];
+      if (process.env.VITE_DEV_SERVER_URL) uvicornArgs.push('--reload');
+
+      console.log(`[server-manager] Python: ${python}`);
+
+      managedProcess = spawn(python, uvicornArgs, {
         cwd: serverDir,
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true, // survive UI close
-      }
-    );
+        detached: true,
+      });
+    }
 
-    // Allow the Electron process to exit without waiting for this child
     managedProcess.unref();
 
     if (managedProcess.pid) {
@@ -270,58 +312,51 @@ export async function startServer(): Promise<ServerStatus> {
       console.log(`[server-manager] Server exited with code=${code} signal=${signal}`);
       removePidFile();
       managedProcess = null;
-      setStatus({ state: 'stopped', port: SERVER_PORT });
+      setStatus({ state: 'stopped', port: activePort });
     });
 
     managedProcess.on('error', (err) => {
       console.error(`[server-manager] Failed to start server:`, err);
       removePidFile();
       managedProcess = null;
-      setStatus({ state: 'error', port: SERVER_PORT, error: err.message });
+      setStatus({ state: 'error', port: activePort, error: err.message });
     });
 
-    // Wait for health check
-    const healthy = await waitForHealth();
+    const healthy = await waitForHealth(port);
     if (!healthy) {
       throw new Error('Server failed health check after startup');
     }
 
-    console.log(`[server-manager] Server is healthy on port ${SERVER_PORT}`);
-    const status: ServerStatus = { state: 'running', port: SERVER_PORT, pid: managedProcess?.pid };
+    console.log(`[server-manager] Server is healthy on port ${port}`);
+    const status: ServerStatus = { state: 'running', port, pid: managedProcess?.pid };
     setStatus(status);
     return status;
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[server-manager] Start failed: ${message}`);
-    const status: ServerStatus = { state: 'error', port: SERVER_PORT, error: message };
+    const status: ServerStatus = { state: 'error', port, error: message };
     setStatus(status);
     return status;
   }
 }
 
-/**
- * Stop the server explicitly. Only called from the tray "Stop local server" action.
- */
 export async function stopServer(): Promise<void> {
-  // Try managed process first
   if (managedProcess && managedProcess.exitCode === null) {
     console.log('[server-manager] Stopping managed server...');
     await killProcess(managedProcess);
     managedProcess = null;
     removePidFile();
     removeLockFile();
-    setStatus({ state: 'stopped', port: SERVER_PORT });
+    setStatus({ state: 'stopped', port: activePort });
     return;
   }
 
-  // Fall back to PID file (detached from previous session)
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) {
     console.log(`[server-manager] Stopping detached server (PID ${pid})...`);
     try {
       process.kill(pid, 'SIGTERM');
-      // Give it a moment to shut down gracefully
       await new Promise<void>((resolve) => {
         let waited = 0;
         const interval = setInterval(() => {
@@ -335,18 +370,16 @@ export async function stopServer(): Promise<void> {
           }
         }, 200);
       });
-    } catch {
-      // Already gone
-    }
+    } catch { /* already gone */ }
     removePidFile();
     removeLockFile();
-    setStatus({ state: 'stopped', port: SERVER_PORT });
+    setStatus({ state: 'stopped', port: activePort });
     return;
   }
 
   removePidFile();
   removeLockFile();
-  setStatus({ state: 'stopped', port: SERVER_PORT });
+  setStatus({ state: 'stopped', port: activePort });
 }
 
 function killProcess(proc: ChildProcess): Promise<void> {
@@ -366,17 +399,11 @@ function killProcess(proc: ChildProcess): Promise<void> {
   });
 }
 
-/**
- * Get current server status.
- */
 export function getServerStatus(): ServerStatus {
   return { ...currentStatus };
 }
 
-/**
- * Restart: stop then start.
- */
-export async function restartServer(): Promise<ServerStatus> {
+export async function restartServer(config: ServerManagerConfig): Promise<ServerStatus> {
   await stopServer();
-  return startServer();
+  return startServer(config);
 }

@@ -47,5 +47,9 @@ server/*.log
 *.pyc
 .claude/worktrees/
 
+# CLI tool
+claw-cli/.venv/
+claw-cli/.pytest_cache/
+
 # Generated API client (Orval)
 src/app/generated/

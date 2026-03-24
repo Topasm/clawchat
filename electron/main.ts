@@ -1,37 +1,57 @@
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, Notification, nativeImage, shell, Tray } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import { ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { startServer, stopServer, getServerStatus, restartServer } from './server-manager';
+import type { ServerManagerConfig } from './server-manager';
 
 let mainWindow: BrowserWindow | null = null;
-let serverProcess: ChildProcess | null = null;
+let tray: Tray | null = null;
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const DIST = path.join(__dirname, '../dist');
-const SERVER_DIR = path.join(__dirname, '../server');
 
-// ── Server config (persisted to JSON) ─────────────────────────────────
+// ── App mode & config ────────────────────────────────────────────────
+
+type AppMode = 'client' | 'host';
 
 interface ServerConfig {
+  appMode: AppMode;
   port: number;
   pin: string;
   obsidianVaultPath: string;
+  hostServerUrl: string;
+  autoStartHost: boolean;
 }
 
 const CONFIG_PATH = path.join(app.getPath('userData'), 'server-config.json');
 
 function loadConfig(): ServerConfig {
-  const defaults: ServerConfig = { port: 8000, pin: '123456', obsidianVaultPath: '' };
+  const defaults: ServerConfig = {
+    appMode: 'client',
+    port: 8000,
+    pin: '123456',
+    obsidianVaultPath: '',
+    hostServerUrl: '',
+    autoStartHost: false,
+  };
   try {
     if (fs.existsSync(CONFIG_PATH)) {
-      return { ...defaults, ...JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) };
+      const saved = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+      const merged = { ...defaults, ...saved };
+      // Migration: existing users (had port/pin but no appMode) become hosts
+      if (!('appMode' in saved) && ('port' in saved || 'pin' in saved)) {
+        merged.appMode = 'host';
+        merged.autoStartHost = true;
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
+      }
+      return merged;
     }
   } catch { /* use defaults */ }
   return defaults;
 }
 
-function saveConfig(updates: Partial<ServerConfig>) {
+function saveConfig(updates: Partial<ServerConfig>): ServerConfig {
   const current = loadConfig();
   const merged = { ...current, ...updates };
   fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
@@ -39,136 +59,124 @@ function saveConfig(updates: Partial<ServerConfig>) {
   return merged;
 }
 
-// ── Server status ─────────────────────────────────────────────────────
-
-type ServerState = 'starting' | 'running' | 'stopped' | 'error';
-
-let serverStatus: { state: ServerState; port: number; pid?: number; error?: string } = {
-  state: 'stopped',
-  port: 8000,
-};
-
-function setServerStatus(state: ServerState, extra?: { pid?: number; error?: string }) {
-  serverStatus = { state, port: loadConfig().port, ...extra };
-  mainWindow?.webContents.send('server-status-change', serverStatus);
-}
-
-// ── Spawn the Python backend ──────────────────────────────────────────
-
-function findServerBinary(): string | null {
-  if (!app.isPackaged) return null;
-  const ext = process.platform === 'win32' ? '.exe' : '';
-  const binary = path.join(process.resourcesPath, 'server-bin', `clawchat-server${ext}`);
-  return fs.existsSync(binary) ? binary : null;
-}
-
-function findPython(): string {
-  const venvPython = process.platform === 'win32'
-    ? path.join(SERVER_DIR, 'venv', 'Scripts', 'python.exe')
-    : path.join(SERVER_DIR, 'venv', 'bin', 'python');
-  if (fs.existsSync(venvPython)) return venvPython;
-  return process.platform === 'win32' ? 'python' : 'python3';
-}
-
-function startServer() {
-  if (serverProcess) return; // already running
-
-  const config = loadConfig();
-  setServerStatus('starting');
-
-  // Build environment variables for the server
-  const envVars: Record<string, string> = {
-    ...process.env as Record<string, string>,
-    HOST: '0.0.0.0',
-    PORT: String(config.port),
-    PIN: config.pin,
+function getServerManagerConfig(config: ServerConfig): ServerManagerConfig {
+  return {
+    port: config.port,
+    pin: config.pin,
+    obsidianVaultPath: config.obsidianVaultPath,
   };
-
-  if (config.obsidianVaultPath) {
-    envVars.OBSIDIAN_VAULT_PATH = config.obsidianVaultPath;
-  }
-
-  // Auto-detect Obsidian CLI path if not explicitly set
-  if (!envVars.OBSIDIAN_CLI_COMMAND) {
-    const obsidianExe = process.platform === 'win32'
-      ? path.join(process.env.LOCALAPPDATA || '', 'Programs', 'obsidian', 'Obsidian.exe')
-      : process.platform === 'darwin'
-        ? '/Applications/Obsidian.app/Contents/MacOS/Obsidian'
-        : 'obsidian';
-    if (fs.existsSync(obsidianExe)) {
-      envVars.OBSIDIAN_CLI_COMMAND = obsidianExe;
-    }
-  }
-
-  // In packaged mode, use a writable data directory for DB + uploads
-  let cwd: string;
-  const binary = findServerBinary();
-
-  if (binary) {
-    // Packaged mode — data goes to user data dir, server is a standalone binary
-    const dataDir = path.join(app.getPath('userData'), 'server-data');
-    fs.mkdirSync(path.join(dataDir, 'data', 'uploads'), { recursive: true });
-    envVars.DATABASE_URL = `sqlite+aiosqlite:///${path.join(dataDir, 'data', 'clawchat.db')}`;
-    envVars.UPLOAD_DIR = path.join(dataDir, 'data', 'uploads');
-    cwd = dataDir;
-
-    serverProcess = spawn(binary, [], {
-      cwd,
-      env: envVars,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-  } else {
-    // Dev mode — use Python + uvicorn with source
-    const python = findPython();
-    cwd = SERVER_DIR;
-    const uvicornArgs = ['-m', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', String(config.port)];
-    if (VITE_DEV_SERVER_URL) uvicornArgs.push('--reload');
-
-    serverProcess = spawn(python, uvicornArgs, {
-      cwd,
-      env: envVars,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-  }
-
-  serverProcess.stdout?.on('data', (data: Buffer) => {
-    const text = data.toString();
-    console.log('[server]', text);
-    // uvicorn prints "Uvicorn running on ..." when ready
-    if (text.includes('Uvicorn running') || text.includes('Application startup complete')) {
-      setServerStatus('running', { pid: serverProcess?.pid });
-    }
-  });
-
-  serverProcess.stderr?.on('data', (data: Buffer) => {
-    const text = data.toString();
-    console.error('[server]', text);
-    // uvicorn often logs startup to stderr
-    if (text.includes('Uvicorn running') || text.includes('Application startup complete')) {
-      setServerStatus('running', { pid: serverProcess?.pid });
-    }
-  });
-
-  serverProcess.on('error', (err) => {
-    console.error('[server] Failed to start:', err.message);
-    setServerStatus('error', { error: err.message });
-    serverProcess = null;
-  });
-
-  serverProcess.on('exit', (code) => {
-    console.log('[server] Exited with code', code);
-    if (serverStatus.state !== 'error') {
-      setServerStatus('stopped');
-    }
-    serverProcess = null;
-  });
 }
 
-function stopServer() {
-  if (serverProcess) {
-    serverProcess.kill();
-    serverProcess = null;
-    setServerStatus('stopped');
+// ── System tray ──────────────────────────────────────────────────────
+
+function createTrayIcon(): Tray {
+  // Try to load icon from build resources, fall back to programmatic icon
+  const iconPath = path.join(__dirname, '../build/tray-icon.png');
+  let icon: Electron.NativeImage;
+  if (fs.existsSync(iconPath)) {
+    icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  } else {
+    // Programmatic 16x16 icon (simple filled circle)
+    const size = 16;
+    const canvas = Buffer.alloc(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = x - 7.5, dy = y - 7.5;
+        const inside = dx * dx + dy * dy <= 49; // radius ~7
+        const offset = (y * size + x) * 4;
+        canvas[offset] = inside ? 100 : 0;     // R
+        canvas[offset + 1] = inside ? 140 : 0; // G
+        canvas[offset + 2] = inside ? 255 : 0; // B
+        canvas[offset + 3] = inside ? 255 : 0; // A
+      }
+    }
+    icon = nativeImage.createFromBuffer(canvas, { width: size, height: size });
+  }
+  return new Tray(icon);
+}
+
+function setupTray() {
+  tray = createTrayIcon();
+  tray.setToolTip('ClawChat');
+
+  tray.on('click', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createWindow();
+    }
+  });
+
+  updateTrayMenu();
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const config = loadConfig();
+  const status = getServerStatus();
+
+  if (config.appMode === 'host') {
+    const stateLabel = status.state === 'running'
+      ? 'Host Running'
+      : status.state === 'starting'
+        ? 'Starting...'
+        : status.state === 'error'
+          ? 'Error'
+          : 'Stopped';
+
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: `ClawChat — ${stateLabel}`, enabled: false },
+      { type: 'separator' },
+      {
+        label: 'Show Window',
+        click: () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+            mainWindow.focus();
+          } else {
+            createWindow();
+          }
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Stop Server',
+        enabled: status.state === 'running' || status.state === 'starting',
+        click: async () => {
+          await stopServer();
+          updateTrayMenu();
+        },
+      },
+      {
+        label: 'Restart Server',
+        enabled: status.state !== 'starting',
+        click: async () => {
+          await restartServer(getServerManagerConfig(loadConfig()));
+          updateTrayMenu();
+        },
+      },
+      { type: 'separator' },
+      { label: 'Quit ClawChat', click: () => app.quit() },
+    ]));
+  } else {
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: 'ClawChat — Client', enabled: false },
+      { type: 'separator' },
+      {
+        label: 'Show Window',
+        click: () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+            mainWindow.focus();
+          } else {
+            createWindow();
+          }
+        },
+      },
+      { type: 'separator' },
+      { label: 'Quit', click: () => app.quit() },
+    ]));
   }
 }
 
@@ -213,14 +221,45 @@ ipcMain.on('set-badge-count', (_e, count: number) => {
 });
 
 // Server management IPC
-ipcMain.handle('server:getStatus', () => serverStatus);
+ipcMain.handle('server:getStatus', () => getServerStatus());
 ipcMain.handle('server:getConfig', () => loadConfig());
-ipcMain.handle('server:updateConfig', (_e, updates: Partial<ServerConfig>) => {
-  saveConfig(updates);
-  // Restart server with new config
-  stopServer();
-  startServer();
+
+ipcMain.handle('server:updateConfig', async (_e, updates: Partial<ServerConfig>) => {
+  const config = saveConfig(updates);
+
+  // Handle OS login auto-start
+  if ('autoStartHost' in updates) {
+    app.setLoginItemSettings({ openAtLogin: !!config.autoStartHost });
+  }
+
+  // Restart server if host mode and server-related config changed
+  if (config.appMode === 'host' && ('port' in updates || 'pin' in updates || 'obsidianVaultPath' in updates)) {
+    await restartServer(getServerManagerConfig(config));
+    updateTrayMenu();
+  }
+
+  return config;
 });
+
+ipcMain.handle('server:setAppMode', async (_e, mode: AppMode) => {
+  const config = saveConfig({ appMode: mode });
+
+  if (mode === 'host') {
+    await startServer(getServerManagerConfig(config));
+    if (config.autoStartHost) {
+      app.setLoginItemSettings({ openAtLogin: true });
+    }
+  } else {
+    await stopServer();
+    app.setLoginItemSettings({ openAtLogin: false });
+  }
+
+  updateTrayMenu();
+  return config;
+});
+
+ipcMain.handle('server:getAppMode', () => loadConfig().appMode);
+
 ipcMain.handle('server:getNetworkInfo', async () => {
   const { networkInterfaces } = await import('node:os');
   const nets = networkInterfaces();
@@ -234,10 +273,12 @@ ipcMain.handle('server:getNetworkInfo', async () => {
   }
   return { addresses };
 });
+
 ipcMain.handle('server:selectFolder', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   return result.canceled ? null : result.filePaths[0];
 });
+
 ipcMain.handle('server:openObsidianVault', () => {
   const config = loadConfig();
   if (config.obsidianVaultPath) {
@@ -271,10 +312,20 @@ function setupAutoUpdater() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createWindow();
-  startServer();
+  setupTray();
   setupAutoUpdater();
+
+  const config = loadConfig();
+
+  if (config.appMode === 'host') {
+    await startServer(getServerManagerConfig(config));
+    if (config.autoStartHost) {
+      app.setLoginItemSettings({ openAtLogin: true });
+    }
+    updateTrayMenu();
+  }
 
   // Global shortcut for quick capture (Cmd/Ctrl+Shift+Space)
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
@@ -292,13 +343,22 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  const config = loadConfig();
+  if (config.appMode === 'host') {
+    // Host mode: server keeps running, tray keeps process alive
+    // On macOS this is standard (app stays in dock). On Windows/Linux the tray keeps it.
+    return;
+  }
+  // Client mode: standard quit behavior
   if (process.platform !== 'darwin') {
-    stopServer();
     app.quit();
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   globalShortcut.unregisterAll();
-  stopServer();
+  const config = loadConfig();
+  if (config.appMode === 'host') {
+    await stopServer();
+  }
 });

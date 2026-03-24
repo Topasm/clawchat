@@ -9,6 +9,7 @@ import EventCard from '../shared/EventCard';
 import EmptyState from '../shared/EmptyState';
 import Badge from '../shared/Badge';
 import { SparkleIcon, ClipboardIcon, InboxTrayIcon, FlameIcon, CalendarIcon, CheckCircleIcon, SpinArrowsIcon } from '../shared/Icons';
+import { GearIcon } from '../shared/NavIcons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import type { BriefingData } from '../../hooks/useTodayBriefing';
@@ -62,25 +63,26 @@ export default function TodayView({
   return (
     <div>
       {/* Header */}
-      <div className="cc-page-header">
-        <div className="cc-page-header__title">{greeting || 'Hello'}</div>
-        <div className="cc-page-header__subtitle">
-          {todayDate ? formatDate(todayDate) : ''}
-          {!isMobile && totalTasks > 0 && ` \u00B7 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} for today`}
+      <div className="cc-page-header" style={isMobile ? { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 } : undefined}>
+        <div>
+          <div className="cc-page-header__title">{greeting || 'Hello'}</div>
+          <div className="cc-page-header__subtitle">
+            {todayDate ? formatDate(todayDate) : ''}
+            {!isMobile && totalTasks > 0 && ` \u00B7 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} for today`}
+          </div>
         </div>
+        {isMobile && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            onClick={() => navigate('/settings')}
+            aria-label="Open settings"
+            style={{ minWidth: 44, minHeight: 44, padding: 10 }}
+          >
+            <GearIcon />
+          </button>
+        )}
       </div>
-
-      {/* Mobile quick actions */}
-      {isMobile && (
-        <div className="cc-today-home-actions">
-          <button type="button" className="cc-btn cc-btn--primary" onClick={() => navigate('/chats')}>
-            Open Chat
-          </button>
-          <button type="button" className="cc-btn cc-btn--secondary" onClick={() => navigate('/inbox')}>
-            Inbox
-          </button>
-        </div>
-      )}
 
       {/* Progress bar */}
       {progress.total > 0 && (

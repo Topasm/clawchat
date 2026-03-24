@@ -1,13 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { SunIcon, ChatIcon, TasksIcon, InboxIcon, GearIcon } from './NavIcons';
+import { SunIcon, ChatIcon, InboxIcon } from './NavIcons';
 import { useModuleStore } from '../../stores/useModuleStore';
 
 export const mobileTabs = [
   { to: '/today', label: 'Today', Icon: SunIcon, primary: true },
   { to: '/inbox', label: 'Inbox', Icon: InboxIcon, primary: true, badge: true },
   { to: '/chats', label: 'Projects', Icon: ChatIcon, primary: true },
-  { to: '/tasks', label: 'Tasks', Icon: TasksIcon, primary: false },
-  { to: '/settings', label: 'More', Icon: GearIcon, primary: false },
 ];
 
 export default function BottomNav() {

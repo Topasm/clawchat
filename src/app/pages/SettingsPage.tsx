@@ -6,6 +6,7 @@ import { useSettingsStore } from '../stores/useSettingsStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
+import { useAppMode } from '../hooks/useAppMode';
 import apiClient from '../services/apiClient';
 import { openObsidianVault } from '../utils/openObsidian';
 import SettingsSection from '../components/shared/SettingsSection';
@@ -16,6 +17,7 @@ import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import { IS_CAPACITOR } from '../types/platform';
+import type { ServerStatus } from '../types/electron';
 
 interface AIProviderState {
   active_provider: string;
@@ -39,6 +41,46 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
   const [aiProviderSwitching, setAiProviderSwitching] = useState(false);
   const [claudeCodeChecking, setClaudeCodeChecking] = useState(false);
+  const { appMode, setAppMode: switchAppMode, isHost } = useAppMode();
+  const [hostServerStatus, setHostServerStatus] = useState<ServerStatus | null>(null);
+  const [autoStartHost, setAutoStartHost] = useState(false);
+
+  // Load host-mode specific state
+  useEffect(() => {
+    if (!isElectron) return;
+    window.electronAPI.server.getStatus().then(setHostServerStatus);
+    window.electronAPI.server.getConfig().then((cfg) => {
+      setAutoStartHost(cfg.autoStartHost);
+    });
+    const unsub = window.electronAPI.server.onStatusChange(setHostServerStatus);
+    return unsub;
+  }, [isElectron]);
+
+  const handleModeSwitch = useCallback(async (newMode: string) => {
+    if (newMode !== 'client' && newMode !== 'host') return;
+    if (newMode === appMode) return;
+
+    if (appMode === 'host' && newMode === 'client') {
+      const confirmed = window.confirm(
+        'Switching to client mode will stop the local server. Connected devices will be disconnected. Continue?'
+      );
+      if (!confirmed) return;
+    }
+
+    await switchAppMode(newMode);
+    addToast('success', newMode === 'host' ? 'Host mode enabled. Server starting...' : 'Switched to client mode.');
+
+    if (newMode === 'client') {
+      logout();
+      navigate('/login');
+    }
+  }, [appMode, switchAppMode, addToast, logout, navigate]);
+
+  const handleAutoStartToggle = useCallback(async (enabled: boolean) => {
+    await window.electronAPI.server.updateConfig({ autoStartHost: enabled });
+    setAutoStartHost(enabled);
+    addToast('success', enabled ? 'Server will start on login.' : 'Auto-start disabled.');
+  }, [addToast]);
 
   useEffect(() => {
     if (IS_CAPACITOR) {
@@ -130,6 +172,60 @@ export default function SettingsPage() {
       <div className="cc-page-header">
         <div className="cc-page-header__title">Settings</div>
       </div>
+
+      {isElectron && appMode && (
+        <SettingsSection title="Server Mode">
+          <SettingsRow label="App mode" sublabel={
+            isHost
+              ? 'Running as host — server is active on this machine'
+              : 'Running as client — connected to a remote host'
+          }>
+            <SegmentedControl
+              options={[
+                { label: 'Client', value: 'client' },
+                { label: 'Host', value: 'host' },
+              ]}
+              value={appMode}
+              onChange={handleModeSwitch}
+            />
+          </SettingsRow>
+
+          {isHost && hostServerStatus && (
+            <SettingsRow label="Server status" sublabel={`Port ${hostServerStatus.port}`}>
+              <span style={{
+                fontSize: 12,
+                color: hostServerStatus.state === 'running'
+                  ? 'var(--cc-success)'
+                  : hostServerStatus.state === 'error'
+                    ? 'var(--cc-error)'
+                    : 'var(--cc-text-secondary)',
+              }}>
+                {hostServerStatus.state === 'running' && 'Host Running'}
+                {hostServerStatus.state === 'starting' && 'Starting...'}
+                {hostServerStatus.state === 'stopped' && 'Stopped'}
+                {hostServerStatus.state === 'error' && (hostServerStatus.error || 'Error')}
+              </span>
+            </SettingsRow>
+          )}
+
+          {isHost && (
+            <SettingsRow label="Start on login" sublabel="Automatically start server when you log in to your computer">
+              <Toggle checked={autoStartHost} onChange={handleAutoStartToggle} />
+            </SettingsRow>
+          )}
+
+          {!isHost && (
+            <SettingsRow label="Host server" sublabel={serverUrl || 'Not configured'}>
+              <span style={{
+                fontSize: 12,
+                color: token ? 'var(--cc-success)' : 'var(--cc-text-tertiary)',
+              }}>
+                {token ? 'Connected' : 'Not connected'}
+              </span>
+            </SettingsRow>
+          )}
+        </SettingsSection>
+      )}
 
       <SettingsSection title="Essentials">
         <SettingsRow label="Theme">
@@ -312,7 +408,7 @@ export default function SettingsPage() {
 
       <ObsidianStatusCard />
 
-      {isElectron && (
+      {isElectron && isHost && (
         <SettingsSection title="Obsidian Desktop">
           <SettingsRow label="Vault path" sublabel={obsidianVaultPath || 'Not configured'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -373,7 +469,7 @@ export default function SettingsPage() {
           </SettingsRow>
         </SettingsSection>
       )}
-      {isElectron && token && (
+      {isElectron && isHost && token && (
         <SettingsSection title="Connect Mobile Device">
           <PairingCodeDisplay />
         </SettingsSection>
@@ -384,7 +480,7 @@ export default function SettingsPage() {
             <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
           </SettingsRow>
           <SettingsRow label="Logout">
-            <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/today'); }} style={{ fontSize: 12, padding: '4px 10px' }}>
+            <button className="cc-btn cc-btn--danger" onClick={() => { logout(); navigate('/login'); }} style={{ fontSize: 12, padding: '4px 10px' }}>
               Logout
             </button>
           </SettingsRow>
