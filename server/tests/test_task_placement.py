@@ -1,7 +1,6 @@
 """Atomic Inbox/Tree task placement coverage."""
 
 import pytest
-
 from exceptions import ConflictError, ValidationError
 from models.todo import Todo
 from services import graph_insights_service, project_service, task_placement_service
@@ -18,7 +17,9 @@ async def _project(db_session, title: str = "Project"):
 async def test_place_inbox_task_under_parent_and_undo(db_session):
     project = await _project(db_session)
     parent = Todo(title="Paper", project_id=project.id, sort_order=0)
-    existing = Todo(title="Existing", project_id=project.id, parent_id=None, sort_order=0)
+    existing = Todo(
+        title="Existing", project_id=project.id, parent_id=None, sort_order=0
+    )
     inbox = Todo(title="Figure", inbox_state="captured", sort_order=0)
     db_session.add_all([parent, existing, inbox])
     await db_session.commit()
@@ -220,7 +221,9 @@ async def test_rejects_parent_cycle_and_stale_revision(db_session):
 
 
 @pytest.mark.asyncio
-async def test_batch_placement_preserves_request_order_and_undoes_atomically(db_session):
+async def test_batch_placement_preserves_request_order_and_undoes_atomically(
+    db_session,
+):
     project = await _project(db_session)
     parent = Todo(title="Experiments", project_id=project.id)
     first = Todo(title="First Inbox", inbox_state="captured", sort_order=0)
@@ -332,7 +335,9 @@ async def test_placement_http_contract_and_undo(client, auth_headers, db_session
 
 
 @pytest.mark.asyncio
-async def test_batch_placement_http_contract_and_shared_undo(client, auth_headers, db_session):
+async def test_batch_placement_http_contract_and_shared_undo(
+    client, auth_headers, db_session
+):
     project = await _project(db_session)
     first = Todo(title="Batch one", inbox_state="captured")
     second = Todo(title="Batch two", inbox_state="captured")
@@ -367,3 +372,116 @@ async def test_batch_placement_http_contract_and_shared_undo(client, auth_header
     await db_session.refresh(second)
     assert first.project_id is None
     assert second.project_id is None
+
+
+@pytest.mark.asyncio
+async def test_grouped_placement_applies_multiple_destinations_with_one_undo(
+    client, auth_headers, db_session
+):
+    project = await _project(db_session)
+    paper = Todo(title="Paper", project_id=project.id)
+    experiments = Todo(title="Experiments", project_id=project.id)
+    first = Todo(title="Fix figure", inbox_state="captured")
+    second = Todo(title="Run ablation", inbox_state="captured")
+    db_session.add_all([paper, experiments, first, second])
+    await db_session.commit()
+    revision = await task_placement_service.current_graph_revision(db_session)
+
+    response = await client.post(
+        "/api/todos/placements/groups",
+        headers=auth_headers,
+        json={
+            "groups": [
+                {
+                    "todo_ids": [first.id],
+                    "project_id": project.id,
+                    "parent_id": paper.id,
+                    "inbox_state": "none",
+                },
+                {
+                    "todo_ids": [second.id],
+                    "project_id": project.id,
+                    "parent_id": experiments.id,
+                    "inbox_state": "none",
+                },
+            ],
+            "expected_graph_revision": revision,
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert [todo["id"] for todo in payload["todos"]] == [first.id, second.id]
+    assert payload["todos"][0]["parent_id"] == paper.id
+    assert payload["todos"][1]["parent_id"] == experiments.id
+
+    undone = await client.post(
+        f"/api/todos/placements/{payload['change_set_id']}/undo",
+        headers=auth_headers,
+    )
+    assert undone.status_code == 200, undone.text
+    await db_session.refresh(first)
+    await db_session.refresh(second)
+    assert first.project_id is second.project_id is None
+    assert first.parent_id is second.parent_id is None
+    assert first.inbox_state == second.inbox_state == "captured"
+
+    openapi = (await client.get("/openapi.json")).json()
+    assert "/api/todos/placements/groups" in openapi["paths"]
+
+
+@pytest.mark.asyncio
+async def test_grouped_placement_rolls_back_all_groups_when_later_group_fails(
+    client, auth_headers, db_session
+):
+    project = await _project(db_session)
+    inbox = Todo(title="Valid first group", inbox_state="captured")
+    db_session.add(inbox)
+    await db_session.commit()
+    inbox_id = inbox.id
+    revision = await task_placement_service.current_graph_revision(db_session)
+
+    response = await client.post(
+        "/api/todos/placements/groups",
+        headers=auth_headers,
+        json={
+            "groups": [
+                {
+                    "todo_ids": [inbox_id],
+                    "project_id": project.id,
+                    "parent_id": None,
+                    "inbox_state": "none",
+                },
+                {
+                    "todo_ids": ["todo_missing"],
+                    "project_id": project.id,
+                    "parent_id": None,
+                    "inbox_state": "none",
+                },
+            ],
+            "expected_graph_revision": revision,
+        },
+    )
+    assert response.status_code == 404, response.text
+    db_session.expire_all()
+    restored = await db_session.get(Todo, inbox_id)
+    assert restored is not None
+    assert restored.project_id is None
+    assert restored.parent_id is None
+    assert restored.inbox_state == "captured"
+    assert await task_placement_service.current_graph_revision(db_session) == revision
+
+
+@pytest.mark.asyncio
+async def test_grouped_placement_rejects_duplicate_membership(client, auth_headers):
+    response = await client.post(
+        "/api/todos/placements/groups",
+        headers=auth_headers,
+        json={
+            "groups": [
+                {"todo_ids": ["todo_1"], "project_id": None, "parent_id": None},
+                {"todo_ids": ["todo_1"], "project_id": None, "parent_id": None},
+            ],
+            "expected_graph_revision": 0,
+        },
+    )
+    assert response.status_code == 422

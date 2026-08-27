@@ -7,6 +7,7 @@ from exceptions import ConflictError, NotFoundError, ValidationError
 from models.project import Project
 from models.task_placement_change import TaskPlacementChange
 from models.todo import Todo
+from schemas.task_placement import TaskPlacementGroup
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,8 @@ from services.graph_command_service import (
     insight_delta,
     load_graph_insights,
 )
+
+__all__ = ["current_graph_revision"]
 
 
 def _state(todo: Todo) -> dict[str, object]:
@@ -100,11 +103,7 @@ async def place_tasks(
     if len(todo_ids) != len(set(todo_ids)):
         raise ValidationError("Task placement IDs must be unique")
     await claim_graph_revision(db, expected_graph_revision)
-    rows = list(
-        (
-            await db.execute(select(Todo).where(Todo.id.in_(todo_ids)))
-        ).scalars()
-    )
+    rows = list((await db.execute(select(Todo).where(Todo.id.in_(todo_ids)))).scalars())
     by_id = {todo.id: todo for todo in rows}
     missing = [todo_id for todo_id in todo_ids if todo_id not in by_id]
     if missing:
@@ -139,7 +138,9 @@ async def place_tasks(
         if parent is None:
             raise NotFoundError(f"Parent todo {effective_parent_id} not found")
         if parent.project_id != project_id:
-            raise ValidationError("Parent and task placement must belong to the same project")
+            raise ValidationError(
+                "Parent and task placement must belong to the same project"
+            )
 
     subtrees: dict[str, list[Todo]] = {}
     subtree_ids: set[str] = set()
@@ -167,8 +168,7 @@ async def place_tasks(
     old_scopes = {(todo.project_id, todo.parent_id) for todo in todos}
     selected_ids = set(todo_ids)
     scope_siblings = {
-        scope: await _siblings(db, *scope)
-        for scope in old_scopes | {target_scope}
+        scope: await _siblings(db, *scope) for scope in old_scopes | {target_scope}
     }
     target_items = [
         item for item in scope_siblings[target_scope] if item.id not in selected_ids
@@ -196,9 +196,7 @@ async def place_tasks(
         )
     for todo in todos:
         todo.parent_id = effective_parent_id
-        todo.inbox_state = inbox_state or (
-            "captured" if project_id is None else "none"
-        )
+        todo.inbox_state = inbox_state or ("captured" if project_id is None else "none")
         for item in subtrees[todo.id]:
             item.project_id = project_id
     _renumber(target_items)
@@ -251,6 +249,82 @@ async def place_task(
     return todos[0], change, affected_ids, delta
 
 
+async def place_task_groups(
+    db: AsyncSession,
+    *,
+    groups: list[TaskPlacementGroup],
+    expected_graph_revision: int,
+) -> tuple[list[Todo], TaskPlacementChange, list[str], dict[str, int | None] | None]:
+    """Apply multiple placement destinations as one revision-bound undo unit."""
+    if not groups:
+        raise ValidationError("At least one placement group is required")
+
+    todo_ids = [todo_id for group in groups for todo_id in group.todo_ids]
+    if len(todo_ids) != len(set(todo_ids)):
+        raise ValidationError("A task can appear in only one placement group")
+
+    before_insights = await load_graph_insights(
+        db,
+        generated_at=datetime.now(timezone.utc),
+    )
+    revision = expected_graph_revision
+    moved: list[Todo] = []
+    before_by_id: dict[str, dict[str, object]] = {}
+    after_by_id: dict[str, dict[str, object]] = {}
+    temporary_changes: list[TaskPlacementChange] = []
+
+    for group in groups:
+        group_todos, change, _, _ = await place_tasks(
+            db,
+            todo_ids=list(group.todo_ids),
+            project_id=group.project_id,
+            parent_id=group.parent_id,
+            before_id=group.before_id,
+            inbox_state=group.inbox_state,
+            expected_graph_revision=revision,
+        )
+        moved.extend(group_todos)
+        temporary_changes.append(change)
+        revision = change.applied_graph_revision
+        for state in json.loads(change.before_json):
+            before_by_id.setdefault(str(state["id"]), state)
+        for state in json.loads(change.after_json):
+            after_by_id[str(state["id"])] = state
+
+    for change in temporary_changes:
+        await db.delete(change)
+
+    before = [before_by_id[todo_id] for todo_id in sorted(before_by_id)]
+    after = [
+        after_by_id.get(todo_id, before_by_id[todo_id])
+        for todo_id in sorted(before_by_id)
+    ]
+    affected_ids = [
+        str(previous["id"])
+        for previous, current in zip(before, after, strict=True)
+        if previous != current
+    ]
+    after_insights = await load_graph_insights(
+        db,
+        generated_at=datetime.now(timezone.utc),
+    )
+    aggregate = TaskPlacementChange(
+        todo_id=moved[0].id,
+        base_graph_revision=expected_graph_revision,
+        applied_graph_revision=revision,
+        before_json=json.dumps(before, sort_keys=True),
+        after_json=json.dumps(after, sort_keys=True),
+    )
+    db.add(aggregate)
+    await db.flush()
+    return (
+        moved,
+        aggregate,
+        affected_ids,
+        insight_delta(before_insights, after_insights),
+    )
+
+
 async def undo_placement(
     db: AsyncSession,
     change_set_id: str,
@@ -272,7 +346,9 @@ async def undo_placement(
     by_id = {todo.id: todo for todo in rows}
     missing = sorted(set(ids) - set(by_id))
     if missing:
-        raise ConflictError(f"Cannot undo because tasks no longer exist: {', '.join(missing)}")
+        raise ConflictError(
+            f"Cannot undo because tasks no longer exist: {', '.join(missing)}"
+        )
 
     conflicts: list[str] = []
     placement_fields = ("project_id", "parent_id", "sort_order", "inbox_state")
@@ -291,7 +367,8 @@ async def undo_placement(
                 conflicts.append(f"{todo_id}.{field}")
     if conflicts:
         raise ConflictError(
-            "Cannot undo because placement fields changed later: " + ", ".join(conflicts)
+            "Cannot undo because placement fields changed later: "
+            + ", ".join(conflicts)
         )
 
     for state in before:

@@ -10,6 +10,7 @@ import {
   EventResponseSchema,
   AttachmentResponseSchema,
   TaskBatchPlacementResponseSchema,
+  InboxTriagePreviewResponseSchema,
   TaskPlacementResponseSchema,
 } from '../../types/schemas';
 import type {
@@ -23,6 +24,9 @@ import type {
   BulkTodoUpdate,
   TaskBatchPlacementRequest,
   TaskBatchPlacementResponse,
+  TaskGroupedPlacementRequest,
+  InboxTriagePreviewRequest,
+  InboxTriagePreviewResponse,
   TaskPlacementRequest,
   TaskPlacementResponse,
   ProjectResponse,
@@ -284,6 +288,32 @@ export function usePlaceTodosBatch() {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       void invalidateTaskDerivedQueries(queryClient);
+    },
+  });
+}
+
+export function usePlaceTodoGroups() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      placement: TaskGroupedPlacementRequest,
+    ): Promise<TaskBatchPlacementResponse> => {
+      const response = await apiClient.post('/todos/placements/groups', placement);
+      return TaskBatchPlacementResponseSchema.parse(response.data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      void invalidateTaskDerivedQueries(queryClient);
+    },
+  });
+}
+
+export function usePreviewInboxTriage() {
+  return useMutation({
+    mutationFn: async (request: InboxTriagePreviewRequest): Promise<InboxTriagePreviewResponse> => {
+      const response = await apiClient.post('/todos/placements/triage-preview', request);
+      return InboxTriagePreviewResponseSchema.parse(response.data);
     },
   });
 }

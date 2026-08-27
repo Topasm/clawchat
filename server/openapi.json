@@ -2831,6 +2831,114 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "InboxTriagePreviewRequest": {
+        "properties": {
+          "expected_graph_revision": {
+            "minimum": 0.0,
+            "title": "Expected Graph Revision",
+            "type": "integer"
+          },
+          "todo_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Todo Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "todo_ids",
+          "expected_graph_revision"
+        ],
+        "title": "InboxTriagePreviewRequest",
+        "type": "object"
+      },
+      "InboxTriagePreviewResponse": {
+        "properties": {
+          "base_graph_revision": {
+            "minimum": 0.0,
+            "title": "Base Graph Revision",
+            "type": "integer"
+          },
+          "model_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Provider"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/InboxTriageSuggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "unassigned_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unassigned Task Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_graph_revision",
+          "suggestions",
+          "unassigned_task_ids"
+        ],
+        "title": "InboxTriagePreviewResponse",
+        "type": "object"
+      },
+      "InboxTriageSuggestion": {
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "project_id",
+          "confidence",
+          "reason"
+        ],
+        "title": "InboxTriageSuggestion",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "pin": {
@@ -5924,6 +6032,103 @@
           "affected_task_ids"
         ],
         "title": "TaskDependencyPreviewResponse",
+        "type": "object"
+      },
+      "TaskGroupedPlacementRequest": {
+        "properties": {
+          "expected_graph_revision": {
+            "minimum": 0.0,
+            "title": "Expected Graph Revision",
+            "type": "integer"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/TaskPlacementGroup"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Groups",
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups",
+          "expected_graph_revision"
+        ],
+        "title": "TaskGroupedPlacementRequest",
+        "type": "object"
+      },
+      "TaskPlacementGroup": {
+        "properties": {
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "inbox_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "captured",
+                  "classifying",
+                  "questioning",
+                  "planning",
+                  "plan_ready",
+                  "error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inbox State"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "todo_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Todo Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "todo_ids",
+          "project_id",
+          "parent_id"
+        ],
+        "title": "TaskPlacementGroup",
         "type": "object"
       },
       "TaskPlacementInsightsDelta": {
@@ -11893,6 +12098,148 @@
           }
         ],
         "summary": "Place Todos Batch",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/placements/groups": {
+      "post": {
+        "operationId": "place_todo_groups_api_todos_placements_groups_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskGroupedPlacementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBatchPlacementResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Place Todo Groups",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/placements/triage-preview": {
+      "post": {
+        "operationId": "preview_inbox_triage_api_todos_placements_triage_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboxTriagePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxTriagePreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Inbox Triage",
         "tags": [
           "todos"
         ]

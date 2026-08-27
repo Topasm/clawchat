@@ -210,6 +210,13 @@ choose the same prerequisite from the Inspector. Confirming uses the preview's
 base graph revision, then invalidates relationships, Todos, graph insights, and
 Projects together.
 
+For batch organization, `AI suggest` requests a read-only placement preview for
+the selected queue items. The user can deselect individual recommendations and
+apply the rest. Recommendations with different Project/parent destinations are
+sent through one grouped placement mutation, producing one revision update and
+one Undo. A 409 response dismisses the stale preview and refreshes graph
+insights before another attempt.
+
 ### useToastStore
 
 ```typescript

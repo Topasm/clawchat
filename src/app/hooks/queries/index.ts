@@ -6,6 +6,8 @@ export {
   useUpdateTodo,
   usePlaceTodo,
   usePlaceTodosBatch,
+  usePlaceTodoGroups,
+  usePreviewInboxTriage,
   useUndoTodoPlacement,
   useDeleteTodo,
   useToggleTodoComplete,

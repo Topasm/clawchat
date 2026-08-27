@@ -7,7 +7,9 @@ import usePlatform from '../hooks/usePlatform';
 import {
   useDeleteTodo,
   usePlaceTodo,
+  usePlaceTodoGroups,
   usePlaceTodosBatch,
+  usePreviewInboxTriage,
   useCreateTaskDependency,
   usePreviewTaskDependency,
   useProjectsQuery,
@@ -22,7 +24,11 @@ import SectionHeader from '../components/shared/SectionHeader';
 import EmptyState from '../components/shared/EmptyState';
 import { InboxTrayIcon } from '../components/shared/Icons';
 import apiClient from '../services/apiClient';
-import type { TaskDependencyPreviewResponse, TodoResponse } from '../types/schemas';
+import type {
+  InboxTriagePreviewResponse,
+  TaskDependencyPreviewResponse,
+  TodoResponse,
+} from '../types/schemas';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
 import InboxTriageTree, {
   INBOX_DEPENDENCY_DRAG_TYPE,
@@ -138,6 +144,8 @@ export default function InboxPage() {
   const deleteMutation = useDeleteTodo();
   const placeMutation = usePlaceTodo();
   const placeBatchMutation = usePlaceTodosBatch();
+  const placeGroupsMutation = usePlaceTodoGroups();
+  const triagePreviewMutation = usePreviewInboxTriage();
   const undoPlacement = useUndoTodoPlacement();
   const previewDependency = usePreviewTaskDependency();
   const createDependency = useCreateTaskDependency();
@@ -147,6 +155,8 @@ export default function InboxPage() {
   const [dependencyPreview, setDependencyPreview] = useState<TaskDependencyPreviewResponse | null>(
     null,
   );
+  const [triagePreview, setTriagePreview] = useState<InboxTriagePreviewResponse | null>(null);
+  const [selectedTriageTaskIds, setSelectedTriageTaskIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (graphInsights.data) setPlacementRevision(graphInsights.data.graph_revision);
@@ -157,6 +167,13 @@ export default function InboxPage() {
       setDependencyPreview(null);
     }
   }, [dependencyPreview, selectedTaskId]);
+
+  useEffect(() => {
+    if (triagePreview && placementRevision !== triagePreview.base_graph_revision) {
+      setTriagePreview(null);
+      setSelectedTriageTaskIds([]);
+    }
+  }, [placementRevision, triagePreview]);
 
   const inboxData = useMemo(() => {
     const processing: TodoResponse[] = [];
@@ -346,6 +363,8 @@ export default function InboxPage() {
       addToast('warning', 'The current graph revision is still loading');
       return;
     }
+    setTriagePreview(null);
+    setSelectedTriageTaskIds([]);
     try {
       const moved = todos.find((todo) => todo.id === taskId);
       const nextInboxState =
@@ -415,6 +434,8 @@ export default function InboxPage() {
       addToast('warning', 'The current graph revision is still loading');
       return;
     }
+    setTriagePreview(null);
+    setSelectedTriageTaskIds([]);
     try {
       const result = await placeBatchMutation.mutateAsync({
         todo_ids: taskIds,
@@ -463,6 +484,102 @@ export default function InboxPage() {
         (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
           ?.message ?? 'Could not place these tasks';
       addToast('error', message);
+    }
+  };
+
+  const refreshPlacementRevision = async () => {
+    const refreshed = await graphInsights.refetch();
+    if (refreshed.data) setPlacementRevision(refreshed.data.graph_revision);
+  };
+
+  const triageErrorMessage = (error: unknown, fallback: string): string =>
+    (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
+      ?.message ?? fallback;
+
+  const handleTriagePreview = async () => {
+    if (placementRevision == null || batchTaskIds.length === 0) {
+      addToast('warning', 'Select Inbox tasks after the graph revision finishes loading');
+      return;
+    }
+    try {
+      const preview = await triagePreviewMutation.mutateAsync({
+        todo_ids: batchTaskIds,
+        expected_graph_revision: placementRevision,
+      });
+      setTriagePreview(preview);
+      setSelectedTriageTaskIds(preview.suggestions.map((suggestion) => suggestion.task_id));
+      if (preview.suggestions.length === 0) {
+        addToast('info', 'AI could not confidently place the selected tasks');
+      }
+    } catch (error) {
+      setTriagePreview(null);
+      setSelectedTriageTaskIds([]);
+      addToast('error', triageErrorMessage(error, 'Could not generate placement suggestions'));
+      if ((error as { response?: { status?: number } }).response?.status === 409) {
+        await refreshPlacementRevision();
+      }
+    }
+  };
+
+  const handleApplyTriagePreview = async () => {
+    if (!triagePreview) return;
+    const selected = new Set(selectedTriageTaskIds);
+    const suggestions = triagePreview.suggestions.filter((suggestion) =>
+      selected.has(suggestion.task_id),
+    );
+    if (suggestions.length === 0) {
+      addToast('warning', 'Select at least one suggestion to apply');
+      return;
+    }
+    const grouped = new Map<
+      string,
+      { todo_ids: string[]; project_id: string; parent_id: string | null; inbox_state: 'none' }
+    >();
+    for (const suggestion of suggestions) {
+      const key = `${suggestion.project_id}\u0000${suggestion.parent_id ?? ''}`;
+      const group = grouped.get(key) ?? {
+        todo_ids: [],
+        project_id: suggestion.project_id,
+        parent_id: suggestion.parent_id,
+        inbox_state: 'none' as const,
+      };
+      group.todo_ids.push(suggestion.task_id);
+      grouped.set(key, group);
+    }
+    try {
+      const result = await placeGroupsMutation.mutateAsync({
+        groups: Array.from(grouped.values()),
+        expected_graph_revision: triagePreview.base_graph_revision,
+      });
+      const appliedIds = new Set(suggestions.map((suggestion) => suggestion.task_id));
+      setPlacementRevision(result.graph_revision);
+      setSelectedInboxTaskIds((current) => current.filter((taskId) => !appliedIds.has(taskId)));
+      setTriagePreview(null);
+      setSelectedTriageTaskIds([]);
+      addToast('success', `Applied ${suggestions.length} AI placement suggestions`, {
+        duration: 6000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void undoPlacement
+              .mutateAsync(result.change_set_id)
+              .then((undone) => {
+                setPlacementRevision(undone.graph_revision);
+                addToast('info', 'AI placements reverted');
+              })
+              .catch((error: unknown) => {
+                addToast('error', triageErrorMessage(error, 'Could not undo AI placements'));
+              });
+          },
+        },
+      });
+    } catch (error) {
+      addToast('error', triageErrorMessage(error, 'Could not apply placement suggestions'));
+      if ((error as { response?: { status?: number } }).response?.status === 409) {
+        setTriagePreview(null);
+        setSelectedTriageTaskIds([]);
+        await refreshPlacementRevision();
+      }
     }
   };
 
@@ -621,6 +738,19 @@ export default function InboxPage() {
                 <div>
                   <button
                     type="button"
+                    className="cc-btn cc-btn--secondary"
+                    disabled={
+                      batchTaskIds.length === 0 ||
+                      placementRevision == null ||
+                      triagePreviewMutation.isPending ||
+                      placeGroupsMutation.isPending
+                    }
+                    onClick={() => void handleTriagePreview()}
+                  >
+                    {triagePreviewMutation.isPending ? 'Suggesting…' : 'AI suggest'}
+                  </button>
+                  <button
+                    type="button"
                     className="cc-btn cc-btn--ghost"
                     disabled={batchTaskIds.length === needsOrganising.length}
                     onClick={() => {
@@ -641,13 +771,86 @@ export default function InboxPage() {
                   )}
                 </div>
               </div>
+              {triagePreview && (
+                <div className="cc-inbox-triage__ai-preview" aria-live="polite">
+                  <div className="cc-inbox-triage__ai-preview-header">
+                    <div>
+                      <strong>AI placement preview</strong>
+                      <span>
+                        {triagePreview.suggestions.length} suggested
+                        {triagePreview.model_provider ? ` · ${triagePreview.model_provider}` : ''}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--ghost"
+                      onClick={() => {
+                        setTriagePreview(null);
+                        setSelectedTriageTaskIds([]);
+                      }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  {triagePreview.suggestions.map((suggestion) => {
+                    const project = projects.find((item) => item.id === suggestion.project_id);
+                    const parent = suggestion.parent_id ? todoById.get(suggestion.parent_id) : null;
+                    return (
+                      <label key={suggestion.task_id} className="cc-inbox-triage__ai-suggestion">
+                        <input
+                          type="checkbox"
+                          checked={selectedTriageTaskIds.includes(suggestion.task_id)}
+                          onChange={() =>
+                            setSelectedTriageTaskIds((current) =>
+                              current.includes(suggestion.task_id)
+                                ? current.filter((taskId) => taskId !== suggestion.task_id)
+                                : [...current, suggestion.task_id],
+                            )
+                          }
+                        />
+                        <span>
+                          <strong>
+                            {todoById.get(suggestion.task_id)?.title ?? suggestion.task_id}
+                          </strong>
+                          <small>
+                            → {project?.title ?? suggestion.project_id}
+                            {parent ? ` / ${parent.title}` : ' / Project root'} ·{' '}
+                            {Math.round(suggestion.confidence * 100)}%
+                          </small>
+                          <small>{suggestion.reason}</small>
+                        </span>
+                      </label>
+                    );
+                  })}
+                  {triagePreview.unassigned_task_ids.length > 0 && (
+                    <p>
+                      No confident location: {triagePreview.unassigned_task_ids.length} task
+                      {triagePreview.unassigned_task_ids.length === 1 ? '' : 's'}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn--primary"
+                    disabled={selectedTriageTaskIds.length === 0 || placeGroupsMutation.isPending}
+                    onClick={() => void handleApplyTriagePreview()}
+                  >
+                    {placeGroupsMutation.isPending
+                      ? 'Applying…'
+                      : `Apply selected (${selectedTriageTaskIds.length})`}
+                  </button>
+                </div>
+              )}
               {needsOrganising.map((task) => {
                 const isBatchSelected = batchTaskIds.includes(task.id);
                 return (
                   <div
                     key={task.id}
                     className={`cc-inbox-card${selectedTaskId === task.id ? ' cc-inbox-card--selected' : ''}${isBatchSelected ? ' cc-inbox-card--batch-selected' : ''}`}
-                    draggable={!placeMutation.isPending && !placeBatchMutation.isPending}
+                    draggable={
+                      !placeMutation.isPending &&
+                      !placeBatchMutation.isPending &&
+                      !placeGroupsMutation.isPending
+                    }
                     onDragStart={(event) => {
                       if (isBatchSelected && batchTaskIds.length > 1) {
                         event.dataTransfer.setData(
@@ -770,6 +973,8 @@ export default function InboxPage() {
               placementRevision == null ||
               placeMutation.isPending ||
               placeBatchMutation.isPending ||
+              placeGroupsMutation.isPending ||
+              triagePreviewMutation.isPending ||
               previewDependency.isPending ||
               createDependency.isPending
             }

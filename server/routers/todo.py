@@ -9,8 +9,8 @@ from domain.plan_proposal import PlanProposalStatus
 from domain.task import TaskStatus
 from exceptions import AppError, NotFoundError
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
-from models.agent_task import AgentTask
 from models.agent_run import AgentRun
+from models.agent_task import AgentTask
 from models.conversation import Conversation
 from models.plan_proposal import PlanProposal
 from models.project import Project
@@ -22,6 +22,7 @@ from schemas.common import (
     RequestValidationErrorResponse,
 )
 from schemas.graph_insights import GraphInsightsResponse
+from schemas.inbox_triage import InboxTriagePreviewRequest, InboxTriagePreviewResponse
 from schemas.task import (
     DelegateRequest,
     PlanApplyRequest,
@@ -35,6 +36,7 @@ from schemas.task import (
 from schemas.task_placement import (
     TaskBatchPlacementRequest,
     TaskBatchPlacementResponse,
+    TaskGroupedPlacementRequest,
     TaskPlacementRequest,
     TaskPlacementResponse,
 )
@@ -46,10 +48,11 @@ from schemas.todo import (
     TodoUpdate,
 )
 from services import (
-    graph_insights_service,
     agent_run_service,
     agent_task_service,
+    graph_insights_service,
     inbox_pipeline_service,
+    inbox_triage_service,
     paseo_execution_service,
     plan_proposal_service,
     task_placement_service,
@@ -67,8 +70,8 @@ from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import deserialize_tags, make_id, serialize_tags
 from utils.inbox_display import get_next_action
-from ws.notifications import notify_module_data_changed
 from ws.manager import ws_manager
+from ws.notifications import notify_module_data_changed
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -516,6 +519,79 @@ async def place_todos_batch(
             db,
             todo_ids=body.todo_ids,
             **body.model_dump(exclude={"todo_ids"}),
+        )
+    )
+    await db.commit()
+    for todo in todos:
+        await db.refresh(todo)
+    await notify_module_data_changed("todos")
+    return TaskBatchPlacementResponse(
+        todos=[await _enrich_todo_response(todo, db) for todo in todos],
+        graph_revision=change.applied_graph_revision,
+        affected_task_ids=affected_ids,
+        insights_delta=insights_delta,
+        change_set_id=change.id,
+    )
+
+
+@router.post(
+    "/placements/triage-preview",
+    response_model=InboxTriagePreviewResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
+async def preview_inbox_triage(
+    body: InboxTriagePreviewRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    ai_service = getattr(request.app.state, "active_ai", None) or getattr(
+        request.app.state,
+        "ai_service",
+        None,
+    )
+    if ai_service is None:
+        raise AppError(
+            code="AI_UNAVAILABLE",
+            message="No AI provider is configured",
+            status_code=503,
+        )
+    try:
+        return await inbox_triage_service.generate_preview(
+            db,
+            ai_service,
+            todo_ids=body.todo_ids,
+            expected_graph_revision=body.expected_graph_revision,
+            model_provider=getattr(request.app.state, "active_ai_provider", None),
+        )
+    except AppError:
+        raise
+    except Exception as exc:
+        logger.exception("AI Inbox triage preview failed")
+        raise AppError(
+            code="INBOX_TRIAGE_GENERATION_FAILED",
+            message="AI Inbox triage preview failed",
+            status_code=502,
+        ) from exc
+
+
+@router.post("/placements/groups", response_model=TaskBatchPlacementResponse)
+async def place_todo_groups(
+    body: TaskGroupedPlacementRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    todos, change, affected_ids, insights_delta = (
+        await task_placement_service.place_task_groups(
+            db,
+            groups=body.groups,
+            expected_graph_revision=body.expected_graph_revision,
         )
     )
     await db.commit()

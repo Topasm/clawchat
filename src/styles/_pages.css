@@ -2214,6 +2214,56 @@
   accent-color: var(--cc-primary);
 }
 
+.cc-inbox-triage__ai-preview {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 35%, var(--cc-border));
+  border-radius: var(--cc-radius-md);
+  background: color-mix(in srgb, var(--cc-primary) 4%, var(--cc-surface));
+}
+
+.cc-inbox-triage__ai-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cc-inbox-triage__ai-preview-header > div,
+.cc-inbox-triage__ai-suggestion > span {
+  display: grid;
+  gap: 2px;
+}
+
+.cc-inbox-triage__ai-preview-header span,
+.cc-inbox-triage__ai-preview p,
+.cc-inbox-triage__ai-suggestion small {
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+}
+
+.cc-inbox-triage__ai-suggestion {
+  display: flex;
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  cursor: pointer;
+}
+
+.cc-inbox-triage__ai-suggestion input {
+  margin-top: 2px;
+  accent-color: var(--cc-primary);
+}
+
+.cc-inbox-triage__ai-suggestion strong {
+  color: var(--cc-text);
+  font-size: 11px;
+}
+
 .cc-inbox-tree {
   overflow: hidden;
 }

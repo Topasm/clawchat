@@ -17,6 +17,7 @@ Active foundation work is tracked separately from release status:
 | Inbox task placement canvas | Yes | Backend/Web/OpenAPI/migration/revision/undo checks | No |
 | Inbox dependency connectors | Yes | Backend/Web/OpenAPI/revision/cycle/impact-preview checks | No |
 | Atomic Inbox batch triage | Yes | Backend/Web/OpenAPI/order/rollback/shared-undo checks | No |
+| AI Inbox triage preview | Yes | Backend/Web/OpenAPI/strict-ID/revision/grouped-apply/undo checks | No |
 
 ---
 
@@ -55,6 +56,7 @@ Active foundation work is tracked separately from release status:
 - [x] Separate dependency connector drag with mobile/keyboard prerequisite picker
 - [x] Revision-safe dependency impact preview with explainable cycle rejection
 - [x] Ordered Inbox multi-selection with atomic batch placement and shared Undo
+- [x] Revision-bound AI placement preview with selective, multi-destination atomic apply
 - [x] Demo data seeding (15 sample tasks across all columns)
 
 ### AI Chat

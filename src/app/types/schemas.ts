@@ -156,6 +156,39 @@ export const TaskBatchPlacementResponseSchema = z.object({
   change_set_id: z.string(),
 });
 
+export const TaskPlacementGroupSchema = z.object({
+  todo_ids: z.array(z.string().min(1)).min(1).max(100),
+  project_id: z.string().nullable(),
+  parent_id: z.string().nullable(),
+  before_id: z.string().nullable().optional(),
+  inbox_state: InboxStateSchema.nullable().optional(),
+});
+
+export const TaskGroupedPlacementRequestSchema = z.object({
+  groups: z.array(TaskPlacementGroupSchema).min(1).max(20),
+  expected_graph_revision: z.number().int().nonnegative(),
+});
+
+export const InboxTriagePreviewRequestSchema = z.object({
+  todo_ids: z.array(z.string().min(1)).min(1).max(50),
+  expected_graph_revision: z.number().int().nonnegative(),
+});
+
+export const InboxTriageSuggestionSchema = z.object({
+  task_id: z.string(),
+  project_id: z.string(),
+  parent_id: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+  reason: z.string().min(1).max(500),
+});
+
+export const InboxTriagePreviewResponseSchema = z.object({
+  base_graph_revision: z.number().int().nonnegative(),
+  suggestions: z.array(InboxTriageSuggestionSchema),
+  unassigned_task_ids: z.array(z.string()),
+  model_provider: z.string().nullable().optional(),
+});
+
 export const ProjectTodoResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -711,6 +744,11 @@ export type TaskPlacementRequest = z.infer<typeof TaskPlacementRequestSchema>;
 export type TaskPlacementResponse = z.infer<typeof TaskPlacementResponseSchema>;
 export type TaskBatchPlacementRequest = z.infer<typeof TaskBatchPlacementRequestSchema>;
 export type TaskBatchPlacementResponse = z.infer<typeof TaskBatchPlacementResponseSchema>;
+export type TaskPlacementGroup = z.infer<typeof TaskPlacementGroupSchema>;
+export type TaskGroupedPlacementRequest = z.infer<typeof TaskGroupedPlacementRequestSchema>;
+export type InboxTriagePreviewRequest = z.infer<typeof InboxTriagePreviewRequestSchema>;
+export type InboxTriageSuggestion = z.infer<typeof InboxTriageSuggestionSchema>;
+export type InboxTriagePreviewResponse = z.infer<typeof InboxTriagePreviewResponseSchema>;
 export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 export type ProjectResponse = z.infer<typeof ProjectResponseSchema>;

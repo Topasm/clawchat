@@ -8,7 +8,9 @@ import {
   useCreateTodo,
   useDeleteTodo,
   usePlaceTodo,
+  usePlaceTodoGroups,
   usePlaceTodosBatch,
+  usePreviewInboxTriage,
   useReorderTodos,
   useSetTaskStatus,
   useToggleTodoComplete,
@@ -296,6 +298,86 @@ describe('todo mutations', () => {
       inbox_state: 'none',
       expected_graph_revision: 6,
     });
+    expect(queryClient.getQueryState(queryKeys.todos)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.taskGraphInsightScope(null))?.isInvalidated).toBe(
+      true,
+    );
+  });
+
+  it('previews Inbox triage without invalidating task data', async () => {
+    apiMocks.post.mockResolvedValueOnce({
+      data: {
+        base_graph_revision: 6,
+        suggestions: [
+          {
+            task_id: 'task-1',
+            project_id: 'project-1',
+            parent_id: null,
+            confidence: 0.9,
+            reason: 'Matches the project goal',
+          },
+        ],
+        unassigned_task_ids: [],
+        model_provider: 'test',
+      },
+    });
+    const { queryClient, wrapper } = createHarness();
+    const { result } = renderHook(() => usePreviewInboxTriage(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        todo_ids: ['task-1'],
+        expected_graph_revision: 6,
+      });
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/todos/placements/triage-preview', {
+      todo_ids: ['task-1'],
+      expected_graph_revision: 6,
+    });
+    expect(queryClient.getQueryState(queryKeys.todos)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(false);
+  });
+
+  it('applies grouped placements and invalidates every placement consumer', async () => {
+    apiMocks.post.mockResolvedValueOnce({
+      data: {
+        todos: [
+          { ...todo, id: 'task-1', project_id: 'project-1', inbox_state: 'none' },
+          { ...todo, id: 'task-2', project_id: 'project-2', inbox_state: 'none' },
+        ],
+        graph_revision: 9,
+        affected_task_ids: ['task-1', 'task-2'],
+        insights_delta: null,
+        change_set_id: 'placement-groups-1',
+      },
+    });
+    const { queryClient, wrapper } = createHarness();
+    const { result } = renderHook(() => usePlaceTodoGroups(), { wrapper });
+    const request = {
+      groups: [
+        {
+          todo_ids: ['task-1'],
+          project_id: 'project-1',
+          parent_id: null,
+          inbox_state: 'none' as const,
+        },
+        {
+          todo_ids: ['task-2'],
+          project_id: 'project-2',
+          parent_id: 'parent-2',
+          inbox_state: 'none' as const,
+        },
+      ],
+      expected_graph_revision: 6,
+    };
+
+    await act(async () => {
+      await result.current.mutateAsync(request);
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/todos/placements/groups', request);
     expect(queryClient.getQueryState(queryKeys.todos)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(queryKeys.taskGraphInsightScope(null))?.isInvalidated).toBe(

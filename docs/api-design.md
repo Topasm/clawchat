@@ -824,6 +824,8 @@ Runs the inbox pipeline as a background task. Classifies the todo and suggests a
 ```text
 POST /api/todos/:id/placement
 POST /api/todos/placements/batch
+POST /api/todos/placements/triage-preview
+POST /api/todos/placements/groups
 POST /api/todos/placements/:change_set_id/undo
 ```
 
@@ -848,6 +850,17 @@ at the destination:
 It returns `todos` rather than `todo` and one shared `change_set_id`. Overlapping
 ancestor/descendant selections and any invalid member reject the whole command;
 the existing Undo endpoint restores the entire batch.
+
+AI triage preview is read-only and accepts selected Inbox Task IDs plus the
+current graph revision. It returns only validated existing Project/parent
+destinations, a confidence and explanation, and the IDs it could not place.
+The server rejects unknown IDs, duplicate Task suggestions, cross-Project
+parents, malformed model output, and revisions that change during generation.
+
+Selected recommendations are grouped by destination and sent once to
+`/placements/groups`. The server applies up to 20 destination groups in one
+transaction and returns one aggregate change set, so a failure rolls back every
+group and Undo restores the entire approved preview.
 
 ```json
 {
