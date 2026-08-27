@@ -66,7 +66,7 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Coroutines
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // AndroidX
     implementation("androidx.core:core-ktx:1.15.0")
@@ -75,5 +75,5 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.13")
     testImplementation("app.cash.turbine:turbine:1.2.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }
