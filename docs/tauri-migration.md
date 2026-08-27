@@ -235,7 +235,7 @@ Until real credentials are configured and the draft artifacts pass these checks,
   from feature code.
 - Rust core: 13 configuration, import/rollback, credential-key, health check, onedir resolution, and updater-policy tests pass.
 - Read-only migration auditor: 3 path, configuration, and SHA-256 comparison tests pass.
-- Web production build and renderer budgets pass. The current initial payload is 250.04 KiB raw / 82.90 KiB gzip; all JavaScript is 1.73 MiB against a 1.75 MiB ceiling.
+- Web production build and renderer budgets pass. The current initial payload is 258.87 KiB raw / 85.67 KiB gzip; all JavaScript is 1.84 MiB against a 1.89 MiB ceiling.
 - Production npm dependencies audit with zero known vulnerabilities, and 851 lockfile package
   licenses pass the reviewed allowlist.
 - Tauri preview CI passes on Linux x64, Windows x64, and macOS arm64; every installer is extracted

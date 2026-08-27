@@ -9,6 +9,7 @@ import {
   TodoResponseSchema,
   EventResponseSchema,
   AttachmentResponseSchema,
+  TaskPlacementResponseSchema,
 } from '../../types/schemas';
 import type {
   TodoResponse,
@@ -19,6 +20,9 @@ import type {
   EventUpdate,
   TaskStatus,
   BulkTodoUpdate,
+  TaskPlacementRequest,
+  TaskPlacementResponse,
+  ProjectResponse,
 } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { getTaskStatusLabel } from '../../utils/taskStatus';
@@ -149,6 +153,116 @@ export function useUpdateTodo() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      void invalidateTaskDerivedQueries(queryClient);
+    },
+  });
+}
+
+export function usePlaceTodo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      placement,
+    }: {
+      id: string;
+      placement: TaskPlacementRequest;
+    }): Promise<TaskPlacementResponse> => {
+      const response = await apiClient.post(`/todos/${id}/placement`, placement);
+      return TaskPlacementResponseSchema.parse(response.data);
+    },
+    onMutate: async ({ id, placement }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.todos });
+      const previous = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos);
+      const projects = queryClient.getQueryData<ProjectResponse[]>(queryKeys.projects);
+      const effectiveParentId =
+        placement.project_id && placement.parent_id === null
+          ? (projects?.find((project) => project.id === placement.project_id)?.root_task_id ?? null)
+          : placement.parent_id;
+      const descendants = new Set<string>([id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        (previous ?? []).forEach((todo) => {
+          if (todo.parent_id && descendants.has(todo.parent_id) && !descendants.has(todo.id)) {
+            descendants.add(todo.id);
+            changed = true;
+          }
+        });
+      }
+
+      const moved = previous?.find((todo) => todo.id === id);
+      const orderUpdates = new Map<string, number>();
+      const inScope = (todo: TodoResponse, projectId: string | null, parentId: string | null) =>
+        todo.source !== 'project_root' &&
+        (todo.project_id ?? null) === projectId &&
+        (todo.parent_id ?? null) === parentId;
+      const byOrder = (left: TodoResponse, right: TodoResponse) =>
+        (left.sort_order ?? 0) - (right.sort_order ?? 0) || left.id.localeCompare(right.id);
+      const renumber = (items: TodoResponse[]) =>
+        items.forEach((todo, index) => orderUpdates.set(todo.id, index * 10));
+
+      if (moved && previous) {
+        const oldScope = [moved.project_id ?? null, moved.parent_id ?? null] as const;
+        const newScope = [placement.project_id, effectiveParentId ?? null] as const;
+        const sameScope = oldScope[0] === newScope[0] && oldScope[1] === newScope[1];
+        if (!sameScope) {
+          renumber(
+            previous
+              .filter((todo) => todo.id !== id && inScope(todo, oldScope[0], oldScope[1]))
+              .sort(byOrder),
+          );
+        }
+        const target = previous
+          .filter((todo) => todo.id !== id && inScope(todo, newScope[0], newScope[1]))
+          .sort(byOrder);
+        const beforeIndex = placement.before_id
+          ? target.findIndex((todo) => todo.id === placement.before_id)
+          : -1;
+        target.splice(beforeIndex >= 0 ? beforeIndex : target.length, 0, moved);
+        renumber(target);
+      }
+
+      queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (current) =>
+        (current ?? []).map((todo) => {
+          if (!descendants.has(todo.id) && !orderUpdates.has(todo.id)) return todo;
+          return {
+            ...todo,
+            ...(descendants.has(todo.id) ? { project_id: placement.project_id } : {}),
+            ...(orderUpdates.has(todo.id) ? { sort_order: orderUpdates.get(todo.id) } : {}),
+            ...(todo.id === id
+              ? {
+                  parent_id: effectiveParentId,
+                  inbox_state:
+                    placement.inbox_state ?? (placement.project_id ? 'none' : 'captured'),
+                }
+              : {}),
+          };
+        }),
+      );
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.todos, context.previous);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      void invalidateTaskDerivedQueries(queryClient);
+    },
+  });
+}
+
+export function useUndoTodoPlacement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (changeSetId: string): Promise<TaskPlacementResponse> => {
+      const response = await apiClient.post(`/todos/placements/${changeSetId}/undo`);
+      return TaskPlacementResponseSchema.parse(response.data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       void invalidateTaskDerivedQueries(queryClient);
     },
   });

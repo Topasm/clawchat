@@ -24,7 +24,7 @@ src/
 │   │   └── useToastStore.ts          # Toast notification queue with auto-dismiss
 │   ├── pages/
 │   │   ├── TodayPage.tsx             # Dashboard: greeting, tasks, events, inbox count
-│   │   ├── InboxPage.tsx             # Unscheduled tasks (GTD inbox)
+│   │   ├── InboxPage.tsx             # Capture queue + Project/Work Tree triage canvas
 │   │   ├── ChatListPage.tsx          # Conversation history list
 │   │   ├── ChatPage.tsx              # Full-screen AI conversation
 │   │   ├── AllTasksPage.tsx          # Kanban board (renders KanbanBoard)
@@ -44,6 +44,8 @@ src/
 │   │   │   ├── KanbanColumn.tsx      # Droppable column with drag-over highlight
 │   │   │   ├── KanbanCard.tsx        # Draggable card wrapper (@hello-pangea/dnd)
 │   │   │   └── KanbanFilterBar.tsx   # Search, priority chips, tag dropdown, sort
+│   │   ├── inbox/
+│   │   │   └── InboxTriageTree.tsx   # Project/parent placement, sibling insertion, touch controls
 │   │   ├── chat-panel/
 │   │   │   ├── ChatPanel.tsx         # Collapsible bottom chat panel
 │   │   │   ├── ChatInput.tsx         # Textarea + send/stop buttons

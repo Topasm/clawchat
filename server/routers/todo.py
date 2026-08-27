@@ -32,6 +32,7 @@ from schemas.task import (
     PlanResponse,
     SkillResponse,
 )
+from schemas.task_placement import TaskPlacementRequest, TaskPlacementResponse
 from schemas.todo import (
     AnswerQuestionsRequest,
     ProjectTodoResponse,
@@ -46,6 +47,7 @@ from services import (
     inbox_pipeline_service,
     paseo_execution_service,
     plan_proposal_service,
+    task_placement_service,
     task_relationship_service,
     todo_service,
     vault_sync_service,
@@ -472,6 +474,56 @@ async def update_todo(
     if next_todo_id:
         resp.next_action = f"Next occurrence created: {next_todo_id}"
     return resp
+
+
+@router.post("/{todo_id}/placement", response_model=TaskPlacementResponse)
+async def place_todo(
+    todo_id: str,
+    body: TaskPlacementRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    todo, change, affected_ids, insights_delta = await task_placement_service.place_task(
+        db,
+        todo_id=todo_id,
+        **body.model_dump(),
+    )
+    await db.commit()
+    await db.refresh(todo)
+    await notify_module_data_changed("todos")
+    return TaskPlacementResponse(
+        todo=await _enrich_todo_response(todo, db),
+        graph_revision=change.applied_graph_revision,
+        affected_task_ids=affected_ids,
+        insights_delta=insights_delta,
+        change_set_id=change.id,
+    )
+
+
+@router.post(
+    "/placements/{change_set_id}/undo",
+    response_model=TaskPlacementResponse,
+)
+async def undo_todo_placement(
+    change_set_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    todo, change, affected_ids, insights_delta = await task_placement_service.undo_placement(
+        db,
+        change_set_id,
+    )
+    await db.commit()
+    await db.refresh(todo)
+    await notify_module_data_changed("todos")
+    return TaskPlacementResponse(
+        todo=await _enrich_todo_response(todo, db),
+        graph_revision=change.reverted_graph_revision or change.applied_graph_revision,
+        affected_task_ids=affected_ids,
+        insights_delta=insights_delta,
+        change_set_id=change.id,
+        reverted=True,
+    )
 
 
 @router.delete("/{todo_id}", status_code=204)

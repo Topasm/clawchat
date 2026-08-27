@@ -7,6 +7,8 @@ export type {
   TodoResponse,
   TodoCreate,
   TodoUpdate,
+  TaskPlacementRequest,
+  TaskPlacementResponse,
   TaskStatus,
   TaskRelationshipType,
   TaskRelationshipResponse,

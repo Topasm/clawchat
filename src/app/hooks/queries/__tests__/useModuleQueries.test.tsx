@@ -2,11 +2,12 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TodoResponse } from '../../../types/api';
+import type { ProjectResponse, TodoResponse } from '../../../types/api';
 import {
   useBulkUpdateTodos,
   useCreateTodo,
   useDeleteTodo,
+  usePlaceTodo,
   useReorderTodos,
   useSetTaskStatus,
   useToggleTodoComplete,
@@ -200,5 +201,62 @@ describe('todo mutations', () => {
       true,
     );
     expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
+  });
+
+  it('optimistically inserts a task before its target under the hidden project root', async () => {
+    const project: ProjectResponse = {
+      id: 'project-1',
+      title: 'Paper',
+      status: 'active',
+      root_task_id: 'root-1',
+      graph_revision: 4,
+      execution_workspace_isolation: 'local',
+      created_at: todo.created_at,
+      updated_at: todo.updated_at,
+      task_count: 3,
+      completed_task_count: 0,
+    };
+    const projectTasks: TodoResponse[] = ['First', 'Second', 'Third'].map((title, index) => ({
+      ...todo,
+      id: `task-${index + 1}`,
+      title,
+      project_id: project.id,
+      parent_id: project.root_task_id,
+      sort_order: index * 10,
+      inbox_state: 'none',
+    }));
+    const { queryClient, wrapper } = createHarness();
+    queryClient.setQueryData(queryKeys.projects, [project]);
+    queryClient.setQueryData(queryKeys.todos, projectTasks);
+    apiMocks.post.mockResolvedValueOnce({
+      data: {
+        todo: { ...projectTasks[2], sort_order: 10 },
+        graph_revision: 6,
+        affected_task_ids: ['task-2', 'task-3'],
+        insights_delta: null,
+        change_set_id: 'placement-1',
+        reverted: false,
+      },
+    });
+    const { result } = renderHook(() => usePlaceTodo(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        id: 'task-3',
+        placement: {
+          project_id: project.id,
+          parent_id: null,
+          before_id: 'task-2',
+          inbox_state: 'none',
+          expected_graph_revision: 4,
+        },
+      });
+    });
+
+    const reordered = queryClient
+      .getQueryData<TodoResponse[]>(queryKeys.todos)
+      ?.sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0));
+    expect(reordered?.map((task) => task.id)).toEqual(['task-1', 'task-3', 'task-2']);
+    expect(reordered?.[1].parent_id).toBe(project.root_task_id);
   });
 });

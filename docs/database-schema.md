@@ -15,6 +15,7 @@ messages            N──1 conversations
 todos               (standalone, linked via conversation_id)
 todos               N──1 todos (self-ref via parent_id for sub-tasks)
 todos               N──N todos (directed task_relationships)
+todos               1──N task_placement_changes (logical audit link)
 task_graph_states    1──N plan_proposals (revision snapshot, logical link)
 plan_proposals       1──0..1 change_sets
 plan_proposals       N──1 todos (root_task_id, SET NULL)
@@ -184,6 +185,26 @@ cycle check atomically at the database boundary, closing concurrent-write
 races. Existing JSON dependencies are validated and backfilled during upgrade;
 the JSON column is synchronized temporarily so supported older clients and
 downgrade retain dependency data.
+
+### `task_placement_changes`
+
+Stores the durable undo boundary for one atomic Project/hierarchy/order move.
+The Todo link is logical rather than a foreign key so placement history can
+remain inspectable if the Task is later deleted.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT | PRIMARY KEY | Placement change-set identifier |
+| `todo_id` | TEXT | NOT NULL | Task moved by the command |
+| `base_graph_revision` | INTEGER | NOT NULL, CHECK >= 0 | Client revision claimed before placement |
+| `applied_graph_revision` | INTEGER | NOT NULL, CHECK >= 0 | Revision after the atomic move |
+| `reverted_graph_revision` | INTEGER | NULLABLE, CHECK >= 0 | Revision after a successful Undo |
+| `before_json`, `after_json` | JSON text | NOT NULL | Project, parent, order, and Inbox snapshots for every affected Task |
+| `status` | TEXT | NOT NULL, CHECK | `applied` or `reverted` |
+| `created_at`, `reverted_at` | TIMESTAMP | Reverted nullable | Apply and Undo timestamps |
+
+Undo restores the complete before snapshot only if the global graph revision
+still equals `applied_graph_revision`.
 
 ### `data_migration_markers`
 

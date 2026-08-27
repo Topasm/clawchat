@@ -4,20 +4,20 @@
   "target": "Tauri Linux renderer (Safari 13 compatibility target)",
   "metrics": {
     "initialJavaScript.rawBytes": {
-      "baselineBytes": 263095,
+      "baselineBytes": 265080,
       "maxBytes": 271000
     },
     "initialJavaScript.gzipBytes": {
-      "baselineBytes": 87162,
+      "baselineBytes": 87720,
       "maxBytes": 90000
     },
     "allJavaScript.rawBytes": {
-      "baselineBytes": 1837054,
-      "maxBytes": 1896000
+      "baselineBytes": 1928007,
+      "maxBytes": 1986000
     },
     "allRendererFiles.rawBytes": {
-      "baselineBytes": 1978693,
-      "maxBytes": 2041000
+      "baselineBytes": 2094659,
+      "maxBytes": 2158000
     }
   }
 }

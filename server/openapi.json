@@ -5653,6 +5653,148 @@
         "title": "TableCounts",
         "type": "object"
       },
+      "TaskPlacementInsightsDelta": {
+        "properties": {
+          "blocked_count": {
+            "default": 0,
+            "title": "Blocked Count",
+            "type": "integer"
+          },
+          "critical_path_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Critical Path Minutes"
+          },
+          "ready_count": {
+            "default": 0,
+            "title": "Ready Count",
+            "type": "integer"
+          }
+        },
+        "title": "TaskPlacementInsightsDelta",
+        "type": "object"
+      },
+      "TaskPlacementRequest": {
+        "properties": {
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "expected_graph_revision": {
+            "minimum": 0.0,
+            "title": "Expected Graph Revision",
+            "type": "integer"
+          },
+          "inbox_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "captured",
+                  "classifying",
+                  "questioning",
+                  "planning",
+                  "plan_ready",
+                  "error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inbox State"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "project_id",
+          "parent_id",
+          "expected_graph_revision"
+        ],
+        "title": "TaskPlacementRequest",
+        "type": "object"
+      },
+      "TaskPlacementResponse": {
+        "properties": {
+          "affected_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Task Ids",
+            "type": "array"
+          },
+          "change_set_id": {
+            "title": "Change Set Id",
+            "type": "string"
+          },
+          "graph_revision": {
+            "minimum": 0.0,
+            "title": "Graph Revision",
+            "type": "integer"
+          },
+          "insights_delta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskPlacementInsightsDelta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reverted": {
+            "default": false,
+            "title": "Reverted",
+            "type": "boolean"
+          },
+          "todo": {
+            "$ref": "#/components/schemas/TodoResponse"
+          }
+        },
+        "required": [
+          "todo",
+          "graph_revision",
+          "affected_task_ids",
+          "change_set_id"
+        ],
+        "title": "TaskPlacementResponse",
+        "type": "object"
+      },
       "TaskRelationshipCreate": {
         "additionalProperties": false,
         "description": "Create one directed, typed task edge.",
@@ -11305,6 +11447,53 @@
         ]
       }
     },
+    "/api/todos/placements/{change_set_id}/undo": {
+      "post": {
+        "operationId": "undo_todo_placement_api_todos_placements__change_set_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_set_id",
+            "required": true,
+            "schema": {
+              "title": "Change Set Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPlacementResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Undo Todo Placement",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
     "/api/todos/projects": {
       "get": {
         "description": "List root todos that qualify as projects.\n\nA root todo is a project if it has subtasks, a linked conversation, or\nan explicit source (e.g. obsidian_project).  Simple inbox captures and\nstandalone tasks are excluded.",
@@ -11652,6 +11841,63 @@
           }
         ],
         "summary": "Organize Todo",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/{todo_id}/placement": {
+      "post": {
+        "operationId": "place_todo_api_todos__todo_id__placement_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "todo_id",
+            "required": true,
+            "schema": {
+              "title": "Todo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskPlacementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPlacementResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Place Todo",
         "tags": [
           "todos"
         ]

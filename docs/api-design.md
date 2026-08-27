@@ -798,6 +798,48 @@ Runs the inbox pipeline as a background task. Classifies the todo and suggests a
 }
 ```
 
+### Place in Project Tree
+
+```text
+POST /api/todos/:id/placement
+POST /api/todos/placements/:change_set_id/undo
+```
+
+Placement moves the existing Task; it never creates a copy. Project-root drops,
+parent drops, and sibling insertion are one atomic command guarded by the task
+graph revision.
+
+```json
+{
+  "project_id": "project_paper",
+  "parent_id": "todo_figures",
+  "before_id": null,
+  "inbox_state": "none",
+  "expected_graph_revision": 32
+}
+```
+
+```json
+{
+  "todo": { "id": "todo_figure3", "project_id": "project_paper" },
+  "graph_revision": 35,
+  "affected_task_ids": ["todo_figure3"],
+  "insights_delta": {
+    "ready_count": -1,
+    "blocked_count": 1,
+    "critical_path_minutes": 120
+  },
+  "change_set_id": "placement_123",
+  "reverted": false
+}
+```
+
+The server validates Project/parent consistency, prevents parent cycles, moves
+the full subtree to the new Project, and renumbers affected sibling groups in
+one transaction. A null parent in a Project is stored beneath that Project's
+hidden compatibility root so scoped Graph traversal remains complete. Undo
+fails closed after a later semantic Graph or placement-owned field change.
+
 ### Plan
 
 ```

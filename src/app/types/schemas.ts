@@ -113,6 +113,30 @@ export const TodoUpdateSchema = z.object({
   recurrence_end: z.string().nullable().optional(),
 });
 
+export const TaskPlacementRequestSchema = z.object({
+  project_id: z.string().nullable(),
+  parent_id: z.string().nullable(),
+  before_id: z.string().nullable().optional(),
+  inbox_state: InboxStateSchema.nullable().optional(),
+  expected_graph_revision: z.number().int().nonnegative(),
+});
+
+export const TaskPlacementResponseSchema = z.object({
+  todo: TodoResponseSchema,
+  graph_revision: z.number().int().nonnegative(),
+  affected_task_ids: z.array(z.string()),
+  insights_delta: z
+    .object({
+      ready_count: z.number().int(),
+      blocked_count: z.number().int(),
+      critical_path_minutes: z.number().int().nullable(),
+    })
+    .nullable()
+    .optional(),
+  change_set_id: z.string(),
+  reverted: z.boolean().optional(),
+});
+
 export const ProjectTodoResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -637,6 +661,8 @@ export type RefreshRequest = z.infer<typeof RefreshRequestSchema>;
 export type TodoResponse = z.infer<typeof TodoResponseSchema>;
 export type TodoCreate = z.infer<typeof TodoCreateSchema>;
 export type TodoUpdate = z.infer<typeof TodoUpdateSchema>;
+export type TaskPlacementRequest = z.infer<typeof TaskPlacementRequestSchema>;
+export type TaskPlacementResponse = z.infer<typeof TaskPlacementResponseSchema>;
 export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 export type ProjectResponse = z.infer<typeof ProjectResponseSchema>;

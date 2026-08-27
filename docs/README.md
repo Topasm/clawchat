@@ -23,12 +23,14 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 | [ADR 004: Task Relationships](./adr/004-task-relationship-model.md) | Direction, validation, migration, and compatibility policy for task edges |
 | [ADR 005: Versioned AI Plans](./adr/005-versioned-ai-plan-proposals.md) | Proposal identity, graph revisions, transactional apply, conservative undo, and Vault outbox policy |
 | [ADR 006: Execution Graph Insights](./adr/006-deterministic-execution-graph-insights.md) | Canonical Ready/Blocked semantics, critical path, deadline risk, scope, and graph health |
+| [ADR 011: Atomic Inbox Placement](./adr/011-atomic-inbox-task-placement.md) | Inbox-to-Tree placement semantics, graph-revision concurrency, subtree moves, and conservative undo |
 
 ## Key Features
 
 - **AI Chat with Streaming** — Real-time token-by-token AI response streaming using Server-Sent Events (SSE) with typing indicator and stop generation support
 - **Kanban Task Board** — Drag-and-drop kanban board (Todo / In Progress / Done / Cancelled) with server-persisted status, smooth animations, and filter/sort controls
 - **Task Graph** — Project hierarchy and execution-dependency views backed by parent/child links and normalized relationship edges
+- **Inbox Triage Canvas** — Place the same captured Task into a Project hierarchy, reorder siblings, return it to Inbox, and safely undo the atomic move
 - **Command Palette (Ctrl+K)** — Quick navigation and action launcher using cmdk, search across tasks, pages, and actions
 - **Keyboard Shortcuts** — Global and scoped hotkeys (?, N, /, Ctrl+Shift+C, G+T/I/C/A/S) using react-hotkeys-hook
 - **Toast Notifications** — User feedback on task moves, completions, and creation with auto-dismiss

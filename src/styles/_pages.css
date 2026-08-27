@@ -2132,6 +2132,264 @@
   transition: border-color 0.15s ease;
 }
 
+.cc-inbox-triage {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.35fr) minmax(210px, 0.7fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.cc-inbox-triage__queue,
+.cc-inbox-tree,
+.cc-inbox-triage__inspector {
+  min-width: 0;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  background: var(--cc-surface);
+}
+
+.cc-inbox-triage__queue {
+  padding: 10px;
+}
+
+.cc-inbox-triage__inbox-target {
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px dashed color-mix(in srgb, var(--cc-primary) 45%, var(--cc-border));
+  border-radius: var(--cc-radius-sm);
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  text-align: center;
+}
+
+.cc-inbox-triage__inbox-target:hover {
+  background: color-mix(in srgb, var(--cc-primary) 7%, transparent);
+  color: var(--cc-primary);
+}
+
+.cc-inbox-card[draggable='true'] {
+  cursor: grab;
+}
+
+.cc-inbox-card--selected {
+  outline: 2px solid color-mix(in srgb, var(--cc-primary) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.cc-inbox-tree {
+  overflow: hidden;
+}
+
+.cc-inbox-tree__header,
+.cc-inbox-tree__project-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cc-inbox-tree__header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-inbox-tree__header div,
+.cc-inbox-tree__project-target {
+  min-width: 0;
+}
+
+.cc-inbox-tree__header span,
+.cc-inbox-tree__project-target > span {
+  display: block;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
+.cc-inbox-tree__projects {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.cc-inbox-tree__project {
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+}
+
+.cc-inbox-tree__project-target {
+  padding: 10px;
+  background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
+}
+
+.cc-inbox-tree__project-target:has(button:hover),
+.cc-inbox-tree__project-target:hover {
+  background: color-mix(in srgb, var(--cc-primary) 13%, var(--cc-surface));
+}
+
+.cc-inbox-tree__project-target button,
+.cc-inbox-tree__place-button {
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  padding: 4px 7px;
+  background: var(--cc-primary);
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.cc-inbox-tree__placement-actions {
+  display: flex;
+  gap: 3px;
+  padding-right: 4px;
+}
+
+.cc-inbox-tree__nodes {
+  padding: 5px 8px 8px;
+}
+
+.cc-inbox-tree__insert {
+  height: 10px;
+  border-radius: var(--cc-radius-pill);
+}
+
+.cc-inbox-tree__insert:hover {
+  background: var(--cc-primary);
+}
+
+.cc-inbox-tree__node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--cc-radius-sm);
+}
+
+.cc-inbox-tree__node:hover {
+  border-color: color-mix(in srgb, var(--cc-primary) 42%, var(--cc-border));
+  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
+}
+
+.cc-inbox-tree__node--selected {
+  border-color: var(--cc-primary);
+}
+
+.cc-inbox-tree__node > button:first-child {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 0;
+  padding: 6px;
+  background: transparent;
+  color: var(--cc-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-inbox-tree__node strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-inbox-tree__node small {
+  color: var(--cc-text-tertiary);
+  font-size: 9px;
+}
+
+.cc-inbox-tree__empty {
+  display: block;
+  padding: 12px;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
+.cc-inbox-triage__inspector {
+  position: sticky;
+  top: 12px;
+  padding: 14px;
+}
+
+.cc-inbox-triage__inspector > span {
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cc-inbox-triage__inspector h2 {
+  margin: 6px 0 14px;
+  font-size: 16px;
+}
+
+.cc-inbox-triage__inspector dl {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.cc-inbox-triage__inspector dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cc-inbox-triage__inspector dt {
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
+.cc-inbox-triage__inspector dd {
+  margin: 0;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.cc-inbox-triage__impact {
+  padding: 9px;
+  border-radius: var(--cc-radius-sm);
+  background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cc-inbox-triage__mobile-tree {
+  margin-top: 12px;
+}
+
+@media (max-width: 1100px) {
+  .cc-inbox-triage {
+    grid-template-columns: minmax(240px, 0.9fr) minmax(340px, 1.1fr);
+  }
+
+  .cc-inbox-triage__inspector {
+    position: static;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .cc-inbox-triage {
+    display: block;
+  }
+
+  .cc-inbox-triage__queue {
+    border: 0;
+    padding: 0;
+  }
+
+  .cc-inbox-triage__inspector {
+    margin-top: 12px;
+  }
+}
+
 .cc-inbox-card--planning {
   display: flex;
   align-items: center;

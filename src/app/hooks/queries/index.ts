@@ -4,6 +4,8 @@ export {
   useEventsQuery,
   useCreateTodo,
   useUpdateTodo,
+  usePlaceTodo,
+  useUndoTodoPlacement,
   useDeleteTodo,
   useToggleTodoComplete,
   useSetTaskStatus,

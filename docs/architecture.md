@@ -139,6 +139,16 @@ Inbox pipeline (new todos):
                     ▼                      ▼              ▼
               Create subtasks      Research report    Execute + update
               Export to vault      Export to vault    Export to vault
+
+Inbox placement (same Task identity):
+    Capture → select or drag → Project / parent / sibling position
+                                 │
+                                 ▼
+                      revision-guarded transaction
+                                 │
+                ┌────────────────┼────────────────┐
+                ▼                ▼                ▼
+          Tree/List/Kanban   Graph insights   conservative Undo
 ```
 
 ## CSS Architecture

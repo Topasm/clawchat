@@ -14,6 +14,7 @@ Active foundation work is tracked separately from release status:
 | Unified Review Inbox and Artifacts | Yes | Backend/Web/OpenAPI/version-lifecycle checks | No |
 | AgentTask / AgentRun lifecycle | Yes | Backend/Web/cancellation/retry/restart/migration checks | No |
 | Paseo execution provider | Yes | CLI contract/provider routing/reconnect/cancel/artifact/review checks | No |
+| Inbox task placement canvas | Yes | Backend/Web/OpenAPI/migration/revision/undo checks | No |
 
 ---
 
@@ -46,6 +47,9 @@ Active foundation work is tracked separately from release status:
 - [x] Task detail editing (title, priority, due date, tags, description)
 - [x] Today dashboard with greeting, task sections, overdue items
 - [x] Inbox page for unscheduled tasks
+- [x] Inbox triage split view with Project/Work Tree placement
+- [x] Atomic Project/parent/sibling placement with graph-revision conflict detection
+- [x] Conservative server-side placement Undo and touch-friendly placement controls
 - [x] Demo data seeding (15 sample tasks across all columns)
 
 ### AI Chat
