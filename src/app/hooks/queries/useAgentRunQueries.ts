@@ -43,6 +43,7 @@ function invalidateRuns(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: queryKeys.runs });
   queryClient.invalidateQueries({ queryKey: queryKeys.projects });
   queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
+  queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
 }
 
 export function useCancelAgentRun() {

@@ -19,6 +19,7 @@ Active foundation work is tracked separately from release status:
 | Atomic Inbox batch triage              | Yes         | Backend/Web/OpenAPI/order/rollback/shared-undo checks                 | No       |
 | AI Inbox triage preview                | Yes         | Backend/Web/OpenAPI/strict-ID/revision/grouped-apply/undo checks      | No       |
 | AI-proposed Inbox Workstreams          | Yes         | Backend/Web/proposal-reference/rollback/creation-aware-undo checks    | No       |
+| Task execution telemetry overlay       | Yes         | Backend/Web/OpenAPI/project-scope/realtime invalidation checks        | No       |
 
 ---
 
@@ -62,6 +63,7 @@ Active foundation work is tracked separately from release status:
 - [x] Ordered Inbox multi-selection with atomic batch placement and shared Undo
 - [x] Revision-bound AI placement preview with selective, multi-destination atomic apply
 - [x] Dashed AI Workstream proposals with atomic creation, Task placement, and shared Undo
+- [x] Task-level Agent Run, pending Review, and Artifact overlays in the Inbox Tree and Inspector
 - [x] Demo data seeding (15 sample tasks across all columns)
 
 ### AI Chat

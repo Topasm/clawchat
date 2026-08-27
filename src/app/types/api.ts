@@ -50,6 +50,7 @@ export type {
   AgentRunStatus,
   AgentRunResponse,
   AgentRunEventResponse,
+  TaskExecutionTelemetryResponse,
   ExecutionProviderStatus,
   EventResponse,
   EventCreate,

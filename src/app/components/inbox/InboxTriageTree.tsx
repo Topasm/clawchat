@@ -1,4 +1,9 @@
-import type { ProjectResponse, TodoResponse } from '../../types/api';
+import type {
+  ProjectResponse,
+  TaskExecutionTelemetryResponse,
+  TodoResponse,
+} from '../../types/api';
+import { getTaskExecutionBadges } from '../../utils/taskExecutionTelemetry';
 
 export const INBOX_TASK_DRAG_TYPE = 'application/x-clawchat-task-id';
 export const INBOX_TASK_BATCH_DRAG_TYPE = 'application/x-clawchat-task-batch';
@@ -9,6 +14,7 @@ interface InboxTriageTreeProps {
   todos: TodoResponse[];
   selectedTaskId: string | null;
   batchTaskIds: string[];
+  telemetryByTaskId?: ReadonlyMap<string, TaskExecutionTelemetryResponse>;
   disabled: boolean;
   onSelectTask: (taskId: string) => void;
   onPlace: (taskId: string, projectId: string, parentId: string | null, beforeId?: string) => void;
@@ -71,6 +77,7 @@ export default function InboxTriageTree({
   todos,
   selectedTaskId,
   batchTaskIds,
+  telemetryByTaskId = new Map(),
   disabled,
   onSelectTask,
   onPlace,
@@ -164,6 +171,7 @@ export default function InboxTriageTree({
                       depth={0}
                       selectedTaskId={selectedTaskId}
                       batchTaskIds={batchTaskIds}
+                      telemetryByTaskId={telemetryByTaskId}
                       disabled={disabled}
                       onSelectTask={onSelectTask}
                       onPlace={onPlace}
@@ -191,6 +199,7 @@ function TreeNode({
   depth,
   selectedTaskId,
   batchTaskIds,
+  telemetryByTaskId,
   disabled,
   onSelectTask,
   onPlace,
@@ -203,6 +212,7 @@ function TreeNode({
   depth: number;
   selectedTaskId: string | null;
   batchTaskIds: string[];
+  telemetryByTaskId: ReadonlyMap<string, TaskExecutionTelemetryResponse>;
   disabled: boolean;
   onSelectTask: (taskId: string) => void;
   onPlace: (taskId: string, projectId: string, parentId: string | null, beforeId?: string) => void;
@@ -215,6 +225,7 @@ function TreeNode({
   onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
 }) {
   const children = sorted(childrenByParent.get(task.id) ?? []);
+  const executionBadges = getTaskExecutionBadges(telemetryByTaskId.get(task.id));
   return (
     <div className="cc-inbox-tree__branch">
       <div
@@ -258,7 +269,22 @@ function TreeNode({
       >
         <button type="button" onClick={() => onSelectTask(task.id)}>
           <span>{children.length ? '▾' : '•'}</span>
-          <strong>{task.title}</strong>
+          <span className="cc-inbox-tree__identity">
+            <strong>{task.title}</strong>
+            {executionBadges.length > 0 && (
+              <span className="cc-inbox-tree__telemetry" aria-label="Execution activity">
+                {executionBadges.map((badge) => (
+                  <span
+                    key={badge.key}
+                    className="cc-inbox-tree__telemetry-badge"
+                    data-tone={badge.tone}
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </span>
+            )}
+          </span>
           <small>{task.status.replace('_', ' ')}</small>
         </button>
         <button
@@ -356,6 +382,7 @@ function TreeNode({
           depth={depth + 1}
           selectedTaskId={selectedTaskId}
           batchTaskIds={batchTaskIds}
+          telemetryByTaskId={telemetryByTaskId}
           disabled={disabled}
           onSelectTask={onSelectTask}
           onPlace={onPlace}

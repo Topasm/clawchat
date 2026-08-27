@@ -224,6 +224,13 @@ adapter keeps existing destinations and proposed containers in one ordered
 grouped command; no temporary Todo is inserted into the query cache before
 server approval.
 
+Execution data stays an overlay rather than becoming Tree structure. The
+`useTaskExecutionTelemetryQuery` hook loads one sparse Task projection and the
+pure `getTaskExecutionBadges` adapter applies display precedence for active
+Runs, input/review waits, failures, and Artifacts. Run, Review, and Artifact
+WebSocket changes invalidate the projection; polling is enabled only while an
+Agent is actively executing.
+
 ### useToastStore
 
 ```typescript

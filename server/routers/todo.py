@@ -40,6 +40,7 @@ from schemas.task_placement import (
     TaskPlacementRequest,
     TaskPlacementResponse,
 )
+from schemas.task_execution_telemetry import TaskExecutionTelemetryResponse
 from schemas.todo import (
     AnswerQuestionsRequest,
     ProjectTodoResponse,
@@ -56,6 +57,7 @@ from services import (
     paseo_execution_service,
     plan_proposal_service,
     task_placement_service,
+    task_execution_telemetry_service,
     task_relationship_service,
     todo_service,
     vault_sync_service,
@@ -170,6 +172,21 @@ async def _enrich_todo_response(
             resp.plan_summary = payload.get("summary")
 
     return resp
+
+
+@router.get(
+    "/execution-telemetry",
+    response_model=list[TaskExecutionTelemetryResponse],
+)
+async def list_task_execution_telemetry(
+    project_id: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Return sparse task-level run, review, and artifact telemetry."""
+    return await task_execution_telemetry_service.list_task_execution_telemetry(
+        db, project_id=project_id
+    )
 
 
 @router.get("/projects", response_model=list[ProjectTodoResponse])

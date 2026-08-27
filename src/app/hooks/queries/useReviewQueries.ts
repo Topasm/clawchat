@@ -47,6 +47,7 @@ export function useDecideReview() {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.runs });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
       useToastStore.getState().addToast('success', 'Review decision saved');
     },
     onError: () => useToastStore.getState().addToast('error', 'Could not save review decision'),
@@ -74,6 +75,7 @@ export function useCreateArtifact(projectId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.artifacts(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
       useToastStore.getState().addToast('success', 'Artifact created');
     },
     onError: () => useToastStore.getState().addToast('error', 'Could not create artifact'),
@@ -102,6 +104,7 @@ export function useProposeArtifactRevision(projectId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.artifacts(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
       useToastStore.getState().addToast('success', 'Revision sent to review');
     },
     onError: () => useToastStore.getState().addToast('error', 'Could not propose revision'),

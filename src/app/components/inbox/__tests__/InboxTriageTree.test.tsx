@@ -30,6 +30,47 @@ const task: TodoResponse = {
 };
 
 describe('InboxTriageTree', () => {
+  it('renders task execution and artifact telemetry as compact overlays', () => {
+    render(
+      <InboxTriageTree
+        projects={[project]}
+        todos={[task]}
+        selectedTaskId={null}
+        batchTaskIds={[]}
+        telemetryByTaskId={
+          new Map([
+            [
+              task.id,
+              {
+                task_id: task.id,
+                latest_run_id: 'run-1',
+                latest_run_status: 'running',
+                latest_run_progress: 42,
+                latest_run_provider: 'openclaw',
+                latest_run_progress_message: 'Building report',
+                latest_run_updated_at: '2026-08-27T00:00:00Z',
+                pending_review_count: 0,
+                artifact_count: 2,
+                latest_artifact_id: 'artifact-2',
+                latest_artifact_title: 'Report',
+                latest_artifact_type: 'report',
+                latest_artifact_updated_at: '2026-08-27T00:00:00Z',
+              },
+            ],
+          ])
+        }
+        disabled={false}
+        onSelectTask={vi.fn()}
+        onPlace={vi.fn()}
+        onPlaceBatch={vi.fn()}
+        onPreviewDependency={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Agent 42%')).toBeInTheDocument();
+    expect(screen.getByText('2 artifacts')).toBeInTheDocument();
+  });
+
   it('places the selected Inbox task at the project root', () => {
     const onPlace = vi.fn();
     render(

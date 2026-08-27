@@ -28,13 +28,14 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 | [ADR 013: Atomic Batch Inbox Placement](./adr/013-atomic-batch-inbox-placement.md)             | Ordered multi-selection, all-or-nothing placement, shared impact, and one-step Undo                       |
 | [ADR 014: AI Inbox Triage Preview](./adr/014-ai-inbox-triage-preview.md)                       | Strict existing-location recommendations, revision-safe approval, grouped atomic apply, and shared Undo   |
 | [ADR 015: AI-Proposed Workstreams](./adr/015-ai-proposed-workstreams.md)                       | Dashed structural proposals, preview-local references, atomic creation/placement, and creation-aware Undo |
+| [ADR 016: Task Execution Telemetry](./adr/016-task-execution-telemetry-overlay.md)             | Derived Task-level Run, Review, and Artifact overlays without duplicating canonical execution state       |
 
 ## Key Features
 
 - **AI Chat with Streaming** — Real-time token-by-token AI response streaming using Server-Sent Events (SSE) with typing indicator and stop generation support
 - **Kanban Task Board** — Drag-and-drop kanban board (Todo / In Progress / Done / Cancelled) with server-persisted status, smooth animations, and filter/sort controls
 - **Task Graph** — Project hierarchy and execution-dependency views backed by parent/child links and normalized relationship edges
-- **Inbox Triage Canvas** — Place one or many captured Tasks into a Project hierarchy, preview and approve AI location suggestions, connect dependencies, and safely undo atomic moves
+- **Inbox Triage Canvas** — Place captured Tasks into a Project hierarchy, approve AI suggestions, connect dependencies, and inspect live Run, Review, and Artifact overlays
 - **Command Palette (Ctrl+K)** — Quick navigation and action launcher using cmdk, search across tasks, pages, and actions
 - **Keyboard Shortcuts** — Global and scoped hotkeys (?, N, /, Ctrl+Shift+C, G+T/I/C/A/S) using react-hotkeys-hook
 - **Toast Notifications** — User feedback on task moves, completions, and creation with auto-dismiss

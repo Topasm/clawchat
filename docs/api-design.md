@@ -184,12 +184,18 @@ Edit a message's content. Returns the updated `MessageResponse`.
 
 ```
 GET    /api/todos                  # List todos (filterable by status, priority, due date)
+GET    /api/todos/execution-telemetry # Sparse Task-level Run, Review, and Artifact projection
 POST   /api/todos                  # Create a todo
 PATCH  /api/todos/bulk             # Update or delete multiple todos
 GET    /api/todos/:id              # Get a specific todo
 PATCH  /api/todos/:id              # Update a todo (status, title, etc.)
 DELETE /api/todos/:id              # Delete a todo
 ```
+
+`GET /api/todos/execution-telemetry` accepts an optional `project_id` and
+returns only Tasks that have a linked Run, pending Review, or Artifact. It is a
+derived read model: Task ownership is resolved from the current Todo row, and
+no telemetry value is persisted back onto the Todo.
 
 `status` is the server-owned task lifecycle enum:
 

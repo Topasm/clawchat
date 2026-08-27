@@ -14,6 +14,7 @@ import {
   usePreviewTaskDependency,
   useProjectsQuery,
   useTaskGraphInsightsQuery,
+  useTaskExecutionTelemetryQuery,
   useTodosQuery,
   useToggleTodoComplete,
   useUndoTodoPlacement,
@@ -36,6 +37,7 @@ import InboxTriageTree, {
   INBOX_TASK_BATCH_DRAG_TYPE,
   INBOX_TASK_DRAG_TYPE,
 } from '../components/inbox/InboxTriageTree';
+import { getTaskExecutionBadges } from '../utils/taskExecutionTelemetry';
 
 function transferHasType(event: React.DragEvent, type: string): boolean {
   return (
@@ -139,6 +141,7 @@ export default function InboxPage() {
   const { data: todos = [] } = useTodosQuery();
   const { data: projects = [] } = useProjectsQuery();
   const graphInsights = useTaskGraphInsightsQuery(null);
+  const { data: executionTelemetry = [] } = useTaskExecutionTelemetryQuery();
   const { isMobile } = usePlatform();
   const addToast = useToastStore((s) => s.addToast);
   const toggleMutation = useToggleTodoComplete();
@@ -272,6 +275,14 @@ export default function InboxPage() {
     errors.length;
 
   const selectedTask = todos.find((todo) => todo.id === selectedTaskId) ?? null;
+  const executionTelemetryByTaskId = useMemo(
+    () => new Map(executionTelemetry.map((item) => [item.task_id, item])),
+    [executionTelemetry],
+  );
+  const selectedExecutionTelemetry = selectedTaskId
+    ? executionTelemetryByTaskId.get(selectedTaskId)
+    : undefined;
+  const selectedExecutionBadges = getTaskExecutionBadges(selectedExecutionTelemetry);
 
   const dependencyCandidates = useMemo(() => {
     if (!selectedTask) return [];
@@ -1003,6 +1014,7 @@ export default function InboxPage() {
             todos={todos}
             selectedTaskId={selectedTaskId}
             batchTaskIds={batchTaskIds}
+            telemetryByTaskId={executionTelemetryByTaskId}
             disabled={
               placementRevision == null ||
               placeMutation.isPending ||
@@ -1050,6 +1062,72 @@ export default function InboxPage() {
                     ? 'unknown'
                     : `${graphInsights.data.summary.critical_path_minutes}m`}
                 </p>
+              )}
+              {selectedExecutionTelemetry && (
+                <section
+                  className="cc-inbox-triage__execution-telemetry"
+                  aria-label="Task execution activity"
+                >
+                  <div className="cc-inbox-triage__execution-heading">
+                    <strong>Execution activity</strong>
+                    <div className="cc-inbox-tree__telemetry">
+                      {selectedExecutionBadges.map((badge) => (
+                        <span
+                          key={badge.key}
+                          className="cc-inbox-tree__telemetry-badge"
+                          data-tone={badge.tone}
+                        >
+                          {badge.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedExecutionTelemetry.latest_run_progress_message && (
+                    <p>{selectedExecutionTelemetry.latest_run_progress_message}</p>
+                  )}
+                  {selectedExecutionTelemetry.latest_artifact_title && (
+                    <small>
+                      Latest artifact: {selectedExecutionTelemetry.latest_artifact_title}
+                    </small>
+                  )}
+                  <div className="cc-inbox-triage__execution-actions">
+                    {selectedExecutionTelemetry.latest_run_id && (
+                      <button
+                        type="button"
+                        className="cc-btn cc-btn--ghost"
+                        onClick={() =>
+                          navigate(`/runs?run_id=${selectedExecutionTelemetry.latest_run_id}`)
+                        }
+                      >
+                        Open run
+                      </button>
+                    )}
+                    {selectedExecutionTelemetry.pending_review_count > 0 && (
+                      <button
+                        type="button"
+                        className="cc-btn cc-btn--ghost"
+                        onClick={() =>
+                          navigate(
+                            `/review${selectedTask.project_id ? `?project_id=${selectedTask.project_id}` : ''}`,
+                          )
+                        }
+                      >
+                        Review
+                      </button>
+                    )}
+                    {selectedExecutionTelemetry.artifact_count > 0 && selectedTask.project_id && (
+                      <button
+                        type="button"
+                        className="cc-btn cc-btn--ghost"
+                        onClick={() =>
+                          navigate(`/projects/${selectedTask.project_id}?section=artifacts`)
+                        }
+                      >
+                        Artifacts
+                      </button>
+                    )}
+                  </div>
+                </section>
               )}
               <div className="cc-inbox-triage__dependency-picker">
                 <label htmlFor="inbox-prerequisite-select">Must wait for</label>
@@ -1147,6 +1225,7 @@ export default function InboxPage() {
                     todos={todos}
                     selectedTaskId={selectedTaskId}
                     batchTaskIds={batchTaskIds}
+                    telemetryByTaskId={executionTelemetryByTaskId}
                     disabled={
                       placementRevision == null ||
                       placeMutation.isPending ||

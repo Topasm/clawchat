@@ -1006,6 +1006,22 @@ export const AgentRunEventResponseSchema = z.object({
   created_at: z.string(),
 });
 
+export const TaskExecutionTelemetryResponseSchema = z.object({
+  task_id: z.string(),
+  latest_run_id: z.string().nullable(),
+  latest_run_status: AgentRunStatusSchema.nullable(),
+  latest_run_progress: z.number().int().min(0).max(100).nullable(),
+  latest_run_provider: z.string().nullable(),
+  latest_run_progress_message: z.string().nullable(),
+  latest_run_updated_at: z.string().nullable(),
+  pending_review_count: z.number().int().nonnegative(),
+  artifact_count: z.number().int().nonnegative(),
+  latest_artifact_id: z.string().nullable(),
+  latest_artifact_title: z.string().nullable(),
+  latest_artifact_type: ArtifactTypeSchema.nullable(),
+  latest_artifact_updated_at: z.string().nullable(),
+});
+
 export const ExecutionProviderStatusSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -1246,6 +1262,7 @@ export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
 export type AgentRunResponse = z.infer<typeof AgentRunResponseSchema>;
 export type AgentRunEventResponse = z.infer<typeof AgentRunEventResponseSchema>;
+export type TaskExecutionTelemetryResponse = z.infer<typeof TaskExecutionTelemetryResponseSchema>;
 export type ExecutionProviderStatus = z.infer<typeof ExecutionProviderStatusSchema>;
 export type PlanSubtask = z.infer<typeof PlanSubtaskSchema>;
 export type PlanProposalStatus = z.infer<typeof PlanProposalStatusSchema>;

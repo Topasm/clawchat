@@ -6127,6 +6127,143 @@
         "title": "TaskDependencyPreviewResponse",
         "type": "object"
       },
+      "TaskExecutionTelemetryResponse": {
+        "properties": {
+          "artifact_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Artifact Count",
+            "type": "integer"
+          },
+          "latest_artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Artifact Id"
+          },
+          "latest_artifact_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Artifact Title"
+          },
+          "latest_artifact_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_artifact_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Artifact Updated At"
+          },
+          "latest_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Id"
+          },
+          "latest_run_progress": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Progress"
+          },
+          "latest_run_progress_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Progress Message"
+          },
+          "latest_run_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Provider"
+          },
+          "latest_run_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentRunStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_run_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Updated At"
+          },
+          "pending_review_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Pending Review Count",
+            "type": "integer"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "title": "TaskExecutionTelemetryResponse",
+        "type": "object"
+      },
       "TaskGroupedPlacementRequest": {
         "properties": {
           "expected_graph_revision": {
@@ -12096,6 +12233,65 @@
           }
         ],
         "summary": "Bulk Update Todos",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/execution-telemetry": {
+      "get": {
+        "description": "Return sparse task-level run, review, and artifact telemetry.",
+        "operationId": "list_task_execution_telemetry_api_todos_execution_telemetry_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaskExecutionTelemetryResponse"
+                  },
+                  "title": "Response List Task Execution Telemetry Api Todos Execution Telemetry Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Task Execution Telemetry",
         "tags": [
           "todos"
         ]

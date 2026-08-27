@@ -19,6 +19,7 @@ export const queryKeys = {
   runs: ['runs'] as const,
   runList: (projectId?: string | null) => ['runs', projectId ?? 'all'] as const,
   runEvents: (runId: string) => ['runs', runId, 'events'] as const,
+  taskExecutionTelemetry: ['task-execution-telemetry'] as const,
   messages: (id: string) => ['messages', id] as const,
   today: ['today'] as const,
   attachments: (ownerId: string) => ['attachments', ownerId] as const,

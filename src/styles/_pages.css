@@ -2439,6 +2439,53 @@
   white-space: nowrap;
 }
 
+.cc-inbox-tree__identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cc-inbox-tree__telemetry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cc-inbox-tree__telemetry-badge {
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--cc-radius-pill);
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--cc-text-tertiary) 12%, transparent);
+  color: var(--cc-text-secondary);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='active'] {
+  background: color-mix(in srgb, var(--cc-primary) 13%, transparent);
+  color: var(--cc-primary);
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='attention'] {
+  background: color-mix(in srgb, var(--cc-warning) 13%, transparent);
+  color: var(--cc-warning);
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='success'] {
+  background: color-mix(in srgb, var(--cc-success) 13%, transparent);
+  color: var(--cc-success);
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='error'] {
+  background: color-mix(in srgb, var(--cc-error) 13%, transparent);
+  color: var(--cc-error);
+}
+
 .cc-inbox-tree__node small {
   color: var(--cc-text-tertiary);
   font-size: 9px;
@@ -2500,6 +2547,45 @@
   color: var(--cc-text-secondary);
   font-size: 11px;
   line-height: 1.5;
+}
+
+.cc-inbox-triage__execution-telemetry {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+}
+
+.cc-inbox-triage__execution-heading {
+  display: grid;
+  gap: 6px;
+}
+
+.cc-inbox-triage__execution-heading > strong {
+  font-size: 11px;
+}
+
+.cc-inbox-triage__execution-telemetry p,
+.cc-inbox-triage__execution-telemetry small {
+  margin: 0;
+  color: var(--cc-text-secondary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.cc-inbox-triage__execution-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cc-inbox-triage__execution-actions .cc-btn {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 10px;
 }
 
 .cc-inbox-triage__dependency-picker {
