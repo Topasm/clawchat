@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { IS_ELECTRON } from '../types/platform';
-import type { AppMode } from '../types/electron';
+import { platformApi, type AppMode } from '../platform';
+import { IS_DESKTOP } from '../types/platform';
 
 interface UseAppModeResult {
   /** Current app mode. null if not Electron (web/mobile are always clients). */
@@ -17,25 +17,25 @@ interface UseAppModeResult {
 
 export function useAppMode(): UseAppModeResult {
   const [appMode, setAppModeState] = useState<AppMode | null>(null);
-  const [loading, setLoading] = useState(IS_ELECTRON);
+  const [loading, setLoading] = useState(IS_DESKTOP);
 
   useEffect(() => {
-    if (!IS_ELECTRON) {
+    if (!IS_DESKTOP) {
       setAppModeState(null);
       setLoading(false);
       return;
     }
-    window.electronAPI.server.getAppMode().then((mode) => {
+    platformApi.server.getAppMode().then((mode) => {
       setAppModeState(mode);
       setLoading(false);
     });
   }, []);
 
   const setAppMode = useCallback(async (mode: AppMode) => {
-    if (!IS_ELECTRON) return;
+    if (!IS_DESKTOP) return;
     setLoading(true);
     try {
-      await window.electronAPI.server.setAppMode(mode);
+      await platformApi.server.setAppMode(mode);
       setAppModeState(mode);
     } finally {
       setLoading(false);

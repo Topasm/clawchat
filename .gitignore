@@ -2,6 +2,8 @@ node_modules
 dist
 dist-electron
 release
+src-tauri/target/
+src-tauri/tauri.release.generated.conf.json
 .env
 *.local
 

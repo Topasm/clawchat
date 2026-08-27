@@ -1,76 +1,67 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { useModuleStore } from '../../stores/useModuleStore';
-import { useChatStore } from '../../stores/useChatStore';
+import useDataSync from '../useDataSync';
 
-// Mock apiClient
-vi.mock('../../services/apiClient', () => ({
-  default: {
-    get: vi.fn().mockResolvedValue({ data: { items: [] } }),
-    post: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
+const queryMocks = vi.hoisted(() => ({
+  todos: { isLoading: false, refetch: vi.fn() },
+  events: { isLoading: false, refetch: vi.fn() },
+  conversations: { isLoading: false, refetch: vi.fn() },
+  projects: { isLoading: false, refetch: vi.fn() },
+}));
+
+const fetchSettings = vi.hoisted(() => vi.fn());
+
+vi.mock('../queries', () => ({
+  useTodosQuery: () => queryMocks.todos,
+  useEventsQuery: () => queryMocks.events,
+  useConversationsQuery: () => queryMocks.conversations,
+  useProjectsQuery: () => queryMocks.projects,
+}));
+
+vi.mock('../../stores/useSettingsStore', () => ({
+  useSettingsStore: {
+    getState: () => ({ fetchSettings }),
   },
 }));
 
-// Mock SSE client
-vi.mock('../../services/sseClient', () => ({
-  connectSSE: vi.fn(),
-}));
-
-// Mock secure storage
-vi.mock('../../services/platform', () => ({
-  secureStorage: {
-    get: vi.fn().mockResolvedValue(null),
-    set: vi.fn().mockResolvedValue(undefined),
-    remove: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
-describe('useDataSync logic (store-level)', () => {
+describe('useDataSync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.setState({
-      token: null,
-      refreshToken: null,
-      serverUrl: null,
-      isLoading: false,
-      connectionStatus: 'disconnected',
-    });
-    useModuleStore.getState().resetToDemo();
-    useChatStore.getState().resetToDemo();
+    queryMocks.todos.isLoading = false;
+    queryMocks.events.isLoading = false;
+    queryMocks.conversations.isLoading = false;
+    queryMocks.projects.isLoading = false;
+    useAuthStore.setState({ serverUrl: null });
   });
 
-  it('fetch methods call API (no demo guard in stores)', async () => {
-    const apiClient = (await import('../../services/apiClient')).default;
+  it('reports syncing while any source query is loading', () => {
+    queryMocks.events.isLoading = true;
 
-    await useModuleStore.getState().fetchTodos();
-    await useModuleStore.getState().fetchEvents();
-    await useChatStore.getState().fetchConversations();
+    const { result } = renderHook(() => useDataSync());
 
-    // Stores call apiClient regardless — apiClient handles missing auth
-    expect(apiClient.get).toHaveBeenCalled();
+    expect(result.current.syncing).toBe(true);
   });
 
-  it('fetch methods call API when serverUrl is set', async () => {
-    const apiClient = (await import('../../services/apiClient')).default;
-    useAuthStore.setState({ serverUrl: 'http://localhost:3000', token: 'tok' });
+  it('does not refetch without a configured server', () => {
+    const { result } = renderHook(() => useDataSync());
 
-    await useModuleStore.getState().fetchTodos();
-    await useModuleStore.getState().fetchEvents();
-    await useChatStore.getState().fetchConversations();
+    result.current.refresh();
 
-    // 2 module fetches + 1 chat fetch = 3 calls
-    expect(apiClient.get).toHaveBeenCalledTimes(3);
+    expect(queryMocks.todos.refetch).not.toHaveBeenCalled();
+    expect(fetchSettings).not.toHaveBeenCalled();
   });
 
-  it('setKanbanStatuses clears overrides before fetch', () => {
-    useModuleStore.getState().setKanbanStatuses({});
-    expect(useModuleStore.getState().kanbanStatuses).toEqual({});
-  });
+  it('refreshes every server-data query and settings', () => {
+    useAuthStore.setState({ serverUrl: 'http://localhost:8000' });
+    const { result } = renderHook(() => useDataSync());
 
-  it('starts with empty data when no server', () => {
-    const todos = useModuleStore.getState().todos;
-    expect(todos).toHaveLength(0);
+    result.current.refresh();
+
+    expect(queryMocks.todos.refetch).toHaveBeenCalledOnce();
+    expect(queryMocks.events.refetch).toHaveBeenCalledOnce();
+    expect(queryMocks.conversations.refetch).toHaveBeenCalledOnce();
+    expect(queryMocks.projects.refetch).toHaveBeenCalledOnce();
+    expect(fetchSettings).toHaveBeenCalledOnce();
   });
 });

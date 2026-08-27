@@ -52,6 +52,7 @@ Return ONLY a JSON object with this structure:
       "description": "Optional description",
       "estimated_minutes": 30,
       "due_date": "YYYY-MM-DD or null",
+      "priority": "low | medium | high | urgent",
       "depends_on_indices": [0]
     }
   ]
@@ -59,7 +60,10 @@ Return ONLY a JSON object with this structure:
 
 
 async def generate_plan(
-    db: AsyncSession, ai_service: AIService, todo: Todo
+    db: AsyncSession,
+    ai_service: AIService,
+    todo: Todo,
+    additional_instructions: str | None = None,
 ) -> dict:
     """Generate a structured planning proposal for *todo* using LLM + context.
 
@@ -122,6 +126,8 @@ async def generate_plan(
     parts.append(f"Task: {todo.title}")
     if todo.description:
         parts.append(f"Description: {todo.description}")
+    if additional_instructions and additional_instructions.strip():
+        parts.append(f"User planning guidance:\n{additional_instructions.strip()}")
 
     # Clarification Q&A context (if user answered questions)
     if todo.clarification_questions and todo.clarification_answers:

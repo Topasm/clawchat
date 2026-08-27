@@ -1,0 +1,29 @@
+export const TAURI_COMMANDS = {
+  serverGetStatus: 'server_get_status',
+  serverGetConfig: 'server_get_config',
+  serverGetNetworkInfo: 'server_get_network_info',
+  serverUpdateConfig: 'server_update_config',
+  serverSelectFolder: 'server_select_folder',
+  serverOpenObsidianVault: 'server_open_obsidian_vault',
+  serverSetAppMode: 'server_set_app_mode',
+  serverGetAppMode: 'server_get_app_mode',
+  appShowNotification: 'app_show_notification',
+  appSetBadgeCount: 'app_set_badge_count',
+  secureStorageGet: 'secure_storage_get',
+  secureStorageSet: 'secure_storage_set',
+  secureStorageRemove: 'secure_storage_remove',
+  updaterCheck: 'updater_check',
+  updaterDownload: 'updater_download',
+  updaterInstall: 'updater_install',
+} as const;
+
+export const TAURI_EVENTS = {
+  serverStatusChange: 'server-status-change',
+  quickCapture: 'open-quick-capture',
+  notificationAction: 'notification:action',
+  navigate: 'navigate',
+  updateAvailable: 'update-available',
+  updateNotAvailable: 'update-not-available',
+  updateDownloadProgress: 'update-download-progress',
+  updateDownloaded: 'update-downloaded',
+} as const;

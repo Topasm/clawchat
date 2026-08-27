@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
-import { IS_ELECTRON, IS_CAPACITOR } from '../types/platform';
+import { platformApi } from '../platform';
+import { IS_DESKTOP, IS_CAPACITOR } from '../types/platform';
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 import QRScanner from '../components/shared/QRScanner';
 
@@ -19,7 +20,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
-  const [showServerUrl, setShowServerUrl] = useState(!IS_ELECTRON && !IS_CAPACITOR);
+  const [showServerUrl, setShowServerUrl] = useState(!IS_DESKTOP && !IS_CAPACITOR);
   const [showScanner, setShowScanner] = useState(false);
   const [electronClientMode, setElectronClientMode] = useState(false);
   const biometricAttempted = useRef(false);
@@ -56,14 +57,14 @@ export default function LoginPage() {
     })();
   }, [navigate]);
 
-  // On Electron client mode: show server URL + QR, pre-fill from stored hostServerUrl
+  // On desktop client mode: show server URL + QR, pre-fill from stored hostServerUrl
   useEffect(() => {
-    if (!IS_ELECTRON) return;
-    window.electronAPI.server.getAppMode().then((mode) => {
+    if (!IS_DESKTOP) return;
+    platformApi.server.getAppMode().then((mode) => {
       if (mode === 'client') {
         setElectronClientMode(true);
         setShowServerUrl(true);
-        window.electronAPI.server.getConfig().then((cfg) => {
+        platformApi.server.getConfig().then((cfg) => {
           if (cfg.hostServerUrl) {
             setServerUrl(cfg.hostServerUrl);
           }
@@ -390,7 +391,7 @@ export default function LoginPage() {
           <div style={{ color: colors.error, fontSize: 13, marginTop: 16 }}>{error}</div>
         )}
 
-        {(!IS_ELECTRON || electronClientMode) && !isPairingFirstMobile && (
+        {(!IS_DESKTOP || electronClientMode) && !isPairingFirstMobile && (
           <button
             type="button"
             onClick={() => setShowScanner(true)}

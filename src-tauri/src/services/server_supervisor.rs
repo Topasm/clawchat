@@ -1,0 +1,433 @@
+use std::{
+    fs::{self, OpenOptions},
+    io::{Read, Write},
+    net::{SocketAddr, TcpStream},
+    path::{Path, PathBuf},
+    process::{Child, Command, Stdio},
+    thread,
+    time::Duration,
+};
+
+use crate::models::{NativePaths, ServerConfig, ServerState, ServerStatus};
+
+const MAX_HEALTH_RETRIES: usize = 30;
+
+pub struct ServerSupervisor {
+    paths: NativePaths,
+    child: Option<Child>,
+    reused_pid: Option<u32>,
+    status: ServerStatus,
+}
+
+impl ServerSupervisor {
+    pub fn new(paths: NativePaths, port: u16) -> Self {
+        Self {
+            paths,
+            child: None,
+            reused_pid: None,
+            status: ServerStatus {
+                state: ServerState::Stopped,
+                port,
+                pid: None,
+                error: None,
+            },
+        }
+    }
+
+    pub fn status(&mut self) -> ServerStatus {
+        if let Some(child) = self.child.as_mut() {
+            match child.try_wait() {
+                Ok(Some(exit)) => {
+                    self.child = None;
+                    self.reused_pid = None;
+                    let _ = fs::remove_file(&self.paths.pid_path);
+                    self.status = ServerStatus {
+                        state: if exit.success() {
+                            ServerState::Stopped
+                        } else {
+                            ServerState::Error
+                        },
+                        port: self.status.port,
+                        pid: None,
+                        error: (!exit.success()).then(|| format!("server exited with {exit}")),
+                    };
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.status.state = ServerState::Error;
+                    self.status.error = Some(format!("failed to inspect server process: {error}"));
+                }
+            }
+        }
+        self.status.clone()
+    }
+
+    pub fn start(&mut self, config: &ServerConfig) -> ServerStatus {
+        let port = config.port;
+        if self.child.is_some() {
+            let current = self.status();
+            if matches!(current.state, ServerState::Running) && health_check(port) {
+                return current;
+            }
+            self.stop();
+        }
+
+        if health_check(port) {
+            let pid = read_pid(&self.paths.pid_path);
+            self.reused_pid = pid;
+            self.status = ServerStatus {
+                state: ServerState::Running,
+                port,
+                pid,
+                error: None,
+            };
+            return self.status.clone();
+        }
+        let _ = fs::remove_file(&self.paths.pid_path);
+
+        self.status = ServerStatus {
+            state: ServerState::Starting,
+            port,
+            pid: None,
+            error: None,
+        };
+
+        match self.spawn(config) {
+            Ok(child) => {
+                let pid = child.id();
+                self.child = Some(child);
+                if let Err(error) = write_pid(&self.paths.pid_path, pid) {
+                    eprintln!("[clawchat] {error}");
+                }
+                if wait_for_health(port) {
+                    self.status = ServerStatus {
+                        state: ServerState::Running,
+                        port,
+                        pid: Some(pid),
+                        error: None,
+                    };
+                } else {
+                    self.stop_child();
+                    self.status = ServerStatus {
+                        state: ServerState::Error,
+                        port,
+                        pid: None,
+                        error: Some("server failed health check after startup".to_owned()),
+                    };
+                }
+            }
+            Err(error) => {
+                self.status = ServerStatus {
+                    state: ServerState::Error,
+                    port,
+                    pid: None,
+                    error: Some(error),
+                };
+            }
+        }
+        self.status.clone()
+    }
+
+    pub fn stop(&mut self) -> ServerStatus {
+        self.stop_child();
+        if let Some(pid) = self.reused_pid.take() {
+            terminate_pid(pid);
+        }
+        let _ = fs::remove_file(&self.paths.pid_path);
+        self.status = ServerStatus {
+            state: ServerState::Stopped,
+            port: self.status.port,
+            pid: None,
+            error: None,
+        };
+        self.status.clone()
+    }
+
+    pub fn restart(&mut self, config: &ServerConfig) -> ServerStatus {
+        self.stop();
+        self.start(config)
+    }
+
+    fn stop_child(&mut self) {
+        let Some(mut child) = self.child.take() else {
+            return;
+        };
+        let pid = child.id();
+        signal_pid(pid, false);
+        for _ in 0..25 {
+            match child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) => thread::sleep(Duration::from_millis(200)),
+                Err(_) => break,
+            }
+        }
+        signal_pid(pid, true);
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+
+    fn spawn(&self, config: &ServerConfig) -> Result<Child, String> {
+        fs::create_dir_all(self.paths.server_data_dir.join("uploads")).map_err(|error| {
+            format!(
+                "failed to create server data directory {}: {error}",
+                self.paths.server_data_dir.display()
+            )
+        })?;
+        let (program, arguments, working_directory) = self.server_command(config.port)?;
+        let database = self.paths.server_data_dir.join("clawchat.db");
+        let uploads = self.paths.server_data_dir.join("uploads");
+        let mut command = Command::new(&program);
+        command
+            .args(arguments)
+            .current_dir(working_directory)
+            .env("HOST", "0.0.0.0")
+            .env("PORT", config.port.to_string())
+            .env("PIN", &config.pin)
+            .env(
+                "DATABASE_URL",
+                format!("sqlite+aiosqlite:///{}", database.display()),
+            )
+            .env("UPLOAD_DIR", uploads);
+        if !config.obsidian_vault_path.is_empty() {
+            command.env("OBSIDIAN_VAULT_PATH", &config.obsidian_vault_path);
+        }
+        if let Some(obsidian) = find_obsidian_cli() {
+            command.env("OBSIDIAN_CLI_COMMAND", obsidian);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+
+        let log_path = self.paths.app_data_dir.join("server.log");
+        match OpenOptions::new().create(true).append(true).open(&log_path) {
+            Ok(stdout) => match stdout.try_clone() {
+                Ok(stderr) => {
+                    command
+                        .stdout(Stdio::from(stdout))
+                        .stderr(Stdio::from(stderr));
+                }
+                Err(_) => {
+                    command.stdout(Stdio::null()).stderr(Stdio::null());
+                }
+            },
+            Err(_) => {
+                command.stdout(Stdio::null()).stderr(Stdio::null());
+            }
+        }
+        command.stdin(Stdio::null());
+        command.spawn().map_err(|error| {
+            format!(
+                "failed to start server executable {}: {error}",
+                program.display()
+            )
+        })
+    }
+
+    fn server_command(&self, port: u16) -> Result<(PathBuf, Vec<String>, PathBuf), String> {
+        let executable_name = if cfg!(windows) {
+            "clawchat-server.exe"
+        } else {
+            "clawchat-server"
+        };
+        let packaged = self
+            .paths
+            .resource_dir
+            .join("server-bin")
+            .join(executable_name);
+        if packaged.is_file() {
+            return Ok((packaged, vec![], self.paths.app_data_dir.clone()));
+        }
+        if !cfg!(debug_assertions) {
+            return Err(format!(
+                "packaged server binary is missing: {}",
+                packaged.display()
+            ));
+        }
+
+        let python = find_python(&self.paths.development_server_dir);
+        let mut arguments = vec![
+            "-m".to_owned(),
+            "uvicorn".to_owned(),
+            "main:app".to_owned(),
+            "--host".to_owned(),
+            "0.0.0.0".to_owned(),
+            "--port".to_owned(),
+            port.to_string(),
+        ];
+        if std::env::var_os("VITE_DEV_SERVER_URL").is_some() {
+            arguments.push("--reload".to_owned());
+        }
+        Ok((python, arguments, self.paths.development_server_dir.clone()))
+    }
+}
+
+impl Drop for ServerSupervisor {
+    fn drop(&mut self) {
+        self.stop_child();
+    }
+}
+
+fn find_python(server_dir: &Path) -> PathBuf {
+    let candidates = [
+        server_dir.join("venv/bin/python"),
+        server_dir.join("venv/Scripts/python.exe"),
+    ];
+    candidates
+        .into_iter()
+        .find(|candidate| candidate.is_file())
+        .unwrap_or_else(|| PathBuf::from(if cfg!(windows) { "python" } else { "python3" }))
+}
+
+fn find_obsidian_cli() -> Option<PathBuf> {
+    if let Some(value) = std::env::var_os("OBSIDIAN_CLI_COMMAND") {
+        return Some(PathBuf::from(value));
+    }
+    let candidates = if cfg!(target_os = "macos") {
+        vec![PathBuf::from(
+            "/Applications/Obsidian.app/Contents/MacOS/Obsidian",
+        )]
+    } else if cfg!(windows) {
+        std::env::var_os("LOCALAPPDATA")
+            .map(|root| PathBuf::from(root).join("Programs/obsidian/Obsidian.exe"))
+            .into_iter()
+            .collect()
+    } else {
+        vec![
+            PathBuf::from("/usr/bin/obsidian"),
+            PathBuf::from("/usr/local/bin/obsidian"),
+        ]
+    };
+    candidates.into_iter().find(|candidate| candidate.is_file())
+}
+
+fn health_check(port: u16) -> bool {
+    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_secs(1)) else {
+        return false;
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    let request =
+        format!("GET /api/health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+    let mut response = [0_u8; 64];
+    let Ok(read) = stream.read(&mut response) else {
+        return false;
+    };
+    String::from_utf8_lossy(&response[..read]).starts_with("HTTP/1.1 200")
+        || String::from_utf8_lossy(&response[..read]).starts_with("HTTP/1.0 200")
+}
+
+fn wait_for_health(port: u16) -> bool {
+    for attempt in 1..=MAX_HEALTH_RETRIES {
+        if health_check(port) {
+            return true;
+        }
+        let delay = if attempt <= 5 {
+            150
+        } else if attempt <= 10 {
+            300
+        } else {
+            500
+        };
+        thread::sleep(Duration::from_millis(delay));
+    }
+    false
+}
+
+fn read_pid(path: &Path) -> Option<u32> {
+    fs::read_to_string(path).ok()?.trim().parse().ok()
+}
+
+fn write_pid(path: &Path, pid: u32) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::write(path, pid.to_string())
+        .map_err(|error| format!("failed to write PID file {}: {error}", path.display()))
+}
+
+fn terminate_pid(pid: u32) {
+    signal_pid(pid, false);
+}
+
+fn signal_pid(pid: u32, force: bool) {
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = Command::new("taskkill");
+        command.args(["/PID", &pid.to_string(), "/T"]);
+        if force {
+            command.arg("/F");
+        }
+        command
+    };
+    #[cfg(not(windows))]
+    let mut command = {
+        let mut command = Command::new("kill");
+        let signal = if force { "-KILL" } else { "-TERM" };
+        command.args([signal, "--", &format!("-{pid}")]);
+        command
+    };
+    command.stdout(Stdio::null()).stderr(Stdio::null());
+    let _ = command.status();
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::TcpListener;
+
+    use super::*;
+
+    fn paths(root: &Path) -> NativePaths {
+        NativePaths {
+            app_data_dir: root.to_owned(),
+            config_path: root.join("server-config.json"),
+            server_data_dir: root.join("server-data/data"),
+            pid_path: root.join("server.pid"),
+            resource_dir: root.join("resources"),
+            development_server_dir: root.join("server"),
+        }
+    }
+
+    #[test]
+    fn accepts_successful_health_response() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("listener");
+        let port = listener.local_addr().expect("address").port();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("connection");
+            let mut request = [0_u8; 256];
+            let _ = stream.read(&mut request);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
+                .expect("response");
+        });
+
+        assert!(health_check(port));
+        server.join().expect("server thread");
+    }
+
+    #[test]
+    fn packaged_command_uses_onedir_executable() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let native_paths = paths(root.path());
+        let executable_name = if cfg!(windows) {
+            "clawchat-server.exe"
+        } else {
+            "clawchat-server"
+        };
+        let executable = native_paths
+            .resource_dir
+            .join("server-bin")
+            .join(executable_name);
+        fs::create_dir_all(executable.parent().expect("binary parent")).expect("binary dir");
+        fs::write(&executable, "placeholder").expect("binary");
+
+        let supervisor = ServerSupervisor::new(native_paths, 8000);
+        let (program, arguments, _) = supervisor.server_command(8000).expect("command");
+        assert_eq!(program, executable);
+        assert!(arguments.is_empty());
+    }
+}

@@ -3,11 +3,11 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './app/stores/useAuthStore';
 import { useAutoLogin } from './app/hooks/useAutoLogin';
 import ErrorBoundary from './app/components/shared/ErrorBoundary';
-import Layout from './app/components/Layout';
-import LoginPage from './app/pages/LoginPage';
-import OnboardingPage from './app/pages/OnboardingPage';
 
 // ── Lazy-loaded pages ────────────────────────────────────────────────
+const Layout = lazy(() => import('./app/components/Layout'));
+const LoginPage = lazy(() => import('./app/pages/LoginPage'));
+const OnboardingPage = lazy(() => import('./app/pages/OnboardingPage'));
 const TodayPage = lazy(() => import('./app/pages/TodayPage'));
 const InboxPage = lazy(() => import('./app/pages/InboxPage'));
 const ChatListPage = lazy(() => import('./app/pages/ChatListPage'));
@@ -52,8 +52,8 @@ export default function AppRouter() {
   if (!isAuthenticated) {
     return (
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/login" element={<LazyRoute><LoginPage /></LazyRoute>} />
+        <Route path="/onboarding" element={<LazyRoute><OnboardingPage /></LazyRoute>} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -61,9 +61,9 @@ export default function AppRouter() {
 
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/onboarding" element={<OnboardingPage />} />
-      <Route element={<Layout />}>
+      <Route path="/login" element={<LazyRoute><LoginPage /></LazyRoute>} />
+      <Route path="/onboarding" element={<LazyRoute><OnboardingPage /></LazyRoute>} />
+      <Route element={<ErrorBoundary name="Layout"><LazyRoute><Layout /></LazyRoute></ErrorBoundary>}>
         <Route path="/today" element={<ErrorBoundary name="TodayPage"><LazyRoute><TodayPage /></LazyRoute></ErrorBoundary>} />
         <Route path="/inbox" element={<ErrorBoundary name="InboxPage"><LazyRoute><InboxPage /></LazyRoute></ErrorBoundary>} />
         <Route path="/chats" element={<ErrorBoundary name="ChatListPage"><LazyRoute><ChatListPage /></LazyRoute></ErrorBoundary>} />

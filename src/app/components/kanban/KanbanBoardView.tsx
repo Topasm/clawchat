@@ -5,6 +5,7 @@ import KanbanColumn from './KanbanColumn';
 import KanbanColumnTabs from './KanbanColumnTabs';
 import KanbanFilterBar from './KanbanFilterBar';
 import BulkActionToolbar from './BulkActionToolbar';
+import TasksHeader, { type TasksViewMode } from './TasksHeader';
 
 interface ColumnDef {
   status: KanbanStatus;
@@ -15,6 +16,8 @@ interface ColumnDef {
 
 interface KanbanBoardViewProps {
   todos: TodoResponse[];
+  viewMode: TasksViewMode;
+  onViewModeChange: (mode: TasksViewMode) => void;
   columnDefs: ColumnDef[];
   showSubTasks: boolean;
   isMobile: boolean;
@@ -22,7 +25,6 @@ interface KanbanBoardViewProps {
   onDragEnd: (result: DropResult) => void;
   onToggle: (id: string) => void;
   onClickTask: (id: string) => void;
-  onNewTask: () => void;
   focusedTaskId: string | null;
   onFocusTask: (id: string | null) => void;
   selectedIds: Set<string>;
@@ -34,6 +36,8 @@ interface KanbanBoardViewProps {
 
 export default function KanbanBoardView({
   todos,
+  viewMode,
+  onViewModeChange,
   columnDefs,
   showSubTasks,
   isMobile,
@@ -41,7 +45,6 @@ export default function KanbanBoardView({
   onDragEnd,
   onToggle,
   onClickTask,
-  onNewTask,
   focusedTaskId,
   onFocusTask,
   selectedIds,
@@ -52,19 +55,7 @@ export default function KanbanBoardView({
 }: KanbanBoardViewProps) {
   return (
     <div>
-      <div className="cc-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div className="cc-page-header__title">Tasks</div>
-          <div className="cc-page-header__subtitle">
-            {todos.length} task{todos.length !== 1 ? 's' : ''} organised by status
-          </div>
-        </div>
-        {!isMobile && (
-          <button className="cc-btn cc-btn--primary" onClick={onNewTask}>
-            + New Task
-          </button>
-        )}
-      </div>
+      <TasksHeader todos={todos} viewMode={viewMode} onViewModeChange={onViewModeChange} />
       <KanbanFilterBar />
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
         {isMobile ? (

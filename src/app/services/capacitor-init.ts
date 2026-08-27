@@ -1,12 +1,14 @@
 import { IS_CAPACITOR, IS_ANDROID } from '../types/platform';
 import { syncWidgetData } from './widgetSync';
 import { scheduleEventReminders } from './eventReminders';
-import { useModuleStore } from '../stores/useModuleStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { queryClient } from '../config/queryClient';
+import { queryKeys } from '../hooks/queries/queryKeys';
+import type { EventResponse } from '../types/api';
 import apiClient from './apiClient';
 
 function getTodayEvents() {
-  const { events } = useModuleStore.getState();
+  const events = queryClient.getQueryData<EventResponse[]>(queryKeys.events) ?? [];
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart);

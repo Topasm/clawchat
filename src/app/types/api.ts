@@ -29,4 +29,7 @@ export type {
   PurgeResponse,
   ReindexResponse,
   BackupResponse,
+  PlanSubtask,
+  PlanResponse,
+  PlanApplyResponse,
 } from './schemas';

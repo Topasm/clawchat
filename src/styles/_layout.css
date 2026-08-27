@@ -248,12 +248,70 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   padding: 8px 16px;
   background: var(--cc-primary);
   color: #fff;
   font-size: 13px;
   font-weight: 500;
+}
+
+.cc-update-banner--error {
+  background: var(--cc-error);
+}
+
+.cc-update-banner__content,
+.cc-update-banner__actions,
+.cc-update-banner__message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cc-update-banner__message {
+  flex-wrap: wrap;
+}
+
+.cc-update-banner__notes {
+  max-width: min(44vw, 520px);
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-update-banner__download {
+  display: grid;
+  gap: 5px;
+  width: min(420px, 55vw);
+}
+
+.cc-update-banner__progress {
+  position: relative;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.cc-update-banner__progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #fff;
+  transition: width 0.15s ease;
+}
+
+.cc-update-banner__progress--indeterminate > span {
+  animation: cc-update-progress 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes cc-update-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(560%); }
 }
 
 .cc-update-banner__btn {
@@ -270,6 +328,51 @@
 
 .cc-update-banner__btn:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.cc-update-banner__btn:focus-visible,
+.cc-update-banner__dismiss:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.cc-update-banner__dismiss {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cc-update-banner__dismiss:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@media (max-width: 640px) {
+  .cc-update-banner {
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .cc-update-banner__message {
+    display: grid;
+    gap: 2px;
+  }
+
+  .cc-update-banner__notes {
+    max-width: 55vw;
+  }
+
+  .cc-update-banner__download {
+    width: 58vw;
+  }
 }
 
 .cc-offline-badge {

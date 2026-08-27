@@ -1,4 +1,4 @@
-import { IS_CAPACITOR, IS_ELECTRON } from '../types/platform';
+import { IS_CAPACITOR, IS_DESKTOP } from '../types/platform';
 
 /**
  * Plays a short reminder chime. Used when reminderSound is enabled.
@@ -8,7 +8,7 @@ import { IS_CAPACITOR, IS_ELECTRON } from '../types/platform';
  */
 export function playReminderSound(): void {
   // Capacitor and Electron handle sound natively via notification options
-  if (IS_CAPACITOR || IS_ELECTRON) return;
+  if (IS_CAPACITOR || IS_DESKTOP) return;
 
   try {
     // Use Web Audio API for a short chime — no audio file needed

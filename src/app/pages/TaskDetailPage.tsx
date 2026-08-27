@@ -162,7 +162,7 @@ export default function TaskDetailPage() {
     try {
       await apiClient.post(`/todos/${taskId}/delegate`, { skill_id: skillId });
       useToastStore.getState().addToast('info', `Delegated to ${skillId}`);
-      useModuleStore.getState().fetchTodos();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.todos });
     } catch {
       useToastStore.getState().addToast('error', 'Failed to delegate');
     }

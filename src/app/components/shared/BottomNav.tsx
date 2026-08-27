@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { SunIcon, ChatIcon, InboxIcon } from './NavIcons';
-import { useModuleStore } from '../../stores/useModuleStore';
+import { useTodosQuery } from '../../hooks/queries';
 
 export const mobileTabs = [
   { to: '/today', label: 'Today', Icon: SunIcon, primary: true },
@@ -9,9 +9,10 @@ export const mobileTabs = [
 ];
 
 export default function BottomNav() {
-  const inboxCount = useModuleStore((s) =>
-    (s.todos ?? []).filter((t) => !t.due_date && t.status !== 'completed').length,
-  );
+  const { data: todos = [] } = useTodosQuery();
+  const inboxCount = todos.filter(
+    (todo) => !todo.due_date && todo.status !== 'completed',
+  ).length;
 
   return (
     <nav className="cc-bottom-nav">

@@ -6,6 +6,7 @@ import {
   IS_WEB,
   IS_CAPACITOR,
   IS_ELECTRON,
+  IS_TAURI,
   type Platform,
 } from '../types/platform';
 
@@ -16,6 +17,7 @@ interface PlatformInfo {
   isWeb: boolean;
   isCapacitor: boolean;
   isElectron: boolean;
+  isTauri: boolean;
 }
 
 export default function usePlatform(): PlatformInfo {
@@ -27,6 +29,7 @@ export default function usePlatform(): PlatformInfo {
       isWeb: IS_WEB,
       isCapacitor: IS_CAPACITOR,
       isElectron: IS_ELECTRON,
+      isTauri: IS_TAURI,
     }),
     [],
   );

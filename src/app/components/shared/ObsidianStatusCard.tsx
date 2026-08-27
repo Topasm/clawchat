@@ -58,7 +58,7 @@ export default function ObsidianStatusCard() {
   const queueCount = health.write_queue?.pending ?? 0;
   const deadLetterCount = health.dead_letter_count ?? 0;
   const queueAge = health.queue_age_seconds;
-  const scanStuck = health.scan_stuck ?? health.bidirectional_sync?.scan_stuck;
+  const scanStuck = health.scan_stuck ?? false;
   const lastCliError = health.last_cli_error;
 
   return (

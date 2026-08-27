@@ -12,7 +12,11 @@ const SORT_OPTIONS = [
   { value: 'sort_order', label: 'Manual Order' },
 ] as const;
 
-export default function KanbanFilterBar() {
+interface KanbanFilterBarProps {
+  showSubtaskToggle?: boolean;
+}
+
+export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilterBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filters = useModuleStore((s) => s.kanbanFilters);
   const setSearch = useModuleStore((s) => s.setKanbanSearchQuery);
@@ -96,12 +100,14 @@ export default function KanbanFilterBar() {
         ))}
       </select>
 
-      <button
-        className={`cc-kanban-filter__chip${filters.showSubTasks ? ' cc-kanban-filter__chip--active' : ''}`}
-        onClick={toggleSubTasks}
-      >
-        Sub-tasks
-      </button>
+      {showSubtaskToggle && (
+        <button
+          className={`cc-kanban-filter__chip${filters.showSubTasks ? ' cc-kanban-filter__chip--active' : ''}`}
+          onClick={toggleSubTasks}
+        >
+          Sub-tasks
+        </button>
+      )}
 
       {hasActiveFilters && (
         <button className="cc-kanban-filter__clear" onClick={clearFilters}>

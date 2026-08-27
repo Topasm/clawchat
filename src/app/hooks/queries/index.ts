@@ -16,6 +16,8 @@ export {
   useAttachmentsQuery,
   useUploadAttachment,
   useDeleteAttachment,
+  useGenerateTaskPlan,
+  useApplyTaskPlan,
 } from './useModuleQueries';
 export {
   useProjectsQuery,

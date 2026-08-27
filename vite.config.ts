@@ -1,8 +1,18 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import packageJson from './package.json';
 
 const isElectron = process.env.BUILD_TARGET === 'electron';
+const tauriPlatform = process.env.TAURI_ENV_PLATFORM;
+const isTauriDebug = process.env.TAURI_ENV_DEBUG === 'true';
+const packageVersion = packageJson.version;
+
+const browserTarget = tauriPlatform
+  ? tauriPlatform === 'windows'
+    ? 'chrome105'
+    : 'safari13'
+  : 'es2022';
 
 export default defineConfig(async () => {
   const plugins = [react()];
@@ -45,10 +55,21 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    define: {
+      __APP_VERSION__: JSON.stringify(packageVersion),
+    },
     build: {
+      target: browserTarget,
+      minify: isTauriDebug ? false : 'esbuild',
+      sourcemap: isTauriDebug,
+      emptyOutDir: true,
+      chunkSizeWarningLimit: 650,
       rollupOptions: {
         output: {
           manualChunks: {
+            // Framework runtime shared by every route. Keeping it explicit prevents
+            // lazy feature chunks from becoming accidental entry dependencies.
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
             // Rich-text / code editor — heaviest deps, rarely needed on first load
             'vendor-editor': [
               'lexical',
@@ -66,13 +87,6 @@ export default defineConfig(async () => {
             'vendor-dnd': ['@hello-pangea/dnd'],
             // Data fetching / API layer
             'vendor-query': ['@tanstack/react-query', 'axios'],
-            // QR, animation, dialog — used in pairing / modals
-            'vendor-ui-extras': [
-              'qrcode.react',
-              'framer-motion',
-              '@radix-ui/react-dialog',
-              'cmdk',
-            ],
             // Virtual scrolling
             'vendor-virtuoso': ['react-virtuoso'],
           },
@@ -80,8 +94,10 @@ export default defineConfig(async () => {
       },
     },
     server: {
+      port: 5173,
+      strictPort: true,
       watch: {
-        ignored: ['**/server/**'],
+        ignored: ['**/server/**', '**/src-tauri/**'],
       },
     },
     test: {

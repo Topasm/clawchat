@@ -3,7 +3,7 @@ import os
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,9 +16,17 @@ from models.conversation import Conversation
 from models.todo import Todo
 from schemas.bulk import BulkTodoResponse, BulkTodoUpdate
 from schemas.common import PaginatedResponse
-from schemas.task import DelegateRequest, PlanApplyResponse, PlanResponse, SkillResponse
+from schemas.task import (
+    DelegateRequest,
+    PlanApplyRequest,
+    PlanApplyResponse,
+    PlanGenerateRequest,
+    PlanResponse,
+    SkillResponse,
+)
 from schemas.todo import AnswerQuestionsRequest, ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
 from services import inbox_pipeline_service
+from services import todo_planning_service
 from skills import SKILL_REGISTRY, PERSONA_TO_SKILL, get_skill
 from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
 from utils.inbox_display import get_next_action
@@ -67,6 +75,56 @@ def _humanize_folder_name(source_id: str | None) -> str | None:
     if not source_id:
         return None
     return source_id.replace("_", " ").replace("-", " ").strip().title()
+
+
+def _parse_plan_due_date(value: object) -> datetime | None:
+    """Convert an LLM date/date-time value into a value safe for SQLAlchemy."""
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _build_plan_response(task: AgentTask, todo_id: str, payload: dict) -> PlanResponse:
+    subtask_list = payload.get("subtasks", [])
+    due_dates = sorted(
+        str(subtask["due_date"])
+        for subtask in subtask_list
+        if subtask.get("due_date")
+    )
+    suggested_due_summary = None
+    if due_dates:
+        suggested_due_summary = (
+            due_dates[0]
+            if due_dates[0] == due_dates[-1]
+            else f"{due_dates[0]} \u2013 {due_dates[-1]}"
+        )
+
+    suggested_skills = payload.get("suggested_skills") or []
+    assignee_raw = payload.get("suggested_assignee")
+    return PlanResponse(
+        task_id=task.id,
+        todo_id=todo_id,
+        summary=payload.get("summary", ""),
+        suggested_root_due_date=payload.get("suggested_root_due_date"),
+        suggested_assignee=assignee_raw,
+        suggested_skills=suggested_skills or None,
+        suggested_project_title=payload.get("suggested_project_title"),
+        subtasks=subtask_list,
+        created_at=task.created_at,
+        subtask_count=len(subtask_list),
+        suggested_due_summary=suggested_due_summary,
+        suggested_assignee_label=_skill_label(assignee_raw) if assignee_raw else None,
+        suggested_skills_labels=[_skill_label(skill) for skill in suggested_skills] or None,
+        suggested_project_label=_humanize_folder_name(payload.get("suggested_project_title")),
+    )
 
 
 def _compute_sync_status(source: str | None) -> str | None:
@@ -532,56 +590,68 @@ async def get_latest_plan(
         raise NotFoundError("No plan found")
 
     payload = json.loads(task.payload_json) if task.payload_json else {}
-    subtask_list = payload.get("subtasks", [])
+    return _build_plan_response(task, todo_id, payload)
 
-    # Compute suggested_due_summary from subtask due dates
-    due_dates: list[str] = []
-    for st in subtask_list:
-        dd = st.get("due_date")
-        if dd:
-            due_dates.append(dd)
-    suggested_due_summary = None
-    if due_dates:
-        sorted_dates = sorted(due_dates)
-        if sorted_dates[0] == sorted_dates[-1]:
-            suggested_due_summary = sorted_dates[0]
-        else:
-            suggested_due_summary = f"{sorted_dates[0]} \u2013 {sorted_dates[-1]}"
 
-    # Skill-based plan fields (preferred)
-    suggested_skills = payload.get("suggested_skills") or []
-    suggested_skills_labels = [_skill_label(s) for s in suggested_skills] if suggested_skills else None
+@router.post("/{todo_id}/plan/generate", response_model=PlanResponse)
+async def generate_graph_plan(
+    todo_id: str,
+    body: PlanGenerateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Generate and persist a proposal without creating any child todos."""
+    todo = await db.get(Todo, todo_id)
+    if not todo:
+        raise NotFoundError("Todo not found")
 
-    # Legacy assignee (backward compat)
-    assignee_raw = payload.get("suggested_assignee")
-    suggested_assignee_label = _skill_label(assignee_raw) if assignee_raw else None
-
-    suggested_project_label = _humanize_folder_name(
-        payload.get("suggested_project_title")
+    task = AgentTask(
+        id=make_id("task_"),
+        agent_type="plan",
+        task_type="plan_todo",
+        todo_id=todo.id,
+        instruction=body.instructions or f"Plan subtasks for: {todo.title}",
+        status="running",
+        skill_chain='["plan"]',
+        started_at=datetime.now(timezone.utc),
     )
+    db.add(task)
+    todo.inbox_state = "planning"
+    await db.commit()
+    await _notify_todo_change()
 
-    return PlanResponse(
-        task_id=task.id,
-        todo_id=todo_id,
-        summary=payload.get("summary", ""),
-        suggested_root_due_date=payload.get("suggested_root_due_date"),
-        suggested_assignee=assignee_raw,
-        suggested_skills=suggested_skills or None,
-        suggested_project_title=payload.get("suggested_project_title"),
-        subtasks=subtask_list,
-        created_at=task.created_at,
-        subtask_count=len(subtask_list),
-        suggested_due_summary=suggested_due_summary,
-        suggested_assignee_label=suggested_assignee_label,
-        suggested_skills_labels=suggested_skills_labels,
-        suggested_project_label=suggested_project_label,
-    )
+    try:
+        result = await todo_planning_service.generate_plan(
+            db,
+            request.app.state.ai_service,
+            todo,
+            additional_instructions=body.instructions,
+        )
+        task.payload_json = json.dumps(result)
+        task.status = "completed"
+        task.completed_at = datetime.now(timezone.utc)
+        todo.inbox_state = "plan_ready"
+        todo.automation_error = None
+        await db.commit()
+        await db.refresh(task)
+        await _notify_todo_change()
+        return _build_plan_response(task, todo_id, result)
+    except Exception as exc:
+        task.status = "failed"
+        task.error = str(exc)
+        task.completed_at = datetime.now(timezone.utc)
+        todo.inbox_state = "error"
+        todo.automation_error = str(exc)
+        await db.commit()
+        await _notify_todo_change()
+        raise HTTPException(status_code=502, detail="AI plan generation failed") from exc
 
 
 @router.post("/{todo_id}/plan/apply")
 async def apply_plan(
     todo_id: str,
-    request: Request,
+    body: PlanApplyRequest | None = None,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
@@ -605,37 +675,57 @@ async def apply_plan(
         raise NotFoundError("No plan found")
 
     payload = json.loads(task.payload_json) if task.payload_json else {}
-    subtasks = payload.get("subtasks", [])
+    subtasks = (
+        [subtask.model_dump() for subtask in body.subtasks]
+        if body and body.subtasks is not None
+        else payload.get("subtasks", [])
+    )
+    selected_indices = (
+        list(dict.fromkeys(body.selected_indices))
+        if body and body.selected_indices is not None
+        else list(range(len(subtasks)))
+    )
+    if any(index < 0 or index >= len(subtasks) for index in selected_indices):
+        raise HTTPException(status_code=422, detail="selected_indices contains an invalid subtask index")
+    if not selected_indices:
+        raise HTTPException(status_code=422, detail="Select at least one subtask")
 
     created_ids: list[str] = []
     created_todos: list[Todo] = []
+    created_id_by_original_index: dict[int, str] = {}
 
     # Create child todos
-    for index, subtask in enumerate(subtasks):
+    for sort_order, original_index in enumerate(selected_indices):
+        subtask = subtasks[original_index]
         child = Todo(
             id=make_id("todo_"),
             parent_id=todo_id,
             title=subtask.get("title", ""),
             description=subtask.get("description"),
             estimated_minutes=subtask.get("estimated_minutes"),
-            due_date=subtask.get("due_date"),
-            sort_order=index,
+            due_date=_parse_plan_due_date(subtask.get("due_date")),
+            priority=subtask.get("priority") or "medium",
+            sort_order=sort_order,
         )
         db.add(child)
         created_ids.append(child.id)
         created_todos.append(child)
+        created_id_by_original_index[original_index] = child.id
 
     await db.flush()
 
     # Store dependency links as depends_on on each child todo
-    for index, subtask in enumerate(subtasks):
+    relationship_count = 0
+    for created_todo, original_index in zip(created_todos, selected_indices):
+        subtask = subtasks[original_index]
         dep_ids = [
-            created_ids[dep_index]
+            created_id_by_original_index[dep_index]
             for dep_index in subtask.get("depends_on_indices", [])
-            if 0 <= dep_index < len(created_ids)
+            if dep_index in created_id_by_original_index and dep_index != original_index
         ]
         if dep_ids:
-            created_todos[index].depends_on = json.dumps(dep_ids)
+            created_todo.depends_on = json.dumps(list(dict.fromkeys(dep_ids)))
+            relationship_count += len(set(dep_ids))
 
     # Apply suggested skills (preferred) or legacy assignee
     if payload.get("suggested_skills"):
@@ -646,7 +736,7 @@ async def apply_plan(
 
     # Apply suggested root due date
     if payload.get("suggested_root_due_date"):
-        todo.due_date = payload["suggested_root_due_date"]
+        todo.due_date = _parse_plan_due_date(payload["suggested_root_due_date"])
 
     # Create project folder if suggested and no existing source
     project_folder_created = None

@@ -7,7 +7,8 @@ import { useToastStore } from '../stores/useToastStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { notify } from '../services/platform';
 import { playReminderSound } from '../services/reminderSound';
-import { IS_ELECTRON } from '../types/platform';
+import { platformApi } from '../platform';
+import { IS_DESKTOP } from '../types/platform';
 import apiClient from '../services/apiClient';
 import { queryKeys } from './queries';
 import type { ConversationResponse } from '../types/api';
@@ -178,11 +179,11 @@ export default function useWebSocket(): void {
       }
     };
 
-    // Electron: handle "Mark Done" action from desktop notification
+    // Desktop: handle "Mark Done" action from a native notification
     let unsubNotifAction: (() => void) | undefined;
     let unsubNotifNav: (() => void) | undefined;
-    if (IS_ELECTRON && window.electronAPI?.on) {
-      unsubNotifAction = window.electronAPI.on('notification:action', async (...args: unknown[]) => {
+    if (IS_DESKTOP) {
+      unsubNotifAction = platformApi.events.on('notification:action', async (...args: unknown[]) => {
         const d = args[0] as { action?: string; itemType?: string; itemId?: string };
         if (d.action === 'mark_done' && d.itemId) {
           try {
@@ -196,7 +197,7 @@ export default function useWebSocket(): void {
           }
         }
       });
-      unsubNotifNav = window.electronAPI.on('navigate', (...args: unknown[]) => {
+      unsubNotifNav = platformApi.events.on('navigate', (...args: unknown[]) => {
         const route = args[0] as string;
         if (route) window.dispatchEvent(new CustomEvent('navigate', { detail: route }));
       });

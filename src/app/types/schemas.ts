@@ -553,6 +553,7 @@ export const PlanSubtaskSchema = z.object({
   description: z.string().nullable().optional(),
   estimated_minutes: z.number().nullable().optional(),
   due_date: z.string().nullable().optional(),
+  priority: PrioritySchema.nullable().optional(),
   depends_on_indices: z.array(z.number()).optional(),
 });
 
@@ -637,8 +638,20 @@ export const ObsidianHealthSchema = z.object({
   scan_duration_ms: z.number(),
   is_stale: z.boolean(),
   error: z.string().nullable(),
+  queue_pending: z.number().optional(),
+  queue_age_seconds: z.number().nullable().optional(),
+  dead_letter_count: z.number().optional(),
+  last_cli_error: z.object({
+    timestamp: z.number(),
+    command: z.string(),
+    error: z.string(),
+    returncode: z.number().nullable(),
+  }).nullable().optional(),
+  last_successful_cli_at: z.number().nullable().optional(),
+  scan_stuck: z.boolean().optional(),
   write_queue: z.object({
     pending: z.number(),
+    oldest_age_seconds: z.number().nullable().optional(),
     operations: z.array(z.object({
       op: z.string(),
       path: z.string(),

@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
-  appVersion: '0.1.0',
+  appVersion: __APP_VERSION__,
 
   send(channel: string, ...args: unknown[]) {
     const allowed = ['show-notification', 'set-badge-count'];
@@ -34,6 +34,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const listener = (_event: Electron.IpcRendererEvent, info: { version: string; releaseNotes?: string }) => cb(info);
       ipcRenderer.on('update-available', listener);
       return () => ipcRenderer.removeListener('update-available', listener);
+    },
+    onUpdateNotAvailable(cb: () => void) {
+      const listener = () => cb();
+      ipcRenderer.on('update-not-available', listener);
+      return () => ipcRenderer.removeListener('update-not-available', listener);
+    },
+    onDownloadProgress(cb: (progress: { downloadedBytes: number; totalBytes?: number; percent?: number }) => void) {
+      const listener = (_event: Electron.IpcRendererEvent, progress: { downloadedBytes: number; totalBytes?: number; percent?: number }) => cb(progress);
+      ipcRenderer.on('update-download-progress', listener);
+      return () => ipcRenderer.removeListener('update-download-progress', listener);
     },
     onUpdateDownloaded(cb: () => void) {
       const listener = () => cb();

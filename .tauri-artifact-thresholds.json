@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": null,
+  "note": "Provisional ceilings; record CI baselines after the first successful three-platform package run.",
+  "platforms": {
+    "linux": {
+      "artifacts": [
+        {
+          "id": "deb",
+          "directory": "deb",
+          "extension": ".deb",
+          "required": true,
+          "maxBytes": 131072000
+        },
+        {
+          "id": "appimage",
+          "directory": "appimage",
+          "extension": ".AppImage",
+          "required": true,
+          "maxBytes": 230686720
+        },
+        {
+          "id": "appimage-updater",
+          "directory": "appimage",
+          "extension": ".AppImage.tar.gz",
+          "required": false,
+          "maxBytes": 230686720
+        }
+      ]
+    },
+    "windows": {
+      "artifacts": [
+        {
+          "id": "nsis",
+          "directory": "nsis",
+          "extension": ".exe",
+          "required": true,
+          "maxBytes": 188743680
+        },
+        {
+          "id": "nsis-updater",
+          "directory": "nsis",
+          "extension": ".nsis.zip",
+          "required": false,
+          "maxBytes": 188743680
+        }
+      ]
+    },
+    "macos": {
+      "artifacts": [
+        {
+          "id": "dmg",
+          "directory": "dmg",
+          "extension": ".dmg",
+          "required": true,
+          "maxBytes": 188743680
+        },
+        {
+          "id": "app-updater",
+          "directory": "macos",
+          "extension": ".app.tar.gz",
+          "required": false,
+          "maxBytes": 188743680
+        }
+      ]
+    }
+  }
+}

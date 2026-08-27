@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
-import { IS_ELECTRON } from '../types/platform';
+import { platformApi } from '../platform';
+import { IS_DESKTOP } from '../types/platform';
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 import { useAppMode } from '../hooks/useAppMode';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
@@ -12,8 +13,8 @@ type Step = 'welcome' | 'role' | 'server' | 'claude' | 'pairing' | 'ready';
 type ServerStatus = 'checking' | 'online' | 'offline' | 'error';
 type ClaudeStatus = 'checking' | 'ready' | 'not-installed' | 'not-authenticated' | 'unavailable';
 
-function getSteps(isElectron: boolean, chosenRole: 'host' | 'client' | null): Step[] {
-  if (!isElectron) {
+function getSteps(isDesktop: boolean, chosenRole: 'host' | 'client' | null): Step[] {
+  if (!isDesktop) {
     return ['welcome', 'server', 'claude', 'pairing', 'ready'];
   }
   if (chosenRole === 'client') {
@@ -29,23 +30,21 @@ export default function OnboardingPage() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const { appMode, setAppMode } = useAppMode();
 
-  const [chosenRole, setChosenRole] = useState<'host' | 'client' | null>(
-    IS_ELECTRON ? null : null
-  );
+  const [chosenRole, setChosenRole] = useState<'host' | 'client' | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
   const [serverStatus, setServerStatus] = useState<ServerStatus>('checking');
-  const [electronServerStatus, setElectronServerStatus] = useState<string>('unknown');
+  const [embeddedServerStatus, setEmbeddedServerStatus] = useState<string>('unknown');
   const [manualServerUrl, setManualServerUrl] = useState(DEFAULT_SERVER_URL);
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('checking');
   const [pairingComplete, setPairingComplete] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
-  const steps = getSteps(IS_ELECTRON, chosenRole);
+  const steps = getSteps(IS_DESKTOP, chosenRole);
   const currentIndex = steps.indexOf(currentStep);
 
   // Sync chosenRole from appMode if already set (e.g. migration)
   useEffect(() => {
-    if (IS_ELECTRON && appMode && chosenRole === null) {
+    if (IS_DESKTOP && appMode && chosenRole === null) {
       setChosenRole(appMode);
     }
   }, [appMode, chosenRole]);
@@ -57,12 +56,12 @@ export default function OnboardingPage() {
     }
   }, [token, navigate]);
 
-  // Check embedded server status (Electron IPC)
-  const checkElectronServer = useCallback(async () => {
-    if (!IS_ELECTRON) return;
+  // Check the embedded server status through the active desktop adapter.
+  const checkEmbeddedServer = useCallback(async () => {
+    if (!IS_DESKTOP) return;
     try {
-      const status = await window.electronAPI.server.getStatus();
-      setElectronServerStatus(status.state);
+      const status = await platformApi.server.getStatus();
+      setEmbeddedServerStatus(status.state);
       if (status.state === 'running') {
         setServerStatus('online');
       } else if (status.state === 'starting') {
@@ -98,10 +97,10 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (currentStep !== 'server') return;
 
-    if (IS_ELECTRON && chosenRole === 'host') {
-      checkElectronServer();
-      const unsub = window.electronAPI.server.onStatusChange((status) => {
-        setElectronServerStatus(status.state);
+    if (IS_DESKTOP && chosenRole === 'host') {
+      checkEmbeddedServer();
+      const unsub = platformApi.server.onStatusChange((status) => {
+        setEmbeddedServerStatus(status.state);
         if (status.state === 'running') {
           setServerStatus('online');
         } else if (status.state === 'starting') {
@@ -112,22 +111,22 @@ export default function OnboardingPage() {
       });
       return unsub;
     } else {
-      // Client mode (Electron or non-Electron): check remote server health
+      // Client mode (desktop or non-desktop): check remote server health
       checkServerHealth();
     }
-  }, [currentStep, chosenRole, checkElectronServer, checkServerHealth]);
+  }, [currentStep, chosenRole, checkEmbeddedServer, checkServerHealth]);
 
-  // Auto-retry Electron server check when status is checking
+  // Auto-retry the embedded server check while it is starting.
   useEffect(() => {
-    if (currentStep !== 'server' || !IS_ELECTRON || chosenRole !== 'host' || serverStatus !== 'checking') return;
-    const interval = setInterval(checkElectronServer, 2000);
+    if (currentStep !== 'server' || !IS_DESKTOP || chosenRole !== 'host' || serverStatus !== 'checking') return;
+    const interval = setInterval(checkEmbeddedServer, 2000);
     return () => clearInterval(interval);
-  }, [currentStep, chosenRole, serverStatus, checkElectronServer]);
+  }, [currentStep, chosenRole, serverStatus, checkEmbeddedServer]);
 
   // Check Claude Code availability
   const checkClaudeCode = useCallback(async () => {
     setClaudeStatus('checking');
-    const baseUrl = IS_ELECTRON
+    const baseUrl = IS_DESKTOP
       ? (serverUrl ?? DEFAULT_SERVER_URL)
       : manualServerUrl.replace(/\/+$/, '');
 
@@ -186,11 +185,11 @@ export default function OnboardingPage() {
 
   const handleRoleSelect = async (role: 'host' | 'client') => {
     setChosenRole(role);
-    if (IS_ELECTRON) {
+    if (IS_DESKTOP) {
       await setAppMode(role);
     }
     // Advance to next step (server)
-    const nextSteps = getSteps(IS_ELECTRON, role);
+    const nextSteps = getSteps(IS_DESKTOP, role);
     const roleIndex = nextSteps.indexOf('role');
     if (roleIndex >= 0 && roleIndex + 1 < nextSteps.length) {
       setCurrentStep(nextSteps[roleIndex + 1]);
@@ -211,8 +210,8 @@ export default function OnboardingPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               code: parsed.code,
-              device_name: IS_ELECTRON ? 'Desktop Client' : 'Device',
-              device_type: IS_ELECTRON ? 'web' : 'android',
+              device_name: IS_DESKTOP ? 'Desktop Client' : 'Device',
+              device_type: IS_DESKTOP ? 'web' : 'android',
             }),
           });
           if (!res.ok) {
@@ -228,9 +227,9 @@ export default function OnboardingPage() {
             serverUrl: resolvedUrl,
             isLoading: false,
           });
-          // Save host URL in Electron config
-          if (IS_ELECTRON) {
-            await window.electronAPI.server.updateConfig({ hostServerUrl: resolvedUrl });
+          // Save the host URL in the native desktop config.
+          if (IS_DESKTOP) {
+            await platformApi.server.updateConfig({ hostServerUrl: resolvedUrl });
           }
           setServerStatus('online');
         } catch (err) {
@@ -294,14 +293,14 @@ export default function OnboardingPage() {
   };
 
   const getServerStatusLabel = () => {
-    if (IS_ELECTRON && chosenRole === 'host') {
+    if (IS_DESKTOP && chosenRole === 'host') {
       switch (serverStatus) {
         case 'checking':
           return 'Starting embedded server...';
         case 'online':
           return 'Server is running';
         case 'offline':
-          return `Server is ${electronServerStatus}`;
+          return `Server is ${embeddedServerStatus}`;
         case 'error':
           return 'Failed to start server';
       }
@@ -400,16 +399,16 @@ export default function OnboardingPage() {
   );
 
   const renderServer = () => {
-    const isHostOnElectron = IS_ELECTRON && chosenRole === 'host';
-    const showUrlInput = !isHostOnElectron;
+    const isDesktopHost = IS_DESKTOP && chosenRole === 'host';
+    const showUrlInput = !isDesktopHost;
 
     return (
       <div className="cc-onboarding__card">
         <h2 className="cc-onboarding__card-title">
-          {isHostOnElectron ? 'Server Status' : 'Connect to Host'}
+          {isDesktopHost ? 'Server Status' : 'Connect to Host'}
         </h2>
         <p className="cc-onboarding__card-description">
-          {isHostOnElectron
+          {isDesktopHost
             ? 'ClawChat includes an embedded server. It should start automatically.'
             : 'Connect to your ClawChat host by scanning a QR code or entering the server URL.'}
         </p>
@@ -418,7 +417,7 @@ export default function OnboardingPage() {
           <div className={getServerStatusDot()} />
           <div>
             <div className="cc-onboarding__status-label">{getServerStatusLabel()}</div>
-            {isHostOnElectron && serverStatus === 'checking' && (
+            {isDesktopHost && serverStatus === 'checking' && (
               <div className="cc-onboarding__status-sublabel">This usually takes a few seconds</div>
             )}
           </div>
@@ -451,10 +450,10 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {isHostOnElectron && serverStatus === 'offline' && (
+        {isDesktopHost && serverStatus === 'offline' && (
           <button
             className="cc-btn cc-btn--secondary"
-            onClick={checkElectronServer}
+            onClick={checkEmbeddedServer}
             style={{ marginTop: 8 }}
           >
             Retry
@@ -605,7 +604,7 @@ export default function OnboardingPage() {
         You&apos;re all set!
       </h2>
       <p className="cc-onboarding__card-description" style={{ textAlign: 'center' }}>
-        {IS_ELECTRON && chosenRole === 'host'
+        {IS_DESKTOP && chosenRole === 'host'
           ? 'Your ClawChat host is running. Other devices can connect to this machine.'
           : 'ClawChat is ready to use.'
         }{' '}

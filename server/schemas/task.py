@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AgentTaskResponse(BaseModel):
@@ -57,11 +57,23 @@ class AgentTaskResponse(BaseModel):
 
 
 class PlanSubtask(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=500)
     description: str | None = None
     estimated_minutes: int | None = None
     due_date: str | None = None
+    priority: str | None = None
     depends_on_indices: list[int] = []
+
+
+class PlanGenerateRequest(BaseModel):
+    """Optional user guidance for a fresh AI graph proposal."""
+    instructions: str | None = Field(default=None, max_length=2000)
+
+
+class PlanApplyRequest(BaseModel):
+    """Selection and optional user edits applied to the latest proposal."""
+    selected_indices: list[int] | None = None
+    subtasks: list[PlanSubtask] | None = None
 
 
 class PlanResponse(BaseModel):

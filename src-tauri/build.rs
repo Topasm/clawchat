@@ -1,0 +1,26 @@
+fn main() {
+    const COMMANDS: &[&str] = &[
+        "server_get_status",
+        "server_get_config",
+        "server_get_network_info",
+        "server_update_config",
+        "server_select_folder",
+        "server_open_obsidian_vault",
+        "server_set_app_mode",
+        "server_get_app_mode",
+        "app_show_notification",
+        "app_set_badge_count",
+        "secure_storage_get",
+        "secure_storage_set",
+        "secure_storage_remove",
+        "updater_check",
+        "updater_download",
+        "updater_install",
+    ];
+
+    tauri_build::try_build(
+        tauri_build::Attributes::new()
+            .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),
+    )
+    .expect("failed to build Tauri command permissions");
+}

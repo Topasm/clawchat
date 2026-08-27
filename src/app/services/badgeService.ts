@@ -1,4 +1,5 @@
-import { IS_CAPACITOR, IS_ELECTRON, IS_WEB } from '../types/platform';
+import { platformApi } from '../platform';
+import { IS_CAPACITOR, IS_DESKTOP, IS_WEB } from '../types/platform';
 
 /**
  * Updates the native app icon badge count across all platforms.
@@ -10,8 +11,8 @@ export async function setAppBadge(count: number): Promise<void> {
   const safeCount = Math.max(0, Math.round(count));
 
   try {
-    if (IS_ELECTRON) {
-      window.electronAPI?.setBadgeCount(safeCount);
+    if (IS_DESKTOP) {
+      await platformApi.notifications.setBadgeCount(safeCount);
     } else if (IS_CAPACITOR) {
       const { LocalNotifications } = await import('@capacitor/local-notifications');
       // Capacitor 6 LocalNotifications doesn't have setBadge — use the Badge plugin

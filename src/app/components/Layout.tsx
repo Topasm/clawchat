@@ -3,7 +3,6 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelSize } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
-import { useModuleStore } from '../stores/useModuleStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import apiClient from '../services/apiClient';
 import ChatPanel from './chat-panel/ChatPanel';
@@ -24,12 +23,13 @@ import OfflineIndicator from './shared/OfflineIndicator';
 import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
-import { useCapabilitiesQuery } from '../hooks/queries';
+import { useCapabilitiesQuery, useTodosQuery } from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
 import type { HealthResponse } from '../types/api';
+import { platformApi } from '../platform';
 
 // --- SVG icon components ---
 import {
@@ -113,6 +113,7 @@ export default function Layout() {
   const contentRef = useRef<HTMLDivElement>(null);
   const quickCapture = useQuickCaptureStore();
   const { data: capabilities } = useCapabilitiesQuery();
+  const { data: todos = [] } = useTodosQuery();
 
   // Conditionally filter nav items based on server capabilities
   const filteredPrimaryNavItems = useMemo(() => {
@@ -141,14 +142,12 @@ export default function Layout() {
     return () => window.removeEventListener('navigate', handler);
   }, [navigate]);
 
-  // Electron: global shortcut opens quick capture (Cmd/Ctrl+Shift+Space)
+  // Desktop: global shortcut opens quick capture (Cmd/Ctrl+Shift+Space)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.electronAPI?.on) {
-      const unsub = window.electronAPI.on('open-quick-capture', () => {
-        quickCapture.open();
-      });
-      return () => unsub();
-    }
+    if (!platformApi.runtime.isDesktop) return;
+    return platformApi.events.on('open-quick-capture', () => {
+      quickCapture.open();
+    });
   }, [quickCapture]);
 
   // Web: keyboard shortcut 'Q' opens quick capture (when no input is focused)
@@ -215,8 +214,9 @@ export default function Layout() {
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
 
   // Badge counts
-  const inboxCount = useModuleStore((s) =>
-    (s.todos ?? []).filter((t) => !t.due_date && t.status !== 'completed').length,
+  const inboxCount = useMemo(
+    () => todos.filter((todo) => !todo.due_date && todo.status !== 'completed').length,
+    [todos],
   );
   // Sync inbox count to native app icon badge
   useEffect(() => {

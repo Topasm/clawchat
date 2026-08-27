@@ -11,9 +11,15 @@ import useKanbanDragDrop from '../../hooks/useKanbanDragDrop';
 import type { KanbanStatus } from '../../types/api';
 import { useKanbanShortcuts } from '../../keyboard';
 import KanbanBoardView from './KanbanBoardView';
+import type { TasksViewMode } from './TasksHeader';
 import { ClipboardIcon, SpinArrowsIcon, CheckCircleIcon } from '../shared/Icons';
 
-export default function KanbanBoard() {
+interface KanbanBoardProps {
+  viewMode: TasksViewMode;
+  onViewModeChange: (mode: TasksViewMode) => void;
+}
+
+export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardProps) {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
   const { data: todos = [] } = useTodosQuery();
@@ -125,6 +131,8 @@ export default function KanbanBoard() {
   return (
     <KanbanBoardView
       todos={todos}
+      viewMode={viewMode}
+      onViewModeChange={onViewModeChange}
       columnDefs={columnDefs}
       showSubTasks={kanbanFilters.showSubTasks}
       isMobile={isMobile}
@@ -132,7 +140,6 @@ export default function KanbanBoard() {
       onDragEnd={handleDragEnd}
       onToggle={handleToggle}
       onClickTask={handleClickTask}
-      onNewTask={() => useQuickCaptureStore.getState().open()}
       focusedTaskId={focusedTaskId}
       onFocusTask={setFocusedTaskId}
       selectedIds={selectedTodoIds}

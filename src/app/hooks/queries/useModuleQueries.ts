@@ -9,8 +9,20 @@ import {
   TodoResponseSchema,
   EventResponseSchema,
   AttachmentResponseSchema,
+  PlanApplyResponseSchema,
+  PlanResponseSchema,
 } from '../../types/schemas';
-import type { TodoResponse, TodoCreate, TodoUpdate, EventResponse, EventCreate, EventUpdate, KanbanStatus, BulkTodoUpdate } from '../../types/api';
+import type {
+  TodoResponse,
+  TodoCreate,
+  TodoUpdate,
+  EventResponse,
+  EventCreate,
+  EventUpdate,
+  KanbanStatus,
+  BulkTodoUpdate,
+  PlanSubtask,
+} from '../../types/api';
 import { queryKeys } from './queryKeys';
 
 // ---------------------------------------------------------------------------
@@ -518,6 +530,56 @@ export function useBulkUpdateTodos() {
     },
     onError: () => {
       useToastStore.getState().addToast('error', 'Bulk operation failed');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.today });
+    },
+  });
+}
+
+export function useGenerateTaskPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ todoId, instructions }: { todoId: string; instructions?: string }) => {
+      const response = await apiClient.post(`/todos/${todoId}/plan/generate`, {
+        instructions: instructions?.trim() || null,
+      });
+      return PlanResponseSchema.parse(response.data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+    },
+    onError: () => {
+      useToastStore.getState().addToast('error', 'AI could not generate a task plan');
+    },
+  });
+}
+
+export function useApplyTaskPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      todoId,
+      selectedIndices,
+      subtasks,
+    }: {
+      todoId: string;
+      selectedIndices: number[];
+      subtasks: PlanSubtask[];
+    }) => {
+      const response = await apiClient.post(`/todos/${todoId}/plan/apply`, {
+        selected_indices: selectedIndices,
+        subtasks,
+      });
+      return PlanApplyResponseSchema.parse(response.data);
+    },
+    onSuccess: (result) => {
+      const created = result.created_subtask_ids?.length ?? 0;
+      useToastStore.getState().addToast('success', `Created ${created} task${created === 1 ? '' : 's'}`);
+    },
+    onError: () => {
+      useToastStore.getState().addToast('error', 'Failed to apply the AI plan');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import usePlatform from '../hooks/usePlatform';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { useUpdateStore } from '../stores/useUpdateStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
@@ -17,7 +18,14 @@ import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import { IS_CAPACITOR } from '../types/platform';
-import type { ServerStatus } from '../types/electron';
+import { platformApi, type ServerStatus } from '../platform';
+import {
+  checkForAppUpdate,
+  downloadAppUpdate,
+  installAppUpdate,
+  retryAppUpdate,
+  setAutomaticUpdateChecks,
+} from '../services/updateLifecycle';
 
 interface AIProviderState {
   active_provider: string;
@@ -29,7 +37,7 @@ interface AIProviderState {
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { mode, setMode } = useTheme();
-  const { isMobile, isElectron } = usePlatform();
+  const { isMobile, isDesktop } = usePlatform();
   const settings = useSettingsStore();
   const token = useAuthStore((s) => s.token);
   const serverUrl = useAuthStore((s) => s.serverUrl);
@@ -44,17 +52,20 @@ export default function SettingsPage() {
   const { appMode, setAppMode: switchAppMode, isHost } = useAppMode();
   const [hostServerStatus, setHostServerStatus] = useState<ServerStatus | null>(null);
   const [autoStartHost, setAutoStartHost] = useState(false);
+  const updateStatus = useUpdateStore((state) => state.status);
+  const updateInfo = useUpdateStore((state) => state.info);
+  const automaticChecksEnabled = useUpdateStore((state) => state.automaticChecksEnabled);
 
   // Load host-mode specific state
   useEffect(() => {
-    if (!isElectron) return;
-    window.electronAPI.server.getStatus().then(setHostServerStatus);
-    window.electronAPI.server.getConfig().then((cfg) => {
+    if (!isDesktop) return;
+    platformApi.server.getStatus().then(setHostServerStatus);
+    platformApi.server.getConfig().then((cfg) => {
       setAutoStartHost(cfg.autoStartHost);
     });
-    const unsub = window.electronAPI.server.onStatusChange(setHostServerStatus);
+    const unsub = platformApi.server.onStatusChange(setHostServerStatus);
     return unsub;
-  }, [isElectron]);
+  }, [isDesktop]);
 
   const handleModeSwitch = useCallback(async (newMode: string) => {
     if (newMode !== 'client' && newMode !== 'host') return;
@@ -77,7 +88,7 @@ export default function SettingsPage() {
   }, [appMode, switchAppMode, addToast, logout, navigate]);
 
   const handleAutoStartToggle = useCallback(async (enabled: boolean) => {
-    await window.electronAPI.server.updateConfig({ autoStartHost: enabled });
+    await platformApi.server.updateConfig({ autoStartHost: enabled });
     setAutoStartHost(enabled);
     addToast('success', enabled ? 'Server will start on login.' : 'Auto-start disabled.');
   }, [addToast]);
@@ -156,8 +167,8 @@ export default function SettingsPage() {
   }, [addToast]);
 
   useEffect(() => {
-    if (isElectron) {
-      window.electronAPI.server.getConfig().then((cfg) => {
+    if (isDesktop) {
+      platformApi.server.getConfig().then((cfg) => {
         setObsidianVaultPath(cfg.obsidianVaultPath ?? '');
       });
     } else {
@@ -165,7 +176,7 @@ export default function SettingsPage() {
         setObsidianVaultPath(res.data?.vaultPath ?? '');
       }).catch(() => {});
     }
-  }, [isElectron]);
+  }, [isDesktop]);
 
   return (
     <div style={{ maxWidth: 560 }}>
@@ -173,7 +184,7 @@ export default function SettingsPage() {
         <div className="cc-page-header__title">Settings</div>
       </div>
 
-      {isElectron && appMode && (
+      {isDesktop && appMode && (
         <SettingsSection title="Server Mode">
           <SettingsRow label="App mode" sublabel={
             isHost
@@ -408,7 +419,7 @@ export default function SettingsPage() {
 
       <ObsidianStatusCard />
 
-      {isElectron && isHost && (
+      {isDesktop && isHost && (
         <SettingsSection title="Obsidian Desktop">
           <SettingsRow label="Vault path" sublabel={obsidianVaultPath || 'Not configured'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -416,10 +427,10 @@ export default function SettingsPage() {
                 type="button"
                 className="cc-btn cc-btn--secondary"
                 onClick={async () => {
-                  const folder = await window.electronAPI.server.selectFolder();
+                  const folder = await platformApi.server.selectFolder();
                   if (folder) {
                     setObsidianVaultPath(folder);
-                    await window.electronAPI.server.updateConfig({ obsidianVaultPath: folder });
+                    await platformApi.server.updateConfig({ obsidianVaultPath: folder });
                     addToast('success', 'Vault path saved. Restarting server...');
                   }
                 }}
@@ -433,7 +444,7 @@ export default function SettingsPage() {
                   className="cc-btn cc-btn--danger"
                   onClick={async () => {
                     setObsidianVaultPath('');
-                    await window.electronAPI.server.updateConfig({ obsidianVaultPath: '' });
+                    await platformApi.server.updateConfig({ obsidianVaultPath: '' });
                     addToast('success', 'Vault path cleared.');
                   }}
                   style={{ fontSize: 12, padding: '4px 10px' }}
@@ -457,7 +468,7 @@ export default function SettingsPage() {
         </SettingsSection>
       )}
 
-      {!isElectron && (
+      {!isDesktop && (
         <SettingsSection title="Server Connection">
           <SettingsRow label="Server" sublabel={serverUrl ?? 'Unknown'}>
             <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
@@ -469,12 +480,12 @@ export default function SettingsPage() {
           </SettingsRow>
         </SettingsSection>
       )}
-      {isElectron && isHost && token && (
+      {isDesktop && isHost && token && (
         <SettingsSection title="Connect Mobile Device">
           <PairingCodeDisplay />
         </SettingsSection>
       )}
-      {isElectron && token && (
+      {isDesktop && token && (
         <SettingsSection title="Account">
           <SettingsRow label="Server" sublabel={serverUrl ?? 'localhost:8000'}>
             <span style={{ fontSize: 12, color: 'var(--cc-success)' }}>Connected</span>
@@ -486,6 +497,62 @@ export default function SettingsPage() {
           </SettingsRow>
         </SettingsSection>
       )}
+      {isDesktop && (
+        <SettingsSection title="Updates">
+          <SettingsRow
+            label="Automatic update checks"
+            sublabel="Check for signed releases at startup and periodically. Installation always requires confirmation."
+          >
+            <Toggle checked={automaticChecksEnabled} onChange={setAutomaticUpdateChecks} />
+          </SettingsRow>
+          <SettingsRow
+            label="Software update"
+            sublabel={
+              updateStatus === 'available'
+                ? `Version ${updateInfo?.version ?? ''} is available`
+                : updateStatus === 'downloading'
+                  ? 'Downloading update…'
+                  : updateStatus === 'ready'
+                    ? 'Ready to install and restart'
+                    : updateStatus === 'restarting'
+                      ? 'Installing update…'
+                      : updateStatus === 'up-to-date'
+                        ? 'ClawChat is up to date'
+                        : updateStatus === 'error'
+                          ? 'The last update operation failed'
+                          : `Current version ${platformApi.runtime.appVersion}`
+            }
+          >
+            <button
+              type="button"
+              className="cc-btn cc-btn--secondary"
+              disabled={updateStatus === 'checking' || updateStatus === 'downloading' || updateStatus === 'restarting'}
+              onClick={() => {
+                if (updateStatus === 'available') void downloadAppUpdate();
+                else if (updateStatus === 'ready') void installAppUpdate();
+                else if (updateStatus === 'error') void retryAppUpdate();
+                else void checkForAppUpdate(true);
+              }}
+              style={{ fontSize: 12, padding: '4px 10px' }}
+            >
+              {updateStatus === 'checking' && 'Checking…'}
+              {updateStatus === 'downloading' && 'Downloading…'}
+              {updateStatus === 'restarting' && 'Restarting…'}
+              {updateStatus === 'available' && 'Download'}
+              {updateStatus === 'ready' && 'Restart'}
+              {updateStatus === 'error' && 'Retry'}
+              {(updateStatus === 'idle' || updateStatus === 'up-to-date') && 'Check Now'}
+            </button>
+          </SettingsRow>
+        </SettingsSection>
+      )}
+      <SettingsSection title="About">
+        <SettingsRow label="ClawChat" sublabel="Application version">
+          <span style={{ fontSize: 12, color: 'var(--cc-text-secondary)' }}>
+            v{platformApi.runtime.appVersion}
+          </span>
+        </SettingsRow>
+      </SettingsSection>
     </div>
   );
 }

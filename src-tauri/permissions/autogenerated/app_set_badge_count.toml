@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-set-badge-count"
+description = "Enables the app_set_badge_count command without any pre-configured scope."
+commands.allow = ["app_set_badge_count"]
+
+[[permission]]
+identifier = "deny-app-set-badge-count"
+description = "Denies the app_set_badge_count command without any pre-configured scope."
+commands.deny = ["app_set_badge_count"]

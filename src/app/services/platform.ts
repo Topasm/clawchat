@@ -1,4 +1,5 @@
-import { IS_CAPACITOR, IS_ELECTRON } from '../types/platform';
+import { platformApi } from '../platform';
+import { IS_CAPACITOR, IS_DESKTOP } from '../types/platform';
 
 export interface NotifyOptions {
   /** Silent notification (no sound). Defaults to false. */
@@ -20,8 +21,8 @@ export interface NotifyOptions {
 export async function notify(title: string, body: string, options: NotifyOptions = {}): Promise<void> {
   const { silent = false, itemType, itemId } = options;
 
-  if (IS_ELECTRON) {
-    window.electronAPI?.showNotification(title, body, { silent, itemType, itemId });
+  if (IS_DESKTOP) {
+    await platformApi.notifications.show(title, body, { silent, itemType, itemId });
   } else if (IS_CAPACITOR) {
     const { LocalNotifications } = await import('@capacitor/local-notifications');
     const perm = await LocalNotifications.checkPermissions();
@@ -104,28 +105,47 @@ export const storage = {
 };
 
 /**
- * Secure storage — uses Electron's safeStorage (OS-level encryption) when
- * running in Electron, falls back to the regular storage abstraction otherwise.
+ * Secure storage uses the desktop OS credential vault when available. A legacy
+ * local value is promoted on first read; web/mobile and unavailable OS vaults
+ * retain the existing storage fallback.
  */
 export const secureStorage = {
   async get(key: string): Promise<string | null> {
-    const api = (window as any).electronAPI;
-    if (api?.secureStore) {
-      return api.secureStore.get(key);
+    if (platformApi.secureStorage) {
+      try {
+        const secured = await platformApi.secureStorage.get(key);
+        if (secured !== null) return secured;
+        const legacy = await storage.get(key);
+        if (legacy !== null) {
+          await platformApi.secureStorage.set(key, legacy);
+          await storage.remove(key);
+        }
+        return legacy;
+      } catch (error) {
+        console.warn('OS secure storage is unavailable; using platform storage.', error);
+      }
     }
     return storage.get(key);
   },
   async set(key: string, value: string): Promise<void> {
-    const api = (window as any).electronAPI;
-    if (api?.secureStore) {
-      return api.secureStore.set(key, value);
+    if (platformApi.secureStorage) {
+      try {
+        await platformApi.secureStorage.set(key, value);
+        await storage.remove(key);
+        return;
+      } catch (error) {
+        console.warn('OS secure storage is unavailable; using platform storage.', error);
+      }
     }
     return storage.set(key, value);
   },
   async remove(key: string): Promise<void> {
-    const api = (window as any).electronAPI;
-    if (api?.secureStore) {
-      return api.secureStore.delete(key);
+    if (platformApi.secureStorage) {
+      try {
+        await platformApi.secureStorage.remove(key);
+      } catch (error) {
+        console.warn('OS secure storage is unavailable while removing a credential.', error);
+      }
     }
     return storage.remove(key);
   },

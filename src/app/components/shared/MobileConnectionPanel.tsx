@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { IS_ELECTRON } from '../../types/platform';
+import { platformApi } from '../../platform';
+import { IS_DESKTOP } from '../../types/platform';
 import { DEFAULT_SERVER_URL } from '../../config/constants';
 
 interface NetworkAddress {
@@ -21,10 +22,10 @@ export default function MobileConnectionPanel() {
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!IS_ELECTRON) return;
+    if (!IS_DESKTOP) return;
     const [netInfo, cfg] = await Promise.all([
-      window.electronAPI.server.getNetworkInfo(),
-      window.electronAPI.server.getConfig(),
+      platformApi.server.getNetworkInfo(),
+      platformApi.server.getConfig(),
     ]);
     setAddresses(netInfo.addresses);
     setConfig(cfg);

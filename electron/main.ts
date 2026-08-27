@@ -292,10 +292,31 @@ ipcMain.handle('server:openObsidianVault', () => {
 function setupAutoUpdater() {
   autoUpdater.autoDownload = false;
 
+  const serializeUpdateInfo = (info: { version: string; releaseNotes?: unknown }) => ({
+    version: info.version,
+    releaseNotes: typeof info.releaseNotes === 'string'
+      ? info.releaseNotes
+      : Array.isArray(info.releaseNotes)
+        ? info.releaseNotes
+            .map((note) => typeof note === 'object' && note && 'note' in note ? String(note.note) : '')
+            .filter(Boolean)
+            .join('\n') || undefined
+        : undefined,
+  });
+
   autoUpdater.on('update-available', (info) => {
-    mainWindow?.webContents.send('update-available', {
-      version: info.version,
-      releaseNotes: info.releaseNotes,
+    mainWindow?.webContents.send('update-available', serializeUpdateInfo(info));
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update-not-available');
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update-download-progress', {
+      downloadedBytes: progress.transferred,
+      totalBytes: progress.total,
+      percent: progress.percent,
     });
   });
 
@@ -303,7 +324,10 @@ function setupAutoUpdater() {
     mainWindow?.webContents.send('update-downloaded');
   });
 
-  ipcMain.handle('updater:check', () => autoUpdater.checkForUpdates());
+  ipcMain.handle('updater:check', async () => {
+    const result = await autoUpdater.checkForUpdates();
+    return result?.updateInfo ? serializeUpdateInfo(result.updateInfo) : null;
+  });
   ipcMain.handle('updater:download', () => autoUpdater.downloadUpdate());
   ipcMain.handle('updater:install', () => {
     autoUpdater.quitAndInstall(false, true);
