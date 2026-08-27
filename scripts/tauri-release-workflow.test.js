@@ -5,8 +5,12 @@ const test = require('node:test');
 
 const workflowPath = path.resolve(__dirname, '..', '.github', 'workflows', 'release-tauri.yml');
 
+function readWorkflow() {
+  return fs.readFileSync(workflowPath, 'utf8').replace(/\r\n/g, '\n');
+}
+
 test('preflight gates the build matrix and one dependent job publishes the release', () => {
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const workflow = readWorkflow();
 
   assert.doesNotMatch(workflow, /tauri-apps\/tauri-action/);
   assert.match(workflow, /\n  preflight:\n[\s\S]*?npm run check:release-version/);
@@ -32,7 +36,7 @@ test('preflight gates the build matrix and one dependent job publishes the relea
 });
 
 test('final inventory requires every platform updater and all expected release files', () => {
-  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const workflow = readWorkflow();
 
   for (const platform of ['linux-x86_64', 'darwin-aarch64', 'windows-x86_64']) {
     assert.match(workflow, new RegExp(platform));
