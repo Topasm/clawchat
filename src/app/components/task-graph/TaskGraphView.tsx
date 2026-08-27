@@ -20,12 +20,19 @@ interface TaskGraphViewProps {
   nodes: TaskFlowNode[];
   edges: Edge[];
   isMobile: boolean;
-  onOpenTask: (taskId: string) => void;
+  selectedTaskId?: string | null;
+  onSelectTask: (taskId: string | null) => void;
 }
 
 const nodeTypes = { task: TaskGraphNode };
 
-function TaskGraphCanvas({ nodes: sourceNodes, edges, isMobile, onOpenTask }: TaskGraphViewProps) {
+function TaskGraphCanvas({
+  nodes: sourceNodes,
+  edges,
+  isMobile,
+  selectedTaskId,
+  onSelectTask,
+}: TaskGraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<TaskFlowNode>(sourceNodes);
   const { fitView } = useReactFlow<TaskFlowNode>();
   const layoutKey = useMemo(
@@ -45,16 +52,22 @@ function TaskGraphCanvas({ nodes: sourceNodes, edges, isMobile, onOpenTask }: Ta
   }, [fitView, isMobile, layoutKey]);
 
   const handleNodeClick: NodeMouseHandler<TaskFlowNode> = (_event, node) => {
-    onOpenTask(node.id);
+    onSelectTask(node.id);
   };
+
+  const displayedNodes = useMemo(
+    () => nodes.map((node) => ({ ...node, selected: node.id === selectedTaskId })),
+    [nodes, selectedTaskId],
+  );
 
   return (
     <ReactFlow<TaskFlowNode>
-      nodes={nodes}
+      nodes={displayedNodes}
       edges={edges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       onNodeClick={handleNodeClick}
+      onPaneClick={() => onSelectTask(null)}
       nodesDraggable={!isMobile}
       nodesConnectable={false}
       edgesReconnectable={false}
@@ -78,7 +91,12 @@ function TaskGraphCanvas({ nodes: sourceNodes, edges, isMobile, onOpenTask }: Ta
           zoomable
           position="bottom-left"
           nodeColor={(node) => {
-            const status = (node as TaskFlowNode).data.status;
+            const taskNode = node as TaskFlowNode;
+            const status = taskNode.data.status;
+            const insight = taskNode.data.insight;
+            if (insight?.is_blocked) return 'var(--cc-error)';
+            if (insight?.is_ready) return 'var(--cc-success)';
+            if (insight?.is_on_critical_path) return 'var(--cc-warning)';
             return status === 'completed'
               ? 'var(--cc-success)'
               : status === 'in_progress'

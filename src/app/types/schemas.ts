@@ -176,6 +176,122 @@ export const TaskRelationshipListResponseSchema = z
   ])
   .transform((response) => (Array.isArray(response) ? response : response.items));
 
+// -- Task graph execution insights -----------------------------------------
+
+export const GraphInsightScopeRoleSchema = z.enum(['root', 'descendant', 'context', 'global']);
+
+export const GraphExecutionStateSchema = z.enum([
+  'ready',
+  'blocked',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'pending',
+]);
+
+export const GraphDueRiskSchema = z.enum([
+  'none',
+  'overdue',
+  'blocked',
+  'insufficient_time',
+  'unknown_estimate',
+]);
+
+export const TaskGraphInsightNodeSchema = z.object({
+  task_id: z.string(),
+  title: z.string(),
+  status: TaskStatusSchema,
+  parent_id: z.string().nullable(),
+  scope_role: GraphInsightScopeRoleSchema,
+  execution_state: GraphExecutionStateSchema,
+  estimated_minutes: z.number().int().nullable(),
+  due_date: z.string().nullable(),
+  dependency_ids: z.array(z.string()),
+  direct_blocker_ids: z.array(z.string()),
+  transitive_blocker_ids: z.array(z.string()),
+  transitive_blocker_count: z.number().int().nonnegative(),
+  transitive_blockers_truncated: z.boolean(),
+  downstream_task_ids: z.array(z.string()),
+  downstream_count: z.number().int().nonnegative(),
+  downstream_truncated: z.boolean(),
+  is_ready: z.boolean(),
+  is_blocked: z.boolean(),
+  is_unschedulable: z.boolean(),
+  is_on_critical_path: z.boolean(),
+  remaining_path_minutes: z.number().int().nonnegative().nullable(),
+  remaining_path_known_minutes: z.number().int().nonnegative(),
+  estimate_complete: z.boolean(),
+  is_container: z.boolean(),
+  due_slack_minutes: z.number().int().nullable(),
+  due_risk: GraphDueRiskSchema,
+});
+
+export const TaskGraphInsightSummarySchema = z.object({
+  active_count: z.number().int().nonnegative(),
+  pending_count: z.number().int().nonnegative(),
+  in_progress_count: z.number().int().nonnegative(),
+  completed_count: z.number().int().nonnegative(),
+  cancelled_count: z.number().int().nonnegative(),
+  ready_count: z.number().int().nonnegative(),
+  blocked_count: z.number().int().nonnegative(),
+  at_risk_count: z.number().int().nonnegative(),
+  overdue_count: z.number().int().nonnegative(),
+  orphan_count: z.number().int().nonnegative(),
+  critical_path_task_ids: z.array(z.string()),
+  critical_path_minutes: z.number().int().nonnegative().nullable(),
+  critical_path_known_minutes: z.number().int().nonnegative(),
+  critical_path_estimate_complete: z.boolean(),
+  unknown_estimate_task_ids: z.array(z.string()),
+  unschedulable_task_ids: z.array(z.string()),
+  unschedulable_count: z.number().int().nonnegative(),
+  cycle_count: z.number().int().nonnegative(),
+  parent_cycle_count: z.number().int().nonnegative(),
+  missing_dependency_count: z.number().int().nonnegative(),
+  missing_parent_count: z.number().int().nonnegative(),
+  due_date_conflict_count: z.number().int().nonnegative(),
+  unknown_estimate_count: z.number().int().nonnegative(),
+  invalid_estimate_count: z.number().int().nonnegative(),
+  cancelled_prerequisite_count: z.number().int().nonnegative(),
+  isolated_count: z.number().int().nonnegative(),
+  issue_count: z.number().int().nonnegative(),
+  is_healthy: z.boolean(),
+});
+
+export const TaskGraphInsightIssueSchema = z.object({
+  code: z.enum([
+    'dependency_cycle',
+    'self_dependency',
+    'duplicate_dependency',
+    'missing_dependency',
+    'parent_cycle',
+    'missing_parent',
+    'due_date_conflict',
+    'cancelled_prerequisite',
+    'invalid_estimate',
+    'lifecycle_conflict',
+  ]),
+  severity: z.enum(['info', 'warning', 'error']),
+  task_ids: z.array(z.string()),
+  related_task_ids: z.array(z.string()),
+  message: z.string(),
+});
+
+export const TaskGraphInsightsResponseSchema = z.object({
+  graph_revision: z.number().int().nonnegative(),
+  generated_at: z.string(),
+  scope: z.object({
+    root_task_id: z.string().nullable(),
+    task_count: z.number().int().nonnegative(),
+    primary_task_count: z.number().int().nonnegative(),
+    relationship_count: z.number().int().nonnegative(),
+    prerequisite_task_count: z.number().int().nonnegative(),
+  }),
+  nodes: z.array(TaskGraphInsightNodeSchema),
+  summary: TaskGraphInsightSummarySchema,
+  issues: z.array(TaskGraphInsightIssueSchema),
+  issues_truncated: z.boolean(),
+});
+
 // -- Events -----------------------------------------------------------------
 
 export const EventResponseSchema = z.object({
@@ -397,6 +513,13 @@ export type TaskRelationshipType = z.infer<typeof TaskRelationshipTypeSchema>;
 export type TaskRelationshipResponse = z.infer<typeof TaskRelationshipResponseSchema>;
 export type TaskRelationshipCreate = z.infer<typeof TaskRelationshipCreateSchema>;
 export type TaskRelationshipUpdate = z.infer<typeof TaskRelationshipUpdateSchema>;
+export type GraphInsightScopeRole = z.infer<typeof GraphInsightScopeRoleSchema>;
+export type GraphExecutionState = z.infer<typeof GraphExecutionStateSchema>;
+export type GraphDueRisk = z.infer<typeof GraphDueRiskSchema>;
+export type TaskGraphInsightNode = z.infer<typeof TaskGraphInsightNodeSchema>;
+export type TaskGraphInsightSummary = z.infer<typeof TaskGraphInsightSummarySchema>;
+export type TaskGraphInsightIssue = z.infer<typeof TaskGraphInsightIssueSchema>;
+export type TaskGraphInsightsResponse = z.infer<typeof TaskGraphInsightsResponseSchema>;
 
 export type EventResponse = z.infer<typeof EventResponseSchema>;
 export type EventCreate = z.infer<typeof EventCreateSchema>;

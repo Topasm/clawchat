@@ -252,6 +252,142 @@
   border-top: 2px dashed var(--cc-error);
 }
 
+/* -- Deterministic execution insights ---------------------- */
+
+.cc-task-insights {
+  position: relative;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--cc-border);
+  background: color-mix(in srgb, var(--cc-surface) 96%, var(--cc-primary));
+}
+
+.cc-task-insights--loading,
+.cc-task-insights--error {
+  min-height: 48px;
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+}
+
+.cc-task-insights--error {
+  color: var(--cc-error);
+}
+
+.cc-task-insights__heading {
+  min-width: 112px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 6px;
+  color: var(--cc-text);
+  font-size: 11px;
+}
+
+.cc-task-insights__heading > span {
+  grid-column: 2;
+  color: var(--cc-text-tertiary);
+  font-size: 9px;
+}
+
+.cc-task-insights__heading[data-health='healthy'] > span {
+  color: var(--cc-success);
+}
+.cc-task-insights__heading[data-health='warning'] > span {
+  color: var(--cc-warning);
+}
+.cc-task-insights__heading[data-health='error'] > span {
+  color: var(--cc-error);
+}
+
+.cc-task-insights__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(82px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.cc-task-insights__metric {
+  min-width: 82px;
+  padding: 5px 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+}
+
+.cc-task-insights__metric dt {
+  color: var(--cc-text-tertiary);
+  font-size: 9px;
+}
+
+.cc-task-insights__metric dd {
+  margin: 1px 0 0;
+  color: var(--cc-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cc-task-insights__metric--ready dd {
+  color: var(--cc-success);
+}
+.cc-task-insights__metric--blocked dd,
+.cc-task-insights__metric--risk dd {
+  color: var(--cc-error);
+}
+.cc-task-insights__metric--critical dd {
+  color: var(--cc-warning);
+}
+
+.cc-task-insights__issues {
+  min-width: 0;
+  max-width: 280px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cc-task-insights__issues li {
+  max-width: 150px;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-task-insights__issues li[data-tone='error'] {
+  background: color-mix(in srgb, var(--cc-error) 11%, transparent);
+  color: var(--cc-error);
+}
+.cc-task-insights__issues li[data-tone='warning'] {
+  background: color-mix(in srgb, var(--cc-warning) 11%, transparent);
+  color: var(--cc-warning);
+}
+
+.cc-task-insights__updated {
+  margin-left: auto;
+  color: var(--cc-text-tertiary);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.cc-task-flow__workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cc-task-flow__workspace--details {
+  grid-template-columns: minmax(0, 1fr) 286px;
+}
+
 /* -- React Flow canvas -------------------------------------- */
 
 .cc-task-flow__canvas {
@@ -302,6 +438,17 @@
   fill: var(--cc-error);
 }
 
+.cc-task-flow__edge--critical .react-flow__edge-path {
+  stroke: var(--cc-warning);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.cc-task-flow__edge--critical .react-flow__arrowhead polyline {
+  stroke: var(--cc-warning);
+  fill: var(--cc-warning);
+}
+
 .cc-task-flow__canvas .react-flow__controls,
 .cc-task-flow__canvas .react-flow__minimap {
   overflow: hidden;
@@ -336,6 +483,42 @@
 
 .cc-task-flow-node--completed {
   opacity: 0.72;
+}
+
+.cc-task-flow-node--ready {
+  border-color: color-mix(in srgb, var(--cc-success) 68%, var(--cc-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cc-success) 10%, transparent);
+}
+
+.cc-task-flow-node--blocked {
+  border-color: color-mix(in srgb, var(--cc-error) 62%, var(--cc-border));
+  background: color-mix(in srgb, var(--cc-error) 3%, var(--cc-surface));
+}
+
+.cc-task-flow-node--unschedulable {
+  border-style: double;
+  border-width: 3px;
+}
+
+.cc-task-flow-node--critical {
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--cc-warning) 76%, transparent);
+}
+
+.cc-task-flow-node--ready.cc-task-flow-node--critical {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--cc-success) 10%, transparent),
+    inset 0 -3px 0 color-mix(in srgb, var(--cc-warning) 76%, transparent);
+}
+
+.cc-task-flow-node--at-risk::after {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cc-error);
+  content: '';
 }
 
 .cc-task-flow-node__handle {
@@ -451,6 +634,41 @@
   -webkit-line-clamp: 2;
 }
 
+.cc-task-flow-node__insights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cc-task-flow-node__insights span {
+  padding: 2px 5px;
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.cc-task-flow-node__insight--ready {
+  background: color-mix(in srgb, var(--cc-success) 12%, transparent) !important;
+  color: var(--cc-success) !important;
+}
+.cc-task-flow-node__insight--blocked,
+.cc-task-flow-node__insight--risk {
+  background: color-mix(in srgb, var(--cc-error) 11%, transparent) !important;
+  color: var(--cc-error) !important;
+}
+.cc-task-flow-node__insight--critical {
+  background: color-mix(in srgb, var(--cc-warning) 12%, transparent) !important;
+  color: var(--cc-warning) !important;
+}
+.cc-task-flow-node__insight--context {
+  background: color-mix(in srgb, var(--cc-primary) 10%, transparent) !important;
+  color: var(--cc-primary) !important;
+}
+
 .cc-task-flow-node--completed .cc-task-flow-node__title {
   text-decoration: line-through;
 }
@@ -528,6 +746,163 @@
 .cc-task-flow__empty span {
   max-width: 340px;
   font-size: 12px;
+}
+
+/* -- Selected task execution detail ------------------------ */
+
+.cc-task-insight-detail {
+  min-width: 0;
+  max-height: clamp(440px, calc(100vh - 295px), 760px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-left: 1px solid var(--cc-border);
+  background: var(--cc-surface);
+}
+
+.cc-task-insight-detail__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cc-task-insight-detail__heading span {
+  color: var(--cc-text-tertiary);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.cc-task-insight-detail__heading h3 {
+  margin: 3px 0 0;
+  color: var(--cc-text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.cc-task-insight-detail__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cc-task-insight-detail__badges span {
+  padding: 3px 7px;
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.cc-task-insight-detail__badges [data-state='ready'] {
+  color: var(--cc-success);
+}
+.cc-task-insight-detail__badges [data-state='blocked'],
+.cc-task-insight-detail__badges [data-state='risk'] {
+  color: var(--cc-error);
+}
+.cc-task-insight-detail__badges [data-state='critical'] {
+  color: var(--cc-warning);
+}
+.cc-task-insight-detail__badges [data-state='context'] {
+  color: var(--cc-primary);
+}
+.cc-task-insight-detail__badges [data-state='container'] {
+  color: var(--cc-text-secondary);
+}
+
+.cc-task-insight-detail__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 0;
+}
+
+.cc-task-insight-detail__facts > div {
+  min-width: 0;
+  padding: 7px;
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-background);
+}
+
+.cc-task-insight-detail__facts dt,
+.cc-task-insight-detail__facts dd {
+  overflow-wrap: anywhere;
+}
+.cc-task-insight-detail__facts dt {
+  color: var(--cc-text-tertiary);
+  font-size: 9px;
+}
+.cc-task-insight-detail__facts dd {
+  margin: 2px 0 0;
+  color: var(--cc-text);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.cc-task-insight-detail__group h4 {
+  margin: 0 0 5px;
+  color: var(--cc-text-secondary);
+  font-size: 10px;
+}
+
+.cc-task-insight-detail__group ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 17px;
+  color: var(--cc-text);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.cc-task-insight-detail__clear {
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--cc-radius-sm);
+  background: color-mix(in srgb, var(--cc-success) 8%, transparent);
+  color: var(--cc-success);
+  font-size: 10px;
+}
+
+.cc-task-insight-detail__container-note {
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--cc-radius-sm);
+  background: color-mix(in srgb, var(--cc-primary) 7%, transparent);
+  color: var(--cc-text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.cc-task-insight-detail__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--cc-border);
+}
+
+.cc-task-insight-detail__actions > span {
+  color: var(--cc-text-tertiary);
+  font-size: 8px;
+}
+
+.cc-task-insight-detail__actions .cc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 /* -- AI proposal workspace --------------------------------- */
@@ -832,6 +1207,29 @@
   .cc-task-flow__summary > span:nth-child(2) {
     margin-left: 0;
   }
+  .cc-task-insights {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .cc-task-insights__heading {
+    grid-template-columns: auto 1fr auto;
+  }
+  .cc-task-insights__heading > span {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .cc-task-insights__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cc-task-insights__issues {
+    max-width: none;
+  }
+  .cc-task-insights__updated {
+    margin-left: 0;
+  }
+  .cc-task-flow__workspace--details {
+    grid-template-columns: 1fr;
+  }
   .cc-task-flow__canvas {
     height: calc(100dvh - 365px);
     min-height: 390px;
@@ -848,6 +1246,11 @@
     right: -18px;
     width: 36px;
     height: 36px;
+  }
+  .cc-task-insight-detail {
+    max-height: 360px;
+    border-top: 1px solid var(--cc-border);
+    border-left: 0;
   }
   .cc-dialog__content.cc-task-proposal {
     width: calc(100vw - 20px);

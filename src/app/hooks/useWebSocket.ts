@@ -12,6 +12,7 @@ import { IS_DESKTOP } from '../types/platform';
 import apiClient from '../services/apiClient';
 import { queryKeys } from './queries';
 import type { ConversationResponse } from '../types/api';
+import { invalidateTaskDerivedQueries } from './queries/invalidateTaskDerivedQueries';
 
 /**
  * Connects to the server WebSocket on mount and wires up event handlers
@@ -36,6 +37,7 @@ export default function useWebSocket(): void {
       if (status === 'connected') {
         void queryClient.invalidateQueries({ queryKey: queryKeys.todos });
         void queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+        void invalidateTaskDerivedQueries(queryClient);
         void queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
         void queryClient.invalidateQueries({ queryKey: queryKeys.events });
         void queryClient.invalidateQueries({ queryKey: queryKeys.today });
@@ -69,6 +71,7 @@ export default function useWebSocket(): void {
       if (d.module === 'todos') {
         queryClient.invalidateQueries({ queryKey: queryKeys.todos });
         queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+        void invalidateTaskDerivedQueries(queryClient);
         queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
       } else if (d.module === 'events') {
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
@@ -76,6 +79,7 @@ export default function useWebSocket(): void {
         // Refresh all
         queryClient.invalidateQueries({ queryKey: queryKeys.todos });
         queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+        void invalidateTaskDerivedQueries(queryClient);
         queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
       }
@@ -225,6 +229,7 @@ export default function useWebSocket(): void {
                 await apiClient.patch(`/todos/${d.itemId}`, { status: 'completed' });
                 queryClient.invalidateQueries({ queryKey: queryKeys.todos });
                 queryClient.invalidateQueries({ queryKey: queryKeys.today });
+                void invalidateTaskDerivedQueries(queryClient);
               }
             } catch {
               // Best-effort

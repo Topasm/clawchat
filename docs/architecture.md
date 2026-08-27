@@ -194,6 +194,21 @@ existence, uniqueness, self-edge rejection, and an acyclic dependency graph.
 `todos.depends_on` remains only as a deprecated, transactionally synchronized
 compatibility shadow for older clients and rollback. See [ADR 004](./adr/004-task-relationship-model.md).
 
+## Deterministic Execution Insights
+
+The server analyzes a revision-consistent Todo and normalized-relationship
+snapshot to derive `ready`, `blocked`, blocker propagation, downstream impact,
+critical path, deadline risk, and graph-health issues. These values are
+read-only projections; they never introduce additional persisted lifecycle
+states.
+
+A project/root scope includes structural descendants plus recursive external
+prerequisites. External tasks are marked as context and influence readiness
+without inflating the project's summary counts. Missing estimates remain
+explicitly unknown, and critical-path duration is exact only when every
+relevant execution estimate is known. See
+[ADR 006](./adr/006-deterministic-execution-graph-insights.md).
+
 ## Versioned AI Planning
 
 AI planning captures the current graph revision and the hash of all prompt

@@ -17,24 +17,17 @@ export default function TaskGraphPage({ viewMode, onViewModeChange }: TaskGraphP
   const { data: relationships = [] } = useTaskRelationshipsQuery();
   const filters = useModuleStore((state) => state.kanbanFilters);
   const filteredTodos = useKanbanFilters(todos, filters);
+  const hasExternalFilter = Boolean(
+    filters.searchQuery || filters.priorities.length || filters.tags.length,
+  );
 
   // When a filter matches a child, retain its ancestors and visible
   // dependencies so the result still has useful graph context.
   const graphTodos = useMemo(() => {
-    const hasNarrowingFilter = Boolean(
-      filters.searchQuery || filters.priorities.length || filters.tags.length,
-    );
-    if (!hasNarrowingFilter) return filteredTodos;
+    if (!hasExternalFilter) return filteredTodos;
 
     return expandTaskGraphContext(todos, filteredTodos, relationships);
-  }, [
-    filteredTodos,
-    filters.priorities.length,
-    filters.searchQuery,
-    filters.tags.length,
-    relationships,
-    todos,
-  ]);
+  }, [filteredTodos, hasExternalFilter, relationships, todos]);
 
   return (
     <div>
@@ -45,7 +38,12 @@ export default function TaskGraphPage({ viewMode, onViewModeChange }: TaskGraphP
         subtitle={`${graphTodos.length} task${graphTodos.length !== 1 ? 's' : ''} mapped by project and dependency`}
       />
       <KanbanFilterBar showSubtaskToggle={false} />
-      <TaskGraph todos={graphTodos} metadataTodos={todos} relationships={relationships} />
+      <TaskGraph
+        todos={graphTodos}
+        metadataTodos={todos}
+        relationships={relationships}
+        hasExternalFilter={hasExternalFilter}
+      />
     </div>
   );
 }

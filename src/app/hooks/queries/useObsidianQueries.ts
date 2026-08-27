@@ -14,6 +14,7 @@ import type {
   ObsidianScanResult,
 } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
+import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 
 // ---------------------------------------------------------------------------
 // Query hooks
@@ -120,6 +121,7 @@ export function useObsidianScan() {
       qc.invalidateQueries({ queryKey: queryKeys.obsidianSyncStatus });
       qc.invalidateQueries({ queryKey: queryKeys.obsidianHealth });
       qc.invalidateQueries({ queryKey: queryKeys.todos });
+      void invalidateTaskDerivedQueries(qc);
     },
   });
 }

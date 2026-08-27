@@ -276,7 +276,8 @@ export default function TaskGraphProposalDialog({
                   nodes={preview.nodes}
                   edges={preview.edges}
                   isMobile={isMobile}
-                  onOpenTask={(nodeId) => {
+                  onSelectTask={(nodeId) => {
+                    if (!nodeId) return;
                     const index = proposalIndexFromNodeId(nodeId);
                     if (index !== null) toggleSelection(index);
                   }}

@@ -1,5 +1,5 @@
 import type { Node, NodeProps } from '@xyflow/react';
-import type { TaskStatus, TodoResponse } from '../../types/api';
+import type { TaskGraphInsightNode, TaskStatus, TodoResponse } from '../../types/api';
 
 export type TaskGraphMode = 'structure' | 'execution';
 
@@ -12,6 +12,7 @@ export type TaskGraphNodeData = {
   dependencyCount: number;
   hasVisibleChildren: boolean;
   isCollapsed: boolean;
+  insight?: TaskGraphInsightNode;
   proposalSelection?: 'selected' | 'excluded' | 'fixed';
   onToggleCollapse: (taskId: string) => void;
 };

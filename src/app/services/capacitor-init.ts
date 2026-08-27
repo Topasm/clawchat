@@ -6,6 +6,7 @@ import { queryClient } from '../config/queryClient';
 import { queryKeys } from '../hooks/queries/queryKeys';
 import type { EventResponse } from '../types/api';
 import apiClient from './apiClient';
+import { invalidateTaskDerivedQueries } from '../hooks/queries/invalidateTaskDerivedQueries';
 
 function getTodayEvents() {
   const events = queryClient.getQueryData<EventResponse[]>(queryKeys.events) ?? [];
@@ -62,6 +63,9 @@ export async function initCapacitor(): Promise<void> {
       try {
         if (extra.itemType === 'todo') {
           await apiClient.patch(`/todos/${extra.itemId}`, { status: 'completed' });
+          queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+          queryClient.invalidateQueries({ queryKey: queryKeys.today });
+          void invalidateTaskDerivedQueries(queryClient);
         }
         // Trigger data refresh
         window.dispatchEvent(new CustomEvent('app:resume'));

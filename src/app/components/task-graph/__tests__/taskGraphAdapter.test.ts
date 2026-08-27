@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { TodoResponse } from '../../../types/api';
-import { buildTaskGraphElements, expandTaskGraphContext } from '../taskGraphAdapter';
+import type { TaskGraphInsightNode, TodoResponse } from '../../../types/api';
+import {
+  augmentTaskGraphTodos,
+  buildTaskGraphElements,
+  expandTaskGraphContext,
+  mergeExecutionRelationships,
+} from '../taskGraphAdapter';
 
 function todo(id: string, overrides: Partial<TodoResponse> = {}): TodoResponse {
   return {
@@ -35,6 +40,41 @@ const baseOptions = {
   relationships,
   onToggleCollapse: vi.fn(),
 };
+
+function insight(
+  taskId: string,
+  overrides: Partial<TaskGraphInsightNode> = {},
+): TaskGraphInsightNode {
+  return {
+    task_id: taskId,
+    title: taskId,
+    status: 'pending',
+    parent_id: null,
+    scope_role: 'global',
+    execution_state: 'pending',
+    estimated_minutes: 30,
+    due_date: null,
+    dependency_ids: [],
+    direct_blocker_ids: [],
+    transitive_blocker_ids: [],
+    transitive_blocker_count: 0,
+    transitive_blockers_truncated: false,
+    downstream_task_ids: [],
+    downstream_count: 0,
+    downstream_truncated: false,
+    is_container: false,
+    is_ready: false,
+    is_blocked: false,
+    is_unschedulable: false,
+    is_on_critical_path: false,
+    remaining_path_minutes: 30,
+    remaining_path_known_minutes: 30,
+    estimate_complete: true,
+    due_risk: 'none',
+    due_slack_minutes: null,
+    ...overrides,
+  };
+}
 
 describe('buildTaskGraphElements', () => {
   it('uses only parent_id relationships in structure mode', () => {
@@ -98,6 +138,22 @@ describe('buildTaskGraphElements', () => {
 
     result.nodes.find((node) => node.id === 'project')!.data.onToggleCollapse('project');
     expect(onToggleCollapse).toHaveBeenCalledWith('project');
+  });
+
+  it('attaches server-derived execution state and highlights only consecutive critical edges', () => {
+    const result = buildTaskGraphElements(todos, {
+      ...baseOptions,
+      mode: 'execution',
+      hideCompleted: false,
+      insightNodes: [
+        insight('research', { is_ready: true, execution_state: 'ready' }),
+        insight('write', { is_on_critical_path: true, execution_state: 'blocked' }),
+      ],
+      criticalPathTaskIds: ['research', 'write'],
+    });
+
+    expect(result.nodes.find((node) => node.id === 'research')?.data.insight?.is_ready).toBe(true);
+    expect(result.edges[0].className).toContain('cc-task-flow__edge--critical');
   });
 });
 
@@ -185,5 +241,67 @@ describe('expandTaskGraphContext', () => {
 
     expect(result).toHaveLength(10_001);
     expect(result[0].id).toBe('task-0');
+  });
+});
+
+describe('insight snapshot pagination recovery', () => {
+  it('hydrates every missing snapshot node when external filters are inactive', () => {
+    const metadataOnly = todo('metadata-only', { title: 'Canonical metadata task' });
+    const result = augmentTaskGraphTodos(
+      [todo('loaded')],
+      [todo('loaded'), metadataOnly],
+      [
+        insight('metadata-only', { title: 'Snapshot metadata title' }),
+        insight('over-page', { title: 'Task beyond Todo pagination', status: 'in_progress' }),
+      ],
+      '2026-08-27T12:00:00Z',
+      { includeAllMissing: true, includeContextMissing: false },
+    );
+
+    expect(result.map((item) => item.id)).toEqual(['loaded', 'metadata-only', 'over-page']);
+    expect(result[1]).toBe(metadataOnly);
+    expect(result[2]).toMatchObject({
+      title: 'Task beyond Todo pagination',
+      status: 'in_progress',
+      source: 'graph_insight',
+      project_label: 'Graph snapshot',
+    });
+  });
+
+  it('preserves external filter meaning while restoring prerequisite context', () => {
+    const result = augmentTaskGraphTodos(
+      [todo('matched')],
+      [],
+      [
+        insight('unmatched-primary', { scope_role: 'global' }),
+        insight('external-prerequisite', { scope_role: 'context' }),
+      ],
+      '2026-08-27T12:00:00Z',
+      { includeAllMissing: false, includeContextMissing: true },
+    );
+
+    expect(result.map((item) => item.id)).toEqual(['matched', 'external-prerequisite']);
+    expect(result[1].project_label).toBe('External prerequisite');
+  });
+
+  it('merges edges beyond relationship pagination and deduplicates normalized rows', () => {
+    const paginatedRelationships = Array.from({ length: 10_000 }, (_, index) => ({
+      id: `relationship-${index}`,
+      source_task_id: `dependent-${index}`,
+      target_task_id: `prerequisite-${index}`,
+      type: 'depends_on',
+    }));
+    const result = mergeExecutionRelationships(paginatedRelationships, [
+      insight('dependent-0', { dependency_ids: ['prerequisite-0'] }),
+      insight('dependent-over-page', { dependency_ids: ['prerequisite-over-page'] }),
+    ]);
+
+    expect(result).toHaveLength(10_001);
+    expect(result.at(-1)).toEqual({
+      id: 'insight-dependency:dependent-over-page:prerequisite-over-page',
+      source_task_id: 'dependent-over-page',
+      target_task_id: 'prerequisite-over-page',
+      type: 'depends_on',
+    });
   });
 });

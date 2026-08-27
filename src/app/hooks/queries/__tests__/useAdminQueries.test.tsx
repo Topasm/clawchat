@@ -34,6 +34,8 @@ describe('admin query invalidation', () => {
     });
     const { queryClient, wrapper } = createHarness();
     queryClient.setQueryData(queryKeys.taskRelationships, []);
+    queryClient.setQueryData(queryKeys.projects, []);
+    queryClient.setQueryData(queryKeys.taskGraphInsightScope(null), { graph_revision: 1 });
     const { result } = renderHook(() => usePurgeData(), { wrapper });
 
     await act(async () => {
@@ -45,5 +47,9 @@ describe('admin query invalidation', () => {
       older_than_days: 30,
     });
     expect(queryClient.getQueryState(queryKeys.taskRelationships)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.taskGraphInsightScope(null))?.isInvalidated).toBe(
+      true,
+    );
   });
 });

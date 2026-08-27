@@ -313,6 +313,74 @@ Malformed or invalid graphs return the named `ErrorResponse` contract with
 HTTP 400, an existing/conflicting edge returns 409, and request-schema failures
 return 422.
 
+## Execution Graph Insights
+
+```text
+GET /api/todos/graph/insights?root_task_id=:root_id&limit=2000
+```
+
+Omit `root_task_id` for a global snapshot. A root-scoped response includes the
+root, all structural descendants, and the recursive prerequisite closure.
+Prerequisites outside the root are returned as `scope_role: "context"`; summary
+lifecycle/Ready/Blocked/risk counts cover only the primary root scope, while
+critical-path and health diagnostics include relevant context.
+
+```json
+{
+  "graph_revision": 21,
+  "generated_at": "2026-08-27T07:00:00Z",
+  "scope": {
+    "root_task_id": "todo_project",
+    "task_count": 7,
+    "primary_task_count": 6,
+    "relationship_count": 5,
+    "prerequisite_task_count": 1
+  },
+  "nodes": [
+    {
+      "task_id": "todo_analysis",
+      "scope_role": "descendant",
+      "execution_state": "blocked",
+      "is_ready": false,
+      "is_blocked": true,
+      "direct_blocker_ids": ["todo_experiment"],
+      "transitive_blocker_ids": ["todo_data"],
+      "downstream_count": 2,
+      "is_on_critical_path": true,
+      "remaining_path_minutes": 420,
+      "remaining_path_known_minutes": 420,
+      "estimate_complete": true,
+      "due_risk": "insufficient_time"
+    }
+  ],
+  "summary": {
+    "ready_count": 2,
+    "blocked_count": 3,
+    "critical_path_task_ids": ["todo_data", "todo_experiment", "todo_analysis"],
+    "critical_path_minutes": 420,
+    "critical_path_estimate_complete": true,
+    "at_risk_count": 1,
+    "issue_count": 0,
+    "is_healthy": true
+  },
+  "issues": [],
+  "issues_truncated": false
+}
+```
+
+Only `completed` prerequisites release a dependent; a cancelled prerequisite
+remains a blocker. `ready` applies to pending actionable leaf tasks, while
+`in_progress` remains separate. Null or invalid estimates are not treated as
+zero: exact critical-path and deadline values become nullable and the response
+retains a known lower bound. Deadline risk is a continuous wall-clock lower
+bound, not a work-hours or resource scheduler.
+
+Transitive blocker and downstream ID lists are capped at 20 items per node. If
+the corresponding `*_truncated` flag is true, its count is a lower bound (for
+example, `21` means at least 21) and clients must not present it as an exact
+total. Oversized scopes fail with HTTP 400 rather than returning partial graph
+semantics.
+
 ---
 
 ## Calendar Endpoints

@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { TaskRelationshipResponse, TaskStatus, TodoResponse } from '../../types/api';
+import type { TaskStatus, TodoResponse } from '../../types/api';
 import { TaskStatusSchema } from '../../types/schemas';
 import usePlatform from '../../hooks/usePlatform';
+import { useProjectsQuery, useTaskGraphInsightsQuery } from '../../hooks/queries';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SegmentedControl from '../shared/SegmentedControl';
 import { SparkleIcon } from '../shared/Icons';
-import { buildTaskGraphElements, expandTaskGraphContext } from './taskGraphAdapter';
+import {
+  augmentTaskGraphTodos,
+  buildTaskGraphElements,
+  expandTaskGraphContext,
+  mergeExecutionRelationships,
+} from './taskGraphAdapter';
+import type { GraphRelationshipLike } from './taskGraphLayout';
 import TaskGraphView from './TaskGraphView';
 import TaskGraphProposalDialog from './TaskGraphProposalDialog';
+import { TaskGraphHealthPanel, TaskGraphNodeInsightPanel } from './TaskGraphInsightsPanel';
 import type { TaskGraphMode } from './taskGraphTypes';
 
 interface TaskGraphProps {
   todos: TodoResponse[];
   metadataTodos?: TodoResponse[];
-  relationships?: TaskRelationshipResponse[];
+  relationships?: GraphRelationshipLike[];
+  hasExternalFilter?: boolean;
 }
 
 const GRAPH_MODE_OPTIONS = [
@@ -26,6 +35,7 @@ export default function TaskGraph({
   todos,
   metadataTodos = todos,
   relationships = [],
+  hasExternalFilter = false,
 }: TaskGraphProps) {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
@@ -36,24 +46,23 @@ export default function TaskGraph({
   const [projectId, setProjectId] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
   const [proposalOpen, setProposalOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const projectsQuery = useProjectsQuery();
+  const insightsQuery = useTaskGraphInsightsQuery(
+    projectId === 'all' ? null : projectId,
+    mode === 'execution' || selectedTaskId !== null,
+  );
 
   const childIdsByParent = useMemo(() => {
     const map = new Map<string, string[]>();
-    todos.forEach((todo) => {
+    metadataTodos.forEach((todo) => {
       if (!todo.parent_id) return;
       map.set(todo.parent_id, [...(map.get(todo.parent_id) ?? []), todo.id]);
     });
     return map;
-  }, [todos]);
+  }, [metadataTodos]);
 
-  const projectOptions = useMemo(
-    () =>
-      todos.filter(
-        (todo) =>
-          !todo.parent_id && (childIdsByParent.has(todo.id) || todo.source === 'obsidian_project'),
-      ),
-    [childIdsByParent, todos],
-  );
+  const projectOptions = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
 
   const planningTargets = useMemo(
     () =>
@@ -83,13 +92,40 @@ export default function TaskGraph({
     return ids;
   }, [childIdsByParent, projectId]);
 
-  const graphTodos = useMemo(() => {
-    const projectTodos = projectIds ? todos.filter((todo) => projectIds.has(todo.id)) : todos;
-    if (statusFilter === 'all') return projectTodos;
+  const graphRelationships = useMemo(
+    () =>
+      mode === 'execution' && insightsQuery.data
+        ? mergeExecutionRelationships(relationships, insightsQuery.data.nodes)
+        : relationships,
+    [insightsQuery.data, mode, relationships],
+  );
 
-    const matches = projectTodos.filter((todo) => todo.status === statusFilter);
-    return expandTaskGraphContext(projectTodos, matches, relationships);
-  }, [projectIds, relationships, statusFilter, todos]);
+  const scopedTodos = useMemo(() => {
+    const projectTodos = projectIds ? todos.filter((todo) => projectIds.has(todo.id)) : todos;
+    if (!insightsQuery.data) return projectTodos;
+    return augmentTaskGraphTodos(
+      projectTodos,
+      metadataTodos,
+      insightsQuery.data.nodes,
+      insightsQuery.data.generated_at,
+      {
+        includeAllMissing: mode === 'execution' && !hasExternalFilter,
+        includeContextMissing: Boolean(projectIds),
+      },
+    );
+  }, [hasExternalFilter, insightsQuery.data, metadataTodos, mode, projectIds, todos]);
+
+  const graphTodos = useMemo(() => {
+    if (statusFilter === 'all') return scopedTodos;
+
+    const matches = scopedTodos.filter((todo) => todo.status === statusFilter);
+    return expandTaskGraphContext(scopedTodos, matches, graphRelationships);
+  }, [graphRelationships, scopedTodos, statusFilter]);
+
+  const graphMetadataTodos = useMemo(() => {
+    const metadataIds = new Set(metadataTodos.map((todo) => todo.id));
+    return [...metadataTodos, ...scopedTodos.filter((todo) => !metadataIds.has(todo.id))];
+  }, [metadataTodos, scopedTodos]);
 
   const toggleCollapsed = useCallback((id: string) => {
     setCollapsedIds((current) => {
@@ -106,12 +142,35 @@ export default function TaskGraph({
         mode,
         collapsedIds,
         hideCompleted,
-        relationships,
-        metadataTodos,
+        relationships: graphRelationships,
+        metadataTodos: graphMetadataTodos,
+        insightNodes: mode === 'execution' ? insightsQuery.data?.nodes : undefined,
+        criticalPathTaskIds:
+          mode === 'execution' ? insightsQuery.data?.summary.critical_path_task_ids : undefined,
         onToggleCollapse: toggleCollapsed,
       }),
-    [collapsedIds, graphTodos, hideCompleted, metadataTodos, mode, relationships, toggleCollapsed],
+    [
+      collapsedIds,
+      graphTodos,
+      hideCompleted,
+      insightsQuery.data,
+      graphMetadataTodos,
+      graphRelationships,
+      mode,
+      toggleCollapsed,
+    ],
   );
+
+  const selectedInsight = useMemo(
+    () => insightsQuery.data?.nodes.find((insight) => insight.task_id === selectedTaskId),
+    [insightsQuery.data, selectedTaskId],
+  );
+
+  useEffect(() => {
+    if (selectedTaskId && !elements.nodes.some((node) => node.id === selectedTaskId)) {
+      setSelectedTaskId(null);
+    }
+  }, [elements.nodes, selectedTaskId]);
 
   const handleStatusFilter = (value: string) => {
     const parsed = TaskStatusSchema.safeParse(value);
@@ -201,12 +260,35 @@ export default function TaskGraph({
         <span>{mode === 'structure' ? 'Sub-task' : 'Depends on'}</span>
       </div>
 
-      <TaskGraphView
-        nodes={elements.nodes}
-        edges={elements.edges}
-        isMobile={isMobile}
-        onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
-      />
+      {mode === 'execution' && (
+        <TaskGraphHealthPanel
+          insights={insightsQuery.data}
+          isLoading={insightsQuery.isLoading}
+          isError={insightsQuery.isError}
+          visibleNodeCount={elements.nodes.length}
+        />
+      )}
+
+      <div
+        className={`cc-task-flow__workspace${selectedInsight ? ' cc-task-flow__workspace--details' : ''}`}
+      >
+        <TaskGraphView
+          nodes={elements.nodes}
+          edges={elements.edges}
+          isMobile={isMobile}
+          selectedTaskId={selectedTaskId}
+          onSelectTask={setSelectedTaskId}
+        />
+        {selectedInsight && insightsQuery.data && (
+          <TaskGraphNodeInsightPanel
+            insight={selectedInsight}
+            allInsights={insightsQuery.data.nodes}
+            generatedAt={insightsQuery.data.generated_at}
+            onClose={() => setSelectedTaskId(null)}
+            onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
+          />
+        )}
+      </div>
       {proposalOpen && (
         <TaskGraphProposalDialog
           targets={planningTargets}

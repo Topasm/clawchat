@@ -9,6 +9,7 @@ Active foundation work is tracked separately from release status:
 | Canonical task status | Yes | Backend/Web contract checks; Android CI pending | No |
 | Normalized task relationships | Yes | Backend/Web/migration regression checks | No |
 | Versioned AI plan proposals | Yes | Backend/Web/OpenAPI/migration/concurrency regression checks | No |
+| Deterministic execution graph insights | Yes | Backend/Web/algorithm/performance regression checks | No |
 
 ---
 
@@ -193,7 +194,7 @@ Active foundation work is tracked separately from release status:
 - [x] Add normalized `task_relationships` table and API
 - [x] Migrate existing `depends_on` data without loss
 - [x] Reject self-edges, duplicates, dangling references, and dependency cycles
-- [ ] Derive blocked/readiness state from canonical dependency edges
+- [x] Derive Ready/Blocked state, blocker propagation, critical path, deadline risk, and graph health from canonical dependency edges
 
 #### Bulk Task Operations
 - [x] Add multi-select mode to kanban board (Ctrl/Cmd+click on cards)

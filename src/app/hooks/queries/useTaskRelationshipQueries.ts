@@ -34,6 +34,7 @@ export function useCreateTaskRelationship() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskGraphInsights });
     },
   });
 }
@@ -47,6 +48,7 @@ export function useDeleteTaskRelationship() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskGraphInsights });
     },
   });
 }

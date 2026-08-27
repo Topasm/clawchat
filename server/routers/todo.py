@@ -19,6 +19,7 @@ from schemas.common import (
     PaginatedResponse,
     RequestValidationErrorResponse,
 )
+from schemas.graph_insights import GraphInsightsResponse
 from schemas.task import (
     DelegateRequest,
     PlanApplyRequest,
@@ -37,6 +38,7 @@ from schemas.todo import (
     TodoUpdate,
 )
 from services import (
+    graph_insights_service,
     inbox_pipeline_service,
     plan_proposal_service,
     task_relationship_service,
@@ -235,6 +237,34 @@ async def list_projects(
         items.append(resp)
 
     return items
+
+
+@router.get(
+    "/graph/insights",
+    response_model=GraphInsightsResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid graph scope"},
+        404: {"model": ErrorResponse, "description": "Root todo not found"},
+        409: {"model": ErrorResponse, "description": "Graph changed during read"},
+    },
+)
+async def get_graph_insights(
+    root_task_id: str | None = None,
+    limit: int = Query(
+        graph_insights_service.DEFAULT_GRAPH_INSIGHT_LIMIT,
+        ge=1,
+        le=graph_insights_service.MAX_GRAPH_INSIGHT_LIMIT,
+    ),
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Return deterministic execution insights for a project or global graph."""
+
+    return await graph_insights_service.get_graph_insights(
+        db,
+        root_task_id=root_task_id,
+        limit=limit,
+    )
 
 
 @router.get("", response_model=PaginatedResponse[TodoResponse])

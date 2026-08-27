@@ -4,6 +4,7 @@ import { queryClient } from '../config/queryClient';
 import { queryKeys } from './queries/queryKeys';
 import apiClient from '../services/apiClient';
 import type { TodoResponse, EventResponse, ConversationResponse } from '../types/api';
+import { invalidateTaskDerivedQueries } from './queries/invalidateTaskDerivedQueries';
 
 interface BackupData {
   version: number;
@@ -22,9 +23,7 @@ function isValidBackup(obj: unknown): obj is BackupData {
   if (typeof record.data !== 'object' || record.data === null) return false;
   const data = record.data as Record<string, unknown>;
   return (
-    Array.isArray(data.todos) &&
-    Array.isArray(data.events) &&
-    Array.isArray(data.conversations)
+    Array.isArray(data.todos) && Array.isArray(data.events) && Array.isArray(data.conversations)
   );
 }
 
@@ -34,7 +33,8 @@ export default function useSettingsExportImport() {
   const handleExport = () => {
     const todos = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos) ?? [];
     const events = queryClient.getQueryData<EventResponse[]>(queryKeys.events) ?? [];
-    const conversations = queryClient.getQueryData<ConversationResponse[]>(queryKeys.conversations) ?? [];
+    const conversations =
+      queryClient.getQueryData<ConversationResponse[]>(queryKeys.conversations) ?? [];
 
     const backup: BackupData = {
       version: 1,
@@ -97,8 +97,16 @@ export default function useSettingsExportImport() {
 
     for (const event of events) {
       try {
-        const { title, description, start_time, end_time, location, is_all_day, reminder_minutes, tags } =
-          event as Record<string, unknown>;
+        const {
+          title,
+          description,
+          start_time,
+          end_time,
+          location,
+          is_all_day,
+          reminder_minutes,
+          tags,
+        } = event as Record<string, unknown>;
         await apiClient.post('/events', {
           title: String(title ?? ''),
           description: description != null ? String(description) : undefined,
@@ -130,6 +138,7 @@ export default function useSettingsExportImport() {
     queryClient.invalidateQueries({ queryKey: queryKeys.events });
     queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
     queryClient.invalidateQueries({ queryKey: queryKeys.today });
+    void invalidateTaskDerivedQueries(queryClient);
 
     if (errors > 0) {
       useToastStore.getState().addToast('warning', `Import done with ${errors} failed item(s)`);

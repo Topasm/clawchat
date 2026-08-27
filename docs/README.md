@@ -22,6 +22,7 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 | [ADR 003: Task Status](./adr/003-task-status-source-of-truth.md) | Why task lifecycle state is server-owned and generated for every client |
 | [ADR 004: Task Relationships](./adr/004-task-relationship-model.md) | Direction, validation, migration, and compatibility policy for task edges |
 | [ADR 005: Versioned AI Plans](./adr/005-versioned-ai-plan-proposals.md) | Proposal identity, graph revisions, transactional apply, conservative undo, and Vault outbox policy |
+| [ADR 006: Execution Graph Insights](./adr/006-deterministic-execution-graph-insights.md) | Canonical Ready/Blocked semantics, critical path, deadline risk, scope, and graph health |
 
 ## Key Features
 

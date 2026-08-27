@@ -20,6 +20,7 @@ import type {
   StalePlanProposalDetails,
 } from '../../types/api';
 import { queryKeys } from './queryKeys';
+import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 
 export interface GeneratePlanProposalVariables {
   todoId: string;
@@ -95,6 +96,7 @@ async function invalidatePlanData(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: queryKeys.todos }),
     queryClient.invalidateQueries({ queryKey: queryKeys.today }),
     queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships }),
+    invalidateTaskDerivedQueries(queryClient),
   ]);
 }
 

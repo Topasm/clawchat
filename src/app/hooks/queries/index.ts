@@ -51,6 +51,7 @@ export {
   useCreateTaskRelationship,
   useDeleteTaskRelationship,
 } from './useTaskRelationshipQueries';
+export { useTaskGraphInsightsQuery } from './useTaskGraphInsightsQuery';
 export {
   useAdminOverviewQuery,
   useAdminAIQuery,

@@ -1,6 +1,9 @@
 export const queryKeys = {
   todos: ['todos'] as const,
   taskRelationships: ['task-relationships'] as const,
+  taskGraphInsights: ['task-graph-insights'] as const,
+  taskGraphInsightScope: (rootTaskId?: string | null) =>
+    ['task-graph-insights', rootTaskId ?? 'all'] as const,
   planProposals: ['plan-proposals'] as const,
   latestPlanProposal: (todoId: string) => ['plan-proposals', 'latest', todoId] as const,
   planProposal: (proposalId: string) => ['plan-proposals', 'detail', proposalId] as const,

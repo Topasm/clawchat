@@ -1376,6 +1376,556 @@
         "title": "FeaturesCapability",
         "type": "object"
       },
+      "GraphDueRisk": {
+        "description": "Conservative due-date assessment for a task.",
+        "enum": [
+          "none",
+          "overdue",
+          "blocked",
+          "insufficient_time",
+          "unknown_estimate"
+        ],
+        "title": "GraphDueRisk",
+        "type": "string"
+      },
+      "GraphExecutionState": {
+        "description": "Derived execution state without replacing the persisted task status.",
+        "enum": [
+          "pending",
+          "ready",
+          "blocked",
+          "in_progress",
+          "completed",
+          "cancelled"
+        ],
+        "title": "GraphExecutionState",
+        "type": "string"
+      },
+      "GraphInsightIssue": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/GraphIssueCode"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "related_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Task Ids",
+            "type": "array"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/GraphIssueSeverity"
+          },
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "GraphInsightIssue",
+        "type": "object"
+      },
+      "GraphInsightNode": {
+        "properties": {
+          "dependency_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependency Ids",
+            "type": "array"
+          },
+          "direct_blocker_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Direct Blocker Ids",
+            "type": "array"
+          },
+          "downstream_count": {
+            "description": "Exact count when downstream_truncated is false; otherwise a lower bound",
+            "minimum": 0.0,
+            "title": "Downstream Count",
+            "type": "integer"
+          },
+          "downstream_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Downstream Task Ids",
+            "type": "array"
+          },
+          "downstream_truncated": {
+            "title": "Downstream Truncated",
+            "type": "boolean"
+          },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "due_risk": {
+            "$ref": "#/components/schemas/GraphDueRisk"
+          },
+          "due_slack_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Slack Minutes"
+          },
+          "estimate_complete": {
+            "title": "Estimate Complete",
+            "type": "boolean"
+          },
+          "estimated_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Minutes"
+          },
+          "execution_state": {
+            "$ref": "#/components/schemas/GraphExecutionState"
+          },
+          "is_blocked": {
+            "title": "Is Blocked",
+            "type": "boolean"
+          },
+          "is_container": {
+            "title": "Is Container",
+            "type": "boolean"
+          },
+          "is_on_critical_path": {
+            "title": "Is On Critical Path",
+            "type": "boolean"
+          },
+          "is_ready": {
+            "title": "Is Ready",
+            "type": "boolean"
+          },
+          "is_unschedulable": {
+            "title": "Is Unschedulable",
+            "type": "boolean"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "remaining_path_known_minutes": {
+            "minimum": 0.0,
+            "title": "Remaining Path Known Minutes",
+            "type": "integer"
+          },
+          "remaining_path_minutes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Path Minutes"
+          },
+          "scope_role": {
+            "$ref": "#/components/schemas/GraphScopeRole"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "transitive_blocker_count": {
+            "description": "Exact count when transitive_blockers_truncated is false; otherwise a lower bound",
+            "minimum": 0.0,
+            "title": "Transitive Blocker Count",
+            "type": "integer"
+          },
+          "transitive_blocker_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Transitive Blocker Ids",
+            "type": "array"
+          },
+          "transitive_blockers_truncated": {
+            "title": "Transitive Blockers Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task_id",
+          "title",
+          "status",
+          "scope_role",
+          "execution_state",
+          "transitive_blocker_count",
+          "transitive_blockers_truncated",
+          "downstream_count",
+          "downstream_truncated",
+          "is_container",
+          "is_ready",
+          "is_blocked",
+          "is_unschedulable",
+          "is_on_critical_path",
+          "remaining_path_known_minutes",
+          "estimate_complete",
+          "due_risk"
+        ],
+        "title": "GraphInsightNode",
+        "type": "object"
+      },
+      "GraphInsightScope": {
+        "properties": {
+          "prerequisite_task_count": {
+            "minimum": 0.0,
+            "title": "Prerequisite Task Count",
+            "type": "integer"
+          },
+          "primary_task_count": {
+            "minimum": 0.0,
+            "title": "Primary Task Count",
+            "type": "integer"
+          },
+          "relationship_count": {
+            "minimum": 0.0,
+            "title": "Relationship Count",
+            "type": "integer"
+          },
+          "root_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Task Id"
+          },
+          "task_count": {
+            "minimum": 0.0,
+            "title": "Task Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task_count",
+          "primary_task_count",
+          "relationship_count",
+          "prerequisite_task_count"
+        ],
+        "title": "GraphInsightScope",
+        "type": "object"
+      },
+      "GraphInsightSummary": {
+        "properties": {
+          "active_count": {
+            "minimum": 0.0,
+            "title": "Active Count",
+            "type": "integer"
+          },
+          "at_risk_count": {
+            "minimum": 0.0,
+            "title": "At Risk Count",
+            "type": "integer"
+          },
+          "blocked_count": {
+            "minimum": 0.0,
+            "title": "Blocked Count",
+            "type": "integer"
+          },
+          "cancelled_count": {
+            "minimum": 0.0,
+            "title": "Cancelled Count",
+            "type": "integer"
+          },
+          "cancelled_prerequisite_count": {
+            "minimum": 0.0,
+            "title": "Cancelled Prerequisite Count",
+            "type": "integer"
+          },
+          "completed_count": {
+            "minimum": 0.0,
+            "title": "Completed Count",
+            "type": "integer"
+          },
+          "critical_path_estimate_complete": {
+            "title": "Critical Path Estimate Complete",
+            "type": "boolean"
+          },
+          "critical_path_known_minutes": {
+            "minimum": 0.0,
+            "title": "Critical Path Known Minutes",
+            "type": "integer"
+          },
+          "critical_path_minutes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Critical Path Minutes"
+          },
+          "critical_path_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Critical Path Task Ids",
+            "type": "array"
+          },
+          "cycle_count": {
+            "minimum": 0.0,
+            "title": "Cycle Count",
+            "type": "integer"
+          },
+          "due_date_conflict_count": {
+            "minimum": 0.0,
+            "title": "Due Date Conflict Count",
+            "type": "integer"
+          },
+          "in_progress_count": {
+            "minimum": 0.0,
+            "title": "In Progress Count",
+            "type": "integer"
+          },
+          "invalid_estimate_count": {
+            "minimum": 0.0,
+            "title": "Invalid Estimate Count",
+            "type": "integer"
+          },
+          "is_healthy": {
+            "title": "Is Healthy",
+            "type": "boolean"
+          },
+          "isolated_count": {
+            "minimum": 0.0,
+            "title": "Isolated Count",
+            "type": "integer"
+          },
+          "issue_count": {
+            "minimum": 0.0,
+            "title": "Issue Count",
+            "type": "integer"
+          },
+          "missing_dependency_count": {
+            "minimum": 0.0,
+            "title": "Missing Dependency Count",
+            "type": "integer"
+          },
+          "missing_parent_count": {
+            "minimum": 0.0,
+            "title": "Missing Parent Count",
+            "type": "integer"
+          },
+          "orphan_count": {
+            "minimum": 0.0,
+            "title": "Orphan Count",
+            "type": "integer"
+          },
+          "overdue_count": {
+            "minimum": 0.0,
+            "title": "Overdue Count",
+            "type": "integer"
+          },
+          "parent_cycle_count": {
+            "minimum": 0.0,
+            "title": "Parent Cycle Count",
+            "type": "integer"
+          },
+          "pending_count": {
+            "minimum": 0.0,
+            "title": "Pending Count",
+            "type": "integer"
+          },
+          "ready_count": {
+            "minimum": 0.0,
+            "title": "Ready Count",
+            "type": "integer"
+          },
+          "unknown_estimate_count": {
+            "minimum": 0.0,
+            "title": "Unknown Estimate Count",
+            "type": "integer"
+          },
+          "unknown_estimate_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown Estimate Task Ids",
+            "type": "array"
+          },
+          "unschedulable_count": {
+            "minimum": 0.0,
+            "title": "Unschedulable Count",
+            "type": "integer"
+          },
+          "unschedulable_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unschedulable Task Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "active_count",
+          "pending_count",
+          "in_progress_count",
+          "completed_count",
+          "cancelled_count",
+          "ready_count",
+          "blocked_count",
+          "at_risk_count",
+          "overdue_count",
+          "orphan_count",
+          "isolated_count",
+          "critical_path_known_minutes",
+          "critical_path_estimate_complete",
+          "unschedulable_count",
+          "cycle_count",
+          "missing_dependency_count",
+          "due_date_conflict_count",
+          "unknown_estimate_count",
+          "invalid_estimate_count",
+          "parent_cycle_count",
+          "missing_parent_count",
+          "cancelled_prerequisite_count",
+          "issue_count",
+          "is_healthy"
+        ],
+        "title": "GraphInsightSummary",
+        "type": "object"
+      },
+      "GraphInsightsResponse": {
+        "properties": {
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "graph_revision": {
+            "minimum": 0.0,
+            "title": "Graph Revision",
+            "type": "integer"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/GraphInsightIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "issues_truncated": {
+            "default": false,
+            "title": "Issues Truncated",
+            "type": "boolean"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphInsightNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/GraphInsightScope"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/GraphInsightSummary"
+          }
+        },
+        "required": [
+          "graph_revision",
+          "generated_at",
+          "scope",
+          "nodes",
+          "summary",
+          "issues"
+        ],
+        "title": "GraphInsightsResponse",
+        "type": "object"
+      },
+      "GraphIssueCode": {
+        "enum": [
+          "dependency_cycle",
+          "self_dependency",
+          "duplicate_dependency",
+          "missing_dependency",
+          "parent_cycle",
+          "missing_parent",
+          "due_date_conflict",
+          "cancelled_prerequisite",
+          "invalid_estimate",
+          "lifecycle_conflict"
+        ],
+        "title": "GraphIssueCode",
+        "type": "string"
+      },
+      "GraphIssueSeverity": {
+        "enum": [
+          "info",
+          "warning",
+          "error"
+        ],
+        "title": "GraphIssueSeverity",
+        "type": "string"
+      },
+      "GraphScopeRole": {
+        "description": "Why a task is present in one graph-insight snapshot.",
+        "enum": [
+          "root",
+          "descendant",
+          "context",
+          "global"
+        ],
+        "title": "GraphScopeRole",
+        "type": "string"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -7876,6 +8426,103 @@
           }
         ],
         "summary": "Bulk Update Todos",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/graph/insights": {
+      "get": {
+        "description": "Return deterministic execution insights for a project or global graph.",
+        "operationId": "get_graph_insights_api_todos_graph_insights_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "root_task_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root Task Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 2000,
+              "maximum": 5000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphInsightsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid graph scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Root todo not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Graph changed during read"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Graph Insights",
         "tags": [
           "todos"
         ]

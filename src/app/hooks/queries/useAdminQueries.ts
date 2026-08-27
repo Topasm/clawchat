@@ -15,6 +15,7 @@ import {
   BackupResponseSchema,
 } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
+import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 
 // --- Queries ---
 
@@ -154,6 +155,7 @@ export function usePurgeData() {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminActivity });
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+      void invalidateTaskDerivedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
     },
   });

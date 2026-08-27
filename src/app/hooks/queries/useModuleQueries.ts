@@ -22,6 +22,7 @@ import type {
 } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { getTaskStatusLabel } from '../../utils/taskStatus';
+import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 
 // ---------------------------------------------------------------------------
 // Pending delete timers (for undo-on-delete pattern)
@@ -111,6 +112,7 @@ export function useCreateTodo() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      void invalidateTaskDerivedQueries(queryClient);
     },
   });
 }
@@ -146,6 +148,7 @@ export function useUpdateTodo() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      void invalidateTaskDerivedQueries(queryClient);
     },
   });
 }
@@ -163,6 +166,7 @@ export function useDeleteTodo() {
           try {
             await apiClient.delete(`/todos/${id}`);
             queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+            void invalidateTaskDerivedQueries(queryClient);
           } catch (err) {
             logger.warn('Failed to delete todo on server:', err);
             // Rollback: refetch to restore
@@ -248,6 +252,7 @@ export function useToggleTodoComplete() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      void invalidateTaskDerivedQueries(queryClient);
     },
   });
 }
@@ -279,6 +284,7 @@ export function useSetTaskStatus() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      void invalidateTaskDerivedQueries(queryClient);
     },
   });
 }
@@ -313,6 +319,7 @@ export function useReorderTodos() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      void invalidateTaskDerivedQueries(queryClient);
     },
   });
 }
@@ -515,6 +522,7 @@ export function useBulkUpdateTodos() {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
       queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+      void invalidateTaskDerivedQueries(queryClient);
     },
   });
 }
