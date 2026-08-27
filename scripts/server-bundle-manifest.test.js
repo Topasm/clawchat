@@ -189,6 +189,39 @@ test(
   },
 );
 
+test(
+  'resolves packaged PyInstaller links through omitted manifest aliases on Unix',
+  { skip: process.platform === 'win32' },
+  () => {
+    const fixture = createFixture();
+    try {
+      fixture.manifest.files.push(
+        {
+          path: '_internal/current',
+          type: 'symlink',
+          target: '.',
+        },
+        {
+          path: '_internal/runtime-chain.bin',
+          type: 'symlink',
+          target: 'current/runtime.bin',
+        },
+      );
+      fixture.manifest.files.sort((left, right) =>
+        left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
+      );
+      fs.writeFileSync(fixture.manifestPath, JSON.stringify(fixture.manifest));
+
+      assert.equal(
+        validateServerBundle(fixture.bundleRoot, { allowMaterializedSymlinks: true }).fileCount,
+        4,
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  },
+);
+
 test('package smoke discovers and validates exactly one server resource', () => {
   const fixture = createFixture();
   try {

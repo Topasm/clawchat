@@ -45,6 +45,43 @@ function validateRelativePath(relativePath) {
   }
 }
 
+function resolveManifestSymlinkTarget(entry, manifest) {
+  let currentPath = path.posix.normalize(
+    path.posix.join(path.posix.dirname(entry.path), entry.target),
+  );
+  validateRelativePath(currentPath);
+  const symlinks = manifest.files
+    .filter((candidate) => candidate?.type === 'symlink')
+    .sort((left, right) => right.path.length - left.path.length);
+  const seen = new Set();
+
+  for (let depth = 0; depth <= symlinks.length; depth += 1) {
+    if (seen.has(currentPath)) {
+      throw new Error(`server bundle symbolic link cycle for ${entry.path}`);
+    }
+    seen.add(currentPath);
+    const alias = symlinks.find(
+      (candidate) =>
+        currentPath === candidate.path || currentPath.startsWith(`${candidate.path}/`),
+    );
+    if (!alias) return currentPath;
+    if (
+      typeof alias.target !== 'string' ||
+      alias.target.length === 0 ||
+      path.posix.isAbsolute(alias.target)
+    ) {
+      throw new Error(`manifest entry is not a valid symbolic link: ${alias.path}`);
+    }
+    const suffix = currentPath === alias.path ? '' : currentPath.slice(alias.path.length + 1);
+    currentPath = path.posix.normalize(
+      path.posix.join(path.posix.dirname(alias.path), alias.target, suffix),
+    );
+    validateRelativePath(currentPath);
+  }
+
+  throw new Error(`server bundle symbolic link chain is too deep for ${entry.path}`);
+}
+
 function validateExecutableFormat(executablePath, platform) {
   const handle = fs.openSync(executablePath, 'r');
   const header = Buffer.alloc(4);
@@ -170,11 +207,8 @@ function validateServerBundle(
       ) {
         throw new Error(`manifest entry is not a valid symbolic link: ${entry.path}`);
       }
-      const declaredTarget = path.resolve(path.dirname(filePath), entry.target);
-      const declaredRelativeTarget = path.relative(root, declaredTarget);
-      if (declaredRelativeTarget.startsWith('..') || path.isAbsolute(declaredRelativeTarget)) {
-        throw new Error(`server bundle symbolic link escapes the bundle: ${entry.path}`);
-      }
+      const resolvedManifestTarget = resolveManifestSymlinkTarget(entry, manifest);
+      const declaredTarget = path.resolve(root, ...resolvedManifestTarget.split('/'));
       const realTarget = fs.realpathSync(declaredTarget);
       const relativeTarget = path.relative(realRoot, realTarget);
       if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
