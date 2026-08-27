@@ -127,6 +127,41 @@ test('validates contained PyInstaller symlinks on Unix', { skip: process.platfor
   }
 });
 
+test(
+  'validates packaged PyInstaller symlinks materialized as identical files on Unix',
+  { skip: process.platform === 'win32' },
+  () => {
+    const fixture = createFixture();
+    try {
+      const linkPath = path.join(fixture.internalRoot, 'runtime-link.bin');
+      fs.copyFileSync(path.join(fixture.internalRoot, 'runtime.bin'), linkPath);
+      fixture.manifest.files.splice(1, 0, {
+        path: '_internal/runtime-link.bin',
+        type: 'symlink',
+        target: 'runtime.bin',
+      });
+      fixture.manifest.files.sort((left, right) =>
+        left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
+      );
+      fs.writeFileSync(fixture.manifestPath, JSON.stringify(fixture.manifest));
+
+      assert.throws(() => validateServerBundle(fixture.bundleRoot), /not a valid symbolic link/);
+      assert.equal(
+        validateServerBundle(fixture.bundleRoot, { allowMaterializedSymlinks: true }).fileCount,
+        3,
+      );
+
+      fs.writeFileSync(linkPath, 'changed-library');
+      assert.throws(
+        () => validateServerBundle(fixture.bundleRoot, { allowMaterializedSymlinks: true }),
+        /materialized symbolic link content mismatch/,
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  },
+);
+
 test('package smoke discovers and validates exactly one server resource', () => {
   const fixture = createFixture();
   try {

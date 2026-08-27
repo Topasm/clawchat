@@ -150,7 +150,11 @@ async function main() {
         manifests.map((entry) => path.relative(packageRoot, entry)).join(', '),
     );
   }
-  const result = validateServerBundle(path.dirname(manifests[0]));
+  const result = validateServerBundle(path.dirname(manifests[0]), {
+    // Tauri's resource bundler dereferences PyInstaller links on some package formats.
+    // The validator still requires the materialized file to match its in-bundle target.
+    allowMaterializedSymlinks: true,
+  });
   console.log(
     `Tauri package smoke: verified ${path.relative(packageRoot, result.root)} ` +
       `(${result.fileCount} files, ${result.totalBytes} bytes)`,

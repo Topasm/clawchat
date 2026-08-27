@@ -68,7 +68,11 @@ function validateExecutableFormat(executablePath, platform) {
 
 function validateServerBundle(
   bundleRoot,
-  { expectedPlatform = process.platform, expectedArchitecture = process.arch } = {},
+  {
+    expectedPlatform = process.platform,
+    expectedArchitecture = process.arch,
+    allowMaterializedSymlinks = false,
+  } = {},
 ) {
   const root = path.resolve(bundleRoot);
   const rootMetadata = fs.lstatSync(root);
@@ -145,16 +149,38 @@ function validateServerBundle(
       }
       totalBytes += entry.size;
     } else if (entry.type === 'symlink') {
-      if (!metadata.isSymbolicLink() || typeof entry.target !== 'string' || entry.target.length === 0) {
+      if (
+        typeof entry.target !== 'string' ||
+        entry.target.length === 0 ||
+        path.isAbsolute(entry.target)
+      ) {
         throw new Error(`manifest entry is not a valid symbolic link: ${entry.path}`);
       }
-      if (path.isAbsolute(entry.target) || fs.readlinkSync(filePath) !== entry.target) {
-        throw new Error(`server bundle symbolic link mismatch for ${entry.path}`);
+      const declaredTarget = path.resolve(path.dirname(filePath), entry.target);
+      const declaredRelativeTarget = path.relative(root, declaredTarget);
+      if (declaredRelativeTarget.startsWith('..') || path.isAbsolute(declaredRelativeTarget)) {
+        throw new Error(`server bundle symbolic link escapes the bundle: ${entry.path}`);
       }
-      const realTarget = fs.realpathSync(filePath);
+      const realTarget = fs.realpathSync(declaredTarget);
       const relativeTarget = path.relative(realRoot, realTarget);
       if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
         throw new Error(`server bundle symbolic link escapes the bundle: ${entry.path}`);
+      }
+      if (metadata.isSymbolicLink()) {
+        if (fs.readlinkSync(filePath) !== entry.target) {
+          throw new Error(`server bundle symbolic link mismatch for ${entry.path}`);
+        }
+      } else if (allowMaterializedSymlinks && metadata.isFile()) {
+        const targetMetadata = fs.statSync(realTarget);
+        if (
+          !targetMetadata.isFile() ||
+          metadata.size !== targetMetadata.size ||
+          sha256File(filePath) !== sha256File(realTarget)
+        ) {
+          throw new Error(`materialized symbolic link content mismatch for ${entry.path}`);
+        }
+      } else {
+        throw new Error(`manifest entry is not a valid symbolic link: ${entry.path}`);
       }
     } else {
       throw new Error(`manifest contains an unsupported entry type: ${entry.path}`);
