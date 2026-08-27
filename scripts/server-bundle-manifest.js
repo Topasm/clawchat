@@ -125,7 +125,21 @@ function validateServerBundle(
     if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
       throw new Error(`manifest file escapes the bundle: ${entry.path}`);
     }
-    const metadata = fs.lstatSync(filePath);
+    let metadata = null;
+    try {
+      metadata = fs.lstatSync(filePath);
+    } catch (error) {
+      if (
+        !(
+          allowMaterializedSymlinks &&
+          entry.type === 'symlink' &&
+          error instanceof Error &&
+          error.code === 'ENOENT'
+        )
+      ) {
+        throw error;
+      }
+    }
     if (entry.type === 'file') {
       if (!Number.isSafeInteger(entry.size) || entry.size < 0) {
         throw new Error(`manifest contains an invalid file size: ${entry.path}`);
@@ -133,7 +147,7 @@ function validateServerBundle(
       if (typeof entry.sha256 !== 'string' || !/^[a-f\d]{64}$/.test(entry.sha256)) {
         throw new Error(`manifest contains an invalid SHA-256: ${entry.path}`);
       }
-      if (metadata.isSymbolicLink() || !metadata.isFile()) {
+      if (!metadata || metadata.isSymbolicLink() || !metadata.isFile()) {
         throw new Error(`manifest entry is not a regular file: ${entry.path}`);
       }
       if (metadata.size !== entry.size) {
@@ -166,7 +180,20 @@ function validateServerBundle(
       if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
         throw new Error(`server bundle symbolic link escapes the bundle: ${entry.path}`);
       }
-      if (metadata.isSymbolicLink()) {
+      const targetManifestPath = relativeTarget.split(path.sep).join('/');
+      if (
+        !manifest.files.some(
+          (candidate) =>
+            candidate?.path === targetManifestPath ||
+            candidate?.path?.startsWith(`${targetManifestPath}/`),
+        )
+      ) {
+        throw new Error(`server bundle symbolic link target is not declared: ${entry.path}`);
+      }
+      if (!metadata) {
+        // Some package formats omit directory alias links while retaining their target tree.
+        // The target is still contained here and its own manifest entries are validated below.
+      } else if (metadata.isSymbolicLink()) {
         if (fs.readlinkSync(filePath) !== entry.target) {
           throw new Error(`server bundle symbolic link mismatch for ${entry.path}`);
         }
@@ -185,7 +212,7 @@ function validateServerBundle(
     } else {
       throw new Error(`manifest contains an unsupported entry type: ${entry.path}`);
     }
-    manifestPaths.push(entry.path);
+    if (metadata) manifestPaths.push(entry.path);
   }
 
   const sortedManifestPaths = [...manifestPaths].sort();
