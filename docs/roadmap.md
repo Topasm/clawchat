@@ -4,26 +4,28 @@ ClawChat development progress and planned work.
 
 Active foundation work is tracked separately from release status:
 
-| Workstream | Implemented | Validated | Released |
-|---|---|---|---|
-| Canonical task status | Yes | Backend/Web/Android generated-contract and serialization checks | No |
-| Normalized task relationships | Yes | Backend/Web/migration regression checks | No |
-| Versioned AI plan proposals | Yes | Backend/Web/OpenAPI/migration/concurrency regression checks | No |
-| Deterministic execution graph insights | Yes | Backend/Web/algorithm/performance regression checks | No |
-| First-class Project identity | Yes | Backend/Web/OpenAPI/fresh-migration checks | No |
-| Unified Review Inbox and Artifacts | Yes | Backend/Web/OpenAPI/version-lifecycle checks | No |
-| AgentTask / AgentRun lifecycle | Yes | Backend/Web/cancellation/retry/restart/migration checks | No |
-| Paseo execution provider | Yes | CLI contract/provider routing/reconnect/cancel/artifact/review checks | No |
-| Inbox task placement canvas | Yes | Backend/Web/OpenAPI/migration/revision/undo checks | No |
-| Inbox dependency connectors | Yes | Backend/Web/OpenAPI/revision/cycle/impact-preview checks | No |
-| Atomic Inbox batch triage | Yes | Backend/Web/OpenAPI/order/rollback/shared-undo checks | No |
-| AI Inbox triage preview | Yes | Backend/Web/OpenAPI/strict-ID/revision/grouped-apply/undo checks | No |
+| Workstream                             | Implemented | Validated                                                             | Released |
+| -------------------------------------- | ----------- | --------------------------------------------------------------------- | -------- |
+| Canonical task status                  | Yes         | Backend/Web/Android generated-contract and serialization checks       | No       |
+| Normalized task relationships          | Yes         | Backend/Web/migration regression checks                               | No       |
+| Versioned AI plan proposals            | Yes         | Backend/Web/OpenAPI/migration/concurrency regression checks           | No       |
+| Deterministic execution graph insights | Yes         | Backend/Web/algorithm/performance regression checks                   | No       |
+| First-class Project identity           | Yes         | Backend/Web/OpenAPI/fresh-migration checks                            | No       |
+| Unified Review Inbox and Artifacts     | Yes         | Backend/Web/OpenAPI/version-lifecycle checks                          | No       |
+| AgentTask / AgentRun lifecycle         | Yes         | Backend/Web/cancellation/retry/restart/migration checks               | No       |
+| Paseo execution provider               | Yes         | CLI contract/provider routing/reconnect/cancel/artifact/review checks | No       |
+| Inbox task placement canvas            | Yes         | Backend/Web/OpenAPI/migration/revision/undo checks                    | No       |
+| Inbox dependency connectors            | Yes         | Backend/Web/OpenAPI/revision/cycle/impact-preview checks              | No       |
+| Atomic Inbox batch triage              | Yes         | Backend/Web/OpenAPI/order/rollback/shared-undo checks                 | No       |
+| AI Inbox triage preview                | Yes         | Backend/Web/OpenAPI/strict-ID/revision/grouped-apply/undo checks      | No       |
+| AI-proposed Inbox Workstreams          | Yes         | Backend/Web/proposal-reference/rollback/creation-aware-undo checks    | No       |
 
 ---
 
 ## Completed
 
 ### Cross-Platform Restructure
+
 - [x] Migrate from React Native (Expo) to Vite + React + TypeScript
 - [x] Tauri 2 integration for desktop (Windows, macOS, Linux); legacy Electron shell retired
 - [x] Native Kotlin/Compose Android client; Capacitor retained provisionally for iOS
@@ -31,6 +33,7 @@ Active foundation work is tracked separately from release status:
 - [x] Unified monorepo structure (`src/app/`, `src/styles/`, `src-tauri/`)
 
 ### UI Framework
+
 - [x] React Router v7 with nested layout routes
 - [x] Sidebar navigation (Today, Inbox, Chats, All Tasks, Settings)
 - [x] Persistent collapsible chat panel
@@ -39,6 +42,7 @@ Active foundation work is tracked separately from release status:
 - [x] Responsive design with mobile breakpoints
 
 ### Task Management
+
 - [x] Kanban board on All Tasks page (Todo / In Progress / Done / Cancelled columns)
 - [x] @hello-pangea/dnd drag-and-drop with smooth animations and drop placeholders
 - [x] Kanban filter/sort bar (search, priority chips, tag dropdown, sort selector)
@@ -57,9 +61,11 @@ Active foundation work is tracked separately from release status:
 - [x] Revision-safe dependency impact preview with explainable cycle rejection
 - [x] Ordered Inbox multi-selection with atomic batch placement and shared Undo
 - [x] Revision-bound AI placement preview with selective, multi-destination atomic apply
+- [x] Dashed AI Workstream proposals with atomic creation, Task placement, and shared Undo
 - [x] Demo data seeding (15 sample tasks across all columns)
 
 ### AI Chat
+
 - [x] SSE streaming (Server-Sent Events) with real-time token rendering
 - [x] Dual-path messaging: orchestrator via `/send` + WebSocket when connected, SSE `/stream` fallback
 - [x] Streaming indicator (animated 3-dot typing)
@@ -73,6 +79,7 @@ Active foundation work is tracked separately from release status:
 - [x] Intent labels on assistant messages (created task, searched events, daily briefing, etc.)
 
 ### State Management (Zustand)
+
 - [x] `useAuthStore` — JWT auth, server URL, token refresh, persisted
 - [x] `useChatStore` — Conversations, messages, dual-path streaming (SSE + WebSocket), abort, action metadata
 - [x] `useModuleStore` — local todo/event view preferences and kanban filters
@@ -80,6 +87,7 @@ Active foundation work is tracked separately from release status:
 - [x] Optimistic updates with server sync fallback
 
 ### Settings
+
 - [x] Chat settings (font size, bubble style, send on enter, timestamps)
 - [x] LLM settings (model, temperature, system prompt, max tokens)
 - [x] Appearance (theme toggle, compact mode)
@@ -89,6 +97,7 @@ Active foundation work is tracked separately from release status:
 - [x] System prompt editor page
 
 ### Shared Components
+
 - [x] TaskCard, Badge with SVG priority icons (priority/due/tag/status/count variants)
 - [x] Checkbox (circular, animated), SectionHeader (collapsible)
 - [x] EmptyState, EventCard, ConversationItem
@@ -101,18 +110,21 @@ Active foundation work is tracked separately from release status:
 - [x] Utility classes (margin, flex, gap)
 
 ### UI Polish
+
 - [x] Keyboard shortcuts: Ctrl+K, ?, Ctrl+Shift+C, N, /, G+T/I/C/A/S (react-hotkeys-hook)
 - [x] Resizable sidebar via react-resizable-panels (fixed layout on mobile)
 - [x] Full-text search page across tasks, events, messages
 - [x] Toast feedback on task move, toggle, create
 
 ### Infrastructure
+
 - [x] Axios API client with auth interceptor and JWT token refresh
 - [x] Platform-aware `apiClient` (skips fetch when no server configured)
 - [x] Date/time formatters and grouping utilities
 - [x] TypeScript strict mode — zero type errors
 
 ### Server Alignment (v0.2.0)
+
 - [x] Server (`server/`) fully aligned with client types
 - [x] SSE streaming endpoint (`POST /api/chat/stream`) matching client's `sseClient.ts`
 - [x] Message edit (`PUT`) and delete (`DELETE`) endpoints
@@ -123,11 +135,13 @@ Active foundation work is tracked separately from release status:
 - [x] Orchestrator wired to real service calls (not stubs)
 
 ### Calendar & Events
+
 - [x] Event creation flow from UI (form + date picker)
 - [x] Calendar view (week/month)
 - [x] Event reminders
 
 ### Code Quality & Refactoring (v0.3.1)
+
 - [x] Extract shared utilities: `isDemoMode()`, `isTextInput()`, `formatShortDateTime()` into `utils/helpers.ts` and `formatters.ts`
 - [x] Extract shared hooks: `useRegenerate`, `useDebouncedPersist` to eliminate duplicated logic
 - [x] Extract shared `Icons.tsx` component (CalendarIcon, MemoIcon) from Layout and ActionCard
@@ -144,6 +158,7 @@ Active foundation work is tracked separately from release status:
 - [x] Server: Remove dead code (`get_queued_tasks`, `confirm_action` intent, unused schemas)
 
 ### AI Features (Phase 5)
+
 - [x] Chat-to-action: create tasks/events from conversation (orchestrator → UI refresh via WebSocket `module_data_changed`)
 - [x] Daily morning briefing generation (orchestrator `daily_briefing` intent)
 - [x] Cross-module full-text search (`/api/search` with FTS5, orchestrator `search` intent)
@@ -158,14 +173,17 @@ Active foundation work is tracked separately from release status:
 ## Planned
 
 ### Phase 1: Live Integration
+
 - [x] End-to-end testing with live server
 - [x] Live data replacing demo seeds on connection
 - [x] Native notifications and tray lifecycle via Tauri
 
 ### Phase 2: Core Quality & Reliability
-> *These upgrades improve the entire app's reliability and developer experience before adding new features.*
+
+> _These upgrades improve the entire app's reliability and developer experience before adding new features._
 
 #### TanStack Query (React Query) — Server State Management
+
 - [x] Install `@tanstack/react-query` v5
 - [x] Replace manual Axios + Zustand fetching in `useModuleStore` with `useQuery`/`useMutation`
 - [x] Benefits: automatic caching, background refetch, stale-while-revalidate, loading/error states, retry logic
@@ -173,6 +191,7 @@ Active foundation work is tracked separately from release status:
 - [x] Add `QueryClientProvider` in `App.tsx`
 
 #### Zod Runtime Validation
+
 - [x] Install `zod` v3
 - [x] Add Zod schemas for all API response types (`TodoResponse`, `EventResponse`, `MessageResponse`, etc.)
 - [x] Validate API responses at the boundary (in `apiClient.ts` or per-query)
@@ -180,11 +199,13 @@ Active foundation work is tracked separately from release status:
 - [x] Replace manual form validation with Zod `.safeParse()`
 
 #### Error Boundaries
+
 - [x] Add `<ErrorBoundary>` wrapper around the main layout with a user-friendly fallback UI
 - [x] Add per-page error boundaries for isolation (a crash in Calendar shouldn't break Chat)
 - [ ] Optional: Sentry integration for production error tracking (privacy-respecting, self-hosted Sentry)
 
 #### Unit & Integration Tests
+
 - [x] Install Vitest + @testing-library/react
 - [x] Add tests for Zustand stores (auth, chat, module, settings)
 - [x] Add tests for utility functions (formatters, naturalLanguageParser)
@@ -194,9 +215,11 @@ Active foundation work is tracked separately from release status:
 - [x] Phase 4: 146 tests across 10 files (+9 tests for attachments, RichTextEditor, FileDropZone)
 
 ### Phase 3: Advanced Task Management
-> *These features bring ClawChat's task system closer to a professional project management tool.*
+
+> _These features bring ClawChat's task system closer to a professional project management tool._
 
 #### Sub-tasks (Hierarchical Tasks)
+
 - [x] Add `parent_id` field to `TodoResponse` and `TodoCreate` types
 - [x] Server: add `parent_id` column to todos table (nullable foreign key to self, `ON DELETE SET NULL`)
 - [x] UI: render sub-tasks as collapsible children under parent tasks in kanban
@@ -205,6 +228,7 @@ Active foundation work is tracked separately from release status:
 - [x] Inbox: indent sub-tasks under their parent
 
 #### Task Dependencies
+
 - [x] Keep the Todo `depends_on` JSON array as a deprecated compatibility shadow
 - [x] Add normalized `task_relationships` table and API
 - [x] Migrate existing `depends_on` data without loss
@@ -214,20 +238,24 @@ Active foundation work is tracked separately from release status:
 - [x] Provide a Graph layout reset without changing canonical task or relationship data
 
 #### Bulk Task Operations
+
 - [x] Add multi-select mode to kanban board (Ctrl/Cmd+click on cards)
 - [x] Bulk actions toolbar: change status, change priority, delete (floating BulkActionToolbar)
 - [x] Select all / deselect all within a column
 
 #### Enhanced Kanban Sorting & Ordering
+
 - [x] Add sort options: `updated_at`, custom manual order (drag-to-reorder within column)
 - [x] Persist custom card order (add `sort_order` field to todos)
 - [x] Server: support `sort_order` in todo API (query param + column)
 - [x] Drag within a column reorders; drag between columns changes status
 
 ### Phase 4: Content & Editing
-> *Reusable content-editing groundwork plus the shipped system-prompt editor.*
+
+> _Reusable content-editing groundwork plus the shipped system-prompt editor._
 
 #### Rich Text Editor (Lexical)
+
 - [x] Install `lexical` + `@lexical/react` + `@lexical/markdown`
 - [x] Lexical rich text editor component
 - [x] Support: bold, italic, headings, bullet lists, code blocks, links
@@ -235,6 +263,7 @@ Active foundation work is tracked separately from release status:
 - [ ] Integrate the reusable editor into a persisted task/document workflow
 
 #### CodeMirror for System Prompt Editor
+
 - [x] Install `@uiw/react-codemirror` + `@codemirror/lang-markdown` + `@codemirror/theme-one-dark`
 - [x] Replace textarea on SystemPromptPage with CodeMirror editor
 - [x] Syntax highlighting, line numbers, word wrap
@@ -242,12 +271,14 @@ Active foundation work is tracked separately from release status:
 - [ ] Optional: use for JSON settings editor too
 
 #### File Attachments
+
 - [x] Server: file upload endpoint (`POST /api/attachments`) with local storage
 - [x] UI: drag-and-drop file upload zone on task detail page
 - [x] Attachment list with preview (images) and download links
 - [x] Size limits and allowed file type validation
 
 ### Phase 6: Mobile
+
 - [x] Native Android app with Compose feature modules, widgets, notifications, and background work
 - [x] Bottom navigation for native Android and the shared mobile layout
 - [x] Complete Android release CI validation for the canonical task contract
@@ -256,18 +287,21 @@ Active foundation work is tracked separately from release status:
 - [x] Deprecate Capacitor Android; no new product work targets it
 
 ### Phase 7: Polish & Deploy
+
 - [x] Offline support (queue actions, sync on reconnect)
 - [x] Signed Tauri auto-update
 - [x] Production Docker deployment
-- [x] Keyboard shortcuts for navigation *(completed)*
+- [x] Keyboard shortcuts for navigation _(completed)_
 - [x] Performance optimization — see below
 
 #### Performance & UX Polish
+
 - [ ] Add list virtualization/windowing for long chat histories and task lists
 - [x] `framer-motion` animations for page transitions, panel open/close, toast popups
 - [x] Loading skeletons/placeholders for pages while data fetches
 
 #### Component Architecture Refactor
+
 - [x] Adopt Container → View → Primitive pattern for complex components
   - **Containers**: manage state, call hooks, pass data down (e.g., `CalendarContainer`, `AdminContainer`, `TodayContainer`)
   - **Views**: stateless, receive props, handle layout (e.g., `KanbanBoardView`, `TodayView`, `MonthView`, `WeekView`)
@@ -281,6 +315,7 @@ Active foundation work is tracked separately from release status:
   - Pages are thin re-exports; `router.tsx` unchanged; 146 tests pass; 0 type errors
 
 ### Phase 8: Admin Dashboard
+
 - [x] Server: admin schemas (`server/schemas/admin.py`) — 13 Pydantic response/request models
 - [x] Server: admin service layer (`server/services/admin_service.py`) — table counts, storage stats, uptime, activity feed, agent task history, module data overview, purge, FTS reindex, DB backup
 - [x] Server: admin router (`server/routers/admin.py`) — 11 endpoints (overview, AI config, AI test, activity, sessions, disconnect, config, data, reindex, backup, purge)
@@ -297,6 +332,7 @@ Active foundation work is tracked separately from release status:
 - [x] Typecheck passes, 146 tests pass
 
 ### Phase 9: Obsidian Vault Integration & Agent Personas
+
 - [x] Obsidian CLI wrapper (`obsidian_cli_service.py`) using official `key=value` parameter syntax
 - [x] CLI operations: create, append, rename, move, search, files, commands
 - [x] Filesystem fallback when CLI is unavailable
@@ -326,7 +362,7 @@ Active foundation work is tracked separately from release status:
 - **Internationalization (i18next)** — Multi-language UI support using `i18next` + `react-i18next` with locale files
 - **Google Calendar bidirectional sync**
 - **Voice input** (speech-to-text)
-- ~~**Web dashboard** for server admin~~ *(completed — Phase 8)*
+- ~~**Web dashboard** for server admin~~ _(completed — Phase 8)_
 - **Multi-language AI responses**
 - **End-to-end encryption**
 - **Plugin system** for community modules

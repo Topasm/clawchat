@@ -217,6 +217,13 @@ sent through one grouped placement mutation, producing one revision update and
 one Undo. A 409 response dismisses the stale preview and refreshes graph
 insights before another attempt.
 
+Proposed Workstreams are rendered as dashed preview nodes. Suggestions refer to
+them with preview-local keys, and the client materializes only Workstreams still
+referenced by selected suggestions. The pure `buildInboxTriagePlacementGroups`
+adapter keeps existing destinations and proposed containers in one ordered
+grouped command; no temporary Todo is inserted into the query cache before
+server approval.
+
 ### useToastStore
 
 ```typescript
@@ -230,11 +237,11 @@ Types: `success`, `error`, `info`, `warning`. Each renders with a colored left b
 ### useAuthStore
 
 ```typescript
-token: string | null               // JWT access token
-refreshToken: string | null        // JWT refresh token
-serverUrl: string | null           // User's server URL
-login(serverUrl, pin)              // POST /api/auth/login
-logout()                           // Clear all auth state
+token: string | null; // JWT access token
+refreshToken: string | null; // JWT refresh token
+serverUrl: string | null; // User's server URL
+login(serverUrl, pin); // POST /api/auth/login
+logout(); // Clear all auth state
 ```
 
 ### useChatStore
@@ -256,19 +263,21 @@ deleteMessage / editMessage / regenerateMessage
 
 The All Tasks page (`/tasks`) renders a 3-column kanban board:
 
-| Column | Status | Color |
-|--------|--------|-------|
-| Todo | `pending` | Blue highlight on drag-over |
+| Column      | Status        | Color                         |
+| ----------- | ------------- | ----------------------------- |
+| Todo        | `pending`     | Blue highlight on drag-over   |
 | In Progress | `in_progress` | Yellow highlight on drag-over |
-| Done | `completed` | Green highlight on drag-over |
+| Done        | `completed`   | Green highlight on drag-over  |
 
 **Drag and drop**: Uses `@hello-pangea/dnd` for smooth animations and keyboard-accessible dragging.
+
 - `KanbanBoard` wraps columns in `<DragDropContext>` and handles `onDragEnd`
 - `KanbanColumn` uses `<Droppable>` with `snapshot.isDraggingOver` for highlight
 - `KanbanCard` uses `<Draggable>` with `snapshot.isDragging` for visual feedback
 - Visual feedback: dragging card gets box-shadow + subtle rotation, target column gets a colored border glow
 
 **Filter/Sort Bar**: Above the kanban grid, provides:
+
 - Text search across task titles, descriptions, and tags
 - Priority toggle chips (urgent/high/medium/low)
 - Tag dropdown filter
@@ -279,25 +288,26 @@ The All Tasks page (`/tasks`) renders a 3-column kanban board:
 
 ## Keyboard Shortcuts
 
-| Key | Action | Scope |
-|-----|--------|-------|
-| `Ctrl+K` / `Cmd+K` | Open command palette | Global |
-| `?` | Show keyboard shortcuts help | Global |
-| `Ctrl+Shift+C` | Toggle chat panel | Global |
-| `G+T` | Go to Today | Global |
-| `G+I` | Go to Inbox | Global |
-| `G+C` | Go to Chats | Global |
-| `G+A` | Go to All Tasks | Global |
-| `G+S` | Go to Settings | Global |
-| `N` | New task (opens QuickCapture) | Kanban |
-| `/` | Focus search input | Kanban |
-| `Esc` | Close dialog / palette | Dialog |
+| Key                | Action                        | Scope  |
+| ------------------ | ----------------------------- | ------ |
+| `Ctrl+K` / `Cmd+K` | Open command palette          | Global |
+| `?`                | Show keyboard shortcuts help  | Global |
+| `Ctrl+Shift+C`     | Toggle chat panel             | Global |
+| `G+T`              | Go to Today                   | Global |
+| `G+I`              | Go to Inbox                   | Global |
+| `G+C`              | Go to Chats                   | Global |
+| `G+A`              | Go to All Tasks               | Global |
+| `G+S`              | Go to Settings                | Global |
+| `N`                | New task (opens QuickCapture) | Kanban |
+| `/`                | Focus search input            | Kanban |
+| `Esc`              | Close dialog / palette        | Dialog |
 
 Shortcuts are defined in `keyboard/registry.ts` and wired via hooks in `keyboard/hooks.ts`.
 
 ## Command Palette
 
 Opened with `Ctrl+K`, the command palette provides:
+
 - **Navigation** — Jump to any page (Today, Inbox, Chats, Tasks, Calendar, Settings)
 - **Actions** — Toggle dark/light theme
 - **Tasks** — Search across todo titles, click to navigate to task detail
@@ -307,6 +317,7 @@ Built with `cmdk` (headless command menu) rendered inside a `@radix-ui/react-dia
 ## Dialog System
 
 Reusable dialog components wrapping `@radix-ui/react-dialog`:
+
 - `Dialog` — Base component with animated overlay (fade-in) and content (zoom-in), focus trap, ESC to close
 - `ConfirmDialog` — Convenience wrapper with confirm/cancel buttons and danger variant
 - `ShortcutsHelp` — Lists all keyboard shortcuts grouped by scope
@@ -331,6 +342,7 @@ All classes use BEM naming with `.cc-` prefix:
 ```
 
 Colors are injected as CSS custom properties on `.cc-root`:
+
 - `--cc-background`, `--cc-surface`, `--cc-text`, `--cc-primary`, `--cc-success`, etc.
 - Light/dark themes swap variable values; components never use hardcoded colors
 

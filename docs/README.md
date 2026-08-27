@@ -4,29 +4,30 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 
 ## Documentation Index
 
-| Document | Description |
-|----------|-------------|
-| [Architecture Overview](./architecture.md) | System design, data flow, and design principles |
-| [Platform Matrix](./architecture/platform-matrix.md) | Supported clients, ownership boundaries, and release validation |
-| [Database Schema](./database-schema.md) | Core tables, supporting persistence, indexes, and migration strategy |
-| [API Design](./api-design.md) | Human-readable REST/SSE/WebSocket guide and contract-generation workflow |
-| [Backend Guide](./backend-guide.md) | FastAPI project structure, modules, and dev setup |
-| [Frontend Guide](./frontend-guide.md) | Vite + React + TypeScript app structure and component reference |
-| [Tauri Migration](./tauri-migration.md) | Desktop runtime architecture, data migration, updater, and signing |
-| [Electron Cutover](./electron-cutover.md) | Completed removal record and legacy data-import guarantees |
-| [Build Performance](./build-performance.md) | Renderer/native build layers and performance budgets |
-| [Deployment](./deployment.md) | Docker setup, environment variables, and production config |
-| [Remote Access Runbook](./remote-access-runbook.md) | Cloudflare Tunnel (primary) and Tailscale (secondary) remote access setup |
-| [Roadmap](./roadmap.md) | Development progress and upcoming work (includes vibe-kanban-inspired upgrades) |
-| [Upgrade Reference](./upgrade-reference.md) | Libraries, patterns, and code examples for planned upgrades |
-| [ADR 003: Task Status](./adr/003-task-status-source-of-truth.md) | Why task lifecycle state is server-owned and generated for every client |
-| [ADR 004: Task Relationships](./adr/004-task-relationship-model.md) | Direction, validation, migration, and compatibility policy for task edges |
-| [ADR 005: Versioned AI Plans](./adr/005-versioned-ai-plan-proposals.md) | Proposal identity, graph revisions, transactional apply, conservative undo, and Vault outbox policy |
-| [ADR 006: Execution Graph Insights](./adr/006-deterministic-execution-graph-insights.md) | Canonical Ready/Blocked semantics, critical path, deadline risk, scope, and graph health |
-| [ADR 011: Atomic Inbox Placement](./adr/011-atomic-inbox-task-placement.md) | Inbox-to-Tree placement semantics, graph-revision concurrency, subtree moves, and conservative undo |
-| [ADR 012: Previewed Dependency Connectors](./adr/012-previewed-inbox-dependency-connectors.md) | Separate connector semantics, impact preview, cycle explanations, and revision-safe apply |
-| [ADR 013: Atomic Batch Inbox Placement](./adr/013-atomic-batch-inbox-placement.md) | Ordered multi-selection, all-or-nothing placement, shared impact, and one-step Undo |
-| [ADR 014: AI Inbox Triage Preview](./adr/014-ai-inbox-triage-preview.md) | Strict existing-location recommendations, revision-safe approval, grouped atomic apply, and shared Undo |
+| Document                                                                                       | Description                                                                                               |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [Architecture Overview](./architecture.md)                                                     | System design, data flow, and design principles                                                           |
+| [Platform Matrix](./architecture/platform-matrix.md)                                           | Supported clients, ownership boundaries, and release validation                                           |
+| [Database Schema](./database-schema.md)                                                        | Core tables, supporting persistence, indexes, and migration strategy                                      |
+| [API Design](./api-design.md)                                                                  | Human-readable REST/SSE/WebSocket guide and contract-generation workflow                                  |
+| [Backend Guide](./backend-guide.md)                                                            | FastAPI project structure, modules, and dev setup                                                         |
+| [Frontend Guide](./frontend-guide.md)                                                          | Vite + React + TypeScript app structure and component reference                                           |
+| [Tauri Migration](./tauri-migration.md)                                                        | Desktop runtime architecture, data migration, updater, and signing                                        |
+| [Electron Cutover](./electron-cutover.md)                                                      | Completed removal record and legacy data-import guarantees                                                |
+| [Build Performance](./build-performance.md)                                                    | Renderer/native build layers and performance budgets                                                      |
+| [Deployment](./deployment.md)                                                                  | Docker setup, environment variables, and production config                                                |
+| [Remote Access Runbook](./remote-access-runbook.md)                                            | Cloudflare Tunnel (primary) and Tailscale (secondary) remote access setup                                 |
+| [Roadmap](./roadmap.md)                                                                        | Development progress and upcoming work (includes vibe-kanban-inspired upgrades)                           |
+| [Upgrade Reference](./upgrade-reference.md)                                                    | Libraries, patterns, and code examples for planned upgrades                                               |
+| [ADR 003: Task Status](./adr/003-task-status-source-of-truth.md)                               | Why task lifecycle state is server-owned and generated for every client                                   |
+| [ADR 004: Task Relationships](./adr/004-task-relationship-model.md)                            | Direction, validation, migration, and compatibility policy for task edges                                 |
+| [ADR 005: Versioned AI Plans](./adr/005-versioned-ai-plan-proposals.md)                        | Proposal identity, graph revisions, transactional apply, conservative undo, and Vault outbox policy       |
+| [ADR 006: Execution Graph Insights](./adr/006-deterministic-execution-graph-insights.md)       | Canonical Ready/Blocked semantics, critical path, deadline risk, scope, and graph health                  |
+| [ADR 011: Atomic Inbox Placement](./adr/011-atomic-inbox-task-placement.md)                    | Inbox-to-Tree placement semantics, graph-revision concurrency, subtree moves, and conservative undo       |
+| [ADR 012: Previewed Dependency Connectors](./adr/012-previewed-inbox-dependency-connectors.md) | Separate connector semantics, impact preview, cycle explanations, and revision-safe apply                 |
+| [ADR 013: Atomic Batch Inbox Placement](./adr/013-atomic-batch-inbox-placement.md)             | Ordered multi-selection, all-or-nothing placement, shared impact, and one-step Undo                       |
+| [ADR 014: AI Inbox Triage Preview](./adr/014-ai-inbox-triage-preview.md)                       | Strict existing-location recommendations, revision-safe approval, grouped atomic apply, and shared Undo   |
+| [ADR 015: AI-Proposed Workstreams](./adr/015-ai-proposed-workstreams.md)                       | Dashed structural proposals, preview-local references, atomic creation/placement, and creation-aware Undo |
 
 ## Key Features
 
@@ -61,26 +62,26 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Desktop App | Tauri 2 + Rust | Native desktop shell, server lifecycle, secure storage, and signed updates |
-| Web App | Vite + React 18 | Fast dev server and optimized production builds |
-| Language | TypeScript | Type-safe codebase |
-| Routing | React Router v7 | Client-side navigation and lazy route splitting |
-| Client State | Zustand + TanStack Query | Local preferences/session state plus cached server state and mutations |
-| HTTP Client | Axios | REST API communication with token refresh |
-| Real-time | SSE + WebSocket | Streaming AI responses and cross-client change notifications |
-| Drag & Drop | @hello-pangea/dnd | Kanban board drag-and-drop with animations |
-| Dialogs | @radix-ui/react-dialog | Accessible modal/dialog primitives |
-| Command Palette | cmdk | Headless command menu |
-| Keyboard Shortcuts | react-hotkeys-hook | Global and scoped hotkey management |
-| Resizable Panels | react-resizable-panels | Adjustable sidebar/panel layout |
-| Code Editor | @uiw/react-codemirror | Syntax-highlighted editor for system prompt |
-| Styling | CSS with custom properties | BEM naming (`.cc-` prefix), theme-aware via CSS variables |
-| Backend | Python FastAPI | Async API server with AI orchestration |
-| Database | SQLite | Single-file, zero-config persistent storage |
-| AI Layer | Ollama / OpenAI-compatible API / Claude Code | Local-first LLM with optional external backends |
-| Deployment | Docker Compose | One-command server setup |
+| Layer              | Technology                                   | Purpose                                                                    |
+| ------------------ | -------------------------------------------- | -------------------------------------------------------------------------- |
+| Desktop App        | Tauri 2 + Rust                               | Native desktop shell, server lifecycle, secure storage, and signed updates |
+| Web App            | Vite + React 18                              | Fast dev server and optimized production builds                            |
+| Language           | TypeScript                                   | Type-safe codebase                                                         |
+| Routing            | React Router v7                              | Client-side navigation and lazy route splitting                            |
+| Client State       | Zustand + TanStack Query                     | Local preferences/session state plus cached server state and mutations     |
+| HTTP Client        | Axios                                        | REST API communication with token refresh                                  |
+| Real-time          | SSE + WebSocket                              | Streaming AI responses and cross-client change notifications               |
+| Drag & Drop        | @hello-pangea/dnd                            | Kanban board drag-and-drop with animations                                 |
+| Dialogs            | @radix-ui/react-dialog                       | Accessible modal/dialog primitives                                         |
+| Command Palette    | cmdk                                         | Headless command menu                                                      |
+| Keyboard Shortcuts | react-hotkeys-hook                           | Global and scoped hotkey management                                        |
+| Resizable Panels   | react-resizable-panels                       | Adjustable sidebar/panel layout                                            |
+| Code Editor        | @uiw/react-codemirror                        | Syntax-highlighted editor for system prompt                                |
+| Styling            | CSS with custom properties                   | BEM naming (`.cc-` prefix), theme-aware via CSS variables                  |
+| Backend            | Python FastAPI                               | Async API server with AI orchestration                                     |
+| Database           | SQLite                                       | Single-file, zero-config persistent storage                                |
+| AI Layer           | Ollama / OpenAI-compatible API / Claude Code | Local-first LLM with optional external backends                            |
+| Deployment         | Docker Compose                               | One-command server setup                                                   |
 
 ## Quick Start
 

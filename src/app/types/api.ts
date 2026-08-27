@@ -15,6 +15,7 @@ export type {
   TaskGroupedPlacementRequest,
   InboxTriagePreviewRequest,
   InboxTriageSuggestion,
+  InboxTriageProposedWorkstream,
   InboxTriagePreviewResponse,
   TaskStatus,
   TaskRelationshipType,

@@ -474,6 +474,7 @@ Body: file (binary)
 ```
 
 **Validation:**
+
 - Allowed extensions: `jpg, jpeg, png, gif, webp, svg, pdf, txt, md, zip` (configurable)
 - Max file size: 10 MB (configurable via `MAX_UPLOAD_SIZE_MB`)
 - Files stored on disk as `{uuid}.{ext}` in the configured `upload_dir`
@@ -862,6 +863,29 @@ Selected recommendations are grouped by destination and sent once to
 transaction and returns one aggregate change set, so a failure rolls back every
 group and Undo restores the entire approved preview.
 
+When the existing Tree has no suitable branch, the preview can include a
+`proposed_workstreams` entry and Task suggestions can reference its preview-local
+key through `proposed_parent_key`. The grouped apply translates each selected
+proposal into a `create_parent` destination:
+
+```json
+{
+  "todo_ids": ["todo_format", "todo_deadline"],
+  "project_id": "project_paper",
+  "parent_id": null,
+  "create_parent": {
+    "title": "Submission",
+    "description": "Conference submission preparation",
+    "parent_id": null
+  },
+  "inbox_state": "none"
+}
+```
+
+The response exposes created containers in `created_todos`. The shared Undo
+restores the selected Tasks and removes the created containers, while stale or
+later-edited graphs fail closed.
+
 ```json
 {
   "project_id": "project_paper",
@@ -1036,24 +1060,24 @@ When a user message is sent via `POST /api/chat/send`, the backend classifies th
 
 ### Supported Intents
 
-| Intent | Description | Module |
-|--------|-------------|--------|
-| `general_chat` | General conversation, no specific action | AI Chat |
-| `create_todo` | Create a new task | Todo Service |
-| `query_todos` | List or search tasks | Todo Service |
-| `update_todo` | Modify an existing task | Todo Service |
-| `delete_todo` | Remove a task | Todo Service |
-| `complete_todo` | Mark a task as done | Todo Service |
-| `create_event` | Create a calendar event | Calendar Service |
-| `query_events` | List or search events | Calendar Service |
-| `update_event` | Modify an existing event | Calendar Service |
-| `delete_event` | Remove an event | Calendar Service |
-| `search` | Full-text search across all data | Search Service |
-| `delegate_task` | Assign an async task to the AI agent | Agent Service |
-| `daily_briefing` | Request today's summary | Briefing Service |
-| `suggest_time` | Suggest available time slots | Scheduling Service |
-| `check_conflicts` | Check for scheduling conflicts | Scheduling Service |
-| `analyze_schedule` | Analyze schedule patterns | Scheduling Service |
+| Intent             | Description                              | Module             |
+| ------------------ | ---------------------------------------- | ------------------ |
+| `general_chat`     | General conversation, no specific action | AI Chat            |
+| `create_todo`      | Create a new task                        | Todo Service       |
+| `query_todos`      | List or search tasks                     | Todo Service       |
+| `update_todo`      | Modify an existing task                  | Todo Service       |
+| `delete_todo`      | Remove a task                            | Todo Service       |
+| `complete_todo`    | Mark a task as done                      | Todo Service       |
+| `create_event`     | Create a calendar event                  | Calendar Service   |
+| `query_events`     | List or search events                    | Calendar Service   |
+| `update_event`     | Modify an existing event                 | Calendar Service   |
+| `delete_event`     | Remove an event                          | Calendar Service   |
+| `search`           | Full-text search across all data         | Search Service     |
+| `delegate_task`    | Assign an async task to the AI agent     | Agent Service      |
+| `daily_briefing`   | Request today's summary                  | Briefing Service   |
+| `suggest_time`     | Suggest available time slots             | Scheduling Service |
+| `check_conflicts`  | Check for scheduling conflicts           | Scheduling Service |
+| `analyze_schedule` | Analyze schedule patterns                | Scheduling Service |
 
 ---
 
@@ -1076,14 +1100,14 @@ All errors follow a consistent format:
 
 ### Error Codes
 
-| HTTP Status | Code | Description |
-|-------------|------|-------------|
-| 400 | `VALIDATION_ERROR` | Invalid request body or parameters |
-| 401 | `UNAUTHORIZED` | Missing or invalid JWT token |
-| 403 | `FORBIDDEN` | Token valid but insufficient permissions |
-| 404 | `NOT_FOUND` | Resource does not exist |
-| 409 | `CONFLICT` | Resource conflict (e.g., duplicate) |
-| 422 | `UNPROCESSABLE` | Semantically invalid request |
-| 429 | `RATE_LIMITED` | Too many requests |
-| 500 | `INTERNAL_ERROR` | Unexpected server error |
-| 503 | `AI_UNAVAILABLE` | LLM provider is unreachable |
+| HTTP Status | Code               | Description                              |
+| ----------- | ------------------ | ---------------------------------------- |
+| 400         | `VALIDATION_ERROR` | Invalid request body or parameters       |
+| 401         | `UNAUTHORIZED`     | Missing or invalid JWT token             |
+| 403         | `FORBIDDEN`        | Token valid but insufficient permissions |
+| 404         | `NOT_FOUND`        | Resource does not exist                  |
+| 409         | `CONFLICT`         | Resource conflict (e.g., duplicate)      |
+| 422         | `UNPROCESSABLE`    | Semantically invalid request             |
+| 429         | `RATE_LIMITED`     | Too many requests                        |
+| 500         | `INTERNAL_ERROR`   | Unexpected server error                  |
+| 503         | `AI_UNAVAILABLE`   | LLM provider is unreachable              |

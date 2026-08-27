@@ -45,5 +45,5 @@ A graph change during generation or before apply makes the preview stale.
 - AI never moves Inbox Tasks without explicit approval.
 - Recommendations can target several Projects and parents atomically.
 - Existing placement, revision, insight-delta, and Undo semantics are reused.
-- The first version recommends only existing locations; proposed Workstream
-  creation remains a separate versioned change-set feature.
+- ADR 015 extends this preview with validated, non-persistent Workstream
+  proposals that reuse the same grouped change-set boundary.

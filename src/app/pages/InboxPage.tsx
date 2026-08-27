@@ -30,6 +30,7 @@ import type {
   TodoResponse,
 } from '../types/schemas';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
+import { buildInboxTriagePlacementGroups } from '../utils/inboxTriage';
 import InboxTriageTree, {
   INBOX_DEPENDENCY_DRAG_TYPE,
   INBOX_TASK_BATCH_DRAG_TYPE,
@@ -531,24 +532,19 @@ export default function InboxPage() {
       addToast('warning', 'Select at least one suggestion to apply');
       return;
     }
-    const grouped = new Map<
-      string,
-      { todo_ids: string[]; project_id: string; parent_id: string | null; inbox_state: 'none' }
-    >();
-    for (const suggestion of suggestions) {
-      const key = `${suggestion.project_id}\u0000${suggestion.parent_id ?? ''}`;
-      const group = grouped.get(key) ?? {
-        todo_ids: [],
-        project_id: suggestion.project_id,
-        parent_id: suggestion.parent_id,
-        inbox_state: 'none' as const,
-      };
-      group.todo_ids.push(suggestion.task_id);
-      grouped.set(key, group);
+    let groups;
+    try {
+      groups = buildInboxTriagePlacementGroups(triagePreview, selectedTriageTaskIds);
+    } catch (error) {
+      addToast(
+        'error',
+        error instanceof Error ? error.message : 'The placement preview is invalid',
+      );
+      return;
     }
     try {
       const result = await placeGroupsMutation.mutateAsync({
-        groups: Array.from(grouped.values()),
+        groups,
         expected_graph_revision: triagePreview.base_graph_revision,
       });
       const appliedIds = new Set(suggestions.map((suggestion) => suggestion.task_id));
@@ -778,6 +774,9 @@ export default function InboxPage() {
                       <strong>AI placement preview</strong>
                       <span>
                         {triagePreview.suggestions.length} suggested
+                        {triagePreview.proposed_workstreams.length > 0
+                          ? ` · ${triagePreview.proposed_workstreams.length} new Workstream${triagePreview.proposed_workstreams.length === 1 ? '' : 's'}`
+                          : ''}
                         {triagePreview.model_provider ? ` · ${triagePreview.model_provider}` : ''}
                       </span>
                     </div>
@@ -792,9 +791,40 @@ export default function InboxPage() {
                       Dismiss
                     </button>
                   </div>
+                  {triagePreview.proposed_workstreams.map((workstream) => {
+                    const project = projects.find((item) => item.id === workstream.project_id);
+                    const parent = workstream.parent_id ? todoById.get(workstream.parent_id) : null;
+                    const selectedCount = triagePreview.suggestions.filter(
+                      (suggestion) =>
+                        suggestion.proposed_parent_key === workstream.key &&
+                        selectedTriageTaskIds.includes(suggestion.task_id),
+                    ).length;
+                    return (
+                      <div
+                        key={workstream.key}
+                        className="cc-inbox-triage__ai-workstream"
+                        aria-label={`Proposed Workstream ${workstream.title}`}
+                      >
+                        <span>AI proposed Workstream</span>
+                        <strong>{workstream.title}</strong>
+                        <small>
+                          {project?.title ?? workstream.project_id}
+                          {parent ? ` / ${parent.title}` : ' / Project root'} ·{' '}
+                          {Math.round(workstream.confidence * 100)}% · {selectedCount} selected task
+                          {selectedCount === 1 ? '' : 's'}
+                        </small>
+                        <small>{workstream.reason}</small>
+                      </div>
+                    );
+                  })}
                   {triagePreview.suggestions.map((suggestion) => {
                     const project = projects.find((item) => item.id === suggestion.project_id);
                     const parent = suggestion.parent_id ? todoById.get(suggestion.parent_id) : null;
+                    const proposed = suggestion.proposed_parent_key
+                      ? triagePreview.proposed_workstreams.find(
+                          (workstream) => workstream.key === suggestion.proposed_parent_key,
+                        )
+                      : null;
                     return (
                       <label key={suggestion.task_id} className="cc-inbox-triage__ai-suggestion">
                         <input
@@ -814,8 +844,12 @@ export default function InboxPage() {
                           </strong>
                           <small>
                             → {project?.title ?? suggestion.project_id}
-                            {parent ? ` / ${parent.title}` : ' / Project root'} ·{' '}
-                            {Math.round(suggestion.confidence * 100)}%
+                            {proposed
+                              ? ` / ${proposed.title} (new)`
+                              : parent
+                                ? ` / ${parent.title}`
+                                : ' / Project root'}{' '}
+                            · {Math.round(suggestion.confidence * 100)}%
                           </small>
                           <small>{suggestion.reason}</small>
                         </span>

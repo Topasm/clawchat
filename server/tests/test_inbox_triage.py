@@ -3,12 +3,15 @@
 import json
 
 import pytest
+from exceptions import AppError
 from main import app
 from models.todo import Todo
 from services import inbox_triage_service, project_service, task_placement_service
 
 
-def _tool_response(suggestions: list[dict]) -> dict:
+def _tool_response(
+    suggestions: list[dict], proposed_workstreams: list[dict] | None = None
+) -> dict:
     return {
         "choices": [
             {
@@ -16,7 +19,13 @@ def _tool_response(suggestions: list[dict]) -> dict:
                     "tool_calls": [
                         {
                             "function": {
-                                "arguments": json.dumps({"suggestions": suggestions})
+                                "arguments": json.dumps(
+                                    {
+                                        "suggestions": suggestions,
+                                        "proposed_workstreams": proposed_workstreams
+                                        or [],
+                                    }
+                                )
                             }
                         }
                     ]
@@ -27,13 +36,18 @@ def _tool_response(suggestions: list[dict]) -> dict:
 
 
 class FakeTriageAI:
-    def __init__(self, suggestions: list[dict]):
+    def __init__(
+        self,
+        suggestions: list[dict],
+        proposed_workstreams: list[dict] | None = None,
+    ):
         self.suggestions = suggestions
+        self.proposed_workstreams = proposed_workstreams or []
         self.calls: list[dict] = []
 
     async def function_call(self, **kwargs) -> dict:
         self.calls.append(kwargs)
-        return _tool_response(self.suggestions)
+        return _tool_response(self.suggestions, self.proposed_workstreams)
 
 
 @pytest.mark.asyncio
@@ -113,6 +127,84 @@ async def test_preview_endpoint_rejects_parent_from_another_project(
 
     assert response.status_code == 502, response.text
     assert response.json()["error"]["code"] == "INBOX_TRIAGE_GENERATION_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_generate_preview_can_propose_a_new_workstream(db_session):
+    project = await project_service.create_project(db_session, title="Research")
+    first = Todo(title="Check conference format", inbox_state="captured")
+    second = Todo(title="Confirm submission deadline", inbox_state="captured")
+    db_session.add_all([first, second])
+    await db_session.commit()
+    revision = await task_placement_service.current_graph_revision(db_session)
+    proposal = {
+        "key": "submission",
+        "project_id": project.id,
+        "parent_id": None,
+        "title": "Submission",
+        "description": "Conference submission preparation",
+        "confidence": 0.88,
+        "reason": "Both tasks prepare the submission.",
+    }
+    ai = FakeTriageAI(
+        [
+            {
+                "task_id": todo.id,
+                "project_id": project.id,
+                "parent_id": None,
+                "proposed_parent_key": "submission",
+                "confidence": 0.9,
+                "reason": "This belongs in submission preparation.",
+            }
+            for todo in (first, second)
+        ],
+        [proposal],
+    )
+
+    result = await inbox_triage_service.generate_preview(
+        db_session,
+        ai,
+        todo_ids=[first.id, second.id],
+        expected_graph_revision=revision,
+        model_provider="test",
+    )
+
+    assert result.proposed_workstreams[0].title == "Submission"
+    assert {item.proposed_parent_key for item in result.suggestions} == {"submission"}
+    assert await task_placement_service.current_graph_revision(db_session) == revision
+
+
+@pytest.mark.asyncio
+async def test_preview_rejects_unused_workstream_proposal(db_session):
+    project = await project_service.create_project(db_session, title="Research")
+    inbox = Todo(title="Unrelated task", inbox_state="captured")
+    db_session.add(inbox)
+    await db_session.commit()
+    revision = await task_placement_service.current_graph_revision(db_session)
+    ai = FakeTriageAI(
+        [],
+        [
+            {
+                "key": "unused",
+                "project_id": project.id,
+                "parent_id": None,
+                "title": "Unused Workstream",
+                "description": None,
+                "confidence": 0.5,
+                "reason": "Not referenced by a task.",
+            }
+        ],
+    )
+
+    with pytest.raises(AppError) as exc_info:
+        await inbox_triage_service.generate_preview(
+            db_session,
+            ai,
+            todo_ids=[inbox.id],
+            expected_graph_revision=revision,
+            model_provider="test",
+        )
+    assert "unused Workstream proposal" in exc_info.value.message
 
 
 @pytest.mark.asyncio

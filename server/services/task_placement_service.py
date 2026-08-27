@@ -8,7 +8,7 @@ from models.project import Project
 from models.task_placement_change import TaskPlacementChange
 from models.todo import Todo
 from schemas.task_placement import TaskPlacementGroup
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.graph_command_service import (
@@ -254,7 +254,13 @@ async def place_task_groups(
     *,
     groups: list[TaskPlacementGroup],
     expected_graph_revision: int,
-) -> tuple[list[Todo], TaskPlacementChange, list[str], dict[str, int | None] | None]:
+) -> tuple[
+    list[Todo],
+    list[Todo],
+    TaskPlacementChange,
+    list[str],
+    dict[str, int | None] | None,
+]:
     """Apply multiple placement destinations as one revision-bound undo unit."""
     if not groups:
         raise ValidationError("At least one placement group is required")
@@ -263,22 +269,81 @@ async def place_task_groups(
     if len(todo_ids) != len(set(todo_ids)):
         raise ValidationError("A task can appear in only one placement group")
 
+    await claim_graph_revision(db, expected_graph_revision)
     before_insights = await load_graph_insights(
         db,
         generated_at=datetime.now(timezone.utc),
     )
     revision = expected_graph_revision
     moved: list[Todo] = []
+    created: list[Todo] = []
     before_by_id: dict[str, dict[str, object]] = {}
     after_by_id: dict[str, dict[str, object]] = {}
     temporary_changes: list[TaskPlacementChange] = []
 
     for group in groups:
+        destination_parent_id = group.parent_id
+        if group.create_parent is not None:
+            project = await db.get(Project, group.project_id)
+            if project is None:
+                raise NotFoundError(f"Project {group.project_id} not found")
+            container_parent_id = group.create_parent.parent_id or project.root_task_id
+            if container_parent_id is not None:
+                container_parent = await db.get(Todo, container_parent_id)
+                if container_parent is None:
+                    raise NotFoundError(f"Parent todo {container_parent_id} not found")
+                if container_parent.project_id != group.project_id:
+                    raise ValidationError(
+                        "New parent and its container must belong to the same project"
+                    )
+            duplicate = (
+                (
+                    await db.execute(
+                        select(Todo.id).where(
+                            Todo.project_id == group.project_id,
+                            Todo.parent_id == container_parent_id,
+                            func.lower(Todo.title) == group.create_parent.title.lower(),
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if duplicate is not None:
+                raise ValidationError(
+                    "A task with this title already exists at the proposed location"
+                )
+            siblings = await _siblings(db, group.project_id, container_parent_id)
+            container = Todo(
+                title=group.create_parent.title,
+                description=group.create_parent.description,
+                project_id=group.project_id,
+                parent_id=container_parent_id,
+                sort_order=(
+                    max((item.sort_order for item in siblings), default=-10) + 10
+                ),
+                source="ai_triage_workstream",
+                inbox_state="none",
+            )
+            db.add(container)
+            await db.flush()
+            created.append(container)
+            before_by_id[container.id] = {"id": container.id, "exists": False}
+            after_by_id[container.id] = {
+                **_state(container),
+                "exists": True,
+                "title": container.title,
+                "description": container.description,
+                "source": container.source,
+            }
+            revision = await ensure_graph_revision_advanced(db, revision)
+            destination_parent_id = container.id
+
         group_todos, change, _, _ = await place_tasks(
             db,
             todo_ids=list(group.todo_ids),
             project_id=group.project_id,
-            parent_id=group.parent_id,
+            parent_id=destination_parent_id,
             before_id=group.before_id,
             inbox_state=group.inbox_state,
             expected_graph_revision=revision,
@@ -289,7 +354,8 @@ async def place_task_groups(
         for state in json.loads(change.before_json):
             before_by_id.setdefault(str(state["id"]), state)
         for state in json.loads(change.after_json):
-            after_by_id[str(state["id"])] = state
+            state_id = str(state["id"])
+            after_by_id[state_id] = {**after_by_id.get(state_id, {}), **state}
 
     for change in temporary_changes:
         await db.delete(change)
@@ -319,6 +385,7 @@ async def place_task_groups(
     await db.flush()
     return (
         moved,
+        created,
         aggregate,
         affected_ids,
         insight_delta(before_insights, after_insights),
@@ -350,6 +417,9 @@ async def undo_placement(
             f"Cannot undo because tasks no longer exist: {', '.join(missing)}"
         )
 
+    created_ids = {
+        str(state["id"]) for state in before if state.get("exists", True) is False
+    }
     conflicts: list[str] = []
     placement_fields = ("project_id", "parent_id", "sort_order", "inbox_state")
     restored_ids: list[str] = []
@@ -357,6 +427,15 @@ async def undo_placement(
         todo_id = str(state["id"])
         applied_state = after_by_id[todo_id]
         current_state = _state(by_id[todo_id])
+        if todo_id in created_ids:
+            for field in ("title", "description", "source"):
+                if getattr(by_id[todo_id], field) != applied_state.get(field):
+                    conflicts.append(f"{todo_id}.{field}")
+            for field in placement_fields:
+                if current_state[field] != applied_state[field]:
+                    conflicts.append(f"{todo_id}.{field}")
+            restored_ids.append(todo_id)
+            continue
         if any(state[field] != applied_state[field] for field in placement_fields):
             restored_ids.append(todo_id)
         for field in placement_fields:
@@ -373,6 +452,8 @@ async def undo_placement(
 
     for state in before:
         todo_id = str(state["id"])
+        if todo_id in created_ids:
+            continue
         todo = by_id[todo_id]
         applied_state = after_by_id[todo_id]
         if state["project_id"] != applied_state["project_id"]:
@@ -383,6 +464,9 @@ async def undo_placement(
             todo.sort_order = int(state["sort_order"])
         if state["inbox_state"] != applied_state["inbox_state"]:
             todo.inbox_state = str(state["inbox_state"])
+    await db.flush()
+    for todo_id in created_ids:
+        await db.delete(by_id[todo_id])
     await db.flush()
     after_insights = await load_graph_insights(db, generated_at=analysis_time)
     reverted_revision = await ensure_graph_revision_advanced(

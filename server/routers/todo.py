@@ -587,7 +587,7 @@ async def place_todo_groups(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todos, change, affected_ids, insights_delta = (
+    todos, created_todos, change, affected_ids, insights_delta = (
         await task_placement_service.place_task_groups(
             db,
             groups=body.groups,
@@ -597,9 +597,14 @@ async def place_todo_groups(
     await db.commit()
     for todo in todos:
         await db.refresh(todo)
+    for todo in created_todos:
+        await db.refresh(todo)
     await notify_module_data_changed("todos")
     return TaskBatchPlacementResponse(
         todos=[await _enrich_todo_response(todo, db) for todo in todos],
+        created_todos=[
+            await _enrich_todo_response(todo, db) for todo in created_todos
+        ],
         graph_revision=change.applied_graph_revision,
         affected_task_ids=affected_ids,
         insights_delta=insights_delta,

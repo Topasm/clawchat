@@ -4,6 +4,7 @@ import pytest
 from exceptions import ConflictError, ValidationError
 from models.todo import Todo
 from services import graph_insights_service, project_service, task_placement_service
+from sqlalchemy import select
 
 
 async def _project(db_session, title: str = "Project"):
@@ -450,6 +451,11 @@ async def test_grouped_placement_rolls_back_all_groups_when_later_group_fails(
                     "project_id": project.id,
                     "parent_id": None,
                     "inbox_state": "none",
+                    "create_parent": {
+                        "title": "Should roll back",
+                        "description": None,
+                        "parent_id": None,
+                    },
                 },
                 {
                     "todo_ids": ["todo_missing"],
@@ -468,6 +474,14 @@ async def test_grouped_placement_rolls_back_all_groups_when_later_group_fails(
     assert restored.project_id is None
     assert restored.parent_id is None
     assert restored.inbox_state == "captured"
+    created = list(
+        (
+            await db_session.execute(
+                select(Todo).where(Todo.source == "ai_triage_workstream")
+            )
+        ).scalars()
+    )
+    assert created == []
     assert await task_placement_service.current_graph_revision(db_session) == revision
 
 
@@ -485,3 +499,56 @@ async def test_grouped_placement_rejects_duplicate_membership(client, auth_heade
         },
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_grouped_placement_creates_workstream_and_undo_removes_it(
+    client, auth_headers, db_session
+):
+    project = await _project(db_session)
+    first = Todo(title="Format paper", inbox_state="captured")
+    second = Todo(title="Check deadline", inbox_state="captured")
+    db_session.add_all([first, second])
+    await db_session.commit()
+    first_id = first.id
+    second_id = second.id
+    revision = await task_placement_service.current_graph_revision(db_session)
+
+    response = await client.post(
+        "/api/todos/placements/groups",
+        headers=auth_headers,
+        json={
+            "groups": [
+                {
+                    "todo_ids": [first_id, second_id],
+                    "project_id": project.id,
+                    "parent_id": None,
+                    "inbox_state": "none",
+                    "create_parent": {
+                        "title": "Submission",
+                        "description": "AI-proposed Workstream",
+                        "parent_id": None,
+                    },
+                }
+            ],
+            "expected_graph_revision": revision,
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert len(payload["created_todos"]) == 1
+    workstream_id = payload["created_todos"][0]["id"]
+    assert payload["created_todos"][0]["source"] == "ai_triage_workstream"
+    assert {todo["parent_id"] for todo in payload["todos"]} == {workstream_id}
+
+    undone = await client.post(
+        f"/api/todos/placements/{payload['change_set_id']}/undo",
+        headers=auth_headers,
+    )
+    assert undone.status_code == 200, undone.text
+    db_session.expire_all()
+    assert await db_session.get(Todo, workstream_id) is None
+    restored_first = await db_session.get(Todo, first_id)
+    restored_second = await db_session.get(Todo, second_id)
+    assert restored_first is not None and restored_first.project_id is None
+    assert restored_second is not None and restored_second.project_id is None

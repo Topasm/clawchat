@@ -143,6 +143,7 @@ export const TaskBatchPlacementRequestSchema = TaskPlacementRequestSchema.extend
 
 export const TaskBatchPlacementResponseSchema = z.object({
   todos: z.array(TodoResponseSchema),
+  created_todos: z.array(TodoResponseSchema).optional().default([]),
   graph_revision: z.number().int().nonnegative(),
   affected_task_ids: z.array(z.string()),
   insights_delta: z
@@ -161,6 +162,14 @@ export const TaskPlacementGroupSchema = z.object({
   project_id: z.string().nullable(),
   parent_id: z.string().nullable(),
   before_id: z.string().nullable().optional(),
+  create_parent: z
+    .object({
+      title: z.string().min(1).max(200),
+      description: z.string().nullable().optional(),
+      parent_id: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
   inbox_state: InboxStateSchema.nullable().optional(),
 });
 
@@ -178,13 +187,25 @@ export const InboxTriageSuggestionSchema = z.object({
   task_id: z.string(),
   project_id: z.string(),
   parent_id: z.string().nullable(),
+  proposed_parent_key: z.string().nullable().optional(),
   confidence: z.number().min(0).max(1),
   reason: z.string().min(1).max(500),
+});
+
+export const InboxTriageProposedWorkstreamSchema = z.object({
+  key: z.string(),
+  project_id: z.string(),
+  parent_id: z.string().nullable(),
+  title: z.string(),
+  description: z.string().nullable().optional(),
+  confidence: z.number().min(0).max(1),
+  reason: z.string(),
 });
 
 export const InboxTriagePreviewResponseSchema = z.object({
   base_graph_revision: z.number().int().nonnegative(),
   suggestions: z.array(InboxTriageSuggestionSchema),
+  proposed_workstreams: z.array(InboxTriageProposedWorkstreamSchema).optional().default([]),
   unassigned_task_ids: z.array(z.string()),
   model_provider: z.string().nullable().optional(),
 });
@@ -748,6 +769,7 @@ export type TaskPlacementGroup = z.infer<typeof TaskPlacementGroupSchema>;
 export type TaskGroupedPlacementRequest = z.infer<typeof TaskGroupedPlacementRequestSchema>;
 export type InboxTriagePreviewRequest = z.infer<typeof InboxTriagePreviewRequestSchema>;
 export type InboxTriageSuggestion = z.infer<typeof InboxTriageSuggestionSchema>;
+export type InboxTriageProposedWorkstream = z.infer<typeof InboxTriageProposedWorkstreamSchema>;
 export type InboxTriagePreviewResponse = z.infer<typeof InboxTriagePreviewResponseSchema>;
 export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;

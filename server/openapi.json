@@ -2873,6 +2873,14 @@
             ],
             "title": "Model Provider"
           },
+          "proposed_workstreams": {
+            "items": {
+              "$ref": "#/components/schemas/InboxTriageProposedWorkstream"
+            },
+            "maxItems": 10,
+            "title": "Proposed Workstreams",
+            "type": "array"
+          },
           "suggestions": {
             "items": {
               "$ref": "#/components/schemas/InboxTriageSuggestion"
@@ -2894,6 +2902,71 @@
           "unassigned_task_ids"
         ],
         "title": "InboxTriagePreviewResponse",
+        "type": "object"
+      },
+      "InboxTriageProposedWorkstream": {
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "key": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "project_id",
+          "title",
+          "confidence",
+          "reason"
+        ],
+        "title": "InboxTriageProposedWorkstream",
         "type": "object"
       },
       "InboxTriageSuggestion": {
@@ -2918,6 +2991,19 @@
           "project_id": {
             "title": "Project Id",
             "type": "string"
+          },
+          "proposed_parent_key": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Parent Key"
           },
           "reason": {
             "maxLength": 500,
@@ -5853,6 +5939,13 @@
             "title": "Change Set Id",
             "type": "string"
           },
+          "created_todos": {
+            "items": {
+              "$ref": "#/components/schemas/TodoResponse"
+            },
+            "title": "Created Todos",
+            "type": "array"
+          },
           "graph_revision": {
             "minimum": 0.0,
             "title": "Graph Revision",
@@ -6071,6 +6164,16 @@
             ],
             "title": "Before Id"
           },
+          "create_parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskPlacementNewParent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "inbox_state": {
             "anyOf": [
               {
@@ -6156,6 +6259,44 @@
           }
         },
         "title": "TaskPlacementInsightsDelta",
+        "type": "object"
+      },
+      "TaskPlacementNewParent": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "TaskPlacementNewParent",
         "type": "object"
       },
       "TaskPlacementRequest": {

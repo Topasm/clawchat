@@ -8,9 +8,13 @@ from domain.task import TaskStatus
 from exceptions import AppError, ConflictError, NotFoundError, ValidationError
 from models.project import Project
 from models.todo import Todo
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
-from schemas.inbox_triage import InboxTriagePreviewResponse, InboxTriageSuggestion
+from schemas.inbox_triage import (
+    InboxTriagePreviewResponse,
+    InboxTriageProposedWorkstream,
+    InboxTriageSuggestion,
+)
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +23,10 @@ from services.graph_command_service import current_graph_revision
 
 class _SuggestionPayload(BaseModel):
     suggestions: list[InboxTriageSuggestion]
+    proposed_workstreams: list[InboxTriageProposedWorkstream] = Field(
+        default_factory=list,
+        max_length=10,
+    )
 
 
 def _generation_error(message: str) -> AppError:
@@ -186,6 +194,12 @@ async def generate_preview(
                                             {"type": "null"},
                                         ]
                                     },
+                                    "proposed_parent_key": {
+                                        "anyOf": [
+                                            {"type": "string"},
+                                            {"type": "null"},
+                                        ]
+                                    },
                                     "confidence": {
                                         "type": "number",
                                         "minimum": 0,
@@ -197,23 +211,72 @@ async def generate_preview(
                                     "task_id",
                                     "project_id",
                                     "parent_id",
+                                    "proposed_parent_key",
                                     "confidence",
                                     "reason",
                                 ],
                             },
-                        }
+                        },
+                        "proposed_workstreams": {
+                            "type": "array",
+                            "maxItems": 10,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "key": {"type": "string"},
+                                    "project_id": {
+                                        "type": "string",
+                                        "enum": project_ids,
+                                    },
+                                    "parent_id": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string",
+                                                "enum": list(node_by_id),
+                                            },
+                                            {"type": "null"},
+                                        ]
+                                    },
+                                    "title": {"type": "string"},
+                                    "description": {
+                                        "anyOf": [
+                                            {"type": "string"},
+                                            {"type": "null"},
+                                        ]
+                                    },
+                                    "confidence": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 1,
+                                    },
+                                    "reason": {"type": "string"},
+                                },
+                                "required": [
+                                    "key",
+                                    "project_id",
+                                    "parent_id",
+                                    "title",
+                                    "description",
+                                    "confidence",
+                                    "reason",
+                                ],
+                            },
+                        },
                     },
-                    "required": ["suggestions"],
+                    "required": ["suggestions", "proposed_workstreams"],
                 },
             },
         }
     ]
     response = await ai_service.function_call(
         system_prompt=(
-            "You organize Inbox tasks into an existing project tree. Use only IDs "
-            "provided in the context. parent_id=null means the project root. Return "
-            "at most one suggestion per task and omit tasks when the destination is "
-            "uncertain. Never invent a project or tree node."
+            "You organize Inbox tasks into a project tree. Use only Task, Project, "
+            "and existing parent IDs from the context. parent_id=null means the "
+            "project root. When no existing branch fits several related tasks, you "
+            "may propose a concise new Workstream with a unique key, then reference "
+            "that key from suggestions. Do not propose a Workstream for one task "
+            "when an existing location is adequate. Return at most one suggestion "
+            "per task and omit uncertain tasks."
         ),
         user_message=json.dumps(context, ensure_ascii=False, separators=(",", ":")),
         tools=tools,
@@ -227,8 +290,41 @@ async def generate_preview(
     except PydanticValidationError as exc:
         raise _generation_error("AI returned invalid Inbox triage suggestions") from exc
 
+    proposed_by_key: dict[str, InboxTriageProposedWorkstream] = {}
+    proposed_locations: set[tuple[str, str | None, str]] = set()
+    for proposed in payload.proposed_workstreams:
+        if proposed.key in proposed_by_key:
+            raise _generation_error("AI returned a duplicate Workstream key")
+        project = project_by_id.get(proposed.project_id)
+        if project is None:
+            raise _generation_error("AI returned an unknown Workstream project")
+        effective_parent_id = proposed.parent_id or project.root_task_id
+        if proposed.parent_id is not None:
+            parent = node_by_id.get(proposed.parent_id)
+            if parent is None or parent.project_id != project.id:
+                raise _generation_error(
+                    "AI returned a Workstream parent outside its project"
+                )
+        location = (
+            proposed.project_id,
+            effective_parent_id,
+            proposed.title.casefold(),
+        )
+        if location in proposed_locations or any(
+            node.project_id == proposed.project_id
+            and node.parent_id == effective_parent_id
+            and node.title.casefold() == proposed.title.casefold()
+            for node in nodes
+        ):
+            raise _generation_error(
+                "AI proposed a duplicate Workstream at an existing location"
+            )
+        proposed_locations.add(location)
+        proposed_by_key[proposed.key] = proposed
+
     allowed_tasks = set(todo_ids)
     seen_tasks: set[str] = set()
+    referenced_proposals: set[str] = set()
     suggestions: list[InboxTriageSuggestion] = []
     for suggestion in payload.suggestions:
         if suggestion.task_id not in allowed_tasks or suggestion.task_id in seen_tasks:
@@ -242,8 +338,18 @@ async def generate_preview(
                 raise _generation_error(
                     "AI returned a parent outside the suggested project"
                 )
+        if suggestion.proposed_parent_key is not None:
+            proposed = proposed_by_key.get(suggestion.proposed_parent_key)
+            if proposed is None or proposed.project_id != suggestion.project_id:
+                raise _generation_error(
+                    "AI returned an unknown or cross-project Workstream reference"
+                )
+            referenced_proposals.add(suggestion.proposed_parent_key)
         seen_tasks.add(suggestion.task_id)
         suggestions.append(suggestion)
+
+    if referenced_proposals != set(proposed_by_key):
+        raise _generation_error("AI returned an unused Workstream proposal")
 
     current = await current_graph_revision(db)
     if current != expected_graph_revision:
@@ -257,6 +363,7 @@ async def generate_preview(
     return InboxTriagePreviewResponse(
         base_graph_revision=expected_graph_revision,
         suggestions=suggestions,
+        proposed_workstreams=payload.proposed_workstreams,
         unassigned_task_ids=[
             todo_id for todo_id in todo_ids if todo_id not in seen_tasks
         ],

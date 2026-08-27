@@ -56,10 +56,25 @@ class TaskPlacementResponse(BaseModel):
 
 class TaskBatchPlacementResponse(BaseModel):
     todos: list[TodoResponse]
+    created_todos: list[TodoResponse] = Field(default_factory=list)
     graph_revision: int = Field(ge=0)
     affected_task_ids: list[str]
     insights_delta: TaskPlacementInsightsDelta | None = None
     change_set_id: str
+
+
+class TaskPlacementNewParent(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    parent_id: str | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _normalize_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("New parent title must not be blank")
+        return normalized
 
 
 class TaskPlacementGroup(BaseModel):
@@ -67,6 +82,7 @@ class TaskPlacementGroup(BaseModel):
     project_id: str | None = Field(...)
     parent_id: str | None = Field(...)
     before_id: str | None = None
+    create_parent: TaskPlacementNewParent | None = None
     inbox_state: (
         Literal[
             "none",
@@ -88,6 +104,18 @@ class TaskPlacementGroup(BaseModel):
         if len(value) != len(set(value)):
             raise ValueError("todo_ids must not contain duplicates")
         return value
+
+    @model_validator(mode="after")
+    def _validate_destination(self):
+        if self.create_parent is not None and (
+            self.parent_id is not None or self.before_id is not None
+        ):
+            raise ValueError(
+                "parent_id and before_id must be null when create_parent is supplied"
+            )
+        if self.create_parent is not None and self.project_id is None:
+            raise ValueError("A new parent requires a project destination")
+        return self
 
 
 class TaskGroupedPlacementRequest(BaseModel):
