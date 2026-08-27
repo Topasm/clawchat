@@ -6,6 +6,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.task import TaskStatus
 from exceptions import AIUnavailableError
 from models.agent_task import AgentTask
 from models.event import Event
@@ -44,7 +45,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         .where(
             Todo.due_date >= today_start,
             Todo.due_date <= today_end,
-            Todo.status.notin_(["completed", "cancelled"]),
+            Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.created_at.asc())
     )
@@ -56,7 +57,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         .where(
             Todo.due_date > today_end,
             Todo.due_date <= upcoming_end,
-            Todo.status.notin_(["completed", "cancelled"]),
+            Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.due_date.asc())
     )
@@ -67,7 +68,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         select(Todo)
         .where(
             Todo.due_date < today_start,
-            Todo.status.in_(["pending", "in_progress"]),
+            Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
         )
         .order_by(Todo.due_date.asc())
     )
@@ -75,7 +76,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
 
     # In-progress tasks (not due today)
     in_progress_q = select(Todo).where(
-        Todo.status == "in_progress",
+        Todo.status == TaskStatus.IN_PROGRESS,
         or_(
             Todo.due_date == None,  # noqa: E711
             Todo.due_date < today_start,
@@ -92,7 +93,7 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
     # Inbox count (no due date, pending)
     inbox_q = select(func.count(Todo.id)).where(
         Todo.due_date == None,  # noqa: E711
-        Todo.status == "pending",
+        Todo.status == TaskStatus.PENDING,
     )
     inbox_count = (await db.execute(inbox_q)).scalar() or 0
 

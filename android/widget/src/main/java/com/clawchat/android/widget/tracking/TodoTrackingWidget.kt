@@ -37,6 +37,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodayResponse
 import com.clawchat.android.core.network.ApiResult
@@ -198,7 +199,7 @@ private fun TodoList(
 
 @Composable
 private fun TodoRow(todo: Todo) {
-    val completed = todo.status == "completed"
+    val completed = todo.status == TaskStatus.COMPLETED
 
     Column(modifier = GlanceModifier.padding(bottom = 4.dp)) {
         Row(
@@ -210,7 +211,7 @@ private fun TodoRow(todo: Todo) {
                     actionRunCallback<ToggleTodoAction>(
                         actionParametersOf(
                             TodoTrackingWidget.TODO_ID_KEY to todo.id,
-                            TodoTrackingWidget.CURRENT_STATUS_KEY to todo.status,
+                            TodoTrackingWidget.CURRENT_STATUS_KEY to todo.status.wireValue,
                         )
                     )
                 ),
@@ -251,7 +252,7 @@ private fun TodoRow(todo: Todo) {
                     if (completed) R.drawable.ic_widget_check_circle
                     else R.drawable.ic_widget_circle
                 ),
-                contentDescription = if (completed) "Completed" else "Pending",
+                contentDescription = taskStatusLabel(todo.status),
                 colorFilter = ColorFilter.tint(
                     if (completed) GlanceTheme.colors.primary
                     else GlanceTheme.colors.onSurfaceVariant
@@ -259,6 +260,13 @@ private fun TodoRow(todo: Todo) {
             )
         }
     }
+}
+
+private fun taskStatusLabel(status: TaskStatus): String = when (status) {
+    TaskStatus.PENDING -> "Pending"
+    TaskStatus.IN_PROGRESS -> "In progress"
+    TaskStatus.COMPLETED -> "Completed"
+    TaskStatus.CANCELLED -> "Cancelled"
 }
 
 @Composable

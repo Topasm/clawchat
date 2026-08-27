@@ -58,19 +58,21 @@ interface ScheduleEntry {
 }
 
 async function scheduleViaAlarmManager(toSchedule: ScheduleEntry[]): Promise<void> {
-  const { Capacitor } = await import('@capacitor/core');
-  const AlarmScheduler = Capacitor.Plugins['AlarmScheduler'] as {
-    scheduleReminder(opts: {
-      id: number;
-      title: string;
-      body: string;
-      triggerAt: number;
-      type: string;
-      itemId: string;
-      route: string;
-    }): Promise<void>;
-    cancelReminder(opts: { id: number }): Promise<void>;
-  } | undefined;
+  const { Capacitor, registerPlugin } = await import('@capacitor/core');
+  const AlarmScheduler = Capacitor.isPluginAvailable('AlarmScheduler')
+    ? registerPlugin<{
+        scheduleReminder(opts: {
+          id: number;
+          title: string;
+          body: string;
+          triggerAt: number;
+          type: string;
+          itemId: string;
+          route: string;
+        }): Promise<void>;
+        cancelReminder(opts: { id: number }): Promise<void>;
+      }>('AlarmScheduler')
+    : undefined;
 
   if (!AlarmScheduler) return;
 

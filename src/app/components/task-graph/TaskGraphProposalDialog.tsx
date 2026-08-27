@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
-import type { PlanResponse, PlanSubtask, TodoResponse } from '../../types/api';
-import { useApplyTaskPlan, useGenerateTaskPlan } from '../../hooks/queries';
+import type { PlanProposalResponse, PlanSubtask, TodoResponse } from '../../types/api';
+import {
+  getPlanProposalMutationError,
+  isStalePlanProposalError,
+  useApplyPlanProposal,
+  useGeneratePlanProposal,
+} from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
 import Dialog from '../shared/Dialog';
 import SegmentedControl from '../shared/SegmentedControl';
@@ -8,6 +13,7 @@ import TaskGraphView from './TaskGraphView';
 import { buildTaskGraphElements } from './taskGraphAdapter';
 import type { TaskGraphMode } from './taskGraphTypes';
 import {
+  buildProposalRelationships,
   buildProposalTodos,
   PROPOSAL_ROOT_ID,
   proposalIndexFromNodeId,
@@ -31,14 +37,14 @@ export default function TaskGraphProposalDialog({
   onOpenChange,
 }: TaskGraphProposalDialogProps) {
   const { isMobile } = usePlatform();
-  const generatePlan = useGenerateTaskPlan();
-  const applyPlan = useApplyTaskPlan();
+  const generatePlan = useGeneratePlanProposal();
+  const applyPlan = useApplyPlanProposal();
   const defaultTarget = targets.some((target) => target.id === initialTargetId)
     ? initialTargetId!
-    : targets[0]?.id ?? '';
+    : (targets[0]?.id ?? '');
   const [targetId, setTargetId] = useState(defaultTarget);
   const [instructions, setInstructions] = useState('');
-  const [plan, setPlan] = useState<PlanResponse | null>(null);
+  const [plan, setPlan] = useState<PlanProposalResponse | null>(null);
   const [draftSubtasks, setDraftSubtasks] = useState<PlanSubtask[]>([]);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [mode, setMode] = useState<TaskGraphMode>('execution');
@@ -47,11 +53,12 @@ export default function TaskGraphProposalDialog({
   const preview = useMemo(() => {
     if (!target || !plan) return { nodes: [], edges: [] };
     const todos = buildProposalTodos(target, draftSubtasks);
+    const relationships = buildProposalRelationships(draftSubtasks);
     const elements = buildTaskGraphElements(todos, {
       mode,
       collapsedIds: new Set(),
       hideCompleted: false,
-      kanbanStatuses: {},
+      relationships,
       metadataTodos: todos,
       onToggleCollapse: () => undefined,
     });
@@ -63,11 +70,12 @@ export default function TaskGraphProposalDialog({
           ...node,
           data: {
             ...node.data,
-            proposalSelection: node.id === PROPOSAL_ROOT_ID
-              ? 'fixed' as const
-              : index !== null && selected.has(index)
-                ? 'selected' as const
-                : 'excluded' as const,
+            proposalSelection:
+              node.id === PROPOSAL_ROOT_ID
+                ? ('fixed' as const)
+                : index !== null && selected.has(index)
+                  ? ('selected' as const)
+                  : ('excluded' as const),
           },
         };
       }),
@@ -76,11 +84,16 @@ export default function TaskGraphProposalDialog({
 
   const handleGenerate = async () => {
     if (!targetId) return;
-    const nextPlan = await generatePlan.mutateAsync({ todoId: targetId, instructions });
-    const subtasks = nextPlan.subtasks ?? [];
-    setPlan(nextPlan);
-    setDraftSubtasks(subtasks);
-    setSelected(new Set(subtasks.map((_, index) => index)));
+    try {
+      const nextPlan = await generatePlan.mutateAsync({ todoId: targetId, instructions });
+      const subtasks = nextPlan.subtasks;
+      setPlan(nextPlan);
+      setDraftSubtasks(subtasks);
+      setSelected(new Set(subtasks.map((_, index) => index)));
+      applyPlan.reset();
+    } catch {
+      // The mutation owns error feedback; keep the current proposal available.
+    }
   };
 
   const toggleSelection = (index: number) => {
@@ -88,38 +101,66 @@ export default function TaskGraphProposalDialog({
   };
 
   const updateSubtask = (index: number, updates: Partial<PlanSubtask>) => {
-    setDraftSubtasks((current) => current.map((subtask, candidateIndex) => (
-      candidateIndex === index ? { ...subtask, ...updates } : subtask
-    )));
+    setDraftSubtasks((current) =>
+      current.map((subtask, candidateIndex) =>
+        candidateIndex === index ? { ...subtask, ...updates } : subtask,
+      ),
+    );
   };
 
   const handleApply = async () => {
-    if (!targetId || selected.size === 0) return;
-    await applyPlan.mutateAsync({
-      todoId: targetId,
-      selectedIndices: [...selected].sort((a, b) => a - b),
-      subtasks: draftSubtasks,
-    });
-    onOpenChange(false);
+    if (!targetId || !plan || plan.base_graph_revision === null || selected.size === 0) return;
+    try {
+      await applyPlan.mutateAsync({
+        todoId: targetId,
+        proposalId: plan.proposal_id,
+        baseGraphRevision: plan.base_graph_revision,
+        selectedIndices: [...selected].sort((a, b) => a - b),
+        subtasks: draftSubtasks,
+      });
+      onOpenChange(false);
+    } catch {
+      // A stale proposal must remain open so the user can inspect and regenerate it.
+    }
   };
 
-  const hasInvalidTitle = draftSubtasks.some((subtask, index) => (
-    selected.has(index) && !subtask.title.trim()
-  ));
+  const hasInvalidTitle = draftSubtasks.some(
+    (subtask, index) => selected.has(index) && !subtask.title.trim(),
+  );
+  const applyError = applyPlan.error ? getPlanProposalMutationError(applyPlan.error) : undefined;
+  const isStale = Boolean(
+    plan?.status === 'stale' || (applyPlan.error && isStalePlanProposalError(applyPlan.error)),
+  );
+  const hasServerValidationErrors = (plan?.validation.errors.length ?? 0) > 0;
+  const isLegacyProposal = plan?.base_graph_revision === null;
+  const canApplyProposal = plan?.status === 'draft';
 
   return (
-    <Dialog open onOpenChange={onOpenChange} title="AI task graph proposal" className="cc-task-proposal">
+    <Dialog
+      open
+      onOpenChange={onOpenChange}
+      title="AI task graph proposal"
+      className="cc-task-proposal"
+    >
       <div className="cc-task-proposal__setup">
         <label>
           <span>Goal or project</span>
-          <select value={targetId} onChange={(event) => setTargetId(event.target.value)} disabled={Boolean(plan)}>
+          <select
+            value={targetId}
+            onChange={(event) => setTargetId(event.target.value)}
+            disabled={Boolean(plan)}
+          >
             {targets.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>{candidate.title}</option>
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.title}
+              </option>
             ))}
           </select>
         </label>
         <label className="cc-task-proposal__guidance">
-          <span>Guidance for AI <small>optional</small></span>
+          <span>
+            Guidance for AI <small>optional</small>
+          </span>
           <textarea
             value={instructions}
             onChange={(event) => setInstructions(event.target.value)}
@@ -147,10 +188,78 @@ export default function TaskGraphProposalDialog({
 
       {plan && !generatePlan.isPending && (
         <>
+          <div className="cc-task-proposal__diff" aria-label="Authoritative proposal diff">
+            <span>
+              {plan.diff.add_task_count} task{plan.diff.add_task_count === 1 ? '' : 's'} to add
+            </span>
+            <span>
+              {plan.diff.add_relationship_count} dependenc
+              {plan.diff.add_relationship_count === 1 ? 'y' : 'ies'} to add
+            </span>
+            {plan.diff.root_update_fields.length > 0 && (
+              <span>Root updates: {plan.diff.root_update_fields.join(', ')}</span>
+            )}
+          </div>
+
+          {(plan.validation.errors.length > 0 || plan.validation.warnings.length > 0) && (
+            <div className="cc-task-proposal__validation" aria-label="Proposal validation">
+              {plan.validation.errors.map((issue, index) => (
+                <div key={`error-${issue.code}-${index}`} role="alert">
+                  <strong>Cannot apply:</strong> {issue.message}
+                </div>
+              ))}
+              {plan.validation.warnings.map((issue, index) => (
+                <div key={`warning-${issue.code}-${index}`}>
+                  <strong>Review:</strong> {issue.message}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {isLegacyProposal && (
+            <div className="cc-task-proposal__conflict" role="alert">
+              This older proposal has no graph revision and cannot be applied safely.
+              <button
+                type="button"
+                className="cc-btn cc-btn--ghost"
+                onClick={() => void handleGenerate()}
+              >
+                Regenerate
+              </button>
+            </div>
+          )}
+
+          {!isLegacyProposal && isStale && (
+            <div className="cc-task-proposal__conflict" role="alert">
+              <div>
+                <strong>The task graph changed after this proposal was created.</strong>
+                {!applyError?.staleDetails && (
+                  <span>Regenerate it from the current graph before applying.</span>
+                )}
+                {applyError?.staleDetails && (
+                  <span>
+                    Proposal revision {applyError.staleDetails.base_revision ?? 'unknown'} · current
+                    revision {applyError.staleDetails.current_revision}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="cc-btn cc-btn--ghost"
+                onClick={() => void handleGenerate()}
+              >
+                Regenerate
+              </button>
+            </div>
+          )}
+
           <div className="cc-task-proposal__heading">
             <div>
               <strong>{plan.summary || 'Proposed task structure'}</strong>
-              <span>{selected.size}/{draftSubtasks.length} tasks selected · dependencies stay valid automatically</span>
+              <span>
+                {selected.size}/{draftSubtasks.length} tasks selected · dependencies stay valid
+                automatically
+              </span>
             </div>
             <SegmentedControl
               ariaLabel="Proposal graph mode"
@@ -175,7 +284,10 @@ export default function TaskGraphProposalDialog({
               </div>
               <div className="cc-task-proposal__list" aria-label="Proposed tasks">
                 {draftSubtasks.map((subtask, index) => (
-                  <div key={index} className={`cc-task-proposal__item${selected.has(index) ? '' : ' cc-task-proposal__item--excluded'}`}>
+                  <div
+                    key={index}
+                    className={`cc-task-proposal__item${selected.has(index) ? '' : ' cc-task-proposal__item--excluded'}`}
+                  >
                     <input
                       type="checkbox"
                       checked={selected.has(index)}
@@ -192,9 +304,11 @@ export default function TaskGraphProposalDialog({
                       <div className="cc-task-proposal__item-meta">
                         <select
                           value={subtask.priority ?? 'medium'}
-                          onChange={(event) => updateSubtask(index, {
-                            priority: event.target.value as PlanSubtask['priority'],
-                          })}
+                          onChange={(event) =>
+                            updateSubtask(index, {
+                              priority: event.target.value as PlanSubtask['priority'],
+                            })
+                          }
                           aria-label={`Priority for ${subtask.title}`}
                         >
                           <option value="low">Low</option>
@@ -202,9 +316,14 @@ export default function TaskGraphProposalDialog({
                           <option value="high">High</option>
                           <option value="urgent">Urgent</option>
                         </select>
-                        {subtask.estimated_minutes ? <span>{subtask.estimated_minutes}m</span> : null}
+                        {subtask.estimated_minutes ? (
+                          <span>{subtask.estimated_minutes}m</span>
+                        ) : null}
                         {(subtask.depends_on_indices?.length ?? 0) > 0 && (
-                          <span>{subtask.depends_on_indices!.length} prerequisite{subtask.depends_on_indices!.length === 1 ? '' : 's'}</span>
+                          <span>
+                            {subtask.depends_on_indices!.length} prerequisite
+                            {subtask.depends_on_indices!.length === 1 ? '' : 's'}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -213,18 +332,32 @@ export default function TaskGraphProposalDialog({
               </div>
             </div>
           ) : (
-            <div className="cc-task-proposal__empty">AI did not return any actionable tasks. Add more guidance and regenerate.</div>
+            <div className="cc-task-proposal__empty">
+              AI did not return any actionable tasks. Add more guidance and regenerate.
+            </div>
           )}
 
           <div className="cc-task-proposal__actions">
-            <button type="button" className="cc-btn cc-btn--ghost" onClick={() => onOpenChange(false)}>
+            <button
+              type="button"
+              className="cc-btn cc-btn--ghost"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </button>
             <button
               type="button"
               className="cc-btn cc-btn--primary"
               onClick={() => void handleApply()}
-              disabled={selected.size === 0 || hasInvalidTitle || applyPlan.isPending}
+              disabled={
+                selected.size === 0 ||
+                hasInvalidTitle ||
+                hasServerValidationErrors ||
+                isLegacyProposal ||
+                !canApplyProposal ||
+                isStale ||
+                applyPlan.isPending
+              }
             >
               {applyPlan.isPending ? 'Creating tasks…' : `Approve and create ${selected.size}`}
             </button>

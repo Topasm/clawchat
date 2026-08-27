@@ -8,16 +8,18 @@ The ClawChat frontend is built with React 18, TypeScript, and Vite. It runs in b
 src/
 ├── main.tsx                           # React entry point
 ├── App.tsx                            # Root: ThemeProvider + Router
-├── router.tsx                         # React Router v6 route definitions
+├── router.tsx                         # React Router v7 route definitions
 ├── app/
 │   ├── types/
 │   │   ├── api.ts                     # API request/response interfaces (Pydantic mirrors)
 │   │   ├── schemas.ts                # Zod schemas for API validation
 │   │   └── platform.ts               # Platform detection (Tauri, Capacitor, Web)
+│   ├── generated/contracts/
+│   │   └── taskStatus.ts             # Generated canonical task-status values (do not edit)
 │   ├── stores/
 │   │   ├── useAuthStore.ts           # Auth state: JWT, serverUrl, login/logout (persisted) + ConnectionStatus type (canonical)
 │   │   ├── useChatStore.ts           # Chat: conversations, messages, SSE streaming
-│   │   ├── useModuleStore.ts         # Modules: todos, events, kanban statuses, filters
+│   │   ├── useModuleStore.ts         # Local module filters and view preferences
 │   │   ├── useSettingsStore.ts       # Settings: theme, LLM, chat, panel sizes (persisted)
 │   │   └── useToastStore.ts          # Toast notification queue with auto-dismiss
 │   ├── pages/
@@ -38,7 +40,7 @@ src/
 │   ├── components/
 │   │   ├── Layout.tsx                # Sidebar + resizable panels + chat panel + shortcuts
 │   │   ├── kanban/
-│   │   │   ├── KanbanBoard.tsx       # Board: DragDropContext, filter bar, 3 columns
+│   │   │   ├── KanbanBoard.tsx       # Board: DragDropContext, filter bar, 4 status columns
 │   │   │   ├── KanbanColumn.tsx      # Droppable column with drag-over highlight
 │   │   │   ├── KanbanCard.tsx        # Draggable card wrapper (@hello-pangea/dnd)
 │   │   │   └── KanbanFilterBar.tsx   # Search, priority chips, tag dropdown, sort
@@ -149,7 +151,7 @@ src/
 
 ## Navigation
 
-React Router v6 with a nested layout route:
+React Router v7 with a nested layout route:
 
 ```
 / → redirect to /today
@@ -179,16 +181,10 @@ Manages todos, events, kanban board state, and kanban filters:
 
 ```typescript
 // Key state
-todos: TodoResponse[]              // Seeded with 15 demo tasks
-kanbanStatuses: Record<string, KanbanStatus>  // Local in_progress overrides
 kanbanFilters: { searchQuery, priorities[], tags[], sortField, sortDirection }
 events: EventResponse[]
 
 // Key actions
-setKanbanStatus(id, status)        // Move task between kanban columns (+ toast)
-toggleTodoComplete(id)             // Toggle + clear kanban override (+ toast)
-createTodo(data)                   // POST /todos (+ toast)
-fetchTodos(params)                 // GET /todos (skips if no server configured)
 setKanbanSearchQuery(query)        // Filter kanban by text
 toggleKanbanPriorityFilter(p)      // Toggle priority filter chip
 toggleKanbanTagFilter(tag)         // Toggle tag filter
@@ -196,7 +192,14 @@ setKanbanSort(field, direction)    // Change sort field/direction
 clearKanbanFilters()               // Reset all filters
 ```
 
-The kanban board uses a **local override pattern**: the server only knows `pending` and `completed` statuses. The `in_progress` status is tracked client-side in `kanbanStatuses`. When a task is moved to "In Progress", its server status remains `pending` but the UI shows it in the correct column.
+Todos are server state managed by TanStack Query. Kanban mutations persist the exact canonical status (`pending`, `in_progress`, `completed`, or `cancelled`) through the API and optimistically update the query cache. There is no Zustand status override, so list, graph, kanban, Tauri, and Android all observe the same value after refetch or restart.
+
+Task relationships are separate server state under the
+`taskRelationships` query key. The Graph and task-detail relationship section
+read normalized rows from `/api/task-relationships`; create/delete mutations,
+Todo deletion, plan application, and `module_data_changed` WebSocket events all
+invalidate that cache. The Graph reverses stored `depends_on` edges only for
+display so execution flows from prerequisite to dependent task.
 
 ### useToastStore
 
@@ -317,7 +320,7 @@ Colors are injected as CSS custom properties on `.cc-root`:
 
 ## Platform Detection
 
-Runtime detection for cross-platform behavior:
+Runtime detection inside the shared React client:
 
 ```typescript
 IS_TAURI     // running inside the Tauri shell
@@ -327,15 +330,23 @@ IS_WEB       // Not Tauri, not Capacitor
 detectPlatform(): 'web' | 'tauri' | 'ios' | 'android'
 ```
 
-On mobile (Capacitor), resizable panels are skipped and fixed layout is used instead.
+On Capacitor iOS, resizable panels are skipped and a fixed layout is used instead. Native Android is a separate Kotlin/Compose client under `android/`; Capacitor Android remains only as a deprecated transitional artifact.
 
 ## API Types
 
-All API types are defined as Zod schemas in `types/schemas.ts` for runtime validation, with TypeScript types inferred via `z.infer<>` and re-exported from `types/api.ts`:
+API responses are validated with Zod schemas in `types/schemas.ts`, with
+TypeScript types inferred via `z.infer<>` and re-exported from `types/api.ts`.
+The canonical `TaskStatus` and `TaskRelationshipType` values are generated
+from FastAPI's checked-in OpenAPI snapshot; Android's Kotlin enums come from
+the same source.
+
+Run `npm run generate:api` after changing a server schema. CI checks both the
+OpenAPI snapshot and generated runtime enum contracts for drift.
 
 ```typescript
-TodoResponse    { id, title, description, status, priority, due_date, completed_at, tags, created_at, updated_at }
-TodoCreate      { title, description?, priority?, due_date?, tags? }
+TodoResponse    { id, title, description, status, priority, due_date, completed_at, tags, depends_on?, created_at, updated_at }
+TodoCreate      { title, description?, status?, priority?, due_date?, tags?, depends_on? }
+TaskRelationshipResponse { id, source_task_id, target_task_id, type, label?, created_by, proposal_id?, created_at, updated_at }
 EventResponse   { id, title, description, start_time, end_time, location, is_all_day, reminder_minutes, recurrence_rule, tags, created_at, updated_at }
 ConversationResponse { id, title, last_message, is_archived?, created_at, updated_at }
 MessageResponse { id, conversation_id, role, content, message_type?, created_at }
@@ -363,6 +374,9 @@ npm run dev           # Vite dev server (web)
 npm run dev:tauri     # Tauri + Vite
 npm run typecheck     # npx tsc --noEmit
 npm run build         # Production build
+npm run generate:api  # Refresh OpenAPI + generated TS/Kotlin contracts
+uv run --project server --locked python scripts/export-openapi.py --check # Verify snapshot
+npm run check:api-contract # Verify generated TS/Kotlin values
 ```
 
 Demo mode activates automatically when no server URL is configured — all pages show seeded sample data.

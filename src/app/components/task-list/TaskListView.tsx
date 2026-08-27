@@ -1,9 +1,8 @@
-import type { KanbanStatus, TodoResponse } from '../../types/api';
+import type { TodoResponse } from '../../types/api';
 import { formatDueDate } from '../../utils/formatters';
 
 interface TaskListViewProps {
   todos: TodoResponse[];
-  kanbanStatuses: Record<string, KanbanStatus>;
   onOpenTask: (taskId: string) => void;
   onToggleTask: (taskId: string) => void;
 }
@@ -20,7 +19,7 @@ function getTaskDepth(todo: TodoResponse, todoById: Map<string, TodoResponse>) {
   return Math.min(depth, 4);
 }
 
-export default function TaskListView({ todos, kanbanStatuses, onOpenTask, onToggleTask }: TaskListViewProps) {
+export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskListViewProps) {
   const todoById = new Map(todos.map((todo) => [todo.id, todo]));
 
   if (todos.length === 0) {
@@ -37,9 +36,12 @@ export default function TaskListView({ todos, kanbanStatuses, onOpenTask, onTogg
         <span role="columnheader">Due</span>
       </div>
       {todos.map((todo) => {
-        const status = kanbanStatuses[todo.id] ?? (todo.status as KanbanStatus);
+        const status = todo.status;
         const depth = getTaskDepth(todo, todoById);
-        const context = todo.project_label || todo.tags?.[0] || (todo.parent_id ? todoById.get(todo.parent_id)?.title : null);
+        const context =
+          todo.project_label ||
+          todo.tags?.[0] ||
+          (todo.parent_id ? todoById.get(todo.parent_id)?.title : null);
         return (
           <div
             key={todo.id}
@@ -54,7 +56,11 @@ export default function TaskListView({ todos, kanbanStatuses, onOpenTask, onTogg
               }
             }}
           >
-            <span className="cc-task-list__task" role="cell" style={{ paddingLeft: 12 + depth * 22 }}>
+            <span
+              className="cc-task-list__task"
+              role="cell"
+              style={{ paddingLeft: 12 + depth * 22 }}
+            >
               <input
                 type="checkbox"
                 checked={status === 'completed'}
@@ -65,10 +71,27 @@ export default function TaskListView({ todos, kanbanStatuses, onOpenTask, onTogg
               {depth > 0 && <i className="cc-task-list__branch" aria-hidden="true" />}
               <strong>{todo.title}</strong>
             </span>
-            <span role="cell"><i className={`cc-task-list__status cc-task-list__status--${status}`} />{status.replace('_', ' ')}</span>
-            <span role="cell"><i className={`cc-task-list__priority cc-task-list__priority--${todo.priority ?? 'medium'}`} />{todo.priority ?? 'medium'}</span>
-            <span role="cell" title={context ?? undefined}>{context || '—'}</span>
-            <span role="cell" className={todo.due_date && formatDueDate(todo.due_date) === 'Overdue' ? 'cc-task-list__overdue' : ''}>
+            <span role="cell">
+              <i className={`cc-task-list__status cc-task-list__status--${status}`} />
+              {status.replace('_', ' ')}
+            </span>
+            <span role="cell">
+              <i
+                className={`cc-task-list__priority cc-task-list__priority--${todo.priority ?? 'medium'}`}
+              />
+              {todo.priority ?? 'medium'}
+            </span>
+            <span role="cell" title={context ?? undefined}>
+              {context || '—'}
+            </span>
+            <span
+              role="cell"
+              className={
+                todo.due_date && formatDueDate(todo.due_date) === 'Overdue'
+                  ? 'cc-task-list__overdue'
+                  : ''
+              }
+            >
               {todo.due_date ? formatDueDate(todo.due_date) : '—'}
             </span>
           </div>

@@ -193,11 +193,11 @@ Rebuild the frontend (`npm run build`) after changing `VITE_DEFAULT_SERVER_URL`.
 
 See the [Remote Access Runbook](./remote-access-runbook.md) for step-by-step setup of both options.
 
-## Mobile Access Checklist
+## Browser and Mobile Access Checklist
 
 When testing from a phone or tablet:
 
-1. Open the ClawChat URL in the mobile browser (e.g. `https://clawchat.example.com/`).
+1. Open the ClawChat URL in a browser, or configure the same HTTPS server URL in native Android/Capacitor iOS.
 2. Leave the `Server URL` field as the prefilled site URL unless you intentionally changed it.
 3. Enter the ClawChat PIN and confirm the health indicator shows the server is reachable.
 4. If the app loads but login fails, verify the reverse proxy and tunnel are running on the host, and that `curl http://127.0.0.1:8080/api/health` succeeds locally.
@@ -235,6 +235,6 @@ docker compose exec ollama ollama pull llama3.2
 curl http://localhost:8000/api/health
 # {"status":"ok","version":"0.1.0","ai_provider":"ollama","ai_model":"llama3.2"}
 
-# 6. Connect the mobile app
-# Open ClawChat app -> Enter server URL: http://<your-ip>:8000 -> Enter PIN
+# 6. Connect a client
+# Open ClawChat -> enter http://<your-ip>:8000 (or the HTTPS public URL) -> enter PIN
 ```

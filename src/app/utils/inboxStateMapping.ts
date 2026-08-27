@@ -1,5 +1,8 @@
 /** Maps internal inbox states to user-facing display values */
 
+import type { TaskStatus } from '../types/api';
+import { isTerminalTaskStatus } from './taskStatus';
+
 export const INBOX_DISPLAY_LABELS: Record<string, string | null> = {
   classifying: 'Planning now',
   planning: 'Planning now',
@@ -24,8 +27,11 @@ export function getInboxDisplayLabel(inboxState: string): string | null {
   return INBOX_DISPLAY_LABELS[inboxState] ?? null;
 }
 
-export function getInboxNextAction(inboxState: string, status = 'pending'): string | null {
-  if (status === 'completed') return null;
+export function getInboxNextAction(
+  inboxState: string,
+  status: TaskStatus = 'pending',
+): string | null {
+  if (isTerminalTaskStatus(status)) return null;
   return INBOX_DISPLAY_ACTIONS[inboxState] ?? 'execute';
 }
 
@@ -47,14 +53,20 @@ export function getInboxSection(inboxState: string): InboxDisplaySection | null 
 
 export function getInboxSectionLabel(section: InboxDisplaySection): string {
   switch (section) {
-    case 'planning_now': return 'Planning now';
-    case 'review_suggestion': return 'Review suggestion';
-    case 'needs_detail': return 'Needs organizing';
-    case 'failed': return 'Failed';
+    case 'planning_now':
+      return 'Planning now';
+    case 'review_suggestion':
+      return 'Review suggestion';
+    case 'needs_detail':
+      return 'Needs organizing';
+    case 'failed':
+      return 'Failed';
   }
 }
 
-export function getInboxCardAction(inboxState: string): { label: string; disabled: boolean } | null {
+export function getInboxCardAction(
+  inboxState: string,
+): { label: string; disabled: boolean } | null {
   switch (inboxState) {
     case 'classifying':
     case 'planning':

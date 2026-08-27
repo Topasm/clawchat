@@ -1,6 +1,12 @@
 from models.conversation import Conversation  # noqa: F401
 from models.message import Message  # noqa: F401
 from models.todo import Todo  # noqa: F401
+from models.task_relationship import TaskRelationship  # noqa: F401
+from models.data_migration_marker import DataMigrationMarker  # noqa: F401
+from models.task_graph_state import TaskGraphState  # noqa: F401
+from models.plan_proposal import PlanProposal  # noqa: F401
+from models.change_set import ChangeSet  # noqa: F401
+from models.vault_sync_job import VaultSyncJob  # noqa: F401
 from models.event import Event  # noqa: F401
 from models.agent_task import AgentTask  # noqa: F401
 from models.user_settings import UserSettings  # noqa: F401

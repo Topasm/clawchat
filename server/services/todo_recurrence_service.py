@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from dateutil.rrule import rrulestr
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.task import TaskStatus
 from models.todo import Todo
 from utils import make_id
 
@@ -86,7 +87,7 @@ async def spawn_next_occurrence(db: AsyncSession, completed_todo: Todo) -> Todo 
         id=make_id("todo_"),
         title=completed_todo.title,
         description=completed_todo.description,
-        status="pending",
+        status=TaskStatus.PENDING,
         priority=completed_todo.priority,
         due_date=next_due,
         tags=completed_todo.tags,

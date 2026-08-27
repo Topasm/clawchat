@@ -2,6 +2,7 @@ package com.clawchat.android.feature.inbox
 
 import app.cash.turbine.test
 import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
@@ -34,35 +35,35 @@ class InboxViewModelTest {
     private val capturedTodo = Todo(
         id = "1",
         title = "Captured item",
-        status = "pending",
+        status = TaskStatus.PENDING,
         inboxState = "captured",
     )
 
     private val planReadyTodo = Todo(
         id = "2",
         title = "Plan ready item",
-        status = "pending",
+        status = TaskStatus.PENDING,
         inboxState = "plan_ready",
     )
 
     private val planningTodo = Todo(
         id = "3",
         title = "Planning item",
-        status = "pending",
+        status = TaskStatus.PENDING,
         inboxState = "planning",
     )
 
     private val errorTodo = Todo(
         id = "4",
         title = "Error item",
-        status = "pending",
+        status = TaskStatus.PENDING,
         inboxState = "error",
     )
 
     private val regularTodo = Todo(
         id = "5",
         title = "Regular task",
-        status = "pending",
+        status = TaskStatus.PENDING,
         inboxState = "none",
     )
 

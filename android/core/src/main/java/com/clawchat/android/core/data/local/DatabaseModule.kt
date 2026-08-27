@@ -20,7 +20,7 @@ object DatabaseModule {
             context,
             ClawChatDatabase::class.java,
             ClawChatDatabase.DB_NAME,
-        ).fallbackToDestructiveMigration().build()
+        ).build()
     }
 
     @Provides

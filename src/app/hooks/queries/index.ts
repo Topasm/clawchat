@@ -6,7 +6,7 @@ export {
   useUpdateTodo,
   useDeleteTodo,
   useToggleTodoComplete,
-  useSetKanbanStatus,
+  useSetTaskStatus,
   useReorderTodos,
   useCreateEvent,
   useUpdateEvent,
@@ -16,9 +16,22 @@ export {
   useAttachmentsQuery,
   useUploadAttachment,
   useDeleteAttachment,
-  useGenerateTaskPlan,
-  useApplyTaskPlan,
 } from './useModuleQueries';
+export {
+  useLatestPlanProposalQuery,
+  useGeneratePlanProposal,
+  useApplyPlanProposal,
+  useDismissPlanProposal,
+  useRevertPlanChangeSet,
+  getPlanProposalMutationError,
+  isStalePlanProposalError,
+} from './usePlanProposalQueries';
+export type {
+  GeneratePlanProposalVariables,
+  ApplyPlanProposalVariables,
+  DismissPlanProposalVariables,
+  PlanProposalMutationError,
+} from './usePlanProposalQueries';
 export {
   useProjectsQuery,
   useConversationsQuery,
@@ -33,6 +46,11 @@ export {
   useFetchMessages,
 } from './useChatQueries';
 export { default as useTodayData } from './useTodayQuery';
+export {
+  useTaskRelationshipsQuery,
+  useCreateTaskRelationship,
+  useDeleteTaskRelationship,
+} from './useTaskRelationshipQueries';
 export {
   useAdminOverviewQuery,
   useAdminAIQuery,

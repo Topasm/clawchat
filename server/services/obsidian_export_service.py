@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
+from domain.task import TaskStatus
 from models.todo import Todo
 from utils import deserialize_tags
 from utils.atomic_files import atomic_write_lines, synchronized_path
@@ -150,6 +151,27 @@ def export_todos_batch(
     return result
 
 
+def reconcile_todos_in_vault(
+    vault_path: str,
+    items: list[tuple[Todo, str | None]],
+    removed_todo_ids: set[str],
+) -> ExportResult:
+    """Strictly reconcile managed markers for an outbox delivery.
+
+    Unlike the legacy convenience wrappers, this function lets filesystem
+    failures propagate so a durable outbox job can record and retry them.
+    User-authored files and directories are never removed.
+    """
+    active_ids = {todo.id for todo, _project_name in items}
+    _remove_markers_from_vault(vault_path, active_ids | removed_todo_ids)
+    result = export_todos_batch(vault_path, items, remove_existing=False)
+    if result.errors:
+        raise RuntimeError(
+            f"Failed to export {result.errors} todo marker(s) to the vault"
+        )
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -175,7 +197,7 @@ def _get_file_path(
 
 
 def _todo_to_md_line(todo: Todo) -> str:
-    marker = "x" if todo.status == "completed" else " "
+    marker = "x" if todo.status == TaskStatus.COMPLETED else " "
     parts = [f"- [{marker}] {todo.title}"]
 
     if todo.due_date:

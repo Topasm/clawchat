@@ -1,6 +1,10 @@
 # ClawChat
 
-Privacy-first, self-hosted personal assistant — tasks, calendar, notes, and AI chat in one app.
+Privacy-first, self-hosted AI project execution workspace for tasks, dependency
+graphs, calendar, documents, agents, and chat.
+
+ClawChat ships a shared web/Tauri client, a native Android app, and a provisional
+Capacitor iOS shell. They connect to one FastAPI server and one SQLite database.
 
 ## Quick Start (local)
 
@@ -10,9 +14,10 @@ make setup          # install frontend + backend dependencies, create .env
 make dev            # start frontend on :5173 and backend on :8000
 ```
 
-Requires **Node.js >= 22** (Node 24 LTS recommended), **Python >= 3.11**,
-**uv 0.10.2**, and an OpenAI-compatible LLM endpoint (e.g. Ollama). Backend
-installs are reproduced from the committed `server/uv.lock`.
+Requires **Node.js >= 22** (Node 24 LTS recommended), **Python >= 3.11**, and
+**uv 0.10.2**. AI features also require a configured backend such as Ollama, an
+OpenAI-compatible endpoint, or Claude Code. Backend installs are reproduced from
+the committed `server/uv.lock`.
 
 ## Docker
 
@@ -44,6 +49,25 @@ When using the Ollama profile, set `AI_BASE_URL=http://ollama:11434` in your `.e
 | `make typecheck` | TypeScript type checking |
 | `make build` | Production build |
 | `make clean` | Remove generated files and caches |
+
+## API Contracts
+
+FastAPI owns the wire contract. After changing a server schema, regenerate the
+checked-in OpenAPI snapshot and the generated TypeScript/Kotlin contracts:
+
+```bash
+npm run generate:api
+uv run --project server --locked python scripts/export-openapi.py --check
+npm run check:api-contract
+```
+
+The canonical task lifecycle is `pending`, `in_progress`, `completed`, or
+`cancelled`. A task's blocked/readiness state is derived from dependencies and is
+not a lifecycle status.
+
+Task dependencies are normalized in `task_relationships` with referential,
+uniqueness, and DAG-cycle validation. The legacy `todos.depends_on` JSON field
+is maintained only as a temporary compatibility shadow.
 
 ## Documentation
 

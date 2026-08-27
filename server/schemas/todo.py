@@ -1,8 +1,9 @@
 import json
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
+from domain.task import TaskStatus
 from utils.vault_paths import normalize_vault_relative_path
 
 
@@ -15,6 +16,7 @@ def _normalize_source_id(value: str | None) -> str | None:
 class TodoCreate(BaseModel):
     title: str
     description: str | None = None
+    status: TaskStatus = TaskStatus.PENDING
     priority: str = "medium"
     due_date: datetime | None = None
     tags: list[str] | None = None
@@ -26,7 +28,11 @@ class TodoCreate(BaseModel):
     enabled_skills: list[str] | None = None
     inbox_state: str = "none"
     estimated_minutes: int | None = None
-    depends_on: list[str] | None = None
+    depends_on: list[str] | None = Field(
+        default=None,
+        description="Compatibility input; use /api/task-relationships instead",
+        json_schema_extra={"deprecated": True},
+    )
     recurrence_rule: str | None = None
     recurrence_end: datetime | None = None
 
@@ -36,7 +42,7 @@ class TodoCreate(BaseModel):
 class TodoUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
-    status: str | None = None
+    status: TaskStatus | None = None
     priority: str | None = None
     due_date: datetime | None = None
     tags: list[str] | None = None
@@ -46,7 +52,11 @@ class TodoUpdate(BaseModel):
     enabled_skills: list[str] | None = None
     inbox_state: str | None = None
     estimated_minutes: int | None = None
-    depends_on: list[str] | None = None
+    depends_on: list[str] | None = Field(
+        default=None,
+        description="Compatibility input; use /api/task-relationships instead",
+        json_schema_extra={"deprecated": True},
+    )
     source: str | None = None
     source_id: str | None = None
     recurrence_rule: str | None = None
@@ -65,7 +75,7 @@ class ProjectTodoResponse(BaseModel):
     id: str
     title: str
     description: str | None = None
-    status: str
+    status: TaskStatus
     priority: str
     due_date: datetime | None = None
     completed_at: datetime | None = None
@@ -78,7 +88,11 @@ class ProjectTodoResponse(BaseModel):
     enabled_skills: list[str] | None = None
     inbox_state: str = "none"
     estimated_minutes: int | None = None
-    depends_on: list[str] | None = None
+    depends_on: list[str] | None = Field(
+        default=None,
+        description="Deprecated compatibility shadow; use /api/task-relationships instead",
+        json_schema_extra={"deprecated": True},
+    )
     created_at: datetime
     updated_at: datetime
     conversation_id: str | None = None
@@ -113,7 +127,7 @@ class TodoResponse(BaseModel):
     id: str
     title: str
     description: str | None = None
-    status: str
+    status: TaskStatus
     priority: str
     due_date: datetime | None = None
     completed_at: datetime | None = None
@@ -126,7 +140,11 @@ class TodoResponse(BaseModel):
     enabled_skills: list[str] | None = None
     inbox_state: str = "none"
     estimated_minutes: int | None = None
-    depends_on: list[str] | None = None
+    depends_on: list[str] | None = Field(
+        default=None,
+        description="Deprecated compatibility shadow; use /api/task-relationships instead",
+        json_schema_extra={"deprecated": True},
+    )
     created_at: datetime
     updated_at: datetime
     clarification_questions: list[str] | None = None

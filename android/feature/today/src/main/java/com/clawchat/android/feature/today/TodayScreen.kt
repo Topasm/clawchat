@@ -50,10 +50,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.clawchat.android.core.data.model.BriefingResponse
 import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
@@ -79,7 +80,9 @@ fun TodayScreen(
     var showQuickAdd by remember { mutableStateOf(false) }
 
     val totalTasks = state.todayTodos.size + state.overdueTodos.size
-    val completedTasks = (state.todayTodos + state.overdueTodos).count { it.status == "completed" }
+    val completedTasks = (state.todayTodos + state.overdueTodos).count {
+        it.status == TaskStatus.COMPLETED
+    }
     val hasContent = state.briefing != null ||
         state.overdueTodos.isNotEmpty() ||
         state.todayTodos.isNotEmpty() ||
@@ -355,7 +358,7 @@ private fun TodoRow(
     todo: Todo,
     onToggle: () -> Unit,
 ) {
-    val isCompleted = todo.status == "completed"
+    val isCompleted = todo.status == TaskStatus.COMPLETED
     val view = LocalView.current
 
     ClawListItemSurface {
@@ -391,11 +394,17 @@ private fun TodoRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    if (todo.status != TaskStatus.PENDING) {
+                        ClawStatusChip(
+                            text = taskStatusLabel(todo.status),
+                            tone = taskStatusTone(todo.status),
+                        )
+                    }
                     PriorityChip(todo.priority)
                     todo.dueDate?.let {
                         ClawStatusChip(
                             text = it,
-                            tone = if (todo.status == "completed") ClawTone.Default else ClawTone.Warning,
+                            tone = if (todo.status == TaskStatus.COMPLETED) ClawTone.Default else ClawTone.Warning,
                         )
                     }
                     if (todo.isRecurring) {
@@ -408,6 +417,20 @@ private fun TodoRow(
             }
         }
     }
+}
+
+private fun taskStatusLabel(status: TaskStatus): String = when (status) {
+    TaskStatus.PENDING -> "Pending"
+    TaskStatus.IN_PROGRESS -> "In progress"
+    TaskStatus.COMPLETED -> "Completed"
+    TaskStatus.CANCELLED -> "Cancelled"
+}
+
+private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
+    TaskStatus.PENDING -> ClawTone.Default
+    TaskStatus.IN_PROGRESS -> ClawTone.Primary
+    TaskStatus.COMPLETED -> ClawTone.Success
+    TaskStatus.CANCELLED -> ClawTone.Default
 }
 
 @Composable

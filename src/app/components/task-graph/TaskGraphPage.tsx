@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useTodosQuery } from '../../hooks/queries';
+import { useTaskRelationshipsQuery, useTodosQuery } from '../../hooks/queries';
 import useKanbanFilters from '../../hooks/useKanbanFilters';
 import { useModuleStore } from '../../stores/useModuleStore';
 import KanbanFilterBar from '../kanban/KanbanFilterBar';
@@ -14,9 +14,9 @@ interface TaskGraphPageProps {
 
 export default function TaskGraphPage({ viewMode, onViewModeChange }: TaskGraphPageProps) {
   const { data: todos = [] } = useTodosQuery();
-  const kanbanStatuses = useModuleStore((state) => state.kanbanStatuses);
+  const { data: relationships = [] } = useTaskRelationshipsQuery();
   const filters = useModuleStore((state) => state.kanbanFilters);
-  const filteredTodos = useKanbanFilters(todos, kanbanStatuses, filters);
+  const filteredTodos = useKanbanFilters(todos, filters);
 
   // When a filter matches a child, retain its ancestors and visible
   // dependencies so the result still has useful graph context.
@@ -26,8 +26,15 @@ export default function TaskGraphPage({ viewMode, onViewModeChange }: TaskGraphP
     );
     if (!hasNarrowingFilter) return filteredTodos;
 
-    return expandTaskGraphContext(todos, filteredTodos);
-  }, [filteredTodos, filters.priorities.length, filters.searchQuery, filters.tags.length, todos]);
+    return expandTaskGraphContext(todos, filteredTodos, relationships);
+  }, [
+    filteredTodos,
+    filters.priorities.length,
+    filters.searchQuery,
+    filters.tags.length,
+    relationships,
+    todos,
+  ]);
 
   return (
     <div>
@@ -38,7 +45,7 @@ export default function TaskGraphPage({ viewMode, onViewModeChange }: TaskGraphP
         subtitle={`${graphTodos.length} task${graphTodos.length !== 1 ? 's' : ''} mapped by project and dependency`}
       />
       <KanbanFilterBar showSubtaskToggle={false} />
-      <TaskGraph todos={graphTodos} metadataTodos={todos} kanbanStatuses={kanbanStatuses} />
+      <TaskGraph todos={graphTodos} metadataTodos={todos} relationships={relationships} />
     </div>
   );
 }

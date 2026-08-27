@@ -1,13 +1,14 @@
 package com.clawchat.android.core.data.local
 
 import com.clawchat.android.core.data.model.Event
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 
 fun Todo.toEntity(): TodoEntity = TodoEntity(
     id = id,
     title = title,
     description = description,
-    status = status,
+    status = status.wireValue,
     priority = priority,
     dueDate = dueDate,
     completedAt = completedAt,
@@ -25,7 +26,7 @@ fun TodoEntity.toModel(): Todo = Todo(
     id = id,
     title = title,
     description = description,
-    status = status,
+    status = TaskStatus.fromWireValue(status),
     priority = priority,
     dueDate = dueDate,
     completedAt = completedAt,

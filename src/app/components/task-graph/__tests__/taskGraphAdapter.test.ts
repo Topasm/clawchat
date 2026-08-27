@@ -17,13 +17,22 @@ function todo(id: string, overrides: Partial<TodoResponse> = {}): TodoResponse {
 const todos = [
   todo('project'),
   todo('research', { parent_id: 'project', tags: ['paper'] }),
-  todo('write', { parent_id: 'project', depends_on: ['research'] }),
+  todo('write', { parent_id: 'project' }),
   todo('done', { parent_id: 'project', status: 'completed' }),
+];
+
+const relationships = [
+  {
+    id: 'relationship-1',
+    source_task_id: 'write',
+    target_task_id: 'research',
+    type: 'depends_on',
+  },
 ];
 
 const baseOptions = {
   collapsedIds: new Set<string>(),
-  kanbanStatuses: {},
+  relationships,
   onToggleCollapse: vi.fn(),
 };
 
@@ -50,6 +59,7 @@ describe('buildTaskGraphElements', () => {
 
     expect(result.edges.map((edge) => edge.id)).toEqual(['dependency:research:write']);
     expect(result.edges[0].markerEnd).toBeDefined();
+    expect(result.nodes.find((node) => node.id === 'write')?.data.dependencyCount).toBe(1);
   });
 
   it('can hide completed nodes without changing the source data', () => {
@@ -96,28 +106,84 @@ describe('expandTaskGraphContext', () => {
     const contextualTodos = [
       todo('project'),
       todo('research', { parent_id: 'project' }),
-      todo('draft', { parent_id: 'project', depends_on: ['research'] }),
-      todo('review', { parent_id: 'project', depends_on: ['draft'] }),
+      todo('draft', { parent_id: 'project' }),
+      todo('review', { parent_id: 'project' }),
       todo('unrelated'),
     ];
+    const contextualRelationships = [
+      { source_task_id: 'draft', target_task_id: 'research', type: 'depends_on' },
+      { source_task_id: 'review', target_task_id: 'draft', type: 'depends_on' },
+    ];
 
-    const result = expandTaskGraphContext(contextualTodos, [contextualTodos[3]]);
+    const result = expandTaskGraphContext(
+      contextualTodos,
+      [contextualTodos[3]],
+      contextualRelationships,
+    );
 
     expect(result.map((item) => item.id)).toEqual(['project', 'research', 'draft', 'review']);
   });
 
   it('does not loop on cyclic parent or dependency data', () => {
-    const cyclicTodos = [
-      todo('a', { parent_id: 'b', depends_on: ['b'] }),
-      todo('b', { parent_id: 'a', depends_on: ['a'] }),
+    const cyclicTodos = [todo('a', { parent_id: 'b' }), todo('b', { parent_id: 'a' })];
+    const cyclicRelationships = [
+      { source_task_id: 'a', target_task_id: 'b', type: 'depends_on' },
+      { source_task_id: 'b', target_task_id: 'a', type: 'depends_on' },
     ];
 
-    expect(expandTaskGraphContext(cyclicTodos, [cyclicTodos[0]])).toEqual(cyclicTodos);
+    expect(expandTaskGraphContext(cyclicTodos, [cyclicTodos[0]], cyclicRelationships)).toEqual(
+      cyclicTodos,
+    );
   });
 
   it('ignores relationships that are absent from the available dataset', () => {
-    const matched = todo('matched', { parent_id: 'missing-parent', depends_on: ['missing-task'] });
+    const matched = todo('matched', { parent_id: 'missing-parent' });
 
-    expect(expandTaskGraphContext([matched], [matched])).toEqual([matched]);
+    expect(
+      expandTaskGraphContext(
+        [matched],
+        [matched],
+        [{ source_task_id: 'matched', target_task_id: 'missing-task', type: 'depends_on' }],
+      ),
+    ).toEqual([matched]);
+  });
+
+  it('retains a 10,000-edge prerequisite fan-out', () => {
+    const dependent = todo('dependent');
+    const prerequisites = Array.from({ length: 10_000 }, (_, index) =>
+      todo(`prerequisite-${index}`),
+    );
+    const manyRelationships = prerequisites.map((prerequisite) => ({
+      source_task_id: dependent.id,
+      target_task_id: prerequisite.id,
+      type: 'depends_on',
+    }));
+
+    const result = expandTaskGraphContext(
+      [dependent, ...prerequisites],
+      [dependent],
+      manyRelationships,
+    );
+
+    expect(result).toHaveLength(10_001);
+    expect(result.at(-1)?.id).toBe('prerequisite-9999');
+  });
+
+  it('walks a 10,000-edge prerequisite chain without recursive stack growth', () => {
+    const chainedTodos = Array.from({ length: 10_001 }, (_, index) => todo(`task-${index}`));
+    const chainedRelationships = chainedTodos.slice(1).map((task, index) => ({
+      source_task_id: task.id,
+      target_task_id: chainedTodos[index].id,
+      type: 'depends_on',
+    }));
+
+    const result = expandTaskGraphContext(
+      chainedTodos,
+      [chainedTodos.at(-1)!],
+      chainedRelationships,
+    );
+
+    expect(result).toHaveLength(10_001);
+    expect(result[0].id).toBe('task-0');
   });
 });

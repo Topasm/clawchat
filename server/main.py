@@ -2,31 +2,36 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 from app_version import APP_VERSION
 from config import settings
 from database import async_session_factory, init_db
 from exceptions import AppError, app_error_handler
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
+from routers import attachment as attachment_router
 from routers import auth as auth_router
 from routers import calendar as calendar_router
 from routers import capabilities as capabilities_router
+from routers import change_set as change_set_router
 from routers import chat as chat_router
 from routers import notifications as notifications_router
+from routers import obsidian as obsidian_router
+from routers import pairing as pairing_router
 from routers import search as search_router
 from routers import settings as settings_router
 from routers import tags as tags_router
+from routers import task_relationship as task_relationship_router
 from routers import tasks as tasks_router
 from routers import today as today_router
-from routers import attachment as attachment_router
-from routers import obsidian as obsidian_router
-from routers import pairing as pairing_router
 from routers import todo as todo_router
 from routers import voice as voice_router
 from services.ai_service import AIService
-from services.claude_code_provider import ClaudeCodeProvider, ClaudeCodeStatus, _find_claude_cli
+from services.claude_code_provider import (
+    ClaudeCodeProvider,
+    ClaudeCodeStatus,
+    _find_claude_cli,
+)
 from services.orchestrator import Orchestrator
 from services.scheduler import Scheduler
 from ws.handler import websocket_endpoint
@@ -79,25 +84,31 @@ async def lifespan(app: FastAPI):
             return cc, ClaudeCodeStatus.ERROR, None
 
     async def _init_vault():
-        if not settings.obsidian_vault_path:
-            return
+        if settings.obsidian_vault_path:
+            try:
+                from services.obsidian_cli_service import load_queue
+                load_queue()
+                logger.info("Obsidian CLI write queue loaded")
+            except Exception:
+                logger.debug("Could not load Obsidian CLI write queue")
+            try:
+                from services.obsidian_vault_indexer import refresh_index
+                idx = await asyncio.to_thread(refresh_index)
+                logger.info(
+                    "Obsidian vault index: %d projects (CLI=%s, companion=%s)",
+                    len(idx.projects),
+                    idx.cli_available,
+                    idx.companion_online,
+                )
+            except Exception:
+                logger.debug("Could not build initial vault index")
         try:
-            from services.obsidian_cli_service import load_queue
-            load_queue()
-            logger.info("Obsidian CLI write queue loaded")
+            from services.vault_sync_service import process_pending_vault_sync_jobs
+
+            async with async_session_factory() as vault_job_db:
+                await process_pending_vault_sync_jobs(vault_job_db)
         except Exception:
-            logger.debug("Could not load Obsidian CLI write queue")
-        try:
-            from services.obsidian_vault_indexer import refresh_index
-            idx = await asyncio.to_thread(refresh_index)
-            logger.info(
-                "Obsidian vault index: %d projects (CLI=%s, companion=%s)",
-                len(idx.projects),
-                idx.cli_available,
-                idx.companion_online,
-            )
-        except Exception:
-            logger.debug("Could not build initial vault index")
+            logger.exception("Could not resume pending Vault sync jobs")
 
     ai_connected, (claude_code, claude_code_status, claude_code_version), _ = (
         await asyncio.gather(_check_ai(), _check_claude_code(), _init_vault())
@@ -146,6 +157,26 @@ async def lifespan(app: FastAPI):
     else:
         app.state.scheduler = None
 
+    async def _vault_outbox_loop() -> None:
+        from services.vault_sync_service import process_pending_vault_sync_jobs
+
+        while True:
+            try:
+                async with async_session_factory() as vault_job_db:
+                    await process_pending_vault_sync_jobs(vault_job_db)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Periodic Vault outbox delivery failed")
+            await asyncio.sleep(15)
+
+    # Outbox recovery is independent of the optional feature scheduler. This
+    # also resolves jobs as succeeded when no Vault is configured.
+    app.state.vault_outbox_task = asyncio.create_task(
+        _vault_outbox_loop(),
+        name="vault-outbox",
+    )
+
     # The host initiates the relay connection outbound, so no inbound port or
     # firewall change is needed. An empty RELAY_URL keeps LAN-only behavior.
     app.state.relay_connector = None
@@ -162,6 +193,10 @@ async def lifespan(app: FastAPI):
     # Stop scheduler before closing AI service
     if app.state.scheduler:
         await app.state.scheduler.stop()
+
+    app.state.vault_outbox_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await app.state.vault_outbox_task
 
     if app.state.relay_connector:
         await app.state.relay_connector.stop()
@@ -189,6 +224,16 @@ app.add_middleware(
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
+app.include_router(
+    change_set_router.router,
+    prefix="/api/change-sets",
+    tags=["change-sets"],
+)
+app.include_router(
+    task_relationship_router.router,
+    prefix="/api/task-relationships",
+    tags=["task-relationships"],
+)
 app.include_router(calendar_router.router, prefix="/api/events", tags=["calendar"])
 app.include_router(search_router.router, prefix="/api/search", tags=["search"])
 app.include_router(today_router.router, prefix="/api/today", tags=["today"])

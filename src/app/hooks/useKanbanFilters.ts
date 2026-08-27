@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { TodoResponse, KanbanStatus } from '../types/api';
+import type { TodoResponse } from '../types/api';
 
 interface KanbanFilters {
   searchQuery: string;
@@ -17,11 +17,7 @@ const PRIORITY_ORDER: Record<string, number> = {
   low: 3,
 };
 
-export default function useKanbanFilters(
-  todos: TodoResponse[],
-  kanbanStatuses: Record<string, KanbanStatus>,
-  filters: KanbanFilters,
-) {
+export default function useKanbanFilters(todos: TodoResponse[], filters: KanbanFilters) {
   return useMemo(() => {
     let result = [...todos];
 
@@ -73,5 +69,5 @@ export default function useKanbanFilters(
     });
 
     return result;
-  }, [todos, kanbanStatuses, filters]);
+  }, [todos, filters]);
 }

@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from domain.task import TaskStatus
 from models.agent_task import AgentTask
 from models.todo import Todo
 from services.ai_service import AIService
@@ -300,7 +301,9 @@ async def _handle_executor(
     child_q = select(Todo).where(Todo.parent_id == todo.id)
     children = list((await db.execute(child_q)).scalars().all())
 
-    completed = sum(1 for c in children if c.status == "completed")
+    completed = sum(
+        1 for child in children if child.status == TaskStatus.COMPLETED
+    )
     total = len(children)
 
     # Update progress in the instruction/result

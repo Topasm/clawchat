@@ -25,6 +25,7 @@ export default function useTodayProgress() {
     todayEnd.setDate(todayEnd.getDate() + 1);
 
     const allTodayTasks = allTodos.filter((t) => {
+      if (t.status === 'cancelled') return false;
       if (!t.due_date) return false;
       const d = new Date(t.due_date);
       return d >= todayStart && d < todayEnd;
@@ -45,9 +46,7 @@ export default function useTodayProgress() {
     if (streak.lastCompletedDate === today) return;
 
     const yesterday = getYesterdayISO();
-    const newStreak = streak.lastCompletedDate === yesterday
-      ? streak.currentStreak + 1
-      : 1;
+    const newStreak = streak.lastCompletedDate === yesterday ? streak.currentStreak + 1 : 1;
 
     setStreak({ lastCompletedDate: today, currentStreak: newStreak });
   }, [progress.allDone, streak, setStreak]);

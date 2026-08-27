@@ -1,6 +1,7 @@
 import { MarkerType, Position, type Edge } from '@xyflow/react';
-import type { KanbanStatus, TodoResponse } from '../../types/api';
+import type { TodoResponse } from '../../types/api';
 import { buildExecutionGraphLayout, buildStructureGraphLayout } from './taskGraphLayout';
+import type { GraphRelationshipLike } from './taskGraphLayout';
 import type { TaskFlowNode, TaskGraphMode } from './taskGraphTypes';
 
 export interface TaskGraphElements {
@@ -12,7 +13,7 @@ interface TaskGraphAdapterOptions {
   mode: TaskGraphMode;
   collapsedIds: ReadonlySet<string>;
   hideCompleted: boolean;
-  kanbanStatuses: Record<string, KanbanStatus>;
+  relationships: readonly GraphRelationshipLike[];
   metadataTodos?: TodoResponse[];
   onToggleCollapse: (taskId: string) => void;
 }
@@ -25,26 +26,31 @@ interface TaskGraphAdapterOptions {
 export function expandTaskGraphContext(
   allTodos: TodoResponse[],
   matchedTodos: TodoResponse[],
+  relationships: readonly GraphRelationshipLike[],
 ): TodoResponse[] {
   if (matchedTodos.length === 0) return [];
 
   const todoById = new Map(allTodos.map((todo) => [todo.id, todo]));
   const includedIds = new Set<string>();
+  const dependenciesByTaskId = new Map<string, string[]>();
+  relationships.forEach((relationship) => {
+    if (relationship.type !== 'depends_on') return;
+    const dependencies = dependenciesByTaskId.get(relationship.source_task_id);
+    if (dependencies) dependencies.push(relationship.target_task_id);
+    else dependenciesByTaskId.set(relationship.source_task_id, [relationship.target_task_id]);
+  });
 
-  const include = (id: string, path: ReadonlySet<string>) => {
-    if (path.has(id)) return;
+  const pendingIds = matchedTodos.map((todo) => todo.id);
+  while (pendingIds.length > 0) {
+    const id = pendingIds.pop()!;
+    if (includedIds.has(id)) continue;
     const todo = todoById.get(id);
-    if (!todo) return;
+    if (!todo) continue;
 
     includedIds.add(id);
-    const nextPath = new Set(path);
-    nextPath.add(id);
-
-    if (todo.parent_id) include(todo.parent_id, nextPath);
-    new Set(todo.depends_on ?? []).forEach((dependencyId) => include(dependencyId, nextPath));
-  };
-
-  matchedTodos.forEach((todo) => include(todo.id, new Set()));
+    if (todo.parent_id) pendingIds.push(todo.parent_id);
+    dependenciesByTaskId.get(id)?.forEach((dependencyId) => pendingIds.push(dependencyId));
+  }
   return allTodos.filter((todo) => includedIds.has(todo.id));
 }
 
@@ -53,11 +59,8 @@ export function buildTaskGraphElements(
   todos: TodoResponse[],
   options: TaskGraphAdapterOptions,
 ): TaskGraphElements {
-  const effectiveStatus = (todo: TodoResponse): KanbanStatus =>
-    options.kanbanStatuses[todo.id] ?? (todo.status as KanbanStatus);
-
   const sourceTodos = options.hideCompleted
-    ? todos.filter((todo) => effectiveStatus(todo) !== 'completed')
+    ? todos.filter((todo) => todo.status !== 'completed')
     : todos;
   const sourceIds = new Set(sourceTodos.map((todo) => todo.id));
   const visibleChildrenById = new Map<string, TodoResponse[]>();
@@ -77,32 +80,44 @@ export function buildTaskGraphElements(
     metadataChildrenById.set(todo.parent_id, children);
   });
 
-  const layout = options.mode === 'structure'
-    ? buildStructureGraphLayout(sourceTodos, options.collapsedIds)
-    : buildExecutionGraphLayout(sourceTodos, options.collapsedIds);
+  const layout =
+    options.mode === 'structure'
+      ? buildStructureGraphLayout(sourceTodos, options.collapsedIds)
+      : buildExecutionGraphLayout(sourceTodos, options.relationships, options.collapsedIds);
   const todoById = new Map(sourceTodos.map((todo) => [todo.id, todo]));
+  const dependencyCountByTaskId = new Map<string, number>();
+  options.relationships.forEach((relationship) => {
+    if (relationship.type !== 'depends_on') return;
+    dependencyCountByTaskId.set(
+      relationship.source_task_id,
+      (dependencyCountByTaskId.get(relationship.source_task_id) ?? 0) + 1,
+    );
+  });
 
   const nodes: TaskFlowNode[] = layout.nodes.flatMap((position) => {
     const todo = todoById.get(position.id);
     if (!todo) return [];
     const children = metadataChildrenById.get(todo.id) ?? [];
-    return [{
-      id: todo.id,
-      type: 'task',
-      position: { x: position.x, y: position.y },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-      data: {
-        todo,
-        status: effectiveStatus(todo),
-        mode: options.mode,
-        childCount: children.length,
-        completedChildCount: children.filter((child) => effectiveStatus(child) === 'completed').length,
-        hasVisibleChildren: (visibleChildrenById.get(todo.id)?.length ?? 0) > 0,
-        isCollapsed: options.collapsedIds.has(todo.id),
-        onToggleCollapse: options.onToggleCollapse,
+    return [
+      {
+        id: todo.id,
+        type: 'task',
+        position: { x: position.x, y: position.y },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        data: {
+          todo,
+          status: todo.status,
+          mode: options.mode,
+          childCount: children.length,
+          completedChildCount: children.filter((child) => child.status === 'completed').length,
+          dependencyCount: dependencyCountByTaskId.get(todo.id) ?? 0,
+          hasVisibleChildren: (visibleChildrenById.get(todo.id)?.length ?? 0) > 0,
+          isCollapsed: options.collapsedIds.has(todo.id),
+          onToggleCollapse: options.onToggleCollapse,
+        },
       },
-    }];
+    ];
   });
 
   const edges: Edge[] = layout.edges.map((edge) => ({
@@ -111,9 +126,10 @@ export function buildTaskGraphElements(
     target: edge.targetId,
     type: 'smoothstep',
     className: `cc-task-flow__edge cc-task-flow__edge--${edge.type}`,
-    markerEnd: edge.type === 'dependency'
-      ? { type: MarkerType.ArrowClosed, width: 18, height: 18 }
-      : undefined,
+    markerEnd:
+      edge.type === 'dependency'
+        ? { type: MarkerType.ArrowClosed, width: 18, height: 18 }
+        : undefined,
     selectable: false,
     focusable: false,
   }));

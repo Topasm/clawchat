@@ -1,6 +1,14 @@
 # API Design
 
-All communication between the mobile app and the self-hosted server uses REST (HTTPS) for CRUD operations and SSE (Server-Sent Events) for real-time streaming.
+Clients use REST (HTTPS) for CRUD, SSE (Server-Sent Events) for streamed AI responses, and WebSocket notifications for cross-client synchronization.
+
+This document is a usage guide, not the machine-readable source of truth. FastAPI's deterministic snapshot at `server/openapi.json` is authoritative for request/response schemas. After changing a Pydantic schema or route contract, run:
+
+```bash
+npm run generate:api        # refresh OpenAPI and generated TypeScript/Kotlin contracts
+uv run --project server --locked python scripts/export-openapi.py --check
+npm run check:api-contract  # verify generated TS/Kotlin values against the snapshot
+```
 
 ## Base URL
 
@@ -177,10 +185,22 @@ Edit a message's content. Returns the updated `MessageResponse`.
 ```
 GET    /api/todos                  # List todos (filterable by status, priority, due date)
 POST   /api/todos                  # Create a todo
+PATCH  /api/todos/bulk             # Update or delete multiple todos
 GET    /api/todos/:id              # Get a specific todo
 PATCH  /api/todos/:id              # Update a todo (status, title, etc.)
 DELETE /api/todos/:id              # Delete a todo
 ```
+
+`status` is the server-owned task lifecycle enum:
+
+```text
+pending | in_progress | completed | cancelled
+```
+
+`blocked` is not a status. Clients derive readiness from incomplete normalized
+`depends_on` edges. The legacy nullable `depends_on: string[]` Todo field is
+still accepted and returned during the compatibility window, but new clients
+must use the task-relationship endpoints below.
 
 #### `GET /api/todos`
 
@@ -231,6 +251,67 @@ DELETE /api/todos/:id              # Delete a todo
   "updated_at": "2026-02-21T09:00:00Z"
 }
 ```
+
+#### `PATCH /api/todos/bulk`
+
+```json
+// Request: set an exact canonical status
+{
+  "ids": ["todo_001", "todo_002"],
+  "status": "in_progress"
+}
+
+// Response 200
+{
+  "updated": 2,
+  "deleted": 0,
+  "errors": []
+}
+```
+
+## Task Relationship Endpoints
+
+```text
+GET    /api/task-relationships       # List/filter normalized task links
+POST   /api/task-relationships       # Create and validate one link
+PATCH  /api/task-relationships/:id   # Change endpoints, type, or label
+DELETE /api/task-relationships/:id   # Delete one link
+```
+
+`GET` accepts `task_id`, `source_task_id`, `target_task_id`, `type`, and
+`limit`. `task_id` matches either endpoint. For `depends_on`, the source is the
+task being executed and the target is its prerequisite:
+
+```json
+// POST /api/task-relationships
+{
+  "source_task_id": "todo_analysis",
+  "target_task_id": "todo_experiment",
+  "type": "depends_on"
+}
+
+// Response 201
+{
+  "id": "rel_3f04c7b8c1a2",
+  "source_task_id": "todo_analysis",
+  "target_task_id": "todo_experiment",
+  "type": "depends_on",
+  "label": null,
+  "created_by": "user",
+  "proposal_id": null,
+  "created_at": "2026-08-27T09:00:00Z",
+  "updated_at": "2026-08-27T09:00:00Z"
+}
+```
+
+The server rejects missing endpoints, self-links, duplicate typed edges, and a
+`depends_on` mutation that would introduce a cycle. Deleting a Todo cascades to
+all incident relationships. The inverse `blocks` direction is derived rather
+than persisted. `created_by` and `proposal_id` are server-owned provenance and
+cannot be supplied or changed through the public relationship mutation API.
+Malformed or invalid graphs return the named `ErrorResponse` contract with
+HTTP 400, an existing/conflicting edge returns 409, and request-schema failures
+return 422.
 
 ---
 
@@ -382,7 +463,7 @@ Returns all data needed for the Today dashboard in a single request.
 ## Notification Endpoints
 
 ```
-POST   /api/notifications/register-token   # Register an Expo push notification token
+POST   /api/notifications/register-token   # Register a platform push token
 ```
 
 #### `POST /api/notifications/register-token`
@@ -390,7 +471,7 @@ POST   /api/notifications/register-token   # Register an Expo push notification 
 ```json
 // Request
 {
-  "token": "ExponentPushToken[xxxxxx]",
+  "token": "<platform-push-token>",
   "device_id": "optional-device-id"
 }
 
@@ -420,16 +501,16 @@ GET    /api/search                 # Full-text search across all data types
       "type": "todo",
       "id": "todo_001",
       "title": "Review VLA paper",
-      "snippet": "Read and summarize key findings about **VLA model**...",
-      "score": 0.95,
+      "preview": "Read and summarize key findings about VLA model...",
+      "rank": -0.95,
       "created_at": "2026-02-21T09:00:00Z"
     },
     {
       "type": "event",
       "id": "evt_001",
       "title": "VLA Model Review with Haechan",
-      "snippet": "Meeting about **VLA model** review...",
-      "score": 0.88,
+      "preview": "Meeting about VLA model review...",
+      "rank": -0.88,
       "created_at": "2026-02-21T10:30:00Z"
     }
   ],
@@ -441,17 +522,18 @@ GET    /api/search                 # Full-text search across all data types
 
 ---
 
-## WebSocket Protocol (Legacy — replaced by SSE)
+## WebSocket Synchronization Protocol
 
-> **Note:** The WebSocket protocol described below is the original design. The current implementation uses **SSE (Server-Sent Events)** via `POST /api/chat/stream` for real-time streaming, which is simpler and works better with React Native. The WebSocket design is preserved here for reference and may be implemented for features like push notifications in the future.
+`POST /api/chat/stream` over SSE is the primary chat-streaming path. The persistent WebSocket remains active for cache invalidation, background-task progress, reminders, briefings, liveness, and compatibility with the asynchronous `/api/chat/send` path.
 
 ### Connection
 
-```
-wss://<server-address>:<port>/ws?token=<jwt_token>
+```text
+POST /api/auth/ws-ticket                    # Authorization: Bearer <access token>
+wss://<server-address>:<port>/ws?ticket=<short-lived-ticket>
 ```
 
-The client opens a single persistent WebSocket connection after authentication. All real-time communication flows through this connection.
+The client exchanges its bearer token for a short-lived ticket before opening the socket. A legacy `?token=` parameter is accepted only during the mobile migration window. On reconnect, clients refetch authoritative REST state so missed ephemeral events cannot create permanent drift.
 
 ### Message Format
 
@@ -514,60 +596,32 @@ Signals the streaming response is complete.
 }
 ```
 
-#### `action_card`
+#### `module_data_changed`
 
-An interactive UI card for confirming or displaying module actions.
+Tells clients to invalidate cached module data and refetch it from REST.
 
 ```json
 {
-  "type": "action_card",
+  "type": "module_data_changed",
   "data": {
-    "message_id": "msg_xyz789",
-    "card_type": "event_created",
-    "payload": {
-      "id": "evt_001",
-      "title": "VLA Model Review with Haechan",
-      "start_time": "2026-02-22T15:00:00Z",
-      "end_time": "2026-02-22T16:00:00Z"
-    },
-    "actions": [
-      { "label": "Edit", "action": "edit_event", "params": { "id": "evt_001" } },
-      { "label": "Delete", "action": "delete_event", "params": { "id": "evt_001" } }
-    ]
+    "module": "todos"
   }
 }
 ```
 
-#### `notification`
+#### Background and notification events
 
-Push notification for agent task completion, reminders, etc.
-
-```json
-{
-  "type": "notification",
-  "data": {
-    "title": "Agent Task Complete",
-    "body": "Your research summary on VLA models is ready.",
-    "conversation_id": "conv_abc123",
-    "action": "open_conversation"
-  }
-}
-```
+Current clients also handle `task_completed`, `task_failed`, `task_progress`, `reminder`, `nudge`, `daily_briefing`, `weekly_review`, and `conversation_updated`. Liveness messages use `heartbeat`, `tick`, and `pong`.
 
 ### Client -> Server Message Types
 
-#### `action_response`
+#### `ping`
 
-User responds to an action card.
+The client periodically sends a liveness probe; the server responds with `pong`.
 
 ```json
 {
-  "type": "action_response",
-  "data": {
-    "message_id": "msg_xyz789",
-    "action": "edit_event",
-    "params": { "id": "evt_001" }
-  }
+  "type": "ping"
 }
 ```
 
@@ -627,8 +681,7 @@ POST   /api/admin/db/purge                    # Purge old data (conversations, m
     "todos": 25,
     "events": 8,
     "agent_tasks": 3,
-    "attachments": 2,
-    "task_relationships": 4
+    "attachments": 2
   },
   "storage": {
     "db_size_bytes": 524288,
@@ -680,9 +733,73 @@ Runs the inbox pipeline as a background task. Classifies the todo and suggests a
 ### Plan
 
 ```
-GET    /api/todos/:id/plan/latest           # Get the latest plan for a todo
-POST   /api/todos/:id/plan/apply            # Apply a plan (create subtasks)
+POST   /api/todos/:id/plan/generate         # Generate and persist a validated proposal
+GET    /api/todos/:id/plan/latest           # Get the latest proposal/history entry
+POST   /api/todos/:id/plan/apply            # Atomically apply one exact proposal revision
+POST   /api/todos/:id/plan/dismiss          # Reject one exact proposal
+POST   /api/change-sets/:id/revert          # Conservatively undo an applied change set
 ```
+
+Planning is a versioned change-set workflow, not a direct conversion of an LLM
+response into Todos:
+
+```text
+capture graph revision
+  -> strict schema + semantic validation
+  -> preview proposal_id/base_graph_revision
+  -> compare-and-swap apply
+  -> change set + inverse operations + Vault outbox in one transaction
+```
+
+The generated response includes `proposal_id`, `base_graph_revision`, proposal
+`status`, deterministic `validation`, a summarized `diff`, and editable
+`subtasks`. Imported legacy proposals have a null base revision and cannot be
+applied or reverted; clients must regenerate them.
+
+Apply must echo the exact proposal identity and revision shown in the preview:
+
+```json
+{
+  "proposal_id": "proposal_abc123",
+  "base_graph_revision": 17,
+  "selected_indices": [0, 1],
+  "subtasks": [
+    {
+      "title": "Collect data",
+      "estimated_minutes": 120,
+      "priority": "high",
+      "depends_on_indices": []
+    },
+    {
+      "title": "Analyze results",
+      "estimated_minutes": 180,
+      "priority": "medium",
+      "depends_on_indices": [0]
+    }
+  ]
+}
+```
+
+Successful apply returns stable created IDs plus a `change_set_id` and
+`applied_graph_revision`. Repeating the same canonical request replays that
+response without creating duplicate tasks. Reusing the proposal with different
+edits, applying after any semantic graph mutation, or undoing after subsequent
+graph/user side effects returns `409`; there is no force-apply or destructive
+force-undo path.
+
+Generate, apply, dismiss, and revert fail closed on network errors. Both the
+hand-written hooks and the OpenAPI-generated fetcher opt these revision-sensitive
+commands out of the generic offline mutation queue, so they cannot replay later
+against a different graph.
+
+Selection is dependency-closed. The server also rejects malformed dates or
+priorities, dangling/self dependencies, duplicate edges or titles, cycles,
+unknown skills, unsafe Vault project names, and due-date inconsistencies.
+
+Apply and revert never perform filesystem I/O inside their database transaction.
+They return the Vault outbox state, normally `pending`; a durable worker then
+reconciles managed `<!-- claw:id -->` markers while preserving user-authored
+Markdown content.
 
 ### Delegate / Skills
 

@@ -15,9 +15,8 @@ interface TaskListPageProps {
 export default function TaskListPage({ viewMode, onViewModeChange }: TaskListPageProps) {
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
-  const kanbanStatuses = useModuleStore((state) => state.kanbanStatuses);
   const filters = useModuleStore((state) => state.kanbanFilters);
-  const filteredTodos = useKanbanFilters(todos, kanbanStatuses, filters);
+  const filteredTodos = useKanbanFilters(todos, filters);
   const toggleTodo = useToggleTodoComplete();
   const orderedTodos = useMemo(() => {
     const todoById = new Map(filteredTodos.map((todo) => [todo.id, todo]));
@@ -50,7 +49,6 @@ export default function TaskListPage({ viewMode, onViewModeChange }: TaskListPag
       <KanbanFilterBar showSubtaskToggle={false} />
       <TaskListView
         todos={orderedTodos}
-        kanbanStatuses={kanbanStatuses}
         onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
         onToggleTask={(taskId) => {
           const todo = todos.find((candidate) => candidate.id === taskId);

@@ -36,6 +36,7 @@ from schemas.admin import (
 )
 from services import admin_service
 from ws.manager import ws_manager
+from ws.notifications import notify_module_data_changed
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +251,8 @@ async def purge_data(
         raise ValidationError("older_than_days must be >= 1")
 
     count = await admin_service.purge_old_data(db, body.target, body.older_than_days)
+    if body.target == "todos" and count > 0:
+        await notify_module_data_changed("todos")
     return PurgeResponse(deleted_count=count, target=body.target)
 
 

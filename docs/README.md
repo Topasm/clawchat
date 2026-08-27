@@ -1,14 +1,15 @@
 # ClawChat Documentation
 
-ClawChat is a privacy-first, self-hosted personal assistant that unifies task management, calendar, notes, and AI-powered conversation into a single cross-platform desktop and web app backed by a user-owned server.
+ClawChat is a privacy-first, self-hosted AI project execution workspace that unifies tasks, dependency graphs, calendar, documents, agents, and chat. Web/Tauri and native Android clients share one FastAPI contract and a user-owned SQLite database; Capacitor iOS remains provisional.
 
 ## Documentation Index
 
 | Document | Description |
 |----------|-------------|
 | [Architecture Overview](./architecture.md) | System design, data flow, and design principles |
-| [Database Schema](./database-schema.md) | All tables, columns, indexes, and migration strategy |
-| [API Design](./api-design.md) | REST endpoints, SSE streaming, and authentication |
+| [Platform Matrix](./architecture/platform-matrix.md) | Supported clients, ownership boundaries, and release validation |
+| [Database Schema](./database-schema.md) | Core tables, supporting persistence, indexes, and migration strategy |
+| [API Design](./api-design.md) | Human-readable REST/SSE/WebSocket guide and contract-generation workflow |
 | [Backend Guide](./backend-guide.md) | FastAPI project structure, modules, and dev setup |
 | [Frontend Guide](./frontend-guide.md) | Vite + React + TypeScript app structure and component reference |
 | [Tauri Migration](./tauri-migration.md) | Desktop runtime architecture, data migration, updater, and signing |
@@ -18,11 +19,15 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 | [Remote Access Runbook](./remote-access-runbook.md) | Cloudflare Tunnel (primary) and Tailscale (secondary) remote access setup |
 | [Roadmap](./roadmap.md) | Development progress and upcoming work (includes vibe-kanban-inspired upgrades) |
 | [Upgrade Reference](./upgrade-reference.md) | Libraries, patterns, and code examples for planned upgrades |
+| [ADR 003: Task Status](./adr/003-task-status-source-of-truth.md) | Why task lifecycle state is server-owned and generated for every client |
+| [ADR 004: Task Relationships](./adr/004-task-relationship-model.md) | Direction, validation, migration, and compatibility policy for task edges |
+| [ADR 005: Versioned AI Plans](./adr/005-versioned-ai-plan-proposals.md) | Proposal identity, graph revisions, transactional apply, conservative undo, and Vault outbox policy |
 
 ## Key Features
 
 - **AI Chat with Streaming** — Real-time token-by-token AI response streaming using Server-Sent Events (SSE) with typing indicator and stop generation support
-- **Kanban Task Board** — Drag-and-drop kanban board (Todo / In Progress / Done) with @hello-pangea/dnd, smooth animations, drop placeholders, and filter/sort bar
+- **Kanban Task Board** — Drag-and-drop kanban board (Todo / In Progress / Done / Cancelled) with server-persisted status, smooth animations, and filter/sort controls
+- **Task Graph** — Project hierarchy and execution-dependency views backed by parent/child links and normalized relationship edges
 - **Command Palette (Ctrl+K)** — Quick navigation and action launcher using cmdk, search across tasks, pages, and actions
 - **Keyboard Shortcuts** — Global and scoped hotkeys (?, N, /, Ctrl+Shift+C, G+T/I/C/A/S) using react-hotkeys-hook
 - **Toast Notifications** — User feedback on task moves, completions, and creation with auto-dismiss
@@ -33,12 +38,12 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 - **Configurable Settings** — 15+ user-configurable settings (chat behavior, LLM parameters, appearance, notifications) with JSON export/import
 - **Today Dashboard** — Greeting, today's tasks, overdue items, events, and inbox count at a glance
 - **Calendar Integration** — Event management with time, location, and detail editing
-- **Rich Text Memos (Lexical)** — Notes with bold, italic, headings, lists, code blocks, and links powered by Lexical rich text editor with markdown round-trip storage
+- **Obsidian Project Documents** — Vault indexing, project context, queued CLI writes, and task/plan export for user-owned Markdown files
 - **CodeMirror System Prompt Editor** — Syntax-highlighted editor with line numbers, word wrap, and dark mode support for the system prompt page
-- **File Attachments** — Drag-and-drop file upload on memos and tasks with image preview, download links, and size/type validation (10MB limit)
-- **Full-Text Search** — Search across tasks, events, and memos from a dedicated search page
+- **File Attachments** — Drag-and-drop task attachments with image preview, download links, and size/type validation (10MB limit)
+- **Full-Text Search** — Server search across tasks, events, and messages; the current search page presents task and event results
 - **Dialog System** — Accessible animated modals using @radix-ui/react-dialog with focus trap and ESC support
-- **Cross-Platform** — Runs through Tauri on desktop, Capacitor/Compose on mobile, and Vite in browsers
+- **Cross-Platform** — Runs through Tauri on desktop, native Compose on Android, provisional Capacitor on iOS, and Vite in browsers
 - **Private Remote Access** — Publish via Cloudflare Tunnel or Tailscale without exposing the backend directly to the internet
 - **Demo Mode** — Fully functional UI with seeded demo data when no backend is connected
 
@@ -56,30 +61,29 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 | Web App | Vite + React 18 | Fast dev server and optimized production builds |
 | Language | TypeScript | Type-safe codebase |
 | Routing | React Router v7 | Client-side navigation and lazy route splitting |
-| State Management | Zustand | Lightweight global state (auth, chat, modules, settings) |
+| Client State | Zustand + TanStack Query | Local preferences/session state plus cached server state and mutations |
 | HTTP Client | Axios | REST API communication with token refresh |
-| Real-time | SSE (Server-Sent Events) | Streaming AI responses |
+| Real-time | SSE + WebSocket | Streaming AI responses and cross-client change notifications |
 | Drag & Drop | @hello-pangea/dnd | Kanban board drag-and-drop with animations |
 | Dialogs | @radix-ui/react-dialog | Accessible modal/dialog primitives |
 | Command Palette | cmdk | Headless command menu |
 | Keyboard Shortcuts | react-hotkeys-hook | Global and scoped hotkey management |
 | Resizable Panels | react-resizable-panels | Adjustable sidebar/panel layout |
-| Rich Text Editor | Lexical + @lexical/react | Markdown-based rich text editing for memos |
 | Code Editor | @uiw/react-codemirror | Syntax-highlighted editor for system prompt |
 | Styling | CSS with custom properties | BEM naming (`.cc-` prefix), theme-aware via CSS variables |
 | Backend | Python FastAPI | Async API server with AI orchestration |
 | Database | SQLite | Single-file, zero-config persistent storage |
-| AI Layer | Ollama / OpenAI-compatible API | Local-first LLM with cloud fallback |
+| AI Layer | Ollama / OpenAI-compatible API / Claude Code | Local-first LLM with optional external backends |
 | Deployment | Docker Compose | One-command server setup |
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-npm install
+# Install frontend/backend dependencies and create .env
+make setup
 
-# Development (web)
-npm run dev
+# Development (web + API)
+make dev
 
 # Development (Tauri desktop)
 npm run dev:tauri
@@ -89,11 +93,14 @@ npm run typecheck
 
 # Production build
 npm run build
+
+# After changing a FastAPI schema
+npm run generate:api
 ```
 
 ## Prerequisites
 
 - **Node.js** >= 22 and npm >= 10 (Node 24 LTS recommended)
-- **Python** >= 3.11 (for the server)
+- **Python** >= 3.11 and **uv** 0.10.2 (for the server)
 - **Docker & Docker Compose** (for server deployment)
-- An **OpenAI-compatible LLM** endpoint (Ollama for local, or Claude/GPT API key)
+- An AI backend for AI features: **Ollama**, an **OpenAI-compatible endpoint**, or **Claude Code**

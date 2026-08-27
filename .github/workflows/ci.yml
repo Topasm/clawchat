@@ -40,6 +40,7 @@ jobs:
       - run: npm run check:licenses
       - run: npm run check:runtime-boundary
       - run: npm run check:release-version
+      - run: npm run check:api-contract
 
   build:
     name: Build
@@ -75,5 +76,7 @@ jobs:
         env:
           DATABASE_URL: sqlite+aiosqlite:///./migration-check.db
           JWT_SECRET: ci-migration-check-secret
+      - name: Verify OpenAPI contract snapshot
+        run: uv run --project server --locked python scripts/export-openapi.py --check
       - run: uv run --locked pytest -q
         working-directory: server

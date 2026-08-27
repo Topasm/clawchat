@@ -2,6 +2,14 @@
 
 ClawChat development progress and planned work.
 
+Active foundation work is tracked separately from release status:
+
+| Workstream | Implemented | Validated | Released |
+|---|---|---|---|
+| Canonical task status | Yes | Backend/Web contract checks; Android CI pending | No |
+| Normalized task relationships | Yes | Backend/Web/migration regression checks | No |
+| Versioned AI plan proposals | Yes | Backend/Web/OpenAPI/migration/concurrency regression checks | No |
+
 ---
 
 ## Completed
@@ -9,12 +17,12 @@ ClawChat development progress and planned work.
 ### Cross-Platform Restructure
 - [x] Migrate from React Native (Expo) to Vite + React + TypeScript
 - [x] Tauri 2 integration for desktop (Windows, macOS, Linux); legacy Electron shell retired
-- [x] Capacitor scaffolding for future mobile builds (iOS, Android)
-- [x] Platform detection runtime (`IS_TAURI`, `IS_WEB`, `IS_MOBILE`)
+- [x] Native Kotlin/Compose Android client; Capacitor retained provisionally for iOS
+- [x] Shared-client platform detection runtime (`IS_TAURI`, `IS_WEB`, `IS_MOBILE`)
 - [x] Unified monorepo structure (`src/app/`, `src/styles/`, `src-tauri/`)
 
 ### UI Framework
-- [x] React Router v6 with nested layout routes
+- [x] React Router v7 with nested layout routes
 - [x] Sidebar navigation (Today, Inbox, Chats, All Tasks, Settings)
 - [x] Persistent collapsible chat panel
 - [x] CSS architecture: BEM naming (`.cc-` prefix), CSS custom properties for theming
@@ -22,12 +30,12 @@ ClawChat development progress and planned work.
 - [x] Responsive design with mobile breakpoints
 
 ### Task Management
-- [x] Kanban board on All Tasks page (Todo / In Progress / Done columns)
+- [x] Kanban board on All Tasks page (Todo / In Progress / Done / Cancelled columns)
 - [x] @hello-pangea/dnd drag-and-drop with smooth animations and drop placeholders
 - [x] Kanban filter/sort bar (search, priority chips, tag dropdown, sort selector)
 - [x] Visual feedback: drag-over column highlights, card box-shadow + rotation
 - [x] Server-native `in_progress` status — no client-side mapping workaround needed
-- [x] Checkbox toggle moves tasks between Todo/Done, clears kanban overrides
+- [x] Checkbox toggle moves tasks between Todo/Done using the server status
 - [x] Quick capture modal with natural language input (tasks, events)
 - [x] Responsive kanban: columns stack vertically below 768px
 - [x] Task detail editing (title, priority, due date, tags, description)
@@ -51,7 +59,7 @@ ClawChat development progress and planned work.
 ### State Management (Zustand)
 - [x] `useAuthStore` — JWT auth, server URL, token refresh, persisted
 - [x] `useChatStore` — Conversations, messages, dual-path streaming (SSE + WebSocket), abort, action metadata
-- [x] `useModuleStore` — Todos, events, kanban statuses, async API actions
+- [x] `useModuleStore` — local todo/event view preferences and kanban filters
 - [x] `useSettingsStore` — 15+ settings, theme, LLM params, persisted
 - [x] Optimistic updates with server sync fallback
 
@@ -94,7 +102,7 @@ ClawChat development progress and planned work.
 - [x] Message edit (`PUT`) and delete (`DELETE`) endpoints
 - [x] Ollama native streaming support (`/api/chat` NDJSON)
 - [x] Client TS types match server Pydantic schemas (PaginatedResponse, ConversationResponse, TodoResponse, EventResponse, MessageResponse with metadata)
-- [x] Server todo status supports `in_progress` / `cancelled` — client kanban uses server status directly
+- [x] Canonical server task status with persisted `in_progress` / `cancelled`, OpenAPI enum, generated TypeScript/Kotlin contracts, and no client override
 - [x] Async business services (todo, calendar) in server
 - [x] Orchestrator wired to real service calls (not stubs)
 
@@ -180,11 +188,12 @@ ClawChat development progress and planned work.
 - [x] Task detail page: section to add/view/manage sub-tasks with QuickCaptureModal
 - [x] Inbox: indent sub-tasks under their parent
 
-#### Task Relationships
-- [x] Add task relationship types: `blocks`, `blocked_by`, `related`, `duplicate_of`
-- [x] Server: new `task_relationships` table (`id`, `source_todo_id`, `target_todo_id`, `relationship_type`)
-- [x] UI: task detail page RelationshipsSection to link related tasks
-- [x] Kanban: BlockerBadge visual indicator when a task has blockers
+#### Task Dependencies
+- [x] Keep the Todo `depends_on` JSON array as a deprecated compatibility shadow
+- [x] Add normalized `task_relationships` table and API
+- [x] Migrate existing `depends_on` data without loss
+- [x] Reject self-edges, duplicates, dangling references, and dependency cycles
+- [ ] Derive blocked/readiness state from canonical dependency edges
 
 #### Bulk Task Operations
 - [x] Add multi-select mode to kanban board (Ctrl/Cmd+click on cards)
@@ -198,14 +207,14 @@ ClawChat development progress and planned work.
 - [x] Drag within a column reorders; drag between columns changes status
 
 ### Phase 4: Content & Editing
-> *Rich text and code editing for a more capable notes and prompt editing experience.*
+> *Reusable content-editing groundwork plus the shipped system-prompt editor.*
 
 #### Rich Text Editor (Lexical)
 - [x] Install `lexical` + `@lexical/react` + `@lexical/markdown`
 - [x] Lexical rich text editor component
 - [x] Support: bold, italic, headings, bullet lists, code blocks, links
 - [x] Markdown import/export
-- [ ] Optional: use for task descriptions too
+- [ ] Integrate the reusable editor into a persisted task/document workflow
 
 #### CodeMirror for System Prompt Editor
 - [x] Install `@uiw/react-codemirror` + `@codemirror/lang-markdown` + `@codemirror/theme-one-dark`
@@ -221,10 +230,12 @@ ClawChat development progress and planned work.
 - [x] Size limits and allowed file type validation
 
 ### Phase 6: Mobile
-- [x] Capacitor builds for iOS and Android
-- [x] Bottom tab navigation for mobile layout
-- [ ] Touch-optimized kanban (touch drag-and-drop)
-- [x] Push notifications (Capacitor)
+- [x] Native Android app with Compose feature modules, widgets, notifications, and background work
+- [x] Bottom navigation for native Android and the shared mobile layout
+- [ ] Complete Android release CI validation for the canonical task contract
+- [ ] Touch-optimize the provisional Capacitor iOS kanban
+- [x] Retain Capacitor iOS packaging while native iOS priority is undecided
+- [x] Deprecate Capacitor Android; no new product work targets it
 
 ### Phase 7: Polish & Deploy
 - [x] Offline support (queue actions, sync on reconnect)
@@ -234,7 +245,7 @@ ClawChat development progress and planned work.
 - [x] Performance optimization — see below
 
 #### Performance & UX Polish
-- [x] Virtual scrolling with `react-virtuoso` for long chat histories and task lists
+- [ ] Add list virtualization/windowing for long chat histories and task lists
 - [x] `framer-motion` animations for page transitions, panel open/close, toast popups
 - [x] Loading skeletons/placeholders for pages while data fetches
 
@@ -282,7 +293,10 @@ ClawChat development progress and planned work.
 - [x] Agent personas: `planner` (subtask breakdown), `researcher` (investigation), `executor` (action)
 - [x] Task delegation endpoint (`POST /api/todos/:id/delegate`) with background execution
 - [x] Organize endpoint (`POST /api/todos/:id/organize`) with correct background session handling
-- [x] Plan API: generate, view latest, and apply plans as subtasks
+- [x] Versioned Plan API: proposal ID, graph revision, context hash, and stale detection
+- [x] Strict plan/schema validation with exact transactional and idempotent apply
+- [x] Reversible change sets with conservative undo and durable Vault sync outbox
+- [x] Plan review UI: diff, validation, stale/legacy fail-closed handling, and Undo
 - [x] TaskCard persona badges: unified indigo badges (AI / Plan / Research / Exec) for all agent assignees
 - [x] TaskDetailPage: persona buttons, delegation actions, "Run Planner" button
 - [x] Obsidian export: `@agent(planner|researcher|executor|openclaw)` annotations in vault markdown

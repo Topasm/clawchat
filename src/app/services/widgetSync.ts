@@ -1,9 +1,9 @@
 import { IS_ANDROID } from '../types/platform';
 import { queryClient } from '../config/queryClient';
-import { useModuleStore } from '../stores/useModuleStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { queryKeys } from '../hooks/queries/queryKeys';
 import type { TodoResponse, EventResponse } from '../types/api';
+import { isTerminalTaskStatus } from '../utils/taskStatus';
 
 function getCachedTodos(): TodoResponse[] {
   return queryClient.getQueryData<TodoResponse[]>(queryKeys.todos) ?? [];
@@ -48,9 +48,9 @@ function formatWidgetTime(isoString: string): string {
 function buildWidgetData(): WidgetData {
   const todos = getCachedTodos();
 
-  // All pending root-level tasks, newest first
+  // All active root-level tasks, newest first
   const pendingTasks = todos
-    .filter((t) => t.status !== 'completed' && !t.parent_id)
+    .filter((t) => !isTerminalTaskStatus(t.status) && !t.parent_id)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const displayTasks = pendingTasks.slice(0, 5).map((t) => ({
@@ -89,25 +89,18 @@ function buildCalendarWidgetData(): CalendarWidgetData {
 
 function buildKanbanWidgetData(): KanbanWidgetData {
   const todos = getCachedTodos();
-  const store = useModuleStore.getState();
 
   // Only root-level tasks (no subtasks)
   const rootTasks = todos.filter((t) => !t.parent_id);
 
-  // Use kanban overrides from the store
-  const getStatus = (t: { id: string; status: string }) => {
-    const kanbanStatus = store.kanbanStatuses[t.id];
-    return kanbanStatus ?? t.status;
-  };
+  const todoCount = rootTasks.filter((t) => t.status === 'pending').length;
+  const progressCount = rootTasks.filter((t) => t.status === 'in_progress').length;
+  const doneCount = rootTasks.filter((t) => t.status === 'completed').length;
 
-  const todoCount = rootTasks.filter((t) => getStatus(t) === 'pending').length;
-  const progressCount = rootTasks.filter((t) => getStatus(t) === 'in_progress').length;
-  const doneCount = rootTasks.filter((t) => getStatus(t) === 'completed').length;
-
-  // Top 3 priority pending tasks (high > medium > low > none)
+  // Top 3 priority active tasks (high > medium > low > none)
   const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
   const topTasks = rootTasks
-    .filter((t) => getStatus(t) !== 'completed')
+    .filter((t) => !isTerminalTaskStatus(t.status))
     .sort((a, b) => {
       const pa = priorityOrder[a.priority ?? ''] ?? 3;
       const pb = priorityOrder[b.priority ?? ''] ?? 3;
@@ -132,8 +125,10 @@ export async function syncWidgetData(): Promise<void> {
   if (!IS_ANDROID) return;
 
   try {
-    const { Capacitor } = await import('@capacitor/core');
-    const WidgetData = Capacitor.Plugins['WidgetData'] as WidgetPluginType | undefined;
+    const { Capacitor, registerPlugin } = await import('@capacitor/core');
+    const WidgetData = Capacitor.isPluginAvailable('WidgetData')
+      ? registerPlugin<WidgetPluginType>('WidgetData')
+      : undefined;
 
     if (!WidgetData) return;
 

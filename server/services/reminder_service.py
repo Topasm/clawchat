@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.task import TaskStatus
 from models.event import Event
 from models.todo import Todo
 from services.recurrence_service import generate_occurrences
@@ -115,7 +116,7 @@ async def check_todo_reminders(
         .where(
             Todo.due_date >= now,
             Todo.due_date <= window_end,
-            Todo.status.notin_(["completed", "cancelled"]),
+            Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
     )
     todos = (await db.execute(q)).scalars().all()
@@ -154,7 +155,7 @@ async def check_overdue_todos(
         select(Todo)
         .where(
             Todo.due_date < now,
-            Todo.status.in_(["pending", "in_progress"]),
+            Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
         )
     )
     todos = (await db.execute(q)).scalars().all()

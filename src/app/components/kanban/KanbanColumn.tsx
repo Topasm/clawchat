@@ -1,13 +1,13 @@
 import { useState, Fragment, type ReactNode } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
-import type { TodoResponse, KanbanStatus } from '../../types/api';
+import type { TodoResponse, TaskStatus } from '../../types/api';
 import KanbanCard from './KanbanCard';
 import SwipeActions from './SwipeActions';
 import EmptyState from '../shared/EmptyState';
 import { ClipboardIcon } from '../shared/Icons';
 
 interface KanbanColumnProps {
-  status: KanbanStatus;
+  status: TaskStatus;
   title: string;
   icon: ReactNode;
   tasks: TodoResponse[];
@@ -21,15 +21,16 @@ interface KanbanColumnProps {
   onSelect?: (id: string) => void;
   isMultiSelectMode?: boolean;
   isMobile?: boolean;
-  onMove?: (id: string, status: KanbanStatus) => void;
+  onMove?: (id: string, status: TaskStatus) => void;
   onComplete?: (id: string) => void;
   onDelete?: (id: string) => void;
 }
 
-const variantMap: Record<KanbanStatus, string> = {
+const variantMap: Record<TaskStatus, string> = {
   pending: 'todo',
   in_progress: 'progress',
   completed: 'done',
+  cancelled: 'cancelled',
 };
 
 export default function KanbanColumn({
@@ -57,7 +58,8 @@ export default function KanbanColumn({
   const toggleExpand = (id: string) => {
     setExpandedParents((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -65,11 +67,17 @@ export default function KanbanColumn({
   // Build render list: parent tasks, optionally with children inline
   const rootTasks = tasks.filter((t) => !t.parent_id);
   const getChildren = (parentId: string) => allTodos.filter((t) => t.parent_id === parentId);
-  const getSubTaskCount = (parentId: string) => allTodos.filter((t) => t.parent_id === parentId).length;
+  const getSubTaskCount = (parentId: string) =>
+    allTodos.filter((t) => t.parent_id === parentId).length;
 
   let draggableIndex = 0;
 
-  const renderCard = (task: TodoResponse, idx: number, isSubTask?: boolean, subTaskCount?: number) => (
+  const renderCard = (
+    task: TodoResponse,
+    idx: number,
+    isSubTask?: boolean,
+    subTaskCount?: number,
+  ) => (
     <KanbanCard
       task={task}
       index={idx}
@@ -116,7 +124,10 @@ export default function KanbanColumn({
           )}
           <div className="cc-kanban__cards">
             {rootTasks.length === 0 && !snapshot.isDraggingOver ? (
-              <EmptyState icon={<ClipboardIcon size={20} />} message={`No ${title.toLowerCase()} tasks`} />
+              <EmptyState
+                icon={<ClipboardIcon size={20} />}
+                message={`No ${title.toLowerCase()} tasks`}
+              />
             ) : (
               rootTasks.map((task) => {
                 const idx = draggableIndex++;
@@ -126,7 +137,11 @@ export default function KanbanColumn({
 
                 return (
                   <Fragment key={task.id}>
-                    <div onClick={childCount > 0 && showSubTasks ? () => toggleExpand(task.id) : undefined}>
+                    <div
+                      onClick={
+                        childCount > 0 && showSubTasks ? () => toggleExpand(task.id) : undefined
+                      }
+                    >
                       {wrapWithSwipe(task.id, renderCard(task, idx, undefined, childCount))}
                     </div>
                     {children.map((child) => {

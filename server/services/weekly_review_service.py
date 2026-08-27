@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.task import TaskStatus
 from exceptions import AIUnavailableError
 from models.todo import Todo
 from services.ai_service import AIService
@@ -24,7 +25,7 @@ async def gather_review_data(db: AsyncSession) -> dict:
     completed_q = (
         select(Todo)
         .where(
-            Todo.status == "completed",
+            Todo.status == TaskStatus.COMPLETED,
             Todo.completed_at >= week_ago,
         )
         .order_by(Todo.completed_at.desc())
@@ -35,7 +36,7 @@ async def gather_review_data(db: AsyncSession) -> dict:
     stale_q = (
         select(Todo)
         .where(
-            Todo.status.in_(["pending", "in_progress"]),
+            Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
             Todo.updated_at < week_ago,
         )
         .order_by(Todo.updated_at.asc())
@@ -50,7 +51,7 @@ async def gather_review_data(db: AsyncSession) -> dict:
             Todo.due_date != None,  # noqa: E711
             Todo.due_date <= week_ahead,
             Todo.due_date > now,
-            Todo.status.notin_(["completed", "cancelled"]),
+            Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.due_date.asc())
     )
@@ -61,7 +62,7 @@ async def gather_review_data(db: AsyncSession) -> dict:
         select(Todo)
         .where(
             Todo.due_date < now,
-            Todo.status.in_(["pending", "in_progress"]),
+            Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
         )
         .order_by(Todo.due_date.asc())
     )
@@ -73,7 +74,7 @@ async def gather_review_data(db: AsyncSession) -> dict:
         .where(
             Todo.inbox_state.in_(["captured", "classifying", "none"]),
             Todo.due_date == None,  # noqa: E711
-            Todo.status == "pending",
+            Todo.status == TaskStatus.PENDING,
         )
         .order_by(Todo.created_at.asc())
         .limit(20)
@@ -82,7 +83,7 @@ async def gather_review_data(db: AsyncSession) -> dict:
 
     # Total counts
     total_q = select(func.count(Todo.id)).where(
-        Todo.status.notin_(["completed", "cancelled"])
+        Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED])
     )
     total_open = (await db.execute(total_q)).scalar() or 0
 

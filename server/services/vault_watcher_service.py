@@ -22,6 +22,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from domain.task import TaskStatus
 from models.todo import Todo
 from utils import deserialize_tags, serialize_tags
 from utils.vault_paths import VaultPathError, resolve_vault_path
@@ -344,7 +345,11 @@ def _parse_todo_line(line: str) -> dict:
     cb_match = _CHECKBOX_RE.match(line.strip())
     if cb_match:
         marker = cb_match.group(1)
-        result["status"] = "completed" if marker.lower() == "x" else "pending"
+        result["status"] = (
+            TaskStatus.COMPLETED.value
+            if marker.lower() == "x"
+            else TaskStatus.PENDING.value
+        )
         result["title"] = cb_match.group(2).strip()
         # Clean metadata from title
         title = result["title"]
@@ -393,15 +398,18 @@ def _diff_todo(db_todo: Todo, vault_data: dict) -> list[SyncChange]:
     changes: list[SyncChange] = []
 
     # Status
-    vault_status = vault_data.get("status")
-    if vault_status and vault_status != db_todo.status:
-        changes.append(SyncChange(
-            todo_id=db_todo.id,
-            field="status",
-            old_value=db_todo.status,
-            new_value=vault_status,
-            source_file="",
-        ))
+    vault_status_value = vault_data.get("status")
+    if vault_status_value:
+        vault_status = TaskStatus(vault_status_value)
+        db_status = TaskStatus(db_todo.status)
+        if vault_status != db_status:
+            changes.append(SyncChange(
+                todo_id=db_todo.id,
+                field="status",
+                old_value=db_status.value,
+                new_value=vault_status.value,
+                source_file="",
+            ))
 
     # Due date
     vault_due = vault_data.get("due_date")
@@ -467,10 +475,11 @@ def _diff_todo(db_todo: Todo, vault_data: dict) -> list[SyncChange]:
 def _apply_change(todo: Todo, change: SyncChange) -> None:
     """Apply a single change to a Todo model instance."""
     if change.field == "status":
-        todo.status = change.new_value
-        if change.new_value == "completed" and not todo.completed_at:
+        status = TaskStatus(change.new_value)
+        todo.status = status
+        if status == TaskStatus.COMPLETED and not todo.completed_at:
             todo.completed_at = datetime.now(timezone.utc)
-        elif change.new_value == "pending":
+        else:
             todo.completed_at = None
 
     elif change.field == "due_date":

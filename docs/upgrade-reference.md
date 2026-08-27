@@ -1,12 +1,14 @@
 # Upgrade Reference
 
-Concrete implementation guidance for planned upgrades. Each section includes the library, install command, and integration pattern for ClawChat.
+Implementation guidance and historical design notes for upgrades. Some sections are already implemented; verify the roadmap and current source before treating a snippet as current architecture.
 
-> Source: patterns and libraries identified from analyzing the [vibe-kanban](../../vibe-kanban) codebase.
+> Source: patterns and libraries originally identified while analyzing the vibe-kanban codebase.
 
 ---
 
 ## 1. TanStack Query (React Query)
+
+**Status**: Implemented for server state and mutations.
 
 **Why**: Replace manual Axios + Zustand API fetching with automatic caching, background refetch, loading/error states, and retry logic. Eliminates boilerplate in stores.
 
@@ -70,6 +72,8 @@ export function useCreateTodo() {
 
 ## 2. Zod Runtime Validation
 
+**Status**: Implemented. Canonical task-status values are generated from OpenAPI and consumed by the Zod schema.
+
 **Why**: Catch API contract mismatches at runtime instead of silently passing bad data into components. Also replaces manual form validation.
 
 **Install**:
@@ -131,6 +135,8 @@ if (!result.success) {
 
 ## 3. Error Boundaries
 
+**Status**: Implemented at the application, layout, and route levels.
+
 **Why**: Prevent a crash in one component from white-screening the entire app.
 
 **Option A — Lightweight (no external dep)**:
@@ -185,9 +191,11 @@ import * as Sentry from '@sentry/react';
 
 ## 4. Sub-tasks
 
+**Status**: Implemented with `todos.parent_id` and client-side grouping.
+
 **Database change** (server):
 ```sql
-ALTER TABLE todos ADD COLUMN parent_id TEXT REFERENCES todos(id) ON DELETE CASCADE;
+ALTER TABLE todos ADD COLUMN parent_id TEXT REFERENCES todos(id) ON DELETE SET NULL;
 CREATE INDEX idx_todos_parent ON todos(parent_id);
 ```
 
@@ -206,28 +214,52 @@ interface TodoResponse {
 
 ## 5. Task Relationships
 
-**Database** (server):
+**Status**: Implemented. `task_relationships` is the server-owned source of truth,
+and Graph/task-detail clients use its API. The nullable `todos.depends_on` field
+remains only as a transactionally synchronized compatibility shadow for older
+clients and safe migration rollback.
+
+The migration preserves valid existing edges and fails closed on malformed
+JSON, self-edges, duplicates, dangling todo IDs, cycles, or a lossy downgrade.
+Runtime validation and SQLite triggers enforce the same graph invariants.
+`blocked` will be computed from incomplete prerequisites; it must not be added
+to the canonical task lifecycle enum described in [ADR 003](./adr/003-task-status-source-of-truth.md).
+
+**Database shape** (server):
 ```sql
 CREATE TABLE task_relationships (
   id TEXT PRIMARY KEY,
-  source_id TEXT NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
-  target_id TEXT NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('blocks', 'blocked_by', 'related', 'duplicate_of')),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(source_id, target_id, type)
+  source_task_id TEXT NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+  target_task_id TEXT NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('depends_on', 'related', 'duplicate')),
+  label TEXT,
+  created_by TEXT NOT NULL DEFAULT 'user',
+  proposal_id TEXT,
+  created_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP NOT NULL,
+  UNIQUE(source_task_id, target_task_id, type)
 );
 ```
 
-**UI**: Task detail page gets a "Related Tasks" section where users can search and link other tasks. Kanban cards show a small icon when the task has blockers.
+For `depends_on`, `source_task_id` is the task being executed and `target_task_id` is its prerequisite. The inverse `blocks` direction is derived at query time rather than stored as a second edge.
+
+**UI**: Task detail dependency edits use relationship POST/DELETE mutations. The
+execution Graph, filtered prerequisite closure, proposal preview, graph-node
+counts, and TaskCard counts read normalized edges. Dependency count indexing is
+shared per query result so rendering many cards is O(edges + cards), not
+O(edges × cards).
 
 ---
 
 ## 6. Bulk Operations
 
+**Status**: Implemented.
+
 **API endpoint** (server):
 ```
 PATCH /api/todos/bulk
-Body: { ids: string[], update: { status?, priority?, tags_add?, tags_remove? } }
+Body: { ids: string[], status?, priority?, tags?, delete?: boolean }
+Response: { updated: number, deleted: number, errors: string[] }
 ```
 
 **UI pattern**:
@@ -237,7 +269,9 @@ Body: { ids: string[], update: { status?, priority?, tags_add?, tags_remove? } }
 
 ---
 
-## 7. Rich Text — Lexical Editor *(Completed — Phase 4)*
+## 7. Rich Text — Lexical Editor Component
+
+**Status**: The reusable component and tests are implemented, but it is not currently mounted in a persisted task, memo, or document workflow.
 
 **Installed**:
 ```bash
@@ -257,7 +291,7 @@ Theme classes: `.cc-rte__paragraph`, `.cc-rte__h1-h3`, `.cc-rte__bold/italic`, `
 
 Read-only mode: `editable={false}` hides toolbar and removes borders for inline display.
 
-**Storage**: Memo content stored as markdown on server. Lexical converts markdown on load and converts back on save.
+**Target storage**: Persist Markdown in the owning task/document workflow. Lexical already converts Markdown on load and back on change; the product integration remains planned.
 
 ---
 
@@ -278,6 +312,8 @@ Integrated into `SystemPromptPage.tsx`, replacing the plain textarea. Character 
 ---
 
 ## 9. Virtual Scrolling
+
+**Status**: Planned; no virtualization library is currently installed.
 
 **Install**:
 ```bash
@@ -301,6 +337,8 @@ import { Virtuoso } from 'react-virtuoso';
 ---
 
 ## 10. Framer Motion Animations
+
+**Status**: Implemented for route/panel transitions, dialogs, toasts, and bulk controls.
 
 **Install**:
 ```bash

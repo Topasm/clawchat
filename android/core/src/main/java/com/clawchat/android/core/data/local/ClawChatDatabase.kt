@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [TodoEntity::class, EventEntity::class],
     version = 1,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class ClawChatDatabase : RoomDatabase() {
     abstract fun todoDao(): TodoDao

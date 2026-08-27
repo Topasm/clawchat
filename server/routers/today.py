@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from database import get_db
+from domain.task import TaskStatus
 from models.event import Event
 from models.todo import Todo
 from schemas.calendar import EventResponse
@@ -32,7 +33,7 @@ def _todo_to_response(todo: Todo) -> TodoResponse:
     if todo.tags:
         resp.tags = deserialize_tags(todo.tags)
     resp.next_action = get_next_action(
-        todo.inbox_state or "none", todo.status or "pending"
+        todo.inbox_state or "none", todo.status or TaskStatus.PENDING
     )
     if todo.source == "obsidian_project":
         resp.sync_status = "synced"
@@ -86,7 +87,7 @@ async def get_today(
         .where(
             Todo.due_date >= today_start,
             Todo.due_date <= today_end,
-            Todo.status.notin_(["completed", "cancelled"]),
+            Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.created_at.asc())
     )
@@ -94,7 +95,7 @@ async def get_today(
 
     # Also include in-progress tasks not due today
     in_progress_q = select(Todo).where(
-        Todo.status == "in_progress",
+        Todo.status == TaskStatus.IN_PROGRESS,
         or_(
             Todo.due_date == None,  # noqa: E711
             Todo.due_date < today_start,
@@ -109,7 +110,7 @@ async def get_today(
         select(Todo)
         .where(
             Todo.due_date < today_start,
-            Todo.status.in_(["pending", "in_progress"]),
+            Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
         )
         .order_by(Todo.due_date.asc())
     )
@@ -126,7 +127,7 @@ async def get_today(
     # Inbox count: no due_date, pending
     inbox_q = select(func.count(Todo.id)).where(
         Todo.due_date == None,  # noqa: E711
-        Todo.status == "pending",
+        Todo.status == TaskStatus.PENDING,
     )
     inbox_count = (await db.execute(inbox_q)).scalar() or 0
 

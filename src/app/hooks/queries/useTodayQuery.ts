@@ -9,6 +9,7 @@ import type { TodoResponse, EventResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { syncWidgetData } from '../../services/widgetSync';
 import { scheduleEventReminders } from '../../services/eventReminders';
+import { isTerminalTaskStatus } from '../../utils/taskStatus';
 
 interface TodayData {
   todayTasks: TodoResponse[];
@@ -37,12 +38,12 @@ function deriveTodayFromCache(
   const todayTasks = todos.filter((t) => {
     if (!t.due_date) return false;
     const d = new Date(t.due_date);
-    return d >= todayStart && d < todayEnd && t.status !== 'completed';
+    return d >= todayStart && d < todayEnd && !isTerminalTaskStatus(t.status);
   });
 
   const overdueTasks = todos.filter((t) => {
     if (!t.due_date) return false;
-    return new Date(t.due_date) < todayStart && t.status !== 'completed';
+    return new Date(t.due_date) < todayStart && !isTerminalTaskStatus(t.status);
   });
 
   const todayEvents = events.filter((e) => {
@@ -95,8 +96,12 @@ export default function useTodayData(): TodayData {
           apiClient.get('/todos'),
           apiClient.get('/events'),
         ]);
-        const todos = z.array(TodoResponseSchema).parse(todosRes.data?.items ?? todosRes.data ?? []);
-        const events = z.array(EventResponseSchema).parse(eventsRes.data?.items ?? eventsRes.data ?? []);
+        const todos = z
+          .array(TodoResponseSchema)
+          .parse(todosRes.data?.items ?? todosRes.data ?? []);
+        const events = z
+          .array(EventResponseSchema)
+          .parse(eventsRes.data?.items ?? eventsRes.data ?? []);
 
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -107,11 +112,11 @@ export default function useTodayData(): TodayData {
           todayTasks: todos.filter((t) => {
             if (!t.due_date) return false;
             const d = new Date(t.due_date);
-            return d >= todayStart && d < todayEnd && t.status !== 'completed';
+            return d >= todayStart && d < todayEnd && !isTerminalTaskStatus(t.status);
           }),
           overdueTasks: todos.filter((t) => {
             if (!t.due_date) return false;
-            return new Date(t.due_date) < todayStart && t.status !== 'completed';
+            return new Date(t.due_date) < todayStart && !isTerminalTaskStatus(t.status);
           }),
           todayEvents: events.filter((e) => {
             const d = new Date(e.start_time);
@@ -154,7 +159,9 @@ export default function useTodayData(): TodayData {
     return {
       ...data,
       isLoading: query.isLoading,
-      refresh: () => { query.refetch(); },
+      refresh: () => {
+        query.refetch();
+      },
     };
   }
 
@@ -165,6 +172,8 @@ export default function useTodayData(): TodayData {
   return {
     ...fallback,
     isLoading: query.isLoading,
-    refresh: () => { query.refetch(); },
+    refresh: () => {
+      query.refetch();
+    },
   };
 }

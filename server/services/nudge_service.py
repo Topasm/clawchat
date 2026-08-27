@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.task import TaskStatus
 from exceptions import AIUnavailableError
 from models.todo import Todo
 from services.ai_service import AIService
@@ -29,7 +30,7 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
     stale_q = (
         select(Todo)
         .where(
-            Todo.status == "pending",
+            Todo.status == TaskStatus.PENDING,
             Todo.updated_at < stale_cutoff,
             Todo.inbox_state.in_(["none", "captured"]),
         )
@@ -53,7 +54,7 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
     soon_q = (
         select(Todo)
         .where(
-            Todo.status == "pending",
+            Todo.status == TaskStatus.PENDING,
             Todo.due_date != None,  # noqa: E711
             Todo.due_date <= soon_cutoff,
             Todo.due_date > now,

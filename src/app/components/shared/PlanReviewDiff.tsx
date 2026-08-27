@@ -1,80 +1,167 @@
 import { useState } from 'react';
+import type { PlanProposalResponse } from '../../types/api';
+import { getPlanProposalMutationError, isStalePlanProposalError } from '../../hooks/queries';
+import { toggleProposalSelection } from '../task-graph/taskGraphProposal';
 import Badge from './Badge';
 
-export interface PlanSubtask {
-  title: string;
-  estimated_minutes?: number;
-  due_date?: string;
-  priority?: string;
-}
-
-export interface TaskPlan {
-  summary?: string;
-  subtasks?: PlanSubtask[];
-  project_name?: string;
-}
-
 interface PlanReviewDiffProps {
-  plan: TaskPlan;
-  onApply: (selectedIndices?: number[]) => void;
-  onDismiss: () => void;
+  plan: PlanProposalResponse;
+  onApply: (selectedIndices: number[]) => void | Promise<void>;
+  onDismiss: () => void | Promise<void>;
+  onRegenerate: () => void | Promise<void>;
+  applyError?: unknown;
+  isApplying?: boolean;
+  isDismissing?: boolean;
+  isRegenerating?: boolean;
   compact?: boolean;
 }
 
-export default function PlanReviewDiff({ plan, onApply, onDismiss, compact }: PlanReviewDiffProps) {
-  const subtasks = plan.subtasks ?? [];
-  const [selected, setSelected] = useState<Set<number>>(() => new Set(subtasks.map((_, i) => i)));
+export default function PlanReviewDiff({
+  plan,
+  onApply,
+  onDismiss,
+  onRegenerate,
+  applyError,
+  isApplying,
+  isDismissing,
+  isRegenerating,
+  compact,
+}: PlanReviewDiffProps) {
+  const subtasks = plan.subtasks;
+  const [selection, setSelection] = useState<{
+    proposalId: string;
+    indices: Set<number>;
+  }>(() => ({
+    proposalId: plan.proposal_id,
+    indices: new Set(subtasks.map((_, index) => index)),
+  }));
+  const selected =
+    selection.proposalId === plan.proposal_id
+      ? selection.indices
+      : new Set(subtasks.map((_, index) => index));
 
-  const toggleIndex = (idx: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
+  const toggleIndex = (index: number) => {
+    setSelection((current) => ({
+      proposalId: plan.proposal_id,
+      indices: toggleProposalSelection(
+        subtasks,
+        current.proposalId === plan.proposal_id
+          ? current.indices
+          : new Set(subtasks.map((_, candidateIndex) => candidateIndex)),
+        index,
+      ),
+    }));
   };
 
+  const stale = Boolean(
+    plan.status === 'stale' || (applyError && isStalePlanProposalError(applyError)),
+  );
+  const normalizedApplyError = applyError ? getPlanProposalMutationError(applyError) : undefined;
+  const legacyProposal = plan.base_graph_revision === null;
+  const invalidProposal = plan.validation.errors.length > 0;
+  const canApply =
+    plan.status === 'draft' && !legacyProposal && !invalidProposal && !stale && selected.size > 0;
+
   const handleApply = () => {
-    if (selected.size === subtasks.length) {
-      onApply();
-    } else {
-      onApply(Array.from(selected));
-    }
+    const indices = [...selected].sort((left, right) => left - right);
+    void Promise.resolve(onApply(indices)).catch(() => undefined);
   };
 
   return (
     <div className={`cc-plan-review${compact ? ' cc-plan-review--compact' : ''}`}>
       {plan.summary && <p className="cc-plan-review__summary">{plan.summary}</p>}
 
-      <div className="cc-plan-review__stats">
-        {subtasks.length > 0 && (
+      <div className="cc-plan-review__stats" aria-label="Authoritative proposal diff">
+        <span className="cc-plan-review__stat">
+          {plan.diff.add_task_count} task{plan.diff.add_task_count === 1 ? '' : 's'} to add
+        </span>
+        <span className="cc-plan-review__stat">
+          {plan.diff.add_relationship_count} dependenc
+          {plan.diff.add_relationship_count === 1 ? 'y' : 'ies'} to add
+        </span>
+        {plan.diff.root_update_fields.length > 0 && (
           <span className="cc-plan-review__stat">
-            Will create {subtasks.length} sub-task{subtasks.length !== 1 ? 's' : ''}
+            Root updates: {plan.diff.root_update_fields.join(', ')}
           </span>
-        )}
-        {subtasks.some((s) => s.due_date) && (
-          <span className="cc-plan-review__stat">Will assign dates</span>
-        )}
-        {plan.project_name && (
-          <span className="cc-plan-review__stat">Will file under {plan.project_name}</span>
         )}
       </div>
 
+      {(plan.validation.errors.length > 0 || plan.validation.warnings.length > 0) && (
+        <div className="cc-plan-review__validation" aria-label="Proposal validation">
+          {plan.validation.errors.map((issue, index) => (
+            <div key={`error-${issue.code}-${index}`} role="alert">
+              <strong>Cannot apply:</strong> {issue.message}
+            </div>
+          ))}
+          {plan.validation.warnings.map((issue, index) => (
+            <div key={`warning-${issue.code}-${index}`}>
+              <strong>Review:</strong> {issue.message}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {legacyProposal && (
+        <div className="cc-plan-review__conflict" role="alert">
+          <span>This older proposal cannot be applied safely. Generate a revision-aware plan.</span>
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
+            disabled={isRegenerating}
+          >
+            {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+          </button>
+        </div>
+      )}
+
+      {!legacyProposal && stale && (
+        <div className="cc-plan-review__conflict" role="alert">
+          <span>
+            <strong>The task graph changed after this proposal was created.</strong>
+            {!normalizedApplyError?.staleDetails && (
+              <> Regenerate it from the current graph before applying.</>
+            )}
+            {normalizedApplyError?.staleDetails && (
+              <>
+                {' '}
+                Revision {normalizedApplyError.staleDetails.base_revision ?? 'unknown'} →{' '}
+                {normalizedApplyError.staleDetails.current_revision}.
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
+            disabled={isRegenerating}
+          >
+            {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+          </button>
+        </div>
+      )}
+
       {subtasks.length > 0 && (
         <div className="cc-plan-review__subtasks">
-          {subtasks.map((s, i) => (
-            <label key={i} className="cc-plan-review__subtask">
+          {subtasks.map((subtask, index) => (
+            <label key={index} className="cc-plan-review__subtask">
               <input
                 type="checkbox"
-                checked={selected.has(i)}
-                onChange={() => toggleIndex(i)}
+                checked={selected.has(index)}
+                onChange={() => toggleIndex(index)}
                 className="cc-plan-review__checkbox"
               />
               <div className="cc-plan-review__subtask-body">
-                <span className="cc-plan-review__subtask-title">{s.title}</span>
+                <span className="cc-plan-review__subtask-title">{subtask.title}</span>
                 <span className="cc-plan-review__subtask-meta">
-                  {s.estimated_minutes && <span>{s.estimated_minutes}m</span>}
-                  {s.due_date && <Badge variant="due" dueDate={s.due_date} />}
+                  {subtask.estimated_minutes && <span>{subtask.estimated_minutes}m</span>}
+                  {subtask.due_date && <Badge variant="due" dueDate={subtask.due_date} />}
+                  {(subtask.depends_on_indices?.length ?? 0) > 0 && (
+                    <span>
+                      {subtask.depends_on_indices!.length} prerequisite
+                      {subtask.depends_on_indices!.length === 1 ? '' : 's'}
+                    </span>
+                  )}
                 </span>
               </div>
             </label>
@@ -88,20 +175,18 @@ export default function PlanReviewDiff({ plan, onApply, onDismiss, compact }: Pl
           className="cc-btn cc-btn--primary"
           style={{ fontSize: 12 }}
           onClick={handleApply}
-          disabled={selected.size === 0 && subtasks.length > 0}
+          disabled={!canApply || isApplying || isDismissing || isRegenerating}
         >
-          Apply
-          {selected.size < subtasks.length && subtasks.length > 0
-            ? ` (${selected.size}/${subtasks.length})`
-            : ''}
+          {isApplying ? 'Applying…' : `Apply (${selected.size}/${subtasks.length})`}
         </button>
         <button
           type="button"
           className="cc-btn cc-btn--ghost"
           style={{ fontSize: 12 }}
-          onClick={onDismiss}
+          onClick={() => void Promise.resolve(onDismiss()).catch(() => undefined)}
+          disabled={isApplying || isDismissing || isRegenerating}
         >
-          Dismiss
+          {isDismissing ? 'Dismissing…' : 'Dismiss'}
         </button>
       </div>
     </div>

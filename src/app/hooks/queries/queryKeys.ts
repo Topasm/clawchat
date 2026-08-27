@@ -1,5 +1,9 @@
 export const queryKeys = {
   todos: ['todos'] as const,
+  taskRelationships: ['task-relationships'] as const,
+  planProposals: ['plan-proposals'] as const,
+  latestPlanProposal: (todoId: string) => ['plan-proposals', 'latest', todoId] as const,
+  planProposal: (proposalId: string) => ['plan-proposals', 'detail', proposalId] as const,
   events: ['events'] as const,
   conversations: ['conversations'] as const,
   projects: ['projects'] as const,

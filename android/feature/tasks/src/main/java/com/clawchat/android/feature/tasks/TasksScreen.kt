@@ -53,9 +53,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
+import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawMetricPill
@@ -79,6 +81,11 @@ fun TasksScreen(
             task = state.selectedTask!!,
             onBack = { viewModel.selectTask(null) },
             onToggle = { viewModel.toggleComplete(state.selectedTask!!.id) },
+            onSetStatus = { status ->
+                state.selectedTask?.let { task ->
+                    viewModel.updateTask(task.id, TodoUpdate(status = status))
+                }
+            },
             onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
         )
     } else {
@@ -102,12 +109,12 @@ fun TasksScreen(
 private fun TaskListView(
     tasks: List<Todo>,
     isLoading: Boolean,
-    statusFilter: String?,
+    statusFilter: TaskStatus?,
     onSelect: (Todo) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
-    onSetFilter: (String?) -> Unit,
+    onSetFilter: (TaskStatus?) -> Unit,
     onRefresh: () -> Unit,
     onCreate: (TodoCreate) -> Unit,
 ) {
@@ -117,7 +124,10 @@ private fun TaskListView(
         val inboxState = task.inboxState
         inboxState == null || inboxState == "none"
     }
-    val completedCount = filteredTasks.count { it.status == "completed" }
+    val completedCount = filteredTasks.count { it.status == TaskStatus.COMPLETED }
+    val activeCount = filteredTasks.count {
+        it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -150,6 +160,7 @@ private fun TaskListView(
         ) {
             TaskSummaryCard(
                 totalCount = filteredTasks.size,
+                activeCount = activeCount,
                 completedCount = completedCount,
                 statusFilter = statusFilter,
                 onSetFilter = onSetFilter,
@@ -217,9 +228,10 @@ private fun TaskListView(
 @Composable
 private fun TaskSummaryCard(
     totalCount: Int,
+    activeCount: Int,
     completedCount: Int,
-    statusFilter: String?,
-    onSetFilter: (String?) -> Unit,
+    statusFilter: TaskStatus?,
+    onSetFilter: (TaskStatus?) -> Unit,
 ) {
     ClawSectionCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         ClawStatusChip(
@@ -242,7 +254,7 @@ private fun TaskSummaryCard(
         ) {
             ClawMetricPill(
                 label = "Active",
-                value = (totalCount - completedCount).coerceAtLeast(0).toString(),
+                value = activeCount.toString(),
                 modifier = Modifier.weight(1f),
             )
             ClawMetricPill(
@@ -254,8 +266,7 @@ private fun TaskSummaryCard(
                 label = "View",
                 value = when (statusFilter) {
                     null -> "All"
-                    "pending" -> "Open"
-                    else -> "Done"
+                    else -> taskStatusLabel(statusFilter)
                 },
                 modifier = Modifier.weight(1f),
             )
@@ -269,16 +280,13 @@ private fun TaskSummaryCard(
                 selected = statusFilter == null,
                 onClick = { onSetFilter(null) },
             )
-            TaskFilterChip(
-                label = "Pending",
-                selected = statusFilter == "pending",
-                onClick = { onSetFilter("pending") },
-            )
-            TaskFilterChip(
-                label = "Done",
-                selected = statusFilter == "completed",
-                onClick = { onSetFilter("completed") },
-            )
+            TaskStatus.entries.forEach { status ->
+                TaskFilterChip(
+                    label = taskStatusLabel(status),
+                    selected = statusFilter == status,
+                    onClick = { onSetFilter(status) },
+                )
+            }
         }
     }
 }
@@ -320,7 +328,7 @@ private fun TaskRow(
     onToggle: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val isCompleted = task.status == "completed"
+    val isCompleted = task.status == TaskStatus.COMPLETED
     val view = LocalView.current
     val completionAlpha by animateFloatAsState(
         targetValue = if (isCompleted) 0.65f else 1f,
@@ -386,6 +394,10 @@ private fun TaskRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                ClawStatusChip(
+                    text = taskStatusLabel(task.status),
+                    tone = taskStatusTone(task.status),
+                )
                 PriorityChip(task.priority)
                 task.dueDate?.let {
                     ClawStatusChip(
@@ -413,12 +425,27 @@ private fun inboxStateLabel(inboxState: String?): String? = when (inboxState) {
     else -> inboxState.replaceFirstChar { it.uppercase() }
 }
 
+private fun taskStatusLabel(status: TaskStatus): String = when (status) {
+    TaskStatus.PENDING -> "Pending"
+    TaskStatus.IN_PROGRESS -> "In progress"
+    TaskStatus.COMPLETED -> "Completed"
+    TaskStatus.CANCELLED -> "Cancelled"
+}
+
+private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
+    TaskStatus.PENDING -> ClawTone.Default
+    TaskStatus.IN_PROGRESS -> ClawTone.Primary
+    TaskStatus.COMPLETED -> ClawTone.Success
+    TaskStatus.CANCELLED -> ClawTone.Default
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TaskDetailView(
     task: Todo,
     onBack: () -> Unit,
     onToggle: () -> Unit,
+    onSetStatus: (TaskStatus) -> Unit,
     onDelete: () -> Unit,
 ) {
     Scaffold(
@@ -468,13 +495,25 @@ private fun TaskDetailView(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
-                            checked = task.status == "completed",
+                            checked = task.status == TaskStatus.COMPLETED,
                             onCheckedChange = { onToggle() },
                         )
                         Text(
-                            text = if (task.status == "completed") "Completed" else "Pending",
+                            text = taskStatusLabel(task.status),
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TaskStatus.entries.forEach { status ->
+                            TaskFilterChip(
+                                label = taskStatusLabel(status),
+                                selected = task.status == status,
+                                onClick = { onSetStatus(status) },
+                            )
+                        }
                     }
                 }
             }

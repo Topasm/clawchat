@@ -2,12 +2,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useBulkUpdateTodos } from '../../hooks/queries';
 import type { TodoResponse } from '../../types/api';
+import { TaskStatusSchema } from '../../types/schemas';
 
 export default function BulkActionToolbar() {
   const selectedIds = useModuleStore((s) => s.selectedTodoIds);
   const clearSelection = useModuleStore((s) => s.clearTodoSelection);
   const bulkUpdateMutation = useBulkUpdateTodos();
-  const bulkUpdate = (data: Parameters<typeof bulkUpdateMutation.mutate>[0]) => bulkUpdateMutation.mutate(data);
+  const bulkUpdate = (data: Parameters<typeof bulkUpdateMutation.mutate>[0]) =>
+    bulkUpdateMutation.mutate(data);
 
   const count = selectedIds.size;
   const ids = Array.from(selectedIds);
@@ -28,19 +30,26 @@ export default function BulkActionToolbar() {
             className="cc-bulk-toolbar__select"
             value=""
             onChange={(e) => {
-              if (e.target.value) bulkUpdate({ ids, status: e.target.value as TodoResponse['status'] });
+              const status = TaskStatusSchema.safeParse(e.target.value);
+              if (status.success) bulkUpdate({ ids, status: status.data });
             }}
           >
             <option value="">Set Status</option>
             <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
             <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
 
           <select
             className="cc-bulk-toolbar__select"
             value=""
             onChange={(e) => {
-              if (e.target.value) bulkUpdate({ ids, priority: e.target.value as NonNullable<TodoResponse['priority']> });
+              if (e.target.value)
+                bulkUpdate({
+                  ids,
+                  priority: e.target.value as NonNullable<TodoResponse['priority']>,
+                });
             }}
           >
             <option value="">Set Priority</option>

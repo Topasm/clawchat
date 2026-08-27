@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd';
-import type { KanbanStatus, TodoResponse } from '../../types/api';
+import type { TaskStatus, TodoResponse } from '../../types/api';
 import KanbanColumn from './KanbanColumn';
 import KanbanColumnTabs from './KanbanColumnTabs';
 import KanbanFilterBar from './KanbanFilterBar';
@@ -8,7 +8,7 @@ import BulkActionToolbar from './BulkActionToolbar';
 import TasksHeader, { type TasksViewMode } from './TasksHeader';
 
 interface ColumnDef {
-  status: KanbanStatus;
+  status: TaskStatus;
   title: string;
   icon: ReactNode;
   tasks: TodoResponse[];
@@ -30,7 +30,7 @@ interface KanbanBoardViewProps {
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
   isMultiSelectMode: boolean;
-  onMove: (id: string, status: KanbanStatus) => void;
+  onMove: (id: string, status: TaskStatus) => void;
   onDelete?: (id: string) => void;
 }
 

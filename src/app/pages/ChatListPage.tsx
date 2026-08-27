@@ -23,6 +23,7 @@ import ConfirmDialog from '../components/shared/ConfirmDialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
 import type { ProjectTodoResponse } from '../types/api';
+import { isTerminalTaskStatus } from '../utils/taskStatus';
 
 function getSyncBadge(project: ProjectTodoResponse): {
   label: string;
@@ -81,7 +82,7 @@ export default function ChatListPage() {
       if (!accumulator) continue;
 
       accumulator.childCount += 1;
-      if (todo.status !== 'completed') {
+      if (!isTerminalTaskStatus(todo.status)) {
         accumulator.openCount += 1;
         if (todo.due_date) {
           const dueTime = new Date(todo.due_date).getTime();

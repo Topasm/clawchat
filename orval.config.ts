@@ -7,9 +7,8 @@
  * Usage:
  *   npm run generate:api
  *
- * Prerequisites:
- *   - The backend server must be running at http://localhost:8000
- *     (start with: make dev-backend)
+ * The FastAPI OpenAPI snapshot is generated first by `npm run generate:api`, so
+ * code generation is deterministic and does not require a running server.
  *
  * The generated code lives in src/app/generated/ and uses the existing
  * apiClient axios instance (via customFetcher) to preserve JWT auth,
@@ -23,21 +22,19 @@ import { defineConfig } from 'orval';
 export default defineConfig({
   clawchat: {
     input: {
-      target: 'http://localhost:8000/openapi.json',
+      target: 'server/openapi.json',
     },
     output: {
       mode: 'tags-split',
       target: 'src/app/generated/',
       schemas: 'src/app/generated/schemas',
       client: 'react-query',
+      httpClient: 'axios',
+      formatter: 'prettier',
       override: {
         mutator: {
           path: './src/app/services/customFetcher.ts',
           name: 'customFetcher',
-        },
-        query: {
-          useQuery: true,
-          useMutation: true,
         },
       },
     },

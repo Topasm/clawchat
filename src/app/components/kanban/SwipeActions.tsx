@@ -1,26 +1,33 @@
 import { useRef, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { KanbanStatus } from '../../types/api';
+import type { TaskStatus } from '../../types/api';
 import { hapticLight } from '../../utils/haptics';
 
 interface SwipeActionsProps {
   children: ReactNode;
   taskId: string;
-  currentStatus: KanbanStatus;
-  onMove: (id: string, status: KanbanStatus) => void;
+  currentStatus: TaskStatus;
+  onMove: (id: string, status: TaskStatus) => void;
   onComplete: (id: string) => void;
 }
 
 const THRESHOLD = 40; // px to reveal action panel
 const DIRECTION_RATIO = 1.5; // horizontal must exceed vertical by this factor
 
-const statusLabels: Record<KanbanStatus, string> = {
+const statusLabels: Record<TaskStatus, string> = {
   pending: 'Todo',
   in_progress: 'In Progress',
   completed: 'Done',
+  cancelled: 'Cancelled',
 };
-const allStatuses: KanbanStatus[] = ['pending', 'in_progress', 'completed'];
+const allStatuses: TaskStatus[] = ['pending', 'in_progress', 'completed', 'cancelled'];
 
-export default function SwipeActions({ children, taskId, currentStatus, onMove, onComplete }: SwipeActionsProps) {
+export default function SwipeActions({
+  children,
+  taskId,
+  currentStatus,
+  onMove,
+  onComplete,
+}: SwipeActionsProps) {
   const startX = useRef(0);
   const startY = useRef(0);
   const [offsetX, setOffsetX] = useState(0);
@@ -90,7 +97,7 @@ export default function SwipeActions({ children, taskId, currentStatus, onMove, 
     }
   };
 
-  const handleMove = (status: KanbanStatus) => {
+  const handleMove = (status: TaskStatus) => {
     onMove(taskId, status);
     reset();
   };
@@ -99,12 +106,19 @@ export default function SwipeActions({ children, taskId, currentStatus, onMove, 
   const isActive = offsetX !== 0 || showMoveMenu;
 
   return (
-    <div className={`cc-swipe-actions${isActive ? ' cc-swipe-actions--active' : ''}`} ref={containerRef}>
+    <div
+      className={`cc-swipe-actions${isActive ? ' cc-swipe-actions--active' : ''}`}
+      ref={containerRef}
+    >
       {/* Right-side panel (revealed by swiping left) */}
       <div className="cc-swipe-actions__panel cc-swipe-actions__panel--right">
         {showMoveMenu ? (
           moveTargets.map((s) => (
-            <button key={s} className="cc-swipe-actions__btn cc-swipe-actions__btn--move" onClick={() => handleMove(s)}>
+            <button
+              key={s}
+              className="cc-swipe-actions__btn cc-swipe-actions__btn--move"
+              onClick={() => handleMove(s)}
+            >
               {statusLabels[s]}
             </button>
           ))

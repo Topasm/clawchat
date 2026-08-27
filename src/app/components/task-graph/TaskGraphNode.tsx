@@ -10,6 +10,7 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
     status,
     childCount,
     completedChildCount,
+    dependencyCount,
     hasVisibleChildren,
     isCollapsed,
     proposalSelection,
@@ -28,7 +29,13 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
       <span className={`cc-task-flow-node__priority cc-task-flow-node__priority--${priority}`} />
       <div className="cc-task-flow-node__topline">
         <span className={`cc-task-flow-node__status cc-task-flow-node__status--${status}`}>
-          {status === 'in_progress' ? 'In progress' : status === 'completed' ? 'Done' : 'Todo'}
+          {status === 'in_progress'
+            ? 'In progress'
+            : status === 'completed'
+              ? 'Done'
+              : status === 'cancelled'
+                ? 'Cancelled'
+                : 'Todo'}
         </span>
         {childCount > 0 && <span className="cc-task-flow-node__kind">Project</span>}
         {proposalSelection && (
@@ -62,10 +69,8 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
             {dueLabel}
           </span>
         )}
-        {(todo.depends_on?.length ?? 0) > 0 && <span>{todo.depends_on!.length} dependencies</span>}
-        {childCount === 0 && !dueLabel && !todo.depends_on?.length && (
-          <span>{priority} priority</span>
-        )}
+        {dependencyCount > 0 && <span>{dependencyCount} dependencies</span>}
+        {childCount === 0 && !dueLabel && dependencyCount === 0 && <span>{priority} priority</span>}
       </div>
 
       {hasVisibleChildren && !proposalSelection && (

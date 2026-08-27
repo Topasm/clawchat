@@ -2,6 +2,7 @@ package com.clawchat.android.feature.tasks
 
 import app.cash.turbine.test
 import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
@@ -36,12 +37,12 @@ class TasksViewModelTest {
     private val sampleTodo = Todo(
         id = "1",
         title = "Test task",
-        status = "pending",
+        status = TaskStatus.PENDING,
     )
 
     private val sampleTodos = listOf(
         sampleTodo,
-        Todo(id = "2", title = "Second task", status = "completed"),
+        Todo(id = "2", title = "Second task", status = TaskStatus.COMPLETED),
     )
 
     @Before
@@ -106,22 +107,22 @@ class TasksViewModelTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
         coEvery { todoRepository.updateTodo("1", any()) } returns
-            ApiResult.Success(sampleTodo.copy(status = "completed"))
+            ApiResult.Success(sampleTodo.copy(status = TaskStatus.COMPLETED))
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.uiState.test {
             val current = awaitItem()
-            assertEquals("pending", current.tasks.first { it.id == "1" }.status)
+            assertEquals(TaskStatus.PENDING, current.tasks.first { it.id == "1" }.status)
 
             viewModel.onAction(TasksAction.ToggleComplete("1"))
             // Optimistic update
             val optimistic = awaitItem()
-            assertEquals("completed", optimistic.tasks.first { it.id == "1" }.status)
+            assertEquals(TaskStatus.COMPLETED, optimistic.tasks.first { it.id == "1" }.status)
         }
 
-        coVerify { todoRepository.updateTodo("1", TodoUpdate(status = "completed")) }
+        coVerify { todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED)) }
     }
 
     @Test
@@ -136,15 +137,15 @@ class TasksViewModelTest {
 
         viewModel.uiState.test {
             val loaded = awaitItem()
-            assertEquals("pending", loaded.tasks.first().status)
+            assertEquals(TaskStatus.PENDING, loaded.tasks.first().status)
 
             viewModel.onAction(TasksAction.ToggleComplete("1"))
             // Optimistic update
             val optimistic = awaitItem()
-            assertEquals("completed", optimistic.tasks.first().status)
+            assertEquals(TaskStatus.COMPLETED, optimistic.tasks.first().status)
             // Rollback
             val rolledBack = awaitItem()
-            assertEquals("pending", rolledBack.tasks.first().status)
+            assertEquals(TaskStatus.PENDING, rolledBack.tasks.first().status)
         }
     }
 
@@ -159,10 +160,10 @@ class TasksViewModelTest {
         coEvery { todoRepository.listTodos(match { it["status"] == "completed" }) } returns
             ApiResult.Success(PaginatedResponse(items = listOf(sampleTodos[1]), total = 1))
 
-        viewModel.onAction(TasksAction.SetFilter("completed"))
+        viewModel.onAction(TasksAction.SetFilter(TaskStatus.COMPLETED))
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals("completed", viewModel.uiState.value.statusFilter)
+        assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.statusFilter)
         assertEquals(1, viewModel.uiState.value.tasks.size)
     }
 
@@ -170,7 +171,7 @@ class TasksViewModelTest {
     fun `createTask adds task to beginning of list`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
-        val newTodo = Todo(id = "new", title = "New task", status = "pending")
+        val newTodo = Todo(id = "new", title = "New task", status = TaskStatus.PENDING)
         coEvery { todoRepository.createTodo(any()) } returns ApiResult.Success(newTodo)
         val input = TodoCreate(
             title = "New task",

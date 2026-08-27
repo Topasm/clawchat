@@ -106,12 +106,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (IS_CAPACITOR) {
-      import('@capacitor/core').then(({ Capacitor }) => {
-        const Biometric = Capacitor.Plugins['Biometric'] as
-          | {
+      import('@capacitor/core').then(({ Capacitor, registerPlugin }) => {
+        const Biometric = Capacitor.isPluginAvailable('Biometric')
+          ? registerPlugin<{
               isAvailable(): Promise<{ available: boolean }>;
-            }
-          | undefined;
+            }>('Biometric')
+          : undefined;
         if (Biometric) {
           Biometric.isAvailable().then((res) => setBiometricAvailable(res.available));
         }
@@ -124,15 +124,15 @@ export default function SettingsPage() {
       if (enabled) {
         // Verify identity before enabling
         try {
-          const { Capacitor } = await import('@capacitor/core');
-          const Biometric = Capacitor.Plugins['Biometric'] as
-            | {
+          const { Capacitor, registerPlugin } = await import('@capacitor/core');
+          const Biometric = Capacitor.isPluginAvailable('Biometric')
+            ? registerPlugin<{
                 authenticate(opts: {
                   title: string;
                   subtitle: string;
                 }): Promise<{ success: boolean }>;
-              }
-            | undefined;
+              }>('Biometric')
+            : undefined;
           if (!Biometric) return;
           const result = await Biometric.authenticate({
             title: 'Enable Biometric Lock',

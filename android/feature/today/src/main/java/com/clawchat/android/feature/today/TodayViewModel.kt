@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.BriefingResponse
 import com.clawchat.android.core.data.model.Event
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
@@ -115,7 +116,11 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             val allTodos = _uiState.value.todayTodos + _uiState.value.overdueTodos
             val todo = allTodos.find { it.id == todoId } ?: return@launch
-            val newStatus = if (todo.status == "completed") "pending" else "completed"
+            val newStatus = if (todo.status == TaskStatus.COMPLETED) {
+                TaskStatus.PENDING
+            } else {
+                TaskStatus.COMPLETED
+            }
 
             try {
                 _uiState.optimistic(

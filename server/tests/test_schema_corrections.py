@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from database import (
@@ -13,6 +13,10 @@ from database import (
     _run_data_migrations,
     _setup_fts,
 )
+from domain.task_relationship import TASK_RELATIONSHIP_MIGRATION_MARKER
+from exceptions import ValidationError
+from models.data_migration_marker import DataMigrationMarker
+from models.task_relationship import TaskRelationship
 
 
 # Use a dedicated in-memory engine for schema correction tests so we can
@@ -81,7 +85,7 @@ async def test_corrections_add_missing_columns(fresh_db: AsyncSession):
     for col in (
         "parent_id", "sort_order", "source", "source_id",
         "assignee", "inbox_state", "estimated_minutes",
-        "automation_error", "enabled_skills",
+        "automation_error", "enabled_skills", "depends_on",
     ):
         assert col in todo_cols, f"Missing column todos.{col}"
 
@@ -149,6 +153,106 @@ async def test_skill_migration_idempotent(fresh_db: AsyncSession):
     assert row.scalar() == '[\"custom\"]', "Should not overwrite existing enabled_skills"
 
 
+@pytest.mark.asyncio
+async def test_legacy_dependency_backfill_is_idempotent(fresh_db: AsyncSession):
+    prerequisite_id, prerequisite_stmt, prerequisite_params = _todo_insert()
+    await fresh_db.execute(prerequisite_stmt, prerequisite_params)
+    dependent_id, dependent_stmt, dependent_params = _todo_insert(
+        extra_cols=", depends_on",
+        extra_vals=", :depends_on",
+        extra_params={"depends_on": f'[\"{prerequisite_id}\"]'},
+    )
+    await fresh_db.execute(dependent_stmt, dependent_params)
+    await fresh_db.commit()
+
+    await _run_data_migrations(fresh_db)
+    await _run_data_migrations(fresh_db)
+
+    relationships = list(
+        (
+            await fresh_db.execute(
+                select(TaskRelationship).where(
+                    TaskRelationship.source_task_id == dependent_id
+                )
+            )
+        ).scalars().all()
+    )
+    assert len(relationships) == 1
+    assert relationships[0].target_task_id == prerequisite_id
+    assert relationships[0].type == "depends_on"
+    assert relationships[0].created_by == "legacy"
+    count = (
+        await fresh_db.execute(select(func.count(TaskRelationship.id)))
+    ).scalar_one()
+    assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_legacy_dependency_backfill_rejects_dangling_edges(
+    fresh_db: AsyncSession,
+):
+    _todo_id, statement, params = _todo_insert(
+        extra_cols=", depends_on",
+        extra_vals=", '[\"todo_missing\"]'",
+    )
+    await fresh_db.execute(statement, params)
+    await fresh_db.commit()
+
+    with pytest.raises(ValidationError, match="missing dependency"):
+        await _run_data_migrations(fresh_db)
+    await fresh_db.rollback()
+    assert (
+        await fresh_db.get(
+            DataMigrationMarker,
+            TASK_RELATIONSHIP_MIGRATION_MARKER,
+        )
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_repeated_startup_does_not_resurrect_deleted_dependency(
+    fresh_db: AsyncSession,
+):
+    prerequisite_id, prerequisite_stmt, prerequisite_params = _todo_insert()
+    await fresh_db.execute(prerequisite_stmt, prerequisite_params)
+    dependent_id, dependent_stmt, dependent_params = _todo_insert(
+        extra_cols=", depends_on",
+        extra_vals=", :depends_on",
+        extra_params={"depends_on": f'[\"{prerequisite_id}\"]'},
+    )
+    await fresh_db.execute(dependent_stmt, dependent_params)
+    await fresh_db.commit()
+
+    await _run_data_migrations(fresh_db)
+    await fresh_db.execute(
+        delete(TaskRelationship).where(
+            TaskRelationship.source_task_id == dependent_id
+        )
+    )
+    await fresh_db.commit()
+
+    # The retained JSON is now stale. On subsequent startups the existing
+    # normalized table is authoritative and must clear it, not re-import it.
+    stale_shadow = await fresh_db.execute(
+        text("SELECT depends_on FROM todos WHERE id = :id"),
+        {"id": dependent_id},
+    )
+    assert stale_shadow.scalar_one() == f'[\"{prerequisite_id}\"]'
+
+    await _run_data_migrations(fresh_db)
+
+    relationship_count = (
+        await fresh_db.execute(select(func.count(TaskRelationship.id)))
+    ).scalar_one()
+    assert relationship_count == 0
+    reconciled_shadow = await fresh_db.execute(
+        text("SELECT depends_on FROM todos WHERE id = :id"),
+        {"id": dependent_id},
+    )
+    assert reconciled_shadow.scalar_one() is None
+
+
 # ---- FTS tests ----
 
 
@@ -158,12 +262,7 @@ async def test_fts_trigger_sync(fresh_db: AsyncSession):
     await _apply_schema_corrections(fresh_db)
     await _setup_fts(fresh_db)
 
-    tid, stmt, params = _todo_insert()
-    params["title"] = "Buy groceries"
-    # Also set description via raw SQL
-    cols_with_desc = stmt.text.replace("updated_at", "updated_at, description")
-    vals_with_desc = cols_with_desc.split("VALUES")[1] if "VALUES" in cols_with_desc else ""
-    # Easier: just build a new statement
+    tid = str(uuid.uuid4())
     await fresh_db.execute(
         text(
             "INSERT INTO todos (id, title, description, status, priority, sort_order, inbox_state, created_at, updated_at) "

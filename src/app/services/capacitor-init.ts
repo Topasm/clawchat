@@ -100,21 +100,28 @@ export async function initCapacitor(): Promise<void> {
       if (lastBackgrounded > 0 && elapsed > 5 * 60 * 1000) {
         const biometricEnabled = useSettingsStore.getState().biometricEnabled;
         if (biometricEnabled) {
-          import('@capacitor/core').then(({ Capacitor }) => {
-            const Biometric = Capacitor.Plugins['Biometric'] as {
-              authenticate(opts: { title: string; subtitle: string }): Promise<{ success: boolean }>;
-            } | undefined;
+          import('@capacitor/core').then(({ Capacitor, registerPlugin }) => {
+            const Biometric = Capacitor.isPluginAvailable('Biometric')
+              ? registerPlugin<{
+                  authenticate(opts: {
+                    title: string;
+                    subtitle: string;
+                  }): Promise<{ success: boolean }>;
+                }>('Biometric')
+              : undefined;
             if (!Biometric) return;
             Biometric.authenticate({
               title: 'Unlock ClawChat',
               subtitle: 'Verify your identity to continue',
-            }).then((result) => {
-              if (!result.success) {
+            })
+              .then((result) => {
+                if (!result.success) {
+                  window.dispatchEvent(new CustomEvent('navigate', { detail: '/login' }));
+                }
+              })
+              .catch(() => {
                 window.dispatchEvent(new CustomEvent('navigate', { detail: '/login' }));
-              }
-            }).catch(() => {
-              window.dispatchEvent(new CustomEvent('navigate', { detail: '/login' }));
-            });
+              });
           });
         }
       }

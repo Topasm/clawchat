@@ -3,6 +3,7 @@ package com.clawchat.android.feature.tasks
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
@@ -23,14 +24,14 @@ private const val TAG = "TasksViewModel"
 data class TasksUiState(
     val tasks: List<Todo> = emptyList(),
     val isLoading: Boolean = false,
-    val statusFilter: String? = null, // null = all
+    val statusFilter: TaskStatus? = null, // null = all
     val selectedTask: Todo? = null,
     val error: String? = null,
 )
 
 sealed interface TasksAction {
     data class ToggleComplete(val todoId: String) : TasksAction
-    data class SetFilter(val status: String?) : TasksAction
+    data class SetFilter(val status: TaskStatus?) : TasksAction
     data class SelectTask(val task: Todo?) : TasksAction
     data object Refresh : TasksAction
     data class Create(val input: TodoCreate) : TasksAction
@@ -70,7 +71,7 @@ class TasksViewModel @Inject constructor(
     fun loadTasks() = onAction(TasksAction.Refresh)
     fun selectTask(task: Todo?) = onAction(TasksAction.SelectTask(task))
     fun toggleComplete(todoId: String) = onAction(TasksAction.ToggleComplete(todoId))
-    fun setStatusFilter(status: String?) = onAction(TasksAction.SetFilter(status))
+    fun setStatusFilter(status: TaskStatus?) = onAction(TasksAction.SetFilter(status))
     fun createTask(input: TodoCreate) = onAction(TasksAction.Create(input))
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
@@ -90,7 +91,7 @@ class TasksViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val params = mutableMapOf<String, String>("limit" to "200")
-            _uiState.value.statusFilter?.let { params["status"] = it }
+            _uiState.value.statusFilter?.let { params["status"] = it.wireValue }
             when (val result = todoRepository.listTodos(params)) {
                 is ApiResult.Success -> _uiState.update { it.copy(tasks = result.data.items, isLoading = false) }
                 is ApiResult.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
@@ -99,7 +100,7 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    private fun doSetStatusFilter(status: String?) {
+    private fun doSetStatusFilter(status: TaskStatus?) {
         _uiState.update { it.copy(statusFilter = status) }
         doLoadTasks()
     }
@@ -107,19 +108,33 @@ class TasksViewModel @Inject constructor(
     private fun doToggleComplete(todoId: String) {
         viewModelScope.launch {
             val todo = _uiState.value.tasks.find { it.id == todoId } ?: return@launch
-            val newStatus = if (todo.status == "completed") "pending" else "completed"
+            val newStatus = if (todo.status == TaskStatus.COMPLETED) {
+                TaskStatus.PENDING
+            } else {
+                TaskStatus.COMPLETED
+            }
 
             try {
                 _uiState.optimistic(
                     update = { state ->
-                        state.copy(tasks = state.tasks.map {
-                            if (it.id == todoId) it.copy(status = newStatus) else it
-                        })
+                        state.copy(
+                            tasks = state.tasks.map {
+                                if (it.id == todoId) it.copy(status = newStatus) else it
+                            },
+                            selectedTask = state.selectedTask?.let {
+                                if (it.id == todoId) it.copy(status = newStatus) else it
+                            },
+                        )
                     },
                     rollback = { state ->
-                        state.copy(tasks = state.tasks.map {
-                            if (it.id == todoId) it.copy(status = todo.status) else it
-                        })
+                        state.copy(
+                            tasks = state.tasks.map {
+                                if (it.id == todoId) it.copy(status = todo.status) else it
+                            },
+                            selectedTask = state.selectedTask?.let {
+                                if (it.id == todoId) it.copy(status = todo.status) else it
+                            },
+                        )
                     },
                 ) {
                     val result = todoRepository.updateTodo(todoId, TodoUpdate(status = newStatus))

@@ -2,30 +2,57 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.todo import Todo
-from models.agent_task import AgentTask
-from services.ai_service import AIService
-from services.obsidian_context_service import list_project_folders, resolve_project_folder
 from config import settings
-from utils import make_id, serialize_tags
-from ws.manager import ws_manager
+from models.todo import Todo
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils import serialize_tags
+from ws.notifications import notify_module_data_changed
+
+from services.ai_service import AIService
+from services.obsidian_context_service import list_project_folders
 
 logger = logging.getLogger(__name__)
+
+_STALE_CLASSIFICATION_ERROR = (
+    "Classification result was discarded because the todo changed while the AI "
+    "was running"
+)
+
+
+@dataclass(frozen=True)
+class _ClassificationSnapshot:
+    """Immutable input and optimistic-concurrency token for classification."""
+
+    id: str
+    title: str
+    description: str | None
+    priority: str
+    tags: str | None
+    source: str | None
+    source_id: str | None
+    updated_at: datetime
+
+    @classmethod
+    def capture(cls, todo: Todo) -> "_ClassificationSnapshot":
+        return cls(
+            id=todo.id,
+            title=todo.title,
+            description=todo.description,
+            priority=todo.priority,
+            tags=todo.tags,
+            source=todo.source,
+            source_id=todo.source_id,
+            updated_at=todo.updated_at,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
-
-
-async def _notify_todo_change():
-    await ws_manager.send_json("user", {
-        "type": "module_data_changed",
-        "data": {"module": "todos"},
-    })
 
 
 async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) -> None:
@@ -39,58 +66,55 @@ async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) ->
         # Step 1 — classify
         todo.inbox_state = "classifying"
         await db.commit()
+        todo = await db.get(Todo, todo_id, populate_existing=True)
+        if todo is None:
+            return
 
+        snapshot = _ClassificationSnapshot.capture(todo)
         classification = await _classify_todo(ai_service, todo)
+        updates, next_state = _classification_updates(snapshot, classification)
 
-        # Step 2 — auto-apply priority
-        if classification.get("priority"):
-            todo.priority = classification["priority"]
+        # This must be the first database write after the classifier returns.
+        # Updating the Todo and checking its snapshot in one statement closes the
+        # SELECT-then-write race without rejecting edits to unrelated Todos.
+        claimed_todo_id = (
+            await db.execute(
+                update(Todo)
+                .where(
+                    Todo.id == snapshot.id,
+                    Todo.updated_at == snapshot.updated_at,
+                    Todo.inbox_state == "classifying",
+                    Todo.title == snapshot.title,
+                    Todo.description == snapshot.description,
+                    Todo.priority == snapshot.priority,
+                    Todo.tags == snapshot.tags,
+                    Todo.source == snapshot.source,
+                    Todo.source_id == snapshot.source_id,
+                )
+                .values(**updates)
+                .returning(Todo.id)
+                .execution_options(synchronize_session=False)
+            )
+        ).scalar_one_or_none()
+        if claimed_todo_id is None:
+            await _mark_classification_stale(db, todo_id)
+            return
 
-        # Step 3 — merge tags
-        new_tags = classification.get("tags") or []
-        if new_tags:
-            existing_raw = todo.tags
-            existing: list[str] = []
-            if existing_raw:
-                try:
-                    existing = json.loads(existing_raw)
-                except (json.JSONDecodeError, TypeError):
-                    existing = []
-            merged = list(dict.fromkeys(existing + new_tags))  # dedupe, preserve order
-            todo.tags = serialize_tags(merged)
-
-        # Step 4 — matched project folder
-        matched_folder = classification.get("matched_project_folder")
-        confidence = classification.get("project_confidence", 0)
-        if matched_folder and confidence >= 0.8:
-            todo.source = "obsidian_project"
-            todo.source_id = matched_folder
+        await db.commit()
+        todo = await db.get(Todo, todo_id, populate_existing=True)
+        if todo is None:
+            return
+        await notify_module_data_changed("todos")
 
         # Step 5 — questioning, planning, or captured
-        if classification.get("needs_planning"):
-            # If task description is short (< 30 words), ask clarifying questions first
-            task_text = (todo.title or "") + " " + (todo.description or "")
-            word_count = len(task_text.split())
-            if word_count < 30:
-                todo.inbox_state = "questioning"
-                await db.commit()
-                await _notify_todo_change()
-                await _generate_clarification_questions(db, ai_service, todo)
-            else:
-                todo.inbox_state = "planning"
-                await db.commit()
-                await _notify_todo_change()
-                await _trigger_planning(db, ai_service, todo)
-        else:
-            todo.inbox_state = "captured"
-            await db.commit()
-            await _notify_todo_change()
+        if next_state == "questioning":
+            await _generate_clarification_questions(db, ai_service, todo)
+        elif next_state == "planning":
+            await _trigger_planning(db, ai_service, todo)
 
     except Exception as exc:
         logger.exception("Inbox pipeline failed for todo %s", todo_id)
-        todo.inbox_state = "error"
-        todo.automation_error = str(exc)
-        await db.commit()
+        await _record_pipeline_error(db, todo_id, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +122,9 @@ async def process_todo(db: AsyncSession, ai_service: AIService, todo_id: str) ->
 # ---------------------------------------------------------------------------
 
 
-async def resume_after_answers(db: AsyncSession, ai_service: AIService, todo_id: str) -> None:
+async def resume_after_answers(
+    db: AsyncSession, ai_service: AIService, todo_id: str
+) -> None:
     """Transition a todo from questioning to planning, using Q&A context."""
     todo = await db.get(Todo, todo_id)
     if not todo:
@@ -108,14 +134,99 @@ async def resume_after_answers(db: AsyncSession, ai_service: AIService, todo_id:
     try:
         todo.inbox_state = "planning"
         await db.commit()
-        await _notify_todo_change()
+        await notify_module_data_changed("todos")
         await _trigger_planning(db, ai_service, todo)
     except Exception as exc:
         logger.exception("Planning after answers failed for todo %s", todo_id)
-        todo.inbox_state = "error"
-        todo.automation_error = str(exc)
+        await _record_pipeline_error(db, todo_id, exc)
+
+
+def _classification_updates(
+    snapshot: _ClassificationSnapshot,
+    classification: dict,
+) -> tuple[dict[str, object], str]:
+    """Build the complete classifier patch without mutating its ORM snapshot."""
+    priority = classification.get("priority") or snapshot.priority
+
+    tags = snapshot.tags
+    new_tags = classification.get("tags") or []
+    if new_tags:
+        existing: list[str] = []
+        if snapshot.tags:
+            try:
+                parsed = json.loads(snapshot.tags)
+                if isinstance(parsed, list):
+                    existing = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
+        merged = list(dict.fromkeys(existing + new_tags))
+        tags = serialize_tags(merged)
+
+    source = snapshot.source
+    source_id = snapshot.source_id
+    matched_folder = classification.get("matched_project_folder")
+    confidence = classification.get("project_confidence", 0)
+    if matched_folder and confidence >= 0.8:
+        source = "obsidian_project"
+        source_id = matched_folder
+
+    next_state = "captured"
+    if classification.get("needs_planning"):
+        task_text = f"{snapshot.title or ''} {snapshot.description or ''}"
+        next_state = "questioning" if len(task_text.split()) < 30 else "planning"
+
+    return (
+        {
+            "priority": priority,
+            "tags": tags,
+            "source": source,
+            "source_id": source_id,
+            "inbox_state": next_state,
+            "automation_error": None,
+        },
+        next_state,
+    )
+
+
+async def _mark_classification_stale(db: AsyncSession, todo_id: str) -> None:
+    """Discard a stale classifier result without writing any semantic fields."""
+    await db.rollback()
+    result = await db.execute(
+        update(Todo)
+        .where(Todo.id == todo_id, Todo.inbox_state == "classifying")
+        .values(
+            inbox_state="error",
+            automation_error=_STALE_CLASSIFICATION_ERROR,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+    logger.info("%s for todo %s", _STALE_CLASSIFICATION_ERROR, todo_id)
+    if result.rowcount:
+        await notify_module_data_changed("todos")
+
+
+async def _record_pipeline_error(
+    db: AsyncSession,
+    todo_id: str,
+    exc: Exception,
+) -> None:
+    """Recover the transaction, then record an error without a stale ORM write."""
+    await db.rollback()
+    try:
+        result = await db.execute(
+            update(Todo)
+            .where(Todo.id == todo_id)
+            .values(inbox_state="error", automation_error=str(exc))
+            .execution_options(synchronize_session=False)
+        )
         await db.commit()
-        await _notify_todo_change()
+    except Exception:
+        await db.rollback()
+        logger.exception("Failed to persist inbox pipeline error for todo %s", todo_id)
+        return
+    if result.rowcount:
+        await notify_module_data_changed("todos")
 
 
 # ---------------------------------------------------------------------------
@@ -125,8 +236,13 @@ async def resume_after_answers(db: AsyncSession, ai_service: AIService, todo_id:
 _QUESTION_SYSTEM_PROMPT = (
     "You are a task planning assistant. Given a task title, generate 3-5 short "
     "clarifying questions that would help decompose this into specific subtasks. "
-    "Return ONLY a JSON array of strings, e.g. [\"Question 1?\", \"Question 2?\"]."
+    'Return ONLY a JSON array of strings, e.g. ["Question 1?", "Question 2?"].'
 )
+_DEFAULT_CLARIFICATION_QUESTIONS = [
+    "What is the desired outcome or goal?",
+    "What are the key steps involved?",
+    "Are there any deadlines or time constraints?",
+]
 
 
 async def _generate_clarification_questions(
@@ -143,31 +259,35 @@ async def _generate_clarification_questions(
             f"Task: {task_text}",
         )
         from utils import strip_markdown_fences
+
         cleaned = strip_markdown_fences(raw_response)
         questions = json.loads(cleaned)
 
         if not isinstance(questions, list) or not questions:
-            questions = [
-                "What is the desired outcome or goal?",
-                "What are the key steps involved?",
-                "Are there any deadlines or time constraints?",
-            ]
-
-        todo.clarification_questions = json.dumps(questions)
-        await db.commit()
-        await _notify_todo_change()
+            questions = list(_DEFAULT_CLARIFICATION_QUESTIONS)
 
     except Exception:
-        logger.exception("Failed to generate clarification questions for todo %s", todo.id)
-        # Fallback: provide default questions
-        fallback = [
-            "What is the desired outcome or goal?",
-            "What are the key steps involved?",
-            "Are there any deadlines or time constraints?",
-        ]
-        todo.clarification_questions = json.dumps(fallback)
+        logger.exception(
+            "Failed to generate clarification questions for todo %s", todo.id
+        )
+        questions = list(_DEFAULT_CLARIFICATION_QUESTIONS)
+
+    # Keep provider/parse fallback separate from persistence failures. A failed
+    # flush or commit must be rolled back by the caller rather than attempting a
+    # second commit on a PendingRollback session.
+    try:
+        result = await db.execute(
+            update(Todo)
+            .where(Todo.id == todo.id, Todo.inbox_state == "questioning")
+            .values(clarification_questions=json.dumps(questions))
+            .execution_options(synchronize_session=False)
+        )
         await db.commit()
-        await _notify_todo_change()
+    except Exception:
+        await db.rollback()
+        raise
+    if result.rowcount:
+        await notify_module_data_changed("todos")
 
 
 # ---------------------------------------------------------------------------
@@ -220,8 +340,13 @@ _CLASSIFY_TOOLS = [
                         "items": {
                             "type": "string",
                             "enum": [
-                                "plan", "research", "summarize", "draft",
-                                "code_review", "data_analysis", "obsidian_sync",
+                                "plan",
+                                "research",
+                                "summarize",
+                                "draft",
+                                "code_review",
+                                "data_analysis",
+                                "obsidian_sync",
                                 "prioritize",
                             ],
                         },
@@ -249,7 +374,7 @@ async def _classify_todo(ai_service: AIService, todo: Todo) -> dict:
             folders = list_project_folders(settings.obsidian_vault_path)
             if folders:
                 parts.append(f"Known project folders: {', '.join(folders)}")
-        except Exception:
+        except Exception:  # noqa: BLE001 - optional vault context must not block capture
             logger.debug("Could not list Obsidian project folders")
 
     user_message = "\n".join(parts)
@@ -284,39 +409,16 @@ async def _classify_todo(ai_service: AIService, todo: Todo) -> dict:
 # ---------------------------------------------------------------------------
 
 
-async def _trigger_planning(db: AsyncSession, ai_service: AIService, todo: Todo) -> None:
-    """Create a planner AgentTask and generate a subtask plan for the todo."""
-    agent_task = AgentTask(
-        id=make_id("task_"),
-        agent_type="plan",
-        task_type="plan_todo",
-        todo_id=todo.id,
-        instruction=f"Plan subtasks for: {todo.title}",
-        status="queued",
-        skill_chain='["plan"]',
+async def _trigger_planning(
+    db: AsyncSession, ai_service: AIService, todo: Todo
+) -> None:
+    """Generate through the same canonical proposal service as the public API."""
+    from services import plan_proposal_service
+
+    await plan_proposal_service.generate_proposal(
+        db,
+        ai_service,
+        todo.id,
+        model_provider=settings.ai_provider,
     )
-    db.add(agent_task)
-    await db.flush()
-
-    try:
-        from services import todo_planning_service
-
-        result = await todo_planning_service.generate_plan(db, ai_service, todo)
-        agent_task.payload_json = json.dumps(result) if not isinstance(result, str) else result
-        agent_task.status = "completed"
-        agent_task.completed_at = datetime.now(timezone.utc)
-
-        todo.inbox_state = "plan_ready"
-        await db.commit()
-        await _notify_todo_change()
-
-    except Exception as exc:
-        logger.exception("Planning failed for todo %s", todo.id)
-        agent_task.status = "failed"
-        agent_task.error = str(exc)
-        agent_task.completed_at = datetime.now(timezone.utc)
-
-        todo.inbox_state = "error"
-        todo.automation_error = str(exc)
-        await db.commit()
-        await _notify_todo_change()
+    await notify_module_data_changed("todos")

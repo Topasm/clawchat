@@ -1,10 +1,10 @@
-# AI Secretary — Project Vision & Goals
+# ClawChat — Product Vision & Goals
 
 ## Overview
 
-**AI Secretary** is a privacy-first, self-hosted personal assistant application that unifies task management, calendar, notes, and AI-powered conversation into a single mobile app backed by a user-owned server.
+**ClawChat** is a privacy-first, self-hosted AI project execution workspace. It unifies tasks, dependency graphs, calendar, documents, agents, and AI-powered conversation across web, Tauri desktop, and native Android clients backed by a user-owned server. A Capacitor iOS client remains provisional.
 
-Unlike existing productivity tools that scatter user data across multiple third-party cloud services, AI Secretary keeps all personal data on the user's own infrastructure. The AI assistant serves as the central interface — users interact through natural language conversation, and the system intelligently routes requests to the appropriate internal modules.
+Unlike existing productivity tools that scatter user data across multiple third-party cloud services, ClawChat keeps primary application data on the user's own infrastructure. The AI assistant serves as a central interface — users interact through natural language conversation, and the system intelligently routes requests to the appropriate internal modules.
 
 ---
 
@@ -34,14 +34,14 @@ The user opens the app, says "Schedule a meeting with Haechan tomorrow at 3 PM a
 4. Confirms the action in conversational language
 5. Reflects the change immediately on the home screen widget
 
-No app-switching. No manual entry. No data leaving the user's server.
+No app-switching or manual entry. With a local LLM, no application content needs to leave the user's server.
 
 ---
 
 ## Goals
 
 ### G1. Privacy by Architecture
-Data sovereignty is not a feature — it is the architecture. All data (conversations, tasks, events, notes) is stored exclusively on the user's self-hosted server. The mobile app communicates only with this server over HTTPS. No telemetry, no analytics, no third-party data processing. If the user chooses a local LLM (e.g., Ollama), even AI inference stays on-premise.
+Data sovereignty is not a feature — it is the architecture. All data (conversations, tasks, events, notes) is stored on the user's self-hosted server. Clients communicate with this server over HTTPS. No telemetry or analytics are required. If the user chooses a local LLM (e.g., Ollama), AI inference also stays on-premise; cloud LLMs remain an explicit opt-in.
 
 ### G2. Conversation as the Primary Interface
 Natural language is the most intuitive input method. The AI chat is the main screen and the primary way users interact with all features. Users should be able to:
@@ -51,8 +51,8 @@ Natural language is the most intuitive input method. The AI chat is the main scr
 
 Direct manipulation UI (tapping, swiping) remains available for all features, but conversation should always be a viable alternative.
 
-### G3. Unified Data Model
-Todos, calendar events, notes, and conversations live in a single database on the user's server. This unified model enables:
+### G3. Unified Application Data
+Tasks, calendar events, messages, and conversations live in a single database on the user's server. Project documents remain user-owned Markdown in an optional Obsidian vault and are connected through indexing and export. This model enables:
 - **Cross-module awareness**: The AI knows your schedule when suggesting task priorities
 - **Full-text search**: One search query spans all data types
 - **Traceability**: Every item links back to the conversation that created it
@@ -79,9 +79,7 @@ The agent operates on a scheduler, checking for actionable items and delivering 
 The server ships as a Docker Compose package. A single `docker compose up` launches the entire backend — API server, database, and optionally a local LLM. No manual configuration of databases, reverse proxies, or model downloads. The target audience includes technically capable individuals who own or rent a server (home lab, VPS, university server) but don't want to spend hours on DevOps.
 
 ### G7. Optional External Integrations
-While the system is fully functional in isolation, users may optionally connect:
-- **Google Calendar**: Bidirectional sync so events appear in both systems
-- **Cloud LLM APIs** (e.g., Claude, GPT): For users who prefer stronger models over local inference
+While the system is fully functional in isolation, users may optionally connect cloud LLM APIs. Google Calendar bidirectional sync remains a future consideration rather than a current integration.
 
 All integrations are opt-in and configured through the app's settings screen. When disabled, no external API calls are made.
 
@@ -92,8 +90,8 @@ All integrations are opt-in and configured through the app's settings screen. Wh
 To maintain focus and avoid scope creep, the following are explicitly **not** goals for the initial release:
 
 - **Multi-user / team collaboration**: This is a personal assistant, not a team workspace.
-- **End-to-end encryption**: The server is self-hosted and trusted. E2E encryption between app and server adds complexity without meaningful security benefit in this threat model.
-- **Web client**: The React Native app is the sole client. A web dashboard may be considered in the future.
+- **Untrusted application server**: Clients trust the selected self-hosted FastAPI server. The optional relay is end-to-end encrypted so the relay cannot read payloads, but it does not make the application server untrusted.
+- **Multi-tenant public SaaS**: Web is a primary client, but ClawChat is deployed for a user-owned server rather than as a shared hosted service.
 - **App Store distribution**: Initial distribution is via sideloading (APK) and TestFlight. Public store listing is a future consideration.
 - **Plugin / extension system**: The module architecture supports future extensibility, but a formal plugin API is out of scope.
 
@@ -116,7 +114,7 @@ To maintain focus and avoid scope creep, the following are explicitly **not** go
 │                                                      │
 │   Tauri (desktop)       Pages (thin re-exports)      │
 │   Web Browser (Vite)    ├── Today, Inbox, Chat       │
-│   Capacitor (mobile)    ├── Kanban Board (All Tasks) │
+│   Capacitor iOS         ├── Kanban + Task Graph      │
 │                         ├── Task/Event Detail        │
 │                         ├── Calendar, Admin          │
 │                         └── Settings                 │
@@ -134,16 +132,18 @@ To maintain focus and avoid scope creep, the following are explicitly **not** go
 │                      │                                │
 │   FastAPI Backend                                     │
 │   ├── AI Engine (Intent Classification + Orchestrator)│
-│   ├── Modules (Todo, Calendar, Memo, Agent)           │
+│   ├── Modules (Todo, Calendar, Chat, Agent)           │
 │   ├── Scheduler (Reminders, Briefing, Auto-tasks)     │
-│   └── Services (Google Calendar sync, Notifications)  │
+│   └── Services (Vault sync, Relay, Notifications)      │
 │                                                       │
 │   Local Database (SQLite)                             │
-│   All conversations, tasks, events, notes stored here │
+│   Conversations, tasks, events, messages stored here  │
 │                                                       │
 │   LLM (Ollama local or Claude API)                    │
 └───────────────────────────────────────────────────────┘
 ```
+
+Native Android uses Kotlin and Jetpack Compose for Android-specific UI, widgets, notifications, offline cache, and background work. It shares the FastAPI wire contract with web/Tauri rather than sharing React UI code. See the [platform matrix](docs/architecture/platform-matrix.md).
 
 ---
 
@@ -154,7 +154,7 @@ The project is considered successful when a user can:
 1. Install the server with a single `docker compose up` command
 2. Connect the desktop/web app by entering their server address
 3. Add a task, event, or note entirely through conversation
-4. See the result reflected on the kanban board and today dashboard immediately
+4. See canonical task state reflected consistently in list, kanban, graph, today, and Android views
 5. Receive a morning briefing summarizing their day
 6. Delegate a research task to the AI and receive results via notification
 7. Verify that no data has left their server by inspecting network traffic
@@ -169,11 +169,11 @@ The project is considered successful when a user can:
 | Web framework | Vite + React 18 + TypeScript | Fast builds, type safety, single codebase |
 | Server framework | Python FastAPI | Async, fast, excellent for AI workloads |
 | Database | SQLite | Zero-config, single-file, sufficient for single-user |
-| State management | Zustand | Lightweight, minimal boilerplate |
+| State management | Zustand + TanStack Query | Local client state plus cached/mutated server state |
 | Styling | CSS custom properties + BEM | Theme-aware, no runtime CSS-in-JS overhead |
-| LLM abstraction | Ollama + Claude API | Local-first with cloud fallback option |
+| LLM abstraction | Ollama + OpenAI-compatible API + Claude Code | Local-first with optional external backends |
 | Deployment | Docker Compose | One-command setup, reproducible environment |
-| Real-time | SSE (Server-Sent Events) | Streaming AI responses |
+| Real-time | SSE + WebSocket | Streaming AI responses and cross-client synchronization |
 | Auth | JWT (PIN-based) | Simple, sufficient for single-user self-hosted |
 
 ---

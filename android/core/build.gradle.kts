@@ -1,27 +1,23 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlin.plugin.serialization")
-    id("com.google.dagger.hilt.android")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 android {
     namespace = "com.clawchat.android.core"
-    compileSdk = 35
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
+        sourceCompatibility = JavaVersion.toVersion(libs.versions.jvmTarget.get())
+        targetCompatibility = JavaVersion.toVersion(libs.versions.jvmTarget.get())
     }
 
     buildFeatures {
@@ -29,51 +25,56 @@ android {
     }
 }
 
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
 dependencies {
     // Compose
-    implementation(platform("androidx.compose:compose-bom:2025.01.01"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-core")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.animation:animation")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.animation)
 
     // Hilt
-    implementation("com.google.dagger:hilt-android:2.53.1")
-    ksp("com.google.dagger:hilt-android-compiler:2.53.1")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     // Network
-    api("com.squareup.retrofit2:retrofit:2.11.0")
-    api("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
-    api("com.squareup.okhttp3:okhttp:4.12.0")
-    api("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    api("com.squareup.okhttp3:okhttp-sse:4.12.0")
-    implementation("org.bouncycastle:bcprov-jdk18on:1.83")
+    api(libs.retrofit.core)
+    api(libs.retrofit.kotlinx.serialization)
+    api(libs.okhttp.core)
+    api(libs.okhttp.logging)
+    api(libs.okhttp.sse)
+    implementation(libs.bouncycastle)
 
     // Data
-    api("androidx.datastore:datastore-preferences:1.1.1")
+    api(libs.androidx.datastore.preferences)
 
     // WorkManager
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Room
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // Serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    api(libs.kotlinx.serialization.json)
 
     // Coroutines
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    api(libs.kotlinx.coroutines.android)
 
     // AndroidX
-    implementation("androidx.core:core-ktx:1.15.0")
+    implementation(libs.androidx.core.ktx)
 
     // Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("io.mockk:mockk:1.13.13")
-    testImplementation("app.cash.turbine:turbine:1.2.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.room.testing)
 }

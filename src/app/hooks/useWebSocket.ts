@@ -35,6 +35,8 @@ export default function useWebSocket(): void {
       // emitted while the client was offline.
       if (status === 'connected') {
         void queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
         void queryClient.invalidateQueries({ queryKey: queryKeys.events });
         void queryClient.invalidateQueries({ queryKey: queryKeys.today });
         void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
@@ -56,7 +58,9 @@ export default function useWebSocket(): void {
       const { isStreaming, clearStreamingState } = useChatStore.getState();
       if (isStreaming) {
         clearStreamingState();
-        useToastStore.getState().addToast('error', 'Connection lost during response. Reconnecting...');
+        useToastStore
+          .getState()
+          .addToast('error', 'Connection lost during response. Reconnecting...');
       }
     };
 
@@ -64,18 +68,27 @@ export default function useWebSocket(): void {
       const d = data as { module?: string };
       if (d.module === 'todos') {
         queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+        queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+        queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
       } else if (d.module === 'events') {
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
       } else {
         // Refresh all
         queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+        queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
+        queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
     };
 
     const handleReminder = (data: unknown) => {
-      const d = data as { title?: string; message?: string; item_type?: 'todo' | 'event'; item_id?: string };
+      const d = data as {
+        title?: string;
+        message?: string;
+        item_type?: 'todo' | 'event';
+        item_id?: string;
+      };
       const message = d.message ?? `Reminder: ${d.title ?? 'Upcoming event'}`;
       useToastStore.getState().addToast('warning', message, { duration: 10000 });
       const settings = useSettingsStore.getState();
@@ -139,7 +152,12 @@ export default function useWebSocket(): void {
     };
 
     const handleStreamEnd = (data: unknown) => {
-      const d = data as { message_id: string; full_content: string; metadata?: Record<string, unknown>; conversation_id?: string };
+      const d = data as {
+        message_id: string;
+        full_content: string;
+        metadata?: Record<string, unknown>;
+        conversation_id?: string;
+      };
       clearPendingRunTimeout();
       const chatStore = useChatStore.getState();
       chatStore.finalizeStreamMessage(d.message_id, d.full_content, d.metadata);
@@ -158,9 +176,10 @@ export default function useWebSocket(): void {
       const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
       useChatStore.setState({
         isStreaming: false,
-        streamAbortController: null
+        streamAbortController: null,
       });
-      const errorMsg = d.error_message || d.message || 'An error occurred while generating a response';
+      const errorMsg =
+        d.error_message || d.message || 'An error occurred while generating a response';
       useToastStore.getState().addToast('error', errorMsg);
       // Reload messages to get authoritative server state
       if (conversationId) {
@@ -174,7 +193,7 @@ export default function useWebSocket(): void {
       const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
       useChatStore.setState({
         isStreaming: false,
-        streamAbortController: null
+        streamAbortController: null,
       });
       // Reload messages to get authoritative server state
       if (conversationId) {
@@ -196,20 +215,23 @@ export default function useWebSocket(): void {
     let unsubNotifAction: (() => void) | undefined;
     let unsubNotifNav: (() => void) | undefined;
     if (IS_DESKTOP) {
-      unsubNotifAction = platformApi.events.on('notification:action', async (...args: unknown[]) => {
-        const d = args[0] as { action?: string; itemType?: string; itemId?: string };
-        if (d.action === 'mark_done' && d.itemId) {
-          try {
-            if (d.itemType === 'todo') {
-              await apiClient.patch(`/todos/${d.itemId}`, { status: 'completed' });
-              queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-              queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      unsubNotifAction = platformApi.events.on(
+        'notification:action',
+        async (...args: unknown[]) => {
+          const d = args[0] as { action?: string; itemType?: string; itemId?: string };
+          if (d.action === 'mark_done' && d.itemId) {
+            try {
+              if (d.itemType === 'todo') {
+                await apiClient.patch(`/todos/${d.itemId}`, { status: 'completed' });
+                queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+                queryClient.invalidateQueries({ queryKey: queryKeys.today });
+              }
+            } catch {
+              // Best-effort
             }
-          } catch {
-            // Best-effort
           }
-        }
-      });
+        },
+      );
       unsubNotifNav = platformApi.events.on('navigate', (...args: unknown[]) => {
         const route = args[0] as string;
         if (route) window.dispatchEvent(new CustomEvent('navigate', { detail: route }));
@@ -217,7 +239,12 @@ export default function useWebSocket(): void {
     }
 
     const handleNudge = (data: unknown) => {
-      const d = data as { title?: string; message?: string; todo_id?: string; suggested_action?: string };
+      const d = data as {
+        title?: string;
+        message?: string;
+        todo_id?: string;
+        suggested_action?: string;
+      };
       const message = d.message ?? 'You have a task that needs attention';
       useToastStore.getState().addToast('info', message, { duration: 15000 });
       const settings = useSettingsStore.getState();
@@ -228,7 +255,9 @@ export default function useWebSocket(): void {
 
     const handleWeeklyReview = (data: unknown) => {
       const d = data as { content?: string };
-      useToastStore.getState().addToast('info', 'Weekly review is ready! Check your chat.', { duration: 15000 });
+      useToastStore
+        .getState()
+        .addToast('info', 'Weekly review is ready! Check your chat.', { duration: 15000 });
       const settings = useSettingsStore.getState();
       if (settings.notificationsEnabled) {
         void notify('Weekly Review', d.content?.slice(0, 100) ?? 'Your weekly review is ready');

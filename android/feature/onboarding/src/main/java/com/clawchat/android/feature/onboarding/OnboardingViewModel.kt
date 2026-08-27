@@ -38,7 +38,7 @@ data class OnboardingUiState(
 class OnboardingViewModel @Inject constructor(
     private val pairingApi: PairingApi,
     private val sessionStore: SessionStore,
-    @DebugServerUrl private val debugServerUrl: String,
+    @param:DebugServerUrl private val debugServerUrl: String,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState(serverUrl = debugServerUrl))

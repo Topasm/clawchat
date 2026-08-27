@@ -35,6 +35,7 @@ ios/App/Pods
 Thumbs.db
 
 # Python / Server
+/data/
 server/__pycache__
 server/**/__pycache__
 server/data/
@@ -54,5 +55,10 @@ server/*.log
 claw-cli/.venv/
 claw-cli/.pytest_cache/
 
-# Generated API client (Orval)
-src/app/generated/
+# Generated API client (Orval). The small runtime contract is checked in so CI
+# can detect drift without requiring a running backend.
+src/app/generated/*
+!src/app/generated/contracts/
+src/app/generated/contracts/*
+!src/app/generated/contracts/taskStatus.ts
+!src/app/generated/contracts/taskRelationshipType.ts

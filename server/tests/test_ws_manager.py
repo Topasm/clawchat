@@ -1,5 +1,8 @@
+from unittest.mock import AsyncMock
+
 import pytest
 
+from ws import notifications as ws_notifications
 from ws.manager import ConnectionManager
 
 
@@ -27,3 +30,21 @@ async def test_close_user_removes_and_closes_all_transports():
     assert first.closed is True
     assert second.closed is True
     assert "device-1" not in manager.active_connections
+
+
+@pytest.mark.asyncio
+async def test_notify_module_data_changed_uses_canonical_payload_and_user(
+    monkeypatch,
+):
+    send_json = AsyncMock()
+    monkeypatch.setattr(ws_notifications.ws_manager, "send_json", send_json)
+
+    await ws_notifications.notify_module_data_changed("todos")
+
+    send_json.assert_awaited_once_with(
+        "user",
+        {
+            "type": "module_data_changed",
+            "data": {"module": "todos"},
+        },
+    )

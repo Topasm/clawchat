@@ -8,12 +8,16 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from domain.task import TaskStatus
 from exceptions import NotFoundError
 from models.todo import Todo
 from services.obsidian_export_service import export_todo, remove_todo_from_vault
+from services import task_relationship_service
 from utils import apply_model_updates, make_id, serialize_tags
 
 logger = logging.getLogger(__name__)
+
+_DEPENDENCIES_UNSET = object()
 
 
 _ORDER_COLUMNS = {
@@ -27,7 +31,7 @@ _ORDER_COLUMNS = {
 async def get_todos(
     db: AsyncSession,
     *,
-    status_filter: str | None = None,
+    status_filter: TaskStatus | None = None,
     priority: str | None = None,
     due_before: datetime | None = None,
     parent_id: str | None = None,
@@ -78,6 +82,7 @@ async def create_todo(
     *,
     title: str,
     description: str | None = None,
+    status: TaskStatus = TaskStatus.PENDING,
     priority: str = "medium",
     due_date: datetime | None = None,
     tags: list[str] | None = None,
@@ -97,7 +102,11 @@ async def create_todo(
         id=make_id("todo_"),
         title=title,
         description=description,
+        status=status,
         priority=priority,
+        completed_at=(
+            datetime.now(timezone.utc) if status == TaskStatus.COMPLETED else None
+        ),
         due_date=due_date,
         tags=serialize_tags(tags),
         parent_id=parent_id,
@@ -108,12 +117,19 @@ async def create_todo(
         enabled_skills=json.dumps(enabled_skills) if enabled_skills else None,
         inbox_state=inbox_state,
         estimated_minutes=estimated_minutes,
-        depends_on=json.dumps(depends_on) if depends_on else None,
+        depends_on=None,
         recurrence_rule=recurrence_rule,
         recurrence_end=recurrence_end,
     )
     db.add(todo)
     await db.flush()
+
+    if depends_on is not None:
+        await task_relationship_service.replace_task_dependencies(
+            db,
+            todo.id,
+            depends_on,
+        )
 
     if settings.obsidian_vault_path:
         project_name = None
@@ -128,13 +144,25 @@ async def create_todo(
 
 async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
     todo = await get_todo(db, todo_id)
+    dependency_ids = (
+        updates.pop("depends_on")
+        if "depends_on" in updates
+        else _DEPENDENCIES_UNSET
+    )
     apply_model_updates(todo, updates)
 
     if "status" in updates:
-        if updates["status"] == "completed" and not todo.completed_at:
+        if updates["status"] == TaskStatus.COMPLETED and not todo.completed_at:
             todo.completed_at = datetime.now(timezone.utc)
-        elif updates["status"] != "completed":
+        elif updates["status"] != TaskStatus.COMPLETED:
             todo.completed_at = None
+
+    if dependency_ids is not _DEPENDENCIES_UNSET:
+        await task_relationship_service.replace_task_dependencies(
+            db,
+            todo.id,
+            dependency_ids,
+        )
 
     await db.flush()
 
@@ -152,7 +180,16 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
 async def delete_todo(db: AsyncSession, todo_id: str) -> None:
     todo = await get_todo(db, todo_id)
     deleted_id = todo.id
+    dependent_source_ids = await task_relationship_service.dependent_source_ids(
+        db,
+        {todo.id},
+    )
     await db.delete(todo)
+    await db.flush()
+    await task_relationship_service.sync_dependency_shadows(
+        db,
+        dependent_source_ids,
+    )
     await db.flush()
 
     if settings.obsidian_vault_path:

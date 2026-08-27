@@ -2,6 +2,7 @@ package com.clawchat.android.feature.today
 
 import app.cash.turbine.test
 import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
@@ -39,13 +40,13 @@ class TodayViewModelTest {
     private val sampleTodo = Todo(
         id = "1",
         title = "Today task",
-        status = "pending",
+        status = TaskStatus.PENDING,
     )
 
     private val sampleOverdueTodo = Todo(
         id = "2",
         title = "Overdue task",
-        status = "pending",
+        status = TaskStatus.PENDING,
     )
 
     private val sampleTodayResponse = TodayResponse(
@@ -112,21 +113,21 @@ class TodayViewModelTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
         coEvery { todoRepository.updateTodo("1", any()) } returns
-            ApiResult.Success(sampleTodo.copy(status = "completed"))
+            ApiResult.Success(sampleTodo.copy(status = TaskStatus.COMPLETED))
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.uiState.test {
             val current = awaitItem()
-            assertEquals("pending", current.todayTodos.first().status)
+            assertEquals(TaskStatus.PENDING, current.todayTodos.first().status)
 
             viewModel.onAction(TodayAction.ToggleComplete("1"))
             val optimistic = awaitItem()
-            assertEquals("completed", optimistic.todayTodos.first().status)
+            assertEquals(TaskStatus.COMPLETED, optimistic.todayTodos.first().status)
         }
 
-        coVerify { todoRepository.updateTodo("1", TodoUpdate(status = "completed")) }
+        coVerify { todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED)) }
     }
 
     @Test
@@ -142,15 +143,15 @@ class TodayViewModelTest {
 
         viewModel.uiState.test {
             val loaded = awaitItem()
-            assertEquals("pending", loaded.todayTodos.first().status)
+            assertEquals(TaskStatus.PENDING, loaded.todayTodos.first().status)
 
             viewModel.onAction(TodayAction.ToggleComplete("1"))
             // Optimistic update
             val optimistic = awaitItem()
-            assertEquals("completed", optimistic.todayTodos.first().status)
+            assertEquals(TaskStatus.COMPLETED, optimistic.todayTodos.first().status)
             // Rollback
             val rolledBack = awaitItem()
-            assertEquals("pending", rolledBack.todayTodos.first().status)
+            assertEquals(TaskStatus.PENDING, rolledBack.todayTodos.first().status)
         }
     }
 
@@ -160,21 +161,21 @@ class TodayViewModelTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
         coEvery { todoRepository.updateTodo("2", any()) } returns
-            ApiResult.Success(sampleOverdueTodo.copy(status = "completed"))
+            ApiResult.Success(sampleOverdueTodo.copy(status = TaskStatus.COMPLETED))
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.uiState.test {
             val current = awaitItem()
-            assertEquals("pending", current.overdueTodos.first().status)
+            assertEquals(TaskStatus.PENDING, current.overdueTodos.first().status)
 
             viewModel.onAction(TodayAction.ToggleComplete("2"))
             val optimistic = awaitItem()
-            assertEquals("completed", optimistic.overdueTodos.first().status)
+            assertEquals(TaskStatus.COMPLETED, optimistic.overdueTodos.first().status)
         }
 
-        coVerify { todoRepository.updateTodo("2", TodoUpdate(status = "completed")) }
+        coVerify { todoRepository.updateTodo("2", TodoUpdate(status = TaskStatus.COMPLETED)) }
     }
 
     @Test
@@ -183,7 +184,7 @@ class TodayViewModelTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
         coEvery { todoRepository.createTodo(any()) } returns
-            ApiResult.Success(Todo(id = "new", title = "Quick", status = "pending"))
+            ApiResult.Success(Todo(id = "new", title = "Quick", status = TaskStatus.PENDING))
         val input = TodoCreate(
             title = "Quick",
             description = "From sheet",

@@ -83,7 +83,9 @@ function TaskGraphCanvas({ nodes: sourceNodes, edges, isMobile, onOpenTask }: Ta
               ? 'var(--cc-success)'
               : status === 'in_progress'
                 ? 'var(--cc-warning)'
-                : 'var(--cc-primary)';
+                : status === 'cancelled'
+                  ? 'var(--cc-text-tertiary)'
+                  : 'var(--cc-primary)';
           }}
         />
       )}

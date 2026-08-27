@@ -1,14 +1,15 @@
 import type { Node, NodeProps } from '@xyflow/react';
-import type { KanbanStatus, TodoResponse } from '../../types/api';
+import type { TaskStatus, TodoResponse } from '../../types/api';
 
 export type TaskGraphMode = 'structure' | 'execution';
 
 export type TaskGraphNodeData = {
   todo: TodoResponse;
-  status: KanbanStatus;
+  status: TaskStatus;
   mode: TaskGraphMode;
   childCount: number;
   completedChildCount: number;
+  dependencyCount: number;
   hasVisibleChildren: boolean;
   isCollapsed: boolean;
   proposalSelection?: 'selected' | 'excluded' | 'fixed';

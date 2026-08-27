@@ -7,27 +7,6 @@ describe('useModuleStore', () => {
     useModuleStore.getState().resetToDemo();
   });
 
-  describe('kanban status overrides', () => {
-    it('sets and reads a status override', () => {
-      useModuleStore.getState().setKanbanStatus('task-1', 'in_progress');
-
-      expect(useModuleStore.getState().getKanbanStatus('task-1')).toBe('in_progress');
-      expect(useModuleStore.getState().getKanbanStatus('unknown')).toBe('pending');
-    });
-
-    it('replaces all status overrides', () => {
-      useModuleStore.getState().setKanbanStatuses({
-        'task-1': 'in_progress',
-        'task-2': 'completed',
-      });
-
-      expect(useModuleStore.getState().kanbanStatuses).toEqual({
-        'task-1': 'in_progress',
-        'task-2': 'completed',
-      });
-    });
-  });
-
   describe('task selection', () => {
     it('toggles a selected task', () => {
       useModuleStore.getState().toggleTodoSelection('task-1');
@@ -102,14 +81,12 @@ describe('useModuleStore', () => {
   });
 
   it('resetToDemo clears transient module UI state', () => {
-    useModuleStore.getState().setKanbanStatus('task-1', 'completed');
     useModuleStore.getState().selectAllTodos(['task-1', 'task-2']);
     useModuleStore.setState({ isLoading: true, lastFetched: 123 });
 
     useModuleStore.getState().resetToDemo();
 
     const state = useModuleStore.getState();
-    expect(state.kanbanStatuses).toEqual({});
     expect(state.selectedTodoIds.size).toBe(0);
     expect(state.isLoading).toBe(false);
     expect(state.lastFetched).toBeNull();

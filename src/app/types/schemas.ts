@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  TASK_STATUSES,
+  type TaskStatus as GeneratedTaskStatus,
+} from '../generated/contracts/taskStatus';
+import { TASK_RELATIONSHIP_TYPES } from '../generated/contracts/taskRelationshipType';
+
+export { TASK_RELATIONSHIP_TYPES, TASK_STATUSES };
 
 // ---------------------------------------------------------------------------
 // Zod schemas mirroring server Pydantic models
@@ -24,15 +31,23 @@ export const RefreshRequestSchema = z.object({
 
 // -- Todos ------------------------------------------------------------------
 
-const TodoStatusSchema = z.enum(['pending', 'completed']);
+export const TaskStatusSchema = z.enum(TASK_STATUSES);
 const PrioritySchema = z.enum(['urgent', 'high', 'medium', 'low']);
-const InboxStateSchema = z.enum(['none', 'classifying', 'captured', 'questioning', 'planning', 'plan_ready', 'error']);
+const InboxStateSchema = z.enum([
+  'none',
+  'classifying',
+  'captured',
+  'questioning',
+  'planning',
+  'plan_ready',
+  'error',
+]);
 
 export const TodoResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().nullable().optional(),
-  status: TodoStatusSchema,
+  status: TaskStatusSchema,
   priority: PrioritySchema.optional(),
   due_date: z.string().nullable().optional(),
   tags: z.array(z.string()).nullable().optional(),
@@ -63,6 +78,7 @@ export const TodoResponseSchema = z.object({
 export const TodoCreateSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
+  status: TaskStatusSchema.optional(),
   priority: PrioritySchema.optional(),
   due_date: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -81,7 +97,7 @@ export const TodoCreateSchema = z.object({
 export const TodoUpdateSchema = z.object({
   title: z.string().min(1, 'Title is required').optional(),
   description: z.string().optional(),
-  status: TodoStatusSchema.optional(),
+  status: TaskStatusSchema.optional(),
   priority: PrioritySchema.optional(),
   due_date: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -98,7 +114,7 @@ export const ProjectTodoResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().nullable().optional(),
-  status: TodoStatusSchema,
+  status: TaskStatusSchema,
   priority: PrioritySchema.optional(),
   due_date: z.string().nullable().optional(),
   tags: z.array(z.string()).nullable().optional(),
@@ -119,7 +135,46 @@ export const ProjectTodoResponseSchema = z.object({
   completed_subtask_count: z.number().optional(),
 });
 
-export const KanbanStatusSchema = z.enum(['pending', 'in_progress', 'completed']);
+// -- Task relationships ----------------------------------------------------
+
+export const TaskRelationshipTypeSchema = z.enum(TASK_RELATIONSHIP_TYPES);
+
+export const TaskRelationshipResponseSchema = z.object({
+  id: z.string(),
+  source_task_id: z.string(),
+  target_task_id: z.string(),
+  type: TaskRelationshipTypeSchema,
+  label: z.string().nullable().optional(),
+  created_by: z.string(),
+  proposal_id: z.string().nullable().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const TaskRelationshipCreateSchema = z
+  .object({
+    source_task_id: z.string().min(1),
+    target_task_id: z.string().min(1),
+    type: TaskRelationshipTypeSchema,
+    label: z.string().nullable().optional(),
+  })
+  .strict();
+
+export const TaskRelationshipUpdateSchema = z
+  .object({
+    source_task_id: z.string().min(1).optional(),
+    target_task_id: z.string().min(1).optional(),
+    type: TaskRelationshipTypeSchema.optional(),
+    label: z.string().nullable().optional(),
+  })
+  .strict();
+
+export const TaskRelationshipListResponseSchema = z
+  .union([
+    z.array(TaskRelationshipResponseSchema),
+    z.object({ items: z.array(TaskRelationshipResponseSchema) }),
+  ])
+  .transform((response) => (Array.isArray(response) ? response : response.items));
 
 // -- Events -----------------------------------------------------------------
 
@@ -337,7 +392,11 @@ export type TodoResponse = z.infer<typeof TodoResponseSchema>;
 export type TodoCreate = z.infer<typeof TodoCreateSchema>;
 export type TodoUpdate = z.infer<typeof TodoUpdateSchema>;
 export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
-export type KanbanStatus = z.infer<typeof KanbanStatusSchema>;
+export type TaskStatus = GeneratedTaskStatus;
+export type TaskRelationshipType = z.infer<typeof TaskRelationshipTypeSchema>;
+export type TaskRelationshipResponse = z.infer<typeof TaskRelationshipResponseSchema>;
+export type TaskRelationshipCreate = z.infer<typeof TaskRelationshipCreateSchema>;
+export type TaskRelationshipUpdate = z.infer<typeof TaskRelationshipUpdateSchema>;
 
 export type EventResponse = z.infer<typeof EventResponseSchema>;
 export type EventCreate = z.infer<typeof EventCreateSchema>;
@@ -366,7 +425,7 @@ export type BriefingResponse = z.infer<typeof BriefingResponseSchema>;
 
 export const BulkTodoUpdateSchema = z.object({
   ids: z.array(z.string()).min(1),
-  status: TodoStatusSchema.optional(),
+  status: TaskStatusSchema.optional(),
   priority: PrioritySchema.optional(),
   tags: z.array(z.string()).optional(),
   delete: z.boolean().optional(),
@@ -548,30 +607,108 @@ export const BackupResponseSchema = z.object({
   size_bytes: z.number(),
 });
 
-export const PlanSubtaskSchema = z.object({
-  title: z.string(),
-  description: z.string().nullable().optional(),
-  estimated_minutes: z.number().nullable().optional(),
-  due_date: z.string().nullable().optional(),
-  priority: PrioritySchema.nullable().optional(),
-  depends_on_indices: z.array(z.number()).optional(),
+const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected an ISO date');
+
+export const PlanProposalStatusSchema = z.enum([
+  'generating',
+  'draft',
+  'applying',
+  'applied',
+  'rejected',
+  'stale',
+  'reverted',
+  'failed',
+]);
+
+export const PlanChangeSetStatusSchema = z.enum(['applying', 'applied', 'reverted', 'failed']);
+export const PlanVaultSyncStatusSchema = z.enum(['pending', 'processing', 'succeeded', 'failed']);
+
+export const PlanSubtaskSchema = z
+  .object({
+    title: z.string().trim().min(1).max(500),
+    description: z.string().max(10_000).nullable().optional(),
+    estimated_minutes: z.number().int().min(1).max(10_080).nullable().optional(),
+    due_date: IsoDateSchema.nullable().optional(),
+    priority: PrioritySchema.nullable().optional(),
+    depends_on_indices: z.array(z.number().int().min(0).max(49)).max(50).optional(),
+  })
+  .strict();
+
+export const PlanValidationIssueSchema = z
+  .object({
+    code: z.string(),
+    message: z.string(),
+    path: z.string().nullable().optional(),
+  })
+  .strict();
+
+export const PlanValidationResultSchema = z
+  .object({
+    errors: z.array(PlanValidationIssueSchema),
+    warnings: z.array(PlanValidationIssueSchema),
+  })
+  .strict();
+
+export const PlanProposalDiffSchema = z
+  .object({
+    add_task_count: z.number().int().nonnegative(),
+    add_relationship_count: z.number().int().nonnegative(),
+    root_update_fields: z.array(z.string()),
+  })
+  .strict();
+
+export const PlanProposalResponseSchema = z.object({
+  proposal_id: z.string().min(1),
+  task_id: z.string().min(1),
+  agent_task_id: z.string().nullable(),
+  todo_id: z.string().min(1),
+  base_graph_revision: z.number().int().nonnegative().nullable(),
+  status: PlanProposalStatusSchema,
+  validation: PlanValidationResultSchema,
+  diff: PlanProposalDiffSchema,
+  summary: z.string(),
+  suggested_root_due_date: IsoDateSchema.nullable(),
+  suggested_assignee: z.string().nullable(),
+  suggested_skills: z.array(z.string()).nullable(),
+  suggested_project_title: z.string().nullable(),
+  subtasks: z.array(PlanSubtaskSchema),
+  subtask_count: z.number().int().nonnegative(),
+  suggested_due_summary: z.string().nullable(),
+  suggested_assignee_label: z.string().nullable(),
+  suggested_skills_labels: z.array(z.string()).nullable(),
+  suggested_project_label: z.string().nullable(),
+  created_at: z.string(),
 });
 
-export const PlanResponseSchema = z.object({
-  task_id: z.string(),
+// Backward-compatible name used by existing graph planning imports.
+export const PlanResponseSchema = PlanProposalResponseSchema;
+
+export const PlanGenerateRequestSchema = z
+  .object({ instructions: z.string().max(2000).nullable().optional() })
+  .strict();
+
+export const PlanApplyRequestSchema = z
+  .object({
+    proposal_id: z.string().trim().min(1).max(128),
+    base_graph_revision: z.number().int().nonnegative(),
+    selected_indices: z
+      .array(z.number().int().min(0).max(49))
+      .min(1)
+      .max(50)
+      .refine((indices) => new Set(indices).size === indices.length, 'Duplicate selection')
+      .optional(),
+    subtasks: z.array(PlanSubtaskSchema).max(50).optional(),
+  })
+  .strict();
+
+export const PlanDismissRequestSchema = z
+  .object({ proposal_id: z.string().trim().min(1).max(128) })
+  .strict();
+
+export const PlanDismissResponseSchema = z.object({
+  status: z.literal('rejected'),
   todo_id: z.string(),
-  summary: z.string(),
-  suggested_root_due_date: z.string().nullable().optional(),
-  suggested_assignee: z.string().nullable().optional(),
-  suggested_skills: z.array(z.string()).nullable().optional(),
-  suggested_project_title: z.string().nullable().optional(),
-  subtasks: z.array(PlanSubtaskSchema).optional(),
-  subtask_count: z.number().optional(),
-  suggested_due_summary: z.string().nullable().optional(),
-  suggested_assignee_label: z.string().nullable().optional(),
-  suggested_skills_labels: z.array(z.string()).nullable().optional(),
-  suggested_project_label: z.string().nullable().optional(),
-  created_at: z.string(),
+  proposal_id: z.string(),
 });
 
 export const SkillSchema = z.object({
@@ -587,9 +724,39 @@ export const SkillsResponseSchema = z.object({
 
 export const PlanApplyResponseSchema = z.object({
   todo_id: z.string(),
-  created_subtask_ids: z.array(z.string()).optional(),
-  created_relationships: z.number().optional(),
-  project_folder_created: z.string().nullable().optional(),
+  proposal_id: z.string(),
+  change_set_id: z.string(),
+  applied_graph_revision: z.number().int().nonnegative(),
+  created_subtask_ids: z.array(z.string()),
+  created_relationships: z.number().int().nonnegative(),
+  root_update_fields: z.array(z.string()),
+  project_folder_created: z.string().nullable(),
+  already_applied: z.boolean(),
+  can_undo: z.boolean(),
+  vault_sync_status: PlanVaultSyncStatusSchema,
+});
+
+export const PlanUndoResponseSchema = z.object({
+  change_set_id: z.string(),
+  proposal_id: z.string(),
+  todo_id: z.string(),
+  reverted_graph_revision: z.number().int().nonnegative(),
+  reverted_subtask_ids: z.array(z.string()),
+  already_reverted: z.boolean(),
+  vault_sync_status: PlanVaultSyncStatusSchema,
+});
+
+export const StalePlanProposalDetailsSchema = z.object({
+  base_revision: z.number().int().nonnegative().nullable(),
+  current_revision: z.number().int().nonnegative(),
+});
+
+export const PlanProposalErrorResponseSchema = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+  }),
 });
 
 export type AdminOverviewResponse = z.infer<typeof AdminOverviewResponseSchema>;
@@ -609,8 +776,22 @@ export type BackupResponse = z.infer<typeof BackupResponseSchema>;
 export type InboxState = z.infer<typeof InboxStateSchema>;
 export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
 export type PlanSubtask = z.infer<typeof PlanSubtaskSchema>;
+export type PlanProposalStatus = z.infer<typeof PlanProposalStatusSchema>;
+export type PlanChangeSetStatus = z.infer<typeof PlanChangeSetStatusSchema>;
+export type PlanVaultSyncStatus = z.infer<typeof PlanVaultSyncStatusSchema>;
+export type PlanValidationIssue = z.infer<typeof PlanValidationIssueSchema>;
+export type PlanValidationResult = z.infer<typeof PlanValidationResultSchema>;
+export type PlanProposalDiff = z.infer<typeof PlanProposalDiffSchema>;
+export type PlanProposalResponse = z.infer<typeof PlanProposalResponseSchema>;
 export type PlanResponse = z.infer<typeof PlanResponseSchema>;
+export type PlanGenerateRequest = z.infer<typeof PlanGenerateRequestSchema>;
+export type PlanApplyRequest = z.infer<typeof PlanApplyRequestSchema>;
+export type PlanDismissRequest = z.infer<typeof PlanDismissRequestSchema>;
+export type PlanDismissResponse = z.infer<typeof PlanDismissResponseSchema>;
 export type PlanApplyResponse = z.infer<typeof PlanApplyResponseSchema>;
+export type PlanUndoResponse = z.infer<typeof PlanUndoResponseSchema>;
+export type StalePlanProposalDetails = z.infer<typeof StalePlanProposalDetailsSchema>;
+export type PlanProposalErrorResponse = z.infer<typeof PlanProposalErrorResponseSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
 export type SkillsResponse = z.infer<typeof SkillsResponseSchema>;
 
@@ -641,24 +822,29 @@ export const ObsidianHealthSchema = z.object({
   queue_pending: z.number().optional(),
   queue_age_seconds: z.number().nullable().optional(),
   dead_letter_count: z.number().optional(),
-  last_cli_error: z.object({
-    timestamp: z.number(),
-    command: z.string(),
-    error: z.string(),
-    returncode: z.number().nullable(),
-  }).nullable().optional(),
+  last_cli_error: z
+    .object({
+      timestamp: z.number(),
+      command: z.string(),
+      error: z.string(),
+      returncode: z.number().nullable(),
+    })
+    .nullable()
+    .optional(),
   last_successful_cli_at: z.number().nullable().optional(),
   scan_stuck: z.boolean().optional(),
   write_queue: z.object({
     pending: z.number(),
     oldest_age_seconds: z.number().nullable().optional(),
-    operations: z.array(z.object({
-      op: z.string(),
-      path: z.string(),
-      queued_at: z.number(),
-      retries: z.number(),
-      error: z.string().nullable(),
-    })),
+    operations: z.array(
+      z.object({
+        op: z.string(),
+        path: z.string(),
+        queued_at: z.number(),
+        retries: z.number(),
+        error: z.string().nullable(),
+      }),
+    ),
   }),
   bidirectional_sync: z.object({
     last_scan: z.number().nullable(),

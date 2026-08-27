@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
@@ -15,8 +16,14 @@ class ToggleTodoAction : ActionCallback {
         parameters: ActionParameters,
     ) {
         val todoId = parameters[TodoTrackingWidget.TODO_ID_KEY] ?: return
-        val currentStatus = parameters[TodoTrackingWidget.CURRENT_STATUS_KEY] ?: return
-        val newStatus = if (currentStatus == "completed") "pending" else "completed"
+        val currentStatus = parameters[TodoTrackingWidget.CURRENT_STATUS_KEY]
+            ?.let { runCatching { TaskStatus.fromWireValue(it) }.getOrNull() }
+            ?: return
+        val newStatus = if (currentStatus == TaskStatus.COMPLETED) {
+            TaskStatus.PENDING
+        } else {
+            TaskStatus.COMPLETED
+        }
 
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,

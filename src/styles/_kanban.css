@@ -4,7 +4,7 @@
 
 .cc-kanban {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   min-height: 0;
 }
@@ -19,7 +19,10 @@
   border: 1px solid var(--cc-border);
   max-height: calc(100vh - 200px);
   overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
 }
 
 /* Drag-over highlight per variant */
@@ -36,6 +39,11 @@
 .cc-kanban__column--done.cc-kanban__column--drag-over {
   border-color: var(--cc-success);
   background: rgba(34, 197, 94, 0.04);
+}
+
+.cc-kanban__column--cancelled.cc-kanban__column--drag-over {
+  border-color: var(--cc-text-tertiary);
+  background: color-mix(in srgb, var(--cc-text-tertiary) 4%, transparent);
 }
 
 /* -- Header -------------------------------------------------- */
@@ -94,7 +102,10 @@
 .cc-kanban__card {
   cursor: grab;
   border-radius: var(--cc-radius-md);
-  transition: box-shadow 0.15s, transform 0.15s, opacity 0.15s;
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s,
+    opacity 0.15s;
   position: relative;
 }
 
@@ -145,7 +156,9 @@
   outline-offset: 2px;
   border-radius: var(--cc-radius-md);
   background: color-mix(in srgb, var(--cc-primary) 8%, transparent);
-  transition: outline 0.15s, background 0.15s;
+  transition:
+    outline 0.15s,
+    background 0.15s;
 }
 
 .cc-kanban__card--subtask {
@@ -226,7 +239,9 @@
   color: var(--cc-text-secondary);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .cc-kanban-tabs__tab--active {

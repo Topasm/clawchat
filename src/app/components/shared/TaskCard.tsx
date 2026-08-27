@@ -1,8 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { TodoResponse } from '../../types/api';
+import { useTaskRelationshipsQuery } from '../../hooks/queries';
+import { getDependsOnCountBySource } from '../../utils/taskRelationships';
 import Checkbox from './Checkbox';
 import Badge from './Badge';
 import { RepeatIcon } from './Icons';
+
+const EMPTY_RELATIONSHIPS = [] as const;
 const SKILL_BADGE_LABELS: Record<string, string> = {
   plan: 'Plan',
   research: 'Research',
@@ -36,6 +40,9 @@ export default function TaskCard({
   isCompletedOverride,
 }: TaskCardProps) {
   const isCompleted = isCompletedOverride ?? task.status === 'completed';
+  const { data: relationships } = useTaskRelationshipsQuery();
+  const dependencyCount =
+    getDependsOnCountBySource(relationships ?? EMPTY_RELATIONSHIPS).get(task.id) ?? 0;
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -194,12 +201,12 @@ export default function TaskCard({
                       : 'Exec'}
               </span>
             ) : null}
-            {(task.depends_on?.length ?? 0) > 0 && (
+            {dependencyCount > 0 && (
               <span
                 className="cc-badge cc-badge--blocker"
-                title={`Depends on ${task.depends_on!.length} task(s)`}
+                title={`Depends on ${dependencyCount} task(s)`}
               >
-                {task.depends_on!.length} dep{task.depends_on!.length !== 1 ? 's' : ''}
+                {dependencyCount} dep{dependencyCount !== 1 ? 's' : ''}
               </span>
             )}
             {(subTaskCount ?? 0) > 0 && (

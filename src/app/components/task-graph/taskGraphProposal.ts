@@ -1,4 +1,5 @@
 import type { PlanSubtask, TodoResponse } from '../../types/api';
+import type { GraphRelationshipLike } from './taskGraphLayout';
 
 export const PROPOSAL_ROOT_ID = 'proposal:root';
 
@@ -13,17 +14,13 @@ export function proposalIndexFromNodeId(nodeId: string): number | null {
   return Number.isInteger(index) && index >= 0 ? index : null;
 }
 
-export function buildProposalTodos(
-  root: TodoResponse,
-  subtasks: PlanSubtask[],
-): TodoResponse[] {
+export function buildProposalTodos(root: TodoResponse, subtasks: PlanSubtask[]): TodoResponse[] {
   const now = new Date().toISOString();
   const virtualRoot: TodoResponse = {
     ...root,
     id: PROPOSAL_ROOT_ID,
     status: 'pending',
     parent_id: null,
-    depends_on: [],
     created_at: root.created_at || now,
     updated_at: root.updated_at || now,
   };
@@ -36,9 +33,6 @@ export function buildProposalTodos(
     due_date: subtask.due_date,
     tags: root.tags ?? [],
     parent_id: PROPOSAL_ROOT_ID,
-    depends_on: (subtask.depends_on_indices ?? [])
-      .filter((dependencyIndex) => dependencyIndex >= 0 && dependencyIndex < subtasks.length && dependencyIndex !== index)
-      .map(proposalNodeId),
     sort_order: index,
     project_label: root.title,
     created_at: now,
@@ -46,6 +40,24 @@ export function buildProposalTodos(
   }));
 
   return [virtualRoot, ...children];
+}
+
+export function buildProposalRelationships(subtasks: PlanSubtask[]): GraphRelationshipLike[] {
+  return subtasks.flatMap((subtask, index) =>
+    [...new Set(subtask.depends_on_indices ?? [])].flatMap((dependencyIndex) => {
+      if (dependencyIndex < 0 || dependencyIndex >= subtasks.length || dependencyIndex === index) {
+        return [];
+      }
+      return [
+        {
+          id: `proposal:relationship:${index}:${dependencyIndex}`,
+          source_task_id: proposalNodeId(index),
+          target_task_id: proposalNodeId(dependencyIndex),
+          type: 'depends_on',
+        },
+      ];
+    }),
+  );
 }
 
 /**

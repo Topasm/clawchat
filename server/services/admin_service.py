@@ -10,12 +10,14 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from domain.task import TaskStatus
 from models.conversation import Conversation
 from models.message import Message
 from models.todo import Todo
 from models.event import Event
 from models.agent_task import AgentTask
 from models.attachment import Attachment
+from services import task_relationship_service
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +174,7 @@ async def purge_old_data(db: AsyncSession, target: str, older_than_days: int) ->
 
     if target == "todos":
         q = select(model).where(
-            Todo.status == "completed",
+            Todo.status == TaskStatus.COMPLETED,
             date_col.isnot(None),
             date_col < cutoff,
         )
@@ -181,8 +183,19 @@ async def purge_old_data(db: AsyncSession, target: str, older_than_days: int) ->
 
     rows = (await db.execute(q)).scalars().all()
     count = len(rows)
+    dependent_source_ids: set[str] = set()
+    if target == "todos":
+        dependent_source_ids = await task_relationship_service.dependent_source_ids(
+            db,
+            {row.id for row in rows},
+        )
     for row in rows:
         await db.delete(row)
+    await db.flush()
+    await task_relationship_service.sync_dependency_shadows(
+        db,
+        dependent_source_ids,
+    )
     await db.commit()
     return count
 

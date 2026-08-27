@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanSubtask, TodoResponse } from '../../../types/api';
 import {
+  buildProposalRelationships,
   buildProposalTodos,
   PROPOSAL_ROOT_ID,
   proposalIndexFromNodeId,
@@ -26,26 +27,32 @@ const subtasks: PlanSubtask[] = [
 ];
 
 describe('task graph proposal adapter', () => {
-  it('builds temporary hierarchy and dependency IDs without mutating the root', () => {
-    const result = buildProposalTodos(root, subtasks);
+  it('builds temporary hierarchy without mutating the root', () => {
+    const todos = buildProposalTodos(root, subtasks);
 
-    expect(result[0].id).toBe(PROPOSAL_ROOT_ID);
-    expect(result[1]).toMatchObject({
+    expect(todos[0].id).toBe(PROPOSAL_ROOT_ID);
+    expect(todos[1]).toMatchObject({
       id: proposalNodeId(0),
       parent_id: PROPOSAL_ROOT_ID,
       priority: 'high',
-      depends_on: [],
     });
-    expect(result[3].depends_on).toEqual([proposalNodeId(1)]);
     expect(root.id).toBe('real-root');
   });
 
-  it('ignores invalid, self, and missing dependency indices', () => {
-    const result = buildProposalTodos(root, [
+  it('builds normalized preview relationships and ignores invalid references', () => {
+    const relationships = buildProposalRelationships([
       { title: 'Safe task', depends_on_indices: [-1, 0, 3] },
+      { title: 'Dependent task', depends_on_indices: [0, 0] },
     ]);
 
-    expect(result[1].depends_on).toEqual([]);
+    expect(relationships).toEqual([
+      {
+        id: 'proposal:relationship:1:0',
+        source_task_id: proposalNodeId(1),
+        target_task_id: proposalNodeId(0),
+        type: 'depends_on',
+      },
+    ]);
   });
 
   it('maps proposal node IDs back to subtask indices', () => {

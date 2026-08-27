@@ -17,6 +17,7 @@ import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,27 +84,22 @@ fun SwipeToDismissCard(
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            when (value) {
-                SwipeToDismissBoxValue.EndToStart -> {
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                    onDelete()
-                    true
-                }
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    if (onSetDueToday == null) {
-                        false
-                    } else {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        onSetDueToday()
-                        false
-                    }
-                }
-                SwipeToDismissBoxValue.Settled -> false
+    val dismissState = rememberSwipeToDismissBoxState()
+
+    LaunchedEffect(dismissState.currentValue) {
+        when (dismissState.currentValue) {
+            SwipeToDismissBoxValue.EndToStart -> {
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                onDelete()
             }
-        },
-    )
+            SwipeToDismissBoxValue.StartToEnd -> {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onSetDueToday?.invoke()
+                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+            }
+            SwipeToDismissBoxValue.Settled -> Unit
+        }
+    }
 
     SwipeToDismissBox(
         state = dismissState,

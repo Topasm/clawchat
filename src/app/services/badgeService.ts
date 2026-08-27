@@ -20,16 +20,16 @@ export async function setAppBadge(count: number): Promise<void> {
       await platformApi.notifications.setBadgeCount(safeCount);
     } else if (IS_CAPACITOR) {
       const { LocalNotifications } = await import('@capacitor/local-notifications');
-      // Capacitor 6 LocalNotifications doesn't have setBadge — use the Badge plugin
+      // LocalNotifications doesn't have setBadge — use the Badge plugin
       // approach via native bridge. For iOS, setting badge on a notification works.
       // We schedule a silent local notification with the badge count.
-      const { Capacitor } = await import('@capacitor/core');
-      const BadgePlugin = Capacitor.Plugins['Badge'] as
-        | {
+      const { Capacitor, registerPlugin } = await import('@capacitor/core');
+      const BadgePlugin = Capacitor.isPluginAvailable('Badge')
+        ? registerPlugin<{
             set(opts: { count: number }): Promise<void>;
             clear(): Promise<void>;
-          }
-        | undefined;
+          }>('Badge')
+        : undefined;
 
       if (BadgePlugin) {
         if (safeCount > 0) {

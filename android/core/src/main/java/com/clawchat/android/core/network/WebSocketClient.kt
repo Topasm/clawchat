@@ -205,7 +205,7 @@ class WebSocketClient @Inject constructor(
                     return TicketResult.Unauthorized
                 }
                 if (!response.isSuccessful) return TicketResult.RetryableFailure
-                val body = response.body?.string() ?: return TicketResult.RetryableFailure
+                val body = response.body.string()
                 JSONObject(body).optString("ticket")
                     .takeIf { it.isNotBlank() }
                     ?.let { TicketResult.Success(it) }

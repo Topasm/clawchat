@@ -12,6 +12,7 @@ import EmptyState from '../components/shared/EmptyState';
 import { InboxTrayIcon } from '../components/shared/Icons';
 import apiClient from '../services/apiClient';
 import type { TodoResponse } from '../types/schemas';
+import { isTerminalTaskStatus } from '../utils/taskStatus';
 
 function QuestionnaireCard({ task }: { task: TodoResponse }) {
   const questions = task.clarification_questions ?? [];
@@ -110,11 +111,9 @@ export default function InboxPage() {
     for (const todo of todos) {
       todoById.set(todo.id, todo);
       if (todo.parent_id) {
-        childCountByParent.set(
-          todo.parent_id,
-          (childCountByParent.get(todo.parent_id) ?? 0) + 1,
-        );
+        childCountByParent.set(todo.parent_id, (childCountByParent.get(todo.parent_id) ?? 0) + 1);
       }
+      if (isTerminalTaskStatus(todo.status)) continue;
 
       if (todo.inbox_state === 'classifying' || todo.inbox_state === 'planning') {
         processing.push(todo);
@@ -125,11 +124,8 @@ export default function InboxPage() {
       } else if (todo.inbox_state === 'error') {
         errors.push(todo);
       } else if (
-        todo.inbox_state === 'captured'
-        || ((!todo.inbox_state || todo.inbox_state === 'none')
-          && !todo.due_date
-          && todo.status !== 'completed'
-          && !todo.parent_id)
+        todo.inbox_state === 'captured' ||
+        ((!todo.inbox_state || todo.inbox_state === 'none') && !todo.due_date && !todo.parent_id)
       ) {
         needsOrganising.push(todo);
       }
@@ -156,16 +152,27 @@ export default function InboxPage() {
     todoById,
   } = inboxData;
 
-  const handleDelete = useCallback((id: string) => {
-    deleteMutation.mutate(id);
-  }, [deleteMutation]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      deleteMutation.mutate(id);
+    },
+    [deleteMutation],
+  );
 
-  const handleToggle = useCallback((id: string) => {
-    const todo = todoById.get(id);
-    if (todo) toggleMutation.mutate({ id, currentStatus: todo.status });
-  }, [todoById, toggleMutation]);
+  const handleToggle = useCallback(
+    (id: string) => {
+      const todo = todoById.get(id);
+      if (todo) toggleMutation.mutate({ id, currentStatus: todo.status });
+    },
+    [todoById, toggleMutation],
+  );
 
-  const totalItems = processing.length + questioning.length + planReady.length + needsOrganising.length + errors.length;
+  const totalItems =
+    processing.length +
+    questioning.length +
+    planReady.length +
+    needsOrganising.length +
+    errors.length;
 
   const handleOrganize = async (id: string) => {
     try {
@@ -228,7 +235,12 @@ export default function InboxPage() {
 
       {/* Answer questions (questioning) */}
       {questioning.length > 0 && (
-        <SectionHeader title="Answer questions" count={questioning.length} variant="accent" defaultOpen>
+        <SectionHeader
+          title="Answer questions"
+          count={questioning.length}
+          variant="accent"
+          defaultOpen
+        >
           {questioning.map((task) => (
             <QuestionnaireCard key={task.id} task={task} />
           ))}
@@ -237,7 +249,12 @@ export default function InboxPage() {
 
       {/* Review suggestion (plan_ready) */}
       {planReady.length > 0 && (
-        <SectionHeader title="Review suggestion" count={planReady.length} variant="accent" defaultOpen>
+        <SectionHeader
+          title="Review suggestion"
+          count={planReady.length}
+          variant="accent"
+          defaultOpen
+        >
           {planReady.map((task) => (
             <div key={task.id} className="cc-inbox-card cc-inbox-card--review">
               <TaskCard

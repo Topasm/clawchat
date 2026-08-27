@@ -9,6 +9,10 @@ import {
   useUpdateTodo,
   useDeleteTodo,
   useToggleTodoComplete,
+  useLatestPlanProposalQuery,
+  useGeneratePlanProposal,
+  useApplyPlanProposal,
+  useDismissPlanProposal,
   queryKeys,
 } from '../hooks/queries';
 import apiClient from '../services/apiClient';
@@ -16,13 +20,13 @@ import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
 import TaskCard from '../components/shared/TaskCard';
 import PlanReviewDiff from '../components/shared/PlanReviewDiff';
-import type { TaskPlan } from '../components/shared/PlanReviewDiff';
 import RecurrenceSelector from '../components/shared/RecurrenceSelector';
 import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
 import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
+import { getTaskStatusLabel, isTerminalTaskStatus } from '../utils/taskStatus';
 
 const PRIORITIES: Array<TodoResponse['priority']> = ['low', 'medium', 'high', 'urgent'];
 
@@ -70,16 +74,19 @@ export default function TaskDetailPage() {
   const toggleCompleteMutation = useToggleTodoComplete();
 
   const task = todos.find((t) => t.id === taskId);
+  const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
+  const generatePlanMutation = useGeneratePlanProposal();
+  const applyPlanMutation = useApplyPlanProposal();
+  const dismissPlanMutation = useDismissPlanProposal();
   const childTasks = todos.filter((t) => t.parent_id === taskId);
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
-  const incompleteChildren = childTasks.filter((t) => t.status !== 'completed');
+  const incompleteChildren = childTasks.filter((t) => !isTerminalTaskStatus(t.status));
   const nextSubtask = incompleteChildren[0] ?? null;
 
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
-  const [plan, setPlan] = useState<TaskPlan | null>(null);
-  const [planLoading, setPlanLoading] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const plan = latestPlanQuery.data ?? null;
 
   useEffect(() => {
     if (task) {
@@ -87,19 +94,6 @@ export default function TaskDetailPage() {
       setDescription(task.description ?? '');
     }
   }, [task]);
-
-  useEffect(() => {
-    if (!taskId || task?.inbox_state !== 'plan_ready') {
-      setPlan(null);
-      return;
-    }
-    setPlanLoading(true);
-    apiClient
-      .get(`/todos/${taskId}/plan/latest`)
-      .then((res) => setPlan(res.data))
-      .catch(() => setPlan(null))
-      .finally(() => setPlanLoading(false));
-  }, [taskId, task?.inbox_state]);
 
   const serverUpdateTodo = useCallback(
     (id: string, data: TodoUpdate) => {
@@ -151,30 +145,27 @@ export default function TaskDetailPage() {
     [todos, toggleCompleteMutation],
   );
 
-  const handleApplyPlan = async (selectedIndices?: number[]) => {
-    try {
-      if (selectedIndices) {
-        await apiClient.post(`/todos/${taskId}/plan/apply`, { selected_indices: selectedIndices });
-      } else {
-        await apiClient.post(`/todos/${taskId}/plan/apply`);
-      }
-      useToastStore.getState().addToast('success', 'Plan applied');
-      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-      setPlan(null);
-    } catch {
-      useToastStore.getState().addToast('error', 'Failed to apply plan');
-    }
+  const handleApplyPlan = async (selectedIndices: number[]) => {
+    if (!taskId || !plan || plan.base_graph_revision === null) return;
+    await applyPlanMutation.mutateAsync({
+      todoId: taskId,
+      proposalId: plan.proposal_id,
+      baseGraphRevision: plan.base_graph_revision,
+      selectedIndices,
+      subtasks: plan.subtasks,
+    });
   };
 
   const handleDismissPlan = async () => {
-    try {
-      await apiClient.post(`/todos/${taskId}/plan/dismiss`);
-      useToastStore.getState().addToast('info', 'Plan dismissed');
-      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-      setPlan(null);
-    } catch {
-      useToastStore.getState().addToast('error', 'Failed to dismiss');
-    }
+    if (!taskId || !plan) return;
+    await dismissPlanMutation.mutateAsync({ todoId: taskId, proposalId: plan.proposal_id });
+    useToastStore.getState().addToast('info', 'Plan dismissed');
+  };
+
+  const handleRegeneratePlan = async () => {
+    if (!taskId) return;
+    await generatePlanMutation.mutateAsync({ todoId: taskId });
+    applyPlanMutation.reset();
   };
 
   const handleDelegate = async (skillId: string) => {
@@ -203,13 +194,14 @@ export default function TaskDetailPage() {
   }
 
   const isProject = task.source === 'obsidian_project';
-  const hasPlan = task.inbox_state === 'plan_ready' && plan;
+  const hasPlan = plan && (plan.status === 'draft' || plan.status === 'stale');
   const isPlanned = childTasks.length > 0;
-  const dueInfo = task.due_date ? getDueCountdown(task.due_date) : null;
+  const dueInfo =
+    task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
 
   // Blocker info from child tasks
   const blockedByRelationships = todos.filter(
-    (t) => t.parent_id === taskId && t.status !== 'completed',
+    (t) => t.parent_id === taskId && !isTerminalTaskStatus(t.status),
   );
 
   return (
@@ -229,7 +221,9 @@ export default function TaskDetailPage() {
           <button type="button" className="cc-detail__field-btn" onClick={cyclePriority}>
             <Badge variant="priority" level={task.priority || 'medium'} />
           </button>
-          {task.status === 'completed' && <Badge variant="status">Completed</Badge>}
+          {task.status !== 'pending' && (
+            <Badge variant="status">{getTaskStatusLabel(task.status)}</Badge>
+          )}
           {task.inbox_state && task.inbox_state !== 'none' && (
             <Badge variant="status">{task.inbox_state}</Badge>
           )}
@@ -240,7 +234,16 @@ export default function TaskDetailPage() {
       <div className="cc-exec-panel__section">
         <div className="cc-exec-panel__section-title">Next step</div>
         {hasPlan ? (
-          <PlanReviewDiff plan={plan} onApply={handleApplyPlan} onDismiss={handleDismissPlan} />
+          <PlanReviewDiff
+            plan={plan}
+            onApply={handleApplyPlan}
+            onDismiss={handleDismissPlan}
+            onRegenerate={handleRegeneratePlan}
+            applyError={applyPlanMutation.error}
+            isApplying={applyPlanMutation.isPending}
+            isDismissing={dismissPlanMutation.isPending}
+            isRegenerating={generatePlanMutation.isPending}
+          />
         ) : nextSubtask ? (
           <div className="cc-exec-panel__next-step">
             <TaskCard
@@ -258,8 +261,10 @@ export default function TaskDetailPage() {
           </div>
         ) : (
           <div className="cc-exec-panel__next-step-empty">
-            {task.status === 'completed' ? (
-              <span className="cc-exec-panel__done-label">Task completed</span>
+            {isTerminalTaskStatus(task.status) ? (
+              <span className="cc-exec-panel__done-label">
+                {task.status === 'completed' ? 'Task completed' : 'Task cancelled'}
+              </span>
             ) : (
               <span className="cc-exec-panel__do-this">This task is your next step</span>
             )}
@@ -335,7 +340,7 @@ export default function TaskDetailPage() {
       <div className="cc-exec-panel__section">
         <div className="cc-exec-panel__section-title">Actions</div>
         <div className="cc-exec-panel__action-bar">
-          {!isPlanned && !hasPlan && task.status !== 'completed' && (
+          {!isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
             <button
               type="button"
               className="cc-btn cc-btn--secondary"
@@ -352,7 +357,7 @@ export default function TaskDetailPage() {
               Plan this task
             </button>
           )}
-          {isPlanned && !hasPlan && task.status !== 'completed' && (
+          {isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
             <button
               type="button"
               className="cc-btn cc-btn--secondary"

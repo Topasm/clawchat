@@ -12,7 +12,7 @@ export const mobileTabs = [
 export default function BottomNav() {
   const { t } = useTranslation();
   const { data: todos = [] } = useTodosQuery();
-  const inboxCount = todos.filter((todo) => !todo.due_date && todo.status !== 'completed').length;
+  const inboxCount = todos.filter((todo) => !todo.due_date && todo.status === 'pending').length;
 
   return (
     <nav className="cc-bottom-nav">

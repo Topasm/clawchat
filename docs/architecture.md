@@ -8,7 +8,8 @@
 │   Platform Targets                                       │
 │   ├── Tauri 2 (Windows, macOS, Linux)                    │
 │   ├── Web Browser (Vite dev server / static build)       │
-│   └── Capacitor (iOS, Android)                           │
+│   ├── Native Android (Kotlin + Compose)                  │
+│   └── Capacitor iOS (provisional)                       │
 │                                                          │
 │   Pages                         State (Zustand)          │
 │   ├── TodayPage                 ├── useAuthStore         │
@@ -57,16 +58,17 @@
 │  FastAPI Backend  (server/)                                │
 │  ├── Routers (chat, todo, tasks, calendar, attachment,    │
 │  │           search, today, admin, obsidian, pairing,     │
-│  │           settings, task-relationships)                │
+│  │           settings, task relationships, change sets)   │
 │  ├── Services (ai, orchestrator, todo, calendar,          │
-│  │            scheduling, inbox pipeline, obsidian        │
-│  │            CLI/vault/export, claude code)              │
+│  │            planning/validation, inbox pipeline,        │
+│  │            Vault outbox/export, claude code)           │
 │  └── Models & Schemas (SQLAlchemy async + Pydantic)       │
 │                                                           │
 │  SQLite Database                                          │
 │  ├── conversations, messages                              │
-│  ├── todos, events, attachments, task_relationships       │
-│  └── agent_tasks, paired_devices, user_settings           │
+│  ├── todos, task_relationships, events, attachments       │
+│  ├── task_graph_states, plan_proposals, change_sets       │
+│  └── vault_sync_jobs, agent_tasks, devices, settings      │
 │                                                           │
 │  File Storage (data/uploads/)                             │
 │  └── Uploaded attachments (UUID-named files)              │
@@ -91,11 +93,11 @@ All data stays on the user's server. The app communicates only with this server 
 ### 2. Conversation as Interface
 Natural language chat is the primary way users interact with all features. Direct manipulation UI (clicking, dragging) remains available as an alternative.
 
-### 3. Unified Data Model
-Todos, calendar events, notes, and conversations live in a single SQLite database, enabling cross-module awareness, full-text search, and traceability.
+### 3. Unified Application Data
+Todos, calendar events, messages, and conversations live in a single SQLite database, enabling cross-module awareness, full-text search, and traceability. Project documents remain user-owned Markdown files in an optional Obsidian vault and are integrated through indexing, context, and export services.
 
-### 4. Cross-Platform from a Single Codebase
-One React + TypeScript codebase targets Tauri desktop, web browsers, and Capacitor mobile. Platform differences are handled through the neutral platform adapter and runtime detection (`IS_TAURI`, `IS_WEB`, `IS_MOBILE`).
+### 4. Deliberate Platform Boundaries
+React + TypeScript is shared by the web and Tauri desktop targets. Native Android owns Android-specific UI, widgets, notifications, and background behavior. Capacitor is provisional for iOS only; Capacitor Android is deprecated and receives no new feature work. Platform differences in the React application are handled through the neutral platform adapter. See [platform-matrix.md](./architecture/platform-matrix.md).
 
 ### 5. Local by Default, Cloud by Choice
 The system works fully offline with demo data. Cloud services (LLM APIs, server sync) are optional enhancements.
@@ -155,7 +157,7 @@ Five Zustand stores manage all client state:
 |-------|---------------|
 | `useAuthStore` | JWT tokens, server URL, login/logout (persisted to localStorage) |
 | `useChatStore` | Conversations, messages, SSE streaming, abort controller |
-| `useModuleStore` | Todos, events, kanban statuses, kanban filters, CRUD + async API actions |
+| `useModuleStore` | Local todo/event view preferences and kanban filters |
 | `useSettingsStore` | Theme, chat behavior, LLM params, panel sizes, notifications (persisted to localStorage) |
 | `useToastStore` | Toast notification queue with auto-dismiss (success/error/info/warning) |
 
@@ -174,3 +176,31 @@ The architecture splits state responsibilities between specialized tools (comple
 | **Validation** | Zod | Validates API responses and form inputs at runtime |
 
 This mirrors the pattern used in production by vibe-kanban, where Zustand handles UI preferences and React Query handles all server-side data with intelligent caching. See [roadmap.md](./roadmap.md) Phase 2 for details.
+
+## Canonical Task Lifecycle
+
+Task lifecycle state is server-owned and persisted in `todos.status`:
+
+```text
+pending | in_progress | completed | cancelled
+```
+
+Web, Tauri, and Android read that value directly. Zustand does not override task status. `blocked` is not a lifecycle value; it is derived from incomplete dependencies. FastAPI publishes the enum in OpenAPI, and checked-in TypeScript and Kotlin contracts are generated from that schema. See [ADR 003](./adr/003-task-status-source-of-truth.md).
+
+Task links are server-owned rows in `task_relationships`. For a `depends_on`
+edge, the source is the task being executed and the target is its prerequisite;
+`blocks` is derived by reversing that edge. The server enforces endpoint
+existence, uniqueness, self-edge rejection, and an acyclic dependency graph.
+`todos.depends_on` remains only as a deprecated, transactionally synchronized
+compatibility shadow for older clients and rollback. See [ADR 004](./adr/004-task-relationship-model.md).
+
+## Versioned AI Planning
+
+AI planning captures the current graph revision and the hash of all prompt
+context before presenting a proposal. The client applies that exact
+`proposal_id` and `base_graph_revision`; the server rejects a stale preview
+instead of rebasing it implicitly. One transaction creates the selected tasks
+and relationships, updates the root, records forward/inverse operations, and
+enqueues Vault reconciliation. Repeated identical requests replay the stored
+result, while undo is refused after later graph or linked-data changes. See
+[ADR 005](./adr/005-versioned-ai-plan-proposals.md).

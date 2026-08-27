@@ -230,7 +230,7 @@ export default function Layout() {
 
   // Badge counts
   const inboxCount = useMemo(
-    () => todos.filter((todo) => !todo.due_date && todo.status !== 'completed').length,
+    () => todos.filter((todo) => !todo.due_date && todo.status === 'pending').length,
     [todos],
   );
   // Sync inbox count to native app icon badge

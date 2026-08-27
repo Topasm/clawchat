@@ -1,16 +1,8 @@
 import { create } from 'zustand';
-import type {
-  KanbanStatus,
-} from '../types/api';
 
 interface ModuleState {
   isLoading: boolean;
   lastFetched: number | null;
-
-  kanbanStatuses: Record<string, KanbanStatus>;
-  setKanbanStatus: (id: string, status: KanbanStatus) => void;
-  getKanbanStatus: (id: string) => KanbanStatus;
-  setKanbanStatuses: (statuses: Record<string, KanbanStatus>) => void;
 
   // Multi-select
   selectedTodoIds: Set<string>;
@@ -30,37 +22,27 @@ interface ModuleState {
   setKanbanSearchQuery: (query: string) => void;
   toggleKanbanPriorityFilter: (priority: string) => void;
   toggleKanbanTagFilter: (tag: string) => void;
-  setKanbanSort: (field: 'title' | 'priority' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order', direction: 'asc' | 'desc') => void;
+  setKanbanSort: (
+    field: 'title' | 'priority' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order',
+    direction: 'asc' | 'desc',
+  ) => void;
   clearKanbanFilters: () => void;
   toggleShowSubTasks: () => void;
 
   resetToDemo: () => void;
 }
 
-export const useModuleStore = create<ModuleState>()((set, get) => ({
+export const useModuleStore = create<ModuleState>()((set) => ({
   isLoading: false,
   lastFetched: null,
-
-  kanbanStatuses: {} as Record<string, KanbanStatus>,
-  setKanbanStatus: (id, status) => {
-    set((state) => ({
-      kanbanStatuses: { ...state.kanbanStatuses, [id]: status },
-    }));
-  },
-  getKanbanStatus: (id) => {
-    const { kanbanStatuses } = get();
-    if (kanbanStatuses[id]) return kanbanStatuses[id];
-    return 'pending';
-  },
-
-  setKanbanStatuses: (statuses) => set({ kanbanStatuses: statuses }),
 
   // --- Multi-select ---
   selectedTodoIds: new Set<string>(),
   toggleTodoSelection: (id) =>
     set((state) => {
       const next = new Set(state.selectedTodoIds);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return { selectedTodoIds: next };
     }),
   selectAllTodos: (ids) => set({ selectedTodoIds: new Set(ids) }),
@@ -68,7 +50,6 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
 
   resetToDemo: () => {
     set({
-      kanbanStatuses: {} as Record<string, KanbanStatus>,
       selectedTodoIds: new Set<string>(),
       isLoading: false,
       lastFetched: null,
@@ -97,13 +78,13 @@ export const useModuleStore = create<ModuleState>()((set, get) => ({
   toggleKanbanTagFilter: (tag) =>
     set((state) => {
       const current = state.kanbanFilters.tags;
-      const next = current.includes(tag)
-        ? current.filter((t) => t !== tag)
-        : [...current, tag];
+      const next = current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag];
       return { kanbanFilters: { ...state.kanbanFilters, tags: next } };
     }),
   setKanbanSort: (field, direction) =>
-    set((state) => ({ kanbanFilters: { ...state.kanbanFilters, sortField: field, sortDirection: direction } })),
+    set((state) => ({
+      kanbanFilters: { ...state.kanbanFilters, sortField: field, sortDirection: direction },
+    })),
   clearKanbanFilters: () =>
     set({
       kanbanFilters: {

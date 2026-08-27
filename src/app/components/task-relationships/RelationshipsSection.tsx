@@ -1,83 +1,190 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTodosQuery, useUpdateTodo } from '../../hooks/queries';
+import {
+  useCreateTaskRelationship,
+  useDeleteTaskRelationship,
+  useTaskRelationshipsQuery,
+  useTodosQuery,
+} from '../../hooks/queries';
+import { useToastStore } from '../../stores/useToastStore';
 
 interface RelationshipsSectionProps {
   taskId: string;
 }
 
+interface ApiErrorResponse {
+  response?: {
+    status?: number;
+    data?: {
+      detail?: unknown;
+      error?: { message?: unknown };
+    };
+  };
+}
+
+function formatValidationDetail(detail: unknown): string | null {
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (!Array.isArray(detail)) return null;
+  const messages = detail.flatMap((item) => {
+    if (!item || typeof item !== 'object' || !('msg' in item)) return [];
+    return typeof item.msg === 'string' ? [item.msg] : [];
+  });
+  return messages.length > 0 ? messages.join('; ') : null;
+}
+
+export function getRelationshipMutationErrorMessage(error: unknown, fallback: string): string {
+  const response = (error as ApiErrorResponse | null)?.response;
+  if (response?.status !== 400 && response?.status !== 409 && response?.status !== 422) {
+    return fallback;
+  }
+  const customMessage = response.data?.error?.message;
+  if (typeof customMessage === 'string' && customMessage.trim()) return customMessage;
+  return formatValidationDetail(response.data?.detail) ?? fallback;
+}
+
 export default function RelationshipsSection({ taskId }: RelationshipsSectionProps) {
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
-  const updateTodo = useUpdateTodo();
+  const { data: relationships = [], isLoading, isError } = useTaskRelationshipsQuery();
+  const createRelationship = useCreateTaskRelationship();
+  const deleteRelationship = useDeleteTaskRelationship();
+  const addToast = useToastStore((state) => state.addToast);
 
   const [showForm, setShowForm] = useState(false);
   const [selectedTodoId, setSelectedTodoId] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const task = todos.find((t) => t.id === taskId);
-  const dependsOn = task?.depends_on ?? [];
+  const dependencies = useMemo(
+    () =>
+      relationships.filter(
+        (relationship) =>
+          relationship.type === 'depends_on' && relationship.source_task_id === taskId,
+      ),
+    [relationships, taskId],
+  );
+  const dependencyIds = useMemo(
+    () => new Set(dependencies.map((relationship) => relationship.target_task_id)),
+    [dependencies],
+  );
+  const todoTitleById = useMemo(() => new Map(todos.map((todo) => [todo.id, todo.title])), [todos]);
 
-  const getTodoTitle = (id: string) => todos.find((t) => t.id === id)?.title ?? id;
-
-  const handleAdd = () => {
-    if (!selectedTodoId || dependsOn.includes(selectedTodoId)) return;
-    updateTodo.mutate({ id: taskId, data: { depends_on: [...dependsOn, selectedTodoId] } });
-    setShowForm(false);
-    setSelectedTodoId('');
+  const handleAdd = async () => {
+    if (!selectedTodoId || dependencyIds.has(selectedTodoId)) return;
+    setErrorMessage(null);
+    try {
+      await createRelationship.mutateAsync({
+        source_task_id: taskId,
+        target_task_id: selectedTodoId,
+        type: 'depends_on',
+      });
+      setShowForm(false);
+      setSelectedTodoId('');
+    } catch (error) {
+      const message = getRelationshipMutationErrorMessage(error, 'Failed to add dependency');
+      setErrorMessage(message);
+      addToast('error', message);
+    }
   };
 
-  const handleRemove = (depId: string) => {
-    const updated = dependsOn.filter((id) => id !== depId);
-    updateTodo.mutate({ id: taskId, data: { depends_on: updated.length ? updated : null } });
+  const handleRemove = async (relationshipId: string) => {
+    setErrorMessage(null);
+    try {
+      await deleteRelationship.mutateAsync(relationshipId);
+    } catch (error) {
+      const message = getRelationshipMutationErrorMessage(error, 'Failed to remove dependency');
+      setErrorMessage(message);
+      addToast('error', message);
+    }
   };
 
-  const otherTodos = todos.filter((t) => t.id !== taskId && !dependsOn.includes(t.id));
+  const otherTodos = todos.filter((todo) => todo.id !== taskId && !dependencyIds.has(todo.id));
+  const isMutating = createRelationship.isPending || deleteRelationship.isPending;
 
   return (
     <div className="cc-detail__section">
       <div className="cc-detail__section-title">Depends on</div>
-      {dependsOn.map((depId) => (
-        <div key={depId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-          <span
-            style={{ fontSize: 13, color: 'var(--cc-primary)', cursor: 'pointer' }}
-            onClick={() => navigate(`/tasks/${depId}`)}
-          >
-            {getTodoTitle(depId)}
-          </span>
+      {isLoading && <div style={{ fontSize: 12 }}>Loading dependencies…</div>}
+      {isError && (
+        <div role="alert" style={{ fontSize: 12, color: 'var(--cc-error)' }}>
+          Failed to load dependencies
+        </div>
+      )}
+      {dependencies.map((relationship) => (
+        <div
+          key={relationship.id}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}
+        >
           <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            style={{ fontSize: 13, color: 'var(--cc-primary)', padding: 0 }}
+            onClick={() => navigate(`/tasks/${relationship.target_task_id}`)}
+          >
+            {todoTitleById.get(relationship.target_task_id) ?? relationship.target_task_id}
+          </button>
+          <button
+            type="button"
             className="cc-btn cc-btn--ghost"
             style={{ padding: '2px 6px', fontSize: 11 }}
-            onClick={() => handleRemove(depId)}
+            onClick={() => void handleRemove(relationship.id)}
+            disabled={isMutating}
           >
             Remove
           </button>
         </div>
       ))}
 
+      {errorMessage && (
+        <div role="alert" style={{ marginTop: 6, fontSize: 12, color: 'var(--cc-error)' }}>
+          {errorMessage}
+        </div>
+      )}
+
       {showForm ? (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
           <select
             className="cc-kanban-filter__select"
             value={selectedTodoId}
-            onChange={(e) => setSelectedTodoId(e.target.value)}
+            onChange={(event) => setSelectedTodoId(event.target.value)}
+            disabled={isMutating}
           >
             <option value="">Select task...</option>
-            {otherTodos.map((t) => (
-              <option key={t.id} value={t.id}>{t.title}</option>
+            {otherTodos.map((todo) => (
+              <option key={todo.id} value={todo.id}>
+                {todo.title}
+              </option>
             ))}
           </select>
-          <button className="cc-btn cc-btn--primary" onClick={handleAdd} disabled={!selectedTodoId}>
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            onClick={() => void handleAdd()}
+            disabled={!selectedTodoId || isMutating}
+          >
             Add
           </button>
-          <button className="cc-btn cc-btn--ghost" onClick={() => setShowForm(false)}>
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            onClick={() => {
+              setShowForm(false);
+              setErrorMessage(null);
+            }}
+            disabled={isMutating}
+          >
             Cancel
           </button>
         </div>
       ) : (
         <button
+          type="button"
           className="cc-btn cc-btn--ghost"
           style={{ fontSize: 12, marginTop: 4 }}
-          onClick={() => setShowForm(true)}
+          onClick={() => {
+            setShowForm(true);
+            setErrorMessage(null);
+          }}
+          disabled={isLoading || isError}
         >
           + Add dependency
         </button>

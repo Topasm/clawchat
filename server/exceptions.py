@@ -1,10 +1,10 @@
-from typing import Optional
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
 
 class AppError(Exception):
-    def __init__(self, code: str, message: str, status_code: int = 500, details: Optional[dict] = None):
+    def __init__(self, code: str, message: str, status_code: int = 500, details: dict | None = None):
         self.code = code
         self.message = message
         self.status_code = status_code
@@ -21,14 +21,57 @@ class NotFoundError(AppError):
         super().__init__(code="NOT_FOUND", message=message, status_code=404)
 
 
+class ConflictError(AppError):
+    def __init__(self, message: str = "Resource conflict"):
+        super().__init__(code="CONFLICT", message=message, status_code=409)
+
+
+class StalePlanProposalError(AppError):
+    def __init__(
+        self,
+        *,
+        base_revision: int | None,
+        current_revision: int,
+    ):
+        super().__init__(
+            code="STALE_PLAN_PROPOSAL",
+            message="The task graph changed after this plan was generated",
+            status_code=409,
+            details={
+                "base_revision": base_revision,
+                "current_revision": current_revision,
+            },
+        )
+
+
+class PlanProposalConflictError(AppError):
+    def __init__(self, message: str, *, details: dict | None = None):
+        super().__init__(
+            code="PLAN_PROPOSAL_CONFLICT",
+            message=message,
+            status_code=409,
+            details=details,
+        )
+
+
 class AIUnavailableError(AppError):
     def __init__(self, message: str = "AI provider is unreachable"):
         super().__init__(code="AI_UNAVAILABLE", message=message, status_code=503)
 
 
 class ValidationError(AppError):
-    def __init__(self, message: str, details: Optional[dict] = None):
+    def __init__(self, message: str, details: dict | None = None):
         super().__init__(code="VALIDATION_ERROR", message=message, status_code=400, details=details)
+
+
+class PlanValidationError(AppError):
+    def __init__(self, message: str, *, details: dict | None = None):
+        super().__init__(
+            code="PLAN_VALIDATION_ERROR",
+            message=message,
+            status_code=422,
+            details=details,
+        )
 
 
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:

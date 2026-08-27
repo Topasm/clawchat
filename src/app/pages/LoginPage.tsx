@@ -47,15 +47,15 @@ export default function LoginPage() {
 
     (async () => {
       try {
-        const { Capacitor } = await import('@capacitor/core');
-        const Biometric = Capacitor.Plugins['Biometric'] as
-          | {
+        const { Capacitor, registerPlugin } = await import('@capacitor/core');
+        const Biometric = Capacitor.isPluginAvailable('Biometric')
+          ? registerPlugin<{
               authenticate(opts: {
                 title: string;
                 subtitle: string;
               }): Promise<{ success: boolean }>;
-            }
-          | undefined;
+            }>('Biometric')
+          : undefined;
         if (!Biometric) return;
 
         const result = await Biometric.authenticate({

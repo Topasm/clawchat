@@ -1,53 +1,62 @@
 import json
-import os
-import re
+import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from sqlalchemy import case, func, select
-from sqlalchemy import select as sa_select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from auth.dependencies import get_current_user
+from config import settings
 from database import get_db
-from exceptions import NotFoundError
+from domain.plan_proposal import PlanProposalStatus
+from domain.task import TaskStatus
+from exceptions import AppError, NotFoundError
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from models.agent_task import AgentTask
 from models.conversation import Conversation
+from models.plan_proposal import PlanProposal
 from models.todo import Todo
 from schemas.bulk import BulkTodoResponse, BulkTodoUpdate
-from schemas.common import PaginatedResponse
+from schemas.common import (
+    ErrorResponse,
+    PaginatedResponse,
+    RequestValidationErrorResponse,
+)
 from schemas.task import (
     DelegateRequest,
     PlanApplyRequest,
     PlanApplyResponse,
+    PlanDismissRequest,
+    PlanDismissResponse,
     PlanGenerateRequest,
     PlanResponse,
     SkillResponse,
 )
-from schemas.todo import AnswerQuestionsRequest, ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
-from services import inbox_pipeline_service, todo_planning_service, todo_service
-from skills import SKILL_REGISTRY, PERSONA_TO_SKILL, get_skill
-from utils import deserialize_tags, make_id, serialize_tags
-from utils.inbox_display import get_next_action
-from config import settings
+from schemas.todo import (
+    AnswerQuestionsRequest,
+    ProjectTodoResponse,
+    TodoCreate,
+    TodoResponse,
+    TodoUpdate,
+)
+from services import (
+    inbox_pipeline_service,
+    plan_proposal_service,
+    task_relationship_service,
+    todo_service,
+    vault_sync_service,
+)
 from services.obsidian_export_service import (
-    export_todo,
     export_todos_batch,
     remove_todos_from_vault,
 )
-from ws.manager import ws_manager
+from skills import PERSONA_TO_SKILL, SKILL_REGISTRY, get_skill
+from sqlalchemy import case, func, select
+from sqlalchemy import select as sa_select
+from sqlalchemy.ext.asyncio import AsyncSession
+from utils import deserialize_tags, make_id, serialize_tags
+from utils.inbox_display import get_next_action
+from ws.notifications import notify_module_data_changed
 
 router = APIRouter()
-
-DEFAULT_USER_ID = "user"
-
-
-async def _notify_todo_change():
-    """Broadcast a module_data_changed event so all clients refresh todos."""
-    await ws_manager.send_json(DEFAULT_USER_ID, {
-        "type": "module_data_changed",
-        "data": {"module": "todos"},
-    })
+logger = logging.getLogger(__name__)
 
 # -- Assignee / skill display labels -------------------------------------------
 
@@ -73,54 +82,26 @@ def _humanize_folder_name(source_id: str | None) -> str | None:
     return source_id.replace("_", " ").replace("-", " ").strip().title()
 
 
-def _parse_plan_due_date(value: object) -> datetime | None:
-    """Convert an LLM date/date-time value into a value safe for SQLAlchemy."""
-    if isinstance(value, datetime):
-        return value
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed
+def _schedule_vault_sync(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    job_id: str | None,
+) -> None:
+    if job_id is None:
+        return
+    session_factory = getattr(request.app.state, "session_factory", None)
+    if session_factory is None:
+        logger.warning("Vault sync job %s remains pending: no session factory", job_id)
+        return
 
+    async def _process() -> None:
+        try:
+            async with session_factory() as job_db:
+                await vault_sync_service.process_vault_sync_job(job_db, job_id)
+        except Exception:
+            logger.exception("Background Vault sync job %s failed", job_id)
 
-def _build_plan_response(task: AgentTask, todo_id: str, payload: dict) -> PlanResponse:
-    subtask_list = payload.get("subtasks", [])
-    due_dates = sorted(
-        str(subtask["due_date"])
-        for subtask in subtask_list
-        if subtask.get("due_date")
-    )
-    suggested_due_summary = None
-    if due_dates:
-        suggested_due_summary = (
-            due_dates[0]
-            if due_dates[0] == due_dates[-1]
-            else f"{due_dates[0]} \u2013 {due_dates[-1]}"
-        )
-
-    suggested_skills = payload.get("suggested_skills") or []
-    assignee_raw = payload.get("suggested_assignee")
-    return PlanResponse(
-        task_id=task.id,
-        todo_id=todo_id,
-        summary=payload.get("summary", ""),
-        suggested_root_due_date=payload.get("suggested_root_due_date"),
-        suggested_assignee=assignee_raw,
-        suggested_skills=suggested_skills or None,
-        suggested_project_title=payload.get("suggested_project_title"),
-        subtasks=subtask_list,
-        created_at=task.created_at,
-        subtask_count=len(subtask_list),
-        suggested_due_summary=suggested_due_summary,
-        suggested_assignee_label=_skill_label(assignee_raw) if assignee_raw else None,
-        suggested_skills_labels=[_skill_label(skill) for skill in suggested_skills] or None,
-        suggested_project_label=_humanize_folder_name(payload.get("suggested_project_title")),
-    )
+    background_tasks.add_task(_process)
 
 
 def _compute_sync_status(source: str | None) -> str | None:
@@ -145,7 +126,7 @@ async def _enrich_todo_response(
 
     # next_action
     resp.next_action = get_next_action(
-        todo.inbox_state or "none", todo.status or "pending"
+        todo.inbox_state or "none", todo.status or TaskStatus.PENDING
     )
 
     # sync_status
@@ -157,18 +138,17 @@ async def _enrich_todo_response(
     # plan_summary — only fetch when inbox_state is plan_ready
     if include_plan_summary and todo.inbox_state == "plan_ready":
         plan_q = (
-            sa_select(AgentTask)
+            sa_select(PlanProposal)
             .where(
-                AgentTask.todo_id == todo.id,
-                AgentTask.task_type == "plan_todo",
-                AgentTask.status == "completed",
+                PlanProposal.root_task_id == todo.id,
+                PlanProposal.status == PlanProposalStatus.DRAFT,
             )
-            .order_by(AgentTask.created_at.desc())
+            .order_by(PlanProposal.created_at.desc())
             .limit(1)
         )
-        plan_task = (await db.execute(plan_q)).scalar()
-        if plan_task and plan_task.payload_json:
-            payload = json.loads(plan_task.payload_json)
+        proposal = (await db.execute(plan_q)).scalar()
+        if proposal and proposal.payload_json:
+            payload = json.loads(proposal.payload_json)
             resp.plan_summary = payload.get("summary")
 
     return resp
@@ -189,7 +169,7 @@ async def list_projects(
         select(
             Todo.parent_id.label("parent_id"),
             func.count(Todo.id).label("subtask_count"),
-            func.sum(case((Todo.status == "completed", 1), else_=0)).label(
+            func.sum(case((Todo.status == TaskStatus.COMPLETED, 1), else_=0)).label(
                 "completed_count"
             ),
         )
@@ -261,7 +241,7 @@ async def list_projects(
 async def list_todos(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=1000),
-    status: str | None = None,
+    status: TaskStatus | None = None,
     priority: str | None = None,
     due_before: datetime | None = None,
     parent_id: str | None = None,
@@ -305,6 +285,11 @@ async def bulk_update_todos(
     errors: list[str] = []
     todo_rows = await db.execute(select(Todo).where(Todo.id.in_(body.ids)))
     todos_by_id = {todo.id: todo for todo in todo_rows.scalars().all()}
+    deleted_todo_ids = set(todos_by_id) if body.delete else set()
+    dependent_source_ids = await task_relationship_service.dependent_source_ids(
+        db,
+        deleted_todo_ids,
+    )
     for todo_id in body.ids:
         todo = todos_by_id.get(todo_id)
         if not todo:
@@ -317,9 +302,9 @@ async def bulk_update_todos(
         else:
             if body.status is not None:
                 todo.status = body.status
-                if body.status == "completed" and not todo.completed_at:
+                if body.status == TaskStatus.COMPLETED and not todo.completed_at:
                     todo.completed_at = datetime.now(timezone.utc)
-                elif body.status != "completed":
+                elif body.status != TaskStatus.COMPLETED:
                     todo.completed_at = None
             if body.priority is not None:
                 todo.priority = body.priority
@@ -328,6 +313,11 @@ async def bulk_update_todos(
             todo.updated_at = datetime.now(timezone.utc)
             updated_todos.append(todo)
             updated += 1
+    await db.flush()
+    await task_relationship_service.sync_dependency_shadows(
+        db,
+        dependent_source_ids,
+    )
     await db.commit()
 
     if settings.obsidian_vault_path:
@@ -351,7 +341,7 @@ async def bulk_update_todos(
             remove_existing=False,
         )
 
-    await _notify_todo_change()
+    await notify_module_data_changed("todos")
     return BulkTodoResponse(updated=updated, deleted=deleted, errors=errors)
 
 
@@ -367,6 +357,7 @@ async def create_todo(
         db,
         title=body.title,
         description=body.description,
+        status=body.status,
         priority=body.priority,
         due_date=body.due_date,
         tags=body.tags,
@@ -396,7 +387,7 @@ async def create_todo(
 
         background_tasks.add_task(_run_pipeline)
 
-    await _notify_todo_change()
+    await notify_module_data_changed("todos")
     return await _enrich_todo_response(todo, db)
 
 
@@ -424,14 +415,18 @@ async def update_todo(
 
     # Spawn next occurrence for recurring tasks on completion
     next_todo_id = None
-    if "status" in data and data["status"] == "completed" and todo.recurrence_rule:
+    if (
+        "status" in data
+        and data["status"] == TaskStatus.COMPLETED
+        and todo.recurrence_rule
+    ):
         from services.todo_recurrence_service import spawn_next_occurrence
         next_todo = await spawn_next_occurrence(db, todo)
         if next_todo:
             next_todo_id = next_todo.id
             await db.commit()
 
-    await _notify_todo_change()
+    await notify_module_data_changed("todos")
     resp = await _enrich_todo_response(todo, db)
     # Include next occurrence ID in response headers for client to pick up
     if next_todo_id:
@@ -448,7 +443,7 @@ async def delete_todo(
     await todo_service.delete_todo(db, todo_id)
     await db.commit()
 
-    await _notify_todo_change()
+    await notify_module_data_changed("todos")
 
 
 @router.post("/{todo_id}/organize")
@@ -494,7 +489,7 @@ async def answer_questions(
     todo.clarification_answers = json.dumps(body.answers)
     todo.inbox_state = "planning"
     await db.commit()
-    await _notify_todo_change()
+    await notify_module_data_changed("todos")
 
     # Trigger planning in background with Q&A context
     ai_service = request.app.state.ai_service
@@ -526,7 +521,7 @@ async def skip_questions(
 
     todo.inbox_state = "planning"
     await db.commit()
-    await _notify_todo_change()
+    await notify_module_data_changed("todos")
 
     # Trigger planning in background without Q&A context
     ai_service = request.app.state.ai_service
@@ -540,31 +535,28 @@ async def skip_questions(
     return {"status": "processing", "todo_id": todo_id}
 
 
-@router.get("/{todo_id}/plan/latest")
+@router.get(
+    "/{todo_id}/plan/latest",
+    response_model=PlanResponse,
+    responses={404: {"model": ErrorResponse}},
+)
 async def get_latest_plan(
     todo_id: str,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    q = (
-        sa_select(AgentTask)
-        .where(
-            AgentTask.todo_id == todo_id,
-            AgentTask.task_type == "plan_todo",
-            AgentTask.status == "completed",
-        )
-        .order_by(AgentTask.created_at.desc())
-        .limit(1)
-    )
-    task = (await db.execute(q)).scalar()
-    if not task:
-        raise NotFoundError("No plan found")
-
-    payload = json.loads(task.payload_json) if task.payload_json else {}
-    return _build_plan_response(task, todo_id, payload)
+    proposal = await plan_proposal_service.get_latest_proposal(db, todo_id)
+    return await plan_proposal_service.build_plan_response(db, proposal)
 
 
-@router.post("/{todo_id}/plan/generate", response_model=PlanResponse)
+@router.post(
+    "/{todo_id}/plan/generate",
+    response_model=PlanResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+    },
+)
 async def generate_graph_plan(
     todo_id: str,
     body: PlanGenerateRequest,
@@ -573,201 +565,84 @@ async def generate_graph_plan(
     _user: str = Depends(get_current_user),
 ):
     """Generate and persist a proposal without creating any child todos."""
-    todo = await db.get(Todo, todo_id)
-    if not todo:
-        raise NotFoundError("Todo not found")
-
-    task = AgentTask(
-        id=make_id("task_"),
-        agent_type="plan",
-        task_type="plan_todo",
-        todo_id=todo.id,
-        instruction=body.instructions or f"Plan subtasks for: {todo.title}",
-        status="running",
-        skill_chain='["plan"]',
-        started_at=datetime.now(timezone.utc),
-    )
-    db.add(task)
-    todo.inbox_state = "planning"
-    await db.commit()
-    await _notify_todo_change()
-
     try:
-        result = await todo_planning_service.generate_plan(
+        ai_service = getattr(request.app.state, "active_ai", None)
+        if ai_service is None:
+            ai_service = request.app.state.ai_service
+        result = await plan_proposal_service.generate_proposal(
             db,
-            request.app.state.ai_service,
-            todo,
+            ai_service,
+            todo_id,
             additional_instructions=body.instructions,
+            model_provider=getattr(
+                request.app.state,
+                "active_ai_provider",
+                "openclaw",
+            ),
         )
-        task.payload_json = json.dumps(result)
-        task.status = "completed"
-        task.completed_at = datetime.now(timezone.utc)
-        todo.inbox_state = "plan_ready"
-        todo.automation_error = None
-        await db.commit()
-        await db.refresh(task)
-        await _notify_todo_change()
-        return _build_plan_response(task, todo_id, result)
+        await notify_module_data_changed("todos")
+        return result
+    except AppError:
+        await notify_module_data_changed("todos")
+        raise
     except Exception as exc:
-        task.status = "failed"
-        task.error = str(exc)
-        task.completed_at = datetime.now(timezone.utc)
-        todo.inbox_state = "error"
-        todo.automation_error = str(exc)
-        await db.commit()
-        await _notify_todo_change()
-        raise HTTPException(status_code=502, detail="AI plan generation failed") from exc
+        logger.exception("AI plan generation failed for todo %s", todo_id)
+        await notify_module_data_changed("todos")
+        raise AppError(
+            code="PLAN_GENERATION_FAILED",
+            message="AI plan generation failed",
+            status_code=502,
+        ) from exc
 
 
-@router.post("/{todo_id}/plan/apply")
+@router.post(
+    "/{todo_id}/plan/apply",
+    response_model=PlanApplyResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        422: {"model": ErrorResponse | RequestValidationErrorResponse},
+    },
+)
 async def apply_plan(
     todo_id: str,
-    body: PlanApplyRequest | None = None,
+    body: PlanApplyRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo = await db.get(Todo, todo_id)
-    if not todo:
-        raise NotFoundError("Todo not found")
-
-    # Fetch latest plan
-    q = (
-        sa_select(AgentTask)
-        .where(
-            AgentTask.todo_id == todo_id,
-            AgentTask.task_type == "plan_todo",
-            AgentTask.status == "completed",
-        )
-        .order_by(AgentTask.created_at.desc())
-        .limit(1)
+    response, job_id = await plan_proposal_service.apply_proposal(
+        db,
+        todo_id,
+        body,
     )
-    task = (await db.execute(q)).scalar()
-    if not task:
-        raise NotFoundError("No plan found")
-
-    payload = json.loads(task.payload_json) if task.payload_json else {}
-    subtasks = (
-        [subtask.model_dump() for subtask in body.subtasks]
-        if body and body.subtasks is not None
-        else payload.get("subtasks", [])
-    )
-    selected_indices = (
-        list(dict.fromkeys(body.selected_indices))
-        if body and body.selected_indices is not None
-        else list(range(len(subtasks)))
-    )
-    if any(index < 0 or index >= len(subtasks) for index in selected_indices):
-        raise HTTPException(status_code=422, detail="selected_indices contains an invalid subtask index")
-    if not selected_indices:
-        raise HTTPException(status_code=422, detail="Select at least one subtask")
-
-    created_ids: list[str] = []
-    created_todos: list[Todo] = []
-    created_id_by_original_index: dict[int, str] = {}
-
-    # Create child todos
-    for sort_order, original_index in enumerate(selected_indices):
-        subtask = subtasks[original_index]
-        child = Todo(
-            id=make_id("todo_"),
-            parent_id=todo_id,
-            title=subtask.get("title", ""),
-            description=subtask.get("description"),
-            estimated_minutes=subtask.get("estimated_minutes"),
-            due_date=_parse_plan_due_date(subtask.get("due_date")),
-            priority=subtask.get("priority") or "medium",
-            sort_order=sort_order,
-        )
-        db.add(child)
-        created_ids.append(child.id)
-        created_todos.append(child)
-        created_id_by_original_index[original_index] = child.id
-
-    await db.flush()
-
-    # Store dependency links as depends_on on each child todo
-    relationship_count = 0
-    for created_todo, original_index in zip(created_todos, selected_indices):
-        subtask = subtasks[original_index]
-        dep_ids = [
-            created_id_by_original_index[dep_index]
-            for dep_index in subtask.get("depends_on_indices", [])
-            if dep_index in created_id_by_original_index and dep_index != original_index
-        ]
-        if dep_ids:
-            created_todo.depends_on = json.dumps(list(dict.fromkeys(dep_ids)))
-            relationship_count += len(set(dep_ids))
-
-    # Apply suggested skills (preferred) or legacy assignee
-    if payload.get("suggested_skills"):
-        todo.enabled_skills = json.dumps(payload["suggested_skills"])
-        todo.assignee = payload["suggested_skills"][0]  # backward compat
-    elif payload.get("suggested_assignee"):
-        todo.assignee = payload["suggested_assignee"]
-
-    # Apply suggested root due date
-    if payload.get("suggested_root_due_date"):
-        todo.due_date = _parse_plan_due_date(payload["suggested_root_due_date"])
-
-    # Create project folder if suggested and no existing source
-    project_folder_created = None
-    if payload.get("suggested_project_title") and not todo.source_id:
-        sanitized_title = re.sub(r'[^\w\s-]', '', payload["suggested_project_title"]).strip()
-        sanitized_title = re.sub(r'\s+', '_', sanitized_title)
-        if settings.obsidian_vault_path:
-            folder_path = os.path.join(settings.obsidian_vault_path, sanitized_title)
-            os.makedirs(folder_path, exist_ok=True)
-            todo_md_path = os.path.join(folder_path, "TODO.md")
-            with open(todo_md_path, "w") as f:
-                f.write("## ClawChat\n")
-            project_folder_created = sanitized_title
-        todo.source = "obsidian_project"
-        todo.source_id = sanitized_title
-
-    # Update root todo state
-    todo.inbox_state = "none"
-
-    # Set root due_date to earliest child due_date if not already set
-    if not todo.due_date:
-        earliest = None
-        for child in created_todos:
-            if child.due_date:
-                if earliest is None or child.due_date < earliest:
-                    earliest = child.due_date
-        if earliest:
-            todo.due_date = earliest
-
-    await db.commit()
-
-    # Export affected todos to vault
-    if settings.obsidian_vault_path:
-        project_name = todo.title
-        export_todo(settings.obsidian_vault_path, todo, None)
-        for child in created_todos:
-            export_todo(settings.obsidian_vault_path, child, project_name)
-
-    await _notify_todo_change()
-    return PlanApplyResponse(
-        todo_id=todo_id,
-        created_subtask_ids=created_ids,
-        created_relationships=relationship_count,
-        project_folder_created=project_folder_created,
-    )
+    _schedule_vault_sync(background_tasks, request, job_id)
+    await notify_module_data_changed("todos")
+    return response
 
 
-@router.post("/{todo_id}/plan/dismiss")
+@router.post(
+    "/{todo_id}/plan/dismiss",
+    response_model=PlanDismissResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    },
+)
 async def dismiss_plan(
     todo_id: str,
+    body: PlanDismissRequest,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo = await db.get(Todo, todo_id)
-    if not todo:
-        raise NotFoundError("Todo not found")
-    todo.inbox_state = "none"
-    await db.commit()
-    await _notify_todo_change()
-    return {"status": "dismissed", "todo_id": todo_id}
+    response = await plan_proposal_service.dismiss_proposal(
+        db,
+        todo_id,
+        body.proposal_id,
+    )
+    await notify_module_data_changed("todos")
+    return response
 
 
 @router.post("/{todo_id}/delegate")

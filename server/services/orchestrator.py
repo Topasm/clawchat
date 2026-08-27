@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from constants import SYSTEM_PROMPT
+from domain.task import TaskStatus
 from exceptions import AIUnavailableError
 from models.agent_task import AgentTask
 from models.conversation import Conversation
@@ -402,7 +403,11 @@ class Orchestrator:
                 todo = _find_by_title(todos, title)
                 if not todo:
                     return f"I couldn't find a task matching '{title}'. Try listing your tasks first.", None
-                todo = await todo_service.update_todo(db, todo.id, status="completed")
+                todo = await todo_service.update_todo(
+                    db,
+                    todo.id,
+                    status=TaskStatus.COMPLETED,
+                )
                 return (
                     f"Marked '{todo.title}' as complete.",
                     {"action_type": "todo_completed", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},

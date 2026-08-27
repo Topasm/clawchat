@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import type { TodoResponse, KanbanStatus } from '../../types/api';
+import type { TodoResponse, TaskStatus } from '../../types/api';
 import KanbanColumn from './KanbanColumn';
 
 interface ColumnDef {
-  status: KanbanStatus;
+  status: TaskStatus;
   title: string;
   icon: ReactNode;
   tasks: TodoResponse[];
@@ -21,7 +21,7 @@ interface KanbanColumnTabsProps {
   selectedIds: Set<string>;
   onSelect: (id: string) => void;
   isMultiSelectMode: boolean;
-  onMove: (id: string, status: KanbanStatus) => void;
+  onMove: (id: string, status: TaskStatus) => void;
   onComplete: (id: string) => void;
   onDelete?: (id: string) => void;
 }
@@ -74,7 +74,9 @@ export default function KanbanColumnTabs({
             onClick={() => setActiveIdx(i)}
           >
             {col.icon} {col.title}
-            <span className="cc-kanban-tabs__count">{col.tasks.filter((t) => !t.parent_id).length}</span>
+            <span className="cc-kanban-tabs__count">
+              {col.tasks.filter((t) => !t.parent_id).length}
+            </span>
           </button>
         ))}
       </div>

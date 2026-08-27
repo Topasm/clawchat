@@ -153,6 +153,7 @@ export function usePurgeData() {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminData });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminActivity });
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
     },
   });

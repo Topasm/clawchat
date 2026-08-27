@@ -8,8 +8,14 @@ export interface GraphTaskLike {
   id: string;
   title: string;
   parent_id?: string | null;
-  depends_on?: string[] | null;
   sort_order?: number;
+}
+
+export interface GraphRelationshipLike {
+  id?: string;
+  source_task_id: string;
+  target_task_id: string;
+  type: string;
 }
 
 export interface TaskGraphNodeLayout {
@@ -40,8 +46,12 @@ function taskOrder(a: GraphTaskLike, b: GraphTaskLike) {
 function canvasSize(nodes: TaskGraphNodeLayout[]): Pick<TaskGraphLayout, 'width' | 'height'> {
   if (nodes.length === 0) return { width: 0, height: 0 };
   return {
-    width: nodes.reduce((max, node) => Math.max(max, node.x + GRAPH_NODE_WIDTH), 0) + GRAPH_CANVAS_PADDING,
-    height: nodes.reduce((max, node) => Math.max(max, node.y + GRAPH_NODE_HEIGHT), 0) + GRAPH_CANVAS_PADDING,
+    width:
+      nodes.reduce((max, node) => Math.max(max, node.x + GRAPH_NODE_WIDTH), 0) +
+      GRAPH_CANVAS_PADDING,
+    height:
+      nodes.reduce((max, node) => Math.max(max, node.y + GRAPH_NODE_HEIGHT), 0) +
+      GRAPH_CANVAS_PADDING,
   };
 }
 
@@ -95,9 +105,8 @@ export function buildStructureGraphLayout(
     if (children.length === 0) return GRAPH_NODE_HEIGHT;
 
     const height = children.reduce(
-      (total, child, index) => total
-        + measureSubtree(child.id, nextAncestors)
-        + (index > 0 ? GRAPH_ROW_GAP : 0),
+      (total, child, index) =>
+        total + measureSubtree(child.id, nextAncestors) + (index > 0 ? GRAPH_ROW_GAP : 0),
       0,
     );
     const measured = Math.max(GRAPH_NODE_HEIGHT, height);
@@ -129,7 +138,9 @@ export function buildStructureGraphLayout(
   };
 
   const roots = visibleTasks
-    .filter((task) => !task.parent_id || task.parent_id === task.id || !taskById.has(task.parent_id))
+    .filter(
+      (task) => !task.parent_id || task.parent_id === task.id || !taskById.has(task.parent_id),
+    )
     .sort(taskOrder);
   let forestTop = GRAPH_CANVAS_PADDING;
   const placeRoot = (root: GraphTaskLike) => {
@@ -139,19 +150,29 @@ export function buildStructureGraphLayout(
   };
   roots.forEach(placeRoot);
   // Rootless cyclic components are still rendered rather than silently lost.
-  visibleTasks.filter((task) => !placed.has(task.id)).sort(taskOrder).forEach(placeRoot);
+  visibleTasks
+    .filter((task) => !placed.has(task.id))
+    .sort(taskOrder)
+    .forEach(placeRoot);
 
   const visibleIds = new Set(nodes.map((node) => node.id));
   const edges: TaskGraphEdgeLayout[] = visibleTasks.flatMap((task) => {
-    if (!task.parent_id || !visibleIds.has(task.id) || !visibleIds.has(task.parent_id) || task.id === task.parent_id) {
+    if (
+      !task.parent_id ||
+      !visibleIds.has(task.id) ||
+      !visibleIds.has(task.parent_id) ||
+      task.id === task.parent_id
+    ) {
       return [];
     }
-    return [{
-      id: `hierarchy:${task.parent_id}:${task.id}`,
-      sourceId: task.parent_id,
-      targetId: task.id,
-      type: 'hierarchy' as const,
-    }];
+    return [
+      {
+        id: `hierarchy:${task.parent_id}:${task.id}`,
+        sourceId: task.parent_id,
+        targetId: task.id,
+        type: 'hierarchy' as const,
+      },
+    ];
   });
 
   return { nodes, edges, ...canvasSize(nodes) };
@@ -160,6 +181,7 @@ export function buildStructureGraphLayout(
 /** Layout the dependency DAG into execution stages using topological depth. */
 export function buildExecutionGraphLayout(
   tasks: GraphTaskLike[],
+  relationships: readonly GraphRelationshipLike[],
   collapsedIds: ReadonlySet<string> = new Set(),
 ): TaskGraphLayout {
   const visibleTasks = filterCollapsedTasks(tasks, collapsedIds);
@@ -169,18 +191,29 @@ export function buildExecutionGraphLayout(
   const incomingCount = new Map(visibleTasks.map((task) => [task.id, 0]));
   const outgoing = new Map<string, Set<string>>();
   const edges: TaskGraphEdgeLayout[] = [];
+  const seenRelationships = new Set<string>();
 
-  visibleTasks.forEach((task) => {
-    new Set(task.depends_on ?? []).forEach((dependencyId) => {
-      if (dependencyId === task.id || !taskById.has(dependencyId)) return;
-      outgoing.set(dependencyId, (outgoing.get(dependencyId) ?? new Set()).add(task.id));
-      incomingCount.set(task.id, (incomingCount.get(task.id) ?? 0) + 1);
-      edges.push({
-        id: `dependency:${dependencyId}:${task.id}`,
-        sourceId: dependencyId,
-        targetId: task.id,
-        type: 'dependency',
-      });
+  relationships.forEach((relationship) => {
+    if (relationship.type !== 'depends_on') return;
+    const taskId = relationship.source_task_id;
+    const dependencyId = relationship.target_task_id;
+    const relationshipKey = `${taskId}:${dependencyId}`;
+    if (
+      dependencyId === taskId ||
+      !taskById.has(taskId) ||
+      !taskById.has(dependencyId) ||
+      seenRelationships.has(relationshipKey)
+    ) {
+      return;
+    }
+    seenRelationships.add(relationshipKey);
+    outgoing.set(dependencyId, (outgoing.get(dependencyId) ?? new Set()).add(taskId));
+    incomingCount.set(taskId, (incomingCount.get(taskId) ?? 0) + 1);
+    edges.push({
+      id: `dependency:${dependencyId}:${taskId}`,
+      sourceId: dependencyId,
+      targetId: taskId,
+      type: 'dependency',
     });
   });
 
@@ -206,9 +239,12 @@ export function buildExecutionGraphLayout(
 
   // Cycles cannot be topologically sorted. Keep them visible in fallback stages.
   let fallbackDepth = Math.max(0, ...depth.values());
-  visibleTasks.filter((task) => !processed.has(task.id)).sort(taskOrder).forEach((task) => {
-    depth.set(task.id, fallbackDepth++);
-  });
+  visibleTasks
+    .filter((task) => !processed.has(task.id))
+    .sort(taskOrder)
+    .forEach((task) => {
+      depth.set(task.id, fallbackDepth++);
+    });
 
   const columns = new Map<number, GraphTaskLike[]>();
   visibleTasks.forEach((task) => {
@@ -220,15 +256,17 @@ export function buildExecutionGraphLayout(
   columns.forEach((column) => column.sort(taskOrder));
 
   const nodes: TaskGraphNodeLayout[] = [];
-  [...columns.entries()].sort(([a], [b]) => a - b).forEach(([columnDepth, column]) => {
-    column.forEach((task, row) => {
-      nodes.push({
-        id: task.id,
-        x: GRAPH_CANVAS_PADDING + columnDepth * (GRAPH_NODE_WIDTH + GRAPH_COLUMN_GAP),
-        y: GRAPH_CANVAS_PADDING + row * (GRAPH_NODE_HEIGHT + GRAPH_ROW_GAP),
+  [...columns.entries()]
+    .sort(([a], [b]) => a - b)
+    .forEach(([columnDepth, column]) => {
+      column.forEach((task, row) => {
+        nodes.push({
+          id: task.id,
+          x: GRAPH_CANVAS_PADDING + columnDepth * (GRAPH_NODE_WIDTH + GRAPH_COLUMN_GAP),
+          y: GRAPH_CANVAS_PADDING + row * (GRAPH_NODE_HEIGHT + GRAPH_ROW_GAP),
+        });
       });
     });
-  });
 
   return { nodes, edges, ...canvasSize(nodes) };
 }

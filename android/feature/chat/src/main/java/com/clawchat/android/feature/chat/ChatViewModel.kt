@@ -6,6 +6,7 @@ import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.di.AuthenticatedClient
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.SseEvent
 import com.clawchat.android.core.network.streamChat
@@ -33,7 +34,7 @@ data class ChatUiState(
 class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val sessionStore: SessionStore,
-    @com.clawchat.android.core.di.AuthenticatedClient private val httpClient: OkHttpClient,
+    @param:AuthenticatedClient private val httpClient: OkHttpClient,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())

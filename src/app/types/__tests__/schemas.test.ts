@@ -13,10 +13,17 @@ import {
   SearchHitSchema,
   TodayResponseSchema,
   HealthResponseSchema,
-  KanbanStatusSchema,
+  TaskStatusSchema,
+  TaskRelationshipCreateSchema,
+  TaskRelationshipListResponseSchema,
+  TaskRelationshipResponseSchema,
   BulkTodoUpdateSchema,
   BulkTodoResponseSchema,
   AttachmentResponseSchema,
+  PlanProposalResponseSchema,
+  PlanApplyRequestSchema,
+  PlanApplyResponseSchema,
+  PlanUndoResponseSchema,
 } from '../schemas';
 
 const now = new Date().toISOString();
@@ -37,7 +44,13 @@ describe('Zod schemas', () => {
     });
 
     it('parses todo with optional fields', () => {
-      const full = { ...validTodo, description: 'desc', priority: 'high', due_date: now, tags: ['a'] };
+      const full = {
+        ...validTodo,
+        description: 'desc',
+        priority: 'high',
+        due_date: now,
+        tags: ['a'],
+      };
       expect(TodoResponseSchema.parse(full)).toEqual(full);
     });
 
@@ -51,7 +64,9 @@ describe('Zod schemas', () => {
     });
 
     it('rejects invalid priority', () => {
-      expect(() => TodoResponseSchema.parse({ ...validTodo, priority: 'extreme' })).toThrow(ZodError);
+      expect(() => TodoResponseSchema.parse({ ...validTodo, priority: 'extreme' })).toThrow(
+        ZodError,
+      );
     });
   });
 
@@ -59,6 +74,13 @@ describe('Zod schemas', () => {
   describe('TodoCreateSchema', () => {
     it('parses valid create payload', () => {
       expect(TodoCreateSchema.parse({ title: 'Do stuff' })).toEqual({ title: 'Do stuff' });
+    });
+
+    it('accepts an explicit canonical status', () => {
+      expect(TodoCreateSchema.parse({ title: 'Continue', status: 'in_progress' })).toEqual({
+        title: 'Continue',
+        status: 'in_progress',
+      });
     });
 
     it('rejects empty title', () => {
@@ -86,9 +108,70 @@ describe('Zod schemas', () => {
     });
   });
 
+  // -- Task relationships --------------------------------------------------
+  describe('TaskRelationship schemas', () => {
+    const relationship = {
+      id: 'relationship-1',
+      source_task_id: 'dependent-task',
+      target_task_id: 'prerequisite-task',
+      type: 'depends_on' as const,
+      label: null,
+      created_by: 'user',
+      proposal_id: null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    it('parses a normalized relationship response', () => {
+      expect(TaskRelationshipResponseSchema.parse(relationship)).toEqual(relationship);
+    });
+
+    it('accepts array and paginated-style list response shapes', () => {
+      expect(TaskRelationshipListResponseSchema.parse([relationship])).toEqual([relationship]);
+      expect(TaskRelationshipListResponseSchema.parse({ items: [relationship] })).toEqual([
+        relationship,
+      ]);
+    });
+
+    it('validates canonical relationship types and create fields', () => {
+      expect(
+        TaskRelationshipCreateSchema.parse({
+          source_task_id: 'dependent-task',
+          target_task_id: 'prerequisite-task',
+          type: 'depends_on',
+        }),
+      ).toEqual({
+        source_task_id: 'dependent-task',
+        target_task_id: 'prerequisite-task',
+        type: 'depends_on',
+      });
+      expect(() =>
+        TaskRelationshipCreateSchema.parse({
+          source_task_id: 'dependent-task',
+          target_task_id: 'prerequisite-task',
+          type: 'blocks',
+        }),
+      ).toThrow(ZodError);
+      expect(() =>
+        TaskRelationshipCreateSchema.parse({
+          source_task_id: 'dependent-task',
+          target_task_id: 'prerequisite-task',
+          type: 'depends_on',
+          created_by: 'ai',
+        }),
+      ).toThrow(ZodError);
+    });
+  });
+
   // -- EventResponse --------------------------------------------------------
   describe('EventResponseSchema', () => {
-    const validEvent = { id: 'e1', title: 'Meeting', start_time: now, created_at: now, updated_at: now };
+    const validEvent = {
+      id: 'e1',
+      title: 'Meeting',
+      start_time: now,
+      created_at: now,
+      updated_at: now,
+    };
 
     it('parses valid event', () => {
       expect(EventResponseSchema.parse(validEvent)).toEqual(validEvent);
@@ -122,13 +205,25 @@ describe('Zod schemas', () => {
   // -- MessageResponse ------------------------------------------------------
   describe('MessageResponseSchema', () => {
     it('parses valid message', () => {
-      const msg = { id: 'msg1', conversation_id: 'c1', role: 'user' as const, content: 'hi', created_at: now };
+      const msg = {
+        id: 'msg1',
+        conversation_id: 'c1',
+        role: 'user' as const,
+        content: 'hi',
+        created_at: now,
+      };
       expect(MessageResponseSchema.parse(msg)).toEqual(msg);
     });
 
     it('rejects invalid role', () => {
       expect(() =>
-        MessageResponseSchema.parse({ id: 'msg1', conversation_id: 'c1', role: 'system', content: 'hi', created_at: now }),
+        MessageResponseSchema.parse({
+          id: 'msg1',
+          conversation_id: 'c1',
+          role: 'system',
+          content: 'hi',
+          created_at: now,
+        }),
       ).toThrow(ZodError);
     });
   });
@@ -146,8 +241,22 @@ describe('Zod schemas', () => {
     it('parses valid paginated search response', () => {
       const data = {
         items: [
-          { type: 'todo', id: '1', title: 'Buy milk', preview: 'Buy milk from store', rank: 1, created_at: now },
-          { type: 'event', id: '2', title: 'Meeting', preview: 'Team standup', rank: 2, created_at: now },
+          {
+            type: 'todo',
+            id: '1',
+            title: 'Buy milk',
+            preview: 'Buy milk from store',
+            rank: 1,
+            created_at: now,
+          },
+          {
+            type: 'event',
+            id: '2',
+            title: 'Meeting',
+            preview: 'Team standup',
+            rank: 2,
+            created_at: now,
+          },
         ],
         total: 2,
         page: 1,
@@ -162,7 +271,14 @@ describe('Zod schemas', () => {
     });
 
     it('validates SearchHitSchema fields', () => {
-      const hit = { type: 'todo', id: 't1', title: 'Note', preview: 'A note...', rank: 1, created_at: now };
+      const hit = {
+        type: 'todo',
+        id: 't1',
+        title: 'Note',
+        preview: 'A note...',
+        rank: 1,
+        created_at: now,
+      };
       expect(SearchHitSchema.parse(hit)).toEqual(hit);
     });
   });
@@ -185,14 +301,26 @@ describe('Zod schemas', () => {
   // -- HealthResponse -------------------------------------------------------
   describe('HealthResponseSchema', () => {
     it('parses valid health response', () => {
-      const data = { status: 'ok' as const, version: '1.0.0', ai_backend: 'anthropic', ai_model: 'claude', ai_connected: true };
+      const data = {
+        status: 'ok' as const,
+        version: '1.0.0',
+        ai_backend: 'anthropic',
+        ai_model: 'claude',
+        ai_connected: true,
+      };
       expect(HealthResponseSchema.parse(data)).toEqual(data);
     });
   });
 
   // -- TodoResponse with parent_id and sort_order ----------------------------
   describe('TodoResponseSchema — Phase 3 fields', () => {
-    const base = { id: '1', title: 'Test', status: 'pending' as const, created_at: now, updated_at: now };
+    const base = {
+      id: '1',
+      title: 'Test',
+      status: 'pending' as const,
+      created_at: now,
+      updated_at: now,
+    };
 
     it('parses todo with parent_id string', () => {
       const todo = { ...base, parent_id: 'parent-1' };
@@ -290,17 +418,103 @@ describe('Zod schemas', () => {
     });
   });
 
-  // -- KanbanStatus ---------------------------------------------------------
-  describe('KanbanStatusSchema', () => {
+  // -- TaskStatus -----------------------------------------------------------
+  describe('TaskStatusSchema', () => {
     it('accepts valid statuses', () => {
-      expect(KanbanStatusSchema.parse('pending')).toBe('pending');
-      expect(KanbanStatusSchema.parse('in_progress')).toBe('in_progress');
-      expect(KanbanStatusSchema.parse('completed')).toBe('completed');
+      expect(TaskStatusSchema.parse('pending')).toBe('pending');
+      expect(TaskStatusSchema.parse('in_progress')).toBe('in_progress');
+      expect(TaskStatusSchema.parse('completed')).toBe('completed');
+      expect(TaskStatusSchema.parse('cancelled')).toBe('cancelled');
     });
 
     it('rejects invalid status', () => {
-      expect(() => KanbanStatusSchema.parse('done')).toThrow(ZodError);
+      expect(() => TaskStatusSchema.parse('done')).toThrow(ZodError);
     });
   });
 
+  describe('versioned plan proposal schemas', () => {
+    const proposal = {
+      proposal_id: 'proposal-1',
+      task_id: 'proposal-1',
+      agent_task_id: null,
+      todo_id: 'todo-1',
+      base_graph_revision: 7,
+      status: 'draft' as const,
+      validation: { errors: [], warnings: [] },
+      diff: {
+        add_task_count: 2,
+        add_relationship_count: 1,
+        root_update_fields: ['due_date'],
+      },
+      summary: 'A safe two-step plan',
+      suggested_root_due_date: null,
+      suggested_assignee: null,
+      suggested_skills: null,
+      suggested_project_title: null,
+      subtasks: [
+        { title: 'Research', depends_on_indices: [] },
+        { title: 'Build', depends_on_indices: [0] },
+      ],
+      subtask_count: 2,
+      suggested_due_summary: null,
+      suggested_assignee_label: null,
+      suggested_skills_labels: null,
+      suggested_project_label: null,
+      created_at: now,
+    };
+
+    it('requires proposal identity, graph revision, diff, and validation', () => {
+      expect(PlanProposalResponseSchema.parse(proposal)).toEqual(proposal);
+      expect(() => PlanProposalResponseSchema.parse({ ...proposal, diff: undefined })).toThrow(
+        ZodError,
+      );
+      expect(() => PlanProposalResponseSchema.parse({ ...proposal, status: 'dismissed' })).toThrow(
+        ZodError,
+      );
+    });
+
+    it('allows a nullable revision only on legacy proposal responses', () => {
+      expect(
+        PlanProposalResponseSchema.parse({ ...proposal, base_graph_revision: null })
+          .base_graph_revision,
+      ).toBeNull();
+      expect(() =>
+        PlanApplyRequestSchema.parse({
+          proposal_id: proposal.proposal_id,
+          base_graph_revision: null,
+          selected_indices: [0],
+        }),
+      ).toThrow(ZodError);
+    });
+
+    it('validates exact apply and undo result contracts', () => {
+      expect(
+        PlanApplyResponseSchema.parse({
+          todo_id: 'todo-1',
+          proposal_id: 'proposal-1',
+          change_set_id: 'change-set-1',
+          applied_graph_revision: 8,
+          created_subtask_ids: ['todo-2'],
+          created_relationships: 1,
+          root_update_fields: ['due_date'],
+          project_folder_created: null,
+          already_applied: false,
+          can_undo: true,
+          vault_sync_status: 'pending',
+        }).change_set_id,
+      ).toBe('change-set-1');
+
+      expect(
+        PlanUndoResponseSchema.parse({
+          change_set_id: 'change-set-1',
+          proposal_id: 'proposal-1',
+          todo_id: 'todo-1',
+          reverted_graph_revision: 9,
+          reverted_subtask_ids: ['todo-2'],
+          already_reverted: false,
+          vault_sync_status: 'processing',
+        }).reverted_graph_revision,
+      ).toBe(9);
+    });
+  });
 });

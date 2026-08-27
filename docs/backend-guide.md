@@ -9,7 +9,11 @@ server/
 ├── main.py                     # FastAPI app entry point (async lifespan)
 ├── config.py                   # Pydantic Settings from .env
 ├── database.py                 # Async SQLAlchemy engine + session factory
-├── utils.py                    # Utilities: make_id(), serialize_tags/deserialize_tags, apply_model_updates, strip_markdown_fences
+├── openapi.json                # Deterministic checked-in API contract snapshot
+├── domain/
+│   ├── task.py                 # Canonical TaskStatus lifecycle enum
+│   └── task_relationship.py    # Canonical relationship-type enum
+├── utils/                      # IDs, serialization, vault paths, and atomic-file helpers
 ├── constants.py                # Shared constants (SYSTEM_PROMPT)
 ├── exceptions.py               # AppError hierarchy + error handler
 ├── pyproject.toml              # Python dependency declarations
@@ -20,8 +24,8 @@ server/
 │   ├── auth.py                 # POST /api/auth/* (login, refresh, logout)
 │   ├── chat.py                 # SSE /stream, message CRUD, conversations
 │   ├── todo.py                 # Full CRUD /api/todos + organize, delegate, plan
+│   ├── task_relationship.py    # Validated normalized edges /api/task-relationships
 │   ├── tasks.py                # Task management /api/tasks (planning, agent tasks)
-│   ├── task_relationship.py    # Task relationships /api/task-relationships
 │   ├── calendar.py             # Full CRUD /api/events
 │   ├── attachment.py           # File upload/download /api/attachments
 │   ├── admin.py                # Admin dashboard /api/admin/* (11 endpoints)
@@ -31,16 +35,21 @@ server/
 │   ├── tags.py                 # GET /api/tags (aggregated tags)
 │   ├── today.py                # GET /api/today (dashboard aggregation)
 │   ├── pairing.py              # Device pairing /api/pairing
+│   ├── capabilities.py         # Runtime/client capability discovery
+│   ├── voice.py                # Voice transcription proxy
 │   └── notifications.py        # POST /api/notifications/register-token
 ├── models/
 │   ├── __init__.py
 │   ├── conversation.py         # Conversation model
 │   ├── message.py              # Message model (role, content, message_type, intent)
 │   ├── todo.py                 # Todo model (status, priority, completed_at, tags)
+│   ├── task_relationship.py    # Directed typed task links with FK/unique constraints
+│   ├── data_migration_marker.py # Crash-safe runtime data-migration completion markers
 │   ├── event.py                # Event model (start/end time, is_all_day, reminder, tags)
 │   ├── attachment.py           # Attachment model (filename, content_type, todo_id)
 │   ├── agent_task.py           # AgentTask model (queued async work)
-│   ├── task_relationship.py    # TaskRelationship model (blocks, related, duplicate_of)
+│   ├── host_identity.py        # Stable desktop host identity
+│   ├── refresh_session.py      # Refresh-token session lifecycle
 │   ├── paired_device.py        # PairedDevice model (device pairing)
 │   └── user_settings.py        # UserSettings model
 ├── schemas/
@@ -49,9 +58,9 @@ server/
 │   ├── auth.py                 # Login/token schemas
 │   ├── chat.py                 # SendMessageRequest, MessageEditRequest, conversation/message responses
 │   ├── todo.py                 # TodoCreate, TodoUpdate, TodoResponse
+│   ├── task_relationship.py    # Relationship create/update/response contracts
 │   ├── calendar.py             # EventCreate, EventUpdate, EventResponse
 │   ├── task.py                 # Task management schemas
-│   ├── task_relationship.py    # TaskRelationship schemas
 │   ├── bulk.py                 # Bulk operation schemas
 │   ├── attachment.py           # AttachmentResponse
 │   ├── admin.py                # Admin response models (overview, AI config, activity, sessions, config, data, purge, reindex, backup)
@@ -59,6 +68,7 @@ server/
 │   ├── search.py               # SearchHit, search response schema
 │   ├── settings.py             # User settings schemas
 │   ├── pairing.py              # Device pairing schemas
+│   ├── capabilities.py         # Capability response schemas
 │   ├── claude_code.py          # Claude Code integration schemas
 ├── services/
 │   ├── __init__.py
@@ -66,7 +76,10 @@ server/
 │   ├── intent_classifier.py    # Intent classification via function calling (16 intents)
 │   ├── orchestrator.py         # Routes intents to services, streams via WebSocket
 │   ├── todo_service.py         # Async todo CRUD with completed_at auto-set
-│   ├── todo_planning_service.py # Todo planning and subtask generation
+│   ├── task_relationship_service.py # Edge validation, DAG checks, JSON compatibility shadow
+│   ├── todo_planning_service.py # Prompt/context capture and strict plan generation
+│   ├── plan_validation_service.py # Deterministic proposal/schema/graph validation
+│   ├── plan_proposal_service.py # Versioned apply, idempotency, change sets, undo
 │   ├── calendar_service.py     # Async event CRUD with recurrence support
 │   ├── scheduling_service.py   # Event scheduling suggestions and conflict detection
 │   ├── search_service.py       # FTS5 full-text search
@@ -76,6 +89,7 @@ server/
 │   ├── obsidian_cli_service.py  # Obsidian CLI wrapper + write queue
 │   ├── obsidian_context_service.py # Vault project context for AI planning
 │   ├── obsidian_export_service.py  # Export todos/plans to vault markdown
+│   ├── vault_sync_service.py       # Durable post-commit Vault outbox delivery
 │   ├── obsidian_vault_indexer.py   # Vault file indexing + companion health
 │   ├── vault_agent_service.py      # AI agent for vault-aware planning (skill-chain aware)
 │   ├── vault_watcher_service.py   # Vault file watching service
@@ -241,7 +255,7 @@ JWT_EXPIRY_HOURS=24
 PIN=123456
 
 # AI Provider
-AI_PROVIDER=ollama                          # "ollama" or "openai"
+AI_PROVIDER=ollama                          # "ollama", "openai", or "claude_code"
 AI_BASE_URL=http://localhost:11434          # Ollama default
 AI_API_KEY=                                 # Required for OpenAI/Claude
 AI_MODEL=llama3.2                           # Model name
@@ -265,25 +279,47 @@ OBSIDIAN_PROJECT_TODO_FILENAME=TODO.md      # Filename to scan for project todos
 OBSIDIAN_SCAN_INTERVAL_MINUTES=5            # Polling fallback interval
 ```
 
+## API Contract Workflow
+
+FastAPI/Pydantic owns the wire schema. `TaskStatus` and
+`TaskRelationshipType` are defined in `server/domain/`, exported as named
+OpenAPI enums, and generated into the React and Android clients. Generated
+files must not be edited directly.
+
+```bash
+# Run from the repository root after a server contract change
+npm run generate:api
+
+# CI-style drift checks: live FastAPI schema vs snapshot, then client contracts
+uv run --project server --locked python scripts/export-openapi.py --check
+npm run check:api-contract
+```
+
+The generation pipeline updates:
+
+- `server/openapi.json`
+- `src/app/generated/contracts/taskStatus.ts`
+- `src/app/generated/contracts/taskRelationshipType.ts`
+- `android/core/src/main/java/com/clawchat/android/core/data/model/TaskStatus.kt`
+- `android/core/src/main/java/com/clawchat/android/core/data/model/TaskRelationshipType.kt`
+
+The same command also recreates the ignored Orval React Query client under
+`src/app/generated/`; only the small runtime enum contracts are checked in
+from that tree.
+
+The canonical lifecycle values are `pending`, `in_progress`, `completed`, and `cancelled`. Dependency-derived `blocked` state is intentionally outside this enum.
+
 ## Development Setup
 
 ```bash
-# Navigate to server
-cd server
+# From the repository root, install locked backend dependencies
+uv sync --project server --locked
 
-# Create virtual environment
-python -m venv venv
-source venv/Scripts/activate  # Windows
-# source venv/bin/activate    # Linux/Mac
-
-# Install dependencies
-uv sync --locked
-
-# Copy and edit environment config
+# Copy and edit the root environment config used by the standard commands
 cp .env.example .env
 
 # Start development server
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uv run --project server --locked uvicorn main:app --app-dir server --reload --host 0.0.0.0 --port 8000
 ```
 
 The server is now accessible at `http://localhost:8000`.
