@@ -3,7 +3,11 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { compareFormattingDebt, normalizeFormattingPath } = require('./prettier-baseline');
+const {
+  compareFormattingDebt,
+  normalizeFormattingPath,
+  normalizeFormattingSource,
+} = require('./prettier-baseline');
 
 test('normalizes Windows repository paths to portable baseline keys', () => {
   assert.equal(
@@ -14,6 +18,10 @@ test('normalizes Windows repository paths to portable baseline keys', () => {
     normalizeFormattingPath('src/app/components/TaskGraph.tsx'),
     'src/app/components/TaskGraph.tsx',
   );
+});
+
+test('normalizes checkout line endings before formatting and hashing', () => {
+  assert.equal(normalizeFormattingSource('first\r\nsecond\rthird\n'), 'first\nsecond\nthird\n');
 });
 
 test('accepts unchanged legacy formatting debt', () => {

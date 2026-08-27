@@ -4,6 +4,10 @@ function normalizeFormattingPath(filename) {
   return filename.replaceAll('\\', '/');
 }
 
+function normalizeFormattingSource(source) {
+  return source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+}
+
 function compareFormattingDebt(currentDebt, baselineFiles) {
   const violations = [];
 
@@ -22,4 +26,8 @@ function compareFormattingDebt(currentDebt, baselineFiles) {
   return violations;
 }
 
-module.exports = { compareFormattingDebt, normalizeFormattingPath };
+module.exports = {
+  compareFormattingDebt,
+  normalizeFormattingPath,
+  normalizeFormattingSource,
+};
