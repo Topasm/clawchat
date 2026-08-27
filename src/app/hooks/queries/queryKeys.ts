@@ -12,6 +12,7 @@ export const queryKeys = {
   projects: ['projects'] as const,
   project: (id: string) => ['projects', id] as const,
   executionProviders: ['execution-providers'] as const,
+  skills: ['skills'] as const,
   reviews: ['reviews'] as const,
   reviewList: (status: string, projectId?: string | null) =>
     ['reviews', status, projectId ?? 'all'] as const,

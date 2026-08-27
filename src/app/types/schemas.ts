@@ -1206,6 +1206,17 @@ export const SkillsResponseSchema = z.object({
   skills: z.array(SkillSchema),
 });
 
+export const DelegateResponseSchema = z.object({
+  status: z.literal('delegated'),
+  task_id: z.string(),
+  todo_id: z.string(),
+  agent_task_id: z.string(),
+  run_id: z.string(),
+  skill_id: z.string(),
+  skill_chain: z.array(z.string()),
+  agent_type: z.string(),
+});
+
 export const PlanApplyResponseSchema = z.object({
   todo_id: z.string(),
   proposal_id: z.string(),
@@ -1283,6 +1294,7 @@ export type StalePlanProposalDetails = z.infer<typeof StalePlanProposalDetailsSc
 export type PlanProposalErrorResponse = z.infer<typeof PlanProposalErrorResponseSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
 export type SkillsResponse = z.infer<typeof SkillsResponseSchema>;
+export type DelegateResponse = z.infer<typeof DelegateResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Obsidian vault integration

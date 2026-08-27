@@ -25,6 +25,7 @@ from schemas.graph_insights import GraphInsightsResponse
 from schemas.inbox_triage import InboxTriagePreviewRequest, InboxTriagePreviewResponse
 from schemas.task import (
     DelegateRequest,
+    DelegateResponse,
     PlanApplyRequest,
     PlanApplyResponse,
     PlanDismissRequest,
@@ -58,6 +59,7 @@ from services import (
     plan_proposal_service,
     task_placement_service,
     task_execution_telemetry_service,
+    task_execution_service,
     task_relationship_service,
     todo_service,
     vault_sync_service,
@@ -869,7 +871,16 @@ async def dismiss_plan(
     return response
 
 
-@router.post("/{todo_id}/delegate")
+@router.post(
+    "/{todo_id}/delegate",
+    response_model=DelegateResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        422: {"model": ErrorResponse | RequestValidationErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
 async def delegate_todo(
     todo_id: str,
     body: DelegateRequest,
@@ -882,11 +893,24 @@ async def delegate_todo(
     if not skill_id and body.agent_type:
         skill_id = PERSONA_TO_SKILL.get(body.agent_type, body.agent_type)
     if not skill_id or skill_id not in SKILL_REGISTRY:
-        raise ValueError(f"Unknown skill: {skill_id}")
+        raise AppError(
+            code="UNKNOWN_SKILL",
+            message=f"Unknown skill: {skill_id}",
+            status_code=422,
+        )
+    if body.require_ready and skill_id == "plan":
+        raise AppError(
+            code="PLAN_EXECUTION_UNSUPPORTED",
+            message="Use the planning workflow instead of executing the plan skill",
+            status_code=422,
+        )
 
     todo = await db.get(Todo, todo_id)
     if not todo:
         raise NotFoundError("Todo not found")
+
+    if body.require_ready:
+        await task_execution_service.validate_ready_execution(db, todo)
 
     task = AgentTask(
         id=make_id("task_"),
@@ -943,13 +967,16 @@ async def delegate_todo(
             else getattr(active_ai, "model", None)
         )
     )
+    if body.require_ready:
+        await task_execution_service.claim_ready_execution(db, todo.id)
+        await db.refresh(todo)
     run = await agent_run_service.create_run(
         db,
         task,
         provider=provider,
         model=run_model,
         host_id=paseo_adapter.host_label if paseo_adapter else None,
-        update_todo_status=skill_id != "plan",
+        update_todo_status=skill_id != "plan" and not body.require_ready,
     )
 
     # Update todo with skill assignment.
@@ -1035,6 +1062,8 @@ async def delegate_todo(
     return {
         "status": "delegated",
         "task_id": task.id,
+        "todo_id": todo.id,
+        "agent_task_id": task.id,
         "run_id": run.id,
         "skill_id": skill_id,
         "skill_chain": [skill_id],

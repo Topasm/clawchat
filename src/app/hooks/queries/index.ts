@@ -77,6 +77,8 @@ export {
   useResumeAgentRun,
 } from './useAgentRunQueries';
 export { useTaskExecutionTelemetryQuery } from './useTaskExecutionTelemetryQuery';
+export { useSkillsQuery, useStartReadyTaskExecution } from './useTaskExecutionQueries';
+export type { StartReadyTaskExecutionVariables } from './useTaskExecutionQueries';
 export { useExecutionProvidersQuery, useTestPaseoConnection } from './useExecutionProviderQueries';
 export {
   useAdminOverviewQuery,

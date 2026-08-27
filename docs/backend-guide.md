@@ -146,10 +146,10 @@ async def lifespan(app: FastAPI):
 
 Supports two LLM providers with automatic routing based on the `provider` config:
 
-| Provider | Streaming Endpoint | Format |
-|----------|-------------------|--------|
-| `ollama` | `POST /api/chat` | NDJSON (one JSON object per line) |
-| `openai` | `POST /v1/chat/completions` | SSE (`data: {...}` lines) |
+| Provider | Streaming Endpoint          | Format                            |
+| -------- | --------------------------- | --------------------------------- |
+| `ollama` | `POST /api/chat`            | NDJSON (one JSON object per line) |
+| `openai` | `POST /v1/chat/completions` | SSE (`data: {...}` lines)         |
 
 Function calling (for intent classification) always uses the OpenAI-compatible endpoint, which Ollama also supports.
 
@@ -157,12 +157,13 @@ Function calling (for intent classification) always uses the OpenAI-compatible e
 
 Handles two streaming paths:
 
-| Endpoint | Transport | Use Case |
-|----------|-----------|----------|
-| `POST /api/chat/stream` | SSE | Primary — client streams tokens directly |
-| `POST /api/chat/send` | WebSocket (via orchestrator) | Background — intent classification + module routing |
+| Endpoint                | Transport                    | Use Case                                            |
+| ----------------------- | ---------------------------- | --------------------------------------------------- |
+| `POST /api/chat/stream` | SSE                          | Primary — client streams tokens directly            |
+| `POST /api/chat/send`   | WebSocket (via orchestrator) | Background — intent classification + module routing |
 
 SSE streaming flow:
+
 1. Save user message to DB
 2. Load last 20 messages as context
 3. Pre-create assistant message ID
@@ -170,6 +171,7 @@ SSE streaming flow:
 5. Save accumulated assistant message with fresh DB session
 
 Message CRUD:
+
 - `DELETE .../messages/:id` — delete a message
 - `PUT .../messages/:id` — edit message content
 
@@ -201,6 +203,7 @@ analyze_schedule  → scheduling_service (schedule analysis)
 The server integrates with Obsidian vaults via the official Obsidian CLI (using `key=value` parameter syntax). All CLI operations fall back to direct filesystem access if the CLI is unavailable.
 
 **CLI command syntax** (matches [official Obsidian CLI](https://obsidian.md/help/Extending+Obsidian/Obsidian+CLI)):
+
 ```
 obsidian version                              # Health check
 obsidian create path=<path> content=<text>    # Create document
@@ -220,6 +223,7 @@ obsidian command id=<command_id>              # Execute plugin command
 ### Inbox Pipeline & Skill-Based Agents
 
 New todos captured via quick-capture enter the inbox pipeline (`inbox_pipeline_service.py`):
+
 1. LLM classifies the todo and suggests relevant skills (`suggested_skills`)
 2. Built-in skills: `plan`, `research`, `summarize`, `draft`, `code_review`, `data_analysis`, `obsidian_sync`, `prioritize`
 3. Skills are registered in `server/skills/` (registry pattern via `SkillDef` dataclass)
@@ -227,7 +231,7 @@ New todos captured via quick-capture enter the inbox pipeline (`inbox_pipeline_s
 
 The `POST /api/todos/{id}/organize` endpoint triggers the pipeline as a background task with a fresh DB session (via `session_factory`, not the request-scoped session).
 
-Delegation: `POST /api/todos/{id}/delegate` accepts `{ "skill_id": "research" }`, creates an `AgentTask` with a `skill_chain`, and runs the skill executor. Legacy `agent_type` is still accepted for backward compatibility.
+Delegation: `POST /api/todos/{id}/delegate` accepts `{ "skill_id": "research" }`, creates an `AgentTask` with a `skill_chain`, and runs the skill executor. The user-approved path also sends `require_ready=true` and `approved=true`; it recomputes graph readiness and atomically claims `pending → in_progress` before creating a single Run. Legacy `agent_type` and delegation without the Ready guard remain supported for compatibility.
 
 Skills are executed sequentially in a chain — each skill's output feeds as context to the next (e.g. `research → summarize → draft`). LLM-based skill selection (`skills/selector.py`) replaces the old keyword-based `detect_agent_type()` heuristic.
 
@@ -323,6 +327,7 @@ uv run --project server --locked uvicorn main:app --app-dir server --reload --ho
 ```
 
 The server is now accessible at `http://localhost:8000`.
+
 - Swagger docs: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 

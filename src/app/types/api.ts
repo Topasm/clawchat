@@ -89,4 +89,7 @@ export type {
   PlanUndoResponse,
   StalePlanProposalDetails,
   PlanProposalErrorResponse,
+  Skill,
+  SkillsResponse,
+  DelegateResponse,
 } from './schemas';

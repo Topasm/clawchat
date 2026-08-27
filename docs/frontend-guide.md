@@ -231,6 +231,13 @@ Runs, input/review waits, failures, and Artifacts. Run, Review, and Artifact
 WebSocket changes invalidate the projection; polling is enabled only while an
 Agent is actively executing.
 
+`ReadyTaskExecutionPanel` keeps execution approval separate from Task Skill
+assignment. It filters out the planning Skill, selects from the server Skill
+registry and discovered providers, checks the Paseo workspace prerequisite,
+and reveals the Start action only after a review step. The owning mutation
+sends the Ready guard and explicit approval, then invalidates Todos, Runs,
+Projects, graph insights, and Task execution telemetry together.
+
 ### useToastStore
 
 ```typescript

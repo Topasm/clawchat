@@ -13,6 +13,9 @@ import {
   useCreateTaskDependency,
   usePreviewTaskDependency,
   useProjectsQuery,
+  useExecutionProvidersQuery,
+  useSkillsQuery,
+  useStartReadyTaskExecution,
   useTaskGraphInsightsQuery,
   useTaskExecutionTelemetryQuery,
   useTodosQuery,
@@ -37,6 +40,7 @@ import InboxTriageTree, {
   INBOX_TASK_BATCH_DRAG_TYPE,
   INBOX_TASK_DRAG_TYPE,
 } from '../components/inbox/InboxTriageTree';
+import ReadyTaskExecutionPanel from '../components/inbox/ReadyTaskExecutionPanel';
 import { getTaskExecutionBadges } from '../utils/taskExecutionTelemetry';
 
 function transferHasType(event: React.DragEvent, type: string): boolean {
@@ -142,6 +146,7 @@ export default function InboxPage() {
   const { data: projects = [] } = useProjectsQuery();
   const graphInsights = useTaskGraphInsightsQuery(null);
   const { data: executionTelemetry = [] } = useTaskExecutionTelemetryQuery();
+  const startReadyExecution = useStartReadyTaskExecution();
   const { isMobile } = usePlatform();
   const addToast = useToastStore((s) => s.addToast);
   const toggleMutation = useToggleTodoComplete();
@@ -154,6 +159,8 @@ export default function InboxPage() {
   const previewDependency = usePreviewTaskDependency();
   const createDependency = useCreateTaskDependency();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const { data: skillsData } = useSkillsQuery(Boolean(selectedTaskId));
+  const { data: executionProviders = [] } = useExecutionProvidersQuery(Boolean(selectedTaskId));
   const [selectedInboxTaskIds, setSelectedInboxTaskIds] = useState<string[]>([]);
   const [placementRevision, setPlacementRevision] = useState<number | null>(null);
   const [dependencyPreview, setDependencyPreview] = useState<TaskDependencyPreviewResponse | null>(
@@ -283,6 +290,9 @@ export default function InboxPage() {
     ? executionTelemetryByTaskId.get(selectedTaskId)
     : undefined;
   const selectedExecutionBadges = getTaskExecutionBadges(selectedExecutionTelemetry);
+  const selectedProject = selectedTask?.project_id
+    ? projects.find((project) => project.id === selectedTask.project_id)
+    : undefined;
 
   const dependencyCandidates = useMemo(() => {
     if (!selectedTask) return [];
@@ -1128,6 +1138,21 @@ export default function InboxPage() {
                     )}
                   </div>
                 </section>
+              )}
+              {selectedInsight && (
+                <ReadyTaskExecutionPanel
+                  task={selectedTask}
+                  insight={selectedInsight}
+                  telemetry={selectedExecutionTelemetry}
+                  project={selectedProject}
+                  skills={skillsData?.skills ?? []}
+                  providers={executionProviders}
+                  isStarting={startReadyExecution.isPending}
+                  onStart={(request) =>
+                    startReadyExecution.mutateAsync({ todoId: selectedTask.id, ...request })
+                  }
+                  onOpenRun={(runId) => navigate(`/runs?run_id=${runId}`)}
+                />
               )}
               <div className="cc-inbox-triage__dependency-picker">
                 <label htmlFor="inbox-prerequisite-select">Must wait for</label>

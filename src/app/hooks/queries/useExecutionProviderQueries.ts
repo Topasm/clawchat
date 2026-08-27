@@ -6,7 +6,7 @@ import { useToastStore } from '../../stores/useToastStore';
 import { ExecutionProviderStatusSchema } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
 
-export function useExecutionProvidersQuery() {
+export function useExecutionProvidersQuery(enabled = true) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
     queryKey: queryKeys.executionProviders,
@@ -14,7 +14,7 @@ export function useExecutionProvidersQuery() {
       const response = await apiClient.get('/execution-providers');
       return z.array(ExecutionProviderStatusSchema).parse(response.data);
     },
-    enabled: !!serverUrl,
+    enabled: !!serverUrl && enabled,
     staleTime: 30_000,
   });
 }

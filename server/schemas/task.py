@@ -269,6 +269,25 @@ class DelegateRequest(BaseModel):
     agent_type: str | None = None  # legacy fallback
     execution_provider: str | None = Field(default=None, max_length=100)
     model: str | None = Field(default=None, max_length=200)
+    require_ready: bool = False
+    approved: bool = False
+
+    @model_validator(mode="after")
+    def validate_ready_execution_approval(self):
+        if self.require_ready and not self.approved:
+            raise ValueError("approved must be true for Ready-only execution")
+        return self
+
+
+class DelegateResponse(BaseModel):
+    status: Literal["delegated"]
+    task_id: str
+    todo_id: str
+    agent_task_id: str
+    run_id: str
+    skill_id: str
+    skill_chain: list[str]
+    agent_type: str
 
 
 class SkillResponse(BaseModel):
@@ -277,4 +296,4 @@ class SkillResponse(BaseModel):
     id: str
     name: str
     description: str
-    tags: list[str] = []
+    tags: list[str] = Field(default_factory=list)

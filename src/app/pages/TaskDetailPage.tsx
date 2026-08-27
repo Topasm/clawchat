@@ -168,16 +168,6 @@ export default function TaskDetailPage() {
     applyPlanMutation.reset();
   };
 
-  const handleDelegate = async (skillId: string) => {
-    try {
-      await apiClient.post(`/todos/${taskId}/delegate`, { skill_id: skillId });
-      useToastStore.getState().addToast('info', `Delegated to ${skillId}`);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-    } catch {
-      useToastStore.getState().addToast('error', 'Failed to delegate');
-    }
-  };
-
   if (!task) {
     return (
       <div className="cc-detail">
@@ -395,7 +385,6 @@ export default function TaskDetailPage() {
                     } else {
                       const updated = [...(task.enabled_skills || []), id];
                       persistField({ enabled_skills: updated, assignee: id });
-                      handleDelegate(id);
                     }
                   }}
                 >
@@ -423,7 +412,7 @@ export default function TaskDetailPage() {
                     ? 'Classifying...'
                     : task.inbox_state === 'plan_ready'
                       ? 'Plan ready for review'
-                      : 'Assigned'}
+                      : 'Assigned · start from Inbox when Ready'}
               </span>
             </div>
           )}

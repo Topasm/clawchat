@@ -1654,6 +1654,11 @@
             ],
             "title": "Agent Type"
           },
+          "approved": {
+            "default": false,
+            "title": "Approved",
+            "type": "boolean"
+          },
           "execution_provider": {
             "anyOf": [
               {
@@ -1678,6 +1683,11 @@
             ],
             "title": "Model"
           },
+          "require_ready": {
+            "default": false,
+            "title": "Require Ready",
+            "type": "boolean"
+          },
           "skill_id": {
             "anyOf": [
               {
@@ -1691,6 +1701,58 @@
           }
         },
         "title": "DelegateRequest",
+        "type": "object"
+      },
+      "DelegateResponse": {
+        "properties": {
+          "agent_task_id": {
+            "title": "Agent Task Id",
+            "type": "string"
+          },
+          "agent_type": {
+            "title": "Agent Type",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "skill_chain": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skill Chain",
+            "type": "array"
+          },
+          "skill_id": {
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "delegated",
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "todo_id": {
+            "title": "Todo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "task_id",
+          "todo_id",
+          "agent_task_id",
+          "run_id",
+          "skill_id",
+          "skill_chain",
+          "agent_type"
+        ],
+        "title": "DelegateResponse",
         "type": "object"
       },
       "DeviceListResponse": {
@@ -12909,20 +12971,60 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DelegateResponse"
+                }
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RequestValidationErrorResponse"
+                    }
+                  ],
+                  "title": "Response 422 Delegate Todo Api Todos  Todo Id  Delegate Post"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "security": [

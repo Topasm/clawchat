@@ -1004,14 +1004,20 @@ GET    /api/todos/skills/list               # List available skills
 ```json
 // POST delegate — Request
 {
-  "skill_id": "research"          // preferred (any registered skill ID)
+  "skill_id": "research",         // preferred (any registered skill ID)
+  "execution_provider": "builtin",
+  "require_ready": true,           // enforce actionable Ready leaf semantics
+  "approved": true,                // required when require_ready is true
   // "agent_type": "planner"      // legacy fallback, mapped to skill ID
 }
 
 // POST delegate — Response 200
 {
   "status": "delegated",
-  "task_id": "task_abc123",
+  "task_id": "agent_task_abc123", // backward-compatible AgentTask ID
+  "todo_id": "todo_abc123",
+  "agent_task_id": "agent_task_abc123",
+  "run_id": "run_abc123",
   "skill_id": "research",
   "skill_chain": ["research"],
   "agent_type": "research"
@@ -1025,6 +1031,13 @@ GET    /api/todos/skills/list               # List available skills
   ]
 }
 ```
+
+`require_ready=true` is the approved execution path. The server recomputes the
+Task's graph state, rejects Blocked Tasks and structural containers, verifies
+there is no active Run, validates the provider, then atomically claims the Todo
+by changing `pending` to `in_progress`. `plan` is rejected in this mode because
+planning uses versioned proposal approval. Calls that omit `require_ready`
+retain the legacy delegation behavior.
 
 ---
 
