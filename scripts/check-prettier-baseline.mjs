@@ -6,7 +6,7 @@ import { relative, resolve } from 'node:path';
 import prettier from 'prettier';
 import prettierBaseline from './prettier-baseline.js';
 
-const { compareFormattingDebt } = prettierBaseline;
+const { compareFormattingDebt, normalizeFormattingPath } = prettierBaseline;
 
 const repositoryRoot = resolve(import.meta.dirname, '..');
 const sourceRoot = resolve(repositoryRoot, 'src');
@@ -33,7 +33,7 @@ async function findFormattingDebt() {
     const source = readFileSync(filename, 'utf8');
     const options = (await prettier.resolveConfig(filename)) ?? {};
     if (!(await prettier.check(source, { ...options, filepath: filename }))) {
-      debt[relative(repositoryRoot, filename)] = digest(source);
+      debt[normalizeFormattingPath(relative(repositoryRoot, filename))] = digest(source);
     }
   }
   return debt;

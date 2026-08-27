@@ -3,7 +3,18 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { compareFormattingDebt } = require('./prettier-baseline');
+const { compareFormattingDebt, normalizeFormattingPath } = require('./prettier-baseline');
+
+test('normalizes Windows repository paths to portable baseline keys', () => {
+  assert.equal(
+    normalizeFormattingPath('src\\app\\components\\TaskGraph.tsx'),
+    'src/app/components/TaskGraph.tsx',
+  );
+  assert.equal(
+    normalizeFormattingPath('src/app/components/TaskGraph.tsx'),
+    'src/app/components/TaskGraph.tsx',
+  );
+});
 
 test('accepts unchanged legacy formatting debt', () => {
   const debt = {

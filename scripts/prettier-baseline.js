@@ -1,5 +1,9 @@
 'use strict';
 
+function normalizeFormattingPath(filename) {
+  return filename.replaceAll('\\', '/');
+}
+
 function compareFormattingDebt(currentDebt, baselineFiles) {
   const violations = [];
 
@@ -18,4 +22,4 @@ function compareFormattingDebt(currentDebt, baselineFiles) {
   return violations;
 }
 
-module.exports = { compareFormattingDebt };
+module.exports = { compareFormattingDebt, normalizeFormattingPath };
