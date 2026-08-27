@@ -37,6 +37,14 @@ describe('wsClient', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ ticket: 'short-lived-ticket', expires_in: 60 }),
+      }),
+    );
     // Mock global WebSocket
     vi.stubGlobal('WebSocket', MockWebSocket);
     // Re-import to get fresh state... but it's a singleton
@@ -48,6 +56,7 @@ describe('wsClient', () => {
 
   afterEach(() => {
     wsClient.disconnect();
+    wsClient.onAuthFailure = null;
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -62,6 +71,72 @@ describe('wsClient', () => {
     await vi.advanceTimersByTimeAsync(10);
 
     expect(statusCb).toHaveBeenCalledWith('connected');
+    expect(fetch).toHaveBeenCalledWith('http://localhost:3000/api/auth/ws-ticket', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer token' },
+      signal: expect.any(AbortSignal),
+    });
+    expect((wsClient as any).ws.url).toContain('/ws?ticket=short-lived-ticket');
+  });
+
+  it('stops reconnecting when the ticket request is unauthorized', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 401 } as Response);
+    const authFailure = vi.fn();
+    wsClient.onAuthFailure = authFailure;
+
+    wsClient.connect('http://localhost:3000', 'revoked-token');
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(authFailure).toHaveBeenCalledOnce();
+    expect((wsClient as any).ws).toBeNull();
+  });
+
+  it('does not open a socket when a ticket arrives after disconnect', async () => {
+    let resolveTicket!: (value: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTicket = resolve;
+      }),
+    );
+
+    wsClient.connect('http://localhost:3000', 'old-token');
+    wsClient.disconnect();
+    resolveTicket({
+      ok: true,
+      status: 200,
+      json: async () => ({ ticket: 'stale-ticket' }),
+    } as Response);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect((wsClient as any).ws).toBeNull();
+  });
+
+  it('starts a fresh ticket request when credentials change', async () => {
+    let resolveOldTicket!: (value: Response) => void;
+    vi.mocked(fetch)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOldTicket = resolve;
+        }),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ticket: 'new-ticket' }),
+      } as Response);
+
+    wsClient.connect('http://old-host', 'old-token');
+    wsClient.connect('http://new-host', 'new-token');
+    await vi.advanceTimersByTimeAsync(10);
+    resolveOldTicket({
+      ok: true,
+      status: 200,
+      json: async () => ({ ticket: 'old-ticket' }),
+    } as Response);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect((wsClient as any).ws.url).toBe('ws://new-host/ws?ticket=new-ticket');
   });
 
   it('disconnect fires disconnected status', async () => {

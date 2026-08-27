@@ -99,6 +99,9 @@ function collectReleaseVersions(projectRoot = path.resolve(__dirname, '..')) {
   const packageLock = readJson(projectRoot, 'package-lock.json');
   const cargoTomlPath = 'src-tauri/Cargo.toml';
   const cargoLockPath = 'src-tauri/Cargo.lock';
+  const serverVersionPath = 'server/app_version.py';
+  const serverProjectPath = 'server/pyproject.toml';
+  const androidBuildPath = 'android/app/build.gradle.kts';
   const cargoTomlPackage = tomlSection(
     readText(projectRoot, cargoTomlPath),
     'package',
@@ -137,6 +140,30 @@ function collectReleaseVersions(projectRoot = path.resolve(__dirname, '..')) {
         cargoLockEntry,
         /^version\s*=\s*"([^"]+)"\s*$/gm,
         'src-tauri/Cargo.lock clawchat-tauri version',
+      ),
+    },
+    {
+      location: 'server/app_version.py APP_VERSION',
+      version: singleCapturedVersion(
+        readText(projectRoot, serverVersionPath),
+        /^APP_VERSION\s*=\s*["']([^"']+)["']\s*$/gm,
+        'server/app_version.py APP_VERSION',
+      ),
+    },
+    {
+      location: 'server/pyproject.toml [project] version',
+      version: singleCapturedVersion(
+        tomlSection(readText(projectRoot, serverProjectPath), 'project', serverProjectPath),
+        /^version\s*=\s*"([^"]+)"\s*$/gm,
+        'server/pyproject.toml [project] version',
+      ),
+    },
+    {
+      location: 'android/app/build.gradle.kts versionName',
+      version: singleCapturedVersion(
+        readText(projectRoot, androidBuildPath),
+        /^\s*versionName\s*=\s*"([^"]+)"\s*$/gm,
+        'android/app/build.gradle.kts versionName',
       ),
     },
     requirePackageVersionWiring(projectRoot, packageVersion),

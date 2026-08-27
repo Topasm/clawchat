@@ -48,15 +48,10 @@ fi
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
-# Determine the Gradle wrapper jar — download if not present
+# The wrapper JAR is versioned with the project and downloads the verified
+# Gradle distribution declared in gradle-wrapper.properties.
 if [ ! -f "$CLASSPATH" ] ; then
-    WRAPPER_URL="https://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
-    echo "Gradle wrapper jar not found. Using system Gradle or downloading..."
-    # Fallback: use system gradle if available
-    if command -v gradle >/dev/null 2>&1; then
-        exec gradle "$@"
-    fi
-    die "ERROR: gradle-wrapper.jar not found and no system Gradle available. Run 'gradle wrapper' to generate."
+    die "ERROR: gradle-wrapper.jar is missing from the checkout."
 fi
 
 exec "$JAVACMD" \

@@ -59,3 +59,12 @@ def strip_markdown_fences(text: str) -> str:
         cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
         cleaned = cleaned.rsplit("```", 1)[0]
     return cleaned.strip()
+
+
+def parse_json_object(text: str) -> dict | None:
+    """Parse a possibly fenced JSON object, returning ``None`` on failure."""
+    try:
+        value = json.loads(strip_markdown_fences(text))
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return value if isinstance(value, dict) else None

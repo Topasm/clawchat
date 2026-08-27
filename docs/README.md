@@ -11,6 +11,9 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 | [API Design](./api-design.md) | REST endpoints, SSE streaming, and authentication |
 | [Backend Guide](./backend-guide.md) | FastAPI project structure, modules, and dev setup |
 | [Frontend Guide](./frontend-guide.md) | Vite + React + TypeScript app structure and component reference |
+| [Tauri Migration](./tauri-migration.md) | Desktop runtime architecture, data migration, updater, and signing |
+| [Electron Cutover](./electron-cutover.md) | Completed removal record and legacy data-import guarantees |
+| [Build Performance](./build-performance.md) | Renderer/native build layers and performance budgets |
 | [Deployment](./deployment.md) | Docker setup, environment variables, and production config |
 | [Remote Access Runbook](./remote-access-runbook.md) | Cloudflare Tunnel (primary) and Tailscale (secondary) remote access setup |
 | [Roadmap](./roadmap.md) | Development progress and upcoming work (includes vibe-kanban-inspired upgrades) |
@@ -35,7 +38,7 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 - **File Attachments** — Drag-and-drop file upload on memos and tasks with image preview, download links, and size/type validation (10MB limit)
 - **Full-Text Search** — Search across tasks, events, and memos from a dedicated search page
 - **Dialog System** — Accessible animated modals using @radix-ui/react-dialog with focus trap and ESC support
-- **Cross-Platform** — Runs as an Electron desktop app (Windows/macOS/Linux) and as a web app in any browser
+- **Cross-Platform** — Runs through Tauri on desktop, Capacitor/Compose on mobile, and Vite in browsers
 - **Private Remote Access** — Publish via Cloudflare Tunnel or Tailscale without exposing the backend directly to the internet
 - **Demo Mode** — Fully functional UI with seeded demo data when no backend is connected
 
@@ -49,10 +52,10 @@ ClawChat is a privacy-first, self-hosted personal assistant that unifies task ma
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Desktop App | Electron | Native desktop shell (Windows, macOS, Linux) |
+| Desktop App | Tauri 2 + Rust | Native desktop shell, server lifecycle, secure storage, and signed updates |
 | Web App | Vite + React 18 | Fast dev server and optimized production builds |
 | Language | TypeScript | Type-safe codebase |
-| Routing | React Router v6 | Client-side navigation |
+| Routing | React Router v7 | Client-side navigation and lazy route splitting |
 | State Management | Zustand | Lightweight global state (auth, chat, modules, settings) |
 | HTTP Client | Axios | REST API communication with token refresh |
 | Real-time | SSE (Server-Sent Events) | Streaming AI responses |
@@ -78,8 +81,8 @@ npm install
 # Development (web)
 npm run dev
 
-# Development (Electron desktop)
-npm run dev:electron
+# Development (Tauri desktop)
+npm run dev:tauri
 
 # Type checking
 npm run typecheck
@@ -90,7 +93,7 @@ npm run build
 
 ## Prerequisites
 
-- **Node.js** >= 18 and npm
+- **Node.js** >= 22 and npm >= 10 (Node 24 LTS recommended)
 - **Python** >= 3.11 (for the server)
 - **Docker & Docker Compose** (for server deployment)
 - An **OpenAI-compatible LLM** endpoint (Ollama for local, or Claude/GPT API key)

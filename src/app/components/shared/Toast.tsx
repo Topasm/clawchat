@@ -1,19 +1,20 @@
 import type { Toast as ToastData } from '../../stores/useToastStore';
 import { useToastStore } from '../../stores/useToastStore';
+import { CheckCircleIcon, CloseIcon, InfoIcon, WarningIcon } from './Icons';
 
-const icons: Record<ToastData['type'], string> = {
-  success: '✓',
-  error: '✕',
-  info: 'ℹ',
-  warning: '⚠',
-};
+function ToastTypeIcon({ type }: { type: ToastData['type'] }) {
+  if (type === 'success') return <CheckCircleIcon size={16} />;
+  if (type === 'error') return <CloseIcon size={16} />;
+  if (type === 'warning') return <WarningIcon size={16} />;
+  return <InfoIcon size={16} />;
+}
 
 export default function Toast({ toast }: { toast: ToastData }) {
   const removeToast = useToastStore((s) => s.removeToast);
 
   return (
     <div className={`cc-toast cc-toast--${toast.type}`} role="alert">
-      <span className="cc-toast__icon">{icons[toast.type]}</span>
+      <span className="cc-toast__icon"><ToastTypeIcon type={toast.type} /></span>
       <span className="cc-toast__message">{toast.message}</span>
       {toast.action && (
         <button
@@ -31,7 +32,7 @@ export default function Toast({ toast }: { toast: ToastData }) {
         onClick={() => removeToast(toast.id)}
         aria-label="Dismiss"
       >
-        ✕
+        <CloseIcon size={14} />
       </button>
     </div>
   );

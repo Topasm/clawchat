@@ -4,7 +4,7 @@ import { platformApi } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
 
 /**
- * Auto-login on Electron in host mode by reading server config from the main process.
+ * Auto-login on a desktop host by reading server config from the native platform adapter.
  * In client mode, the user logs in manually — auto-login is skipped.
  */
 export function useAutoLogin() {

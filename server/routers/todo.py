@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,13 +25,16 @@ from schemas.task import (
     SkillResponse,
 )
 from schemas.todo import AnswerQuestionsRequest, ProjectTodoResponse, TodoCreate, TodoResponse, TodoUpdate
-from services import inbox_pipeline_service
-from services import todo_planning_service
+from services import inbox_pipeline_service, todo_planning_service, todo_service
 from skills import SKILL_REGISTRY, PERSONA_TO_SKILL, get_skill
-from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
+from utils import deserialize_tags, make_id, serialize_tags
 from utils.inbox_display import get_next_action
 from config import settings
-from services.obsidian_export_service import export_todo, remove_todo_from_vault
+from services.obsidian_export_service import (
+    export_todo,
+    export_todos_batch,
+    remove_todos_from_vault,
+)
 from ws.manager import ws_manager
 
 router = APIRouter()
@@ -45,13 +48,6 @@ async def _notify_todo_change():
         "type": "module_data_changed",
         "data": {"module": "todos"},
     })
-
-_ORDER_COLUMNS = {
-    "created_at": Todo.created_at,
-    "updated_at": Todo.updated_at,
-    "sort_order": Todo.sort_order,
-    "priority": Todo.priority,
-}
 
 # -- Assignee / skill display labels -------------------------------------------
 
@@ -189,32 +185,46 @@ async def list_projects(
     an explicit source (e.g. obsidian_project).  Simple inbox captures and
     standalone tasks are excluded.
     """
+    child_counts = (
+        select(
+            Todo.parent_id.label("parent_id"),
+            func.count(Todo.id).label("subtask_count"),
+            func.sum(case((Todo.status == "completed", 1), else_=0)).label(
+                "completed_count"
+            ),
+        )
+        .where(Todo.parent_id.is_not(None))
+        .group_by(Todo.parent_id)
+        .subquery()
+    )
+    conversations = (
+        select(
+            Conversation.project_todo_id.label("project_todo_id"),
+            func.min(Conversation.id).label("conversation_id"),
+        )
+        .where(
+            Conversation.project_todo_id.is_not(None),
+            Conversation.is_archived.is_(False),
+        )
+        .group_by(Conversation.project_todo_id)
+        .subquery()
+    )
     q = (
-        select(Todo)
+        select(
+            Todo,
+            conversations.c.conversation_id,
+            func.coalesce(child_counts.c.subtask_count, 0),
+            func.coalesce(child_counts.c.completed_count, 0),
+        )
+        .outerjoin(child_counts, child_counts.c.parent_id == Todo.id)
+        .outerjoin(conversations, conversations.c.project_todo_id == Todo.id)
         .where(Todo.parent_id.is_(None))
         .order_by(Todo.updated_at.desc())
     )
-    root_todos = (await db.execute(q)).scalars().all()
+    root_todos = (await db.execute(q)).all()
 
     items = []
-    for todo in root_todos:
-        # Get associated conversation
-        conv_q = select(Conversation.id).where(
-            Conversation.project_todo_id == todo.id,
-            Conversation.is_archived == False,  # noqa: E712
-        ).limit(1)
-        conv_id = (await db.execute(conv_q)).scalar()
-
-        # Count subtasks
-        subtask_q = select(func.count(Todo.id)).where(Todo.parent_id == todo.id)
-        subtask_count = (await db.execute(subtask_q)).scalar() or 0
-
-        completed_q = select(func.count(Todo.id)).where(
-            Todo.parent_id == todo.id,
-            Todo.status == "completed",
-        )
-        completed_count = (await db.execute(completed_q)).scalar() or 0
-
+    for todo, conv_id, subtask_count, completed_count in root_todos:
         # Only include as a project if it has subtasks, a conversation, or a source
         has_subtasks = subtask_count > 0
         has_conversation = conv_id is not None
@@ -261,33 +271,18 @@ async def list_todos(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    offset = (page - 1) * limit
-    conditions = []
-    if status:
-        conditions.append(Todo.status == status)
-    if priority:
-        conditions.append(Todo.priority == priority)
-    if due_before:
-        conditions.append(Todo.due_date <= due_before)
-    if parent_id:
-        conditions.append(Todo.parent_id == parent_id)
-    if root_only:
-        conditions.append(Todo.parent_id.is_(None))
-
-    count_q = select(func.count(Todo.id)).where(*conditions)
-    total = (await db.execute(count_q)).scalar() or 0
-
-    col = _ORDER_COLUMNS.get(order_by, Todo.created_at)
-    order_clause = col.asc() if order_dir == "asc" else col.desc()
-
-    q = (
-        select(Todo)
-        .where(*conditions)
-        .order_by(order_clause)
-        .offset(offset)
-        .limit(limit)
+    rows, total = await todo_service.get_todos(
+        db,
+        status_filter=status,
+        priority=priority,
+        due_before=due_before,
+        parent_id=parent_id,
+        root_only=root_only,
+        order_by=order_by,
+        order_dir=order_dir,
+        page=page,
+        limit=limit,
     )
-    rows = (await db.execute(q)).scalars().all()
 
     items = []
     for row in rows:
@@ -308,8 +303,10 @@ async def bulk_update_todos(
     deleted_ids: list[str] = []
     updated_todos: list[Todo] = []
     errors: list[str] = []
+    todo_rows = await db.execute(select(Todo).where(Todo.id.in_(body.ids)))
+    todos_by_id = {todo.id: todo for todo in todo_rows.scalars().all()}
     for todo_id in body.ids:
-        todo = await db.get(Todo, todo_id)
+        todo = todos_by_id.get(todo_id)
         if not todo:
             errors.append(f"Todo {todo_id} not found")
             continue
@@ -334,15 +331,25 @@ async def bulk_update_todos(
     await db.commit()
 
     if settings.obsidian_vault_path:
-        for tid in deleted_ids:
-            remove_todo_from_vault(settings.obsidian_vault_path, tid)
-        for todo in updated_todos:
-            project_name = None
-            if todo.parent_id:
-                parent = await db.get(Todo, todo.parent_id)
-                if parent:
-                    project_name = parent.title
-            export_todo(settings.obsidian_vault_path, todo, project_name)
+        remove_todos_from_vault(
+            settings.obsidian_vault_path,
+            set(deleted_ids) | {todo.id for todo in updated_todos},
+        )
+        parent_ids = {todo.parent_id for todo in updated_todos if todo.parent_id}
+        parent_titles = {}
+        if parent_ids:
+            parent_rows = await db.execute(
+                select(Todo.id, Todo.title).where(Todo.id.in_(parent_ids))
+            )
+            parent_titles = dict(parent_rows.all())
+        export_todos_batch(
+            settings.obsidian_vault_path,
+            [
+                (todo, parent_titles.get(todo.parent_id) if todo.parent_id else None)
+                for todo in updated_todos
+            ],
+            remove_existing=False,
+        )
 
     await _notify_todo_change()
     return BulkTodoResponse(updated=updated, deleted=deleted, errors=errors)
@@ -356,25 +363,25 @@ async def create_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo = Todo(
-        id=make_id("todo_"),
+    todo = await todo_service.create_todo(
+        db,
         title=body.title,
         description=body.description,
         priority=body.priority,
         due_date=body.due_date,
-        tags=serialize_tags(body.tags),
+        tags=body.tags,
         parent_id=body.parent_id,
         sort_order=body.sort_order or 0,
         source=body.source,
         source_id=body.source_id,
         assignee=body.assignee,
+        enabled_skills=body.enabled_skills,
         inbox_state=body.inbox_state,
         estimated_minutes=body.estimated_minutes,
-        depends_on=json.dumps(body.depends_on) if body.depends_on else None,
+        depends_on=body.depends_on,
         recurrence_rule=body.recurrence_rule,
         recurrence_end=body.recurrence_end,
     )
-    db.add(todo)
     await db.commit()
     await db.refresh(todo)
 
@@ -389,14 +396,6 @@ async def create_todo(
 
         background_tasks.add_task(_run_pipeline)
 
-    if settings.obsidian_vault_path:
-        project_name = None
-        if todo.parent_id:
-            parent = await db.get(Todo, todo.parent_id)
-            if parent:
-                project_name = parent.title
-        export_todo(settings.obsidian_vault_path, todo, project_name)
-
     await _notify_todo_change()
     return await _enrich_todo_response(todo, db)
 
@@ -407,9 +406,7 @@ async def get_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo = await db.get(Todo, todo_id)
-    if not todo:
-        raise NotFoundError("Todo not found")
+    todo = await todo_service.get_todo(db, todo_id)
     return await _enrich_todo_response(todo, db)
 
 
@@ -420,19 +417,8 @@ async def update_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo = await db.get(Todo, todo_id)
-    if not todo:
-        raise NotFoundError("Todo not found")
-
     data = body.model_dump(exclude_unset=True)
-    apply_model_updates(todo, data)
-
-    # Auto-set completed_at when status changes to completed
-    if "status" in data:
-        if data["status"] == "completed" and not todo.completed_at:
-            todo.completed_at = datetime.now(timezone.utc)
-        elif data["status"] != "completed":
-            todo.completed_at = None
+    todo = await todo_service.update_todo(db, todo_id, **data)
     await db.commit()
     await db.refresh(todo)
 
@@ -444,14 +430,6 @@ async def update_todo(
         if next_todo:
             next_todo_id = next_todo.id
             await db.commit()
-
-    if settings.obsidian_vault_path:
-        project_name = None
-        if todo.parent_id:
-            parent = await db.get(Todo, todo.parent_id)
-            if parent:
-                project_name = parent.title
-        export_todo(settings.obsidian_vault_path, todo, project_name)
 
     await _notify_todo_change()
     resp = await _enrich_todo_response(todo, db)
@@ -467,15 +445,8 @@ async def delete_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo = await db.get(Todo, todo_id)
-    if not todo:
-        raise NotFoundError("Todo not found")
-    deleted_id = todo.id
-    await db.delete(todo)
+    await todo_service.delete_todo(db, todo_id)
     await db.commit()
-
-    if settings.obsidian_vault_path:
-        remove_todo_from_vault(settings.obsidian_vault_path, deleted_id)
 
     await _notify_todo_change()
 

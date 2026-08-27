@@ -124,6 +124,9 @@ async def _apply_schema_corrections(session: AsyncSession):
         "ALTER TABLE agent_tasks ADD COLUMN payload_json TEXT",
         "ALTER TABLE agent_tasks ADD COLUMN skill_chain TEXT",
         "ALTER TABLE agent_tasks ADD COLUMN current_skill_index INTEGER NOT NULL DEFAULT 0",
+
+        # -- paired_devices --
+        "ALTER TABLE paired_devices ADD COLUMN public_key TEXT",
     ]
 
     for stmt in corrections:

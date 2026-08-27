@@ -32,6 +32,9 @@ data class PairingClaimResponse(
     @SerialName("api_base_url") val apiBaseUrl: String,
     @SerialName("host_name") val hostName: String,
     @SerialName("server_version") val serverVersion: String,
+    @SerialName("host_id") val hostId: String,
+    @SerialName("host_public_key") val hostPublicKey: String,
+    @SerialName("relay_url") val relayUrl: String? = null,
 )
 
 // --- Auth ---

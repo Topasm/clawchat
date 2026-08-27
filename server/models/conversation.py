@@ -24,7 +24,14 @@ class Conversation(Base):
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     metadata_json: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
     project_todo_id: Mapped[str | None] = mapped_column(
-        String, ForeignKey("todos.id", ondelete="SET NULL"), nullable=True
+        String,
+        ForeignKey(
+            "todos.id",
+            name="fk_conversations_project_todo_id",
+            ondelete="SET NULL",
+            use_alter=True,
+        ),
+        nullable=True,
     )
 
     messages = relationship("Message", back_populates="conversation", lazy="selectin")

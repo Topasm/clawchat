@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 logger = logging.getLogger(__name__)
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 from starlette.responses import StreamingResponse
 
 from auth.dependencies import get_current_user
@@ -71,25 +72,26 @@ async def list_conversations(
     count_q = select(func.count(Conversation.id)).where(*conditions)
     total = (await db.execute(count_q)).scalar() or 0
 
+    last_message_subquery = (
+        select(Message.content)
+        .where(Message.conversation_id == Conversation.id)
+        .order_by(Message.created_at.desc())
+        .limit(1)
+        .correlate(Conversation)
+        .scalar_subquery()
+    )
     q = (
-        select(Conversation)
+        select(Conversation, last_message_subquery.label("last_message"))
+        .options(noload(Conversation.messages))
         .where(*conditions)
         .order_by(Conversation.updated_at.desc())
         .offset(offset)
         .limit(limit)
     )
-    rows = (await db.execute(q)).scalars().all()
+    rows = (await db.execute(q)).all()
 
     items = []
-    for conv in rows:
-        # Get last message preview
-        last_msg_q = (
-            select(Message.content)
-            .where(Message.conversation_id == conv.id)
-            .order_by(Message.created_at.desc())
-            .limit(1)
-        )
-        last_msg = (await db.execute(last_msg_q)).scalar()
+    for conv, last_msg in rows:
         preview = last_msg[:100] if last_msg else None
 
         items.append(

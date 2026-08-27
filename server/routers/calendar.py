@@ -6,12 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from database import get_db
-from exceptions import NotFoundError
-from models.event import Event
 from schemas.calendar import EventCreate, EventResponse, EventUpdate
 from schemas.common import PaginatedResponse
 from services import calendar_service
-from utils import apply_model_updates, deserialize_tags, make_id, serialize_tags
+from utils import deserialize_tags
 from ws.manager import ws_manager
 
 router = APIRouter()
@@ -95,8 +93,8 @@ async def create_event(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    event = Event(
-        id=make_id("evt_"),
+    event = await calendar_service.create_event(
+        db,
         title=body.title,
         description=body.description,
         start_time=body.start_time,
@@ -106,9 +104,8 @@ async def create_event(
         reminder_minutes=body.reminder_minutes,
         recurrence_rule=body.recurrence_rule,
         recurrence_end=body.recurrence_end,
-        tags=serialize_tags(body.tags),
+        tags=body.tags,
     )
-    db.add(event)
     await db.commit()
     await db.refresh(event)
 
@@ -125,9 +122,7 @@ async def get_event(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    event = await db.get(Event, event_id)
-    if not event:
-        raise NotFoundError("Event not found")
+    event = await calendar_service.get_event(db, event_id)
     resp = EventResponse.model_validate(event)
     if event.tags:
         resp.tags = deserialize_tags(event.tags)
@@ -141,12 +136,8 @@ async def update_event(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    event = await db.get(Event, event_id)
-    if not event:
-        raise NotFoundError("Event not found")
-
     data = body.model_dump(exclude_unset=True)
-    apply_model_updates(event, data)
+    event = await calendar_service.update_event(db, event_id, **data)
     await db.commit()
     await db.refresh(event)
 
@@ -163,10 +154,7 @@ async def delete_event(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    event = await db.get(Event, event_id)
-    if not event:
-        raise NotFoundError("Event not found")
-    await db.delete(event)
+    await calendar_service.delete_event(db, event_id)
     await db.commit()
     await _notify_event_change()
 

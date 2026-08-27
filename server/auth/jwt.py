@@ -1,26 +1,74 @@
+import hashlib
+import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
-
-from jose import JWTError, jwt
 
 from config import settings
 from exceptions import UnauthorizedError
+from jose import JWTError, jwt
 
 ALGORITHM = "HS256"
 
 
-def create_access_token(subject: str = "user") -> tuple[str, int]:
+REFRESH_TOKEN_LIFETIME = timedelta(days=30)
+
+
+def create_access_token(
+    subject: str = "user",
+    session_id: str | None = None,
+) -> tuple[str, int]:
     expires_delta = timedelta(hours=settings.jwt_expiry_hours)
     expires_in = int(expires_delta.total_seconds())
     expire = datetime.now(timezone.utc) + expires_delta
     payload = {"sub": subject, "exp": expire, "type": "access"}
+    if session_id is not None:
+        payload["sid"] = session_id
     token = jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
     return token, expires_in
 
 
-def create_refresh_token(subject: str = "user") -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=30)
-    payload = {"sub": subject, "exp": expire, "type": "refresh"}
+def create_refresh_token(
+    subject: str = "user",
+    session_id: str | None = None,
+    token_id: str | None = None,
+) -> str:
+    """Create a refresh JWT with identifiers suitable for server-side rotation."""
+    expire = datetime.now(timezone.utc) + REFRESH_TOKEN_LIFETIME
+    payload = {
+        "sub": subject,
+        "exp": expire,
+        "type": "refresh",
+        "sid": session_id or str(uuid.uuid4()),
+        "jti": token_id or create_refresh_token_id(),
+    }
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
+
+
+def create_refresh_token_id() -> str:
+    """Return a high-entropy, URL-safe ID that is never stored in plaintext."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_refresh_token_id(token_id: str) -> str:
+    return hashlib.sha256(token_id.encode("utf-8")).hexdigest()
+
+
+def create_websocket_ticket(
+    subject: str,
+    principal_type: str,
+    lifetime_seconds: int = 60,
+) -> tuple[str, int]:
+    """Create a short-lived credential safe to place in a WebSocket URL."""
+    expire = datetime.now(timezone.utc) + timedelta(seconds=lifetime_seconds)
+    payload = {
+        "sub": subject,
+        "exp": expire,
+        "type": "ws_ticket",
+        "principal_type": principal_type,
+    }
+    return jwt.encode(
+        payload, settings.jwt_secret, algorithm=ALGORITHM
+    ), lifetime_seconds
 
 
 def decode_token(token: str, expected_type: str = "access") -> dict:

@@ -13,6 +13,9 @@ class PairingSessionResponse(BaseModel):
     code: str
     expires_at: datetime
     qr_payload: str  # JSON string with host info + code for QR encoding
+    host_id: str
+    host_public_key: str
+    relay_url: str | None = None
 
 
 class PairingClaimRequest(BaseModel):
@@ -20,6 +23,7 @@ class PairingClaimRequest(BaseModel):
     code: str
     device_name: str
     device_type: str  # "ios" | "android"
+    device_public_key: str | None = None
 
 
 class PairingClaimResponse(BaseModel):
@@ -28,6 +32,9 @@ class PairingClaimResponse(BaseModel):
     api_base_url: str
     host_name: str
     server_version: str
+    host_id: str
+    host_public_key: str
+    relay_url: str | None = None
 
 
 # --- Device Management ---

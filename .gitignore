@@ -1,6 +1,5 @@
 node_modules
 dist
-dist-electron
 release
 src-tauri/target/
 src-tauri/tauri.release.generated.conf.json
@@ -22,7 +21,6 @@ android/*/build/
 android/*/*/build/
 android/app/build/
 android/local.properties
-android/gradle/wrapper/gradle-wrapper.jar
 
 # Capacitor / iOS
 ios/App/Pods
@@ -41,12 +39,15 @@ server/__pycache__
 server/**/__pycache__
 server/data/
 server/venv/
+server/.venv/
 server/vendor/
 server/dist/
 server/build/
+server/migration-check.db
 server/*.spec
 server/*.log
 *.pyc
+*.tsbuildinfo
 .claude/worktrees/
 
 # CLI tool

@@ -20,7 +20,7 @@
   border-radius: 50%;
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
-  box-shadow: 0 2px 8px var(--cc-shadow);
+  box-shadow: var(--cc-shadow-overlay);
   color: var(--cc-text-secondary);
   transition: transform 0.15s ease;
 }

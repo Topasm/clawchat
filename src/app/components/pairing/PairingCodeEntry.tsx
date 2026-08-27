@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, type KeyboardEvent, type ClipboardEvent } from 'react';
 import apiClient from '../../services/apiClient';
 import { IS_IOS, IS_ANDROID } from '../../types/platform';
+import { CheckCircleIcon } from '../shared/Icons';
 
 interface PairingCodeEntryProps {
   onPaired?: (deviceToken: string) => void;
@@ -36,9 +37,12 @@ export default function PairingCodeEntry({ onPaired }: PairingCodeEntryProps) {
   const [error, setError] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const setInputRef = useCallback((index: number) => (el: HTMLInputElement | null) => {
-    inputRefs.current[index] = el;
-  }, []);
+  const setInputRef = useCallback(
+    (index: number) => (el: HTMLInputElement | null) => {
+      inputRefs.current[index] = el;
+    },
+    [],
+  );
 
   const focusInput = (index: number) => {
     if (index >= 0 && index < CODE_LENGTH) {
@@ -144,10 +148,7 @@ export default function PairingCodeEntry({ onPaired }: PairingCodeEntryProps) {
     return (
       <div className="cc-pairing-code-entry">
         <div className="cc-pairing-code-entry__success">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="var(--cc-success)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="20" cy="20" r="16" />
-            <path d="M13 20l4 4 10-10" />
-          </svg>
+          <CheckCircleIcon size={40} style={{ color: 'var(--cc-success)' }} />
           <span className="cc-pairing-code-entry__success-text">Device paired!</span>
         </div>
       </div>
@@ -184,9 +185,7 @@ export default function PairingCodeEntry({ onPaired }: PairingCodeEntryProps) {
         ))}
       </div>
 
-      {error && (
-        <div className="cc-pairing-code-entry__error">{error}</div>
-      )}
+      {error && <div className="cc-pairing-code-entry__error">{error}</div>}
 
       <button
         type="button"

@@ -14,6 +14,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import type { TaskFlowNode } from './taskGraphTypes';
 import TaskGraphNode from './TaskGraphNode';
+import { GraphIcon } from '../shared/Icons';
 
 interface TaskGraphViewProps {
   nodes: TaskFlowNode[];
@@ -78,7 +79,11 @@ function TaskGraphCanvas({ nodes: sourceNodes, edges, isMobile, onOpenTask }: Ta
           position="bottom-left"
           nodeColor={(node) => {
             const status = (node as TaskFlowNode).data.status;
-            return status === 'completed' ? '#4CAF50' : status === 'in_progress' ? '#FF9800' : '#1976D2';
+            return status === 'completed'
+              ? 'var(--cc-success)'
+              : status === 'in_progress'
+                ? 'var(--cc-warning)'
+                : 'var(--cc-primary)';
           }}
         />
       )}
@@ -90,12 +95,7 @@ export default function TaskGraphView(props: TaskGraphViewProps) {
   if (props.nodes.length === 0) {
     return (
       <div className="cc-task-flow__empty">
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <rect x="4" y="17" width="14" height="14" rx="3" />
-          <rect x="30" y="5" width="14" height="14" rx="3" />
-          <rect x="30" y="29" width="14" height="14" rx="3" />
-          <path d="M18 24h6c4 0 3-12 6-12M24 24c4 0 3 12 6 12" />
-        </svg>
+        <GraphIcon size={48} />
         <strong>No tasks to map</strong>
         <span>Create a task or clear the active filters to build your graph.</span>
       </div>

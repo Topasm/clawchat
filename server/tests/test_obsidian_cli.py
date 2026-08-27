@@ -54,8 +54,9 @@ def _make_proc(returncode=0, stdout="", stderr=""):
 
 
 class TestNormalizeVaultPath:
-    def test_strips_leading_slash(self):
-        assert svc._normalize_vault_path("/Projects/foo.md") == "Projects/foo.md"
+    def test_rejects_leading_slash(self):
+        with pytest.raises(ValueError, match="Absolute"):
+            svc._normalize_vault_path("/Projects/foo.md")
 
     def test_normalizes_backslashes(self):
         assert svc._normalize_vault_path("Projects\\sub\\foo.md") == "Projects/sub/foo.md"
@@ -71,8 +72,9 @@ class TestNormalizeVaultPath:
     def test_passthrough_normal_path(self):
         assert svc._normalize_vault_path("Projects/work/TODO.md") == "Projects/work/TODO.md"
 
-    def test_strips_multiple_leading_slashes(self):
-        assert svc._normalize_vault_path("///foo.md") == "foo.md"
+    def test_rejects_windows_drive_path(self):
+        with pytest.raises(ValueError, match="Absolute"):
+            svc._normalize_vault_path("C:\\vault\\foo.md")
 
 
 # ---------------------------------------------------------------------------

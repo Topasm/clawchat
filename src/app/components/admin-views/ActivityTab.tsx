@@ -3,12 +3,13 @@ import { relativeTime } from '../../utils/formatters';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
+import { ChartIcon } from '../shared/Icons';
 
 export default function ActivityTab() {
   const { data, isLoading } = useAdminActivityQuery();
 
   if (!useAuthStore.getState().serverUrl) {
-    return <EmptyState icon="📊" message="Activity log requires a server connection." />;
+    return <EmptyState icon={<ChartIcon size={20} />} message="Activity log requires a server connection." />;
   }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;

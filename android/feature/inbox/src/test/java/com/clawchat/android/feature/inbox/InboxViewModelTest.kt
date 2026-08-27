@@ -8,9 +8,11 @@ import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -71,6 +73,7 @@ class InboxViewModelTest {
         Dispatchers.setMain(testDispatcher)
         todoRepository = mockk()
         syncManager = mockk(relaxed = true)
+        every { syncManager.todoChanged } returns MutableSharedFlow()
     }
 
     @After

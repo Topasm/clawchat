@@ -1,6 +1,6 @@
 # Frontend Guide
 
-The ClawChat frontend is built with React 18, TypeScript, and Vite. It runs as a web app in any browser and as an Electron desktop app on Windows, macOS, and Linux.
+The ClawChat frontend is built with React 18, TypeScript, and Vite. It runs in browsers, in a Tauri 2 desktop shell, and in the Capacitor iOS shell.
 
 ## Directory Structure
 
@@ -13,8 +13,7 @@ src/
 │   ├── types/
 │   │   ├── api.ts                     # API request/response interfaces (Pydantic mirrors)
 │   │   ├── schemas.ts                # Zod schemas for API validation
-│   │   ├── platform.ts               # Platform detection (Electron, Capacitor, Web)
-│   │   └── electron.d.ts             # Electron API type declarations
+│   │   └── platform.ts               # Platform detection (Tauri, Capacitor, Web)
 │   ├── stores/
 │   │   ├── useAuthStore.ts           # Auth state: JWT, serverUrl, login/logout (persisted) + ConnectionStatus type (canonical)
 │   │   ├── useChatStore.ts           # Chat: conversations, messages, SSE streaming
@@ -80,7 +79,7 @@ src/
 │   │   ├── registry.ts              # Shortcut definitions with scopes
 │   │   └── hooks.ts                 # useGlobalShortcuts, useKanbanShortcuts, useNavigationShortcuts
 │   ├── hooks/
-│   │   ├── useAutoLogin.ts          # Electron auto-login from main process
+│   │   ├── useAutoLogin.ts          # Tauri host-sidecar auto-login
 │   │   ├── useCalendarNavigation.ts # Calendar week/month navigation
 │   │   ├── useChatPanel.ts          # Chat panel open/close state
 │   │   ├── useCommandPalette.ts     # Command palette open/close + Ctrl+K listener
@@ -145,9 +144,7 @@ src/
 │   ├── _capacitor.css                # Mobile-specific overrides
 │   ├── _editor.css                   # Lexical RTE, CodeMirror, drop zone, attachments
 │   └── _admin.css                    # Admin dashboard tabs, stat cards, activity feed, tables
-└── electron/
-    ├── main.ts                       # Electron main process
-    └── preload.ts                    # Electron preload (exposes electronAPI)
+└── src-tauri/                        # Rust desktop shell and native commands
 ```
 
 ## Navigation
@@ -323,11 +320,11 @@ Colors are injected as CSS custom properties on `.cc-root`:
 Runtime detection for cross-platform behavior:
 
 ```typescript
-IS_ELECTRON  // window.electronAPI exists
+IS_TAURI     // running inside the Tauri shell
 IS_CAPACITOR // window.Capacitor exists
 IS_IOS / IS_ANDROID / IS_MOBILE
-IS_WEB       // Not Electron, not Capacitor
-detectPlatform(): 'web' | 'electron' | 'ios' | 'android'
+IS_WEB       // Not Tauri, not Capacitor
+detectPlatform(): 'web' | 'tauri' | 'ios' | 'android'
 ```
 
 On mobile (Capacitor), resizable panels are skipped and fixed layout is used instead.
@@ -363,7 +360,7 @@ BackupResponse        { filename, size_bytes }
 
 ```bash
 npm run dev           # Vite dev server (web)
-npm run dev:electron  # Electron + Vite
+npm run dev:tauri     # Tauri + Vite
 npm run typecheck     # npx tsc --noEmit
 npm run build         # Production build
 ```

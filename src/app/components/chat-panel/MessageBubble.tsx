@@ -1,6 +1,13 @@
 import type { ChatMessage } from '../../stores/useChatStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { SparkleIcon } from '../shared/Icons';
+import {
+  CopyIcon,
+  EditIcon,
+  SparkleIcon,
+  SpinArrowsIcon,
+  TrashIcon,
+  UserIcon,
+} from '../shared/Icons';
 import ActionCard from './ActionCard';
 
 const INTENT_LABELS: Record<string, string> = {
@@ -31,6 +38,7 @@ interface MessageBubbleProps {
 
 export default function MessageBubble({ message, projectIcon, onDelete, onRegenerate, onEdit }: MessageBubbleProps) {
   const showTimestamps = useSettingsStore((s) => s.showTimestamps);
+  const showAvatars = useSettingsStore((s) => s.showAvatars);
   const isUser = message.user._id === 'user';
   const role = isUser ? 'user' : 'assistant';
 
@@ -47,7 +55,7 @@ export default function MessageBubble({ message, projectIcon, onDelete, onRegene
 
   return (
     <div className={`cc-bubble-row cc-bubble-row--${role}`}>
-      {!isUser && (
+      {!isUser && showAvatars && (
         <div className="cc-avatar cc-avatar--assistant">
           {projectIcon ? <span style={{ fontSize: 16, lineHeight: 1 }}>{projectIcon}</span> : <SparkleIcon size={16} />}
         </div>
@@ -64,42 +72,29 @@ export default function MessageBubble({ message, projectIcon, onDelete, onRegene
           </div>
         )}
         <div className="cc-bubble__actions">
-          <button type="button" className="cc-bubble__action-btn" onClick={handleCopy} title="Copy">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="4" y="4" width="7" height="7" rx="1" />
-              <path d="M8 4V2.5A1.5 1.5 0 006.5 1H2.5A1.5 1.5 0 001 2.5v4A1.5 1.5 0 002.5 8H4" />
-            </svg>
+          <button type="button" className="cc-bubble__action-btn" onClick={handleCopy} title="Copy" aria-label="Copy message">
+            <CopyIcon size={12} />
           </button>
           {isUser && onEdit && (
-            <button type="button" className="cc-bubble__action-btn" onClick={() => onEdit(message._id)} title="Edit">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M8.5 1.5l2 2M1 11l.5-2L9 1.5l2 2L3.5 11H1z" />
-              </svg>
+            <button type="button" className="cc-bubble__action-btn" onClick={() => onEdit(message._id)} title="Edit" aria-label="Edit message">
+              <EditIcon size={12} />
             </button>
           )}
           {!isUser && onRegenerate && (
-            <button type="button" className="cc-bubble__action-btn" onClick={onRegenerate} title="Regenerate">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M1 1v3.5h3.5M11 11V7.5H7.5" />
-                <path d="M10 4.5A4.5 4.5 0 002 3L1 4.5M2 7.5A4.5 4.5 0 0010 9l1-1.5" />
-              </svg>
+            <button type="button" className="cc-bubble__action-btn" onClick={onRegenerate} title="Regenerate" aria-label="Regenerate response">
+              <SpinArrowsIcon size={12} />
             </button>
           )}
           {onDelete && (
-            <button type="button" className="cc-bubble__action-btn" onClick={onDelete} title="Delete">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M1.5 3h9M4.5 3V2a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3v7a1 1 0 01-1 1h-5a1 1 0 01-1-1V3" />
-              </svg>
+            <button type="button" className="cc-bubble__action-btn" onClick={onDelete} title="Delete" aria-label="Delete message">
+              <TrashIcon size={12} />
             </button>
           )}
         </div>
       </div>
-      {isUser && (
+      {isUser && showAvatars && (
         <div className="cc-avatar cc-avatar--user">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="8" cy="5.5" r="3" />
-            <path d="M2.5 14.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" strokeLinecap="round" />
-          </svg>
+          <UserIcon size={16} />
         </div>
       )}
     </div>

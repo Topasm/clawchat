@@ -10,6 +10,12 @@ import os
 import subprocess
 from pathlib import Path
 
+from utils.vault_paths import (
+    VaultPathError,
+    normalize_vault_relative_path,
+    resolve_vault_path,
+)
+
 logger = logging.getLogger(__name__)
 
 # Folders excluded from project scanning.
@@ -67,14 +73,22 @@ def read_project_context(
             ],
         }
     """
-    abs_folder = os.path.join(vault_path, folder)
+    try:
+        folder = normalize_vault_relative_path(folder)
+        abs_folder = resolve_vault_path(vault_path, folder)
+    except VaultPathError as exc:
+        logger.warning("Rejected project folder outside vault: %s", exc)
+        return {"todo_md": "", "related_docs": []}
 
     if not os.path.isdir(abs_folder):
         logger.warning("Project folder does not exist: %s", abs_folder)
         return {"todo_md": "", "related_docs": []}
 
     # Read TODO.md --------------------------------------------------------
-    todo_path = os.path.join(abs_folder, "TODO.md")
+    try:
+        todo_path = resolve_vault_path(vault_path, f"{folder}/TODO.md")
+    except VaultPathError:
+        todo_path = ""
     todo_md = _read_file_capped(todo_path)
 
     # Gather related .md files -------------------------------------------
@@ -86,7 +100,10 @@ def read_project_context(
             for name in cli_files:
                 if name == "TODO.md":
                     continue
-                full = os.path.join(abs_folder, name)
+                try:
+                    full = resolve_vault_path(vault_path, f"{folder}/{name}")
+                except VaultPathError:
+                    continue
                 if os.path.isfile(full):
                     md_files.append((name, os.path.getmtime(full)))
 
@@ -100,7 +117,11 @@ def read_project_context(
 
     related_docs: list[dict[str, str]] = []
     for name, _mtime in top_files:
-        content = _read_file_capped(os.path.join(abs_folder, name))
+        try:
+            related_path = resolve_vault_path(vault_path, f"{folder}/{name}")
+        except VaultPathError:
+            continue
+        content = _read_file_capped(related_path)
         if content:
             related_docs.append({"name": name, "content": content})
 
@@ -182,6 +203,11 @@ def _list_via_cli(vault_path: str, cli_command: str) -> list[dict[str, str]] | N
                 continue
             if _is_excluded(path.parent.parts):
                 continue
+            try:
+                folder_rel = normalize_vault_relative_path(folder_rel)
+                resolve_vault_path(vault_path, folder_rel, must_exist=True)
+            except VaultPathError:
+                continue
             seen.add(folder_rel)
             results.append({"folder": folder_rel, "name": path.parent.name})
 
@@ -197,6 +223,10 @@ def _list_files_via_cli(
     cli_command: str,
 ) -> list[str] | None:
     """List ``.md`` files inside a specific folder via CLI."""
+    try:
+        folder = normalize_vault_relative_path(folder)
+    except VaultPathError:
+        return None
     try:
         proc = subprocess.run(
             [cli_command, "files", f"folder={folder}"],

@@ -1,3 +1,5 @@
+import { CheckIcon } from './Icons';
+
 interface CheckboxProps {
   checked: boolean;
   onChange: () => void;
@@ -5,17 +7,18 @@ interface CheckboxProps {
 
 export default function Checkbox({ checked, onChange }: CheckboxProps) {
   return (
-    <div
+    <button
+      type="button"
       className={`cc-checkbox${checked ? ' cc-checkbox--checked' : ''}`}
-      onClick={(e) => { e.stopPropagation(); onChange(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange();
+      }}
       role="checkbox"
       aria-checked={checked}
+      aria-label={checked ? 'Mark incomplete' : 'Mark complete'}
     >
-      {checked && (
-        <svg className="cc-checkbox__check" width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M2.5 6L5 8.5L9.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
-    </div>
+      {checked && <CheckIcon className="cc-checkbox__check" size={12} />}
+    </button>
   );
 }

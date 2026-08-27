@@ -2,7 +2,10 @@
 export interface PairingSession {
   code: string;
   expiresAt: string;
-  qrPayload: string;  // JSON string for QR code generation
+  qrPayload: string; // JSON string for QR code generation
+  hostId: string;
+  hostPublicKey: string;
+  relayUrl: string | null;
 }
 
 export interface PairingClaimRequest {
@@ -16,6 +19,9 @@ export interface PairingClaimResponse {
   deviceToken: string;
   hostName: string;
   serverVersion: string;
+  hostId: string;
+  hostPublicKey: string;
+  relayUrl: string | null;
 }
 
 export interface PairedDevice {
@@ -23,7 +29,6 @@ export interface PairedDevice {
   name: string;
   deviceType: string;
   pairedAt: string;
-  lastSeen: string;
+  lastSeen: string | null;
   isActive: boolean;
 }
-

@@ -40,7 +40,7 @@
 
 .cc-admin-stat {
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
 }
@@ -78,7 +78,7 @@
   font-weight: 600;
   text-transform: uppercase;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--cc-radius-xs);
   background: var(--cc-surface-secondary);
   color: var(--cc-text-secondary);
   flex-shrink: 0;
@@ -185,7 +185,7 @@
   padding: 6px 10px;
   font-size: 13px;
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   background: var(--cc-surface);
   color: var(--cc-text);
   font-family: inherit;
@@ -206,7 +206,7 @@
 .cc-admin-model-tag {
   font-size: 12px;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--cc-radius-xs);
   background: var(--cc-surface-secondary);
   color: var(--cc-text-secondary);
   font-family: monospace;

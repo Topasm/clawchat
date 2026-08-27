@@ -3,15 +3,15 @@ import { platformApi, type AppMode } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
 
 interface UseAppModeResult {
-  /** Current app mode. null if not Electron (web/mobile are always clients). */
+  /** Current app mode. null outside desktop runtimes (web/mobile are always clients). */
   appMode: AppMode | null;
   /** Whether a mode change is in progress. */
   loading: boolean;
-  /** Switch mode. Only works on Electron. */
+  /** Switch mode. Only works in a desktop runtime. */
   setAppMode: (mode: AppMode) => Promise<void>;
-  /** Convenience: true when running as host on Electron. */
+  /** Convenience: true when the desktop runtime is hosting. */
   isHost: boolean;
-  /** Convenience: true when not host (client Electron, web, or mobile). */
+  /** Convenience: true when not hosting (desktop client, web, or mobile). */
   isClient: boolean;
 }
 

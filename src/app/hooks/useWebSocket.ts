@@ -30,6 +30,19 @@ export default function useWebSocket(): void {
     // Sync connection status to auth store
     const unsubStatus = wsClient.onStatusChange((status) => {
       useAuthStore.getState().setConnectionStatus(status);
+      // Events are intentionally ephemeral. After either a direct or relay
+      // reconnect, refresh authoritative server state to recover anything
+      // emitted while the client was offline.
+      if (status === 'connected') {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.today });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+        const conversationId = useChatStore.getState().currentConversationId;
+        if (conversationId) {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
+        }
+      }
     });
 
     // Auth failure (server rejected token) — log out immediately

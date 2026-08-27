@@ -15,6 +15,7 @@ import MessageBubble from '../components/chat-panel/MessageBubble';
 import StreamingIndicator from '../components/chat-panel/StreamingIndicator';
 import ChatInput from '../components/chat-panel/ChatInput';
 import { getProjectIcon } from '../utils/projectIcons';
+import { ChevronLeftIcon } from '../components/shared/Icons';
 
 export default function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -70,32 +71,38 @@ export default function ChatPage() {
     }
   }, [isStreaming, streamingMessages.length, conversationId, queryClient, clearStreamingMessages]);
 
-  const handleSend = useCallback(async (text: string) => {
-    if (!conversationId) return;
-    addStreamingMessage({
-      _id: crypto.randomUUID(),
-      text,
-      createdAt: new Date(),
-      user: { _id: 'user', name: 'You' },
-    });
-    try {
-      await sendMessageStreaming(conversationId, text);
-    } catch {
-      // handled in store
-    }
-  }, [conversationId, addStreamingMessage, sendMessageStreaming]);
-
-  const handleRegenerate = useCallback(async (assistantMessageId: string) => {
-    if (!conversationId) return;
-    const userText = await regenerateMutation.mutateAsync({ conversationId, assistantMessageId });
-    if (userText) {
+  const handleSend = useCallback(
+    async (text: string) => {
+      if (!conversationId) return;
+      addStreamingMessage({
+        _id: crypto.randomUUID(),
+        text,
+        createdAt: new Date(),
+        user: { _id: 'user', name: 'You' },
+      });
       try {
-        await sendMessageStreaming(conversationId, userText);
+        await sendMessageStreaming(conversationId, text);
       } catch {
         // handled in store
       }
-    }
-  }, [conversationId, regenerateMutation, sendMessageStreaming]);
+    },
+    [conversationId, addStreamingMessage, sendMessageStreaming],
+  );
+
+  const handleRegenerate = useCallback(
+    async (assistantMessageId: string) => {
+      if (!conversationId) return;
+      const userText = await regenerateMutation.mutateAsync({ conversationId, assistantMessageId });
+      if (userText) {
+        try {
+          await sendMessageStreaming(conversationId, userText);
+        } catch {
+          // handled in store
+        }
+      }
+    },
+    [conversationId, regenerateMutation, sendMessageStreaming],
+  );
 
   // Store has newest-first; Virtuoso needs oldest-first
   const chronological = useMemo(() => [...messages].reverse(), [messages]);
@@ -109,25 +116,32 @@ export default function ChatPage() {
   return (
     <div className="cc-chat-page">
       <div className="cc-chat-page__header">
-        <button type="button" className="cc-chat-page__back" onClick={() => navigate('/chats')}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M10 2L4 8l6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        <button
+          type="button"
+          className="cc-chat-page__back"
+          onClick={() => navigate('/chats')}
+          aria-label="Back to chats"
+        >
+          <ChevronLeftIcon size={16} />
         </button>
-        {projectTodo && <span style={{ fontSize: 18, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>}
+        {projectTodo && (
+          <span style={{ fontSize: 18, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>
+        )}
         <span className="cc-chat-page__title">{convo?.title || 'Chat'}</span>
       </div>
 
       {projectTodo && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '8px 16px',
-          background: 'var(--cc-primary-light)',
-          borderBottom: '1px solid var(--cc-border)',
-          fontSize: 13,
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 16px',
+            background: 'var(--cc-primary-light)',
+            borderBottom: '1px solid var(--cc-border)',
+            fontSize: 13,
+          }}
+        >
           <span style={{ fontSize: 16, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>
           <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{projectTodo.title}</span>
           {projectTodo.subtask_count != null && projectTodo.subtask_count > 0 && (
@@ -144,11 +158,11 @@ export default function ChatPage() {
             key={msg._id}
             message={msg}
             projectIcon={projectTodo ? getProjectIcon(projectTodo.id) : undefined}
-            onDelete={() => conversationId && deleteMessageMutation.mutate({ conversationId, messageId: msg._id })}
+            onDelete={() =>
+              conversationId && deleteMessageMutation.mutate({ conversationId, messageId: msg._id })
+            }
             onRegenerate={
-              msg.user._id === 'assistant'
-                ? () => handleRegenerate(msg._id)
-                : undefined
+              msg.user._id === 'assistant' ? () => handleRegenerate(msg._id) : undefined
             }
           />
         ))}

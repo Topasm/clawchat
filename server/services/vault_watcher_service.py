@@ -5,10 +5,11 @@ Only watches:
 - ``TODO.md`` files that contain ``<!-- claw:... -->`` markers
 - Documents created by ClawChat agents (identified by ``task_id`` frontmatter)
 
-This is NOT a real-time watcher (no inotify/fswatch); it is a periodic scanner
-invoked by the scheduler or on demand via API.
+The scheduler feeds filesystem events into incremental scans and retains a
+low-frequency full scan as a correctness fallback.
 """
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -23,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from models.todo import Todo
 from utils import deserialize_tags, serialize_tags
+from utils.vault_paths import VaultPathError, resolve_vault_path
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,7 @@ class ScanResult:
     changes: list[SyncChange] = field(default_factory=list)
     duration_ms: float = 0.0
     scanned_at: float = 0.0
+    scan_mode: str = "full"
 
 
 # Module-level state
@@ -65,6 +68,7 @@ _last_scan: ScanResult | None = None
 _file_hashes: dict[str, str] = {}  # path -> content hash for change detection
 _scan_in_progress: bool = False
 _last_scan_start: float = 0.0
+_scan_lock = asyncio.Lock()
 
 _STUCK_TIMEOUT = 300  # 5 minutes
 
@@ -74,11 +78,25 @@ _STUCK_TIMEOUT = 300  # 5 minutes
 # ---------------------------------------------------------------------------
 
 
-async def scan_vault(db: AsyncSession) -> ScanResult:
+async def scan_vault(
+    db: AsyncSession,
+    changed_paths: set[str] | list[str] | tuple[str, ...] | None = None,
+) -> ScanResult:
     """Scan the vault for external changes and sync them to the database.
+
+    When ``changed_paths`` is provided, only matching TODO files are read.
+    Passing ``None`` performs a full audit scan.
 
     Returns a ScanResult with details of what was found and applied.
     """
+    async with _scan_lock:
+        return await _scan_vault_locked(db, changed_paths)
+
+
+async def _scan_vault_locked(
+    db: AsyncSession,
+    changed_paths: set[str] | list[str] | tuple[str, ...] | None,
+) -> ScanResult:
     global _last_scan, _scan_in_progress, _last_scan_start
 
     vault_path = settings.obsidian_vault_path
@@ -88,10 +106,13 @@ async def scan_vault(db: AsyncSession) -> ScanResult:
     _scan_in_progress = True
     _last_scan_start = time.monotonic()
     start = time.monotonic()
-    result = ScanResult(scanned_at=time.time())
+    result = ScanResult(
+        scanned_at=time.time(),
+        scan_mode="incremental" if changed_paths is not None else "full",
+    )
 
     try:
-        result = await _do_scan(db, vault_path, result)
+        result = await _do_scan(db, vault_path, result, changed_paths)
     finally:
         _scan_in_progress = False
 
@@ -118,25 +139,19 @@ async def scan_vault(db: AsyncSession) -> ScanResult:
 
 
 async def _do_scan(
-    db: AsyncSession, vault_path: str, result: ScanResult
+    db: AsyncSession,
+    vault_path: str,
+    result: ScanResult,
+    changed_paths: set[str] | list[str] | tuple[str, ...] | None = None,
 ) -> ScanResult:
     """Core scan logic, separated for clean try/finally in caller."""
-    # Find all TODO.md files in the vault
-    todo_files: list[str] = []
     todo_filename = settings.obsidian_project_todo_filename
+    todo_files = _todo_files_for_scan(vault_path, todo_filename, changed_paths)
 
-    for dirpath, _dirs, filenames in os.walk(vault_path):
-        # Skip .obsidian and other hidden directories
-        if any(part.startswith(".") for part in dirpath.split(os.sep)):
-            continue
-        for fname in filenames:
-            if fname == todo_filename:
-                todo_files.append(os.path.join(dirpath, fname))
-
-    # Also check the inbox
-    inbox_todo = os.path.join(vault_path, "00_Inbox", todo_filename)
-    if os.path.isfile(inbox_todo) and inbox_todo not in todo_files:
-        todo_files.append(inbox_todo)
+    if changed_paths is None:
+        active_paths = set(todo_files)
+        for cached_path in set(_file_hashes) - active_paths:
+            _file_hashes.pop(cached_path, None)
 
     result.files_scanned = len(todo_files)
 
@@ -215,6 +230,51 @@ async def _do_scan(
     return result
 
 
+def _todo_files_for_scan(
+    vault_path: str,
+    todo_filename: str,
+    changed_paths: set[str] | list[str] | tuple[str, ...] | None,
+) -> list[str]:
+    """Return safe TODO paths for either a full or incremental scan."""
+    if changed_paths is not None:
+        todo_files: set[str] = set()
+        for changed_path in changed_paths:
+            absolute = (
+                changed_path
+                if os.path.isabs(changed_path)
+                else os.path.join(vault_path, changed_path)
+            )
+            relative = os.path.relpath(absolute, vault_path)
+            try:
+                safe_path = resolve_vault_path(vault_path, relative)
+            except VaultPathError:
+                logger.warning("Ignoring changed path outside vault: %s", changed_path)
+                continue
+            if os.path.basename(safe_path) != todo_filename:
+                continue
+            if os.path.isfile(safe_path):
+                todo_files.add(safe_path)
+            else:
+                _file_hashes.pop(safe_path, None)
+        return sorted(todo_files)
+
+    todo_files = []
+    for dirpath, dirnames, filenames in os.walk(vault_path):
+        dirnames[:] = [name for name in dirnames if not name.startswith(".")]
+        if todo_filename not in filenames:
+            continue
+        relative = os.path.relpath(
+            os.path.join(dirpath, todo_filename), vault_path
+        )
+        try:
+            safe_path = resolve_vault_path(vault_path, relative, must_exist=True)
+        except VaultPathError:
+            logger.warning("Skipping TODO path outside vault: %s", relative)
+            continue
+        todo_files.append(safe_path)
+    return sorted(todo_files)
+
+
 def get_sync_status() -> dict:
     """Return the current sync status for API responses."""
     scan = _last_scan
@@ -240,6 +300,7 @@ def get_sync_status() -> dict:
         "changes_applied": scan.changes_applied,
         "errors": scan.errors,
         "duration_ms": scan.duration_ms,
+        "scan_mode": scan.scan_mode,
         "sync_lag_seconds": round(lag, 1) if lag else None,
         "scan_in_progress": _scan_in_progress,
         "scan_stuck": is_scan_stuck(),

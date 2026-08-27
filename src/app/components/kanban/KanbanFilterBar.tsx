@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useTodosQuery } from '../../hooks/queries';
+import { MagnifyingGlassIcon } from '../shared/Icons';
 
 const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 const SORT_OPTIONS = [
@@ -39,14 +40,12 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
   return (
     <div className="cc-kanban-filter">
       <div className="cc-kanban-filter__search">
-        <svg className="cc-kanban-filter__search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="6" cy="6" r="4.5" />
-          <path d="M9.5 9.5L13 13" strokeLinecap="round" />
-        </svg>
+        <MagnifyingGlassIcon className="cc-kanban-filter__search-icon" size={14} />
         <input
           ref={searchInputRef}
           className="cc-kanban-filter__search-input"
           type="text"
+          aria-label="Search tasks"
           placeholder="Search tasks…"
           value={filters.searchQuery}
           onChange={(e) => setSearch(e.target.value)}
@@ -58,6 +57,7 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
           <button
             key={p}
             className={`cc-kanban-filter__chip cc-kanban-filter__chip--${p}${filters.priorities.includes(p) ? ' cc-kanban-filter__chip--active' : ''}`}
+            aria-pressed={filters.priorities.includes(p)}
             onClick={() => togglePriority(p)}
           >
             {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -68,6 +68,7 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
       {allTags.length > 0 && (
         <select
           className="cc-kanban-filter__select"
+          aria-label="Filter tasks by tag"
           value=""
           onChange={(e) => {
             if (e.target.value) toggleTag(e.target.value);
@@ -86,6 +87,7 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
 
       <select
         className="cc-kanban-filter__select"
+        aria-label="Sort tasks"
         value={`${filters.sortField}-${filters.sortDirection}`}
         onChange={(e) => {
           const [field, dir] = e.target.value.split('-') as [typeof filters.sortField, typeof filters.sortDirection];
@@ -103,6 +105,7 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
       {showSubtaskToggle && (
         <button
           className={`cc-kanban-filter__chip${filters.showSubTasks ? ' cc-kanban-filter__chip--active' : ''}`}
+          aria-pressed={filters.showSubTasks}
           onClick={toggleSubTasks}
         >
           Sub-tasks

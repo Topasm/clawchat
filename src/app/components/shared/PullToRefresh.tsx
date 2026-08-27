@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type RefObject } from 'react';
 import { motion } from 'framer-motion';
+import { ArrowDownIcon, RefreshIcon } from './Icons';
 
 interface PullToRefreshProps {
   contentRef: RefObject<HTMLDivElement | null>;
@@ -83,15 +84,7 @@ export default function PullToRefresh({ contentRef, onRefresh, disabled }: PullT
       <div
         className={`cc-pull-indicator__icon${pastThreshold && !refreshing ? ' cc-pull-indicator__icon--flipped' : ''}${refreshing ? ' cc-pull-indicator__icon--spinning' : ''}`}
       >
-        {refreshing ? (
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M1 8a7 7 0 0113.36-2.92M15 8A7 7 0 011.64 10.92" />
-          </svg>
-        ) : (
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 3v10M4 9l4 4 4-4" />
-          </svg>
-        )}
+        {refreshing ? <RefreshIcon size={16} /> : <ArrowDownIcon size={16} />}
       </div>
     </motion.div>
   );

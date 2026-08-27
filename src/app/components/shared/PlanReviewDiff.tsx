@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import Badge from './Badge';
 
-interface PlanSubtask {
+export interface PlanSubtask {
   title: string;
   estimated_minutes?: number;
   due_date?: string;
   priority?: string;
 }
 
+export interface TaskPlan {
+  summary?: string;
+  subtasks?: PlanSubtask[];
+  project_name?: string;
+}
+
 interface PlanReviewDiffProps {
-  plan: {
-    summary?: string;
-    subtasks?: PlanSubtask[];
-    project_name?: string;
-  };
+  plan: TaskPlan;
   onApply: (selectedIndices?: number[]) => void;
   onDismiss: () => void;
   compact?: boolean;
@@ -42,9 +44,7 @@ export default function PlanReviewDiff({ plan, onApply, onDismiss, compact }: Pl
 
   return (
     <div className={`cc-plan-review${compact ? ' cc-plan-review--compact' : ''}`}>
-      {plan.summary && (
-        <p className="cc-plan-review__summary">{plan.summary}</p>
-      )}
+      {plan.summary && <p className="cc-plan-review__summary">{plan.summary}</p>}
 
       <div className="cc-plan-review__stats">
         {subtasks.length > 0 && (
@@ -53,14 +53,10 @@ export default function PlanReviewDiff({ plan, onApply, onDismiss, compact }: Pl
           </span>
         )}
         {subtasks.some((s) => s.due_date) && (
-          <span className="cc-plan-review__stat">
-            Will assign dates
-          </span>
+          <span className="cc-plan-review__stat">Will assign dates</span>
         )}
         {plan.project_name && (
-          <span className="cc-plan-review__stat">
-            Will file under {plan.project_name}
-          </span>
+          <span className="cc-plan-review__stat">Will file under {plan.project_name}</span>
         )}
       </div>
 
@@ -94,7 +90,10 @@ export default function PlanReviewDiff({ plan, onApply, onDismiss, compact }: Pl
           onClick={handleApply}
           disabled={selected.size === 0 && subtasks.length > 0}
         >
-          Apply{selected.size < subtasks.length && subtasks.length > 0 ? ` (${selected.size}/${subtasks.length})` : ''}
+          Apply
+          {selected.size < subtasks.length && subtasks.length > 0
+            ? ` (${selected.size}/${subtasks.length})`
+            : ''}
         </button>
         <button
           type="button"

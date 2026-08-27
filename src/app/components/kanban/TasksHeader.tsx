@@ -36,6 +36,7 @@ export default function TasksHeader({
       </div>
       <div className="cc-tasks-header__actions">
         <SegmentedControl
+          ariaLabel="Task view"
           options={VIEW_OPTIONS}
           value={viewMode}
           onChange={(value) => onViewModeChange(value as TasksViewMode)}

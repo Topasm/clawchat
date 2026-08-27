@@ -1,6 +1,5 @@
 """Async service for generating daily briefings."""
 
-import json
 import logging
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -12,6 +11,7 @@ from models.agent_task import AgentTask
 from models.event import Event
 from models.todo import Todo
 from services.ai_service import AIService
+from utils import parse_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -262,16 +262,7 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
 
 def _parse_briefing_json(raw: str) -> dict | None:
     """Try to parse the LLM response as JSON. Strip markdown fences if present."""
-    text = raw.strip()
-    if text.startswith("```"):
-        # Remove markdown code fences
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        return None
+    return parse_json_object(raw)
 
 
 def _compute_load(stats: dict) -> str:

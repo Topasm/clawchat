@@ -8,6 +8,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useTodosQuery, useCreateTodo, queryKeys } from '../../hooks/queries';
 import { hapticSuccess } from '../../utils/haptics';
 import Badge from './Badge';
+import { ArrowRightIcon, CalendarIcon, CheckCircleIcon } from './Icons';
 import type { EventResponse, TodoResponse } from '../../types/api';
 
 interface QuickCaptureModalProps {
@@ -20,7 +21,13 @@ interface QuickCaptureModalProps {
 
 type ReceiptMessage = 'Saved to Inbox' | 'Added as subtask' | 'Saved locally';
 
-export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaultParentId, parentTitle }: QuickCaptureModalProps) {
+export default function QuickCaptureModal({
+  isOpen,
+  onClose,
+  placeholder,
+  defaultParentId,
+  parentTitle,
+}: QuickCaptureModalProps) {
   const [text, setText] = useState('');
   const [receipt, setReceipt] = useState<ReceiptMessage | null>(null);
   const [keepOpen, setKeepOpen] = useState(false);
@@ -109,7 +116,10 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
         created_at: now,
         updated_at: now,
       };
-      queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [optimisticEvent, ...(old ?? [])]);
+      queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [
+        optimisticEvent,
+        ...(old ?? []),
+      ]);
       showReceipt('Saved to Inbox');
     } else {
       if (isConnected) {
@@ -139,7 +149,10 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
           created_at: now,
           updated_at: now,
         };
-        queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) => [optimisticTodo, ...(old ?? [])]);
+        queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) => [
+          optimisticTodo,
+          ...(old ?? []),
+        ]);
         showReceipt('Saved locally');
       }
     }
@@ -174,10 +187,7 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <svg className="cc-quick-capture__receipt-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="10" cy="10" r="7" />
-                    <path d="M7 10l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <CheckCircleIcon size={20} className="cc-quick-capture__receipt-icon" />
                   <span>{receipt}</span>
                 </motion.div>
                 <div className="cc-quick-capture__receipt-actions">
@@ -219,43 +229,33 @@ export default function QuickCaptureModal({ isOpen, onClose, placeholder, defaul
                   <div className="cc-quick-capture__preview">
                     <span className="cc-quick-capture__chip">
                       {parsed.type === 'event' ? (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <rect x="1.5" y="2.5" width="9" height="8" rx="1" />
-                          <path d="M1.5 5.5h9" />
-                          <path d="M4 1v2M8 1v2" strokeLinecap="round" />
-                        </svg>
+                        <CalendarIcon size={12} />
                       ) : (
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <circle cx="6" cy="6" r="4.5" />
-                          <path d="M4 6l1.5 1.5 3-3" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <CheckCircleIcon size={12} />
                       )}
                       {parsed.type === 'event' ? 'Event' : parsed.type === 'note' ? 'Note' : 'Task'}
                     </span>
-                    {parsed.priority && (
-                      <Badge variant="priority" level={parsed.priority} />
-                    )}
+                    {parsed.priority && <Badge variant="priority" level={parsed.priority} />}
                     {parsed.dueDate && (
                       <Badge variant="due" dueDate={parsed.dueDate.toISOString()} />
                     )}
                     {parsed.startTime && (
                       <span className="cc-quick-capture__time">
-                        {parsed.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {parsed.startTime.toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </span>
                     )}
                     <span className="cc-quick-capture__flow-chip">
                       {defaultParentId ? (
                         <>
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <path d="M2 5h6M6 3l2 2-2 2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                          <ArrowRightIcon size={10} />
                           Subtask
                         </>
                       ) : (
                         <>
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <path d="M2 5h6M6 3l2 2-2 2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                          <ArrowRightIcon size={10} />
                           Inbox
                         </>
                       )}

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
@@ -98,30 +98,72 @@ export default function InboxPage() {
   const toggleMutation = useToggleTodoComplete();
   const deleteMutation = useDeleteTodo();
 
+  const inboxData = useMemo(() => {
+    const processing: TodoResponse[] = [];
+    const questioning: TodoResponse[] = [];
+    const planReady: TodoResponse[] = [];
+    const errors: TodoResponse[] = [];
+    const needsOrganising: TodoResponse[] = [];
+    const childCountByParent = new Map<string, number>();
+    const todoById = new Map<string, TodoResponse>();
+
+    for (const todo of todos) {
+      todoById.set(todo.id, todo);
+      if (todo.parent_id) {
+        childCountByParent.set(
+          todo.parent_id,
+          (childCountByParent.get(todo.parent_id) ?? 0) + 1,
+        );
+      }
+
+      if (todo.inbox_state === 'classifying' || todo.inbox_state === 'planning') {
+        processing.push(todo);
+      } else if (todo.inbox_state === 'questioning') {
+        questioning.push(todo);
+      } else if (todo.inbox_state === 'plan_ready') {
+        planReady.push(todo);
+      } else if (todo.inbox_state === 'error') {
+        errors.push(todo);
+      } else if (
+        todo.inbox_state === 'captured'
+        || ((!todo.inbox_state || todo.inbox_state === 'none')
+          && !todo.due_date
+          && todo.status !== 'completed'
+          && !todo.parent_id)
+      ) {
+        needsOrganising.push(todo);
+      }
+    }
+
+    return {
+      processing,
+      questioning,
+      planReady,
+      errors,
+      needsOrganising,
+      childCountByParent,
+      todoById,
+    };
+  }, [todos]);
+
+  const {
+    processing,
+    questioning,
+    planReady,
+    errors,
+    needsOrganising,
+    childCountByParent,
+    todoById,
+  } = inboxData;
+
   const handleDelete = useCallback((id: string) => {
     deleteMutation.mutate(id);
   }, [deleteMutation]);
 
   const handleToggle = useCallback((id: string) => {
-    const todo = todos.find((t) => t.id === id);
+    const todo = todoById.get(id);
     if (todo) toggleMutation.mutate({ id, currentStatus: todo.status });
-  }, [todos, toggleMutation]);
-
-  // Group by inbox_state
-  const processing = todos.filter(
-    (t) => t.inbox_state === 'classifying' || t.inbox_state === 'planning',
-  );
-  const questioning = todos.filter((t) => t.inbox_state === 'questioning');
-  const planReady = todos.filter((t) => t.inbox_state === 'plan_ready');
-  const errors = todos.filter((t) => t.inbox_state === 'error');
-  const needsOrganising = todos.filter(
-    (t) =>
-      t.inbox_state === 'captured' ||
-      ((!t.inbox_state || t.inbox_state === 'none') &&
-        !t.due_date &&
-        t.status !== 'completed' &&
-        !t.parent_id),
-  );
+  }, [todoById, toggleMutation]);
 
   const totalItems = processing.length + questioning.length + planReady.length + needsOrganising.length + errors.length;
 
@@ -227,7 +269,6 @@ export default function InboxPage() {
           defaultOpen
         >
           {needsOrganising.map((task) => {
-            const children = todos.filter((t) => t.parent_id === task.id);
             return (
               <div key={task.id} className="cc-inbox-card">
                 <TaskCard
@@ -235,7 +276,7 @@ export default function InboxPage() {
                   onToggle={() => handleToggle(task.id)}
                   onClick={() => navigate(`/tasks/${task.id}`)}
                   onDelete={() => handleDelete(task.id)}
-                  subTaskCount={children.length}
+                  subTaskCount={childCountByParent.get(task.id) ?? 0}
                 />
                 <div className="cc-inbox-card__actions">
                   <button

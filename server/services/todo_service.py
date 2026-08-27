@@ -1,5 +1,6 @@
 """Async service layer for todo CRUD operations."""
 
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -85,6 +86,10 @@ async def create_todo(
     source: str | None = None,
     source_id: str | None = None,
     assignee: str | None = None,
+    enabled_skills: list[str] | None = None,
+    inbox_state: str = "none",
+    estimated_minutes: int | None = None,
+    depends_on: list[str] | None = None,
     recurrence_rule: str | None = None,
     recurrence_end: datetime | None = None,
 ) -> Todo:
@@ -100,6 +105,10 @@ async def create_todo(
         source=source,
         source_id=source_id,
         assignee=assignee,
+        enabled_skills=json.dumps(enabled_skills) if enabled_skills else None,
+        inbox_state=inbox_state,
+        estimated_minutes=estimated_minutes,
+        depends_on=json.dumps(depends_on) if depends_on else None,
         recurrence_rule=recurrence_rule,
         recurrence_end=recurrence_end,
     )

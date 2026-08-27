@@ -1,14 +1,20 @@
 import logging
 from collections.abc import AsyncIterator
 
+from typing import Protocol
+
 from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
 
+class JsonTransport(Protocol):
+    async def send_json(self, data: dict) -> None: ...
+
+
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: dict[str, list[WebSocket]] = {}
+        self.active_connections: dict[str, list[JsonTransport]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
         await websocket.accept()
@@ -16,7 +22,10 @@ class ConnectionManager:
             self.active_connections[user_id] = []
         self.active_connections[user_id].append(websocket)
 
-    def disconnect(self, user_id: str, websocket: WebSocket | None = None):
+    def register(self, user_id: str, transport: JsonTransport) -> None:
+        self.active_connections.setdefault(user_id, []).append(transport)
+
+    def disconnect(self, user_id: str, websocket: JsonTransport | None = None):
         conns = self.active_connections.get(user_id)
         if not conns:
             return
@@ -27,11 +36,24 @@ class ConnectionManager:
         else:
             del self.active_connections[user_id]
 
+    async def close_user(self, user_id: str, reason: str = "Session revoked") -> None:
+        conns = self.active_connections.pop(user_id, [])
+        for transport in conns:
+            close = getattr(transport, "close", None)
+            if close is None:
+                continue
+            try:
+                await close(code=4001, reason=reason)
+            except TypeError:
+                await close()
+            except Exception:
+                logger.debug("Failed to close transport for %s", user_id)
+
     async def send_json(self, user_id: str, data: dict):
         conns = self.active_connections.get(user_id)
         if not conns:
             return
-        dead: list[WebSocket] = []
+        dead: list[JsonTransport] = []
         for ws in conns:
             try:
                 await ws.send_json(data)

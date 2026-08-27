@@ -6,6 +6,7 @@ import {
 } from '../../services/updateLifecycle';
 import { useUpdateStore } from '../../stores/useUpdateStore';
 import { IS_DESKTOP } from '../../types/platform';
+import { CloseIcon } from './Icons';
 
 function formatBytes(bytes?: number) {
   if (!bytes) return '';
@@ -95,7 +96,7 @@ export default function UpdateNotification() {
             aria-label="Dismiss update notification"
             onClick={dismissAppUpdate}
           >
-            ×
+            <CloseIcon size={15} />
           </button>
         )}
       </div>

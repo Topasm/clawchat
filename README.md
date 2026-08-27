@@ -10,7 +10,9 @@ make setup          # install frontend + backend dependencies, create .env
 make dev            # start frontend on :5173 and backend on :8000
 ```
 
-Requires **Node.js >= 18**, **Python >= 3.11**, and an OpenAI-compatible LLM endpoint (e.g. Ollama).
+Requires **Node.js >= 22** (Node 24 LTS recommended), **Python >= 3.11**,
+**uv 0.10.2**, and an OpenAI-compatible LLM endpoint (e.g. Ollama). Backend
+installs are reproduced from the committed `server/uv.lock`.
 
 ## Docker
 

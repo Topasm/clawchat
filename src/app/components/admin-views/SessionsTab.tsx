@@ -3,13 +3,14 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import EmptyState from '../shared/EmptyState';
+import { LinkIcon } from '../shared/Icons';
 
 export default function SessionsTab() {
   const { data, isLoading } = useAdminSessionsQuery();
   const disconnect = useDisconnectSession();
 
   if (!useAuthStore.getState().serverUrl) {
-    return <EmptyState icon="🔗" message="Session management requires a server connection." />;
+    return <EmptyState icon={<LinkIcon size={20} />} message="Session management requires a server connection." />;
   }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;

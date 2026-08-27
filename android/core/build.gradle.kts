@@ -49,6 +49,7 @@ dependencies {
     api("com.squareup.okhttp3:okhttp:4.12.0")
     api("com.squareup.okhttp3:logging-interceptor:4.12.0")
     api("com.squareup.okhttp3:okhttp-sse:4.12.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.83")
 
     // Data
     api("androidx.datastore:datastore-preferences:1.1.1")

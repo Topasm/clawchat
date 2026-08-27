@@ -5,7 +5,7 @@
   justify-content: center;
   min-height: 100vh;
   background: var(--cc-background);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: inherit;
   padding: 24px;
   box-sizing: border-box;
 }
@@ -72,9 +72,8 @@
 .cc-onboarding__card {
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: var(--cc-radius-lg);
   padding: 32px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .cc-onboarding__card-title {
@@ -99,7 +98,7 @@
   gap: 10px;
   padding: 10px 12px;
   background: var(--cc-surface-secondary);
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   margin-bottom: 10px;
 }
 
@@ -112,17 +111,14 @@
 
 .cc-onboarding__status-dot--green {
   background: var(--cc-success);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--cc-success) 40%, transparent);
 }
 
 .cc-onboarding__status-dot--yellow {
   background: var(--cc-warning);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--cc-warning) 40%, transparent);
 }
 
 .cc-onboarding__status-dot--red {
   background: var(--cc-error);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--cc-error) 40%, transparent);
 }
 
 .cc-onboarding__status-dot--gray {
@@ -171,7 +167,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   font-size: 14px;
   background: var(--cc-background);
   color: var(--cc-text);
@@ -206,7 +202,7 @@
   justify-content: center;
   background: var(--cc-surface-secondary);
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   font-size: 22px;
   font-weight: 700;
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -222,7 +218,7 @@
   margin: 12px auto;
   background: var(--cc-surface-secondary);
   border: 2px dashed var(--cc-border);
-  border-radius: 12px;
+  border-radius: var(--cc-radius-lg);
   color: var(--cc-text-tertiary);
   font-size: 12px;
   text-align: center;
@@ -243,7 +239,7 @@
   display: inline-block;
   padding: 2px 8px;
   background: var(--cc-surface-secondary);
-  border-radius: 4px;
+  border-radius: var(--cc-radius-xs);
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 12px;
   color: var(--cc-text);
@@ -291,7 +287,7 @@
   gap: 14px;
   padding: 16px;
   border: 2px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: var(--cc-radius-lg);
   background: var(--cc-surface-secondary);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
@@ -313,7 +309,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--cc-radius-lg);
   background: color-mix(in srgb, var(--cc-primary) 10%, transparent);
   color: var(--cc-primary);
   font-size: 20px;

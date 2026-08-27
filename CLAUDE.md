@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ClawChat is a privacy-first, self-hosted personal assistant that unifies task management, calendar, and AI-powered chat into a cross-platform app (web, Electron desktop, Capacitor mobile). Single server, single SQLite database.
+ClawChat is a privacy-first, self-hosted personal assistant that unifies task management, calendar, and AI-powered chat into a cross-platform app (web, Tauri desktop, Capacitor/Compose mobile). Single server, single SQLite database.
 
 ## Setup & Development
 
@@ -17,7 +17,7 @@ Or use npm directly:
 ```bash
 npm run dev:full            # Same as make dev (uses concurrently)
 npm run dev                 # Frontend only (Vite)
-npm run dev:electron        # Electron + Vite (desktop)
+npm run dev:tauri           # Tauri + Vite (desktop)
 npm run test                # Run all Vitest tests
 npm run typecheck           # TypeScript check (tsconfig.app.json)
 npm run build               # Typecheck + production web build
@@ -25,7 +25,7 @@ npm run build               # Typecheck + production web build
 
 Single test file: `npx vitest run src/app/stores/__tests__/useAuthStore.test.ts`
 
-Backend only: `make dev-backend` or `cd server && . venv/bin/activate && uvicorn main:app --reload --host 0.0.0.0 --port 8000`
+Backend only: `make dev-backend` or `uv run --project server --locked uvicorn main:app --app-dir server --reload --host 0.0.0.0 --port 8000`
 
 ### Docker
 
@@ -40,7 +40,7 @@ Server config is via environment variables (see `.env.example`). Key vars: `AI_P
 
 ### Two-process system
 
-- **Frontend:** React 18 + TypeScript, built with Vite. Runs in browser, Electron, or Capacitor WebView.
+- **Frontend:** React 18 + TypeScript, built with Vite. Runs in browsers, Tauri, or a Capacitor WebView.
 - **Backend:** Python FastAPI async server. Communicates via REST + SSE (streaming chat) + WebSocket (real-time sync).
 
 ### Frontend (`src/`)
@@ -49,7 +49,7 @@ Server config is via environment variables (see `.env.example`). Key vars: `AI_P
 - **State**: Zustand stores (`src/app/stores/`) for auth, chat, modules (todos/events), settings, toasts. Server state via TanStack React Query (`src/app/hooks/`).
 - **API layer**: Axios client with JWT token refresh (`src/app/services/apiClient.ts`), SSE client for streaming chat, WebSocket client for real-time.
 - **Styling**: Plain CSS with BEM naming using `.cc-` prefix. Theme via CSS custom properties. Files in `src/styles/`.
-- **TypeScript config**: Multi-project — `tsconfig.app.json` (frontend), `tsconfig.electron.json` (Electron main process). Root `tsconfig.json` is a project reference file only.
+- **TypeScript config**: `tsconfig.app.json` covers the renderer. Root `tsconfig.json` references that project.
 - **Tests**: Vitest + jsdom + Testing Library. Tests live in `__tests__/` directories adjacent to source. Setup in `src/test/setup.ts`.
 
 ### Backend (`server/`)
@@ -72,9 +72,9 @@ Server config is via environment variables (see `.env.example`). Key vars: `AI_P
 
 User message → SSE stream to `/api/chat/stream` → intent classification via LLM function calling → orchestrator dispatches to service (todo/calendar/etc.) → DB update → streamed response back to client.
 
-### Electron (`electron/`)
+### Tauri (`src-tauri/`)
 
-Main process (`main.ts`) + preload script (`preload.ts`) with IPC bridge for secure storage, Obsidian vault access, and desktop notifications.
+The Rust shell supervises the FastAPI sidecar and provides secure storage, tray, updater, Obsidian, notification, and desktop lifecycle commands through `src/app/platform/`.
 
 ### Android (`android/`)
 

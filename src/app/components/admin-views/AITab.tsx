@@ -3,13 +3,14 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import EmptyState from '../shared/EmptyState';
+import { RobotIcon } from '../shared/Icons';
 
 export default function AITab() {
   const { data, isLoading } = useAdminAIQuery();
   const testConnection = useTestAIConnection();
 
   if (!useAuthStore.getState().serverUrl) {
-    return <EmptyState icon="🤖" message="AI configuration requires a server connection." />;
+    return <EmptyState icon={<RobotIcon size={20} />} message="AI configuration requires a server connection." />;
   }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;

@@ -1,6 +1,8 @@
+import { redactSensitiveText, sanitizeLogMetadata, sanitizeLogValue } from './sensitiveData';
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-interface LogEntry {
+export interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
@@ -9,64 +11,72 @@ interface LogEntry {
 }
 
 const MAX_ENTRIES = 200;
-const STORAGE_KEY = 'clawchat-logs';
+const LEGACY_STORAGE_KEY = 'clawchat-logs';
+const STORAGE_KEY = 'clawchat-logs:v2';
 const FLUSH_INTERVAL_MS = 30_000;
 
-class Logger {
+function isLogEntry(value: unknown): value is LogEntry {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<LogEntry>;
+  return (
+    typeof candidate.timestamp === 'string' &&
+    ['debug', 'info', 'warn', 'error'].includes(candidate.level ?? '') &&
+    typeof candidate.message === 'string'
+  );
+}
+
+export class Logger {
   private entries: LogEntry[] = [];
   private flushTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
+    this.restoreSanitizedEntries();
     this.startAutoFlush();
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeunload', () => this.flush());
     }
   }
 
-  private normalizeMetadata(metadata?: unknown): Record<string, unknown> | undefined {
-    if (metadata == null) return undefined;
-    if (metadata instanceof Error) {
-      return {
-        name: metadata.name,
-        message: metadata.message,
-        ...(metadata.stack ? { stack: metadata.stack } : {}),
-      };
-    }
-    if (typeof metadata === 'object') {
-      return metadata as Record<string, unknown>;
-    }
-    return { value: metadata };
-  }
-
   log(level: LogLevel, message: string, metadata?: unknown): void {
-    const normalizedMetadata = this.normalizeMetadata(metadata);
+    const safeMessage = redactSensitiveText(message);
+    const normalizedMetadata = sanitizeLogMetadata(metadata);
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
-      message,
+      message: safeMessage,
       ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
     };
     this.push(entry);
     // eslint-disable-next-line no-console
     console[level === 'debug' ? 'log' : level](
-      `[${entry.timestamp}] [${level.toUpperCase()}] ${message}`,
+      `[${entry.timestamp}] [${level.toUpperCase()}] ${safeMessage}`,
       normalizedMetadata ?? '',
     );
   }
 
   error(message: string, error?: unknown, metadata?: unknown): void {
-    const stack = error instanceof Error ? error.stack : undefined;
-    const normalizedMetadata = this.normalizeMetadata(metadata);
+    const safeMessage = redactSensitiveText(message);
+    const safeError = error == null ? undefined : sanitizeLogValue(error);
+    const stack =
+      safeError &&
+      typeof safeError === 'object' &&
+      'stack' in safeError &&
+      typeof safeError.stack === 'string'
+        ? safeError.stack
+        : undefined;
+    const normalizedMetadata = sanitizeLogMetadata({
+      ...(metadata == null ? {} : { context: metadata }),
+      ...(safeError == null ? {} : { error: safeError }),
+    });
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'error',
-      message,
+      message: safeMessage,
       ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
       ...(stack ? { stack } : {}),
     };
     this.push(entry);
-    // eslint-disable-next-line no-console
-    console.error(`[${entry.timestamp}] [ERROR] ${message}`, error ?? '', normalizedMetadata ?? '');
+    console.error(`[${entry.timestamp}] [ERROR] ${safeMessage}`, normalizedMetadata ?? '');
   }
 
   warn(message: string, metadata?: unknown): void {
@@ -89,6 +99,15 @@ class Logger {
     }
   }
 
+  getEntries(): readonly LogEntry[] {
+    return this.entries;
+  }
+
+  dispose(): void {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    this.flushTimer = null;
+  }
+
   private push(entry: LogEntry): void {
     this.entries.push(entry);
     if (this.entries.length > MAX_ENTRIES) {
@@ -98,6 +117,30 @@ class Logger {
 
   private startAutoFlush(): void {
     this.flushTimer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
+  }
+
+  private restoreSanitizedEntries(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) {
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      this.entries = parsed
+        .slice(-MAX_ENTRIES)
+        .map((entry) => sanitizeLogValue(entry))
+        .filter(isLogEntry);
+    } catch {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Storage unavailable.
+      }
+    }
   }
 }
 

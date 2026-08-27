@@ -3,6 +3,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
+from utils.vault_paths import normalize_vault_relative_path
+
+
+def _normalize_source_id(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return normalize_vault_relative_path(value)
+
 
 class TodoCreate(BaseModel):
     title: str
@@ -21,6 +29,8 @@ class TodoCreate(BaseModel):
     depends_on: list[str] | None = None
     recurrence_rule: str | None = None
     recurrence_end: datetime | None = None
+
+    _validate_source_id = field_validator("source_id")(_normalize_source_id)
 
 
 class TodoUpdate(BaseModel):
@@ -41,6 +51,8 @@ class TodoUpdate(BaseModel):
     source_id: str | None = None
     recurrence_rule: str | None = None
     recurrence_end: datetime | None = None
+
+    _validate_source_id = field_validator("source_id")(_normalize_source_id)
 
 
 class AnswerQuestionsRequest(BaseModel):

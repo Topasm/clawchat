@@ -4,6 +4,7 @@ import type { KanbanStatus, TodoResponse } from '../../types/api';
 import usePlatform from '../../hooks/usePlatform';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SegmentedControl from '../shared/SegmentedControl';
+import { SparkleIcon } from '../shared/Icons';
 import { buildTaskGraphElements, expandTaskGraphContext } from './taskGraphAdapter';
 import TaskGraphView from './TaskGraphView';
 import TaskGraphProposalDialog from './TaskGraphProposalDialog';
@@ -116,6 +117,7 @@ export default function TaskGraph({ todos, metadataTodos = todos, kanbanStatuses
     <section className="cc-task-flow" aria-label="Task graph">
       <div className="cc-task-flow__toolbar">
         <SegmentedControl
+          ariaLabel="Graph mode"
           options={GRAPH_MODE_OPTIONS}
           value={mode}
           onChange={(value) => setMode(value as TaskGraphMode)}
@@ -129,7 +131,7 @@ export default function TaskGraph({ todos, metadataTodos = todos, kanbanStatuses
             disabled={!serverUrl || planningTargets.length === 0}
             title={!serverUrl ? 'Connect to a server to use AI planning' : 'Generate a task graph proposal'}
           >
-            <span aria-hidden="true">✦</span> AI plan
+            <SparkleIcon size={14} /> AI plan
           </button>
           {projectOptions.length > 0 && (
             <select value={projectId} onChange={(event) => setProjectId(event.target.value)} aria-label="Filter graph by project">

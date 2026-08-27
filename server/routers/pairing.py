@@ -10,6 +10,7 @@ from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app_version import APP_VERSION
 from auth.dependencies import get_current_user
 from config import settings
 from database import get_db
@@ -21,6 +22,8 @@ from schemas.pairing import (
     PairedDeviceResponse,
     DeviceListResponse,
 )
+from services.host_identity import get_or_create_host_identity
+from ws.manager import ws_manager
 
 router = APIRouter()
 
@@ -82,11 +85,16 @@ async def create_pairing_session(
     expires_at = now + timedelta(minutes=PAIRING_EXPIRY_MINUTES)
 
     base_url = _get_base_url()
+    identity = await get_or_create_host_identity(db)
     qr_payload = json.dumps({
         "type": "clawchat_pair",
         "code": code,
         "server_url": base_url,
-        "version": "0.1.0",
+        "version": APP_VERSION,
+        "protocol_version": 2,
+        "host_id": identity.host_id,
+        "host_public_key": identity.public_key,
+        "relay_url": settings.relay_url or None,
     })
 
     session = PairingSession(
@@ -100,6 +108,9 @@ async def create_pairing_session(
         code=code,
         expires_at=expires_at,
         qr_payload=qr_payload,
+        host_id=identity.host_id,
+        host_public_key=identity.public_key,
+        relay_url=settings.relay_url or None,
     )
 
 
@@ -131,6 +142,7 @@ async def claim_pairing_session(
         name=req.device_name,
         device_type=req.device_type,
         device_token=device_token,
+        public_key=req.device_public_key,
     )
     db.add(device)
 
@@ -141,13 +153,17 @@ async def claim_pairing_session(
     await db.commit()
 
     api_base_url = _get_base_url()
+    identity = await get_or_create_host_identity(db)
 
     return PairingClaimResponse(
         device_id=device_id,
         device_token=device_token,
         api_base_url=api_base_url,
         host_name="ClawChat Host",
-        server_version="0.1.0",
+        server_version=APP_VERSION,
+        host_id=identity.host_id,
+        host_public_key=identity.public_key,
+        relay_url=settings.relay_url or None,
     )
 
 
@@ -194,4 +210,5 @@ async def revoke_device(
 
     device.is_active = False
     await db.commit()
+    await ws_manager.close_user(device_id, reason="Device revoked")
     return {"status": "revoked", "device_id": device_id}

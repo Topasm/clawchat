@@ -24,6 +24,9 @@ class SessionStore @Inject constructor(
         private val KEY_API_BASE_URL = stringPreferencesKey("api_base_url")
         private val KEY_DEVICE_ID = stringPreferencesKey("device_id")
         private val KEY_HOST_NAME = stringPreferencesKey("host_name")
+        private val KEY_HOST_ID = stringPreferencesKey("host_id")
+        private val KEY_HOST_PUBLIC_KEY = stringPreferencesKey("host_public_key")
+        private val KEY_RELAY_URL = stringPreferencesKey("relay_url")
         private val KEY_AUTH_MODE = stringPreferencesKey("auth_mode") // "paired" | "manual"
         private val KEY_ONBOARDING_SKIPPED = booleanPreferencesKey("onboarding_skipped")
         private val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
@@ -34,6 +37,9 @@ class SessionStore @Inject constructor(
     val apiBaseUrl: Flow<String?> = dataStore.data.map { it[KEY_API_BASE_URL] }
     val deviceId: Flow<String?> = dataStore.data.map { it[KEY_DEVICE_ID] }
     val hostName: Flow<String?> = dataStore.data.map { it[KEY_HOST_NAME] }
+    val hostId: Flow<String?> = dataStore.data.map { it[KEY_HOST_ID] }
+    val hostPublicKey: Flow<String?> = dataStore.data.map { it[KEY_HOST_PUBLIC_KEY] }
+    val relayUrl: Flow<String?> = dataStore.data.map { it[KEY_RELAY_URL] }
     val authMode: Flow<String?> = dataStore.data.map { it[KEY_AUTH_MODE] }
     val isLoggedIn: Flow<Boolean> = dataStore.data.map { it[KEY_TOKEN] != null }
     val onboardingSkipped: Flow<Boolean> = dataStore.data.map { it[KEY_ONBOARDING_SKIPPED] == true }
@@ -46,12 +52,18 @@ class SessionStore @Inject constructor(
         deviceToken: String,
         apiBaseUrl: String,
         hostName: String,
+        hostId: String,
+        hostPublicKey: String,
+        relayUrl: String?,
     ) {
         dataStore.edit { prefs ->
             prefs[KEY_DEVICE_ID] = deviceId
             prefs[KEY_TOKEN] = deviceToken
             prefs[KEY_API_BASE_URL] = apiBaseUrl
             prefs[KEY_HOST_NAME] = hostName
+            prefs[KEY_HOST_ID] = hostId
+            prefs[KEY_HOST_PUBLIC_KEY] = hostPublicKey
+            if (relayUrl != null) prefs[KEY_RELAY_URL] = relayUrl else prefs.remove(KEY_RELAY_URL)
             prefs[KEY_AUTH_MODE] = "paired"
         }
     }
@@ -92,6 +104,9 @@ class SessionStore @Inject constructor(
             prefs.remove(KEY_API_BASE_URL)
             prefs.remove(KEY_DEVICE_ID)
             prefs.remove(KEY_HOST_NAME)
+            prefs.remove(KEY_HOST_ID)
+            prefs.remove(KEY_HOST_PUBLIC_KEY)
+            prefs.remove(KEY_RELAY_URL)
             prefs.remove(KEY_AUTH_MODE)
             prefs.remove(KEY_ONBOARDING_SKIPPED)
         }

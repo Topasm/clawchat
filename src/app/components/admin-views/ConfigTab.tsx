@@ -2,12 +2,13 @@ import { useAdminConfigQuery } from '../../hooks/queries';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
+import { SettingsIcon } from '../shared/Icons';
 
 export default function ConfigTab() {
   const { data, isLoading } = useAdminConfigQuery();
 
   if (!useAuthStore.getState().serverUrl) {
-    return <EmptyState icon="⚙️" message="Server configuration requires a server connection." />;
+    return <EmptyState icon={<SettingsIcon size={20} />} message="Server configuration requires a server connection." />;
   }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;

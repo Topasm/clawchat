@@ -4,12 +4,13 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import EmptyState from '../shared/EmptyState';
+import { PlugIcon } from '../shared/Icons';
 
 export default function OverviewTab() {
   const { data, isLoading } = useAdminOverviewQuery();
 
   if (!useAuthStore.getState().serverUrl) {
-    return <EmptyState icon="🔌" message="Admin dashboard requires a server connection. Connect to a server in Settings to view server statistics." />;
+    return <EmptyState icon={<PlugIcon size={20} />} message="Admin dashboard requires a server connection. Connect to a server in Settings to view server statistics." />;
   }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;

@@ -7,6 +7,7 @@ import { queryClient } from '../../config/queryClient';
 import { queryKeys } from '../../hooks/queries/queryKeys';
 import { hapticMedium } from '../../utils/haptics';
 import type { ConversationResponse } from '../../types/api';
+import { CalendarIcon, ChatBubbleIcon, CheckCircleIcon, PlusIcon } from './Icons';
 
 interface FabAction {
   label: string;
@@ -14,38 +15,22 @@ interface FabAction {
   onClick: () => void;
 }
 
-const TaskIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="2" width="12" height="12" rx="2" />
-    <path d="M5 8l2 2 4-4" />
-  </svg>
-);
-
-const EventIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="3" width="12" height="11" rx="2" />
-    <path d="M5 1v4M11 1v4M2 7h12" />
-  </svg>
-);
-
-const ChatIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v7a1 1 0 01-1 1H5l-3 3V3z" />
-  </svg>
-);
-
 function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>): FabAction[] {
   if (pathname === '/today') {
     return [
       {
         label: 'New Task',
-        icon: <TaskIcon />,
-        onClick: () => useQuickCaptureStore.getState().open({ placeholder: 'New task: e.g. "Buy groceries tomorrow"' }),
+        icon: <CheckCircleIcon size={16} />,
+        onClick: () =>
+          useQuickCaptureStore
+            .getState()
+            .open({ placeholder: 'New task: e.g. "Buy groceries tomorrow"' }),
       },
       {
         label: 'New Event',
-        icon: <EventIcon />,
-        onClick: () => useQuickCaptureStore.getState().open({ placeholder: 'New event: e.g. "Meeting at 3pm"' }),
+        icon: <CalendarIcon size={16} />,
+        onClick: () =>
+          useQuickCaptureStore.getState().open({ placeholder: 'New event: e.g. "Meeting at 3pm"' }),
       },
     ];
   }
@@ -54,7 +39,7 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
     return [
       {
         label: 'New Task',
-        icon: <TaskIcon />,
+        icon: <CheckCircleIcon size={16} />,
         onClick: () => useQuickCaptureStore.getState().open(),
       },
     ];
@@ -64,7 +49,7 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
     return [
       {
         label: 'New Task',
-        icon: <TaskIcon />,
+        icon: <CheckCircleIcon size={16} />,
         onClick: () => useQuickCaptureStore.getState().open(),
       },
     ];
@@ -74,14 +59,19 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
     return [
       {
         label: 'New Chat',
-        icon: <ChatIcon />,
+        icon: <ChatBubbleIcon size={16} />,
         onClick: async () => {
           try {
             const res = await apiClient.post('/chat/conversations', { title: 'New Conversation' });
             const convo = res.data as ConversationResponse;
-            queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) => [convo, ...(old ?? [])]);
+            queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) => [
+              convo,
+              ...(old ?? []),
+            ]);
             navigate(`/chats/${convo.id}`);
-          } catch { /* stay on list page */ }
+          } catch {
+            /* stay on list page */
+          }
         },
       },
     ];
@@ -91,8 +81,9 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
     return [
       {
         label: 'New Event',
-        icon: <EventIcon />,
-        onClick: () => useQuickCaptureStore.getState().open({ placeholder: 'New event: e.g. "Meeting at 3pm"' }),
+        icon: <CalendarIcon size={16} />,
+        onClick: () =>
+          useQuickCaptureStore.getState().open({ placeholder: 'New event: e.g. "Meeting at 3pm"' }),
       },
     ];
   }
@@ -101,10 +92,7 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
 }
 
 // Hide FAB on detail pages, settings, admin, search
-const HIDDEN_PATTERNS = [
-  /^\/(tasks|chats|events)\/[^/]+/,
-  /^\/(settings|admin|search)/,
-];
+const HIDDEN_PATTERNS = [/^\/(tasks|chats|events)\/[^/]+/, /^\/(settings|admin|search)/];
 
 export default function FloatingActionButton() {
   const [expanded, setExpanded] = useState(false);
@@ -164,10 +152,7 @@ export default function FloatingActionButton() {
           onClick={() => setExpanded((v) => !v)}
           aria-label={expanded ? 'Close actions' : 'Quick actions'}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+          <PlusIcon size={24} />
         </button>
       </div>
     </>

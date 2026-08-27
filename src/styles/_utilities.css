@@ -9,3 +9,4 @@
 .cc-flex-col { flex-direction: column; }
 .cc-items-center { align-items: center; }
 .cc-justify-between { justify-content: space-between; }
+.cc-hidden { display: none !important; }

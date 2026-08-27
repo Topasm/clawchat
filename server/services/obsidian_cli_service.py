@@ -9,15 +9,18 @@ where possible.
 import json
 import logging
 import os
+import posixpath
 import shutil
 import subprocess
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from config import settings
+from utils.atomic_files import atomic_write_text, synchronized_path, synchronized_paths
+from utils.vault_paths import normalize_vault_relative_path, resolve_vault_path
 
 logger = logging.getLogger(__name__)
 
@@ -51,25 +54,14 @@ _last_successful_cli_at: float = 0.0
 # ---------------------------------------------------------------------------
 
 
-def _normalize_vault_path(path: str) -> str:
+def _normalize_vault_path(path: str, *, allow_empty: bool = False) -> str:
     """Normalize a vault-relative path for safe use.
 
     - Rejects ``..`` traversal segments
-    - Strips leading ``/``
+    - Rejects absolute and drive-prefixed paths
     - Normalizes backslashes to forward slashes
     """
-    # Normalize separators
-    path = path.replace("\\", "/")
-
-    # Strip leading slash
-    path = path.lstrip("/")
-
-    # Reject traversal
-    parts = path.split("/")
-    if ".." in parts:
-        raise ValueError(f"Path traversal not allowed: {path}")
-
-    return path
+    return normalize_vault_relative_path(path, allow_empty=allow_empty)
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +192,7 @@ def create_document(
         return False
 
     vault_relative_path = _normalize_vault_path(vault_relative_path)
+    abs_path = resolve_vault_path(vault, vault_relative_path)
 
     # Try CLI
     if use_cli:
@@ -209,11 +202,9 @@ def create_document(
             return True
 
     # Filesystem fallback
-    abs_path = os.path.join(vault, vault_relative_path)
     try:
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        with synchronized_path(abs_path):
+            atomic_write_text(abs_path, content)
         logger.debug("Created document via filesystem: %s", vault_relative_path)
         return True
     except OSError as exc:
@@ -246,6 +237,7 @@ def append_to_document(
         return False
 
     vault_relative_path = _normalize_vault_path(vault_relative_path)
+    abs_path = resolve_vault_path(vault, vault_relative_path)
 
     # Try CLI
     if use_cli:
@@ -255,11 +247,13 @@ def append_to_document(
             return True
 
     # Filesystem fallback
-    abs_path = os.path.join(vault, vault_relative_path)
     try:
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "a", encoding="utf-8") as f:
-            f.write(content)
+        with synchronized_path(abs_path):
+            existing = ""
+            if os.path.exists(abs_path):
+                with open(abs_path, "r", encoding="utf-8") as file:
+                    existing = file.read()
+            atomic_write_text(abs_path, existing + content)
         logger.debug("Appended to document via filesystem: %s", vault_relative_path)
         return True
     except OSError as exc:
@@ -288,6 +282,13 @@ def rename_document(
         return False
 
     vault_relative_path = _normalize_vault_path(vault_relative_path)
+    new_name = _normalize_vault_path(new_name)
+    if "/" in new_name:
+        raise ValueError(f"New document name must be a filename: {new_name}")
+    parent_relative = posixpath.dirname(vault_relative_path)
+    new_relative_path = posixpath.join(parent_relative, new_name)
+    abs_old = resolve_vault_path(vault, vault_relative_path)
+    abs_new = resolve_vault_path(vault, new_relative_path)
 
     # CLI is strongly preferred for rename — it updates internal links
     if use_cli:
@@ -297,11 +298,9 @@ def rename_document(
             return True
 
     # Filesystem fallback (no link update)
-    abs_old = os.path.join(vault, vault_relative_path)
-    parent = os.path.dirname(abs_old)
-    abs_new = os.path.join(parent, new_name)
     try:
-        os.rename(abs_old, abs_new)
+        with synchronized_paths(abs_old, abs_new):
+            os.rename(abs_old, abs_new)
         logger.debug("Renamed document via filesystem (no link update): %s -> %s", vault_relative_path, new_name)
         return True
     except OSError as exc:
@@ -324,9 +323,11 @@ def move_document(
         return False
 
     vault_relative_path = _normalize_vault_path(vault_relative_path)
-    new_folder = _normalize_vault_path(new_folder)
-    filename = os.path.basename(vault_relative_path)
-    new_path = os.path.join(new_folder, filename)
+    new_folder = _normalize_vault_path(new_folder, allow_empty=True)
+    filename = posixpath.basename(vault_relative_path)
+    new_path = posixpath.join(new_folder, filename)
+    abs_old = resolve_vault_path(vault, vault_relative_path)
+    abs_new = resolve_vault_path(vault, new_path)
 
     # CLI preferred for move — updates internal links
     if use_cli:
@@ -336,11 +337,10 @@ def move_document(
             return True
 
     # Filesystem fallback
-    abs_old = os.path.join(vault, vault_relative_path)
-    abs_new = os.path.join(vault, new_path)
     try:
-        os.makedirs(os.path.dirname(abs_new), exist_ok=True)
-        shutil.move(abs_old, abs_new)
+        with synchronized_paths(abs_old, abs_new):
+            os.makedirs(os.path.dirname(abs_new), exist_ok=True)
+            shutil.move(abs_old, abs_new)
         logger.debug("Moved document via filesystem (no link update): %s -> %s", vault_relative_path, new_path)
         return True
     except OSError as exc:

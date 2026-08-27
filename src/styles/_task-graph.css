@@ -25,7 +25,7 @@
 .cc-task-list {
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: var(--cc-radius-md);
   background: var(--cc-surface);
 }
 
@@ -115,7 +115,7 @@
   min-height: 240px;
   place-items: center;
   border: 1px dashed var(--cc-border);
-  border-radius: 12px;
+  border-radius: var(--cc-radius-md);
   color: var(--cc-text-secondary);
   font-size: 13px;
 }
@@ -125,7 +125,7 @@
 .cc-task-flow {
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 14px;
+  border-radius: var(--cc-radius-md);
   background: var(--cc-surface);
 }
 
@@ -157,7 +157,7 @@
   height: 30px;
   padding: 0 25px 0 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   background: var(--cc-background);
   color: var(--cc-text-secondary);
   font-size: 11px;
@@ -220,7 +220,7 @@
 
 .cc-task-flow__canvas .react-flow__node-task {
   width: 244px;
-  border-radius: 12px;
+  border-radius: var(--cc-radius-lg);
 }
 
 .cc-task-flow__canvas .react-flow__node-task:focus-visible {
@@ -230,7 +230,8 @@
 
 .cc-task-flow__canvas .react-flow__node.selected .cc-task-flow-node {
   border-color: var(--cc-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cc-primary) 18%, transparent), 0 8px 24px rgba(0, 0, 0, 0.12);
+  outline: 2px solid color-mix(in srgb, var(--cc-primary) 24%, transparent);
+  outline-offset: 2px;
 }
 
 .cc-task-flow__edge .react-flow__edge-path { stroke-width: 2; }
@@ -245,8 +246,7 @@
 .cc-task-flow__canvas .react-flow__minimap {
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: var(--cc-radius-sm);
 }
 
 /* -- Custom task node --------------------------------------- */
@@ -260,17 +260,16 @@
   gap: 8px;
   padding: 13px 15px 12px;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: var(--cc-radius-md);
   background: var(--cc-surface);
   color: var(--cc-text);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--cc-transition-fast), background var(--cc-transition-fast);
 }
 
 .cc-task-flow-node:hover {
   border-color: color-mix(in srgb, var(--cc-primary) 54%, var(--cc-border));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  background: color-mix(in srgb, var(--cc-primary) 3%, var(--cc-surface));
 }
 
 .cc-task-flow-node--completed { opacity: 0.72; }
@@ -288,7 +287,7 @@
   left: 12px;
   right: 12px;
   height: 3px;
-  border-radius: 0 0 3px 3px;
+  border-radius: 0 0 var(--cc-radius-xs) var(--cc-radius-xs);
   background: var(--cc-priority-medium);
 }
 
@@ -311,7 +310,7 @@
   align-items: center;
   height: 18px;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -432,7 +431,7 @@
 .cc-task-proposal__title-input,
 .cc-task-proposal__item-meta select {
   border: 1px solid var(--cc-border);
-  border-radius: 7px;
+  border-radius: var(--cc-radius-md);
   background: var(--cc-background);
   color: var(--cc-text);
   outline: none;
@@ -455,7 +454,7 @@
   gap: 10px;
   margin-top: 14px;
   border: 1px dashed var(--cc-border);
-  border-radius: 10px;
+  border-radius: var(--cc-radius-lg);
   color: var(--cc-text-secondary);
   font-size: 12px;
 }
@@ -481,7 +480,7 @@
   padding: 9px 11px;
   border: 1px solid var(--cc-border);
   border-bottom: 0;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--cc-radius-lg) var(--cc-radius-lg) 0 0;
   background: var(--cc-surface-secondary);
 }
 
@@ -495,7 +494,7 @@
   grid-template-columns: minmax(0, 1fr) 310px;
   overflow: hidden;
   border: 1px solid var(--cc-border);
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 var(--cc-radius-lg) var(--cc-radius-lg);
 }
 
 .cc-task-proposal__graph { min-width: 0; border-right: 1px solid var(--cc-border); }
@@ -529,11 +528,12 @@
   .cc-task-list { overflow-x: auto; }
   .cc-task-flow__toolbar { align-items: stretch; flex-direction: column; }
   .cc-task-flow__toolbar .cc-segmented { align-self: flex-start; }
-  .cc-task-flow__filters { justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-  .cc-task-flow__filters::-webkit-scrollbar { display: none; }
+  .cc-task-flow__filters { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
   .cc-task-flow__filters select,
   .cc-task-flow__filters .cc-btn,
   .cc-task-flow__completed-toggle { min-height: 36px; }
+  .cc-task-flow__filters select { flex: 1 1 130px; max-width: none; }
+  .cc-task-flow__completed-toggle { padding: 0 4px; }
   .cc-task-flow__summary > span:first-child { display: none; }
   .cc-task-flow__summary > span:nth-child(2) { margin-left: 0; }
   .cc-task-flow__canvas { height: calc(100dvh - 365px); min-height: 390px; overscroll-behavior: contain; }

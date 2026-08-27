@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from datetime import datetime, time, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -18,6 +19,23 @@ logger = logging.getLogger(__name__)
 
 # Default user ID for single-user app
 DEFAULT_USER_ID = "default"
+_VAULT_FULL_AUDIT_SECONDS = 60 * 60
+
+
+def _is_watchable_vault_path(vault_path: str, path: str) -> bool:
+    """Filter hidden, temporary, and unrelated filesystem events."""
+    relative = os.path.relpath(path, vault_path)
+    if relative == os.pardir or relative.startswith(f"{os.pardir}{os.sep}"):
+        return False
+    parts = relative.split(os.sep)
+    if any(part.startswith(".") for part in parts):
+        return False
+    filename = parts[-1]
+    if filename.startswith((".#", "~")) or filename.endswith(
+        ("~", ".tmp", ".swp", ".swx")
+    ):
+        return False
+    return os.path.isdir(path) or filename.endswith(".md") or "." not in filename
 
 
 def _parse_quiet_hours(quiet_str: str) -> tuple[int, int]:
@@ -253,39 +271,103 @@ class Scheduler:
             logger.debug("Nudge loop cancelled")
 
     async def _vault_scan_loop(self) -> None:
-        """Periodically scan the vault for external changes and sync to DB."""
+        """Process real-time vault events with periodic full audit fallback."""
         interval = settings.obsidian_scan_interval_minutes * 60
-        logger.info("Vault scan loop started (interval: %ds)", interval)
+        vault_path = settings.obsidian_vault_path
+        logger.info(
+            "Vault watcher started (poll fallback: %ds, full audit: %ds)",
+            interval,
+            _VAULT_FULL_AUDIT_SECONDS,
+        )
 
-        # Initial index refresh on startup
         try:
             from services.obsidian_vault_indexer import refresh_index
-            refresh_index()
+            from services.vault_watcher_service import scan_vault
+
+            await asyncio.to_thread(refresh_index)
+            async with self.session_factory() as db:
+                await scan_vault(db)
             logger.info("Initial vault index built")
         except Exception:
-            logger.exception("Failed to build initial vault index")
+            logger.exception("Failed to initialize vault watcher")
+
+        try:
+            from watchfiles import awatch
+
+            audit_task = asyncio.create_task(
+                self._vault_full_audit_loop(), name="scheduler-vault-full-audit"
+            )
+            try:
+                async for changes in awatch(vault_path, debounce=500, step=100):
+                    changed_paths = {
+                        path
+                        for _change, path in changes
+                        if _is_watchable_vault_path(vault_path, path)
+                    }
+                    if changed_paths:
+                        try:
+                            await self._sync_changed_vault_paths(changed_paths)
+                        except Exception:
+                            logger.exception("Failed to process vault change batch")
+            finally:
+                audit_task.cancel()
+                await asyncio.gather(audit_task, return_exceptions=True)
+        except ImportError:
+            logger.warning("watchfiles unavailable; using periodic vault scan")
+            await self._vault_poll_loop(interval)
+        except OSError:
+            logger.exception("Vault event watcher failed; using periodic scan")
+            await self._vault_poll_loop(interval)
+        except asyncio.CancelledError:
+            logger.debug("Vault watcher cancelled")
+        except Exception:
+            logger.exception("Vault event watcher stopped; using periodic scan")
+            await self._vault_poll_loop(interval)
+
+    async def _sync_changed_vault_paths(self, changed_paths: set[str]) -> None:
+        from services.obsidian_vault_indexer import refresh_changed_paths
+        from services.vault_watcher_service import scan_vault
+
+        async with self.session_factory() as db:
+            result = await scan_vault(db, changed_paths)
+            if result.changes_applied:
+                logger.info(
+                    "Incremental vault scan: %d changes applied",
+                    result.changes_applied,
+                )
+        await asyncio.to_thread(refresh_changed_paths, changed_paths)
+
+    async def _vault_full_audit_loop(self) -> None:
+        from services.obsidian_vault_indexer import refresh_index
+        from services.vault_watcher_service import scan_vault
+
+        try:
+            while True:
+                await asyncio.sleep(_VAULT_FULL_AUDIT_SECONDS)
+                try:
+                    async with self.session_factory() as db:
+                        await scan_vault(db)
+                    await asyncio.to_thread(refresh_index)
+                except Exception:
+                    logger.exception("Error in vault full audit")
+        except asyncio.CancelledError:
+            logger.debug("Vault full audit loop cancelled")
+
+    async def _vault_poll_loop(self, interval: int) -> None:
+        from services.obsidian_vault_indexer import refresh_index
+        from services.vault_watcher_service import scan_vault
 
         try:
             while True:
                 await asyncio.sleep(interval)
                 try:
-                    from services.vault_watcher_service import scan_vault
-                    from services.obsidian_vault_indexer import refresh_index
-
                     async with self.session_factory() as db:
-                        result = await scan_vault(db)
-                        if result.changes_applied:
-                            logger.info(
-                                "Vault scan: %d changes applied",
-                                result.changes_applied,
-                            )
-
-                    # Refresh index after scan
-                    refresh_index()
+                        await scan_vault(db)
+                    await asyncio.to_thread(refresh_index)
                 except Exception:
-                    logger.exception("Error in vault scan loop")
+                    logger.exception("Error in periodic vault scan")
         except asyncio.CancelledError:
-            logger.debug("Vault scan loop cancelled")
+            logger.debug("Periodic vault scan cancelled")
 
     async def _vault_queue_flush_loop(self) -> None:
         """Periodically attempt to flush the write queue."""

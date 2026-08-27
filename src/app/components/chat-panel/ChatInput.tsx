@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from 're
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import useVoiceInput from '../../hooks/useVoiceInput';
+import { CheckIcon, CloseIcon, MicrophoneIcon, SendIcon, StopIcon } from '../shared/Icons';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -83,7 +84,7 @@ export default function ChatInput({
       handleSend();
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (sendOnEnter && e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -114,10 +115,9 @@ export default function ChatInput({
           className="cc-chat-input__btn cc-chat-input__btn--stop"
           onClick={onStop}
           title="Stop"
+          aria-label="Stop response"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-            <rect x="2" y="2" width="10" height="10" rx="1" />
-          </svg>
+          <StopIcon size={14} />
         </button>
       ) : (
         <>
@@ -127,10 +127,9 @@ export default function ChatInput({
               className="cc-chat-input__cancel-btn"
               onClick={handleCancel}
               title="Cancel edit"
+              aria-label="Cancel edit"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M3 3l8 8M11 3l-8 8" strokeLinecap="round" />
-              </svg>
+              <CloseIcon size={14} />
             </button>
           )}
           {voiceSupported && (
@@ -139,13 +138,9 @@ export default function ChatInput({
               className={`cc-chat-input__btn cc-chat-input__btn--mic${isListening ? ' cc-chat-input__btn--active' : ''}`}
               onClick={isListening ? stopListening : startListening}
               title={isListening ? 'Stop listening' : 'Voice input'}
+              aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="1" width="6" height="9" rx="3" />
-                <path d="M3 7a5 5 0 0 0 10 0" />
-                <line x1="8" y1="12" x2="8" y2="15" />
-                <line x1="5" y1="15" x2="11" y2="15" />
-              </svg>
+              <MicrophoneIcon size={16} />
             </button>
           )}
           <button
@@ -154,15 +149,12 @@ export default function ChatInput({
             onClick={handleSend}
             disabled={!text.trim()}
             title={!healthOK ? 'Server status uncertain — try sending anyway' : isEditing ? 'Save edit' : 'Send'}
+            aria-label={isEditing ? 'Save edited message' : 'Send message'}
           >
             {isEditing ? (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8l4 4L13 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <CheckIcon size={16} />
             ) : (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M14 2L7 9M14 2L9.5 14L7 9M14 2L2 6.5L7 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <SendIcon size={16} />
             )}
           </button>
         </>

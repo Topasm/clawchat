@@ -1,17 +1,24 @@
+/* --- Icon ------------------------------------------------- */
+.cc-icon {
+  display: block;
+  flex: 0 0 auto;
+}
+
 /* --- Card ------------------------------------------------- */
 .cc-card {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 10px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
   padding: 12px 14px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background var(--cc-transition-fast),
+    border-color var(--cc-transition-fast);
 }
 
 .cc-card:hover {
   background: var(--cc-surface-secondary);
-  border-color: var(--cc-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-color: color-mix(in srgb, var(--cc-primary) 24%, var(--cc-border));
 }
 
 .cc-card--task {
@@ -54,7 +61,7 @@
 
 .cc-card__accent-bar {
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--cc-radius-xs);
   flex-shrink: 0;
 }
 
@@ -83,7 +90,7 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  border-radius: 9999px;
+  border-radius: var(--cc-radius-pill);
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
@@ -152,19 +159,30 @@
 .cc-checkbox {
   width: 20px;
   height: 20px;
+  padding: 0;
   border-radius: 50%;
   border: 1.5px solid var(--cc-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
   margin-top: 1px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .cc-checkbox:hover {
   border-color: var(--cc-primary);
+}
+
+.cc-checkbox:focus-visible {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: 2px;
 }
 
 .cc-checkbox--checked {
@@ -184,16 +202,20 @@
 }
 
 .cc-section__header {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   cursor: pointer;
   user-select: none;
   transition: background 0.15s ease;
   background: transparent;
   border: 1px solid transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 
 @media (max-width: 768px) {
@@ -284,7 +306,7 @@
   font-size: 11px;
   font-weight: 600;
   padding: 0 6px;
-  border-radius: 9999px;
+  border-radius: var(--cc-radius-pill);
   background: color-mix(in srgb, var(--cc-text-secondary) 15%, transparent);
   color: var(--cc-text-secondary);
 }
@@ -310,7 +332,8 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
   background: var(--cc-surface-secondary);
   color: var(--cc-text-tertiary);
   margin-bottom: 4px;
@@ -328,7 +351,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   cursor: pointer;
   transition: background 0.15s ease;
   background: transparent;
@@ -393,16 +416,39 @@
   justify-content: center;
   gap: 6px;
   padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
+  min-height: var(--cc-control-height);
+  border: 1px solid transparent;
+  border-radius: var(--cc-radius-sm);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, filter 0.15s ease, transform 0.1s ease;
+  transition:
+    background var(--cc-transition-fast),
+    border-color var(--cc-transition-fast),
+    color var(--cc-transition-fast);
 }
 
 .cc-btn:active {
-  transform: scale(0.98);
+  filter: brightness(0.96);
+}
+
+.cc-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: none;
+}
+
+.cc-btn--compact {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.cc-btn--icon-touch {
+  width: var(--cc-touch-target);
+  min-width: var(--cc-touch-target);
+  min-height: var(--cc-touch-target);
+  padding: 10px;
 }
 
 .cc-btn--primary {
@@ -411,11 +457,12 @@
 }
 
 .cc-btn--primary:hover {
-  filter: brightness(1.08);
+  background: var(--cc-primary-dark);
 }
 
 .cc-btn--secondary {
   background: var(--cc-surface-secondary);
+  border-color: var(--cc-border);
   color: var(--cc-text);
 }
 
@@ -434,6 +481,7 @@
 
 .cc-btn--ghost {
   background: transparent;
+  border-color: transparent;
   color: var(--cc-text-secondary);
 }
 
@@ -452,7 +500,7 @@
   gap: 4px;
   padding: 6px 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: var(--cc-radius-sm);
   background: var(--cc-surface);
   min-height: 34px;
   align-items: center;
@@ -468,7 +516,7 @@
   font-size: 12px;
   background: var(--cc-primary-light);
   color: var(--cc-primary);
-  border-radius: 12px;
+  border-radius: var(--cc-radius-pill);
   font-weight: 500;
 }
 .cc-tag-autocomplete__tag-remove {
@@ -503,9 +551,9 @@
   right: 0;
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   margin-top: 4px;
-  box-shadow: 0 4px 12px var(--cc-shadow);
+  box-shadow: var(--cc-shadow-overlay);
   z-index: 10;
   overflow: hidden;
 }
@@ -526,10 +574,10 @@
 
 /* --- Context Menu ----------------------------------------- */
 .cc-context-menu {
-  background: var(--cc-surface-primary);
+  background: var(--cc-surface);
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--cc-radius-md);
+  box-shadow: var(--cc-shadow-overlay);
   padding: 4px;
   min-width: 140px;
   animation: cc-fade-in 0.1s ease;
@@ -543,19 +591,25 @@
   font-size: 13px;
   text-align: left;
   cursor: pointer;
-  border-radius: 6px;
-  color: var(--cc-text-primary);
+  border-radius: var(--cc-radius-sm);
+  color: var(--cc-text);
 }
 .cc-context-menu__item:hover {
   background: var(--cc-surface-secondary);
 }
 .cc-context-menu__item--danger {
-  color: var(--cc-danger);
+  color: var(--cc-error);
 }
 .cc-context-menu__item--danger:hover {
   background: rgba(239, 68, 68, 0.1);
 }
 @keyframes cc-fade-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

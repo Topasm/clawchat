@@ -5,6 +5,15 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { platformApi } from '../platform';
 import { IS_DESKTOP, IS_CAPACITOR } from '../types/platform';
+import { relayClient } from '../services/relayClient';
+
+interface PairingClaimResult {
+  device_token: string;
+  api_base_url?: string;
+  host_id?: string;
+  host_public_key?: string;
+  relay_url?: string;
+}
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 import QRScanner from '../components/shared/QRScanner';
 
@@ -22,7 +31,7 @@ export default function LoginPage() {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
   const [showServerUrl, setShowServerUrl] = useState(!IS_DESKTOP && !IS_CAPACITOR);
   const [showScanner, setShowScanner] = useState(false);
-  const [electronClientMode, setElectronClientMode] = useState(false);
+  const [desktopClientMode, setDesktopClientMode] = useState(false);
   const biometricAttempted = useRef(false);
   const isPairingFirstMobile = IS_CAPACITOR;
 
@@ -39,9 +48,14 @@ export default function LoginPage() {
     (async () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
-        const Biometric = Capacitor.Plugins['Biometric'] as {
-          authenticate(opts: { title: string; subtitle: string }): Promise<{ success: boolean }>;
-        } | undefined;
+        const Biometric = Capacitor.Plugins['Biometric'] as
+          | {
+              authenticate(opts: {
+                title: string;
+                subtitle: string;
+              }): Promise<{ success: boolean }>;
+            }
+          | undefined;
         if (!Biometric) return;
 
         const result = await Biometric.authenticate({
@@ -62,7 +76,7 @@ export default function LoginPage() {
     if (!IS_DESKTOP) return;
     platformApi.server.getAppMode().then((mode) => {
       if (mode === 'client') {
-        setElectronClientMode(true);
+        setDesktopClientMode(true);
         setShowServerUrl(true);
         platformApi.server.getConfig().then((cfg) => {
           if (cfg.hostServerUrl) {
@@ -84,25 +98,64 @@ export default function LoginPage() {
         setLoading(true);
         setError('');
         try {
-          const res = await fetch(`${pairUrl}/api/pairing/claim`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code: parsed.code,
-              device_name: navigator.userAgent.includes('iPhone') ? 'iPhone' : 'Mobile Device',
-              device_type: navigator.userAgent.includes('iPhone') ? 'ios' : 'android',
-            }),
+          const claimBody = JSON.stringify({
+            code: parsed.code,
+            device_name: navigator.userAgent.includes('iPhone') ? 'iPhone' : 'Mobile Device',
+            device_type: navigator.userAgent.includes('iPhone') ? 'ios' : 'android',
           });
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData?.detail || 'Pairing failed');
+          let result: PairingClaimResult;
+          try {
+            const directController = new AbortController();
+            const directTimeout = setTimeout(() => directController.abort(), 4000);
+            let res: Response;
+            try {
+              res = await fetch(`${pairUrl}/api/pairing/claim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: claimBody,
+                signal: directController.signal,
+              });
+            } finally {
+              clearTimeout(directTimeout);
+            }
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData?.detail || 'Pairing failed');
+            }
+            result = (await res.json()) as PairingClaimResult;
+          } catch (directError) {
+            const relayConfig = {
+              relayUrl: parsed.relay_url,
+              hostId: parsed.host_id,
+              hostPublicKey: parsed.host_public_key,
+            };
+            if (!relayClient.isConfigured(relayConfig)) throw directError;
+            const relayResponse = await relayClient.request(relayConfig, {
+              method: 'POST',
+              path: '/api/pairing/claim',
+              headers: { 'content-type': 'application/json' },
+              body: claimBody,
+            });
+            if (relayResponse.status >= 400) {
+              const detail = (relayResponse.data as { detail?: string } | null)?.detail;
+              throw new Error(detail || 'Pairing failed through relay', { cause: directError });
+            }
+            result = relayResponse.data as PairingClaimResult;
           }
-          const result = await res.json();
+          if (parsed.host_public_key && result.host_public_key !== parsed.host_public_key) {
+            throw new Error('Host identity did not match the scanned QR code');
+          }
+          if (parsed.host_id && result.host_id !== parsed.host_id) {
+            throw new Error('Host ID did not match the scanned QR code');
+          }
           // Store device token as access token and set server URL
           useAuthStore.setState({
             token: result.device_token,
             refreshToken: null,
             serverUrl: result.api_base_url || pairUrl,
+            hostId: result.host_id ?? parsed.host_id ?? null,
+            hostPublicKey: result.host_public_key ?? parsed.host_public_key ?? null,
+            relayUrl: result.relay_url ?? parsed.relay_url ?? null,
             isLoading: false,
           });
           navigate('/today');
@@ -232,8 +285,16 @@ export default function LoginPage() {
             <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 6 }}>
               Connect to your host desktop
             </div>
-            <div style={{ fontSize: 12, lineHeight: 1.5, color: colors.textSecondary, marginBottom: 14 }}>
-              Scan the QR code shown on your main desktop. Manual server login is still available if you need it.
+            <div
+              style={{
+                fontSize: 12,
+                lineHeight: 1.5,
+                color: colors.textSecondary,
+                marginBottom: 14,
+              }}
+            >
+              Scan the QR code shown on your main desktop. Manual server login is still available if
+              you need it.
             </div>
             <button
               type="button"
@@ -275,14 +336,25 @@ export default function LoginPage() {
 
         {showServerUrl ? (
           <>
-            <label style={{ display: 'flex', alignItems: 'center', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: 6,
+                fontSize: 13,
+                color: colors.textSecondary,
+              }}
+            >
               Server URL
               {healthIndicator()}
             </label>
             <input
               type="url"
               value={serverUrl}
-              onChange={(e) => { setServerUrl(e.target.value); setHealthStatus('idle'); }}
+              onChange={(e) => {
+                setServerUrl(e.target.value);
+                setHealthStatus('idle');
+              }}
               onBlur={handleServerUrlBlur}
               placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
               required
@@ -300,8 +372,11 @@ export default function LoginPage() {
                 transition: 'border-color 0.2s',
               }}
             />
-            <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}>
-              When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current site URL is usually correct.
+            <div
+              style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}
+            >
+              When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current
+              site URL is usually correct.
             </div>
             {isPairingFirstMobile && (
               <button
@@ -324,14 +399,26 @@ export default function LoginPage() {
             )}
           </>
         ) : !isPairingFirstMobile ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span style={{ fontSize: 12, color: colors.textTertiary }}>
-              Server: {serverUrl}
-            </span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
+            }}
+          >
+            <span style={{ fontSize: 12, color: colors.textTertiary }}>Server: {serverUrl}</span>
             <button
               type="button"
               onClick={() => setShowServerUrl(true)}
-              style={{ background: 'none', border: 'none', color: colors.textSecondary, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.textSecondary,
+                fontSize: 11,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
             >
               Change
             </button>
@@ -340,7 +427,14 @@ export default function LoginPage() {
 
         {(!isPairingFirstMobile || showServerUrl) && (
           <>
-            <label style={{ display: 'block', marginBottom: 6, fontSize: 13, color: colors.textSecondary }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: 6,
+                fontSize: 13,
+                color: colors.textSecondary,
+              }}
+            >
               PIN
             </label>
             <input
@@ -391,7 +485,7 @@ export default function LoginPage() {
           <div style={{ color: colors.error, fontSize: 13, marginTop: 16 }}>{error}</div>
         )}
 
-        {(!IS_DESKTOP || electronClientMode) && !isPairingFirstMobile && (
+        {(!IS_DESKTOP || desktopClientMode) && !isPairingFirstMobile && (
           <button
             type="button"
             onClick={() => setShowScanner(true)}
@@ -411,11 +505,8 @@ export default function LoginPage() {
             Scan QR Code
           </button>
         )}
-
       </form>
-      {showScanner && (
-        <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />
-      )}
+      {showScanner && <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />}
     </div>
   );
 }

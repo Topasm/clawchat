@@ -8,10 +8,10 @@ ClawChat development progress and planned work.
 
 ### Cross-Platform Restructure
 - [x] Migrate from React Native (Expo) to Vite + React + TypeScript
-- [x] Electron integration for desktop (Windows, macOS, Linux)
+- [x] Tauri 2 integration for desktop (Windows, macOS, Linux); legacy Electron shell retired
 - [x] Capacitor scaffolding for future mobile builds (iOS, Android)
-- [x] Platform detection runtime (`IS_ELECTRON`, `IS_WEB`, `IS_MOBILE`)
-- [x] Unified monorepo structure (`src/app/`, `src/styles/`, `electron/`)
+- [x] Platform detection runtime (`IS_TAURI`, `IS_WEB`, `IS_MOBILE`)
+- [x] Unified monorepo structure (`src/app/`, `src/styles/`, `src-tauri/`)
 
 ### UI Framework
 - [x] React Router v6 with nested layout routes
@@ -136,7 +136,7 @@ ClawChat development progress and planned work.
 ### Phase 1: Live Integration
 - [x] End-to-end testing with live server
 - [x] Live data replacing demo seeds on connection
-- [x] Push notifications via Electron tray
+- [x] Native notifications and tray lifecycle via Tauri
 
 ### Phase 2: Core Quality & Reliability
 > *These upgrades improve the entire app's reliability and developer experience before adding new features.*
@@ -228,7 +228,7 @@ ClawChat development progress and planned work.
 
 ### Phase 7: Polish & Deploy
 - [x] Offline support (queue actions, sync on reconnect)
-- [x] Electron auto-update
+- [x] Signed Tauri auto-update
 - [x] Production Docker deployment
 - [x] Keyboard shortcuts for navigation *(completed)*
 - [x] Performance optimization — see below

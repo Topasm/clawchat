@@ -7,33 +7,16 @@ cd "$DIR"
 
 echo "=== ClawChat Server Setup & Run ==="
 
-# 1. Setup virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo "➡️ Creating virtual environment..."
-    
-    # Try to find Python 3.11+
-    if [ -x "/usr/local/bin/python3.11" ]; then
-        /usr/local/bin/python3.11 -m venv venv
-    elif [ -x "/usr/local/opt/python@3.11/bin/python3.11" ]; then
-        /usr/local/opt/python@3.11/bin/python3.11 -m venv venv
-    elif [ -x "/opt/homebrew/bin/python3.11" ]; then
-        /opt/homebrew/bin/python3.11 -m venv venv
-    elif command -v python3 &> /dev/null; then
-        python3 -m venv venv
-    else
-        echo "❌ Python 3 is required but not installed."
-        exit 1
-    fi
+# 1. Install the exact dependency set recorded in uv.lock.
+if ! command -v uv >/dev/null 2>&1; then
+    echo "❌ uv 0.10.2 or newer is required: https://docs.astral.sh/uv/"
+    exit 1
 fi
 
-# 2. Activate virtual environment
-source venv/bin/activate
+echo "➡️ Synchronizing locked dependencies..."
+uv sync --locked --quiet
 
-# 3. Install requirements
-echo "➡️ Installing/Updating dependencies..."
-pip install -r requirements.txt -q
-
-# 4. Setup environment variables
+# 2. Setup environment variables
 if [ ! -f .env ]; then
     if [ -f .env.example ]; then
         echo "➡️ Creating default .env file..."
@@ -43,8 +26,8 @@ if [ ! -f .env ]; then
     fi
 fi
 
-# 5. Run the server
+# 3. Run the server
 echo "✅ Starting ClawChat server..."
 echo "API Docs available at: http://localhost:8000/docs"
 echo "--------------------------------------------------------"
-uvicorn main:app --reload --port 8000 --host 0.0.0.0
+exec uv run --locked uvicorn main:app --reload --port 8000 --host 0.0.0.0

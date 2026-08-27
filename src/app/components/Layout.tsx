@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from '../i18n';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelSize } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
@@ -22,6 +23,7 @@ import QuickCaptureModal from './shared/QuickCaptureModal';
 import OfflineIndicator from './shared/OfflineIndicator';
 import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
+import { ChevronLeftIcon, ChevronRightIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useCapabilitiesQuery, useTodosQuery } from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
@@ -33,15 +35,20 @@ import { platformApi } from '../platform';
 
 // --- SVG icon components ---
 import {
-  SunIcon, InboxIcon, ChatIcon,
-  TasksIcon, GearIcon, SearchIcon, AdminIcon,
+  SunIcon,
+  InboxIcon,
+  ChatIcon,
+  TasksIcon,
+  GearIcon,
+  SearchIcon,
+  AdminIcon,
   NavCalendarIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
 
 // --- Theme bridge: map ColorPalette → CSS custom properties ---
-function cssVars(colors: ColorPalette): React.CSSProperties {
+function cssVars(colors: ColorPalette, fontSize: number): React.CSSProperties {
   return {
     '--cc-background': colors.background,
     '--cc-surface': colors.surface,
@@ -73,34 +80,38 @@ function cssVars(colors: ColorPalette): React.CSSProperties {
     '--cc-shadow': colors.shadow,
     '--cc-delete-bg': colors.deleteBackground,
     '--cc-meta-tag-bg': colors.metaTagBackground,
+    '--cc-font-size': `${fontSize}px`,
   } as React.CSSProperties;
 }
 
-const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
-  connected: 'Connected',
-  disconnected: 'Disconnected',
-  reconnecting: 'Reconnecting...',
+const CONNECTION_LABEL_KEYS: Record<ConnectionStatus, string> = {
+  connected: 'connection.connected',
+  disconnected: 'connection.disconnected',
+  reconnecting: 'connection.reconnecting',
 };
 
 const primaryNavItems = [
-  { to: '/today', label: 'Today', Icon: SunIcon },
-  { to: '/inbox', label: 'Inbox', Icon: InboxIcon },
-  { to: '/chats', label: 'Projects', Icon: ChatIcon },
+  { to: '/today', labelKey: 'nav.today', Icon: SunIcon },
+  { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
+  { to: '/chats', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
 
 const secondaryNavItems = [
-  { to: '/tasks', label: 'All Tasks', Icon: TasksIcon },
-  { to: '/search', label: 'Search', Icon: SearchIcon },
-  { to: '/calendar', label: 'Calendar', Icon: NavCalendarIcon },
-  { to: '/settings', label: 'Settings', Icon: GearIcon },
-  { to: '/admin', label: 'Admin', Icon: AdminIcon },
+  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
+  { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
+  { to: '/calendar', labelKey: 'nav.calendar', Icon: NavCalendarIcon },
+  { to: '/settings', labelKey: 'nav.settings', Icon: GearIcon },
+  { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },
 ];
 
 // Flat list for backward compatibility (used in swipe navigation, etc.)
 const navItems = [...primaryNavItems, ...secondaryNavItems];
 
 export default function Layout() {
-  const { colors } = useTheme();
+  const { t } = useTranslation();
+  const { colors, isDark } = useTheme();
+  const fontSize = useSettingsStore((state) => state.fontSize);
+  const compactMode = useSettingsStore((state) => state.compactMode);
   const location = useLocation();
   const navigate = useNavigate();
   const chatPanel = useChatPanel();
@@ -155,7 +166,8 @@ export default function Layout() {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'q' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable)
+          return;
         e.preventDefault();
         quickCapture.open();
       }
@@ -198,7 +210,10 @@ export default function Layout() {
     };
     fetchHealth();
     const interval = setInterval(fetchHealth, 60_000);
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [serverUrl, setHealthOK]);
 
   // WebSocket connection for real-time updates
@@ -226,47 +241,58 @@ export default function Layout() {
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
 
-  const activeMobileTabIndex = useMemo(() => (
-    mobileTabs.findIndex((tab) => location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`))
-  ), [location.pathname]);
+  const activeMobileTabIndex = useMemo(
+    () =>
+      mobileTabs.findIndex(
+        (tab) => location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`),
+      ),
+    [location.pathname],
+  );
 
   const canSwipeTabs = isMobile && !onChatPage && activeMobileTabIndex >= 0;
-  const isDetailPage = isMobile && (/^\/(tasks|chats|events)\/[^/]+/.test(location.pathname)
-    || location.pathname === '/settings/system-prompt');
+  const isDetailPage =
+    isMobile &&
+    (/^\/(tasks|chats|events)\/[^/]+/.test(location.pathname) ||
+      location.pathname === '/settings/system-prompt');
 
   const sidebar = (
     <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
       <div className="cc-sidebar__header">
-        <span className="cc-sidebar__title">ClawChat</span>
+        <span className="cc-sidebar__title">{t('common.appName')}</span>
         <button
           className="cc-sidebar-toggle"
           onClick={() => setSidebarCollapsed((c) => !c)}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={t(sidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="cc-nav-icon">
-            {sidebarCollapsed ? (
-              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            ) : (
-              <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            )}
-          </svg>
+          {sidebarCollapsed ? (
+            <ChevronRightIcon size={16} className="cc-nav-icon" />
+          ) : (
+            <ChevronLeftIcon size={16} className="cc-nav-icon" />
+          )}
         </button>
       </div>
       <div className={`cc-connection-status cc-connection-status--${connectionStatus}`}>
         <span className="cc-connection-status__dot" />
         <span className="cc-sidebar__label">
-          {isFlushing ? 'Syncing...' : CONNECTION_LABELS[connectionStatus]}
+          {isFlushing ? t('connection.syncing') : t(CONNECTION_LABEL_KEYS[connectionStatus])}
           {pendingCount > 0 && (
-            <span className="cc-offline-badge" title={`${pendingCount} pending action${pendingCount > 1 ? 's' : ''}`}>
+            <span
+              className="cc-offline-badge"
+              title={t('connection.pending', { count: pendingCount })}
+            >
               {pendingCount}
             </span>
           )}
         </span>
       </div>
       {healthData && (
-        <div className={`cc-health-status cc-health-status--${healthData.ai_connected ? 'ok' : 'degraded'}`}>
+        <div
+          className={`cc-health-status cc-health-status--${healthData.ai_connected ? 'ok' : 'degraded'}`}
+        >
           <span className="cc-health-status__dot" />
-          <span className="cc-sidebar__label">AI: {healthData.ai_connected ? healthData.ai_model : 'Offline'}</span>
+          <span className="cc-sidebar__label">
+            AI: {healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}
+          </span>
         </div>
       )}
       {filteredPrimaryNavItems.map((item) => (
@@ -276,10 +302,10 @@ export default function Layout() {
           className={({ isActive }) =>
             `cc-nav-item cc-nav-item--primary${isActive ? ' cc-nav-item--active' : ''}`
           }
-          title={sidebarCollapsed ? item.label : undefined}
+          title={sidebarCollapsed ? t(item.labelKey) : undefined}
         >
           <item.Icon />
-          <span className="cc-sidebar__label">{item.label}</span>
+          <span className="cc-sidebar__label">{t(item.labelKey)}</span>
           {item.to === '/inbox' && inboxCount > 0 && (
             <span className="cc-nav-badge">{inboxCount}</span>
           )}
@@ -290,13 +316,11 @@ export default function Layout() {
         <NavLink
           key={item.to}
           to={item.to}
-          className={({ isActive }) =>
-            `cc-nav-item${isActive ? ' cc-nav-item--active' : ''}`
-          }
-          title={sidebarCollapsed ? item.label : undefined}
+          className={({ isActive }) => `cc-nav-item${isActive ? ' cc-nav-item--active' : ''}`}
+          title={sidebarCollapsed ? t(item.labelKey) : undefined}
         >
           <item.Icon />
-          <span className="cc-sidebar__label">{item.label}</span>
+          <span className="cc-sidebar__label">{t(item.labelKey)}</span>
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />
@@ -306,7 +330,11 @@ export default function Layout() {
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!canSwipeTabs && !isDetailPage) return;
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, button, [role="button"], [contenteditable="true"], .cc-chat-input, .cc-lexical-editor, .cc-rich-editor')) {
+    if (
+      target.closest(
+        'input, textarea, button, [role="button"], [contenteditable="true"], .cc-chat-input, .cc-lexical-editor, .cc-rich-editor',
+      )
+    ) {
       touchStartX.current = null;
       touchStartY.current = null;
       return;
@@ -316,7 +344,12 @@ export default function Layout() {
   };
 
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if ((!canSwipeTabs && !isDetailPage) || touchStartX.current == null || touchStartY.current == null) return;
+    if (
+      (!canSwipeTabs && !isDetailPage) ||
+      touchStartX.current == null ||
+      touchStartY.current == null
+    )
+      return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
     const savedStartX = touchStartX.current;
@@ -339,7 +372,9 @@ export default function Layout() {
     }
   };
 
-  const handleRefresh = useCallback(() => { refresh(); }, [refresh]);
+  const handleRefresh = useCallback(() => {
+    refresh();
+  }, [refresh]);
 
   // Persisted panel sizes
   const sidebarSize = useSettingsStore((s) => s.sidebarSize);
@@ -347,14 +382,20 @@ export default function Layout() {
   const setSidebarSize = useSettingsStore((s) => s.setSidebarSize);
   const setChatPanelSize = useSettingsStore((s) => s.setChatPanelSize);
 
-  const handleSidebarResize = useCallback((size: PanelSize) => {
-    setSidebarSize(size.asPercentage);
-    setSidebarCollapsed(size.asPercentage <= 4);
-  }, [setSidebarSize]);
+  const handleSidebarResize = useCallback(
+    (size: PanelSize) => {
+      setSidebarSize(size.asPercentage);
+      setSidebarCollapsed(size.asPercentage <= 4);
+    },
+    [setSidebarSize],
+  );
 
-  const handleChatPanelResize = useCallback((size: PanelSize) => {
-    setChatPanelSize(size.asPercentage);
-  }, [setChatPanelSize]);
+  const handleChatPanelResize = useCallback(
+    (size: PanelSize) => {
+      setChatPanelSize(size.asPercentage);
+    },
+    [setChatPanelSize],
+  );
 
   const showChatPanel = !onChatPage && chatPanel.isOpen;
 
@@ -378,7 +419,10 @@ export default function Layout() {
   );
 
   return (
-    <div className={`cc-root${isMobile ? ' cc-root--mobile' : ''}`} style={cssVars(colors)}>
+    <div
+      className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}`}
+      style={cssVars(colors, fontSize)}
+    >
       <UpdateNotification />
       <ToastContainer />
       <OfflineIndicator />
@@ -396,11 +440,15 @@ export default function Layout() {
           {connectionStatus !== 'connected' && (
             <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
               <span className="cc-mobile-status-bar__dot" />
-              <span>{isFlushing ? 'Syncing...' : CONNECTION_LABELS[connectionStatus]}</span>
+              <span>
+                {isFlushing ? t('connection.syncing') : t(CONNECTION_LABEL_KEYS[connectionStatus])}
+              </span>
               {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
             </div>
           )}
-          <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{mobileMainContent}</div>
+          <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            {mobileMainContent}
+          </div>
           <FloatingActionButton />
           <BottomNav />
         </>

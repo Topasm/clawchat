@@ -40,8 +40,34 @@ the complete renderer. The initial metrics guard startup cost; complete-renderer
 route splitting from hiding overall growth. CI and every Tauri package job fail when a threshold
 is exceeded.
 
+The current conservative Tauri baseline is 256.93 KiB raw / 85.12 KiB gzip for initial JavaScript,
+1.75 MiB for all JavaScript, and 1.89 MiB for all renderer files. These numbers come from
+`build:tauri-renderer`, not the smaller ES2022 standalone web build, so the local measurement and
+CI evaluate the same Safari 13-compatible output. Each ceiling retains approximately three percent
+of measured headroom. New feature libraries should be measured and preferably route-loaded before
+they are accepted.
+
 Do not raise a threshold solely to make CI pass. Measure the new output, identify which entry or
 route owns the increase, and record an intentional baseline change in the same commit.
+
+Axios is emitted as `vendor-http` separately from the initial React Query chunk. Capacitor startup
+is dynamically imported, so web and Tauri first paint do not preload the HTTP client solely for a
+mobile-only initialization path.
+
+## Runtime diagnostics
+
+Development builds collect startup milestones, long tasks, and input-to-next-frame latency. Enable
+the same recorder in a production package by launching the renderer with `?performance=1`, then
+inspect the report from DevTools:
+
+```js
+window.clawchatPerformance?.report()
+```
+
+The report includes `auth_ready`, `route_ready`, `startup_shell_hidden`, `platform_ready`, and
+`transport_ready` milestones plus p50/p95 interaction summaries. It evaluates explicit startup,
+input-frame, and long-task budgets and returns any violations without uploading diagnostics.
+`window.clawchatPerformance?.reset()` starts a fresh local sampling window.
 
 ## Rust profiles
 
@@ -59,7 +85,7 @@ npm run build:tauri-server
 npm run check:tauri-server
 ```
 
-CI installs the build-only, pinned PyInstaller version from `server/requirements-build.txt`.
+CI installs the build dependency group, including pinned PyInstaller, from `server/uv.lock`.
 `npm run build:tauri-server` runs the verifier automatically after manifest generation; the
 separate check command remains useful when inspecting an existing output directory. The bundle
 must be built with Python 3.11 or newer; the build script fails before PyInstaller starts when an

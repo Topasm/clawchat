@@ -11,6 +11,7 @@ filesystem on every request.
 import hashlib
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +20,11 @@ from config import settings
 from services.obsidian_context_service import (
     list_project_folders,
     read_project_context,
+)
+from utils.vault_paths import (
+    VaultPathError,
+    normalize_vault_relative_path,
+    resolve_vault_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +50,7 @@ class VaultIndex:
     """Complete vault index state."""
     projects: dict[str, ProjectEntry] = field(default_factory=dict)  # keyed by folder path
     last_full_scan: float = 0.0
+    last_incremental_scan: float = 0.0
     scan_duration_ms: float = 0.0
     vault_path: str = ""
     is_available: bool = False
@@ -54,6 +61,7 @@ class VaultIndex:
 
 # Module-level singleton
 _index = VaultIndex()
+_index_lock = threading.RLock()
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +98,11 @@ def refresh_index() -> VaultIndex:
     This is a synchronous operation because vault scanning is filesystem I/O
     that runs quickly for typical vault sizes (< 1000 folders).
     """
+    with _index_lock:
+        return _refresh_index_locked()
+
+
+def _refresh_index_locked() -> VaultIndex:
     global _index
 
     vault_path = settings.obsidian_vault_path
@@ -117,50 +130,17 @@ def refresh_index() -> VaultIndex:
 
     for folder_info in folders:
         folder_rel = folder_info["folder"]
-        folder_name = folder_info["name"]
-
-        entry = ProjectEntry(
-            folder=folder_rel,
-            name=folder_name,
-            scanned_at=time.time(),
-        )
-
-        # Read TODO.md and compute hash + preview
         try:
-            ctx = read_project_context(vault_path, folder_rel, cli_command)
-            todo_md = ctx.get("todo_md", "")
-            if todo_md:
-                entry.todo_md_hash = hashlib.md5(todo_md.encode()).hexdigest()
-                entry.todo_md_preview = todo_md[:200].strip()
-
-            # Document summaries
-            related = ctx.get("related_docs", [])
-            entry.doc_summaries = [
-                {"name": doc["name"], "summary": doc["content"][:200].strip()}
-                for doc in related
-            ]
-
-            # Find most recent mtime
-            abs_folder = os.path.join(vault_path, folder_rel)
-            if os.path.isdir(abs_folder):
-                try:
-                    mtimes = []
-                    with os.scandir(abs_folder) as entries:
-                        for e in entries:
-                            if e.is_file() and e.name.endswith(".md"):
-                                try:
-                                    mtimes.append(e.stat().st_mtime)
-                                except OSError:
-                                    pass
-                    if mtimes:
-                        entry.last_modified = max(mtimes)
-                except OSError:
-                    pass
-
+            projects[folder_rel] = _build_project_entry(
+                vault_path,
+                folder_rel,
+                folder_info["name"],
+                cli_command,
+            )
         except Exception:
-            logger.warning("Failed to read context for project %s", folder_rel, exc_info=True)
-
-        projects[folder_rel] = entry
+            logger.warning(
+                "Failed to read context for project %s", folder_rel, exc_info=True
+            )
 
     elapsed_ms = (time.monotonic() - start) * 1000
 
@@ -206,6 +186,97 @@ def refresh_index() -> VaultIndex:
     return _index
 
 
+def refresh_changed_paths(changed_paths: set[str] | list[str]) -> VaultIndex:
+    """Refresh only projects affected by filesystem watcher paths."""
+    with _index_lock:
+        return _refresh_changed_paths_locked(changed_paths)
+
+
+def _refresh_changed_paths_locked(
+    changed_paths: set[str] | list[str],
+) -> VaultIndex:
+    global _index
+
+    vault_path = settings.obsidian_vault_path
+    if (
+        not vault_path
+        or not os.path.isdir(vault_path)
+        or not _index.is_available
+        or Path(_index.vault_path).resolve(strict=False)
+        != Path(vault_path).resolve(strict=False)
+    ):
+        return refresh_index()
+
+    affected_folders: set[str] = set()
+    projects = dict(_index.projects)
+    known_folders = sorted(projects, key=len, reverse=True)
+    todo_filename = settings.obsidian_project_todo_filename
+
+    for changed_path in changed_paths:
+        absolute = (
+            changed_path
+            if os.path.isabs(changed_path)
+            else os.path.join(vault_path, changed_path)
+        )
+        relative = os.path.relpath(absolute, vault_path)
+        try:
+            relative = normalize_vault_relative_path(relative)
+            resolve_vault_path(vault_path, relative)
+        except VaultPathError:
+            continue
+        if any(part.startswith(".") for part in Path(relative).parts):
+            continue
+
+        matched = next(
+            (
+                folder
+                for folder in known_folders
+                if relative == folder or relative.startswith(f"{folder}/")
+            ),
+            None,
+        )
+        if matched:
+            affected_folders.add(matched)
+        elif os.path.basename(relative) == todo_filename:
+            folder = os.path.dirname(relative).replace(os.sep, "/")
+            if folder:
+                affected_folders.add(folder)
+        elif os.path.isdir(absolute):
+            try:
+                candidate = resolve_vault_path(
+                    vault_path, f"{relative}/{todo_filename}"
+                )
+            except VaultPathError:
+                continue
+            if os.path.isfile(candidate):
+                affected_folders.add(relative)
+
+    for folder in affected_folders:
+        try:
+            todo_path = resolve_vault_path(vault_path, f"{folder}/{todo_filename}")
+        except VaultPathError:
+            projects.pop(folder, None)
+            continue
+        if not os.path.isfile(todo_path):
+            projects.pop(folder, None)
+            continue
+        try:
+            projects[folder] = _build_project_entry(
+                vault_path,
+                folder,
+                Path(folder).name,
+                settings.obsidian_cli_command,
+            )
+        except Exception:
+            logger.warning(
+                "Failed to refresh changed project %s", folder, exc_info=True
+            )
+
+    _index.projects = projects
+    _index.last_incremental_scan = time.time()
+    return _index
+
+
 def get_health_summary() -> dict:
     """Return a health summary dict suitable for API responses."""
     from services.obsidian_cli_service import (
@@ -238,6 +309,7 @@ def get_health_summary() -> dict:
         "sync_mode": settings.obsidian_sync_mode,
         "project_count": len(idx.projects),
         "last_scan": idx.last_full_scan or None,
+        "last_incremental_scan": idx.last_incremental_scan or None,
         "scan_duration_ms": idx.scan_duration_ms,
         "is_stale": is_stale(),
         "error": idx.error,
@@ -261,6 +333,46 @@ def ensure_fresh(max_age_seconds: int | None = None) -> VaultIndex:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _build_project_entry(
+    vault_path: str,
+    folder_rel: str,
+    folder_name: str,
+    cli_command: str,
+) -> ProjectEntry:
+    entry = ProjectEntry(
+        folder=folder_rel,
+        name=folder_name,
+        scanned_at=time.time(),
+    )
+    ctx = read_project_context(vault_path, folder_rel, cli_command)
+    todo_md = ctx.get("todo_md", "")
+    if todo_md:
+        entry.todo_md_hash = hashlib.md5(todo_md.encode()).hexdigest()
+        entry.todo_md_preview = todo_md[:200].strip()
+
+    related = ctx.get("related_docs", [])
+    entry.doc_summaries = [
+        {"name": doc["name"], "summary": doc["content"][:200].strip()}
+        for doc in related
+    ]
+
+    abs_folder = resolve_vault_path(vault_path, folder_rel, must_exist=True)
+    mtimes = []
+    with os.scandir(abs_folder) as entries:
+        for entry_on_disk in entries:
+            if (
+                entry_on_disk.is_file(follow_symlinks=False)
+                and entry_on_disk.name.endswith(".md")
+            ):
+                try:
+                    mtimes.append(entry_on_disk.stat(follow_symlinks=False).st_mtime)
+                except OSError:
+                    pass
+    if mtimes:
+        entry.last_modified = max(mtimes)
+    return entry
 
 
 def _check_companion_online(vault_path: str, cli_command: str) -> bool:

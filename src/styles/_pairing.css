@@ -53,7 +53,7 @@
   height: 56px;
   background: var(--cc-surface-secondary);
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: var(--cc-radius-lg);
   font-size: 28px;
   font-weight: 700;
   color: var(--cc-text);
@@ -101,7 +101,7 @@
   font-size: 11px;
   padding: 6px 10px;
   background: var(--cc-surface-secondary);
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   color: var(--cc-text-secondary);
   word-break: break-all;
   font-family: monospace;
@@ -207,7 +207,7 @@
   width: 44px;
   height: 52px;
   border: 2px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: var(--cc-radius-lg);
   background: var(--cc-surface);
   color: var(--cc-text);
   font-size: 24px;
@@ -290,7 +290,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   transition: background 0.1s ease;
 }
 
@@ -306,7 +306,7 @@
   align-items: center;
   justify-content: center;
   background: var(--cc-surface-secondary);
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   color: var(--cc-text-secondary);
 }
 
@@ -371,7 +371,7 @@
     width: 40px;
     height: 48px;
     font-size: 24px;
-    border-radius: 8px;
+    border-radius: var(--cc-radius-md);
   }
 
   .cc-pairing-code-display__digits {
@@ -382,7 +382,7 @@
     width: 40px;
     height: 48px;
     font-size: 20px;
-    border-radius: 8px;
+    border-radius: var(--cc-radius-md);
   }
 
   .cc-pairing-code-entry__inputs {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { offlineQueue } from '../services/offlineQueue';
+import { getOfflineQueueScope, offlineQueue } from '../services/offlineQueue';
 import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from '../services/logger';
 
@@ -9,19 +9,22 @@ import { logger } from '../services/logger';
  * Accepts a `refresh` callback to pull fresh data after flushing.
  */
 export function useNetworkStatus(refresh: () => void) {
-  const [isFlushing, setIsFlushing] = useState(false);
-  const [pendingCount, setPendingCount] = useState(() => offlineQueue.getCount());
   const serverUrl = useAuthStore((s) => s.serverUrl);
+  const token = useAuthStore((s) => s.token);
+  const queueScope = getOfflineQueueScope({ serverUrl, token });
+  const [isFlushing, setIsFlushing] = useState(false);
+  const [pendingCount, setPendingCount] = useState(() => offlineQueue.getCount(queueScope));
   const setConnectionStatus = useAuthStore((s) => s.setConnectionStatus);
   const flushingRef = useRef(false);
 
   // Update pending count periodically (cheap — reads localStorage)
   useEffect(() => {
+    setPendingCount(offlineQueue.getCount(queueScope));
     const interval = setInterval(() => {
-      setPendingCount(offlineQueue.getCount());
+      setPendingCount(offlineQueue.getCount(queueScope));
     }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [queueScope]);
 
   useEffect(() => {
     if (!serverUrl) return;
@@ -37,8 +40,8 @@ export function useNetworkStatus(refresh: () => void) {
       try {
         // Dynamic import to avoid circular dependency
         const { default: apiClient } = await import('../services/apiClient');
-        await offlineQueue.flush(apiClient);
-        setPendingCount(offlineQueue.getCount());
+        await offlineQueue.flush(queueScope, apiClient);
+        setPendingCount(offlineQueue.getCount(queueScope));
         refresh();
         setConnectionStatus('connected');
       } catch {
@@ -66,7 +69,7 @@ export function useNetworkStatus(refresh: () => void) {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [serverUrl, setConnectionStatus, refresh]);
+  }, [serverUrl, queueScope, setConnectionStatus, refresh]);
 
   return { isFlushing, pendingCount };
 }

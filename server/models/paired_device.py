@@ -22,6 +22,7 @@ class PairedDevice(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     push_token: Mapped[str | None] = mapped_column(Text, nullable=True)  # for push notifications later
+    public_key: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("idx_paired_devices_is_active", "is_active"),

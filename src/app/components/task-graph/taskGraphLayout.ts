@@ -190,9 +190,10 @@ export function buildExecutionGraphLayout(
     .sort(taskOrder)
     .map((task) => task.id);
   const processed = new Set<string>();
+  let queueHead = 0;
 
-  while (queue.length > 0) {
-    const id = queue.shift()!;
+  while (queueHead < queue.length) {
+    const id = queue[queueHead++];
     if (processed.has(id)) continue;
     processed.add(id);
     for (const targetId of outgoing.get(id) ?? []) {

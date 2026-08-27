@@ -3,12 +3,13 @@ import { formatDateTimeShort } from '../../utils/formatters';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
+import { FolderIcon } from '../shared/Icons';
 
 export default function DataTab() {
   const { data, isLoading } = useAdminDataQuery();
 
   if (!useAuthStore.getState().serverUrl) {
-    return <EmptyState icon="📁" message="Data overview requires a server connection." />;
+    return <EmptyState icon={<FolderIcon size={20} />} message="Data overview requires a server connection." />;
   }
 
   if (isLoading || !data) return <p style={{ color: 'var(--cc-text-secondary)', fontSize: 13 }}>Loading...</p>;

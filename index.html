@@ -1,15 +1,246 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F7F8FA" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' capacitor: https:; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src *; img-src 'self' data: blob:;"
+      content="default-src 'self' capacitor: https:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src *; img-src 'self' data: blob:;"
     />
+    <script src="/startup-theme.js"></script>
+    <style>
+      html {
+        background: #f7f8fa;
+      }
+
+      html[data-cc-theme='dark'] {
+        background: #111316;
+      }
+
+      body {
+        background: inherit;
+      }
+
+      .cc-startup-shell {
+        --startup-background: #f7f8fa;
+        --startup-surface: #ffffff;
+        --startup-muted: #e1e4e8;
+        --startup-text: #181a1d;
+        --startup-subtle: #626872;
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        min-height: 100%;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+          env(safe-area-inset-left);
+        overflow: hidden;
+        color: var(--startup-text);
+        background: var(--startup-background);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        opacity: 1;
+        transition: opacity 120ms ease;
+      }
+
+      html[data-cc-theme='dark'] .cc-startup-shell {
+        --startup-background: #111316;
+        --startup-surface: #181b1f;
+        --startup-muted: #30353b;
+        --startup-text: #f3f4f6;
+        --startup-subtle: #a0a6af;
+      }
+
+      .cc-startup-shell--hidden {
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .cc-startup-shell--error {
+        display: grid;
+        grid-template-columns: minmax(0, 520px);
+        place-content: center;
+        gap: 10px;
+        padding: 32px;
+        color: var(--startup-text);
+        text-align: center;
+      }
+
+      .cc-startup-shell--error strong {
+        font-size: 18px;
+      }
+
+      .cc-startup-shell--error span {
+        color: var(--startup-subtle);
+        font-size: 13px;
+      }
+
+      .cc-startup-shell__sidebar {
+        padding: 24px 18px;
+        border-right: 1px solid var(--startup-muted);
+        background: var(--startup-surface);
+      }
+
+      .cc-startup-shell__brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 34px;
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+
+      .cc-startup-shell__mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 8px;
+        color: #ffffff;
+        background: #2563eb;
+        font-size: 16px;
+      }
+
+      .cc-startup-shell__nav,
+      .cc-startup-shell__content {
+        display: grid;
+        gap: 12px;
+      }
+
+      .cc-startup-shell__line,
+      .cc-startup-shell__card {
+        background: var(--startup-muted);
+      }
+
+      .cc-startup-shell__line {
+        width: 72%;
+        height: 10px;
+        border-radius: 9999px;
+        opacity: 0.7;
+      }
+
+      .cc-startup-shell__line:nth-child(2) {
+        width: 88%;
+      }
+
+      .cc-startup-shell__line:nth-child(3) {
+        width: 64%;
+      }
+
+      .cc-startup-shell__main {
+        width: min(920px, 100%);
+        padding: clamp(28px, 6vw, 72px);
+      }
+
+      .cc-startup-shell__status {
+        margin-bottom: 28px;
+        color: var(--startup-subtle);
+        font-size: 13px;
+      }
+
+      .cc-startup-shell__status-ko {
+        display: none;
+      }
+
+      html[lang='ko'] .cc-startup-shell__status-en {
+        display: none;
+      }
+
+      html[lang='ko'] .cc-startup-shell__status-ko {
+        display: inline;
+      }
+
+      .cc-startup-shell__heading {
+        width: min(260px, 58%);
+        height: 22px;
+        margin-bottom: 12px;
+        border-radius: 9999px;
+        background: var(--startup-muted);
+      }
+
+      .cc-startup-shell__card {
+        height: 86px;
+        border-radius: 10px;
+        opacity: 0.6;
+      }
+
+      @media (max-width: 700px) {
+        .cc-startup-shell {
+          display: block;
+        }
+
+        .cc-startup-shell__sidebar {
+          padding: 16px 20px;
+          border-right: 0;
+          border-bottom: 1px solid var(--startup-muted);
+        }
+
+        .cc-startup-shell__brand {
+          margin-bottom: 0;
+        }
+
+        .cc-startup-shell__nav {
+          display: none;
+        }
+
+        .cc-startup-shell__main {
+          padding: 32px 20px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .cc-startup-shell {
+          transition: none;
+        }
+      }
+    </style>
     <title>ClawChat</title>
   </head>
   <body>
+    <div
+      id="cc-startup-shell"
+      class="cc-startup-shell"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label="ClawChat is loading"
+    >
+      <aside class="cc-startup-shell__sidebar" aria-hidden="true">
+        <div class="cc-startup-shell__brand">
+          <span class="cc-startup-shell__mark">C</span>
+          <span>ClawChat</span>
+        </div>
+        <div class="cc-startup-shell__nav">
+          <span class="cc-startup-shell__line"></span>
+          <span class="cc-startup-shell__line"></span>
+          <span class="cc-startup-shell__line"></span>
+        </div>
+      </aside>
+      <main class="cc-startup-shell__main">
+        <p class="cc-startup-shell__status">
+          <span class="cc-startup-shell__status-en">Loading workspace…</span>
+          <span class="cc-startup-shell__status-ko">작업공간을 불러오는 중…</span>
+        </p>
+        <div class="cc-startup-shell__heading" aria-hidden="true"></div>
+        <div class="cc-startup-shell__content" aria-hidden="true">
+          <div class="cc-startup-shell__card"></div>
+          <div class="cc-startup-shell__card"></div>
+          <div class="cc-startup-shell__card"></div>
+        </div>
+      </main>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

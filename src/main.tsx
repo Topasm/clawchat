@@ -1,13 +1,50 @@
-import { StrictMode } from 'react';
+import { StrictMode, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { initCapacitor } from './app/services/capacitor-init';
+import './app/i18n';
+import { logger } from './app/services/logger';
+import { markStartupPhase, markStartupPhaseAfterPaint } from './app/services/startupPerformance';
+import { useAuthStore } from './app/stores/useAuthStore';
 import './styles/index.css';
 import App from './App';
+import { installGlobalErrorHandlers, scheduleStartupTimeout } from './app/services/startupSurface';
 
-initCapacitor();
+markStartupPhase('renderer_module_loaded');
+installGlobalErrorHandlers();
+scheduleStartupTimeout();
+void import('./app/services/runtimePerformance').then(({ installRuntimePerformance }) => {
+  installRuntimePerformance();
+});
 
-createRoot(document.getElementById('root')!).render(
+void import('./app/services/capacitor-init')
+  .then(({ initCapacitor }) => initCapacitor())
+  .then(() => markStartupPhase('platform_ready'))
+  .catch((error: unknown) => {
+    logger.error('Capacitor initialization failed; continuing with the web shell.', error);
+  });
+
+function StartupShellGuard({ children }: { children: ReactNode }) {
+  const isLoading = useAuthStore((state) => state.isLoading);
+
+  useEffect(() => {
+    return markStartupPhaseAfterPaint('react_root_committed');
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading) markStartupPhase('auth_ready');
+  }, [isLoading]);
+
+  return children;
+}
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('Application root element is missing.');
+}
+
+createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <StartupShellGuard>
+      <App />
+    </StartupShellGuard>
   </StrictMode>,
 );

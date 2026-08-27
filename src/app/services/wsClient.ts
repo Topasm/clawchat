@@ -4,6 +4,8 @@
  */
 
 import type { ConnectionStatus } from '../stores/useAuthStore';
+import { useAuthStore } from '../stores/useAuthStore';
+import { markStartupPhase } from './startupPerformance';
 
 type MessageHandler = (data: unknown) => void;
 type StatusChangeHandler = (status: ConnectionStatus) => void;
@@ -25,31 +27,54 @@ class WSClient {
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
   private livenessTimer: ReturnType<typeof setInterval> | null = null;
   private lastMessageTime: number = 0;
+  private ticketAbortController: AbortController | null = null;
+  private connectionGeneration = 0;
+  private relayUnsubscribe: (() => void) | null = null;
   onDisconnect: (() => void) | null = null;
   onAuthFailure: (() => void) | null = null;
 
   onStatusChange(callback: StatusChangeHandler): () => void {
     this.statusListeners.add(callback);
-    return () => { this.statusListeners.delete(callback); };
+    return () => {
+      this.statusListeners.delete(callback);
+    };
   }
 
   private _emitStatus(status: ConnectionStatus): void {
+    if (status === 'connected') markStartupPhase('transport_ready');
     for (const cb of this.statusListeners) cb(status);
   }
 
   connect(serverUrl: string, token: string): void {
+    const generation = ++this.connectionGeneration;
+    this.shouldReconnect = false;
+    this.ticketAbortController?.abort();
+    this.ticketAbortController = null;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    const previousSocket = this.ws;
+    this.ws = null;
+    previousSocket?.close(1000, 'Connection replaced');
     this.serverUrl = serverUrl;
     this.token = token;
     this.shouldReconnect = true;
-    this._connect();
+    void this._connect(generation);
     this.startWatchdog();
   }
 
   disconnect(): void {
+    this.connectionGeneration += 1;
     this.stopWatchdog();
     this.shouldReconnect = false;
+    this.ticketAbortController?.abort();
+    this.ticketAbortController = null;
     this._stopKeepalive();
     this._stopLivenessCheck();
+    this.relayUnsubscribe?.();
+    this.relayUnsubscribe = null;
+    void import('./relayClient').then(({ relayClient }) => relayClient.disconnect());
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -72,15 +97,52 @@ class WSClient {
     this.listeners.get(type)?.delete(callback);
   }
 
-  private _connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return;
+  private async _connect(generation = this.connectionGeneration): Promise<void> {
+    if (
+      generation !== this.connectionGeneration ||
+      !this.shouldReconnect ||
+      this.ticketAbortController ||
+      this.ws?.readyState === WebSocket.OPEN ||
+      this.ws?.readyState === WebSocket.CONNECTING
+    )
+      return;
 
-    const wsUrl = this.serverUrl.replace(/^http/, 'ws') + `/ws?token=${encodeURIComponent(this.token)}`;
+    const serverUrl = this.serverUrl;
+    const token = this.token;
+    const abortController = new AbortController();
+    this.ticketAbortController = abortController;
 
     try {
-      this.ws = new WebSocket(wsUrl);
+      const response = await fetch(`${serverUrl}/api/auth/ws-ticket`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abortController.signal,
+      });
+      if (generation !== this.connectionGeneration || !this.shouldReconnect) return;
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          this._handleAuthFailure(generation);
+          return;
+        }
+        throw new Error(`WebSocket ticket request failed: ${response.status}`);
+      }
+      const { ticket } = (await response.json()) as { ticket: string };
+      if (generation !== this.connectionGeneration || !this.shouldReconnect) return;
+      if (typeof ticket !== 'string' || ticket.length === 0) {
+        throw new Error('WebSocket ticket response did not include a ticket');
+      }
+      const wsUrl = serverUrl.replace(/^http/, 'ws') + `/ws?ticket=${encodeURIComponent(ticket)}`;
+      const socket = new WebSocket(wsUrl);
+      this.ws = socket;
 
-      this.ws.onopen = () => {
+      socket.onopen = () => {
+        if (generation !== this.connectionGeneration || this.ws !== socket) {
+          socket.close(1000, 'Stale connection');
+          return;
+        }
+        this.relayUnsubscribe?.();
+        this.relayUnsubscribe = null;
+        void import('./relayClient').then(({ relayClient }) => relayClient.unsubscribe());
         this.reconnectDelay = 1000;
         this.lastMessageTime = 0;
         this._emitStatus('connected');
@@ -88,7 +150,8 @@ class WSClient {
         this._startLivenessCheck();
       };
 
-      this.ws.onmessage = (event) => {
+      socket.onmessage = (event) => {
+        if (generation !== this.connectionGeneration || this.ws !== socket) return;
         this.lastMessageTime = Date.now();
         try {
           const msg = JSON.parse(event.data);
@@ -106,36 +169,83 @@ class WSClient {
         }
       };
 
-      this.ws.onclose = (event) => {
+      socket.onclose = (event) => {
+        if (generation !== this.connectionGeneration || this.ws !== socket) return;
         this._stopKeepalive();
         this._stopLivenessCheck();
         this.ws = null;
 
         // Server rejected auth (code 4001) — stop reconnecting and notify
         if (event.code === 4001) {
-          this.shouldReconnect = false;
-          this.stopWatchdog();
-          this._emitStatus('disconnected');
-          this.onAuthFailure?.();
+          this._handleAuthFailure(generation);
           return;
         }
 
         this.onDisconnect?.();
         if (this.shouldReconnect) {
-          this._scheduleReconnect();
+          this._scheduleReconnect(generation);
         } else {
           this._emitStatus('disconnected');
         }
       };
 
-      this.ws.onerror = () => {
+      socket.onerror = () => {
         // onclose will fire after this
       };
-    } catch {
-      if (this.shouldReconnect) {
-        this._scheduleReconnect();
+    } catch (error) {
+      if (
+        abortController.signal.aborted ||
+        generation !== this.connectionGeneration ||
+        !this.shouldReconnect
+      )
+        return;
+      const { relayUrl, hostId, hostPublicKey } = useAuthStore.getState();
+      if (relayUrl && hostId && hostPublicKey) {
+        const relayConfig = { relayUrl, hostId, hostPublicKey };
+        const { relayClient } = await import('./relayClient');
+        if (generation !== this.connectionGeneration || !this.shouldReconnect) return;
+        try {
+          await relayClient.subscribe(relayConfig, token);
+          if (generation !== this.connectionGeneration || !this.shouldReconnect) return;
+          this.relayUnsubscribe?.();
+          this.relayUnsubscribe = relayClient.onEvent((message) => {
+            if (generation !== this.connectionGeneration) return;
+            if (message.type === 'relay_disconnected') {
+              this._emitStatus('reconnecting');
+              if (this.shouldReconnect) this._scheduleReconnect(generation);
+              return;
+            }
+            if (message.type === 'auth_error') {
+              this._handleAuthFailure(generation);
+              return;
+            }
+            const handlers = this.listeners.get(message.type);
+            if (handlers) for (const handler of handlers) handler(message.data);
+          });
+          this.reconnectDelay = 1000;
+          this._emitStatus('connected');
+          return;
+        } catch {
+          // Reconnect scheduling below covers both direct and relay paths.
+        }
+      }
+      if (this.shouldReconnect) this._scheduleReconnect(generation);
+    } finally {
+      if (this.ticketAbortController === abortController) {
+        this.ticketAbortController = null;
       }
     }
+  }
+
+  private _handleAuthFailure(generation: number): void {
+    if (generation !== this.connectionGeneration) return;
+    this.shouldReconnect = false;
+    this.stopWatchdog();
+    this.relayUnsubscribe?.();
+    this.relayUnsubscribe = null;
+    void import('./relayClient').then(({ relayClient }) => relayClient.disconnect());
+    this._emitStatus('disconnected');
+    this.onAuthFailure?.();
   }
 
   private _startKeepalive(): void {
@@ -197,13 +307,15 @@ class WSClient {
     }
   }
 
-  private _scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
+  private _scheduleReconnect(generation = this.connectionGeneration): void {
+    if (generation !== this.connectionGeneration || !this.shouldReconnect || this.reconnectTimer)
+      return;
     this._emitStatus('reconnecting');
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
+      if (generation !== this.connectionGeneration || !this.shouldReconnect) return;
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
-      this._connect();
+      void this._connect(generation);
     }, this.reconnectDelay);
   }
 }

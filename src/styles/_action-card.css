@@ -8,7 +8,7 @@
   gap: 10px;
   margin-top: 8px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   background: var(--cc-surface-secondary);
   border: 1px solid var(--cc-border);
   font-size: 13px;
@@ -34,7 +34,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   flex-shrink: 0;
 }
 
@@ -129,7 +129,7 @@
 .cc-task-progress {
   margin-top: 8px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   background: var(--cc-surface-secondary);
   border: 1px solid var(--cc-border);
 }
@@ -155,14 +155,14 @@
 
 .cc-task-progress__bar {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--cc-radius-xs);
   background: var(--cc-border);
   overflow: hidden;
 }
 
 .cc-task-progress__fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--cc-radius-xs);
   background: var(--cc-primary);
   transition: width 0.3s ease;
 }

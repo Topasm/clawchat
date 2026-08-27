@@ -2,8 +2,8 @@
 .cc-bubble {
   max-width: 70%;
   padding: 10px 14px;
-  border-radius: 18px;
-  font-size: 15px;
+  border-radius: var(--cc-radius-lg);
+  font-size: var(--cc-font-size, 16px);
   line-height: 1.5;
   word-break: break-word;
   position: relative;
@@ -12,14 +12,14 @@
 .cc-bubble--user {
   background: var(--cc-user-bubble);
   color: #fff;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: var(--cc-radius-xs);
   margin-left: auto;
 }
 
 .cc-bubble--assistant {
   background: var(--cc-assistant-bubble);
   color: var(--cc-text);
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: var(--cc-radius-xs);
 }
 
 .cc-bubble__time {
@@ -43,9 +43,9 @@
   transition: opacity 0.15s ease;
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   padding: 2px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--cc-shadow-overlay);
 }
 
 .cc-bubble:hover .cc-bubble__actions {
@@ -57,7 +57,7 @@
   height: 24px;
   border: none;
   background: transparent;
-  border-radius: 4px;
+  border-radius: var(--cc-radius-xs);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -96,7 +96,6 @@
   justify-content: center;
   flex-shrink: 0;
   border: 1px solid var(--cc-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .cc-avatar--assistant {
@@ -149,7 +148,7 @@
   height: 28px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -187,9 +186,9 @@
   flex: 1;
   resize: none;
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: var(--cc-radius-lg);
   padding: 10px 14px;
-  font-size: 14px;
+  font-size: var(--cc-font-size, 16px);
   line-height: 1.4;
   color: var(--cc-text);
   background: var(--cc-background);
@@ -211,7 +210,7 @@
   width: 36px;
   height: 36px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -286,7 +285,7 @@
   color: var(--cc-primary);
   background: var(--cc-primary-light);
   padding: 1px 8px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius-md);
   margin-bottom: 4px;
   letter-spacing: 0.02em;
 }
@@ -305,7 +304,7 @@
   background: none;
   color: var(--cc-text-secondary);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
 }
 .cc-chat-input__cancel-btn:hover {
   background: var(--cc-surface-secondary);

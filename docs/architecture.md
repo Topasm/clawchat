@@ -6,7 +6,7 @@
 ┌─ ClawChat Desktop / Web App ───────────────────────────┐
 │                                                          │
 │   Platform Targets                                       │
-│   ├── Electron (Windows, macOS, Linux)                   │
+│   ├── Tauri 2 (Windows, macOS, Linux)                    │
 │   ├── Web Browser (Vite dev server / static build)       │
 │   └── Capacitor (iOS, Android)                           │
 │                                                          │
@@ -95,7 +95,7 @@ Natural language chat is the primary way users interact with all features. Direc
 Todos, calendar events, notes, and conversations live in a single SQLite database, enabling cross-module awareness, full-text search, and traceability.
 
 ### 4. Cross-Platform from a Single Codebase
-One React + TypeScript codebase targets Electron (desktop), web browsers, and Capacitor (mobile — planned). Platform differences are handled via runtime detection (`IS_ELECTRON`, `IS_WEB`, `IS_MOBILE`).
+One React + TypeScript codebase targets Tauri desktop, web browsers, and Capacitor mobile. Platform differences are handled through the neutral platform adapter and runtime detection (`IS_TAURI`, `IS_WEB`, `IS_MOBILE`).
 
 ### 5. Local by Default, Cloud by Choice
 The system works fully offline with demo data. Cloud services (LLM APIs, server sync) are optional enhancements.

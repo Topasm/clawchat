@@ -153,6 +153,7 @@ export default function TaskGraphProposalDialog({
               <span>{selected.size}/{draftSubtasks.length} tasks selected · dependencies stay valid automatically</span>
             </div>
             <SegmentedControl
+              ariaLabel="Proposal graph mode"
               options={MODE_OPTIONS}
               value={mode}
               onChange={(value) => setMode(value as TaskGraphMode)}

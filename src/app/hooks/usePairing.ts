@@ -7,6 +7,15 @@ import type {
   PairedDevice,
 } from '../types/connection';
 
+interface PairedDeviceApiResponse {
+  id: string;
+  name: string;
+  device_type: string;
+  paired_at: string;
+  last_seen: string;
+  is_active: boolean;
+}
+
 /** Create a new pairing session (desktop side) */
 export function useCreatePairingSession() {
   return useMutation({
@@ -16,6 +25,9 @@ export function useCreatePairingSession() {
         code: res.data.code,
         expiresAt: res.data.expires_at,
         qrPayload: res.data.qr_payload,
+        hostId: res.data.host_id,
+        hostPublicKey: res.data.host_public_key,
+        relayUrl: res.data.relay_url ?? null,
       };
     },
   });
@@ -35,6 +47,9 @@ export function useClaimPairing() {
         deviceToken: res.data.device_token,
         hostName: res.data.host_name,
         serverVersion: res.data.server_version,
+        hostId: res.data.host_id,
+        hostPublicKey: res.data.host_public_key,
+        relayUrl: res.data.relay_url ?? null,
       };
     },
   });
@@ -46,7 +61,7 @@ export function usePairedDevices() {
     queryKey: ['pairedDevices'],
     queryFn: async (): Promise<PairedDevice[]> => {
       const res = await apiClient.get('/pairing/devices');
-      return res.data.devices.map((d: any) => ({
+      return (res.data.devices as PairedDeviceApiResponse[]).map((d) => ({
         id: d.id,
         name: d.name,
         deviceType: d.device_type,

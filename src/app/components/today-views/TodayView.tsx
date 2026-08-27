@@ -8,7 +8,16 @@ import TaskCard from '../shared/TaskCard';
 import EventCard from '../shared/EventCard';
 import EmptyState from '../shared/EmptyState';
 import Badge from '../shared/Badge';
-import { SparkleIcon, ClipboardIcon, InboxTrayIcon, FlameIcon, CalendarIcon, CheckCircleIcon, SpinArrowsIcon } from '../shared/Icons';
+import {
+  SparkleIcon,
+  ClipboardIcon,
+  InboxTrayIcon,
+  FlameIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  SpinArrowsIcon,
+  ChevronRightIcon,
+} from '../shared/Icons';
 import { GearIcon } from '../shared/NavIcons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
 import type { TodoResponse, EventResponse } from '../../types/api';
@@ -48,11 +57,14 @@ export default function TodayView({
   const updateTodoMutation = useUpdateTodo();
   const { isMobile } = usePlatform();
 
-  const toggleTodoComplete = useCallback((id: string) => {
-    // Find the task status from the props to determine the toggle direction
-    const task = [...todayTasks, ...overdueTasks].find((t) => t.id === id);
-    if (task) toggleMutation.mutate({ id, currentStatus: task.status });
-  }, [todayTasks, overdueTasks, toggleMutation]);
+  const toggleTodoComplete = useCallback(
+    (id: string) => {
+      // Find the task status from the props to determine the toggle direction
+      const task = [...todayTasks, ...overdueTasks].find((t) => t.id === id);
+      if (task) toggleMutation.mutate({ id, currentStatus: task.status });
+    },
+    [todayTasks, overdueTasks, toggleMutation],
+  );
   const [briefingOpen, setBriefingOpen] = useState(false);
 
   const totalTasks = todayTasks.length + overdueTasks.length;
@@ -63,21 +75,22 @@ export default function TodayView({
   return (
     <div>
       {/* Header */}
-      <div className="cc-page-header" style={isMobile ? { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 } : undefined}>
+      <div className="cc-page-header cc-today-header">
         <div>
           <div className="cc-page-header__title">{greeting || 'Hello'}</div>
           <div className="cc-page-header__subtitle">
             {todayDate ? formatDate(todayDate) : ''}
-            {!isMobile && totalTasks > 0 && ` \u00B7 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} for today`}
+            {!isMobile &&
+              totalTasks > 0 &&
+              ` \u00B7 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} for today`}
           </div>
         </div>
         {isMobile && (
           <button
             type="button"
-            className="cc-btn cc-btn--ghost"
+            className="cc-btn cc-btn--ghost cc-btn--icon-touch"
             onClick={() => navigate('/settings')}
             aria-label="Open settings"
-            style={{ minWidth: 44, minHeight: 44, padding: 10 }}
           >
             <GearIcon />
           </button>
@@ -121,7 +134,12 @@ export default function TodayView({
 
       {/* Empty state */}
       {!isLoading && !hasAnything && (
-        <EmptyState icon={<SparkleIcon size={20} />} message={isMobile ? 'Nothing urgent right now.' : 'All clear! Nothing scheduled for today.'} />
+        <EmptyState
+          icon={<SparkleIcon size={20} />}
+          message={
+            isMobile ? 'Nothing urgent right now.' : 'All clear! Nothing scheduled for today.'
+          }
+        />
       )}
 
       {/* Section 1: Overdue tasks (red accent, urgent feel) */}
@@ -196,11 +214,7 @@ export default function TodayView({
               </div>
             ))}
           </div>
-          <button
-            type="button"
-            className="cc-link-btn"
-            onClick={() => navigate('/inbox')}
-          >
+          <button type="button" className="cc-link-btn" onClick={() => navigate('/inbox')}>
             View all in Inbox &rarr;
           </button>
         </div>
@@ -236,34 +250,38 @@ export default function TodayView({
             type="button"
             className="cc-briefing-collapsible__toggle"
             onClick={() => setBriefingOpen(!briefingOpen)}
+            aria-expanded={briefingOpen}
           >
-            <svg
+            <ChevronRightIcon
+              size={16}
               className={`cc-section__chevron${briefingOpen ? ' cc-section__chevron--open' : ''}`}
-              viewBox="0 0 16 16"
-              fill="none"
-            >
-              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            />
             <ClipboardIcon size={16} />
             <span className="cc-briefing-collapsible__title">Daily Briefing</span>
             {briefingData.load_assessment && (
-              <span className={`cc-briefing-pill cc-briefing-pill--${briefingData.load_assessment === 'heavy' ? 'warning' : briefingData.load_assessment === 'moderate' ? 'task' : 'event'}`} style={{ marginLeft: 8, fontSize: 11 }}>
+              <span
+                className={`cc-briefing-pill cc-briefing-collapsible__assessment cc-briefing-pill--${briefingData.load_assessment === 'heavy' ? 'warning' : briefingData.load_assessment === 'moderate' ? 'task' : 'event'}`}
+              >
                 {briefingData.load_assessment}
               </span>
             )}
-            {Object.values(briefingData.stats).some(v => v > 0) && (
+            {Object.values(briefingData.stats).some((v) => v > 0) && (
               <span className="cc-briefing-collapsible__badge">
-                {briefingData.stats.events + briefingData.stats.tasks_due + briefingData.stats.overdue} items
+                {briefingData.stats.events +
+                  briefingData.stats.tasks_due +
+                  briefingData.stats.overdue}{' '}
+                items
               </span>
             )}
           </button>
           {briefingOpen && (
-            <div className="cc-briefing-card" style={{ marginTop: 0, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
-              {Object.values(briefingData.stats).some(v => v > 0) && (
+            <div className="cc-briefing-card cc-briefing-card--attached">
+              {Object.values(briefingData.stats).some((v) => v > 0) && (
                 <div className="cc-briefing-card__stats">
                   {briefingData.stats.events > 0 && (
                     <span className="cc-briefing-pill cc-briefing-pill--event">
-                      <CalendarIcon size={13} /> {briefingData.stats.events} event{briefingData.stats.events !== 1 ? 's' : ''}
+                      <CalendarIcon size={13} /> {briefingData.stats.events} event
+                      {briefingData.stats.events !== 1 ? 's' : ''}
                     </span>
                   )}
                   {briefingData.stats.tasks_due > 0 && (
@@ -290,22 +308,25 @@ export default function TodayView({
               )}
               <div className="cc-briefing-card__content">{briefingData.summary}</div>
               {briefingData.suggestions && briefingData.suggestions.length > 0 && (
-                <div className="cc-briefing-card__suggestions" style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="cc-briefing-card__suggestions">
                   {briefingData.suggestions.map((s, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'var(--cc-color-surface-raised, rgba(255,255,255,0.06))' }}>
-                      <span style={{ flex: 1, fontSize: 13 }}>
+                    <div key={i} className="cc-briefing-card__suggestion">
+                      <span className="cc-briefing-card__suggestion-text">
                         <strong>{s.title}</strong>{' '}
-                        <span style={{ opacity: 0.7 }}>{s.reason}</span>
+                        <span className="cc-briefing-card__suggestion-reason">{s.reason}</span>
                       </span>
                       {s.action === 'move_to_tomorrow' && (
                         <button
                           type="button"
-                          className="cc-btn cc-btn--sm cc-btn--ghost"
+                          className="cc-btn cc-btn--compact cc-btn--ghost"
                           onClick={() => {
                             const tomorrow = new Date();
                             tomorrow.setDate(tomorrow.getDate() + 1);
                             tomorrow.setHours(23, 59, 0, 0);
-                            updateTodoMutation.mutate({ id: s.todo_id, data: { due_date: tomorrow.toISOString() } });
+                            updateTodoMutation.mutate({
+                              id: s.todo_id,
+                              data: { due_date: tomorrow.toISOString() },
+                            });
                           }}
                         >
                           Move to tomorrow
@@ -314,7 +335,7 @@ export default function TodayView({
                       {s.action === 'start_with' && (
                         <button
                           type="button"
-                          className="cc-btn cc-btn--sm cc-btn--ghost"
+                          className="cc-btn cc-btn--compact cc-btn--ghost"
                           onClick={() => navigate(`/tasks/${s.todo_id}`)}
                         >
                           Start
@@ -323,7 +344,7 @@ export default function TodayView({
                       {s.action === 'reschedule' && (
                         <button
                           type="button"
-                          className="cc-btn cc-btn--sm cc-btn--ghost"
+                          className="cc-btn cc-btn--compact cc-btn--ghost"
                           onClick={() => navigate(`/tasks/${s.todo_id}`)}
                         >
                           Reschedule

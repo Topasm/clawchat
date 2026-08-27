@@ -6,6 +6,14 @@ from datetime import datetime, timedelta, timezone
 from dateutil.rrule import rrulestr
 
 
+def _match_timezone(value: datetime, reference: datetime) -> datetime:
+    if reference.tzinfo is None:
+        return value.replace(tzinfo=None)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=reference.tzinfo)
+    return value.astimezone(reference.tzinfo)
+
+
 def parse_rrule(rule_string: str, dtstart: datetime, range_start: datetime, range_end: datetime) -> list[datetime]:
     """Parse an RRULE string and return occurrence datetimes within the given range."""
     try:
@@ -32,12 +40,20 @@ def generate_occurrences(event, range_start: datetime, range_end: datetime) -> l
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # Determine effective end of recurrence
-    effective_end = range_end
-    if event.recurrence_end and event.recurrence_end < effective_end:
-        effective_end = event.recurrence_end
+    # SQLite may return naive datetimes even for timezone-aware columns. Match
+    # the query range to the series timezone before dateutil comparisons.
+    series_start = event.start_time
+    aligned_start = _match_timezone(range_start, series_start)
+    effective_end = _match_timezone(range_end, series_start)
+    recurrence_end = (
+        _match_timezone(event.recurrence_end, series_start)
+        if event.recurrence_end
+        else None
+    )
+    if recurrence_end and recurrence_end < effective_end:
+        effective_end = recurrence_end
 
-    dates = parse_rrule(event.recurrence_rule, event.start_time, range_start, effective_end)
+    dates = parse_rrule(event.recurrence_rule, series_start, aligned_start, effective_end)
 
     # Compute event duration for end_time calculation
     duration = timedelta(0)

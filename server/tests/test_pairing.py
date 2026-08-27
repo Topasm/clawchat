@@ -1,4 +1,7 @@
 import pytest
+import json
+
+from app_version import APP_VERSION
 from httpx import AsyncClient
 
 
@@ -11,6 +14,13 @@ async def test_create_pairing_session(client: AsyncClient, auth_headers: dict):
     assert len(data["code"]) == 6
     assert "expires_at" in data
     assert "qr_payload" in data
+    assert data["host_id"].startswith("claw_")
+    assert len(data["host_public_key"]) == 43
+    payload = json.loads(data["qr_payload"])
+    assert payload["version"] == APP_VERSION
+    assert payload["protocol_version"] == 2
+    assert payload["host_id"] == data["host_id"]
+    assert payload["host_public_key"] == data["host_public_key"]
 
 
 @pytest.mark.asyncio
@@ -38,6 +48,18 @@ async def test_claim_pairing_session(client: AsyncClient, auth_headers: dict):
     assert "api_base_url" in data
     assert "host_name" in data
     assert "server_version" in data
+    assert data["server_version"] == APP_VERSION
+    assert data["host_id"] == session_resp.json()["host_id"]
+    assert data["host_public_key"] == session_resp.json()["host_public_key"]
+
+
+@pytest.mark.asyncio
+async def test_host_identity_is_stable_between_pairing_sessions(client: AsyncClient, auth_headers: dict):
+    first = await client.post("/api/pairing/session", headers=auth_headers)
+    second = await client.post("/api/pairing/session", headers=auth_headers)
+
+    assert first.json()["host_id"] == second.json()["host_id"]
+    assert first.json()["host_public_key"] == second.json()["host_public_key"]
 
 
 @pytest.mark.asyncio

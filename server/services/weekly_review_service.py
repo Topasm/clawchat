@@ -1,6 +1,5 @@
 """Weekly review service — gathers data and generates AI-powered GTD review."""
 
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -10,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from exceptions import AIUnavailableError
 from models.todo import Todo
 from services.ai_service import AIService
+from utils import parse_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -204,12 +204,4 @@ async def generate_weekly_review(
 
 def _parse_review_json(raw: str) -> dict | None:
     """Try to parse LLM response as JSON."""
-    text = raw.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text = "\n".join(lines).strip()
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        return None
+    return parse_json_object(raw)

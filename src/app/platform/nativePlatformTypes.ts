@@ -1,11 +1,8 @@
 export type AppMode = 'client' | 'host';
 
-export type NativeRuntimeKind = 'web' | 'electron' | 'tauri';
+export type NativeRuntimeKind = 'web' | 'tauri';
 
-export type NativeEventChannel =
-  | 'open-quick-capture'
-  | 'notification:action'
-  | 'navigate';
+export type NativeEventChannel = 'open-quick-capture' | 'notification:action' | 'navigate';
 
 export interface UpdateInfo {
   version: string;

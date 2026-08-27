@@ -119,6 +119,8 @@ def main() -> None:
             "sqlalchemy.dialects.sqlite",
             "--collect-submodules",
             "uvicorn",
+            "--collect-all",
+            "watchfiles",
             "--collect-submodules",
             "jose",
             "--paths",

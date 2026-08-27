@@ -12,7 +12,8 @@ server/
 ├── utils.py                    # Utilities: make_id(), serialize_tags/deserialize_tags, apply_model_updates, strip_markdown_fences
 ├── constants.py                # Shared constants (SYSTEM_PROMPT)
 ├── exceptions.py               # AppError hierarchy + error handler
-├── requirements.txt            # Python dependencies
+├── pyproject.toml              # Python dependency declarations
+├── uv.lock                     # Reproducible dependency lock
 ├── .env.example                # Example environment config
 ├── routers/
 │   ├── __init__.py
@@ -261,7 +262,7 @@ OBSIDIAN_VAULT_PATH=                        # Absolute path to vault
 OBSIDIAN_CLI_COMMAND=                       # Path to obsidian CLI binary
 OBSIDIAN_SYNC_MODE=filesystem               # "livesync", "filesystem", or "disabled"
 OBSIDIAN_PROJECT_TODO_FILENAME=TODO.md      # Filename to scan for project todos
-OBSIDIAN_SCAN_INTERVAL_MINUTES=5            # Vault re-index interval
+OBSIDIAN_SCAN_INTERVAL_MINUTES=5            # Polling fallback interval
 ```
 
 ## Development Setup
@@ -276,7 +277,7 @@ source venv/Scripts/activate  # Windows
 # source venv/bin/activate    # Linux/Mac
 
 # Install dependencies
-pip install -r requirements.txt
+uv sync --locked
 
 # Copy and edit environment config
 cp .env.example .env

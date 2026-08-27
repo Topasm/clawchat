@@ -8,11 +8,13 @@ ClawChat server is deployed as a Docker Compose stack on the user's own infrastr
 # server/Dockerfile
 FROM python:3.12-slim
 
+COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /uvx /bin/
+
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the locked runtime dependencies
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev
 
 # Copy application code
 COPY . .
@@ -22,7 +24,7 @@ RUN mkdir -p /app/data
 
 # Start server (init_db runs automatically in FastAPI lifespan)
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/.venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ## Docker Compose
@@ -42,7 +44,13 @@ services:
       - .env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test:
+        [
+          "CMD",
+          "/app/.venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5).read()",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -85,6 +93,7 @@ Set `AI_PROVIDER=ollama` and `AI_BASE_URL=http://ollama:11434` in `.env`.
 | `MAX_UPLOAD_SIZE_MB` | `10` | Maximum file upload size in MB |
 | `ALLOWED_EXTENSIONS` | `jpg,jpeg,...,zip` | Comma-separated allowed file extensions |
 | `PUBLIC_URL` | *(empty)* | Public-facing URL for reverse proxy deployments (used in pairing QR codes) |
+| `RELAY_URL` | *(empty)* | Optional ClawChat E2EE relay URL; enables automatic remote fallback without opening an inbound port |
 | `VITE_DEFAULT_SERVER_URL` | *(empty)* | Build-time frontend default server URL (login page, Capacitor app) |
 | `ENABLE_SCHEDULER` | `true` | Enable background scheduler |
 | `BRIEFING_TIME` | `08:00` | Daily briefing time (HH:MM, 24h) |
@@ -127,7 +136,7 @@ docker volume ls | grep clawchat
 
 For the mobile app to reach the server on a local network:
 
-> **Note:** The Electron desktop app binds the embedded server to `127.0.0.1` (loopback only) for security. Direct LAN access (`http://192.168.x.x:8000`) only works with Docker or manual `uvicorn --host 0.0.0.0` deployments. For Electron, use a reverse proxy + Cloudflare Tunnel or Tailscale instead (see [Remote Access](#remote-access)).
+> **Note:** The Tauri desktop app binds its embedded server to `127.0.0.1` by default. Enable host mode through the desktop settings when mobile clients need LAN access, or use Docker/manual `uvicorn --host 0.0.0.0`. For remote access, use Cloudflare Tunnel or Tailscale rather than exposing the port directly.
 
 1. **Find the server's local IP**: Run `ip addr` (Linux) or `ipconfig` (Windows) on the host machine
 2. **Configure the firewall**: Allow inbound TCP on port 8000
@@ -163,10 +172,13 @@ your-domain.com {
 
 ## Remote Access
 
-ClawChat supports two remote access methods. In both cases only the reverse proxy (`127.0.0.1:8080`) is exposed; the FastAPI server and any AI gateway remain loopback-only.
+ClawChat supports three remote access methods. With a tunnel, only the reverse proxy
+(`127.0.0.1:8080`) is exposed; the FastAPI server and any AI gateway remain loopback-only.
+The E2EE relay uses an outbound host connection and exposes no desktop port.
 
 | Method | Audience | Requires |
 |--------|----------|----------|
+| **ClawChat E2EE relay** | Seamless mobile fallback | Relay service + `RELAY_URL`; see [E2EE mobile relay](./e2ee-relay.md) |
 | **Cloudflare Tunnel** (recommended) | Public HTTPS, any device | Cloudflare account + domain |
 | **Tailscale Serve** | Tailnet-only (private) | Tailscale on both host and client |
 

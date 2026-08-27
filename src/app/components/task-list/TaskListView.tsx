@@ -48,7 +48,10 @@ export default function TaskListView({ todos, kanbanStatuses, onOpenTask, onTogg
             tabIndex={0}
             onClick={() => onOpenTask(todo.id)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') onOpenTask(todo.id);
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onOpenTask(todo.id);
+              }
             }}
           >
             <span className="cc-task-list__task" role="cell" style={{ paddingLeft: 12 + depth * 22 }}>

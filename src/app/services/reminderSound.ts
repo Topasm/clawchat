@@ -2,12 +2,12 @@ import { IS_CAPACITOR, IS_DESKTOP } from '../types/platform';
 
 /**
  * Plays a short reminder chime. Used when reminderSound is enabled.
- * On Capacitor/Electron, the OS handles notification sound via the `silent` flag.
+ * On Capacitor/Tauri, the OS handles notification sound via the `silent` flag.
  * On web, we play an audio cue since the Notification API `silent` property
  * isn't reliably supported across browsers.
  */
 export function playReminderSound(): void {
-  // Capacitor and Electron handle sound natively via notification options
+  // Capacitor and Tauri handle sound natively via notification options
   if (IS_CAPACITOR || IS_DESKTOP) return;
 
   try {
@@ -20,7 +20,7 @@ export function playReminderSound(): void {
     gain.connect(ctx.destination);
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(587, ctx.currentTime);       // D5
+    osc.frequency.setValueAtTime(587, ctx.currentTime); // D5
     osc.frequency.setValueAtTime(784, ctx.currentTime + 0.12); // G5
     osc.frequency.setValueAtTime(880, ctx.currentTime + 0.24); // A5
 

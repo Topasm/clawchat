@@ -12,12 +12,15 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,7 +58,8 @@ sealed interface SyncEvent {
 /**
  * WebSocket client for real-time sync with the ClawChat backend.
  *
- * Connects to `ws://<baseUrl>/ws?token=<jwt>`, auto-reconnects with
+ * Exchanges the bearer token for a short-lived WebSocket ticket, then connects
+ * to `ws://<baseUrl>/ws?ticket=<ticket>`. Auto-reconnects with
  * exponential backoff, and sends periodic keepalive pings. Emits
  * [SyncEvent]s via a [SharedFlow] so that repositories and ViewModels
  * can react to server-side changes.
@@ -63,6 +67,7 @@ sealed interface SyncEvent {
 @Singleton
 class WebSocketClient @Inject constructor(
     private val sessionStore: SessionStore,
+    private val relayClient: RelayClient,
 ) {
     companion object {
         private const val TAG = "WebSocketClient"
@@ -81,66 +86,205 @@ class WebSocketClient @Inject constructor(
     private var webSocket: WebSocket? = null
     private var pingJob: Job? = null
     private var reconnectJob: Job? = null
+    private var ticketJob: Job? = null
+    @Volatile private var ticketCall: Call? = null
     private var currentBackoff = INITIAL_BACKOFF_MS
-    private var shouldReconnect = false
+    @Volatile private var shouldReconnect = false
+    private val connectionGeneration = AtomicLong(0)
+
+    init {
+        scope.launch {
+            relayClient.events.collect { message ->
+                when {
+                    message.contains("\"type\":\"relay_disconnected\"") -> {
+                        _events.tryEmit(SyncEvent.Disconnected)
+                        if (shouldReconnect) connect()
+                    }
+                    message.contains("\"type\":\"auth_error\"") ->
+                        handleAuthenticationFailure(connectionGeneration.get())
+                    else -> handleMessage(message)
+                }
+            }
+        }
+    }
 
     /**
      * Opens the WebSocket connection. Reads the current token and base URL
      * from [SessionStore]. If either is missing the connect is skipped.
      */
     fun connect() {
+        val generation = connectionGeneration.incrementAndGet()
+        shouldReconnect = true
+        reconnectJob?.cancel()
+        reconnectJob = null
+        ticketJob?.cancel()
+        ticketJob = null
+        ticketCall?.cancel()
+        ticketCall = null
+        pingJob?.cancel()
+        pingJob = null
+        webSocket?.close(1000, "Reconnecting")
+        webSocket = null
+        currentBackoff = INITIAL_BACKOFF_MS
+
         scope.launch {
             val token = sessionStore.token.first()
             val baseUrl = sessionStore.apiBaseUrl.first()
 
+            if (!isCurrent(generation)) return@launch
             if (token.isNullOrBlank() || baseUrl.isNullOrBlank()) {
                 Log.w(TAG, "Cannot connect: token or baseUrl is null")
+                shouldReconnect = false
                 return@launch
             }
 
-            shouldReconnect = true
-            openConnection(baseUrl, token)
+            openConnection(baseUrl, token, generation)
         }
     }
 
     /** Closes the WebSocket and stops all reconnect / keepalive jobs. */
     fun disconnect() {
         shouldReconnect = false
+        connectionGeneration.incrementAndGet()
         reconnectJob?.cancel()
         reconnectJob = null
+        ticketJob?.cancel()
+        ticketJob = null
+        ticketCall?.cancel()
+        ticketCall = null
         pingJob?.cancel()
         pingJob = null
         webSocket?.close(1000, "Client disconnect")
         webSocket = null
+        scope.launch { relayClient.unsubscribe() }
         Log.d(TAG, "Disconnected")
     }
 
     // ---- internal --------------------------------------------------------
 
-    private fun openConnection(baseUrl: String, token: String) {
+    private fun openConnection(baseUrl: String, token: String, generation: Long) {
+        if (!isCurrent(generation)) return
+        ticketJob?.cancel()
+        ticketCall?.cancel()
+        ticketJob = scope.launch {
+            when (val result = requestTicket(baseUrl, token)) {
+                is TicketResult.Success -> {
+                    if (isCurrent(generation)) {
+                        openConnectionWithTicket(baseUrl, token, result.ticket, generation)
+                    }
+                }
+                TicketResult.Unauthorized -> handleAuthenticationFailure(generation)
+                TicketResult.RetryableFailure -> {
+                    if (!isCurrent(generation)) return@launch
+                    if (relayClient.subscribe(token) && isCurrent(generation)) {
+                        Log.d(TAG, "Connected through E2EE relay")
+                        currentBackoff = INITIAL_BACKOFF_MS
+                        _events.tryEmit(SyncEvent.Connected)
+                        return@launch
+                    }
+                    if (!isCurrent(generation)) return@launch
+                    Log.w(TAG, "Failed to obtain WebSocket ticket or relay connection")
+                    scheduleReconnect(baseUrl, token, generation)
+                }
+            }
+        }
+    }
+
+    private fun requestTicket(baseUrl: String, token: String): TicketResult {
+        val url = "${baseUrl.trimEnd('/')}/api/auth/ws-ticket"
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $token")
+            .post(ByteArray(0).toRequestBody(null))
+            .build()
+        val call = client.newCall(request)
+        ticketCall = call
+        return try {
+            call.execute().use { response ->
+                if (response.code == 401 || response.code == 403) {
+                    return TicketResult.Unauthorized
+                }
+                if (!response.isSuccessful) return TicketResult.RetryableFailure
+                val body = response.body?.string() ?: return TicketResult.RetryableFailure
+                JSONObject(body).optString("ticket")
+                    .takeIf { it.isNotBlank() }
+                    ?.let { TicketResult.Success(it) }
+                    ?: TicketResult.RetryableFailure
+            }
+        } catch (e: Exception) {
+            if (!call.isCanceled()) {
+                Log.w(TAG, "WebSocket ticket request failed: ${e.message}")
+            }
+            TicketResult.RetryableFailure
+        } finally {
+            if (ticketCall === call) ticketCall = null
+        }
+    }
+
+    private fun openConnectionWithTicket(
+        baseUrl: String,
+        token: String,
+        ticket: String,
+        generation: Long,
+    ) {
+        if (!isCurrent(generation)) return
+        scope.launch { relayClient.unsubscribe() }
         // Convert http(s):// to ws(s)://
         val wsUrl = baseUrl
             .replaceFirst("https://", "wss://")
             .replaceFirst("http://", "ws://")
             .trimEnd('/')
 
-        val url = "$wsUrl/ws?token=$token"
+        val url = "$wsUrl/ws?ticket=$ticket"
         Log.d(TAG, "Connecting to $wsUrl/ws")
 
         val request = Request.Builder().url(url).build()
-        webSocket = client.newWebSocket(request, Listener(baseUrl, token))
+        val newWebSocket = client.newWebSocket(request, Listener(baseUrl, token, generation))
+        if (isCurrent(generation)) {
+            webSocket = newWebSocket
+        } else {
+            newWebSocket.close(1000, "Stale connection")
+        }
     }
 
-    private fun scheduleReconnect(baseUrl: String, token: String) {
-        if (!shouldReconnect) return
+    private fun scheduleReconnect(baseUrl: String, token: String, generation: Long) {
+        if (!isCurrent(generation)) return
 
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
             Log.d(TAG, "Reconnecting in ${currentBackoff}ms")
             delay(currentBackoff)
+            if (!isCurrent(generation)) return@launch
             currentBackoff = (currentBackoff * 2).coerceAtMost(MAX_BACKOFF_MS)
-            openConnection(baseUrl, token)
+            openConnection(baseUrl, token, generation)
         }
+    }
+
+    private fun isCurrent(generation: Long): Boolean =
+        shouldReconnect && connectionGeneration.get() == generation
+
+    private suspend fun handleAuthenticationFailure(generation: Long) {
+        if (!isCurrent(generation)) return
+        Log.w(TAG, "Authentication failed; reconnect disabled until a new session is available")
+        shouldReconnect = false
+        connectionGeneration.incrementAndGet()
+        reconnectJob?.cancel()
+        reconnectJob = null
+        ticketCall?.cancel()
+        ticketCall = null
+        pingJob?.cancel()
+        pingJob = null
+        webSocket?.close(1000, "Authentication failed")
+        webSocket = null
+        relayClient.unsubscribe()
+        sessionStore.clearSession()
+        _events.tryEmit(SyncEvent.Disconnected)
+    }
+
+    private sealed interface TicketResult {
+        data class Success(val ticket: String) : TicketResult
+        data object Unauthorized : TicketResult
+        data object RetryableFailure : TicketResult
     }
 
     private fun startPing(ws: WebSocket) {
@@ -209,9 +353,14 @@ class WebSocketClient @Inject constructor(
     private inner class Listener(
         private val baseUrl: String,
         private val token: String,
+        private val generation: Long,
     ) : WebSocketListener() {
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            if (!isCurrent(generation) || this@WebSocketClient.webSocket !== webSocket) {
+                webSocket.close(1000, "Stale connection")
+                return
+            }
             Log.d(TAG, "Connected")
             currentBackoff = INITIAL_BACKOFF_MS
             _events.tryEmit(SyncEvent.Connected)
@@ -219,6 +368,7 @@ class WebSocketClient @Inject constructor(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (!isCurrent(generation) || this@WebSocketClient.webSocket !== webSocket) return
             handleMessage(text)
         }
 
@@ -228,17 +378,21 @@ class WebSocketClient @Inject constructor(
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            if (!isCurrent(generation) || this@WebSocketClient.webSocket !== webSocket) return
             Log.d(TAG, "Closed: $code $reason")
+            this@WebSocketClient.webSocket = null
             pingJob?.cancel()
             _events.tryEmit(SyncEvent.Disconnected)
-            scheduleReconnect(baseUrl, token)
+            scheduleReconnect(baseUrl, token, generation)
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            if (!isCurrent(generation) || this@WebSocketClient.webSocket !== webSocket) return
             Log.w(TAG, "Connection failure: ${t.message}")
+            this@WebSocketClient.webSocket = null
             pingJob?.cancel()
             _events.tryEmit(SyncEvent.Disconnected)
-            scheduleReconnect(baseUrl, token)
+            scheduleReconnect(baseUrl, token, generation)
         }
     }
 }

@@ -3,6 +3,8 @@ import { Command } from 'cmdk';
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { useTodosQuery } from '../../hooks/queries';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { CheckCircleIcon, MagnifyingGlassIcon, PinIcon, ThemeIcon } from './Icons';
+import { ChatIcon, GearIcon, InboxIcon, SunIcon, TasksIcon } from './NavIcons';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -32,10 +34,7 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
         <RadixDialog.Content className="cc-cmd-palette" aria-label="Command palette">
           <Command className="cc-cmd-palette__inner" label="Command palette">
             <div className="cc-cmd-palette__input-wrap">
-              <svg className="cc-cmd-palette__search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="6" cy="6" r="4.5" />
-                <path d="M9.5 9.5L13 13" strokeLinecap="round" />
-              </svg>
+              <MagnifyingGlassIcon className="cc-cmd-palette__search-icon" size={14} />
               <Command.Input className="cc-cmd-palette__input" placeholder="Type a command or search…" />
             </div>
             <Command.List className="cc-cmd-palette__list">
@@ -43,26 +42,26 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
 
               <Command.Group heading="Navigation" className="cc-cmd-palette__group">
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/today')}>
-                  <span>☀️</span> Today
+                  <SunIcon className="cc-cmd-palette__item-icon" /> Today
                   <kbd className="cc-cmd-palette__kbd">G T</kbd>
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/inbox')}>
-                  <span>📥</span> Inbox
+                  <InboxIcon className="cc-cmd-palette__item-icon" /> Inbox
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/chats')}>
-                  <span>💬</span> Chats
+                  <ChatIcon className="cc-cmd-palette__item-icon" /> Chats
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/tasks')}>
-                  <span>📋</span> Tasks
+                  <TasksIcon className="cc-cmd-palette__item-icon" /> Tasks
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/settings')}>
-                  <span>⚙️</span> Settings
+                  <GearIcon className="cc-cmd-palette__item-icon" /> Settings
                 </Command.Item>
               </Command.Group>
 
               <Command.Group heading="Actions" className="cc-cmd-palette__group">
                 <Command.Item className="cc-cmd-palette__item" onSelect={toggleTheme}>
-                  <span>🌓</span> Toggle Theme
+                  <ThemeIcon className="cc-cmd-palette__item-icon" /> Toggle Theme
                 </Command.Item>
               </Command.Group>
 
@@ -75,7 +74,9 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                       value={todo.title}
                       onSelect={() => go(`/tasks/${todo.id}`)}
                     >
-                      <span>{todo.status === 'completed' ? '✅' : '📌'}</span>
+                      {todo.status === 'completed'
+                        ? <CheckCircleIcon className="cc-cmd-palette__item-icon" />
+                        : <PinIcon className="cc-cmd-palette__item-icon" />}
                       {todo.title}
                     </Command.Item>
                   ))}

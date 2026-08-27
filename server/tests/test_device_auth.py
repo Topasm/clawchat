@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.paired_device import PairedDevice
+from auth.jwt import decode_token_any
 
 
 async def _pair_device(client: AsyncClient, auth_headers: dict) -> dict:
@@ -89,3 +90,32 @@ async def test_invalid_device_token_rejected(client: AsyncClient):
     """A made-up token should be rejected."""
     resp = await client.get("/api/todos", headers={"Authorization": "Bearer fake-token-123"})
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_websocket_ticket_preserves_device_identity(client: AsyncClient, auth_headers: dict):
+    claim = await _pair_device(client, auth_headers)
+    response = await client.post(
+        "/api/auth/ws-ticket",
+        headers={"Authorization": f"Bearer {claim['device_token']}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["expires_in"] == 60
+    payload = decode_token_any(data["ticket"], allowed_types={"ws_ticket"})
+    assert payload["sub"] == claim["device_id"]
+    assert payload["principal_type"] == "device"
+
+
+@pytest.mark.asyncio
+async def test_revoked_device_cannot_get_websocket_ticket(client: AsyncClient, auth_headers: dict):
+    claim = await _pair_device(client, auth_headers)
+    await client.delete(f"/api/pairing/devices/{claim['device_id']}", headers=auth_headers)
+
+    response = await client.post(
+        "/api/auth/ws-ticket",
+        headers={"Authorization": f"Bearer {claim['device_token']}"},
+    )
+
+    assert response.status_code == 401

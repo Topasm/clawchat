@@ -18,6 +18,9 @@ function fixture(overrides = {}) {
     packageLockRoot: VERSION,
     cargoToml: VERSION,
     cargoLock: VERSION,
+    serverVersion: VERSION,
+    serverProjectVersion: VERSION,
+    androidVersion: VERSION,
     ...overrides,
   };
   const write = (relativePath, contents) => {
@@ -43,6 +46,15 @@ function fixture(overrides = {}) {
     'src-tauri/Cargo.lock',
     `version = 4\n\n[[package]]\nname = "serde"\nversion = "1.0.0"\n\n[[package]]\nname = "clawchat-tauri"\nversion = "${versions.cargoLock}"\n`,
   );
+  write('server/app_version.py', `APP_VERSION = "${versions.serverVersion}"\n`);
+  write(
+    'server/pyproject.toml',
+    `[project]\nname = "clawchat-server"\nversion = "${versions.serverProjectVersion}"\n`,
+  );
+  write(
+    'android/app/build.gradle.kts',
+    `android {\n  defaultConfig {\n    versionName = "${versions.androidVersion}"\n  }\n}\n`,
+  );
   write('src-tauri/tauri.conf.json', '{"version":"../package.json"}\n');
   write(
     'vite.config.ts',
@@ -64,7 +76,7 @@ test('accepts synchronized package, lockfile, Cargo, Tauri, and renderer version
     const result = checkReleaseVersion(project.root);
     assert.equal(result.version, VERSION);
     assert.equal(result.tag, `clawchat-v${VERSION}`);
-    assert.equal(result.declarations.length, 6);
+    assert.equal(result.declarations.length, 9);
   } finally {
     project.cleanup();
   }
@@ -76,6 +88,9 @@ test('rejects every duplicated release version when it drifts', async (t) => {
     ['packageLockRoot', 'package-lock.json root package version'],
     ['cargoToml', 'src-tauri/Cargo.toml [package] version'],
     ['cargoLock', 'src-tauri/Cargo.lock clawchat-tauri version'],
+    ['serverVersion', 'server/app_version.py APP_VERSION'],
+    ['serverProjectVersion', 'server/pyproject.toml [project] version'],
+    ['androidVersion', 'android/app/build.gradle.kts versionName'],
   ]) {
     await t.test(location, () => {
       const project = fixture({ [key]: '9.9.9' });

@@ -1,10 +1,11 @@
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app_version import APP_VERSION
 from config import settings
 from database import async_session_factory, init_db
 from exceptions import AppError, app_error_handler
@@ -145,16 +146,34 @@ async def lifespan(app: FastAPI):
     else:
         app.state.scheduler = None
 
+    # The host initiates the relay connection outbound, so no inbound port or
+    # firewall change is needed. An empty RELAY_URL keeps LAN-only behavior.
+    app.state.relay_connector = None
+    app.state.relay_task = None
+    if settings.relay_url:
+        from services.relay_connector import RelayHostConnector
+
+        relay_connector = RelayHostConnector(settings.relay_url, settings.port, ws_manager)
+        app.state.relay_connector = relay_connector
+        app.state.relay_task = asyncio.create_task(relay_connector.run_forever())
+
     yield
 
     # Stop scheduler before closing AI service
     if app.state.scheduler:
         await app.state.scheduler.stop()
 
+    if app.state.relay_connector:
+        await app.state.relay_connector.stop()
+    if app.state.relay_task:
+        app.state.relay_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await app.state.relay_task
+
     await ai_service.close()
 
 
-app = FastAPI(title="ClawChat Server", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="ClawChat Server", version=APP_VERSION, lifespan=lifespan)
 
 app.add_exception_handler(AppError, app_error_handler)
 
@@ -201,7 +220,7 @@ async def health():
     ai_model = "claude (via CLI)" if active_provider == "claude_code" else settings.ai_model
     return {
         "status": "ok" if effective_connected else "degraded",
-        "version": "0.1.0",
+        "version": APP_VERSION,
         "ai_provider": active_provider,
         "ai_model": ai_model,
         "ai_connected": effective_connected,

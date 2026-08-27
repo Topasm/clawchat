@@ -30,6 +30,8 @@ data class OnboardingUiState(
     val error: String? = null,
     val serverVersion: String? = null,
     val autoClaimAfterHealthCheck: Boolean = false,
+    val expectedHostId: String? = null,
+    val expectedHostPublicKey: String? = null,
 )
 
 @HiltViewModel
@@ -43,11 +45,29 @@ class OnboardingViewModel @Inject constructor(
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     fun updateServerUrl(url: String) {
-        _uiState.update { it.copy(serverUrl = url, error = null) }
+        _uiState.update {
+            it.copy(
+                serverUrl = url,
+                serverReachable = null,
+                serverVersion = null,
+                autoClaimAfterHealthCheck = false,
+                expectedHostId = null,
+                expectedHostPublicKey = null,
+                error = null,
+            )
+        }
     }
 
     fun updatePairingCode(code: String) {
-        _uiState.update { it.copy(pairingCode = code, error = null) }
+        _uiState.update {
+            it.copy(
+                pairingCode = code,
+                autoClaimAfterHealthCheck = false,
+                expectedHostId = null,
+                expectedHostPublicKey = null,
+                error = null,
+            )
+        }
     }
 
     fun updatePin(pin: String) {
@@ -90,8 +110,11 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun claimPairingCode() {
-        val url = _uiState.value.serverUrl.trimEnd('/')
-        val code = _uiState.value.pairingCode
+        val state = _uiState.value
+        val url = state.serverUrl.trimEnd('/')
+        val code = state.pairingCode
+        val expectedKey = state.expectedHostPublicKey
+        val expectedId = state.expectedHostId
 
         if (url.isBlank() || code.length != 6) return
 
@@ -106,11 +129,20 @@ class OnboardingViewModel @Inject constructor(
                         deviceType = "android",
                     ),
                 )
+                if (expectedKey != null && response.hostPublicKey != expectedKey) {
+                    error("Host identity did not match the scanned QR code")
+                }
+                if (expectedId != null && response.hostId != expectedId) {
+                    error("Host ID did not match the scanned QR code")
+                }
                 sessionStore.savePairedSession(
                     deviceId = response.deviceId,
                     deviceToken = response.deviceToken,
                     apiBaseUrl = response.apiBaseUrl,
                     hostName = response.hostName,
+                    hostId = response.hostId,
+                    hostPublicKey = response.hostPublicKey,
+                    relayUrl = response.relayUrl,
                 )
                 _uiState.update { it.copy(isPairing = false, step = OnboardingStep.READY) }
             } catch (e: Exception) {
@@ -161,12 +193,16 @@ class OnboardingViewModel @Inject constructor(
             if (obj.optString("type") != "clawchat_pair") return
             val serverUrl = obj.optString("server_url", "")
             val code = obj.optString("code", "")
+            val hostId = obj.optString("host_id", "").ifBlank { null }
+            val hostPublicKey = obj.optString("host_public_key", "").ifBlank { null }
             if (serverUrl.isNotBlank() && code.isNotBlank()) {
                 _uiState.update {
                     it.copy(
                         serverUrl = serverUrl,
                         pairingCode = code,
                         autoClaimAfterHealthCheck = true,
+                        expectedHostId = hostId,
+                        expectedHostPublicKey = hostPublicKey,
                     )
                 }
                 checkServer()

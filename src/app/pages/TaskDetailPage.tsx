@@ -4,16 +4,24 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
 import { useDebouncedPersist } from '../hooks/useDebouncedPersist';
-import { useTodosQuery, useUpdateTodo, useDeleteTodo, useToggleTodoComplete, queryKeys } from '../hooks/queries';
+import {
+  useTodosQuery,
+  useUpdateTodo,
+  useDeleteTodo,
+  useToggleTodoComplete,
+  queryKeys,
+} from '../hooks/queries';
 import apiClient from '../services/apiClient';
 import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
 import TaskCard from '../components/shared/TaskCard';
 import PlanReviewDiff from '../components/shared/PlanReviewDiff';
+import type { TaskPlan } from '../components/shared/PlanReviewDiff';
 import RecurrenceSelector from '../components/shared/RecurrenceSelector';
 import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
+import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 
 const PRIORITIES: Array<TodoResponse['priority']> = ['low', 'medium', 'high', 'urgent'];
@@ -30,10 +38,13 @@ const SKILL_OPTIONS = [
 ] as const;
 
 const SKILL_LABELS: Record<string, string> = Object.fromEntries(
-  SKILL_OPTIONS.map(({ id, label }) => [id, label])
+  SKILL_OPTIONS.map(({ id, label }) => [id, label]),
 );
 
-function getDueCountdown(dueDate: string): { label: string; variant: 'overdue' | 'today' | 'upcoming' } {
+function getDueCountdown(dueDate: string): {
+  label: string;
+  variant: 'overdue' | 'today' | 'upcoming';
+} {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const due = new Date(dueDate);
@@ -66,7 +77,7 @@ export default function TaskDetailPage() {
 
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
-  const [plan, setPlan] = useState<any>(null);
+  const [plan, setPlan] = useState<TaskPlan | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -83,24 +94,29 @@ export default function TaskDetailPage() {
       return;
     }
     setPlanLoading(true);
-    apiClient.get(`/todos/${taskId}/plan/latest`)
+    apiClient
+      .get(`/todos/${taskId}/plan/latest`)
       .then((res) => setPlan(res.data))
       .catch(() => setPlan(null))
       .finally(() => setPlanLoading(false));
   }, [taskId, task?.inbox_state]);
 
-  const serverUpdateTodo = useCallback((id: string, data: TodoUpdate) => {
-    updateTodoMutation.mutate({ id, data });
-  }, [updateTodoMutation]);
+  const serverUpdateTodo = useCallback(
+    (id: string, data: TodoUpdate) => {
+      updateTodoMutation.mutate({ id, data });
+    },
+    [updateTodoMutation],
+  );
 
-  const localUpdateTodo = useCallback((id: string, updates: TodoUpdate) => {
-    // Optimistic local update in the query cache
-    queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
-      (old ?? []).map((t) =>
-        t.id === id ? { ...t, ...updates } as TodoResponse : t,
-      ),
-    );
-  }, [queryClient]);
+  const localUpdateTodo = useCallback(
+    (id: string, updates: TodoUpdate) => {
+      // Optimistic local update in the query cache
+      queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
+        (old ?? []).map((t) => (t.id === id ? ({ ...t, ...updates } as TodoResponse) : t)),
+      );
+    },
+    [queryClient],
+  );
 
   const persistField = useDebouncedPersist<TodoUpdate>(taskId, serverUpdateTodo, localUpdateTodo);
 
@@ -127,10 +143,13 @@ export default function TaskDetailPage() {
     navigate('/tasks');
   };
 
-  const handleToggle = useCallback((id: string) => {
-    const todo = todos.find((t) => t.id === id);
-    if (todo) toggleCompleteMutation.mutate({ id, currentStatus: todo.status });
-  }, [todos, toggleCompleteMutation]);
+  const handleToggle = useCallback(
+    (id: string) => {
+      const todo = todos.find((t) => t.id === id);
+      if (todo) toggleCompleteMutation.mutate({ id, currentStatus: todo.status });
+    },
+    [todos, toggleCompleteMutation],
+  );
 
   const handleApplyPlan = async (selectedIndices?: number[]) => {
     try {
@@ -172,7 +191,11 @@ export default function TaskDetailPage() {
     return (
       <div className="cc-detail">
         <div className="cc-page-header__subtitle">Task not found</div>
-        <button type="button" className="cc-btn cc-btn--secondary cc-mt-16" onClick={() => navigate('/tasks')}>
+        <button
+          type="button"
+          className="cc-btn cc-btn--secondary cc-mt-16"
+          onClick={() => navigate('/tasks')}
+        >
           Back to tasks
         </button>
       </div>
@@ -186,7 +209,7 @@ export default function TaskDetailPage() {
 
   // Blocker info from child tasks
   const blockedByRelationships = todos.filter(
-    (t) => t.parent_id === taskId && t.status !== 'completed'
+    (t) => t.parent_id === taskId && t.status !== 'completed',
   );
 
   return (
@@ -194,10 +217,7 @@ export default function TaskDetailPage() {
       {/* Top: Status + Quick Actions */}
       <div className="cc-exec-panel__top">
         <div className="cc-exec-panel__top-row">
-          <Checkbox
-            checked={task.status === 'completed'}
-            onChange={() => handleToggle(task.id)}
-          />
+          <Checkbox checked={task.status === 'completed'} onChange={() => handleToggle(task.id)} />
           <input
             className="cc-detail__title-input"
             value={title}
@@ -209,9 +229,7 @@ export default function TaskDetailPage() {
           <button type="button" className="cc-detail__field-btn" onClick={cyclePriority}>
             <Badge variant="priority" level={task.priority || 'medium'} />
           </button>
-          {task.status === 'completed' && (
-            <Badge variant="status">Completed</Badge>
-          )}
+          {task.status === 'completed' && <Badge variant="status">Completed</Badge>}
           {task.inbox_state && task.inbox_state !== 'none' && (
             <Badge variant="status">{task.inbox_state}</Badge>
           )}
@@ -222,11 +240,7 @@ export default function TaskDetailPage() {
       <div className="cc-exec-panel__section">
         <div className="cc-exec-panel__section-title">Next step</div>
         {hasPlan ? (
-          <PlanReviewDiff
-            plan={plan}
-            onApply={handleApplyPlan}
-            onDismiss={handleDismissPlan}
-          />
+          <PlanReviewDiff plan={plan} onApply={handleApplyPlan} onDismiss={handleDismissPlan} />
         ) : nextSubtask ? (
           <div className="cc-exec-panel__next-step">
             <TaskCard
@@ -237,7 +251,8 @@ export default function TaskDetailPage() {
             />
             {incompleteChildren.length > 1 && (
               <span className="cc-exec-panel__remaining">
-                +{incompleteChildren.length - 1} more sub-task{incompleteChildren.length - 1 !== 1 ? 's' : ''}
+                +{incompleteChildren.length - 1} more sub-task
+                {incompleteChildren.length - 1 !== 1 ? 's' : ''}
               </span>
             )}
           </div>
@@ -253,12 +268,17 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Section 2: Due / Estimate / Recurrence / Blockers */}
-      {(dueInfo || task.estimated_minutes || task.is_recurring || blockedByRelationships.length > 0) && (
+      {(dueInfo ||
+        task.estimated_minutes ||
+        task.is_recurring ||
+        blockedByRelationships.length > 0) && (
         <div className="cc-exec-panel__section">
           <div className="cc-exec-panel__section-title">Due / Estimate / Blockers</div>
           <div className="cc-exec-panel__info-grid">
             {dueInfo && (
-              <div className={`cc-exec-panel__info-item cc-exec-panel__info-item--${dueInfo.variant}`}>
+              <div
+                className={`cc-exec-panel__info-item cc-exec-panel__info-item--${dueInfo.variant}`}
+              >
                 <span className="cc-exec-panel__info-label">Due</span>
                 <span className="cc-exec-panel__info-value">{dueInfo.label}</span>
               </div>
@@ -291,9 +311,7 @@ export default function TaskDetailPage() {
               <div className="cc-exec-panel__context-row">
                 <span className="cc-exec-panel__context-label">Source</span>
                 <span className="cc-exec-panel__context-badge cc-exec-panel__context-badge--synced">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M13.5 5l-7 7L3 8.5" />
-                  </svg>
+                  <CheckIcon size={12} />
                   Obsidian project
                 </span>
               </div>
@@ -365,7 +383,10 @@ export default function TaskDetailPage() {
                   onClick={() => {
                     if (isActive) {
                       const updated = (task.enabled_skills || []).filter((s) => s !== id);
-                      persistField({ enabled_skills: updated.length ? updated : null, assignee: updated[0] || null });
+                      persistField({
+                        enabled_skills: updated.length ? updated : null,
+                        assignee: updated[0] || null,
+                      });
                     } else {
                       const updated = [...(task.enabled_skills || []), id];
                       persistField({ enabled_skills: updated, assignee: id });
@@ -379,18 +400,25 @@ export default function TaskDetailPage() {
             })}
           </div>
 
-          {(task.enabled_skills?.length || (task.assignee && ['planner', 'researcher', 'executor', 'openclaw'].includes(task.assignee))) && (
+          {(task.enabled_skills?.length ||
+            (task.assignee &&
+              ['planner', 'researcher', 'executor', 'openclaw'].includes(task.assignee))) && (
             <div className="cc-exec-panel__agent-status">
               <span className="cc-exec-panel__agent-badge">
                 {task.enabled_skills?.length
                   ? task.enabled_skills.map((s) => SKILL_LABELS[s] || s).join(' → ')
-                  : task.assignee === 'openclaw' ? 'OpenClaw AI' : task.assignee}
+                  : task.assignee === 'openclaw'
+                    ? 'OpenClaw AI'
+                    : task.assignee}
               </span>
               <span className="cc-exec-panel__agent-state">
-                {task.inbox_state === 'planning' ? 'Planning in progress' :
-                 task.inbox_state === 'classifying' ? 'Classifying...' :
-                 task.inbox_state === 'plan_ready' ? 'Plan ready for review' :
-                 'Assigned'}
+                {task.inbox_state === 'planning'
+                  ? 'Planning in progress'
+                  : task.inbox_state === 'classifying'
+                    ? 'Classifying...'
+                    : task.inbox_state === 'plan_ready'
+                      ? 'Plan ready for review'
+                      : 'Assigned'}
               </span>
             </div>
           )}
@@ -404,13 +432,10 @@ export default function TaskDetailPage() {
           className="cc-exec-panel__details-btn"
           onClick={() => setDetailsOpen(!detailsOpen)}
         >
-          <svg
+          <ChevronRightIcon
+            size={16}
             className={`cc-section__chevron${detailsOpen ? ' cc-section__chevron--open' : ''}`}
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          />
           Details
           {(task.tags?.length || childTasks.length > 0) && (
             <span className="cc-exec-panel__details-hint">
@@ -418,7 +443,9 @@ export default function TaskDetailPage() {
                 task.tags?.length ? `${task.tags.length} tags` : '',
                 childTasks.length > 0 ? `${childTasks.length} sub-tasks` : '',
                 description ? 'has description' : '',
-              ].filter(Boolean).join(', ')}
+              ]
+                .filter(Boolean)
+                .join(', ')}
             </span>
           )}
         </button>
@@ -438,9 +465,14 @@ export default function TaskDetailPage() {
           {task.tags && task.tags.length > 0 && (
             <div className="cc-detail__field" style={{ borderBottom: 'none' }}>
               <span className="cc-detail__field-label">Tags</span>
-              <div className="cc-detail__field-value" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <div
+                className="cc-detail__field-value"
+                style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}
+              >
                 {task.tags.map((tag) => (
-                  <Badge key={tag} variant="tag">{tag}</Badge>
+                  <Badge key={tag} variant="tag">
+                    {tag}
+                  </Badge>
                 ))}
               </div>
             </div>
@@ -485,7 +517,11 @@ export default function TaskDetailPage() {
       )}
 
       {/* Delete button */}
-      <button type="button" className="cc-btn cc-btn--danger cc-detail__delete-btn" onClick={handleDelete}>
+      <button
+        type="button"
+        className="cc-btn cc-btn--danger cc-detail__delete-btn"
+        onClick={handleDelete}
+      >
         Delete Task
       </button>
     </div>

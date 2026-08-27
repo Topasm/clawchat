@@ -1,36 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { CalendarIcon } from '../shared/Icons';
+import { CalendarIcon, CheckCircleIcon, CheckIcon, WarningIcon } from '../shared/Icons';
 import SchedulingSuggestions from './SchedulingSuggestions';
 import TaskProgressCard from './TaskProgressCard';
 
 interface ActionCardProps {
   metadata: Record<string, unknown>;
-}
-
-function TaskIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M4 9l3 3 7-7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function WarningIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M9 6v4M9 13h.01" strokeLinecap="round" />
-      <path d="M8.06 2.7L1.56 14.1a1.1 1.1 0 00.94 1.65h12.98a1.1 1.1 0 00.94-1.65L9.94 2.7a1.1 1.1 0 00-1.88 0z" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="var(--cc-success)" strokeWidth="2">
-      <circle cx="9" cy="9" r="7" />
-      <path d="M6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
 }
 
 export default function ActionCard({ metadata }: ActionCardProps) {
@@ -76,7 +50,7 @@ export default function ActionCard({ metadata }: ActionCardProps) {
     return (
       <div className="cc-action-card">
         <div className="cc-action-card__icon cc-action-card__icon--todo">
-          <TaskIcon />
+          <CheckIcon size={14} />
         </div>
         <div className="cc-action-card__content">
           <span className="cc-action-card__label">{label}</span>
@@ -110,7 +84,7 @@ export default function ActionCard({ metadata }: ActionCardProps) {
     return (
       <div className="cc-action-card cc-action-card--warning">
         <div className="cc-action-card__icon cc-action-card__icon--warning">
-          <WarningIcon />
+          <WarningIcon size={14} />
         </div>
         <div className="cc-action-card__content">
           <span className="cc-action-card__label">Scheduling Conflicts</span>
@@ -126,7 +100,7 @@ export default function ActionCard({ metadata }: ActionCardProps) {
     return (
       <div className="cc-action-card cc-action-card--success">
         <div className="cc-action-card__icon cc-action-card__icon--success">
-          <CheckIcon />
+          <CheckCircleIcon size={14} />
         </div>
         <div className="cc-action-card__content">
           <span className="cc-action-card__label">No Conflicts</span>

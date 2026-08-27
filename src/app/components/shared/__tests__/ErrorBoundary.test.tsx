@@ -4,11 +4,14 @@ import ErrorBoundary from '../ErrorBoundary';
 
 // Suppress console.error during intentional error tests
 const originalError = console.error;
+const suppressExpectedWindowError = (event: ErrorEvent) => event.preventDefault();
 beforeEach(() => {
   console.error = vi.fn();
+  window.addEventListener('error', suppressExpectedWindowError);
 });
 afterEach(() => {
   console.error = originalError;
+  window.removeEventListener('error', suppressExpectedWindowError);
 });
 
 // Mock logger
@@ -43,6 +46,19 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     expect(screen.getByText('boom')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('redacts sensitive details from the development fallback', () => {
+    render(
+      <ErrorBoundary name="PrivateFailure">
+        <ThrowingComponent message="Bearer ui-secret at /Users/alice/private.ts" />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.queryByText(/ui-secret/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/alice/)).not.toBeInTheDocument();
+    expect(screen.getByText(/\[redacted\]/)).toBeInTheDocument();
+    expect(screen.getByText(/\[local-path\]/)).toBeInTheDocument();
   });
 
   it('resets state when "Try again" is clicked', () => {

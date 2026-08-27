@@ -6,6 +6,7 @@ import com.clawchat.android.core.di.AuthenticatedClient
 import com.clawchat.android.core.di.UnauthenticatedClient
 import com.clawchat.android.core.network.AuthInterceptor
 import com.clawchat.android.core.network.BaseUrlInterceptor
+import com.clawchat.android.core.network.RelayFallbackInterceptor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -46,9 +47,11 @@ object NetworkModule {
         authInterceptor: AuthInterceptor,
         baseUrlInterceptor: BaseUrlInterceptor,
         loggingInterceptor: HttpLoggingInterceptor,
+        relayFallbackInterceptor: RelayFallbackInterceptor,
     ): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(baseUrlInterceptor)
         .addInterceptor(authInterceptor)
+        .addInterceptor(relayFallbackInterceptor)
         .addInterceptor(loggingInterceptor)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)

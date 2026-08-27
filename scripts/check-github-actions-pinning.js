@@ -11,10 +11,12 @@ if (violations.length > 0) {
   for (const violation of violations) {
     console.error(
       `  ${path.relative(path.resolve(__dirname, '..'), violation.filename)}:${violation.line} ` +
-        `${violation.reference}`,
+        `${violation.reference} (${violation.reason})`,
     );
   }
   process.exit(1);
 }
 
-console.log('Verified GitHub Actions pinning: every remote action uses a full commit SHA');
+console.log(
+  'Verified GitHub Actions pinning: remote actions use full SHAs and core actions use Node 24',
+);

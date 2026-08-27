@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronRightIcon } from './Icons';
 
 interface SectionHeaderProps {
   title: string;
@@ -20,22 +21,21 @@ export default function SectionHeader({
 
   return (
     <div className="cc-section">
-      <div
+      <button
+        type="button"
         className={`cc-section__header${variantClass}`}
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
       >
-        <svg
+        <ChevronRightIcon
           className={`cc-section__chevron${open ? ' cc-section__chevron--open' : ''}`}
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+          size={16}
+        />
         <span className="cc-section__title">{title}</span>
         {count != null && count > 0 && (
           <span className="cc-section__count">{count}</span>
         )}
-      </div>
+      </button>
       {open && <div className="cc-section__body">{children}</div>}
     </div>
   );

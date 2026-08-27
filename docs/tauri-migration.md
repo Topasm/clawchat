@@ -1,6 +1,6 @@
 # Tauri desktop migration
 
-ClawChat is migrating its desktop shell from Electron to Tauri 2 without rewriting the React renderer or the FastAPI application server. The packaged Python server remains a native sidecar during the desktop migration.
+ClawChat completed its desktop-shell migration from Electron to Tauri 2 without rewriting the React renderer or FastAPI server. The packaged Python server remains a native sidecar, and the old Electron data format is supported only as an import source.
 
 Build layering, renderer targets, and bundle regression gates are documented in
 [build-performance.md](build-performance.md).
@@ -11,14 +11,13 @@ Build layering, renderer targets, and bundle regression gates are documented in
 React features
   -> NativePlatformApi
      -> Web adapter
-     -> Electron adapter (transition only)
      -> Tauri adapter
         -> typed commands/events
            -> thin Rust commands
               -> Rust native services
 ```
 
-Feature code must not read `window.electronAPI` or import `@tauri-apps/*` directly. Runtime-specific calls belong under `src/app/platform/`. Rust commands should validate inputs and delegate native work to services rather than containing domain logic.
+Feature code must not read an Electron bridge or import `@tauri-apps/*` directly. Runtime-specific calls belong under `src/app/platform/`. Rust commands should validate inputs and delegate native work to services rather than containing domain logic.
 
 ## Migration phases
 
@@ -31,8 +30,7 @@ Feature code must not read `window.electronAPI` or import `@tauri-apps/*` direct
 - [x] Port tray, notifications, badge, global shortcut, autostart, dialogs, and Obsidian URL handling.
 - [x] Add OS credential-vault storage and a signed Tauri updater pipeline.
 - [ ] Configure production credentials and verify OS-signed/notarized installers.
-- [ ] Run Electron and Tauri builds in parallel until parity and rollback checks pass.
-- [ ] Remove Electron after the cutover gate passes.
+- [x] Retire the Electron workflow and runtime after preserving the read-only data-import path.
 
 Android Compose and iOS Capacitor clients are outside this migration. Their HTTP and WebSocket contracts remain unchanged.
 
@@ -124,7 +122,7 @@ Server bundles require Python 3.11 or newer. The build script pins all PyInstall
 `server/build` and `server/dist` so it cannot overwrite the Vite renderer in the repository-level
 `dist` directory.
 
-`src-tauri/tauri.bundle.conf.json` adds the generated resource only for packaging, so ordinary Rust checks do not require a local PyInstaller artifact. `.github/workflows/build-tauri.yml` creates unsigned preview artifacts alongside the existing Electron workflow; it does not publish or replace Electron releases.
+`src-tauri/tauri.bundle.conf.json` adds the generated resource only for packaging, so ordinary Rust checks do not require a local PyInstaller artifact. `.github/workflows/build-tauri.yml` creates unsigned preview artifacts for the sole desktop runtime.
 
 The manifest covers every regular file by relative path, size, and SHA-256 and records contained
 PyInstaller symlinks. CI extracts each installer and re-runs the validator against the packaged
@@ -175,7 +173,7 @@ Tauri updater signatures are mandatory and independent from Apple notarization, 
 
 The desktop client checks the signed feed at startup, every six hours, and after a network or
 foreground resume when the previous check is at least one hour old. Users can disable background
-checks or run an interactive check from Settings. The shared Tauri/Electron lifecycle reports
+checks or run an interactive check from Settings. The Tauri lifecycle reports
 checking, available, download progress, ready-to-restart, and retryable error states; a dismissed
 version stays quiet until a newer release or an explicit manual check. Installation never happens
 silently because host mode may have active clients and work in progress.
@@ -229,16 +227,27 @@ Until real credentials are configured and the draft artifacts pass these checks,
 
 ## Current verification status
 
-- Renderer: 145 tests pass, including updater lifecycle and concurrent-check coverage.
+- Renderer: 192 tests pass, including runtime adapter parity, updater lifecycle, startup diagnostics,
+  localization, offline isolation, graph layout, and accessibility coverage.
+- Build/release and design-system script suite: 61 tests pass, including action pinning, release
+  inventory, artifact budgets, design-token and icon-contract validation, and packaged PyInstaller
+  link handling. Runtime-boundary coverage rejects static, dynamic, and bracket-based native access
+  from feature code.
 - Rust core: 13 configuration, import/rollback, credential-key, health check, onedir resolution, and updater-policy tests pass.
 - Read-only migration auditor: 3 path, configuration, and SHA-256 comparison tests pass.
-- Web and Electron production builds pass.
+- Web production build and renderer budgets pass. The current initial payload is 250.04 KiB raw / 82.90 KiB gzip; all JavaScript is 1.73 MiB against a 1.75 MiB ceiling.
+- Production npm dependencies audit with zero known vulnerabilities, and 851 lockfile package
+  licenses pass the reviewed allowlist.
+- Tauri preview CI passes on Linux x64, Windows x64, and macOS arm64; every installer is extracted
+  or mounted and its packaged FastAPI server must pass an actual health check.
+- GitHub-owned checkout/setup actions are pinned to approved Node 24 revisions, and the repository
+  check rejects a downgrade to legacy revisions.
 - A Windows GNU source cross-check and Clippy with warnings denied pass.
 - The current Rocky Linux 9.4 host cannot link a native Tauri binary because it has GLib 2.68 and lacks `webkit2gtk-4.1`/`rsvg2`; the Ubuntu Tauri CI job installs the required desktop packages.
 
-## Cutover gate
+## Post-cutover guarantees
 
-- Frontend tests, typecheck, web build, and desktop build pass.
+- Frontend tests, typecheck, web build, and Tauri desktop build pass.
 - Rust formatting, Clippy with warnings denied, and Rust tests pass.
 - The sidecar starts, reuses a healthy instance, restarts, and terminates on all supported desktop targets.
 - Closing the host window keeps the tray process alive; quitting terminates the server process tree.

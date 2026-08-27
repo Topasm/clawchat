@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # Public URL override (for reverse proxy deployments)
     public_url: str = ""
 
+    # Optional E2EE relay for port-forwarding-free remote access
+    relay_url: str = ""
+
     # Obsidian
     obsidian_vault_path: str = ""
     obsidian_cli_command: str = ""
@@ -41,7 +44,7 @@ class Settings(BaseSettings):
     obsidian_project_todo_filename: str = "TODO.md"
     obsidian_companion_node_required: bool = False
     obsidian_scan_interval_minutes: int = 5
-    obsidian_watch_enabled: bool = False  # opt-in: enable periodic vault scanning
+    obsidian_watch_enabled: bool = False  # opt-in: event watcher with polling fallback
 
     # Push notifications (FCM)
     firebase_credentials_path: str = ""

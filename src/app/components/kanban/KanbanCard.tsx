@@ -3,6 +3,7 @@ import { Draggable, Droppable } from '@hello-pangea/dnd';
 import type { TodoResponse } from '../../types/api';
 import TaskCard from '../shared/TaskCard';
 import useTouchSelect from '../../hooks/useTouchSelect';
+import { GripIcon } from '../shared/Icons';
 
 interface KanbanCardProps {
   task: TodoResponse;
@@ -22,7 +23,23 @@ interface KanbanCardProps {
   isCompletedOverride?: boolean;
 }
 
-export default function KanbanCard({ task, index, onToggle, onClick, onDelete, isFocused, onFocus, isSelected, onSelect, onSelectTouch, isSubTask, subTaskCount, isDragDisabled, isMobile, isCompletedOverride }: KanbanCardProps) {
+export default function KanbanCard({
+  task,
+  index,
+  onToggle,
+  onClick,
+  onDelete,
+  isFocused,
+  onFocus,
+  isSelected,
+  onSelect,
+  onSelectTouch,
+  isSubTask,
+  subTaskCount,
+  isDragDisabled,
+  isMobile,
+  isCompletedOverride,
+}: KanbanCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const touchSelectHandlers = useTouchSelect({
@@ -68,14 +85,7 @@ export default function KanbanCard({ task, index, onToggle, onClick, onDelete, i
               >
                 {isMobile && (
                   <div className="cc-kanban__drag-handle" {...provided.dragHandleProps}>
-                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
-                      <circle cx="2" cy="2" r="1.5" />
-                      <circle cx="8" cy="2" r="1.5" />
-                      <circle cx="2" cy="8" r="1.5" />
-                      <circle cx="8" cy="8" r="1.5" />
-                      <circle cx="2" cy="14" r="1.5" />
-                      <circle cx="8" cy="14" r="1.5" />
-                    </svg>
+                    <GripIcon size={16} />
                   </div>
                 )}
                 <TaskCard

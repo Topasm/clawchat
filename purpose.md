@@ -114,7 +114,7 @@ To maintain focus and avoid scope creep, the following are explicitly **not** go
 ```
 ┌─ ClawChat Desktop / Web App ───────────────────────┐
 │                                                      │
-│   Electron (desktop)    Pages (thin re-exports)      │
+│   Tauri (desktop)       Pages (thin re-exports)      │
 │   Web Browser (Vite)    ├── Today, Inbox, Chat       │
 │   Capacitor (mobile)    ├── Kanban Board (All Tasks) │
 │                         ├── Task/Event Detail        │
@@ -165,7 +165,7 @@ The project is considered successful when a user can:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Desktop shell | Electron | Native desktop app (Windows, macOS, Linux) |
+| Desktop shell | Tauri 2 | Native desktop app (Windows, macOS, Linux) |
 | Web framework | Vite + React 18 + TypeScript | Fast builds, type safety, single codebase |
 | Server framework | Python FastAPI | Async, fast, excellent for AI workloads |
 | Database | SQLite | Zero-config, single-file, sufficient for single-user |

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import apiClient from '../../services/apiClient';
+import { CheckCircleIcon } from '../shared/Icons';
 
 interface PairingCodeDisplayProps {
   onPaired?: () => void;
@@ -51,6 +52,9 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
         code: res.data.code,
         expiresAt: res.data.expires_at,
         qrPayload: res.data.qr_payload,
+        hostId: res.data.host_id,
+        hostPublicKey: res.data.host_public_key,
+        relayUrl: res.data.relay_url ?? null,
       };
       setSession(data);
       setState('active');
@@ -102,7 +106,9 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
 
   if (state === 'loading') {
     return (
-      <div className={`cc-pairing-code-display ${compact ? 'cc-pairing-code-display--compact' : ''}`}>
+      <div
+        className={`cc-pairing-code-display ${compact ? 'cc-pairing-code-display--compact' : ''}`}
+      >
         <div className="cc-pairing-code-display__loading">
           <div className="cc-pairing-code-display__spinner" />
           <span>Generating pairing code...</span>
@@ -113,7 +119,9 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
 
   if (state === 'error') {
     return (
-      <div className={`cc-pairing-code-display ${compact ? 'cc-pairing-code-display--compact' : ''}`}>
+      <div
+        className={`cc-pairing-code-display ${compact ? 'cc-pairing-code-display--compact' : ''}`}
+      >
         <div className="cc-pairing-code-display__error">
           <span className="cc-pairing-code-display__error-text">{error}</span>
           <button
@@ -131,14 +139,15 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
 
   if (state === 'paired') {
     return (
-      <div className={`cc-pairing-code-display ${compact ? 'cc-pairing-code-display--compact' : ''}`}>
+      <div
+        className={`cc-pairing-code-display ${compact ? 'cc-pairing-code-display--compact' : ''}`}
+      >
         <div className="cc-pairing-code-display__success">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="var(--cc-success)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="24" cy="24" r="20" />
-            <path d="M16 24l5 5 11-11" />
-          </svg>
+          <CheckCircleIcon size={48} style={{ color: 'var(--cc-success)' }} />
           <span className="cc-pairing-code-display__success-text">Paired!</span>
-          <span className="cc-pairing-code-display__success-sub">Device successfully connected</span>
+          <span className="cc-pairing-code-display__success-sub">
+            Device successfully connected
+          </span>
         </div>
       </div>
     );
@@ -164,12 +173,16 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
       <div className="cc-pairing-code-display__code-container">
         <div className="cc-pairing-code-display__digits">
           {session?.code.split('').map((digit, i) => (
-            <span key={i} className="cc-pairing-code-display__digit">{digit}</span>
+            <span key={i} className="cc-pairing-code-display__digit">
+              {digit}
+            </span>
           ))}
         </div>
         <div className="cc-pairing-code-display__countdown">
           {secondsLeft > 0 ? (
-            <span className={secondsLeft <= 30 ? 'cc-pairing-code-display__countdown--warning' : ''}>
+            <span
+              className={secondsLeft <= 30 ? 'cc-pairing-code-display__countdown--warning' : ''}
+            >
               Expires in {formatTime(secondsLeft)}
             </span>
           ) : (

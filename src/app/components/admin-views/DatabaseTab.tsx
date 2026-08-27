@@ -11,13 +11,11 @@ import SettingsSection from '../shared/SettingsSection';
 import SettingsRow from '../shared/SettingsRow';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import EmptyState from '../shared/EmptyState';
+import { DatabaseIcon } from '../shared/Icons';
 
 export default function DatabaseTab() {
+  const serverUrl = useAuthStore((state) => state.serverUrl);
   const { data: overview } = useAdminOverviewQuery();
-
-  if (!useAuthStore.getState().serverUrl) {
-    return <EmptyState icon="💾" message="Database management requires a server connection." />;
-  }
   const reindex = useReindexFTS();
   const backup = useBackupDatabase();
   const purge = usePurgeData();
@@ -25,6 +23,10 @@ export default function DatabaseTab() {
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
   const [purgeTarget, setPurgeTarget] = useState('conversations');
   const [purgeDays, setPurgeDays] = useState(90);
+
+  if (!serverUrl) {
+    return <EmptyState icon={<DatabaseIcon size={20} />} message="Database management requires a server connection." />;
+  }
 
   const storage = overview?.storage;
 

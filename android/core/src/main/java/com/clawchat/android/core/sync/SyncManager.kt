@@ -53,7 +53,13 @@ class SyncManager @Inject constructor(
                     is SyncEvent.Reminder -> _reminder.tryEmit(event)
                     is SyncEvent.Nudge -> _nudge.tryEmit(event)
                     is SyncEvent.WeeklyReview -> _weeklyReview.tryEmit(event)
-                    is SyncEvent.Connected -> _isConnected.value = true
+                    is SyncEvent.Connected -> {
+                        _isConnected.value = true
+                        // Repositories refetch authoritative state after a
+                        // direct or relay reconnect to recover missed events.
+                        _todoChanged.tryEmit(Unit)
+                        _eventChanged.tryEmit(Unit)
+                    }
                     is SyncEvent.Disconnected -> _isConnected.value = false
                 }
             }

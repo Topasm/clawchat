@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { logger } from '../../services/logger';
+import { redactSensitiveText } from '../../services/sensitiveData';
+import { hideStartupShell } from '../../services/startupSurface';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -23,6 +25,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
+    hideStartupShell();
     const label = this.props.name ?? 'Unknown';
     logger.error(`ErrorBoundary [${label}] caught an error`, error, {
       componentStack: info.componentStack ?? '',
@@ -42,13 +45,18 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       return this.props.fallback;
     }
 
+    const errorMessage =
+      import.meta.env.DEV && this.state.error
+        ? redactSensitiveText(this.state.error.message)
+        : 'An unexpected error occurred. Try again or restart the app.';
+
     return (
       <div className="cc-error-boundary">
-        <div className="cc-error-boundary__icon" aria-hidden="true">!</div>
+        <div className="cc-error-boundary__icon" aria-hidden="true">
+          !
+        </div>
         <h2 className="cc-error-boundary__title">Something went wrong</h2>
-        <p className="cc-error-boundary__message">
-          {this.state.error?.message || 'An unexpected error occurred.'}
-        </p>
+        <p className="cc-error-boundary__message">{errorMessage}</p>
         <button
           type="button"
           className="cc-btn cc-btn--primary cc-error-boundary__btn"

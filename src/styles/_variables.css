@@ -1,3 +1,18 @@
+/* --- Structural design tokens ----------------------------- */
+:root {
+  --cc-radius-xs: 4px;
+  --cc-radius-sm: 6px;
+  --cc-radius-md: 8px;
+  --cc-radius-lg: 10px;
+  --cc-radius-pill: 9999px;
+  --cc-control-height: 36px;
+  --cc-touch-target: 44px;
+  --cc-shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.16);
+  --cc-shadow-drag: 0 8px 20px rgba(0, 0, 0, 0.14);
+  --cc-transition-fast: 120ms ease;
+  --cc-transition-base: 160ms ease;
+}
+
 /* --- Root ------------------------------------------------- */
 /* CSS variables are injected as custom properties on .cc-root
    from the theme bridge in Layout.tsx / ThemeProvider.       */
@@ -7,6 +22,23 @@
   height: 100vh;
   background: var(--cc-background);
   color: var(--cc-text);
-  font-size: 14px;
+  font-size: var(--cc-font-size, 16px);
   line-height: 1.5;
+  color-scheme: light;
+  text-rendering: optimizeLegibility;
+}
+
+.cc-root--dark {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-root *,
+  .cc-root *::before,
+  .cc-root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

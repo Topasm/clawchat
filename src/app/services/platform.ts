@@ -12,13 +12,17 @@ export interface NotifyOptions {
 
 /**
  * Cross-platform desktop notification with optional action buttons.
- * - Electron: uses native Notification via IPC
+ * - Tauri: uses the native notification command
  * - Capacitor: uses LocalNotifications plugin with actionTypeId
  * - Web: uses the browser Notification API
  *
  * When itemType + itemId are provided, a "Mark Done" action button is shown.
  */
-export async function notify(title: string, body: string, options: NotifyOptions = {}): Promise<void> {
+export async function notify(
+  title: string,
+  body: string,
+  options: NotifyOptions = {},
+): Promise<void> {
   const { silent = false, itemType, itemId } = options;
 
   if (IS_DESKTOP) {
@@ -28,17 +32,21 @@ export async function notify(title: string, body: string, options: NotifyOptions
     const perm = await LocalNotifications.checkPermissions();
     if (perm.display === 'prompt') await LocalNotifications.requestPermissions();
     await LocalNotifications.schedule({
-      notifications: [{
-        title,
-        body,
-        id: Date.now() % 100000,
-        schedule: { at: new Date(Date.now() + 100) },
-        smallIcon: 'ic_stat_clawchat',
-        ...(itemId ? {
-          actionTypeId: 'REMINDER_ACTIONS',
-          extra: { itemType, itemId },
-        } : {}),
-      }],
+      notifications: [
+        {
+          title,
+          body,
+          id: Date.now() % 100000,
+          schedule: { at: new Date(Date.now() + 100) },
+          smallIcon: 'ic_stat_clawchat',
+          ...(itemId
+            ? {
+                actionTypeId: 'REMINDER_ACTIONS',
+                extra: { itemType, itemId },
+              }
+            : {}),
+        },
+      ],
     });
   } else if (typeof Notification !== 'undefined') {
     if (Notification.permission === 'granted') {

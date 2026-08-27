@@ -13,8 +13,8 @@
   padding: 10px 18px;
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  border-radius: var(--cc-radius-lg);
+  box-shadow: var(--cc-shadow-overlay);
   z-index: 100;
   /* animation handled by framer-motion */
 }
@@ -40,7 +40,7 @@
 .cc-bulk-toolbar__select {
   padding: 6px 10px;
   border: 1px solid var(--cc-border);
-  border-radius: 6px;
+  border-radius: var(--cc-radius-sm);
   background: var(--cc-background);
   color: var(--cc-text);
   font-size: 12px;

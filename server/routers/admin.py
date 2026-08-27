@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app_version import APP_VERSION
 from auth.dependencies import get_current_user
 from config import settings
 from database import get_db
@@ -60,7 +61,7 @@ async def get_overview(
 
     server = ServerOverview(
         uptime_seconds=admin_service.get_uptime_seconds(),
-        version="0.1.0",
+        version=APP_VERSION,
         ai_backend=active_provider,
         ai_model=ai_model,
         ai_base_url=settings.ai_base_url if active_provider == "openclaw" else "local CLI",
