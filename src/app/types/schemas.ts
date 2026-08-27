@@ -325,6 +325,33 @@ export const TaskRelationshipListResponseSchema = z
   ])
   .transform((response) => (Array.isArray(response) ? response : response.items));
 
+export const TaskDependencyCommandRequestSchema = z
+  .object({
+    dependent_task_id: z.string().min(1),
+    prerequisite_task_id: z.string().min(1),
+    expected_graph_revision: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const TaskDependencyInsightsDeltaSchema = z.object({
+  ready_count: z.number().int(),
+  blocked_count: z.number().int(),
+  critical_path_minutes: z.number().int().nullable(),
+});
+
+export const TaskDependencyPreviewResponseSchema = z.object({
+  dependent_task_id: z.string(),
+  prerequisite_task_id: z.string(),
+  base_graph_revision: z.number().int().nonnegative(),
+  affected_task_ids: z.array(z.string()),
+  insights_delta: TaskDependencyInsightsDeltaSchema.nullable().optional(),
+});
+
+export const TaskDependencyCommandResponseSchema = TaskDependencyPreviewResponseSchema.extend({
+  relationship: TaskRelationshipResponseSchema,
+  graph_revision: z.number().int().nonnegative(),
+});
+
 // -- Task graph execution insights -----------------------------------------
 
 export const GraphInsightScopeRoleSchema = z.enum(['root', 'descendant', 'context', 'global']);
@@ -682,6 +709,10 @@ export type TaskRelationshipType = z.infer<typeof TaskRelationshipTypeSchema>;
 export type TaskRelationshipResponse = z.infer<typeof TaskRelationshipResponseSchema>;
 export type TaskRelationshipCreate = z.infer<typeof TaskRelationshipCreateSchema>;
 export type TaskRelationshipUpdate = z.infer<typeof TaskRelationshipUpdateSchema>;
+export type TaskDependencyCommandRequest = z.infer<typeof TaskDependencyCommandRequestSchema>;
+export type TaskDependencyInsightsDelta = z.infer<typeof TaskDependencyInsightsDeltaSchema>;
+export type TaskDependencyPreviewResponse = z.infer<typeof TaskDependencyPreviewResponseSchema>;
+export type TaskDependencyCommandResponse = z.infer<typeof TaskDependencyCommandResponseSchema>;
 export type GraphInsightScopeRole = z.infer<typeof GraphInsightScopeRoleSchema>;
 export type GraphExecutionState = z.infer<typeof GraphExecutionStateSchema>;
 export type GraphDueRisk = z.infer<typeof GraphDueRiskSchema>;

@@ -2244,6 +2244,33 @@
   padding-right: 4px;
 }
 
+.cc-inbox-tree__dependency-handle,
+.cc-inbox-dependency-handle {
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 45%, var(--cc-border));
+  border-radius: var(--cc-radius-pill);
+  background: color-mix(in srgb, var(--cc-primary) 8%, var(--cc-surface));
+  color: var(--cc-primary);
+  cursor: alias;
+}
+
+.cc-inbox-tree__dependency-handle:hover,
+.cc-inbox-tree__dependency-handle:focus-visible,
+.cc-inbox-dependency-handle:hover,
+.cc-inbox-dependency-handle:focus-visible {
+  border-color: var(--cc-primary);
+  background: color-mix(in srgb, var(--cc-primary) 18%, var(--cc-surface));
+}
+
+.cc-inbox-dependency-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
 .cc-inbox-tree__nodes {
   padding: 5px 8px 8px;
 }
@@ -2358,6 +2385,57 @@
   color: var(--cc-text-secondary);
   font-size: 11px;
   line-height: 1.5;
+}
+
+.cc-inbox-triage__dependency-picker {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.cc-inbox-triage__dependency-picker label {
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cc-inbox-triage__dependency-picker select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  padding: 6px 8px;
+  background: var(--cc-surface);
+  color: var(--cc-text);
+}
+
+.cc-inbox-triage__dependency-picker small,
+.cc-inbox-triage__dependency-preview small {
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.cc-inbox-triage__dependency-preview {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 42%, var(--cc-border));
+  border-radius: var(--cc-radius-md);
+  background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
+}
+
+.cc-inbox-triage__dependency-preview p {
+  margin: 0;
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cc-inbox-triage__dependency-preview > div {
+  display: flex;
+  gap: 6px;
 }
 
 .cc-inbox-triage__mobile-tree {

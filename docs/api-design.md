@@ -274,6 +274,8 @@ must use the task-relationship endpoints below.
 ```text
 GET    /api/task-relationships       # List/filter normalized task links
 POST   /api/task-relationships       # Create and validate one link
+POST   /api/task-relationships/commands/dependency/preview # Validate and preview impact
+POST   /api/task-relationships/commands/dependency         # Revision-safe dependency apply
 PATCH  /api/task-relationships/:id   # Change endpoints, type, or label
 DELETE /api/task-relationships/:id   # Delete one link
 ```
@@ -312,6 +314,25 @@ cannot be supplied or changed through the public relationship mutation API.
 Malformed or invalid graphs return the named `ErrorResponse` contract with
 HTTP 400, an existing/conflicting edge returns 409, and request-schema failures
 return 422.
+
+Inbox connectors use semantic endpoint names and an optimistic-concurrency
+revision. Preview performs the same relationship validation as apply but rolls
+back its savepoint, so neither the edge, compatibility shadow, nor graph
+revision changes:
+
+```json
+{
+  "dependent_task_id": "todo_figure",
+  "prerequisite_task_id": "todo_ablation",
+  "expected_graph_revision": 32
+}
+```
+
+The preview response includes `base_graph_revision`, `affected_task_ids`, and
+Ready/Blocked/critical-path deltas. Apply additionally returns the persisted
+relationship and new `graph_revision`. Cycle errors include
+`details.cycle_task_ids`; stale revisions return HTTP 409 with expected and
+current revisions.
 
 ## Execution Graph Insights
 

@@ -54,6 +54,8 @@ export { default as useTodayData } from './useTodayQuery';
 export {
   useTaskRelationshipsQuery,
   useCreateTaskRelationship,
+  usePreviewTaskDependency,
+  useCreateTaskDependency,
   useDeleteTaskRelationship,
 } from './useTaskRelationshipQueries';
 export { useTaskGraphInsightsQuery } from './useTaskGraphInsightsQuery';

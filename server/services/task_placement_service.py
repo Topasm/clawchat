@@ -3,16 +3,20 @@
 import json
 from datetime import datetime, timezone
 
-from domain.plan_proposal import GLOBAL_TASK_GRAPH_SCOPE_ID
-from exceptions import AppError, ConflictError, NotFoundError, ValidationError
+from exceptions import ConflictError, NotFoundError, ValidationError
 from models.project import Project
-from models.task_graph_state import TaskGraphState
 from models.task_placement_change import TaskPlacementChange
 from models.todo import Todo
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services import graph_insights_service
+from services.graph_command_service import (
+    claim_graph_revision,
+    current_graph_revision,
+    ensure_graph_revision_advanced,
+    insight_delta,
+    load_graph_insights,
+)
 
 
 def _state(todo: Todo) -> dict[str, object]:
@@ -23,63 +27,6 @@ def _state(todo: Todo) -> dict[str, object]:
         "sort_order": todo.sort_order,
         "inbox_state": todo.inbox_state,
     }
-
-
-async def current_graph_revision(db: AsyncSession) -> int:
-    revision = (
-        await db.execute(
-            select(TaskGraphState.revision).where(
-                TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID
-            )
-        )
-    ).scalar_one_or_none()
-    return revision or 0
-
-
-async def _claim_revision(db: AsyncSession, expected: int) -> None:
-    claimed = (
-        await db.execute(
-            update(TaskGraphState)
-            .where(
-                TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID,
-                TaskGraphState.revision == expected,
-            )
-            .values(revision=TaskGraphState.revision)
-            .returning(TaskGraphState.revision)
-        )
-    ).scalar_one_or_none()
-    if claimed is None:
-        current = await current_graph_revision(db)
-        raise ConflictError(
-            f"Task graph changed from revision {expected} to {current}; refresh and retry"
-        )
-
-
-async def _ensure_revision_advanced(db: AsyncSession, previous: int) -> int:
-    """Advance placement-only changes that are outside Todo graph triggers."""
-    current = await current_graph_revision(db)
-    if current != previous:
-        return current
-    advanced = (
-        await db.execute(
-            update(TaskGraphState)
-            .where(
-                TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID,
-                TaskGraphState.revision == previous,
-            )
-            .values(
-                revision=TaskGraphState.revision + 1,
-                updated_at=datetime.now(timezone.utc),
-            )
-            .returning(TaskGraphState.revision)
-        )
-    ).scalar_one_or_none()
-    if advanced is None:
-        current = await current_graph_revision(db)
-        raise ConflictError(
-            f"Task graph changed from revision {previous} to {current}; refresh and retry"
-        )
-    return advanced
 
 
 async def _subtree(db: AsyncSession, todo_id: str) -> list[Todo]:
@@ -138,37 +85,6 @@ def _renumber(items: list[Todo]) -> None:
         item.sort_order = index * 10
 
 
-async def _insight_counts(db: AsyncSession) -> tuple[int, int, int | None] | None:
-    try:
-        insights = await graph_insights_service.get_graph_insights(db)
-    except AppError:
-        return None
-    return (
-        insights.summary.ready_count,
-        insights.summary.blocked_count,
-        insights.summary.critical_path_minutes,
-    )
-
-
-def _insight_delta(
-    before: tuple[int, int, int | None] | None,
-    after: tuple[int, int, int | None] | None,
-) -> dict[str, int | None] | None:
-    if before is None or after is None:
-        return None
-    before_critical = before[2]
-    after_critical = after[2]
-    return {
-        "ready_count": after[0] - before[0],
-        "blocked_count": after[1] - before[1],
-        "critical_path_minutes": (
-            after_critical - before_critical
-            if after_critical is not None and before_critical is not None
-            else None
-        ),
-    }
-
-
 async def place_task(
     db: AsyncSession,
     *,
@@ -179,7 +95,7 @@ async def place_task(
     inbox_state: str | None,
     expected_graph_revision: int,
 ) -> tuple[Todo, TaskPlacementChange, list[str], dict[str, int | None] | None]:
-    await _claim_revision(db, expected_graph_revision)
+    await claim_graph_revision(db, expected_graph_revision)
     todo = await db.get(Todo, todo_id)
     if todo is None:
         raise NotFoundError(f"Todo {todo_id} not found")
@@ -217,7 +133,8 @@ async def place_task(
             details={"todo_id": todo.id, "parent_id": effective_parent_id},
         )
 
-    before_insights = await _insight_counts(db)
+    analysis_time = datetime.now(timezone.utc)
+    before_insights = await load_graph_insights(db, generated_at=analysis_time)
 
     old_scope = (todo.project_id, todo.parent_id)
     new_scope = (project_id, effective_parent_id)
@@ -247,7 +164,7 @@ async def place_task(
     todo.inbox_state = inbox_state or ("captured" if project_id is None else "none")
     _renumber(target_items)
     await db.flush()
-    after_insights = await _insight_counts(db)
+    after_insights = await load_graph_insights(db, generated_at=analysis_time)
 
     after = [_state(item) for item in changed_candidates.values()]
     affected_ids = sorted(
@@ -257,7 +174,10 @@ async def place_task(
     )
     if not affected_ids:
         raise ValidationError("Task is already at the requested placement")
-    applied_revision = await _ensure_revision_advanced(db, expected_graph_revision)
+    applied_revision = await ensure_graph_revision_advanced(
+        db,
+        expected_graph_revision,
+    )
     change = TaskPlacementChange(
         todo_id=todo.id,
         base_graph_revision=expected_graph_revision,
@@ -267,7 +187,7 @@ async def place_task(
     )
     db.add(change)
     await db.flush()
-    return todo, change, affected_ids, _insight_delta(before_insights, after_insights)
+    return todo, change, affected_ids, insight_delta(before_insights, after_insights)
 
 
 async def undo_placement(
@@ -279,8 +199,9 @@ async def undo_placement(
         raise NotFoundError(f"Placement change {change_set_id} not found")
     if change.status != "applied":
         raise ConflictError("This placement has already been reverted")
-    await _claim_revision(db, change.applied_graph_revision)
-    before_insights = await _insight_counts(db)
+    await claim_graph_revision(db, change.applied_graph_revision)
+    analysis_time = datetime.now(timezone.utc)
+    before_insights = await load_graph_insights(db, generated_at=analysis_time)
 
     before: list[dict[str, object]] = json.loads(change.before_json)
     after: list[dict[str, object]] = json.loads(change.after_json)
@@ -325,8 +246,11 @@ async def undo_placement(
         if state["inbox_state"] != applied_state["inbox_state"]:
             todo.inbox_state = str(state["inbox_state"])
     await db.flush()
-    after_insights = await _insight_counts(db)
-    reverted_revision = await _ensure_revision_advanced(db, change.applied_graph_revision)
+    after_insights = await load_graph_insights(db, generated_at=analysis_time)
+    reverted_revision = await ensure_graph_revision_advanced(
+        db,
+        change.applied_graph_revision,
+    )
     change.status = "reverted"
     change.reverted_graph_revision = reverted_revision
     change.reverted_at = datetime.now(timezone.utc)
@@ -335,5 +259,5 @@ async def undo_placement(
         by_id[change.todo_id],
         change,
         sorted(restored_ids),
-        _insight_delta(before_insights, after_insights),
+        insight_delta(before_insights, after_insights),
     )

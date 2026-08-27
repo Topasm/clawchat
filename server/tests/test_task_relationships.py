@@ -1,6 +1,7 @@
 """API and compatibility coverage for normalized task relationships."""
 
 import asyncio
+import json
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
@@ -22,6 +23,7 @@ from exceptions import ValidationError
 from main import app
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
+from services.graph_command_service import current_graph_revision
 from services.task_relationship_service import (
     _assert_dependency_dag,
     replace_task_dependencies,
@@ -390,6 +392,119 @@ async def test_relationship_validation_rejects_invalid_graph(client, auth_header
         headers=auth_headers,
     )
     assert duplicate_patch.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_dependency_command_previews_then_applies_impact(
+    client,
+    auth_headers,
+    db_session,
+):
+    prerequisite = await _create_todo(
+        client,
+        auth_headers,
+        "Prepare data",
+        estimated_minutes=10,
+    )
+    dependent = await _create_todo(
+        client,
+        auth_headers,
+        "Analyze data",
+        estimated_minutes=20,
+    )
+    revision = await current_graph_revision(db_session)
+    payload = {
+        "dependent_task_id": dependent["id"],
+        "prerequisite_task_id": prerequisite["id"],
+        "expected_graph_revision": revision,
+    }
+
+    preview = await client.post(
+        "/api/task-relationships/commands/dependency/preview",
+        json=payload,
+        headers=auth_headers,
+    )
+    assert preview.status_code == 200, preview.text
+    preview_payload = preview.json()
+    assert preview_payload["base_graph_revision"] == revision
+    assert preview_payload["insights_delta"] == {
+        "ready_count": -1,
+        "blocked_count": 1,
+        "critical_path_minutes": 10,
+    }
+    assert dependent["id"] in preview_payload["affected_task_ids"]
+    assert await current_graph_revision(db_session) == revision
+    assert (
+        await client.get("/api/task-relationships", headers=auth_headers)
+    ).json() == []
+    dependent_row = await db_session.get(Todo, dependent["id"])
+    assert dependent_row is not None
+    await db_session.refresh(dependent_row)
+    assert json.loads(dependent_row.depends_on or "[]") == []
+
+    applied = await client.post(
+        "/api/task-relationships/commands/dependency",
+        json=payload,
+        headers=auth_headers,
+    )
+    assert applied.status_code == 201, applied.text
+    applied_payload = applied.json()
+    assert applied_payload["relationship"]["source_task_id"] == dependent["id"]
+    assert applied_payload["relationship"]["target_task_id"] == prerequisite["id"]
+    assert applied_payload["graph_revision"] > revision
+    assert applied_payload["insights_delta"] == preview_payload["insights_delta"]
+    await db_session.refresh(dependent_row)
+    assert json.loads(dependent_row.depends_on or "[]") == [prerequisite["id"]]
+
+
+@pytest.mark.asyncio
+async def test_dependency_command_reports_cycle_path_and_stale_revision(
+    client,
+    auth_headers,
+    db_session,
+):
+    task_a = await _create_todo(client, auth_headers, "A")
+    task_b = await _create_todo(client, auth_headers, "B")
+    task_c = await _create_todo(client, auth_headers, "C")
+    await _create_relationship(client, auth_headers, task_a["id"], task_b["id"])
+    await _create_relationship(client, auth_headers, task_b["id"], task_c["id"])
+    revision = await current_graph_revision(db_session)
+
+    cycle = await client.post(
+        "/api/task-relationships/commands/dependency/preview",
+        json={
+            "dependent_task_id": task_c["id"],
+            "prerequisite_task_id": task_a["id"],
+            "expected_graph_revision": revision,
+        },
+        headers=auth_headers,
+    )
+    assert cycle.status_code == 400, cycle.text
+    assert cycle.json()["error"]["details"] == {
+        "reason": "dependency_cycle",
+        "proposed_edge": {
+            "source_task_id": task_c["id"],
+            "target_task_id": task_a["id"],
+        },
+        "existing_path_task_ids": [task_a["id"], task_b["id"], task_c["id"]],
+        "cycle_task_ids": [task_c["id"], task_a["id"], task_b["id"], task_c["id"]],
+    }
+    assert await current_graph_revision(db_session) == revision
+
+    stale = await client.post(
+        "/api/task-relationships/commands/dependency",
+        json={
+            "dependent_task_id": task_c["id"],
+            "prerequisite_task_id": task_a["id"],
+            "expected_graph_revision": revision - 1,
+        },
+        headers=auth_headers,
+    )
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["error"]["details"] == {
+        "expected_graph_revision": revision - 1,
+        "current_graph_revision": revision,
+    }
 
 
 @pytest.mark.parametrize(
@@ -852,6 +967,12 @@ def test_openapi_exposes_named_task_relationship_type_component():
 
     relationship_paths = openapi["paths"]["/api/task-relationships"]
     item_paths = openapi["paths"]["/api/task-relationships/{relationship_id}"]
+    preview_path = openapi["paths"][
+        "/api/task-relationships/commands/dependency/preview"
+    ]["post"]
+    command_path = openapi["paths"][
+        "/api/task-relationships/commands/dependency"
+    ]["post"]
     for operation, status_codes in (
         (relationship_paths["post"], ("400", "409")),
         (item_paths["patch"], ("400", "404", "409")),
@@ -862,6 +983,16 @@ def test_openapi_exposes_named_task_relationship_type_component():
                 "application/json"
             ]["schema"]
             assert schema == {"$ref": "#/components/schemas/ErrorResponse"}
+
+    assert preview_path["requestBody"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/TaskDependencyCommandRequest"}
+    assert preview_path["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/TaskDependencyPreviewResponse"}
+    assert command_path["responses"]["201"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/TaskDependencyCommandResponse"}
 
     plan_apply_schema = openapi["paths"]["/api/todos/{todo_id}/plan/apply"][
         "post"

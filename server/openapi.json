@@ -5653,6 +5653,155 @@
         "title": "TableCounts",
         "type": "object"
       },
+      "TaskDependencyCommandRequest": {
+        "additionalProperties": false,
+        "description": "Revision-sensitive dependency connector command.",
+        "properties": {
+          "dependent_task_id": {
+            "minLength": 1,
+            "title": "Dependent Task Id",
+            "type": "string"
+          },
+          "expected_graph_revision": {
+            "minimum": 0.0,
+            "title": "Expected Graph Revision",
+            "type": "integer"
+          },
+          "prerequisite_task_id": {
+            "minLength": 1,
+            "title": "Prerequisite Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependent_task_id",
+          "prerequisite_task_id",
+          "expected_graph_revision"
+        ],
+        "title": "TaskDependencyCommandRequest",
+        "type": "object"
+      },
+      "TaskDependencyCommandResponse": {
+        "properties": {
+          "affected_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Task Ids",
+            "type": "array"
+          },
+          "base_graph_revision": {
+            "minimum": 0.0,
+            "title": "Base Graph Revision",
+            "type": "integer"
+          },
+          "dependent_task_id": {
+            "title": "Dependent Task Id",
+            "type": "string"
+          },
+          "graph_revision": {
+            "minimum": 0.0,
+            "title": "Graph Revision",
+            "type": "integer"
+          },
+          "insights_delta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskDependencyInsightsDelta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prerequisite_task_id": {
+            "title": "Prerequisite Task Id",
+            "type": "string"
+          },
+          "relationship": {
+            "$ref": "#/components/schemas/TaskRelationshipResponse"
+          }
+        },
+        "required": [
+          "dependent_task_id",
+          "prerequisite_task_id",
+          "base_graph_revision",
+          "affected_task_ids",
+          "relationship",
+          "graph_revision"
+        ],
+        "title": "TaskDependencyCommandResponse",
+        "type": "object"
+      },
+      "TaskDependencyInsightsDelta": {
+        "properties": {
+          "blocked_count": {
+            "default": 0,
+            "title": "Blocked Count",
+            "type": "integer"
+          },
+          "critical_path_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Critical Path Minutes"
+          },
+          "ready_count": {
+            "default": 0,
+            "title": "Ready Count",
+            "type": "integer"
+          }
+        },
+        "title": "TaskDependencyInsightsDelta",
+        "type": "object"
+      },
+      "TaskDependencyPreviewResponse": {
+        "properties": {
+          "affected_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Task Ids",
+            "type": "array"
+          },
+          "base_graph_revision": {
+            "minimum": 0.0,
+            "title": "Base Graph Revision",
+            "type": "integer"
+          },
+          "dependent_task_id": {
+            "title": "Dependent Task Id",
+            "type": "string"
+          },
+          "insights_delta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskDependencyInsightsDelta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prerequisite_task_id": {
+            "title": "Prerequisite Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dependent_task_id",
+          "prerequisite_task_id",
+          "base_graph_revision",
+          "affected_task_ids"
+        ],
+        "title": "TaskDependencyPreviewResponse",
+        "type": "object"
+      },
       "TaskPlacementInsightsDelta": {
         "properties": {
           "blocked_count": {
@@ -10727,6 +10876,138 @@
           }
         ],
         "summary": "Create Task Relationship",
+        "tags": [
+          "task-relationships"
+        ]
+      }
+    },
+    "/api/task-relationships/commands/dependency": {
+      "post": {
+        "operationId": "create_task_dependency_command_api_task_relationships_commands_dependency_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskDependencyCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDependencyCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid task relationship graph"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Task relationship already exists or conflicts"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Task Dependency Command",
+        "tags": [
+          "task-relationships"
+        ]
+      }
+    },
+    "/api/task-relationships/commands/dependency/preview": {
+      "post": {
+        "operationId": "preview_task_dependency_api_task_relationships_commands_dependency_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskDependencyCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDependencyPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid task relationship graph"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Task relationship already exists or conflicts"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preview Task Dependency",
         "tags": [
           "task-relationships"
         ]

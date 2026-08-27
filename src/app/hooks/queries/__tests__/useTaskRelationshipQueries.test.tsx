@@ -6,8 +6,10 @@ import { useAuthStore } from '../../../stores/useAuthStore';
 import type { TaskRelationshipResponse } from '../../../types/api';
 import { queryKeys } from '../queryKeys';
 import {
+  useCreateTaskDependency,
   useCreateTaskRelationship,
   useDeleteTaskRelationship,
+  usePreviewTaskDependency,
   useTaskRelationshipsQuery,
 } from '../useTaskRelationshipQueries';
 
@@ -101,6 +103,81 @@ describe('task relationship queries', () => {
       type: 'depends_on',
     });
     expect(queryClient.getQueryState(queryKeys.taskRelationships)?.isInvalidated).toBe(true);
+  });
+
+  it('previews a semantic dependency command without invalidating cached graph data', async () => {
+    const preview = {
+      dependent_task_id: 'dependent-task',
+      prerequisite_task_id: 'prerequisite-task',
+      base_graph_revision: 7,
+      affected_task_ids: ['dependent-task'],
+      insights_delta: {
+        ready_count: -1,
+        blocked_count: 1,
+        critical_path_minutes: 20,
+      },
+    };
+    apiMocks.post.mockResolvedValueOnce({ data: preview });
+    const { queryClient, wrapper } = createHarness();
+    queryClient.setQueryData(queryKeys.taskGraphInsights, { graph_revision: 7 });
+    const { result } = renderHook(() => usePreviewTaskDependency(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        dependent_task_id: 'dependent-task',
+        prerequisite_task_id: 'prerequisite-task',
+        expected_graph_revision: 7,
+      });
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/task-relationships/commands/dependency/preview', {
+      dependent_task_id: 'dependent-task',
+      prerequisite_task_id: 'prerequisite-task',
+      expected_graph_revision: 7,
+    });
+    expect(queryClient.getQueryState(queryKeys.taskGraphInsights)?.isInvalidated).toBe(false);
+  });
+
+  it('applies a dependency command and invalidates every graph consumer', async () => {
+    apiMocks.post.mockResolvedValueOnce({
+      data: {
+        relationship,
+        dependent_task_id: 'dependent-task',
+        prerequisite_task_id: 'prerequisite-task',
+        base_graph_revision: 7,
+        graph_revision: 8,
+        affected_task_ids: ['dependent-task'],
+        insights_delta: {
+          ready_count: -1,
+          blocked_count: 1,
+          critical_path_minutes: 20,
+        },
+      },
+    });
+    const { queryClient, wrapper } = createHarness();
+    queryClient.setQueryData(queryKeys.taskRelationships, []);
+    queryClient.setQueryData(queryKeys.taskGraphInsights, { graph_revision: 7 });
+    queryClient.setQueryData(queryKeys.todos, []);
+    queryClient.setQueryData(queryKeys.projects, []);
+    const { result } = renderHook(() => useCreateTaskDependency(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        dependent_task_id: 'dependent-task',
+        prerequisite_task_id: 'prerequisite-task',
+        expected_graph_revision: 7,
+      });
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/task-relationships/commands/dependency', {
+      dependent_task_id: 'dependent-task',
+      prerequisite_task_id: 'prerequisite-task',
+      expected_graph_revision: 7,
+    });
+    expect(queryClient.getQueryState(queryKeys.taskRelationships)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.taskGraphInsights)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.todos)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
   });
 
   it('deletes by relationship ID and invalidates the list', async () => {

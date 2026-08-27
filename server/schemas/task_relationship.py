@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from domain.task_relationship import TaskRelationshipType
@@ -77,3 +77,38 @@ class TaskRelationshipResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TaskDependencyCommandRequest(BaseModel):
+    """Revision-sensitive dependency connector command."""
+
+    dependent_task_id: NonBlankString
+    prerequisite_task_id: NonBlankString
+    expected_graph_revision: int = Field(ge=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _reject_self_dependency(self) -> Self:
+        if self.dependent_task_id == self.prerequisite_task_id:
+            raise ValueError("A task cannot depend on itself")
+        return self
+
+
+class TaskDependencyInsightsDelta(BaseModel):
+    ready_count: int = 0
+    blocked_count: int = 0
+    critical_path_minutes: int | None = None
+
+
+class TaskDependencyPreviewResponse(BaseModel):
+    dependent_task_id: str
+    prerequisite_task_id: str
+    base_graph_revision: int = Field(ge=0)
+    affected_task_ids: list[str]
+    insights_delta: TaskDependencyInsightsDelta | None = None
+
+
+class TaskDependencyCommandResponse(TaskDependencyPreviewResponse):
+    relationship: TaskRelationshipResponse
+    graph_revision: int = Field(ge=0)

@@ -203,6 +203,13 @@ Todo deletion, plan application, and `module_data_changed` WebSocket events all
 invalidate that cache. The Graph reverses stored `depends_on` edges only for
 display so execution flows from prerequisite to dependent task.
 
+The Inbox Triage Canvas keeps card placement and dependency connectors on
+separate drag transfer types. Dragging `↝` from a dependent Task onto its
+prerequisite opens a server-derived impact preview; touch and keyboard users
+choose the same prerequisite from the Inspector. Confirming uses the preview's
+base graph revision, then invalidates relationships, Todos, graph insights, and
+Projects together.
+
 ### useToastStore
 
 ```typescript

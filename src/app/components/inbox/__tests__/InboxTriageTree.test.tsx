@@ -40,6 +40,7 @@ describe('InboxTriageTree', () => {
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPreviewDependency={vi.fn()}
       />,
     );
 
@@ -57,6 +58,7 @@ describe('InboxTriageTree', () => {
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPreviewDependency={vi.fn()}
       />,
     );
 
@@ -74,6 +76,7 @@ describe('InboxTriageTree', () => {
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPreviewDependency={vi.fn()}
       />,
     );
 
@@ -90,10 +93,11 @@ describe('InboxTriageTree', () => {
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={vi.fn()}
+        onPreviewDependency={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole('button', { name: /Figures/ })).toBeInTheDocument();
+    expect(screen.getByText('Figures')).toBeInTheDocument();
   });
 
   it('accepts a dragged Inbox task on the project target', () => {
@@ -106,6 +110,7 @@ describe('InboxTriageTree', () => {
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPreviewDependency={vi.fn()}
       />,
     );
 
@@ -115,5 +120,58 @@ describe('InboxTriageTree', () => {
       dataTransfer: { getData: () => 'inbox-1' },
     });
     expect(onPlace).toHaveBeenCalledWith('inbox-1', project.id, null);
+  });
+
+  it('uses the selected task as the dependent and the connector node as prerequisite', () => {
+    const onPreviewDependency = vi.fn();
+    render(
+      <InboxTriageTree
+        projects={[project]}
+        todos={[task]}
+        selectedTaskId="inbox-1"
+        disabled={false}
+        onSelectTask={vi.fn()}
+        onPlace={vi.fn()}
+        onPreviewDependency={onPreviewDependency}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Dependency connector for Figures. Drag to a prerequisite or drop a dependent here.',
+      }),
+    );
+
+    expect(onPreviewDependency).toHaveBeenCalledWith('inbox-1', task.id);
+  });
+
+  it('does not treat a dependency connector drop as hierarchy placement', () => {
+    const onPlace = vi.fn();
+    const onPreviewDependency = vi.fn();
+    render(
+      <InboxTriageTree
+        projects={[project]}
+        todos={[task]}
+        selectedTaskId={null}
+        disabled={false}
+        onSelectTask={vi.fn()}
+        onPlace={onPlace}
+        onPreviewDependency={onPreviewDependency}
+      />,
+    );
+
+    const connector = screen.getByRole('button', {
+      name: 'Dependency connector for Figures. Drag to a prerequisite or drop a dependent here.',
+    });
+    fireEvent.drop(connector, {
+      dataTransfer: {
+        types: ['application/x-clawchat-task-dependency'],
+        getData: (type: string) =>
+          type === 'application/x-clawchat-task-dependency' ? 'dependent-1' : '',
+      },
+    });
+
+    expect(onPreviewDependency).toHaveBeenCalledWith('dependent-1', task.id);
+    expect(onPlace).not.toHaveBeenCalled();
   });
 });

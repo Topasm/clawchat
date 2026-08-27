@@ -8,6 +8,9 @@ from database import get_db
 from domain.task_relationship import TaskRelationshipType
 from schemas.common import ErrorResponse
 from schemas.task_relationship import (
+    TaskDependencyCommandRequest,
+    TaskDependencyCommandResponse,
+    TaskDependencyPreviewResponse,
     TaskRelationshipCreate,
     TaskRelationshipResponse,
     TaskRelationshipUpdate,
@@ -73,6 +76,56 @@ async def create_task_relationship(
     await db.refresh(relationship)
     await notify_module_data_changed("todos")
     return relationship
+
+
+@router.post(
+    "/commands/dependency/preview",
+    response_model=TaskDependencyPreviewResponse,
+    responses={**_VALIDATION_RESPONSE, **_CONFLICT_RESPONSE},
+)
+async def preview_task_dependency(
+    body: TaskDependencyCommandRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    affected_ids, insights_delta = (
+        await task_relationship_service.preview_dependency_command(db, body)
+    )
+    return TaskDependencyPreviewResponse(
+        dependent_task_id=body.dependent_task_id,
+        prerequisite_task_id=body.prerequisite_task_id,
+        base_graph_revision=body.expected_graph_revision,
+        affected_task_ids=affected_ids,
+        insights_delta=insights_delta,
+    )
+
+
+@router.post(
+    "/commands/dependency",
+    response_model=TaskDependencyCommandResponse,
+    status_code=201,
+    responses={**_VALIDATION_RESPONSE, **_CONFLICT_RESPONSE},
+)
+async def create_task_dependency_command(
+    body: TaskDependencyCommandRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    relationship, revision, affected_ids, insights_delta = (
+        await task_relationship_service.create_dependency_command(db, body)
+    )
+    await db.commit()
+    await db.refresh(relationship)
+    await notify_module_data_changed("todos")
+    return TaskDependencyCommandResponse(
+        relationship=relationship,
+        dependent_task_id=body.dependent_task_id,
+        prerequisite_task_id=body.prerequisite_task_id,
+        base_graph_revision=body.expected_graph_revision,
+        graph_revision=revision,
+        affected_task_ids=affected_ids,
+        insights_delta=insights_delta,
+    )
 
 
 @router.patch(

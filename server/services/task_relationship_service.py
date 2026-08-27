@@ -14,6 +14,14 @@ from exceptions import ConflictError, NotFoundError, ValidationError
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
 from schemas.task_relationship import TaskRelationshipCreate, TaskRelationshipUpdate
+from schemas.task_relationship import TaskDependencyCommandRequest
+from services.graph_command_service import (
+    changed_graph_task_ids,
+    claim_graph_revision,
+    current_graph_revision,
+    insight_delta,
+    load_graph_insights,
+)
 
 
 def _now() -> datetime:
@@ -78,6 +86,35 @@ def _assert_dependency_dag(edges: list[tuple[str, str]]) -> None:
         raise ValidationError("Dependency cycle detected")
 
 
+def _dependency_path(
+    edges: list[tuple[str, str]],
+    start_task_id: str,
+    goal_task_id: str,
+) -> list[str] | None:
+    adjacency: dict[str, list[str]] = defaultdict(list)
+    for source_task_id, target_task_id in edges:
+        adjacency[source_task_id].append(target_task_id)
+    for targets in adjacency.values():
+        targets.sort()
+
+    queue = deque([start_task_id])
+    previous: dict[str, str | None] = {start_task_id: None}
+    while queue:
+        task_id = queue.popleft()
+        if task_id == goal_task_id:
+            path: list[str] = []
+            cursor: str | None = task_id
+            while cursor is not None:
+                path.append(cursor)
+                cursor = previous[cursor]
+            return list(reversed(path))
+        for target_task_id in adjacency.get(task_id, []):
+            if target_task_id not in previous:
+                previous[target_task_id] = task_id
+                queue.append(target_task_id)
+    return None
+
+
 async def _require_tasks(db: AsyncSession, task_ids: set[str]) -> None:
     if not task_ids:
         return
@@ -138,8 +175,88 @@ async def _validate_candidate(
             db,
             exclude_relationship_id=exclude_relationship_id,
         )
+        existing_path = _dependency_path(
+            edges,
+            target_task_id,
+            source_task_id,
+        )
+        if existing_path is not None:
+            cycle_task_ids = [source_task_id, *existing_path]
+            raise ValidationError(
+                "Dependency cycle detected",
+                details={
+                    "reason": "dependency_cycle",
+                    "proposed_edge": {
+                        "source_task_id": source_task_id,
+                        "target_task_id": target_task_id,
+                    },
+                    "existing_path_task_ids": existing_path,
+                    "cycle_task_ids": cycle_task_ids,
+                },
+            )
         edges.append((source_task_id, target_task_id))
         _assert_dependency_dag(edges)
+
+
+async def preview_dependency_command(
+    db: AsyncSession,
+    body: TaskDependencyCommandRequest,
+) -> tuple[list[str], dict[str, int | None] | None]:
+    current = await current_graph_revision(db)
+    if current != body.expected_graph_revision:
+        raise ConflictError(
+            f"Task graph changed from revision {body.expected_graph_revision} to {current}; "
+            "refresh and retry",
+            details={
+                "expected_graph_revision": body.expected_graph_revision,
+                "current_graph_revision": current,
+            },
+        )
+
+    analysis_time = _now()
+    before_insights = await load_graph_insights(db, generated_at=analysis_time)
+    nested = await db.begin_nested()
+    try:
+        await create_relationship(
+            db,
+            TaskRelationshipCreate(
+                source_task_id=body.dependent_task_id,
+                target_task_id=body.prerequisite_task_id,
+                type=TaskRelationshipType.DEPENDS_ON,
+            ),
+        )
+        after_insights = await load_graph_insights(db, generated_at=analysis_time)
+    finally:
+        await nested.rollback()
+    return (
+        changed_graph_task_ids(before_insights, after_insights),
+        insight_delta(before_insights, after_insights),
+    )
+
+
+async def create_dependency_command(
+    db: AsyncSession,
+    body: TaskDependencyCommandRequest,
+) -> tuple[TaskRelationship, int, list[str], dict[str, int | None] | None]:
+    await claim_graph_revision(db, body.expected_graph_revision)
+    analysis_time = _now()
+    before_insights = await load_graph_insights(db, generated_at=analysis_time)
+    relationship = await create_relationship(
+        db,
+        TaskRelationshipCreate(
+            source_task_id=body.dependent_task_id,
+            target_task_id=body.prerequisite_task_id,
+            type=TaskRelationshipType.DEPENDS_ON,
+        ),
+    )
+    after_insights = await load_graph_insights(db, generated_at=analysis_time)
+    revision = await current_graph_revision(db)
+    return (
+        relationship,
+        revision,
+        changed_graph_task_ids(before_insights, after_insights),
+        insight_delta(before_insights, after_insights),
+    )
 
 
 async def sync_dependency_shadow(

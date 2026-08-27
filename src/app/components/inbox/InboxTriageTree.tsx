@@ -1,6 +1,7 @@
 import type { ProjectResponse, TodoResponse } from '../../types/api';
 
 export const INBOX_TASK_DRAG_TYPE = 'application/x-clawchat-task-id';
+export const INBOX_DEPENDENCY_DRAG_TYPE = 'application/x-clawchat-task-dependency';
 
 interface InboxTriageTreeProps {
   projects: ProjectResponse[];
@@ -9,6 +10,7 @@ interface InboxTriageTreeProps {
   disabled: boolean;
   onSelectTask: (taskId: string) => void;
   onPlace: (taskId: string, projectId: string, parentId: string | null, beforeId?: string) => void;
+  onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
 }
 
 function sorted(items: TodoResponse[]) {
@@ -22,6 +24,17 @@ function draggedTaskId(event: React.DragEvent): string | null {
   return event.dataTransfer.getData(INBOX_TASK_DRAG_TYPE) || null;
 }
 
+function acceptsDragType(event: React.DragEvent, type: string): boolean {
+  return (
+    Array.from(event.dataTransfer.types ?? []).includes(type) ||
+    Boolean(event.dataTransfer.getData(type))
+  );
+}
+
+function draggedDependencyTaskId(event: React.DragEvent): string | null {
+  return event.dataTransfer.getData(INBOX_DEPENDENCY_DRAG_TYPE) || null;
+}
+
 export default function InboxTriageTree({
   projects,
   todos,
@@ -29,6 +42,7 @@ export default function InboxTriageTree({
   disabled,
   onSelectTask,
   onPlace,
+  onPreviewDependency,
 }: InboxTriageTreeProps) {
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
 
@@ -64,12 +78,16 @@ export default function InboxTriageTree({
               <div
                 className="cc-inbox-tree__project-target"
                 onDragOver={(event) => {
-                  if (!disabled) event.preventDefault();
+                  if (!disabled && acceptsDragType(event, INBOX_TASK_DRAG_TYPE)) {
+                    event.preventDefault();
+                  }
                 }}
                 onDrop={(event) => {
-                  event.preventDefault();
                   const taskId = draggedTaskId(event);
-                  if (taskId && !disabled) onPlace(taskId, project.id, null);
+                  if (taskId && !disabled) {
+                    event.preventDefault();
+                    onPlace(taskId, project.id, null);
+                  }
                 }}
               >
                 <strong>{project.title}</strong>
@@ -100,6 +118,7 @@ export default function InboxTriageTree({
                       disabled={disabled}
                       onSelectTask={onSelectTask}
                       onPlace={onPlace}
+                      onPreviewDependency={onPreviewDependency}
                     />
                   ))
                 )}
@@ -124,6 +143,7 @@ function TreeNode({
   disabled,
   onSelectTask,
   onPlace,
+  onPreviewDependency,
 }: {
   task: TodoResponse;
   projectId: string;
@@ -133,6 +153,7 @@ function TreeNode({
   disabled: boolean;
   onSelectTask: (taskId: string) => void;
   onPlace: (taskId: string, projectId: string, parentId: string | null, beforeId?: string) => void;
+  onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
 }) {
   const children = sorted(childrenByParent.get(task.id) ?? []);
   return (
@@ -141,12 +162,12 @@ function TreeNode({
         className="cc-inbox-tree__insert"
         style={{ marginLeft: depth * 18 }}
         onDragOver={(event) => {
-          if (!disabled) event.preventDefault();
+          if (!disabled && acceptsDragType(event, INBOX_TASK_DRAG_TYPE)) event.preventDefault();
         }}
         onDrop={(event) => {
-          event.preventDefault();
           const taskId = draggedTaskId(event);
           if (taskId && taskId !== task.id && !disabled) {
+            event.preventDefault();
             onPlace(taskId, projectId, task.parent_id ?? null, task.id);
           }
         }}
@@ -160,19 +181,62 @@ function TreeNode({
           event.dataTransfer.effectAllowed = 'move';
         }}
         onDragOver={(event) => {
-          if (!disabled) event.preventDefault();
+          if (!disabled && acceptsDragType(event, INBOX_TASK_DRAG_TYPE)) event.preventDefault();
         }}
         onDrop={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
           const taskId = draggedTaskId(event);
-          if (taskId && taskId !== task.id && !disabled) onPlace(taskId, projectId, task.id);
+          if (taskId && taskId !== task.id && !disabled) {
+            event.preventDefault();
+            event.stopPropagation();
+            onPlace(taskId, projectId, task.id);
+          }
         }}
       >
         <button type="button" onClick={() => onSelectTask(task.id)}>
           <span>{children.length ? '▾' : '•'}</span>
           <strong>{task.title}</strong>
           <small>{task.status.replace('_', ' ')}</small>
+        </button>
+        <button
+          type="button"
+          className="cc-inbox-tree__dependency-handle"
+          aria-label={`Dependency connector for ${task.title}. Drag to a prerequisite or drop a dependent here.`}
+          title={
+            selectedTaskId && selectedTaskId !== task.id
+              ? `Make selected task wait for ${task.title}`
+              : 'Drag to the task that must finish first'
+          }
+          draggable={!disabled}
+          disabled={disabled}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (selectedTaskId && selectedTaskId !== task.id) {
+              onPreviewDependency(selectedTaskId, task.id);
+            }
+          }}
+          onDragStart={(event) => {
+            event.stopPropagation();
+            event.dataTransfer.setData(INBOX_DEPENDENCY_DRAG_TYPE, task.id);
+            event.dataTransfer.effectAllowed = 'link';
+          }}
+          onDragOver={(event) => {
+            if (!disabled && acceptsDragType(event, INBOX_DEPENDENCY_DRAG_TYPE)) {
+              event.preventDefault();
+              event.stopPropagation();
+              event.dataTransfer.dropEffect = 'link';
+            }
+          }}
+          onDrop={(event) => {
+            const dependentTaskId = draggedDependencyTaskId(event);
+            if (dependentTaskId && dependentTaskId !== task.id && !disabled) {
+              event.preventDefault();
+              event.stopPropagation();
+              onPreviewDependency(dependentTaskId, task.id);
+            }
+          }}
+        >
+          <span aria-hidden="true">↝</span>
         </button>
         {selectedTaskId && selectedTaskId !== task.id && (
           <div className="cc-inbox-tree__placement-actions">
@@ -208,6 +272,7 @@ function TreeNode({
           disabled={disabled}
           onSelectTask={onSelectTask}
           onPlace={onPlace}
+          onPreviewDependency={onPreviewDependency}
         />
       ))}
     </div>

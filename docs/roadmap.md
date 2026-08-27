@@ -15,6 +15,7 @@ Active foundation work is tracked separately from release status:
 | AgentTask / AgentRun lifecycle | Yes | Backend/Web/cancellation/retry/restart/migration checks | No |
 | Paseo execution provider | Yes | CLI contract/provider routing/reconnect/cancel/artifact/review checks | No |
 | Inbox task placement canvas | Yes | Backend/Web/OpenAPI/migration/revision/undo checks | No |
+| Inbox dependency connectors | Yes | Backend/Web/OpenAPI/revision/cycle/impact-preview checks | No |
 
 ---
 
@@ -50,6 +51,8 @@ Active foundation work is tracked separately from release status:
 - [x] Inbox triage split view with Project/Work Tree placement
 - [x] Atomic Project/parent/sibling placement with graph-revision conflict detection
 - [x] Conservative server-side placement Undo and touch-friendly placement controls
+- [x] Separate dependency connector drag with mobile/keyboard prerequisite picker
+- [x] Revision-safe dependency impact preview with explainable cycle rejection
 - [x] Demo data seeding (15 sample tasks across all columns)
 
 ### AI Chat

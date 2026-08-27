@@ -22,8 +22,17 @@ class NotFoundError(AppError):
 
 
 class ConflictError(AppError):
-    def __init__(self, message: str = "Resource conflict"):
-        super().__init__(code="CONFLICT", message=message, status_code=409)
+    def __init__(
+        self,
+        message: str = "Resource conflict",
+        details: dict | None = None,
+    ):
+        super().__init__(
+            code="CONFLICT",
+            message=message,
+            status_code=409,
+            details=details,
+        )
 
 
 class StalePlanProposalError(AppError):

@@ -7,6 +7,8 @@ import usePlatform from '../hooks/usePlatform';
 import {
   useDeleteTodo,
   usePlaceTodo,
+  useCreateTaskDependency,
+  usePreviewTaskDependency,
   useProjectsQuery,
   useTaskGraphInsightsQuery,
   useTodosQuery,
@@ -19,9 +21,19 @@ import SectionHeader from '../components/shared/SectionHeader';
 import EmptyState from '../components/shared/EmptyState';
 import { InboxTrayIcon } from '../components/shared/Icons';
 import apiClient from '../services/apiClient';
-import type { TodoResponse } from '../types/schemas';
+import type { TaskDependencyPreviewResponse, TodoResponse } from '../types/schemas';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
-import InboxTriageTree, { INBOX_TASK_DRAG_TYPE } from '../components/inbox/InboxTriageTree';
+import InboxTriageTree, {
+  INBOX_DEPENDENCY_DRAG_TYPE,
+  INBOX_TASK_DRAG_TYPE,
+} from '../components/inbox/InboxTriageTree';
+
+function transferHasType(event: React.DragEvent, type: string): boolean {
+  return (
+    Array.from(event.dataTransfer.types ?? []).includes(type) ||
+    Boolean(event.dataTransfer.getData(type))
+  );
+}
 
 function QuestionnaireCard({ task }: { task: TodoResponse }) {
   const questions = task.clarification_questions ?? [];
@@ -111,12 +123,23 @@ export default function InboxPage() {
   const deleteMutation = useDeleteTodo();
   const placeMutation = usePlaceTodo();
   const undoPlacement = useUndoTodoPlacement();
+  const previewDependency = usePreviewTaskDependency();
+  const createDependency = useCreateTaskDependency();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [placementRevision, setPlacementRevision] = useState<number | null>(null);
+  const [dependencyPreview, setDependencyPreview] = useState<TaskDependencyPreviewResponse | null>(
+    null,
+  );
 
   useEffect(() => {
     if (graphInsights.data) setPlacementRevision(graphInsights.data.graph_revision);
   }, [graphInsights.data]);
+
+  useEffect(() => {
+    if (dependencyPreview && dependencyPreview.dependent_task_id !== selectedTaskId) {
+      setDependencyPreview(null);
+    }
+  }, [dependencyPreview, selectedTaskId]);
 
   const inboxData = useMemo(() => {
     const processing: TodoResponse[] = [];
@@ -197,6 +220,87 @@ export default function InboxPage() {
     errors.length;
 
   const selectedTask = todos.find((todo) => todo.id === selectedTaskId) ?? null;
+
+  const dependencyCandidates = useMemo(() => {
+    if (!selectedTask) return [];
+    const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
+    return todos
+      .filter((todo) => todo.id !== selectedTask.id && !projectRoots.has(todo.id))
+      .sort((left, right) => {
+        const leftSameProject = left.project_id === selectedTask.project_id ? 0 : 1;
+        const rightSameProject = right.project_id === selectedTask.project_id ? 0 : 1;
+        return leftSameProject - rightSameProject || left.title.localeCompare(right.title);
+      });
+  }, [projects, selectedTask, todos]);
+
+  const dependencyErrorMessage = (error: unknown): string => {
+    const response = (
+      error as {
+        response?: {
+          status?: number;
+          data?: {
+            error?: {
+              message?: string;
+              details?: { cycle_task_ids?: string[] };
+            };
+          };
+        };
+      }
+    ).response;
+    const cycleIds = response?.data?.error?.details?.cycle_task_ids;
+    if (cycleIds?.length) {
+      const path = cycleIds.map((id) => todoById.get(id)?.title ?? id).join(' → ');
+      return `Cannot connect these tasks because it creates a cycle: ${path}`;
+    }
+    if (response?.status === 409) return 'The graph changed. Refreshing before you try again.';
+    return response?.data?.error?.message ?? 'Could not validate this dependency';
+  };
+
+  const handleDependencyPreview = async (dependentTaskId: string, prerequisiteTaskId: string) => {
+    if (placementRevision == null) {
+      addToast('warning', 'The current graph revision is still loading');
+      return;
+    }
+    setSelectedTaskId(dependentTaskId);
+    try {
+      const result = await previewDependency.mutateAsync({
+        dependent_task_id: dependentTaskId,
+        prerequisite_task_id: prerequisiteTaskId,
+        expected_graph_revision: placementRevision,
+      });
+      setDependencyPreview(result);
+    } catch (error) {
+      setDependencyPreview(null);
+      addToast('error', dependencyErrorMessage(error));
+      if ((error as { response?: { status?: number } }).response?.status === 409) {
+        const refreshed = await graphInsights.refetch();
+        if (refreshed.data) setPlacementRevision(refreshed.data.graph_revision);
+      }
+    }
+  };
+
+  const handleDependencyConfirm = async () => {
+    if (!dependencyPreview) return;
+    try {
+      const result = await createDependency.mutateAsync({
+        dependent_task_id: dependencyPreview.dependent_task_id,
+        prerequisite_task_id: dependencyPreview.prerequisite_task_id,
+        expected_graph_revision: dependencyPreview.base_graph_revision,
+      });
+      const dependent = todoById.get(result.dependent_task_id)?.title ?? 'Task';
+      const prerequisite = todoById.get(result.prerequisite_task_id)?.title ?? 'prerequisite';
+      setPlacementRevision(result.graph_revision);
+      setDependencyPreview(null);
+      addToast('success', `“${dependent}” now waits for “${prerequisite}”`);
+    } catch (error) {
+      setDependencyPreview(null);
+      addToast('error', dependencyErrorMessage(error));
+      if ((error as { response?: { status?: number } }).response?.status === 409) {
+        const refreshed = await graphInsights.refetch();
+        if (refreshed.data) setPlacementRevision(refreshed.data.graph_revision);
+      }
+    }
+  };
 
   const handlePlacement = async (
     taskId: string,
@@ -315,11 +419,13 @@ export default function InboxPage() {
         <main className="cc-inbox-triage__queue">
           <div
             className="cc-inbox-triage__inbox-target"
-            onDragOver={(event) => event.preventDefault()}
+            onDragOver={(event) => {
+              if (transferHasType(event, INBOX_TASK_DRAG_TYPE)) event.preventDefault();
+            }}
             onDrop={(event) => {
-              event.preventDefault();
               const taskId = event.dataTransfer.getData(INBOX_TASK_DRAG_TYPE);
               if (taskId && !placeMutation.isPending) {
+                event.preventDefault();
                 void handlePlacement(taskId, null, null);
               }
             }}
@@ -422,6 +528,23 @@ export default function InboxPage() {
                     />
                     <div className="cc-inbox-card__actions">
                       <button
+                        className="cc-inbox-dependency-handle"
+                        type="button"
+                        draggable={!previewDependency.isPending && !createDependency.isPending}
+                        aria-label={`Drag ${task.title} to a task that must finish first`}
+                        title="Connect a prerequisite"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
+                        onDragStart={(event) => {
+                          event.stopPropagation();
+                          event.dataTransfer.setData(INBOX_DEPENDENCY_DRAG_TYPE, task.id);
+                          event.dataTransfer.effectAllowed = 'link';
+                          setSelectedTaskId(task.id);
+                        }}
+                      >
+                        <span aria-hidden="true">↝</span> Prerequisite
+                      </button>
+                      <button
                         className="cc-btn cc-btn--ghost"
                         type="button"
                         aria-label={`Select ${task.title} for placement`}
@@ -489,9 +612,15 @@ export default function InboxPage() {
             projects={projects}
             todos={todos}
             selectedTaskId={selectedTaskId}
-            disabled={placementRevision == null || placeMutation.isPending}
+            disabled={
+              placementRevision == null ||
+              placeMutation.isPending ||
+              previewDependency.isPending ||
+              createDependency.isPending
+            }
             onSelectTask={setSelectedTaskId}
             onPlace={handlePlacement}
+            onPreviewDependency={handleDependencyPreview}
           />
         )}
         <aside className="cc-inbox-triage__inspector" aria-label="Selected task">
@@ -527,6 +656,77 @@ export default function InboxPage() {
                     : `${graphInsights.data.summary.critical_path_minutes}m`}
                 </p>
               )}
+              <div className="cc-inbox-triage__dependency-picker">
+                <label htmlFor="inbox-prerequisite-select">Must wait for</label>
+                <select
+                  id="inbox-prerequisite-select"
+                  value=""
+                  disabled={
+                    placementRevision == null ||
+                    previewDependency.isPending ||
+                    createDependency.isPending
+                  }
+                  onChange={(event) => {
+                    const prerequisiteTaskId = event.target.value;
+                    if (prerequisiteTaskId) {
+                      void handleDependencyPreview(selectedTask.id, prerequisiteTaskId);
+                    }
+                  }}
+                >
+                  <option value="">Choose a prerequisite…</option>
+                  {dependencyCandidates.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.title}
+                    </option>
+                  ))}
+                </select>
+                <small>Desktop: drag ↝ from the dependent task onto its prerequisite.</small>
+              </div>
+              {dependencyPreview && (
+                <section
+                  className="cc-inbox-triage__dependency-preview"
+                  aria-live="polite"
+                  aria-label="Dependency impact preview"
+                >
+                  <strong>Confirm dependency</strong>
+                  <p>
+                    “{todoById.get(dependencyPreview.dependent_task_id)?.title ?? 'Task'}” will wait
+                    for “
+                    {todoById.get(dependencyPreview.prerequisite_task_id)?.title ?? 'prerequisite'}
+                    ”.
+                  </p>
+                  {dependencyPreview.insights_delta && (
+                    <p>
+                      Ready {dependencyPreview.insights_delta.ready_count >= 0 ? '+' : ''}
+                      {dependencyPreview.insights_delta.ready_count} · Blocked{' '}
+                      {dependencyPreview.insights_delta.blocked_count >= 0 ? '+' : ''}
+                      {dependencyPreview.insights_delta.blocked_count} · Critical path{' '}
+                      {dependencyPreview.insights_delta.critical_path_minutes == null
+                        ? 'unchanged'
+                        : `${dependencyPreview.insights_delta.critical_path_minutes >= 0 ? '+' : ''}${dependencyPreview.insights_delta.critical_path_minutes}m`}
+                    </p>
+                  )}
+                  <small>{dependencyPreview.affected_task_ids.length} affected tasks</small>
+                  <div>
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--primary"
+                      disabled={createDependency.isPending}
+                      onClick={() => void handleDependencyConfirm()}
+                    >
+                      {createDependency.isPending ? 'Connecting…' : 'Connect'}
+                    </button>
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--ghost"
+                      disabled={createDependency.isPending}
+                      onClick={() => setDependencyPreview(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </section>
+              )}
               <button
                 type="button"
                 className="cc-btn cc-btn--secondary"
@@ -551,9 +751,15 @@ export default function InboxPage() {
                     projects={projects}
                     todos={todos}
                     selectedTaskId={selectedTaskId}
-                    disabled={placementRevision == null || placeMutation.isPending}
+                    disabled={
+                      placementRevision == null ||
+                      placeMutation.isPending ||
+                      previewDependency.isPending ||
+                      createDependency.isPending
+                    }
                     onSelectTask={setSelectedTaskId}
                     onPlace={handlePlacement}
+                    onPreviewDependency={handleDependencyPreview}
                   />
                 </details>
               )}
