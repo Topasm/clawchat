@@ -40,8 +40,8 @@ dependencies {
     implementation("androidx.compose.animation:animation")
 
     // Hilt
-    implementation("com.google.dagger:hilt-android:2.53.1")
-    ksp("com.google.dagger:hilt-android-compiler:2.53.1")
+    implementation("com.google.dagger:hilt-android:2.60.1")
+    ksp("com.google.dagger:hilt-android-compiler:2.60.1")
 
     // Network
     api("com.squareup.retrofit2:retrofit:2.11.0")
