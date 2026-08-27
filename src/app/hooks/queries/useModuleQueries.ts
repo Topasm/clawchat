@@ -86,6 +86,7 @@ export function useCreateTodo() {
         due_date: newTodo.due_date,
         tags: newTodo.tags ?? [],
         parent_id: newTodo.parent_id ?? null,
+        project_id: newTodo.project_id ?? null,
         description: newTodo.description,
         source: newTodo.source,
         inbox_state: newTodo.inbox_state,

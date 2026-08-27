@@ -15,6 +15,7 @@ from domain.plan_proposal import (
     PlanProposalStatus,
     VaultSyncJobStatus,
 )
+from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
 from exceptions import (
     NotFoundError,
     PlanProposalConflictError,
@@ -26,6 +27,7 @@ from models.attachment import Attachment
 from models.change_set import ChangeSet
 from models.conversation import Conversation
 from models.plan_proposal import PlanProposal
+from models.project import Project
 from models.task_graph_state import TaskGraphState
 from models.todo import Todo
 from models.vault_sync_job import VaultSyncJob
@@ -47,7 +49,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from utils import make_id
 from utils.vault_paths import normalize_vault_relative_path
 
-from services import task_relationship_service, todo_planning_service
+from services import review_item_service, task_relationship_service, todo_planning_service
 from services.plan_validation_service import (
     PlanOutputError,
     PlanSemanticError,
@@ -78,9 +80,7 @@ async def generate_proposal(
     todo = await db.get(Todo, todo_id)
     if todo is None:
         raise NotFoundError("Todo not found")
-    graph_state = await db.get(TaskGraphState, GLOBAL_TASK_GRAPH_SCOPE_ID)
-    if graph_state is None:
-        raise RuntimeError("Global task graph state is not initialized")
+    base_revision = await _current_graph_revision(db, todo.project_id)
 
     context = await todo_planning_service.capture_planning_context(
         db,
@@ -100,8 +100,9 @@ async def generate_proposal(
     proposal = PlanProposal(
         id=make_id("proposal_"),
         root_task_id=todo.id,
+        project_id=todo.project_id,
         agent_task_id=agent_task.id,
-        base_graph_revision=graph_state.revision,
+        base_graph_revision=base_revision,
         model_provider=model_provider,
         model_name=getattr(ai_service, "model", None),
         prompt_version=todo_planning_service.PROMPT_VERSION,
@@ -195,17 +196,11 @@ async def generate_proposal(
         # First write after LLM execution: lock the graph state only if the
         # task graph snapshot is still current. The context reads above and
         # this CAS share one DB transaction, closing the DB-side TOCTOU window.
-        claimed_revision = (
-            await db.execute(
-                update(TaskGraphState)
-                .where(
-                    TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID,
-                    TaskGraphState.revision == base_revision,
-                )
-                .values(revision=TaskGraphState.revision)
-                .returning(TaskGraphState.revision)
-            )
-        ).scalar_one_or_none()
+        claimed_revision = await _claim_graph_revision(
+            db,
+            proposal.project_id,
+            base_revision,
+        )
         if claimed_revision is None:
             await db.rollback()
         proposal = (
@@ -256,6 +251,14 @@ async def generate_proposal(
             if proposal.status == PlanProposalStatus.DRAFT:
                 todo.inbox_state = "plan_ready"
                 todo.automation_error = None
+                await review_item_service.ensure_review_item(
+                    db,
+                    subject_type=ReviewSubjectType.PLAN_PROPOSAL,
+                    subject_id=proposal.id,
+                    project_id=proposal.project_id,
+                    summary=plan.summary or f"Review AI plan for {todo.title}",
+                    risk_level=ReviewRiskLevel.MEDIUM,
+                )
             elif proposal.status != PlanProposalStatus.REJECTED:
                 todo.inbox_state = "none"
         await db.commit()
@@ -369,17 +372,18 @@ async def apply_proposal(
 
     # Deliberately the first DB statement: acquire the global writer/row lock
     # only when the revision still matches the user's preview.
-    claimed_revision = (
+    proposal_project_id = (
         await db.execute(
-            update(TaskGraphState)
-            .where(
-                TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID,
-                TaskGraphState.revision == request.base_graph_revision,
+            select(PlanProposal.project_id).where(
+                PlanProposal.id == request.proposal_id
             )
-            .values(revision=TaskGraphState.revision)
-            .returning(TaskGraphState.revision)
         )
     ).scalar_one_or_none()
+    claimed_revision = await _claim_graph_revision(
+        db,
+        proposal_project_id,
+        request.base_graph_revision,
+    )
     if claimed_revision is None:
         await db.rollback()
         replay = await _replay_apply(db, request.proposal_id, request_hash)
@@ -496,6 +500,7 @@ async def apply_proposal(
             subtask = approved_plan.subtasks[original_index]
             child = Todo(
                 id=make_id("todo_"),
+                project_id=todo.project_id,
                 parent_id=todo_id,
                 title=subtask.title,
                 description=subtask.description,
@@ -540,7 +545,7 @@ async def apply_proposal(
         todo.inbox_state = "none"
         await db.flush()
 
-        applied_revision = await _current_graph_revision(db)
+        applied_revision = await _current_graph_revision(db, proposal.project_id)
         now = datetime.now(timezone.utc)
         root_after = _root_snapshot(todo)
         approved_payload = approved_plan.model_dump(mode="json")
@@ -579,6 +584,16 @@ async def apply_proposal(
         change_set.applied_at = now
         proposal.status = PlanProposalStatus.APPLIED
         proposal.applied_at = now
+        review_item = await review_item_service.ensure_review_item(
+            db,
+            subject_type=ReviewSubjectType.PLAN_PROPOSAL,
+            subject_id=proposal.id,
+            project_id=proposal.project_id,
+            summary=approved_plan.summary or f"Review AI plan for {todo.title}",
+            risk_level=ReviewRiskLevel.MEDIUM,
+        )
+        review_item.status = ReviewStatus.APPROVED
+        review_item.reviewed_at = now
         job = _vault_job(
             change_set,
             event_type="task_plan_applied",
@@ -627,6 +642,16 @@ async def dismiss_proposal(
     if proposal.status in (PlanProposalStatus.APPLIED, PlanProposalStatus.REVERTED):
         raise PlanProposalConflictError("An applied proposal cannot be dismissed")
     proposal.status = PlanProposalStatus.REJECTED
+    review_item = await review_item_service.ensure_review_item(
+        db,
+        subject_type=ReviewSubjectType.PLAN_PROPOSAL,
+        subject_id=proposal.id,
+        project_id=proposal.project_id,
+        summary=f"Review AI plan for {todo_id}",
+        risk_level=ReviewRiskLevel.MEDIUM,
+    )
+    review_item.status = ReviewStatus.REJECTED
+    review_item.reviewed_at = datetime.now(timezone.utc)
     todo = await db.get(Todo, todo_id)
     if todo is not None:
         todo.inbox_state = "none"
@@ -647,17 +672,18 @@ async def revert_change_set(
         )
         .scalar_subquery()
     )
-    claimed_revision = (
+    proposal_project_id = (
         await db.execute(
-            update(TaskGraphState)
-            .where(
-                TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID,
-                TaskGraphState.revision == expected_revision,
-            )
-            .values(revision=TaskGraphState.revision)
-            .returning(TaskGraphState.revision)
+            select(PlanProposal.project_id)
+            .join(ChangeSet, ChangeSet.proposal_id == PlanProposal.id)
+            .where(ChangeSet.id == change_set_id)
         )
     ).scalar_one_or_none()
+    claimed_revision = await _claim_graph_revision(
+        db,
+        proposal_project_id,
+        expected_revision,
+    )
     if claimed_revision is None:
         await db.rollback()
         replay = await _replay_undo(db, change_set_id)
@@ -666,7 +692,7 @@ async def revert_change_set(
         change_set = await db.get(ChangeSet, change_set_id)
         if change_set is None:
             raise NotFoundError("Change set not found")
-        current_revision = await _current_graph_revision(db)
+        current_revision = await _current_graph_revision(db, proposal_project_id)
         raise StalePlanProposalError(
             base_revision=change_set.applied_graph_revision,
             current_revision=current_revision,
@@ -708,7 +734,7 @@ async def revert_change_set(
         # the old plan_ready workflow state again after undo.
         root.inbox_state = "none"
         await db.flush()
-        reverted_revision = await _current_graph_revision(db)
+        reverted_revision = await _current_graph_revision(db, proposal.project_id)
         response = PlanUndoResponse(
             change_set_id=change_set.id,
             proposal_id=proposal.id,
@@ -808,11 +834,17 @@ async def _mark_stale_and_raise(
     requested_base_revision: int,
 ) -> None:
     proposal = await db.get(PlanProposal, proposal_id)
-    current_revision = await _current_graph_revision(db)
     if proposal is None or proposal.root_task_id != todo_id:
         raise NotFoundError("Plan proposal not found")
+    current_revision = await _current_graph_revision(db, proposal.project_id)
     if proposal.status == PlanProposalStatus.DRAFT:
         proposal.status = PlanProposalStatus.STALE
+        await review_item_service.set_subject_review_status(
+            db,
+            ReviewSubjectType.PLAN_PROPOSAL,
+            proposal.id,
+            ReviewStatus.EXPIRED,
+        )
         await db.commit()
     else:
         await db.rollback()
@@ -908,7 +940,49 @@ async def _recover_generation_finalization_failure(
     return None
 
 
-async def _current_graph_revision(db: AsyncSession) -> int:
+async def _claim_graph_revision(
+    db: AsyncSession,
+    project_id: str | None,
+    expected_revision,
+) -> int | None:
+    if project_id is not None:
+        return (
+            await db.execute(
+                update(Project)
+                .where(
+                    Project.id == project_id,
+                    Project.graph_revision == expected_revision,
+                )
+                .values(graph_revision=Project.graph_revision)
+                .returning(Project.graph_revision)
+            )
+        ).scalar_one_or_none()
+    return (
+        await db.execute(
+            update(TaskGraphState)
+            .where(
+                TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID,
+                TaskGraphState.revision == expected_revision,
+            )
+            .values(revision=TaskGraphState.revision)
+            .returning(TaskGraphState.revision)
+        )
+    ).scalar_one_or_none()
+
+
+async def _current_graph_revision(
+    db: AsyncSession,
+    project_id: str | None = None,
+) -> int:
+    if project_id is not None:
+        revision = (
+            await db.execute(
+                select(Project.graph_revision).where(Project.id == project_id)
+            )
+        ).scalar_one_or_none()
+        if revision is None:
+            raise RuntimeError(f"Project {project_id} is not initialized")
+        return revision
     revision = (
         await db.execute(
             select(TaskGraphState.revision).where(

@@ -1,15 +1,18 @@
 """Deterministic execution-graph insight coverage."""
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock
 
 import pytest
 from domain.graph_insights import GraphDueRisk, GraphScopeRole
 from domain.plan_proposal import GLOBAL_TASK_GRAPH_SCOPE_ID
 from domain.task import TaskStatus
 from domain.task_relationship import TaskRelationshipType
+from exceptions import ConflictError
 from models.task_graph_state import TaskGraphState
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
+import services.graph_insights_service as graph_insights_service
 from services.graph_insights_service import (
     _analyze_snapshot,
     _EdgeSnapshot,
@@ -49,6 +52,141 @@ def _dependency(source_task_id: str, target_task_id: str) -> TaskRelationship:
 
 def _nodes_by_id(response):
     return {node.task_id: node for node in response.nodes}
+
+
+def _snapshot(*, revision: int = 1) -> _GraphSnapshot:
+    task = _TaskSnapshot(
+        id="todo_task",
+        title="Task",
+        status=TaskStatus.PENDING,
+        parent_id=None,
+        estimated_minutes=10,
+        due_date=None,
+    )
+    return _GraphSnapshot(
+        revision=revision,
+        root_task_id=None,
+        tasks=(task,),
+        edges=(),
+        primary_ids=frozenset({task.id}),
+        container_ids=frozenset(),
+        existing_parent_ids=frozenset(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_snapshot_revision_change_retries_before_analysis(monkeypatch):
+    db = AsyncMock()
+    loader = AsyncMock(side_effect=[None, _snapshot(revision=9)])
+    monkeypatch.setattr(graph_insights_service, "_load_snapshot", loader)
+
+    response = await get_graph_insights(db)
+
+    assert response.graph_revision == 9
+    assert loader.await_count == 2
+    db.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_snapshot_revision_churn_fails_after_bounded_retries(monkeypatch):
+    db = AsyncMock()
+    loader = AsyncMock(return_value=None)
+    monkeypatch.setattr(graph_insights_service, "_load_snapshot", loader)
+
+    with pytest.raises(ConflictError, match="changed repeatedly"):
+        await get_graph_insights(db)
+
+    assert loader.await_count == 3
+    assert db.rollback.await_count == 2
+
+
+def test_critical_path_ties_use_stable_task_id_order():
+    first = _TaskSnapshot(
+        id="todo_a",
+        title="First",
+        status=TaskStatus.PENDING,
+        parent_id=None,
+        estimated_minutes=10,
+        due_date=None,
+    )
+    second = _TaskSnapshot(
+        id="todo_b",
+        title="Second",
+        status=TaskStatus.PENDING,
+        parent_id=None,
+        estimated_minutes=10,
+        due_date=None,
+    )
+    final = _TaskSnapshot(
+        id="todo_final",
+        title="Final",
+        status=TaskStatus.PENDING,
+        parent_id=None,
+        estimated_minutes=5,
+        due_date=None,
+    )
+    snapshot = _GraphSnapshot(
+        revision=2,
+        root_task_id=None,
+        tasks=(second, final, first),
+        edges=(
+            _EdgeSnapshot("rel_final_b", final.id, second.id),
+            _EdgeSnapshot("rel_final_a", final.id, first.id),
+        ),
+        primary_ids=frozenset({first.id, second.id, final.id}),
+        container_ids=frozenset(),
+        existing_parent_ids=frozenset(),
+    )
+
+    response = _analyze_snapshot(
+        snapshot,
+        generated_at=datetime(2026, 8, 27, tzinfo=timezone.utc),
+    )
+
+    assert response.summary.critical_path_task_ids == [first.id, final.id]
+    assert response.summary.critical_path_minutes == 15
+
+
+def test_terminal_tasks_do_not_create_actionable_due_date_conflicts():
+    completed = _TaskSnapshot(
+        id="todo_completed",
+        title="Completed",
+        status=TaskStatus.COMPLETED,
+        parent_id=None,
+        estimated_minutes=10,
+        due_date=datetime(2026, 8, 27, tzinfo=timezone.utc),
+    )
+    active_dependency = _TaskSnapshot(
+        id="todo_active_dependency",
+        title="Active dependency",
+        status=TaskStatus.PENDING,
+        parent_id=None,
+        estimated_minutes=10,
+        due_date=datetime(2026, 8, 28, tzinfo=timezone.utc),
+    )
+    snapshot = _GraphSnapshot(
+        revision=3,
+        root_task_id=None,
+        tasks=(completed, active_dependency),
+        edges=(
+            _EdgeSnapshot(
+                "rel_completed_dependency",
+                completed.id,
+                active_dependency.id,
+            ),
+        ),
+        primary_ids=frozenset({completed.id, active_dependency.id}),
+        container_ids=frozenset(),
+        existing_parent_ids=frozenset(),
+    )
+
+    response = _analyze_snapshot(
+        snapshot,
+        generated_at=datetime(2026, 8, 27, tzinfo=timezone.utc),
+    )
+
+    assert response.summary.due_date_conflict_count == 0
+    assert all(issue.code.value != "due_date_conflict" for issue in response.issues)
 
 
 @pytest.mark.asyncio

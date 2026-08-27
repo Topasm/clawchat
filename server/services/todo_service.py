@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from domain.task import TaskStatus
-from exceptions import NotFoundError
+from exceptions import NotFoundError, ValidationError
+from models.project import Project
 from models.todo import Todo
 from services.obsidian_export_service import export_todo, remove_todo_from_vault
 from services import task_relationship_service
@@ -34,6 +35,7 @@ async def get_todos(
     status_filter: TaskStatus | None = None,
     priority: str | None = None,
     due_before: datetime | None = None,
+    project_id: str | None = None,
     parent_id: str | None = None,
     root_only: bool = False,
     order_by: str = "created_at",
@@ -48,6 +50,8 @@ async def get_todos(
         conditions.append(Todo.priority == priority)
     if due_before is not None:
         conditions.append(Todo.due_date <= due_before)
+    if project_id is not None:
+        conditions.append(Todo.project_id == project_id)
     if parent_id is not None:
         conditions.append(Todo.parent_id == parent_id)
     if root_only:
@@ -82,6 +86,7 @@ async def create_todo(
     *,
     title: str,
     description: str | None = None,
+    project_id: str | None = None,
     status: TaskStatus = TaskStatus.PENDING,
     priority: str = "medium",
     due_date: datetime | None = None,
@@ -98,10 +103,20 @@ async def create_todo(
     recurrence_rule: str | None = None,
     recurrence_end: datetime | None = None,
 ) -> Todo:
+    if parent_id is not None:
+        parent = await db.get(Todo, parent_id)
+        if parent is None:
+            raise NotFoundError(f"Parent todo {parent_id} not found")
+        if project_id is not None and project_id != parent.project_id:
+            raise ValidationError("A child task must belong to its parent's project")
+        project_id = parent.project_id
+    if project_id is not None and await db.get(Project, project_id) is None:
+        raise NotFoundError(f"Project {project_id} not found")
     todo = Todo(
         id=make_id("todo_"),
         title=title,
         description=description,
+        project_id=project_id,
         status=status,
         priority=priority,
         completed_at=(
@@ -149,6 +164,15 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
         if "depends_on" in updates
         else _DEPENDENCIES_UNSET
     )
+    proposed_parent_id = updates.get("parent_id", todo.parent_id)
+    proposed_project_id = updates.get("project_id", todo.project_id)
+    if proposed_parent_id is not None:
+        parent = await get_todo(db, proposed_parent_id)
+        if proposed_project_id is not None and proposed_project_id != parent.project_id:
+            raise ValidationError("A child task must belong to its parent's project")
+        updates["project_id"] = parent.project_id
+    elif proposed_project_id is not None and await db.get(Project, proposed_project_id) is None:
+        raise NotFoundError(f"Project {proposed_project_id} not found")
     apply_model_updates(todo, updates)
 
     if "status" in updates:

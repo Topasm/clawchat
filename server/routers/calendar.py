@@ -24,6 +24,7 @@ def _event_to_response(row) -> EventResponse:
             tags = deserialize_tags(tags)
         return EventResponse(
             id=row["id"],
+            project_id=row.get("project_id"),
             title=row["title"],
             description=row.get("description"),
             start_time=row["start_time"],
@@ -52,11 +53,17 @@ async def list_events(
     limit: int = Query(50, ge=1, le=200),
     start_after: datetime | None = None,
     start_before: datetime | None = None,
+    project_id: str | None = None,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
     rows, total = await calendar_service.get_events(
-        db, start_after=start_after, start_before=start_before, page=page, limit=limit,
+        db,
+        start_after=start_after,
+        start_before=start_before,
+        project_id=project_id,
+        page=page,
+        limit=limit,
     )
 
     items = [_event_to_response(row) for row in rows]
@@ -88,6 +95,7 @@ async def create_event(
         db,
         title=body.title,
         description=body.description,
+        project_id=body.project_id,
         start_time=body.start_time,
         end_time=body.end_time,
         location=body.location,

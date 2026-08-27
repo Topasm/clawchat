@@ -23,6 +23,11 @@ class Conversation(Base):
     )
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     metadata_json: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
+    project_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     project_todo_id: Mapped[str | None] = mapped_column(
         String,
         ForeignKey(
@@ -38,5 +43,6 @@ class Conversation(Base):
 
     __table_args__ = (
         Index("idx_conversations_updated_at", "updated_at"),
+        Index("idx_conversations_project_id", "project_id"),
         Index("idx_conversations_project_todo_id", "project_todo_id"),
     )

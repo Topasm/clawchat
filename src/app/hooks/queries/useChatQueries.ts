@@ -5,8 +5,18 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useToastStore } from '../../stores/useToastStore';
 import { logger } from '../../services/logger';
 import type { ChatMessage } from '../../stores/useChatStore';
-import { ConversationResponseSchema, MessageResponseSchema, ProjectTodoResponseSchema } from '../../types/schemas';
-import type { ConversationResponse, ProjectTodoResponse } from '../../types/api';
+import {
+  ConversationResponseSchema,
+  MessageResponseSchema,
+  ProjectOverviewResponseSchema,
+  ProjectResponseSchema,
+} from '../../types/schemas';
+import type {
+  ConversationResponse,
+  ProjectCreate,
+  ProjectResponse,
+  ProjectUpdate,
+} from '../../types/api';
 import { queryKeys } from './queryKeys';
 
 // ---------------------------------------------------------------------------
@@ -19,11 +29,64 @@ export function useProjectsQuery() {
   return useQuery({
     queryKey: queryKeys.projects,
     queryFn: async () => {
-      const res = await apiClient.get('/todos/projects');
+      const res = await apiClient.get('/projects');
       const raw = res.data ?? [];
-      return z.array(ProjectTodoResponseSchema).parse(raw);
+      return z.array(ProjectResponseSchema).parse(raw);
     },
     enabled: !!serverUrl,
+  });
+}
+
+export function useProjectQuery(projectId: string | undefined) {
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+  return useQuery({
+    queryKey: queryKeys.project(projectId ?? ''),
+    queryFn: async () => {
+      const response = await apiClient.get(`/projects/${projectId}`);
+      return ProjectOverviewResponseSchema.parse(response.data);
+    },
+    enabled: !!serverUrl && !!projectId,
+  });
+}
+
+export function useCreateProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (project: ProjectCreate) => {
+      const response = await apiClient.post('/projects', project);
+      return ProjectResponseSchema.parse(response.data);
+    },
+    onSuccess: (project) => {
+      queryClient.setQueryData<ProjectResponse[]>(queryKeys.projects, (current) => [
+        project,
+        ...(current ?? []),
+      ]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      useToastStore.getState().addToast('success', 'Project created');
+    },
+    onError: () => {
+      useToastStore.getState().addToast('error', 'Failed to create project');
+    },
+  });
+}
+
+export function useUpdateProject(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: ProjectUpdate) => {
+      const response = await apiClient.patch(`/projects/${projectId}`, updates);
+      return ProjectResponseSchema.parse(response.data);
+    },
+    onSuccess: (project) => {
+      queryClient.setQueryData<ProjectResponse[]>(queryKeys.projects, (current) =>
+        current?.map((item) => (item.id === project.id ? project : item)),
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(project.id) });
+      useToastStore.getState().addToast('success', 'Project execution settings saved');
+    },
+    onError: () => {
+      useToastStore.getState().addToast('error', 'Could not save project settings');
+    },
   });
 }
 
@@ -69,7 +132,10 @@ export function useMessagesQuery(conversationId: string | null) {
 export function useCreateConversation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ title, projectTodoId }: { title?: string; projectTodoId?: string } = {}) => {
+    mutationFn: async ({
+      title,
+      projectTodoId,
+    }: { title?: string; projectTodoId?: string } = {}) => {
       const convoTitle = title || 'New Conversation';
       try {
         const payload: Record<string, string> = { title: convoTitle };
@@ -90,9 +156,10 @@ export function useCreateConversation() {
     },
     onSuccess: (convo) => {
       // Add to cache optimistically
-      queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) =>
-        [convo, ...(old ?? [])],
-      );
+      queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) => [
+        convo,
+        ...(old ?? []),
+      ]);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
@@ -148,7 +215,13 @@ export function useGetOrCreateProjectConversation() {
 export function useDeleteMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
+    mutationFn: async ({
+      conversationId,
+      messageId,
+    }: {
+      conversationId: string;
+      messageId: string;
+    }) => {
       await apiClient.delete(`/chat/conversations/${conversationId}/messages/${messageId}`);
     },
     onMutate: async ({ conversationId, messageId }) => {
@@ -175,8 +248,18 @@ export function useDeleteMessage() {
 export function useEditMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ conversationId, messageId, newText }: { conversationId: string; messageId: string; newText: string }) => {
-      await apiClient.put(`/chat/conversations/${conversationId}/messages/${messageId}`, { content: newText });
+    mutationFn: async ({
+      conversationId,
+      messageId,
+      newText,
+    }: {
+      conversationId: string;
+      messageId: string;
+      newText: string;
+    }) => {
+      await apiClient.put(`/chat/conversations/${conversationId}/messages/${messageId}`, {
+        content: newText,
+      });
       return newText;
     },
     onMutate: async ({ conversationId, messageId, newText }) => {
@@ -231,7 +314,13 @@ export function useEditMessage() {
 export function useRegenerateMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ conversationId, assistantMessageId }: { conversationId: string; assistantMessageId: string }) => {
+    mutationFn: async ({
+      conversationId,
+      assistantMessageId,
+    }: {
+      conversationId: string;
+      assistantMessageId: string;
+    }) => {
       const queryKey = queryKeys.messages(conversationId);
       const messages = queryClient.getQueryData<ChatMessage[]>(queryKey) ?? [];
       const assistantIndex = messages.findIndex((m) => m._id === assistantMessageId);
@@ -281,8 +370,12 @@ export function useFetchMessages() {
     mutationFn: async (conversationId: string) => {
       const res = await apiClient.get(`/chat/conversations/${conversationId}/messages`);
       const rawMessages: Array<{
-        id: string; content: string; role: string; created_at: string;
-        intent?: string; metadata?: Record<string, unknown>;
+        id: string;
+        content: string;
+        role: string;
+        created_at: string;
+        intent?: string;
+        metadata?: Record<string, unknown>;
       }> = res.data?.items ?? res.data ?? [];
       const msgs: ChatMessage[] = rawMessages.map((m) => ({
         _id: m.id,

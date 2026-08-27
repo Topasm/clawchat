@@ -42,6 +42,10 @@ export default function useWebSocket(): void {
         void queryClient.invalidateQueries({ queryKey: queryKeys.events });
         void queryClient.invalidateQueries({ queryKey: queryKeys.today });
         void queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
+        void queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+        void queryClient.invalidateQueries({ queryKey: ['runs'] });
         const conversationId = useChatStore.getState().currentConversationId;
         if (conversationId) {
           void queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
@@ -75,6 +79,16 @@ export default function useWebSocket(): void {
         queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
       } else if (d.module === 'events') {
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
+      } else if (d.module === 'reviews') {
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      } else if (d.module === 'artifacts') {
+        queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+      } else if (d.module === 'projects') {
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      } else if (d.module === 'runs') {
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       } else {
         // Refresh all
         queryClient.invalidateQueries({ queryKey: queryKeys.todos });
@@ -82,6 +96,10 @@ export default function useWebSocket(): void {
         void invalidateTaskDerivedQueries(queryClient);
         queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
         queryClient.invalidateQueries({ queryKey: queryKeys.events });
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
+        queryClient.invalidateQueries({ queryKey: ['artifacts'] });
+        queryClient.invalidateQueries({ queryKey: ['runs'] });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
     };
@@ -111,6 +129,9 @@ export default function useWebSocket(): void {
       const chatStore = useChatStore.getState();
       chatStore.updateTaskProgress?.(d.task_id ?? '', { status: 'completed', result: d.result });
       useToastStore.getState().addToast('success', 'Background task completed');
+      queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
       if (useSettingsStore.getState().notificationsEnabled) {
         void notify('Task Complete', 'Background task finished');
       }
@@ -121,6 +142,7 @@ export default function useWebSocket(): void {
       const chatStore = useChatStore.getState();
       chatStore.updateTaskProgress?.(d.task_id ?? '', { status: 'failed', error: d.error });
       const errorMsg = d.error ?? 'Unknown error';
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
       useToastStore.getState().addToast('error', `Background task failed: ${errorMsg}`);
       if (useSettingsStore.getState().notificationsEnabled) {
         void notify('Task Failed', errorMsg);
@@ -131,6 +153,7 @@ export default function useWebSocket(): void {
       const d = data as { task_id?: string; progress?: number; message?: string; status?: string };
       const chatStore = useChatStore.getState();
       chatStore.updateTaskProgress?.(d.task_id ?? '', d);
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
     };
 
     // --- AI stream events (from orchestrator /send path) ---

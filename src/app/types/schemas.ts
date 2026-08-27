@@ -47,6 +47,7 @@ export const TodoResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().nullable().optional(),
+  project_id: z.string().nullable().optional(),
   status: TaskStatusSchema,
   priority: PrioritySchema.optional(),
   due_date: z.string().nullable().optional(),
@@ -78,6 +79,7 @@ export const TodoResponseSchema = z.object({
 export const TodoCreateSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
+  project_id: z.string().nullable().optional(),
   status: TaskStatusSchema.optional(),
   priority: PrioritySchema.optional(),
   due_date: z.string().optional(),
@@ -97,6 +99,7 @@ export const TodoCreateSchema = z.object({
 export const TodoUpdateSchema = z.object({
   title: z.string().min(1, 'Title is required').optional(),
   description: z.string().optional(),
+  project_id: z.string().nullable().optional(),
   status: TaskStatusSchema.optional(),
   priority: PrioritySchema.optional(),
   due_date: z.string().optional(),
@@ -133,6 +136,128 @@ export const ProjectTodoResponseSchema = z.object({
   conversation_id: z.string().nullable().optional(),
   subtask_count: z.number().optional(),
   completed_subtask_count: z.number().optional(),
+});
+
+export const ProjectStatusSchema = z.enum(['planned', 'active', 'completed', 'archived']);
+
+export const ProjectResponseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  goal: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  status: ProjectStatusSchema,
+  deadline: z.string().nullable().optional(),
+  root_task_id: z.string().nullable().optional(),
+  graph_revision: z.number().int().nonnegative(),
+  default_execution_provider: z.string().nullable().optional(),
+  default_execution_model: z.string().nullable().optional(),
+  execution_workspace_path: z.string().nullable().optional(),
+  execution_workspace_isolation: z.enum(['local', 'worktree']).default('local'),
+  execution_base_branch: z.string().nullable().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  task_count: z.number().int().nonnegative(),
+  completed_task_count: z.number().int().nonnegative(),
+  conversation_id: z.string().nullable().optional(),
+});
+
+export const ProjectOverviewResponseSchema = ProjectResponseSchema.extend({
+  ready_count: z.number().int().nonnegative(),
+  blocked_count: z.number().int().nonnegative(),
+  at_risk_count: z.number().int().nonnegative(),
+  running_agent_count: z.number().int().nonnegative(),
+  pending_review_count: z.number().int().nonnegative(),
+  critical_path_minutes: z.number().int().nonnegative().nullable(),
+});
+
+export const ProjectCreateSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  goal: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  status: ProjectStatusSchema.optional(),
+  deadline: z.string().nullable().optional(),
+  default_execution_provider: z.string().nullable().optional(),
+  default_execution_model: z.string().nullable().optional(),
+  execution_workspace_path: z.string().nullable().optional(),
+  execution_workspace_isolation: z.enum(['local', 'worktree']).optional(),
+  execution_base_branch: z.string().nullable().optional(),
+});
+
+export const ProjectUpdateSchema = ProjectCreateSchema.partial();
+
+export const ReviewSubjectTypeSchema = z.enum([
+  'plan_proposal',
+  'artifact_revision',
+  'agent_run',
+  'code_diff',
+  'schedule_change',
+  'sync_conflict',
+]);
+export const ReviewStatusSchema = z.enum([
+  'pending',
+  'approved',
+  'changes_requested',
+  'rejected',
+  'expired',
+]);
+export const ReviewRiskLevelSchema = z.enum(['low', 'medium', 'high']);
+export const ReviewItemResponseSchema = z.object({
+  id: z.string(),
+  project_id: z.string().nullable(),
+  project_title: z.string().nullable(),
+  subject_type: ReviewSubjectTypeSchema,
+  subject_id: z.string(),
+  subject_title: z.string().nullable(),
+  subject_description: z.string().nullable(),
+  subject_href: z.string().nullable(),
+  status: ReviewStatusSchema,
+  summary: z.string(),
+  risk_level: ReviewRiskLevelSchema,
+  requested_at: z.string(),
+  reviewed_at: z.string().nullable(),
+  review_note: z.string().nullable(),
+  metadata: z.record(z.string(), z.unknown()),
+});
+export const ReviewDecisionResponseSchema = z.object({
+  review: ReviewItemResponseSchema,
+  outcome: z.record(z.string(), z.unknown()),
+});
+
+export const ArtifactTypeSchema = z.enum([
+  'project_brief',
+  'requirements',
+  'acceptance_criteria',
+  'research_note',
+  'decision',
+  'report',
+  'code_diff',
+  'generated_file',
+  'external_link',
+]);
+export const ArtifactResponseSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  task_id: z.string().nullable(),
+  type: ArtifactTypeSchema,
+  title: z.string(),
+  content: z.string(),
+  current_version: z.number().int().positive(),
+  source: z.string(),
+  created_by: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export const ArtifactRevisionResponseSchema = z.object({
+  id: z.string(),
+  artifact_id: z.string(),
+  version: z.number().int().positive(),
+  title: z.string(),
+  content: z.string(),
+  source: z.string(),
+  created_by: z.string().nullable(),
+  status: z.enum(['approved', 'pending', 'changes_requested', 'rejected']),
+  created_at: z.string(),
+  reviewed_at: z.string().nullable(),
 });
 
 // -- Task relationships ----------------------------------------------------
@@ -296,6 +421,7 @@ export const TaskGraphInsightsResponseSchema = z.object({
 
 export const EventResponseSchema = z.object({
   id: z.string(),
+  project_id: z.string().nullable().optional(),
   title: z.string(),
   description: z.string().nullable().optional(),
   start_time: z.string(),
@@ -315,6 +441,7 @@ export const EventResponseSchema = z.object({
 
 export const EventCreateSchema = z.object({
   title: z.string().min(1, 'Title is required'),
+  project_id: z.string().nullable().optional(),
   description: z.string().optional(),
   start_time: z.string().min(1, 'Start time is required'),
   end_time: z.string().optional(),
@@ -328,6 +455,7 @@ export const EventCreateSchema = z.object({
 
 export const EventUpdateSchema = z.object({
   title: z.string().min(1, 'Title is required').optional(),
+  project_id: z.string().nullable().optional(),
   description: z.string().optional(),
   start_time: z.string().optional(),
   end_time: z.string().optional(),
@@ -344,6 +472,7 @@ export const ConversationResponseSchema = z.object({
   title: z.string().optional(),
   last_message: z.string().optional(),
   is_archived: z.boolean().optional(),
+  project_id: z.string().nullable().optional(),
   project_todo_id: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -351,6 +480,7 @@ export const ConversationResponseSchema = z.object({
 
 export const ConversationCreateSchema = z.object({
   title: z.string().optional(),
+  project_id: z.string().optional(),
   project_todo_id: z.string().optional(),
 });
 
@@ -508,6 +638,19 @@ export type TodoResponse = z.infer<typeof TodoResponseSchema>;
 export type TodoCreate = z.infer<typeof TodoCreateSchema>;
 export type TodoUpdate = z.infer<typeof TodoUpdateSchema>;
 export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
+export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
+export type ProjectResponse = z.infer<typeof ProjectResponseSchema>;
+export type ProjectOverviewResponse = z.infer<typeof ProjectOverviewResponseSchema>;
+export type ProjectCreate = z.infer<typeof ProjectCreateSchema>;
+export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
+export type ReviewSubjectType = z.infer<typeof ReviewSubjectTypeSchema>;
+export type ReviewStatus = z.infer<typeof ReviewStatusSchema>;
+export type ReviewRiskLevel = z.infer<typeof ReviewRiskLevelSchema>;
+export type ReviewItemResponse = z.infer<typeof ReviewItemResponseSchema>;
+export type ReviewDecisionResponse = z.infer<typeof ReviewDecisionResponseSchema>;
+export type ArtifactType = z.infer<typeof ArtifactTypeSchema>;
+export type ArtifactResponse = z.infer<typeof ArtifactResponseSchema>;
+export type ArtifactRevisionResponse = z.infer<typeof ArtifactRevisionResponseSchema>;
 export type TaskStatus = GeneratedTaskStatus;
 export type TaskRelationshipType = z.infer<typeof TaskRelationshipTypeSchema>;
 export type TaskRelationshipResponse = z.infer<typeof TaskRelationshipResponseSchema>;
@@ -670,6 +813,70 @@ export const AgentTaskResponseSchema = z.object({
   created_at: z.string(),
   started_at: z.string().nullable().optional(),
   completed_at: z.string().nullable().optional(),
+});
+
+export const AgentRunStatusSchema = z.enum([
+  'queued',
+  'starting',
+  'running',
+  'waiting_input',
+  'waiting_review',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+export const AgentRunResponseSchema = z.object({
+  id: z.string(),
+  agent_task_id: z.string(),
+  project_id: z.string().nullable(),
+  project_title: z.string().nullable(),
+  todo_id: z.string().nullable(),
+  todo_title: z.string().nullable(),
+  task_type: z.string(),
+  instruction: z.string(),
+  instruction_snapshot: z.string(),
+  attempt: z.number().int().positive(),
+  provider: z.string(),
+  model: z.string().nullable(),
+  host_id: z.string().nullable(),
+  workspace_id: z.string().nullable(),
+  external_run_id: z.string().nullable(),
+  status: AgentRunStatusSchema,
+  progress: z.number().int().min(0).max(100),
+  progress_message: z.string().nullable(),
+  result_summary: z.string().nullable(),
+  error: z.string().nullable(),
+  usage: z.record(z.string(), z.unknown()).nullable(),
+  is_adopted: z.boolean(),
+  created_at: z.string(),
+  started_at: z.string().nullable(),
+  heartbeat_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  cancel_requested_at: z.string().nullable(),
+  updated_at: z.string(),
+});
+
+export const AgentRunEventResponseSchema = z.object({
+  id: z.string(),
+  run_id: z.string(),
+  sequence: z.number().int().positive(),
+  event_type: z.string(),
+  message: z.string().nullable(),
+  progress: z.number().int().min(0).max(100).nullable(),
+  payload: z.record(z.string(), z.unknown()).nullable(),
+  created_at: z.string(),
+});
+
+export const ExecutionProviderStatusSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  enabled: z.boolean(),
+  available: z.boolean(),
+  connected: z.boolean(),
+  host: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+  providers: z.array(z.record(z.string(), z.unknown())).default([]),
 });
 
 export const ActivityResponseSchema = z.object({
@@ -898,6 +1105,10 @@ export type BackupResponse = z.infer<typeof BackupResponseSchema>;
 
 export type InboxState = z.infer<typeof InboxStateSchema>;
 export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
+export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
+export type AgentRunResponse = z.infer<typeof AgentRunResponseSchema>;
+export type AgentRunEventResponse = z.infer<typeof AgentRunEventResponseSchema>;
+export type ExecutionProviderStatus = z.infer<typeof ExecutionProviderStatusSchema>;
 export type PlanSubtask = z.infer<typeof PlanSubtaskSchema>;
 export type PlanProposalStatus = z.infer<typeof PlanProposalStatusSchema>;
 export type PlanChangeSetStatus = z.infer<typeof PlanChangeSetStatusSchema>;

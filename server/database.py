@@ -141,6 +141,7 @@ _TASK_RELATIONSHIP_CYCLE_TRIGGERS = [
 ]
 
 _TASK_GRAPH_TODO_SEMANTIC_COLUMNS = (
+    "project_id",
     "title",
     "description",
     "status",
@@ -171,12 +172,34 @@ _TASK_GRAPH_TODO_UPDATE_CHANGED_SQL = " OR ".join(
     f"OLD.{column} IS NOT NEW.{column}"
     for column in _TASK_GRAPH_TODO_SEMANTIC_COLUMNS
 )
-_TASK_GRAPH_REVISION_UPDATE_SQL = f"""
+_GLOBAL_TASK_GRAPH_REVISION_UPDATE_SQL = f"""
     UPDATE task_graph_states
     SET revision = revision + 1,
         updated_at = CURRENT_TIMESTAMP
     WHERE scope_id = '{GLOBAL_TASK_GRAPH_SCOPE_ID}';
 """
+
+
+def _project_revision_update_sql(project_expression: str) -> str:
+    return f"""
+        UPDATE projects
+        SET graph_revision = graph_revision + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = {project_expression};
+    """
+
+
+def _relationship_project_revision_update_sql(prefix: str) -> str:
+    return f"""
+        UPDATE projects
+        SET graph_revision = graph_revision + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id IN (
+            SELECT project_id FROM todos
+            WHERE id IN ({prefix}.source_task_id, {prefix}.target_task_id)
+              AND project_id IS NOT NULL
+        );
+    """
 
 _TASK_GRAPH_REVISION_TRIGGERS: list[tuple[str, str]] = [
     (
@@ -185,7 +208,8 @@ _TASK_GRAPH_REVISION_TRIGGERS: list[tuple[str, str]] = [
         CREATE TRIGGER IF NOT EXISTS todos_bump_task_graph_revision_insert
         AFTER INSERT ON todos
         BEGIN
-            {_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_GLOBAL_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_project_revision_update_sql("NEW.project_id")}
         END
         """,
     ),
@@ -195,7 +219,8 @@ _TASK_GRAPH_REVISION_TRIGGERS: list[tuple[str, str]] = [
         CREATE TRIGGER IF NOT EXISTS todos_bump_task_graph_revision_delete
         AFTER DELETE ON todos
         BEGIN
-            {_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_GLOBAL_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_project_revision_update_sql("OLD.project_id")}
         END
         """,
     ),
@@ -206,7 +231,11 @@ _TASK_GRAPH_REVISION_TRIGGERS: list[tuple[str, str]] = [
         AFTER UPDATE OF {_TASK_GRAPH_TODO_UPDATE_COLUMNS_SQL} ON todos
         WHEN {_TASK_GRAPH_TODO_UPDATE_CHANGED_SQL}
         BEGIN
-            {_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_GLOBAL_TASK_GRAPH_REVISION_UPDATE_SQL}
+            UPDATE projects
+            SET graph_revision = graph_revision + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id IN (OLD.project_id, NEW.project_id);
         END
         """,
     ),
@@ -216,7 +245,8 @@ _TASK_GRAPH_REVISION_TRIGGERS: list[tuple[str, str]] = [
         CREATE TRIGGER IF NOT EXISTS task_relationships_bump_graph_revision_insert
         AFTER INSERT ON task_relationships
         BEGIN
-            {_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_GLOBAL_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_relationship_project_revision_update_sql("NEW")}
         END
         """,
     ),
@@ -226,7 +256,18 @@ _TASK_GRAPH_REVISION_TRIGGERS: list[tuple[str, str]] = [
         CREATE TRIGGER IF NOT EXISTS task_relationships_bump_graph_revision_update
         AFTER UPDATE ON task_relationships
         BEGIN
-            {_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_GLOBAL_TASK_GRAPH_REVISION_UPDATE_SQL}
+            UPDATE projects
+            SET graph_revision = graph_revision + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id IN (
+                SELECT project_id FROM todos
+                WHERE id IN (
+                    OLD.source_task_id, OLD.target_task_id,
+                    NEW.source_task_id, NEW.target_task_id
+                )
+                  AND project_id IS NOT NULL
+            );
         END
         """,
     ),
@@ -236,7 +277,8 @@ _TASK_GRAPH_REVISION_TRIGGERS: list[tuple[str, str]] = [
         CREATE TRIGGER IF NOT EXISTS task_relationships_bump_graph_revision_delete
         AFTER DELETE ON task_relationships
         BEGIN
-            {_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_GLOBAL_TASK_GRAPH_REVISION_UPDATE_SQL}
+            {_relationship_project_revision_update_sql("OLD")}
         END
         """,
     ),
@@ -301,13 +343,14 @@ def _install_task_graph_state_sync(connection) -> None:
         todo_columns = {
             column["name"] for column in inspector.get_columns("todos")
         }
-    todo_triggers_are_safe = set(_TASK_GRAPH_TODO_SEMANTIC_COLUMNS).issubset(
-        todo_columns
+    todo_triggers_are_safe = (
+        inspector.has_table("projects")
+        and set(_TASK_GRAPH_TODO_SEMANTIC_COLUMNS).issubset(todo_columns)
     )
     for target_table, statement in _TASK_GRAPH_REVISION_TRIGGERS:
         if not inspector.has_table(target_table):
             continue
-        if target_table == "todos" and not todo_triggers_are_safe:
+        if not todo_triggers_are_safe:
             continue
         connection.execute(text(statement))
 
@@ -345,6 +388,7 @@ async def _apply_schema_corrections(session: AsyncSession):
     """
     corrections = [
         # -- todos --
+        "ALTER TABLE todos ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
         "ALTER TABLE todos ADD COLUMN parent_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
         "ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE todos ADD COLUMN source TEXT",
@@ -363,13 +407,27 @@ async def _apply_schema_corrections(session: AsyncSession):
         "ALTER TABLE todos ADD COLUMN recurring_source_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
 
         # -- conversations --
+        "ALTER TABLE conversations ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
         "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+
+        # -- events --
+        "ALTER TABLE events ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
+
+        # -- plan proposals --
+        "ALTER TABLE plan_proposals ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
 
         # -- agent_tasks --
         "ALTER TABLE agent_tasks ADD COLUMN todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
         "ALTER TABLE agent_tasks ADD COLUMN payload_json TEXT",
         "ALTER TABLE agent_tasks ADD COLUMN skill_chain TEXT",
         "ALTER TABLE agent_tasks ADD COLUMN current_skill_index INTEGER NOT NULL DEFAULT 0",
+
+        # -- projects / agent_runs (Paseo execution metadata) --
+        "ALTER TABLE projects ADD COLUMN default_execution_model TEXT",
+        "ALTER TABLE projects ADD COLUMN execution_workspace_path TEXT",
+        "ALTER TABLE projects ADD COLUMN execution_workspace_isolation TEXT NOT NULL DEFAULT 'local'",
+        "ALTER TABLE projects ADD COLUMN execution_base_branch TEXT",
+        "ALTER TABLE agent_runs ADD COLUMN external_run_id TEXT",
 
         # -- paired_devices --
         "ALTER TABLE paired_devices ADD COLUMN public_key TEXT",
@@ -380,6 +438,17 @@ async def _apply_schema_corrections(session: AsyncSession):
             await session.execute(text(stmt))
         except (OperationalError, Exception):
             pass  # column already exists
+    for stmt in (
+        "CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_conversations_project_id ON conversations(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_events_project_id ON events(project_id)",
+        "CREATE INDEX IF NOT EXISTS idx_plan_proposals_project_status ON plan_proposals(project_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_runs_external_run_id ON agent_runs(external_run_id)",
+    ):
+        try:
+            await session.execute(text(stmt))
+        except OperationalError:
+            pass
     await session.commit()
 
 
@@ -436,7 +505,253 @@ async def _run_data_migrations(
             )
         await reconcile_dependency_shadows(session)
     await _backfill_legacy_plan_proposals(session)
+    await _backfill_first_class_projects(session)
+    await _backfill_review_items(session)
+    await _backfill_agent_runs(session)
+    from services.agent_run_service import reconcile_interrupted_runs
+
+    await reconcile_interrupted_runs(session)
     await session.commit()
+
+
+async def _backfill_first_class_projects(session: AsyncSession) -> None:
+    """Promote legacy root-Todo workspaces without changing task identity."""
+    from collections import defaultdict, deque
+
+    from models.conversation import Conversation
+    from models.event import Event
+    from models.plan_proposal import PlanProposal
+    from models.project import Project
+    from models.task_graph_state import TaskGraphState
+    from models.todo import Todo
+    from utils import make_id
+
+    todos = list((await session.execute(select(Todo))).scalars().all())
+    if not todos:
+        return
+    children: dict[str, list[Todo]] = defaultdict(list)
+    for todo in todos:
+        if todo.parent_id is not None:
+            children[todo.parent_id].append(todo)
+
+    conversations = list(
+        (await session.execute(select(Conversation))).scalars().all()
+    )
+    linked_root_ids = {
+        conversation.project_todo_id
+        for conversation in conversations
+        if conversation.project_todo_id is not None
+    }
+    projects = list((await session.execute(select(Project))).scalars().all())
+    project_by_root_id = {
+        project.root_task_id: project
+        for project in projects
+        if project.root_task_id is not None
+    }
+    global_state = await session.get(TaskGraphState, GLOBAL_TASK_GRAPH_SCOPE_ID)
+    initial_revision = global_state.revision if global_state is not None else 0
+
+    for root in sorted(todos, key=lambda item: (item.created_at, item.id)):
+        if root.parent_id is not None:
+            continue
+        qualifies = bool(children.get(root.id)) or root.id in linked_root_ids or bool(root.source)
+        if not qualifies:
+            continue
+        project = project_by_root_id.get(root.id)
+        if project is None:
+            project = Project(
+                id=make_id("project_"),
+                title=root.title,
+                description=root.description,
+                status=(
+                    "completed"
+                    if root.status == TaskStatus.COMPLETED
+                    else "active"
+                ),
+                deadline=root.due_date,
+                root_task_id=root.id,
+                graph_revision=initial_revision,
+                created_at=root.created_at,
+                updated_at=root.updated_at,
+            )
+            session.add(project)
+            project_by_root_id[root.id] = project
+
+        queue = deque([root])
+        while queue:
+            todo = queue.popleft()
+            if todo.project_id is None:
+                todo.project_id = project.id
+            queue.extend(children.get(todo.id, ()))
+
+    await session.flush()
+    project_by_root_id = {
+        project.root_task_id: project
+        for project in (await session.execute(select(Project))).scalars().all()
+        if project.root_task_id is not None
+    }
+    for conversation in conversations:
+        if conversation.project_id is None and conversation.project_todo_id is not None:
+            project = project_by_root_id.get(conversation.project_todo_id)
+            if project is not None:
+                conversation.project_id = project.id
+
+    await session.flush()
+    conversation_projects = {
+        conversation.id: conversation.project_id
+        for conversation in conversations
+        if conversation.project_id is not None
+    }
+    events = list((await session.execute(select(Event))).scalars().all())
+    for event_row in events:
+        if event_row.project_id is None and event_row.conversation_id is not None:
+            event_row.project_id = conversation_projects.get(event_row.conversation_id)
+
+    proposals = list(
+        (await session.execute(select(PlanProposal))).scalars().all()
+    )
+    todo_projects = {todo.id: todo.project_id for todo in todos}
+    for proposal in proposals:
+        if proposal.project_id is None and proposal.root_task_id is not None:
+            proposal.project_id = todo_projects.get(proposal.root_task_id)
+
+
+async def _backfill_review_items(session: AsyncSession) -> None:
+    """Mirror the Alembic plan-review backfill for legacy startup upgrades."""
+    from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
+    from models.plan_proposal import PlanProposal
+    from models.review_item import ReviewItem
+    from utils import make_id
+
+    existing_subject_ids = set(
+        (
+            await session.execute(
+                select(ReviewItem.subject_id).where(
+                    ReviewItem.subject_type == ReviewSubjectType.PLAN_PROPOSAL
+                )
+            )
+        ).scalars().all()
+    )
+    proposals = list(
+        (
+            await session.execute(
+                select(PlanProposal).where(
+                    PlanProposal.status.notin_([
+                        PlanProposalStatus.GENERATING,
+                        PlanProposalStatus.FAILED,
+                    ])
+                )
+            )
+        ).scalars().all()
+    )
+    status_map = {
+        PlanProposalStatus.DRAFT: ReviewStatus.PENDING,
+        PlanProposalStatus.APPLYING: ReviewStatus.PENDING,
+        PlanProposalStatus.APPLIED: ReviewStatus.APPROVED,
+        PlanProposalStatus.REJECTED: ReviewStatus.REJECTED,
+        PlanProposalStatus.STALE: ReviewStatus.EXPIRED,
+        PlanProposalStatus.REVERTED: ReviewStatus.APPROVED,
+    }
+    for proposal in proposals:
+        if proposal.id in existing_subject_ids:
+            continue
+        status = status_map[PlanProposalStatus(proposal.status)]
+        reviewed_at = (
+            None
+            if status == ReviewStatus.PENDING
+            else proposal.updated_at or datetime.now(timezone.utc)
+        )
+        session.add(
+            ReviewItem(
+                id=make_id("review_"),
+                project_id=proposal.project_id,
+                subject_type=ReviewSubjectType.PLAN_PROPOSAL,
+                subject_id=proposal.id,
+                status=status,
+                summary="Review AI task plan",
+                risk_level=ReviewRiskLevel.MEDIUM,
+                requested_at=proposal.created_at,
+                reviewed_at=reviewed_at,
+                created_at=proposal.created_at,
+                updated_at=proposal.updated_at,
+            )
+        )
+
+
+async def _backfill_agent_runs(session: AsyncSession) -> None:
+    """Create one durable historical attempt for legacy AgentTask rows."""
+    from models.agent_run import AgentRun, AgentRunEvent
+    from models.agent_task import AgentTask
+    from models.conversation import Conversation
+    from models.todo import Todo
+    from utils import make_id
+
+    existing_task_ids = set(
+        (await session.execute(select(AgentRun.agent_task_id))).scalars().all()
+    )
+    tasks = list((await session.execute(select(AgentTask))).scalars().all())
+    todo_projects = dict(
+        (await session.execute(select(Todo.id, Todo.project_id))).all()
+    )
+    conversation_projects = dict(
+        (await session.execute(select(Conversation.id, Conversation.project_id))).all()
+    )
+    now = datetime.now(timezone.utc)
+    for task in tasks:
+        if task.id in existing_task_ids:
+            continue
+        if task.status == "completed":
+            status = "completed"
+            adopted = True
+            error = task.error
+        elif task.status in ("failed", "cancelled"):
+            status = task.status
+            adopted = False
+            error = task.error
+        else:
+            status = "failed"
+            adopted = False
+            error = "Legacy execution was interrupted; retry is available"
+            task.status = "failed"
+            task.error = error
+            task.completed_at = now
+        result = task.result or task.payload_json
+        completed_at = task.completed_at or now
+        run = AgentRun(
+            id=make_id("run_"),
+            agent_task_id=task.id,
+            project_id=(
+                todo_projects.get(task.todo_id)
+                or conversation_projects.get(task.conversation_id)
+            ),
+            attempt=1,
+            instruction_snapshot=task.instruction,
+            provider="legacy",
+            status=status,
+            progress=100 if status == "completed" else task.progress,
+            progress_message=task.progress_message,
+            result=result,
+            result_summary=result[:500] if result else None,
+            error=error,
+            is_adopted=adopted,
+            created_at=task.created_at,
+            started_at=task.started_at,
+            heartbeat_at=task.completed_at or task.started_at,
+            completed_at=completed_at,
+            updated_at=completed_at,
+        )
+        session.add(run)
+        session.add(
+            AgentRunEvent(
+                id=make_id("run_event_"),
+                run_id=run.id,
+                sequence=1,
+                event_type="migrated",
+                message="Imported from legacy AgentTask state",
+                progress=run.progress,
+                created_at=completed_at,
+            )
+        )
 
 
 async def _backfill_legacy_plan_proposals(session: AsyncSession) -> None:

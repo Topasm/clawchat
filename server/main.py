@@ -9,15 +9,20 @@ from exceptions import AppError, app_error_handler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
+from routers import agent_run as agent_run_router
 from routers import attachment as attachment_router
+from routers import artifact as artifact_router
 from routers import auth as auth_router
 from routers import calendar as calendar_router
 from routers import capabilities as capabilities_router
 from routers import change_set as change_set_router
 from routers import chat as chat_router
+from routers import execution_provider as execution_provider_router
 from routers import notifications as notifications_router
 from routers import obsidian as obsidian_router
 from routers import pairing as pairing_router
+from routers import project as project_router
+from routers import review as review_router
 from routers import search as search_router
 from routers import settings as settings_router
 from routers import tags as tags_router
@@ -61,6 +66,10 @@ async def lifespan(app: FastAPI):
     )
 
     app.state.session_factory = async_session_factory
+
+    from services import paseo_execution_service
+
+    app.state.paseo_adapter = paseo_execution_service.adapter_from_settings()
 
     # Run slow startup checks concurrently instead of sequentially
     async def _check_ai() -> bool:
@@ -143,6 +152,13 @@ async def lifespan(app: FastAPI):
     push_service = PushService(settings.firebase_credentials_path)
     app.state.push_service = push_service
 
+    recovered_paseo_runs = await paseo_execution_service.recover_active_runs(
+        async_session_factory,
+        adapter=app.state.paseo_adapter,
+    )
+    if recovered_paseo_runs:
+        logger.info("Reattached %d Paseo AgentRun monitor(s)", recovered_paseo_runs)
+
     # Start background scheduler if enabled
     if settings.enable_scheduler:
         scheduler = Scheduler(
@@ -222,8 +238,17 @@ app.add_middleware(
 
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
+app.include_router(agent_run_router.router, prefix="/api/runs", tags=["runs"])
 app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
+app.include_router(project_router.router, prefix="/api/projects", tags=["projects"])
+app.include_router(
+    execution_provider_router.router,
+    prefix="/api/execution-providers",
+    tags=["execution-providers"],
+)
+app.include_router(artifact_router.router, prefix="/api", tags=["artifacts"])
+app.include_router(review_router.router, prefix="/api/reviews", tags=["reviews"])
 app.include_router(
     change_set_router.router,
     prefix="/api/change-sets",

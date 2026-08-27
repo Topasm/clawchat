@@ -6,10 +6,14 @@ Active foundation work is tracked separately from release status:
 
 | Workstream | Implemented | Validated | Released |
 |---|---|---|---|
-| Canonical task status | Yes | Backend/Web contract checks; Android CI pending | No |
+| Canonical task status | Yes | Backend/Web/Android generated-contract and serialization checks | No |
 | Normalized task relationships | Yes | Backend/Web/migration regression checks | No |
 | Versioned AI plan proposals | Yes | Backend/Web/OpenAPI/migration/concurrency regression checks | No |
 | Deterministic execution graph insights | Yes | Backend/Web/algorithm/performance regression checks | No |
+| First-class Project identity | Yes | Backend/Web/OpenAPI/fresh-migration checks | No |
+| Unified Review Inbox and Artifacts | Yes | Backend/Web/OpenAPI/version-lifecycle checks | No |
+| AgentTask / AgentRun lifecycle | Yes | Backend/Web/cancellation/retry/restart/migration checks | No |
+| Paseo execution provider | Yes | CLI contract/provider routing/reconnect/cancel/artifact/review checks | No |
 
 ---
 
@@ -195,6 +199,8 @@ Active foundation work is tracked separately from release status:
 - [x] Migrate existing `depends_on` data without loss
 - [x] Reject self-edges, duplicates, dangling references, and dependency cycles
 - [x] Derive Ready/Blocked state, blocker propagation, critical path, deadline risk, and graph health from canonical dependency edges
+- [x] Persist project/mode-specific Graph node positions, viewport, and collapsed nodes locally
+- [x] Provide a Graph layout reset without changing canonical task or relationship data
 
 #### Bulk Task Operations
 - [x] Add multi-select mode to kanban board (Ctrl/Cmd+click on cards)
@@ -233,7 +239,7 @@ Active foundation work is tracked separately from release status:
 ### Phase 6: Mobile
 - [x] Native Android app with Compose feature modules, widgets, notifications, and background work
 - [x] Bottom navigation for native Android and the shared mobile layout
-- [ ] Complete Android release CI validation for the canonical task contract
+- [x] Complete Android release CI validation for the canonical task contract
 - [ ] Touch-optimize the provisional Capacitor iOS kanban
 - [x] Retain Capacitor iOS packaging while native iOS priority is undecided
 - [x] Deprecate Capacitor Android; no new product work targets it

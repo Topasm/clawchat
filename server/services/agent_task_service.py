@@ -9,6 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.agent_task import AgentTask
+from models.agent_run import AgentRun
+from services import agent_run_service
 from services.ai_service import AIService
 from utils import make_id, strip_markdown_fences
 from ws.manager import ConnectionManager
@@ -111,9 +113,19 @@ async def get_sub_tasks(db: AsyncSession, parent_id: str) -> list[AgentTask]:
     return list((await db.execute(q)).scalars().all())
 
 
+async def _attached_run(db: AsyncSession, task: AgentTask) -> AgentRun | None:
+    run = getattr(task, "_active_agent_run", None)
+    if run is not None:
+        return run
+    return await agent_run_service.current_run_for_task(db, task.id)
+
+
 async def mark_running(db: AsyncSession, task: AgentTask) -> None:
     task.status = "running"
     task.started_at = datetime.now(timezone.utc)
+    run = await _attached_run(db, task)
+    if run is not None:
+        await agent_run_service.mark_running(db, run)
     await db.flush()
 
 
@@ -122,6 +134,9 @@ async def mark_completed(db: AsyncSession, task: AgentTask, result: str) -> None
     task.result = result
     task.progress = 100
     task.completed_at = datetime.now(timezone.utc)
+    run = await _attached_run(db, task)
+    if run is not None:
+        await agent_run_service.mark_waiting_review(db, run, task, result)
     await db.flush()
 
 
@@ -129,6 +144,9 @@ async def mark_failed(db: AsyncSession, task: AgentTask, error: str) -> None:
     task.status = "failed"
     task.error = error
     task.completed_at = datetime.now(timezone.utc)
+    run = await _attached_run(db, task)
+    if run is not None:
+        await agent_run_service.mark_failed(db, run, error)
     await db.flush()
 
 
@@ -142,6 +160,9 @@ async def update_progress(
 ) -> None:
     task.progress = progress
     task.progress_message = message
+    run = await _attached_run(db, task)
+    if run is not None:
+        await agent_run_service.update_progress(db, run, progress, message)
     await db.flush()
 
     await ws_manager.send_json(user_id, {
@@ -152,6 +173,7 @@ async def update_progress(
             "message": message,
             "status": task.status,
             "parent_task_id": task.parent_task_id,
+            "run_id": run.id if run is not None else None,
         },
     })
 
@@ -163,8 +185,24 @@ async def execute_task(
     ws_manager: ConnectionManager,
     user_id: str,
     session_factory=None,
+    run: AgentRun | None = None,
+    provider: str = "builtin_llm",
+    model: str | None = None,
 ) -> None:
     """Full pipeline: mark running -> execute -> mark completed/failed -> WS notify."""
+    if run is None:
+        run = await agent_run_service.current_run_for_task(db, task.id)
+    if run is None:
+        run = await agent_run_service.create_run(
+            db,
+            task,
+            provider=provider,
+            model=model or getattr(ai_service, "model", None),
+        )
+    task._active_agent_run = run
+    if run.status == "queued":
+        await agent_run_service.mark_starting(db, run)
+        await db.commit()
     # Skill-chain path — preferred for new tasks.
     if task.skill_chain:
         from skills.executor import execute_skill_chain
@@ -207,6 +245,7 @@ async def execute_task(
                 "result": result,
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
+                "run_id": run.id,
             },
         })
     except Exception as exc:
@@ -226,6 +265,7 @@ async def execute_task(
                 "error": error_msg,
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
+                "run_id": run.id,
             },
         })
 

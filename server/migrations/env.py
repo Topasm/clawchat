@@ -22,6 +22,45 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+_SQLITE_INLINE_PROJECT_FK_TABLES = {
+    "todos",
+    "conversations",
+    "events",
+    "plan_proposals",
+}
+
+
+def _sqlite_include_object(
+    object_,
+    _name,
+    type_,
+    _reflected,
+    _compare_to,
+) -> bool:
+    """Ignore one SQLite reflection gap without hiding other schema drift.
+
+    SQLite stores and enforces ON DELETE SET NULL for project_id columns added
+    in place. SQLAlchemy's SQLite inspector does not reflect the ON DELETE
+    option for an inline FK added through ALTER TABLE, so Alembic otherwise
+    reports a remove/add pair forever. Rebuilding these tables would activate
+    existing cascades and risk task relationship/history loss.
+    """
+    if (
+        type_ == "check_constraint"
+        and _name == "ck_projects_execution_workspace_isolation"
+    ):
+        # Legacy SQLite projects are extended in place to avoid activating
+        # project FK cascades during a table rebuild. ORM validation and fresh
+        # databases still enforce the same two-value domain.
+        return False
+    if type_ != "foreign_key_constraint":
+        return True
+    table = getattr(object_, "table", None)
+    if table is None or table.name not in _SQLITE_INLINE_PROJECT_FK_TABLES:
+        return True
+    columns = {column.name for column in getattr(object_, "columns", ())}
+    return columns != {"project_id"}
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
@@ -53,12 +92,15 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(
+    options = dict(
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
         render_as_batch=connection.dialect.name == "sqlite",
     )
+    if connection.dialect.name == "sqlite":
+        options["include_object"] = _sqlite_include_object
+    context.configure(**options)
 
     with context.begin_transaction():
         context.run_migrations()

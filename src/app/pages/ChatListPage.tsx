@@ -1,42 +1,23 @@
 import { useState, useMemo } from 'react';
 import usePlatform from '../hooks/usePlatform';
 import { useNavigate } from 'react-router-dom';
-import { useChatStore } from '../stores/useChatStore';
 import {
   useConversationsQuery,
+  useCreateProject,
   useProjectsQuery,
   useTodosQuery,
   useCreateConversation,
   useDeleteConversation,
-  useGetOrCreateProjectConversation,
 } from '../hooks/queries';
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
 import Badge from '../components/shared/Badge';
-import {
-  ChatBubbleIcon,
-  CheckIcon,
-  ChevronRightIcon,
-  FolderIcon,
-} from '../components/shared/Icons';
+import { ChatBubbleIcon, CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
+import Dialog from '../components/shared/Dialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
-import type { ProjectTodoResponse } from '../types/api';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
-
-function getSyncBadge(project: ProjectTodoResponse): {
-  label: string;
-  variant: 'synced' | 'linked' | 'none';
-} {
-  if (project.source === 'obsidian_project' || project.source === 'obsidian') {
-    return { label: 'Synced', variant: 'synced' };
-  }
-  if (project.source_id) {
-    return { label: 'Linked folder', variant: 'linked' };
-  }
-  return { label: '', variant: 'none' };
-}
 
 export default function ChatListPage() {
   const navigate = useNavigate();
@@ -44,17 +25,20 @@ export default function ChatListPage() {
   const { data: projects = [], isLoading: projsLoading } = useProjectsQuery();
   const { data: todos = [] } = useTodosQuery();
   const createConversationMutation = useCreateConversation();
+  const createProjectMutation = useCreateProject();
   const deleteConversationMutation = useDeleteConversation();
-  const getOrCreateProjectConvMutation = useGetOrCreateProjectConversation();
   const { isMobile } = usePlatform();
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [quickChatsOpen, setQuickChatsOpen] = useState(false);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [projectTitle, setProjectTitle] = useState('');
+  const [projectGoal, setProjectGoal] = useState('');
 
   const loading = convsLoading || projsLoading;
 
   // Quick chats = conversations without a project_todo_id
-  const quickChats = conversations.filter((c) => !c.project_todo_id);
+  const quickChats = conversations.filter((c) => !c.project_id && !c.project_todo_id);
 
   // Compute per-project metadata
   const projectMeta = useMemo(() => {
@@ -77,8 +61,10 @@ export default function ChatListPage() {
     }
 
     for (const todo of todos) {
-      if (!todo.parent_id) continue;
-      const accumulator = accumulators.get(todo.parent_id);
+      if (!todo.project_id) continue;
+      const project = projects.find((candidate) => candidate.id === todo.project_id);
+      if (!project || todo.id === project.root_task_id) continue;
+      const accumulator = accumulators.get(todo.project_id);
       if (!accumulator) continue;
 
       accumulator.childCount += 1;
@@ -101,7 +87,7 @@ export default function ChatListPage() {
       meta[project.id] = {
         nextDue: accumulator.nextDue,
         openCount: accumulator.openCount,
-        totalCount: project.subtask_count ?? accumulator.childCount,
+        totalCount: project.task_count ?? accumulator.childCount,
       };
     }
     return meta;
@@ -116,13 +102,21 @@ export default function ChatListPage() {
     }
   };
 
-  const handleProjectClick = async (todoId: string) => {
-    try {
-      const convo = await getOrCreateProjectConvMutation.mutateAsync(todoId);
-      navigate(`/chats/${convo.id}`);
-    } catch {
-      // Stay on list page
-    }
+  const handleProjectClick = (projectId: string) => {
+    navigate(`/projects/${projectId}`);
+  };
+
+  const handleCreateProject = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!projectTitle.trim()) return;
+    const project = await createProjectMutation.mutateAsync({
+      title: projectTitle.trim(),
+      goal: projectGoal.trim() || null,
+    });
+    setProjectTitle('');
+    setProjectGoal('');
+    setCreateProjectOpen(false);
+    navigate(`/projects/${project.id}`);
   };
 
   const handleDeleteConfirm = async () => {
@@ -138,11 +132,20 @@ export default function ChatListPage() {
           <div className="cc-page-header__title">Projects</div>
           {!isMobile && <div className="cc-page-header__subtitle">Your project workspaces</div>}
         </div>
-        {!isMobile && (
-          <button type="button" className="cc-btn cc-btn--primary" onClick={handleNewChat}>
-            + Quick Chat
+        <div className="cc-projects-header__actions">
+          {!isMobile && (
+            <button type="button" className="cc-btn" onClick={handleNewChat}>
+              + Quick Chat
+            </button>
+          )}
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            onClick={() => setCreateProjectOpen(true)}
+          >
+            + Project
           </button>
-        )}
+        </div>
       </div>
 
       {loading && projects.length === 0 && conversations.length === 0 && <ChatListSkeleton />}
@@ -152,8 +155,7 @@ export default function ChatListPage() {
         <div className="cc-projects-grid">
           {projects.map((project) => {
             const meta = projectMeta[project.id];
-            const sync = getSyncBadge(project);
-            const completedCount = project.completed_subtask_count ?? 0;
+            const completedCount = project.completed_task_count ?? 0;
             const totalCount = meta?.totalCount ?? 0;
 
             return (
@@ -167,10 +169,10 @@ export default function ChatListPage() {
                   <div className="cc-project-card__icon">{getProjectIcon(project.id)}</div>
                   <div className="cc-project-card__title-area">
                     <div className="cc-project-card__title">{project.title}</div>
-                    {project.description && (
+                    {(project.goal || project.description) && (
                       <div className="cc-project-card__desc">
-                        {project.description.slice(0, 80)}
-                        {project.description.length > 80 ? '...' : ''}
+                        {(project.goal || project.description || '').slice(0, 80)}
+                        {(project.goal || project.description || '').length > 80 ? '...' : ''}
                       </div>
                     )}
                   </div>
@@ -184,15 +186,7 @@ export default function ChatListPage() {
                     </span>
                   )}
                   {meta?.nextDue && <Badge variant="due" dueDate={meta.nextDue} />}
-                  {sync.variant !== 'none' && (
-                    <span
-                      className={`cc-project-card__sync cc-project-card__sync--${sync.variant}`}
-                    >
-                      {sync.variant === 'synced' && <CheckIcon size={12} />}
-                      {sync.variant === 'linked' && <FolderIcon size={12} />}
-                      {sync.label}
-                    </span>
-                  )}
+                  <span className="cc-project-card__status">{project.status}</span>
                 </div>
 
                 {totalCount > 0 && (
@@ -220,7 +214,7 @@ export default function ChatListPage() {
           message={
             isMobile
               ? 'No projects yet.'
-              : 'No projects or conversations yet. Create a root-level todo to start a project!'
+              : 'No projects or conversations yet. Create a project to start a workspace.'
           }
         />
       ) : quickChats.length > 0 ? (
@@ -264,6 +258,40 @@ export default function ChatListPage() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
       />
+      <Dialog open={createProjectOpen} onOpenChange={setCreateProjectOpen} title="New Project">
+        <form className="cc-project-form" onSubmit={handleCreateProject}>
+          <label className="cc-project-form__field">
+            <span>Title</span>
+            <input
+              autoFocus
+              value={projectTitle}
+              onChange={(event) => setProjectTitle(event.target.value)}
+              placeholder="What are you working toward?"
+            />
+          </label>
+          <label className="cc-project-form__field">
+            <span>Goal</span>
+            <textarea
+              value={projectGoal}
+              onChange={(event) => setProjectGoal(event.target.value)}
+              placeholder="Describe the outcome that defines success"
+              rows={3}
+            />
+          </label>
+          <div className="cc-project-form__actions">
+            <button type="button" className="cc-btn" onClick={() => setCreateProjectOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="cc-btn cc-btn--primary"
+              disabled={!projectTitle.trim() || createProjectMutation.isPending}
+            >
+              {createProjectMutation.isPending ? 'Creating…' : 'Create project'}
+            </button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

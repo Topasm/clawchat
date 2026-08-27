@@ -13,6 +13,9 @@ const OnboardingPage = lazy(() => import('./app/pages/OnboardingPage'));
 const TodayPage = lazy(() => import('./app/pages/TodayPage'));
 const InboxPage = lazy(() => import('./app/pages/InboxPage'));
 const ChatListPage = lazy(() => import('./app/pages/ChatListPage'));
+const ProjectWorkspacePage = lazy(() => import('./app/pages/ProjectWorkspacePage'));
+const ReviewPage = lazy(() => import('./app/pages/ReviewPage'));
+const RunsPage = lazy(() => import('./app/pages/RunsPage'));
 const ChatPage = lazy(() => import('./app/pages/ChatPage'));
 const AllTasksPage = lazy(() => import('./app/pages/AllTasksPage'));
 const TaskDetailPage = lazy(() => import('./app/pages/TaskDetailPage'));
@@ -138,6 +141,46 @@ export default function AppRouter() {
             <ErrorBoundary name="InboxPage">
               <LazyRoute>
                 <InboxPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            <ErrorBoundary name="ProjectsPage">
+              <LazyRoute>
+                <ChatListPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ErrorBoundary name="ProjectWorkspacePage">
+              <LazyRoute>
+                <ProjectWorkspacePage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/review"
+          element={
+            <ErrorBoundary name="ReviewPage">
+              <LazyRoute>
+                <ReviewPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/runs"
+          element={
+            <ErrorBoundary name="RunsPage">
+              <LazyRoute>
+                <RunsPage />
               </LazyRoute>
             </ErrorBoundary>
           }

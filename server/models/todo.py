@@ -22,6 +22,11 @@ class Todo(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: make_id("todo_"))
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    project_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(
         String,
         nullable=False,
@@ -87,6 +92,7 @@ class Todo(Base):
             name="ck_todos_status_valid",
         ),
         Index("idx_todos_status", "status"),
+        Index("idx_todos_project_id", "project_id"),
         Index("idx_todos_due_date", "due_date"),
         Index("idx_todos_conversation_id", "conversation_id"),
         Index("idx_todos_parent_id", "parent_id"),

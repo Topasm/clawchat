@@ -16,6 +16,7 @@ def _normalize_source_id(value: str | None) -> str | None:
 class TodoCreate(BaseModel):
     title: str
     description: str | None = None
+    project_id: str | None = None
     status: TaskStatus = TaskStatus.PENDING
     priority: str = "medium"
     due_date: datetime | None = None
@@ -42,6 +43,7 @@ class TodoCreate(BaseModel):
 class TodoUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
+    project_id: str | None = None
     status: TaskStatus | None = None
     priority: str | None = None
     due_date: datetime | None = None
@@ -75,6 +77,7 @@ class ProjectTodoResponse(BaseModel):
     id: str
     title: str
     description: str | None = None
+    project_id: str | None = None
     status: TaskStatus
     priority: str
     due_date: datetime | None = None
@@ -127,6 +130,7 @@ class TodoResponse(BaseModel):
     id: str
     title: str
     description: str | None = None
+    project_id: str | None = None
     status: TaskStatus
     priority: str
     due_date: datetime | None = None

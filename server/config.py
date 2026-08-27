@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_model: str = "llama3.2"
 
+    # Optional Paseo execution daemon. The CLI owns daemon authentication and
+    # supports local, TCP, unix-socket, and E2EE offer URL targets.
+    paseo_enabled: bool = False
+    paseo_cli_command: str = "paseo"
+    paseo_host: str = ""
+    paseo_default_provider: str = "codex"
+    paseo_poll_interval_seconds: float = 3.0
+    paseo_command_timeout_seconds: float = 30.0
+    paseo_reconnect_grace_seconds: float = 120.0
+
     # File uploads
     upload_dir: str = "data/uploads"
     max_upload_size_mb: int = 10

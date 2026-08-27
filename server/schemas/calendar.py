@@ -6,6 +6,7 @@ from pydantic import BaseModel, field_validator
 
 class EventCreate(BaseModel):
     title: str
+    project_id: str | None = None
     description: str | None = None
     start_time: datetime
     end_time: datetime | None = None
@@ -19,6 +20,7 @@ class EventCreate(BaseModel):
 
 class EventUpdate(BaseModel):
     title: str | None = None
+    project_id: str | None = None
     description: str | None = None
     start_time: datetime | None = None
     end_time: datetime | None = None
@@ -32,6 +34,7 @@ class EventUpdate(BaseModel):
 
 class EventResponse(BaseModel):
     id: str
+    project_id: str | None = None
     title: str
     description: str | None = None
     start_time: datetime

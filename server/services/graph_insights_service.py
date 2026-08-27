@@ -19,6 +19,7 @@ from domain.task import TaskStatus
 from domain.task_relationship import TaskRelationshipType
 from exceptions import ConflictError, NotFoundError, ValidationError
 from models.task_graph_state import TaskGraphState
+from models.project import Project
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
 from schemas.graph_insights import (
@@ -28,7 +29,7 @@ from schemas.graph_insights import (
     GraphInsightsResponse,
     GraphInsightSummary,
 )
-from sqlalchemy import distinct, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 DEFAULT_GRAPH_INSIGHT_LIMIT = 2_000
@@ -83,7 +84,45 @@ def _has_valid_estimate(value: int | None) -> bool:
     return value is not None and value > 0
 
 
-async def _current_revision(db: AsyncSession) -> int:
+async def _scope_revision_for_root(
+    db: AsyncSession,
+    root_task_id: str | None,
+) -> tuple[str | None, int]:
+    if root_task_id is None:
+        return None, await _current_revision(db)
+    global_revision = (
+        select(TaskGraphState.revision)
+        .where(TaskGraphState.scope_id == GLOBAL_TASK_GRAPH_SCOPE_ID)
+        .scalar_subquery()
+    )
+    row = (
+        await db.execute(
+            select(
+                Todo.project_id,
+                func.coalesce(Project.graph_revision, global_revision),
+            )
+            .outerjoin(Project, Project.id == Todo.project_id)
+            .where(Todo.id == root_task_id)
+        )
+    ).one_or_none()
+    if row is None:
+        # The scoped task loader supplies the public not-found error.
+        return None, 0
+    return row[0], row[1]
+
+
+async def _current_revision(
+    db: AsyncSession,
+    project_id: str | None = None,
+) -> int:
+    if project_id is not None:
+        revision = (
+            await db.execute(
+                select(Project.graph_revision).where(Project.id == project_id)
+            )
+        ).scalar_one_or_none()
+        if revision is not None:
+            return revision
     revision = (
         await db.execute(
             select(TaskGraphState.revision).where(
@@ -214,7 +253,7 @@ async def _load_snapshot(
     root_task_id: str | None,
     limit: int,
 ) -> _GraphSnapshot | None:
-    revision_before = await _current_revision(db)
+    project_id, revision_before = await _scope_revision_for_root(db, root_task_id)
     tasks, primary_ids = await _load_scoped_tasks(db, root_task_id, limit)
     task_ids = {task.id for task in tasks}
 
@@ -271,7 +310,7 @@ async def _load_snapshot(
             ).scalars()
         )
 
-    revision_after = await _current_revision(db)
+    revision_after = await _current_revision(db, project_id)
     if revision_after != revision_before:
         return None
     return _GraphSnapshot(
@@ -821,12 +860,17 @@ def _analyze_snapshot(
     due_date_conflicts: set[tuple[str, str]] = set()
     for task_id, dependencies in dependency_ids.items():
         task = tasks_by_id.get(task_id)
-        if task is None or task.due_date is None:
+        if (
+            task is None
+            or task.status not in _ACTIVE_STATUSES
+            or task.due_date is None
+        ):
             continue
         for dependency_id in dependencies:
             dependency = tasks_by_id.get(dependency_id)
             if (
                 dependency is not None
+                and dependency.status in _ACTIVE_STATUSES
                 and dependency.due_date is not None
                 and dependency.due_date > task.due_date
             ):
@@ -842,11 +886,16 @@ def _analyze_snapshot(
                 )
 
     for task in snapshot.tasks:
-        if task.parent_id is None or task.due_date is None:
+        if (
+            task.status not in _ACTIVE_STATUSES
+            or task.parent_id is None
+            or task.due_date is None
+        ):
             continue
         parent = tasks_by_id.get(task.parent_id)
         if (
             parent is not None
+            and parent.status in _ACTIVE_STATUSES
             and parent.due_date is not None
             and task.due_date > parent.due_date
         ):

@@ -54,6 +54,24 @@ export function TasksIcon({ size, className, label }: IconProps = {}) {
   );
 }
 
+export function ReviewIcon({ size, className, label }: IconProps = {}) {
+  return (
+    <IconBase size={size} className={navClassName(className)} label={label}>
+      <rect x="3" y="3" width="12" height="12" rx="2" />
+      <path d="M6 9l2 2 4-4" />
+    </IconBase>
+  );
+}
+
+export function RunsIcon({ size, className, label }: IconProps = {}) {
+  return (
+    <IconBase size={size} className={navClassName(className)} label={label}>
+      <path d="M4 3.5l10 5.5-10 5.5z" />
+      <path d="M14.5 3v12" />
+    </IconBase>
+  );
+}
+
 export function GearIcon({ size, className, label }: IconProps = {}) {
   return <SettingsIcon size={size} className={navClassName(className)} label={label} />;
 }

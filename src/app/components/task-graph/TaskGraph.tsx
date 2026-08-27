@@ -18,6 +18,12 @@ import TaskGraphView from './TaskGraphView';
 import TaskGraphProposalDialog from './TaskGraphProposalDialog';
 import { TaskGraphHealthPanel, TaskGraphNodeInsightPanel } from './TaskGraphInsightsPanel';
 import type { TaskGraphMode } from './taskGraphTypes';
+import {
+  createTaskGraphLayoutScope,
+  loadTaskGraphLayout,
+  resetTaskGraphLayout,
+  updateTaskGraphLayout,
+} from './taskGraphPersistence';
 
 interface TaskGraphProps {
   todos: TodoResponse[];
@@ -47,6 +53,7 @@ export default function TaskGraph({
   const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
   const [proposalOpen, setProposalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [layoutResetVersion, setLayoutResetVersion] = useState(0);
   const projectsQuery = useProjectsQuery();
   const insightsQuery = useTaskGraphInsightsQuery(
     projectId === 'all' ? null : projectId,
@@ -63,6 +70,7 @@ export default function TaskGraph({
   }, [metadataTodos]);
 
   const projectOptions = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
+  const layoutScope = useMemo(() => createTaskGraphLayoutScope(projectId, mode), [mode, projectId]);
 
   const planningTargets = useMemo(
     () =>
@@ -79,6 +87,10 @@ export default function TaskGraph({
       setProjectId('all');
     }
   }, [projectId, projectOptions]);
+
+  useEffect(() => {
+    setCollapsedIds(new Set(loadTaskGraphLayout(layoutScope).collapsedIds));
+  }, [layoutScope]);
 
   const projectIds = useMemo(() => {
     if (projectId === 'all') return null;
@@ -127,14 +139,27 @@ export default function TaskGraph({
     return [...metadataTodos, ...scopedTodos.filter((todo) => !metadataIds.has(todo.id))];
   }, [metadataTodos, scopedTodos]);
 
-  const toggleCollapsed = useCallback((id: string) => {
-    setCollapsedIds((current) => {
-      const next = new Set(current);
+  const toggleCollapsed = useCallback(
+    (id: string) => {
+      const next = new Set(collapsedIds);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      return next;
-    });
-  }, []);
+      setCollapsedIds(next);
+      updateTaskGraphLayout(layoutScope, { collapsedIds: [...next] });
+    },
+    [collapsedIds, layoutScope],
+  );
+
+  const expandAll = () => {
+    setCollapsedIds(new Set());
+    updateTaskGraphLayout(layoutScope, { collapsedIds: [] });
+  };
+
+  const resetLayout = () => {
+    resetTaskGraphLayout(layoutScope);
+    setCollapsedIds(new Set());
+    setLayoutResetVersion((version) => version + 1);
+  };
 
   const elements = useMemo(
     () =>
@@ -238,14 +263,13 @@ export default function TaskGraph({
             Hide completed
           </label>
           {collapsedIds.size > 0 && (
-            <button
-              type="button"
-              className="cc-btn cc-btn--ghost"
-              onClick={() => setCollapsedIds(new Set())}
-            >
+            <button type="button" className="cc-btn cc-btn--ghost" onClick={expandAll}>
               Expand all
             </button>
           )}
+          <button type="button" className="cc-btn cc-btn--ghost" onClick={resetLayout}>
+            Reset layout
+          </button>
         </div>
       </div>
 
@@ -273,11 +297,13 @@ export default function TaskGraph({
         className={`cc-task-flow__workspace${selectedInsight ? ' cc-task-flow__workspace--details' : ''}`}
       >
         <TaskGraphView
+          key={`${layoutScope}:${layoutResetVersion}`}
           nodes={elements.nodes}
           edges={elements.edges}
           isMobile={isMobile}
           selectedTaskId={selectedTaskId}
           onSelectTask={setSelectedTaskId}
+          persistenceScope={layoutScope}
         />
         {selectedInsight && insightsQuery.data && (
           <TaskGraphNodeInsightPanel

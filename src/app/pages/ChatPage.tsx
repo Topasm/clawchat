@@ -36,9 +36,10 @@ export default function ChatPage() {
   const { data: projects = [] } = useProjectsQuery();
 
   const convo = conversations.find((c) => c.id === conversationId);
-  const projectTodo = convo?.project_todo_id
-    ? projects.find((p) => p.id === convo.project_todo_id)
-    : null;
+  const projectTodo = projects.find(
+    (project) =>
+      project.id === convo?.project_id || project.root_task_id === convo?.project_todo_id,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Merge query messages with streaming messages
@@ -144,9 +145,9 @@ export default function ChatPage() {
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>
           <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{projectTodo.title}</span>
-          {projectTodo.subtask_count != null && projectTodo.subtask_count > 0 && (
+          {projectTodo.task_count > 0 && (
             <span style={{ color: 'var(--cc-text-tertiary)', marginLeft: 'auto' }}>
-              {projectTodo.completed_subtask_count ?? 0}/{projectTodo.subtask_count} tasks done
+              {projectTodo.completed_task_count}/{projectTodo.task_count} tasks done
             </span>
           )}
         </div>

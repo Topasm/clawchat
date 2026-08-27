@@ -89,6 +89,13 @@ Set `AI_PROVIDER=ollama` and `AI_BASE_URL=http://ollama:11434` in `.env`.
 | `AI_BASE_URL` | `http://localhost:11434` | AI provider API base URL |
 | `AI_API_KEY` | *(empty)* | API key (required for OpenAI/Claude) |
 | `AI_MODEL` | `llama3.2` | Model name to use |
+| `PASEO_ENABLED` | `false` | Enable the optional Paseo execution adapter |
+| `PASEO_CLI_COMMAND` | `paseo` | Official Paseo CLI command available to the server process |
+| `PASEO_HOST` | *(empty)* | Optional daemon target; supports host:port or an E2EE offer URL |
+| `PASEO_DEFAULT_PROVIDER` | `codex` | Default Paseo provider/model identifier |
+| `PASEO_POLL_INTERVAL_SECONDS` | `3` | External agent status polling interval |
+| `PASEO_COMMAND_TIMEOUT_SECONDS` | `30` | Per-command timeout, except transcript collection |
+| `PASEO_RECONNECT_GRACE_SECONDS` | `120` | Daemon outage tolerated before a run fails |
 | `UPLOAD_DIR` | `data/uploads` | Directory for uploaded attachment files |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Maximum file upload size in MB |
 | `ALLOWED_EXTENSIONS` | `jpg,jpeg,...,zip` | Comma-separated allowed file extensions |
@@ -110,6 +117,11 @@ AI_BASE_URL=http://ollama:11434
 AI_MODEL=llama3.2
 ENABLE_SCHEDULER=true
 BRIEFING_TIME=08:00
+
+# Optional coding-agent execution through a local Paseo daemon
+# PASEO_ENABLED=true
+# PASEO_CLI_COMMAND=paseo
+# PASEO_DEFAULT_PROVIDER=codex/gpt-5.5
 
 # Remote access (set when using Cloudflare Tunnel or reverse proxy)
 # PUBLIC_URL=https://clawchat.example.com

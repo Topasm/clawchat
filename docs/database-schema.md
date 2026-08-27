@@ -6,6 +6,11 @@ ClawChat uses a single SQLite database storing application data on the self-host
 
 ```
 conversations       1──N messages
+projects            1──N todos, conversations, events, plan_proposals
+projects            1──0..1 todos (compatibility root_task_id)
+projects            1──N artifacts, review_items
+artifacts           1──N artifact_revisions
+review_items        N──1 review subjects (logical polymorphic link)
 messages            N──1 conversations
 todos               (standalone, linked via conversation_id)
 todos               N──1 todos (self-ref via parent_id for sub-tasks)
@@ -17,6 +22,8 @@ change_sets          1──N vault_sync_jobs
 attachments         N──1 todos (todo_id, CASCADE)
 events              (standalone, linked via conversation_id)
 agent_tasks         (standalone, linked via conversation_id)
+agent_tasks         1──N agent_runs
+agent_runs          1──N agent_run_events
 paired_devices      (standalone)
 pairing_sessions     (short-lived device pairing state)
 refresh_sessions     (rotating refresh-token families)
@@ -30,6 +37,63 @@ All module tables (`todos`, `events`) link back to the `conversation_id` and `me
 
 ## Tables
 
+### `projects`
+
+Stores durable project identity and the project-local graph revision. A
+Project is context and policy; a Todo is a completable execution unit.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT | PRIMARY KEY | Stable Project identifier, distinct from every Todo ID |
+| `title` | TEXT | NOT NULL | Workspace title |
+| `goal` | TEXT | NULLABLE | Outcome that defines project success |
+| `description` | TEXT | NULLABLE | Persistent project notes/context |
+| `status` | TEXT | NOT NULL, CHECK | `planned`, `active`, `completed`, or `archived` |
+| `deadline` | TIMESTAMP | NULLABLE | Project completion deadline |
+| `root_task_id` | TEXT | UNIQUE, FOREIGN KEY -> todos.id ON DELETE SET NULL | Compatibility graph container |
+| `graph_revision` | INTEGER | NOT NULL, CHECK >= 0 | Monotonic project-scoped task graph revision |
+| `default_execution_provider` | TEXT | NULLABLE | Default provider for future AgentRuns (`builtin` or `paseo`) |
+| `default_execution_model` | TEXT | NULLABLE | Provider/model identifier, for example `codex/gpt-5.5` |
+| `execution_workspace_path` | TEXT | NULLABLE | Repository path as seen by the execution host |
+| `execution_workspace_isolation` | TEXT | NOT NULL, CHECK | `local` or `worktree` |
+| `execution_base_branch` | TEXT | NULLABLE | Base ref for worktree branch creation |
+| `created_at`, `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
+
+### `artifacts` and `artifact_revisions`
+
+`artifacts` stores the currently approved project output. `artifact_revisions`
+stores versioned source content; pending content is promoted only through the
+Review decision service.
+
+| Table / column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `artifacts.id` | TEXT | PRIMARY KEY | Stable artifact identifier |
+| `artifacts.project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE CASCADE | Owning Project |
+| `artifacts.task_id` | TEXT | FOREIGN KEY -> todos.id ON DELETE SET NULL, NULLABLE | Optional producing Task |
+| `artifacts.type` | TEXT | NOT NULL, CHECK | Brief, requirements, criteria, note, decision, report, diff, file, or link |
+| `artifacts.title`, `artifacts.content` | TEXT | NOT NULL | Latest approved content |
+| `artifacts.current_version` | INTEGER | NOT NULL, CHECK >= 1 | Latest approved version |
+| `artifact_revisions.artifact_id` | TEXT | FOREIGN KEY -> artifacts.id ON DELETE CASCADE | Version owner |
+| `artifact_revisions.version` | INTEGER | NOT NULL, UNIQUE per artifact | Monotonic version |
+| `artifact_revisions.status` | TEXT | NOT NULL, CHECK | `approved`, `pending`, `changes_requested`, or `rejected` |
+| `artifact_revisions.title`, `artifact_revisions.content` | TEXT | NOT NULL | Exact reviewed value |
+
+### `review_items`
+
+Stores the global human approval queue without taking ownership of each
+subject's mutation logic.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | TEXT | PRIMARY KEY | Review identifier |
+| `project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE CASCADE, NULLABLE | Project scope; null for legacy/global work |
+| `subject_type`, `subject_id` | TEXT | UNIQUE pair, CHECK on type | Polymorphic review subject |
+| `status` | TEXT | NOT NULL, CHECK | `pending`, `approved`, `changes_requested`, `rejected`, or `expired` |
+| `summary` | TEXT | NOT NULL | Human-facing reason for review |
+| `risk_level` | TEXT | NOT NULL, CHECK | `low`, `medium`, or `high` |
+| `requested_at`, `reviewed_at` | TIMESTAMP | Reviewed nullable | Queue and decision timestamps |
+| `review_note` | TEXT | NULLABLE | Approval, rejection, or requested-change note |
+
 ### `conversations`
 
 Stores chat conversation metadata.
@@ -42,6 +106,8 @@ Stores chat conversation metadata.
 | `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW | Last activity timestamp (updated on new message) |
 | `is_archived` | BOOLEAN | NOT NULL, DEFAULT FALSE | Whether the conversation is archived |
 | `metadata` | JSON | NULLABLE | Optional metadata (e.g., pinned status, tags) |
+| `project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE SET NULL, NULLABLE | Owning Project context |
+| `project_todo_id` | TEXT | FOREIGN KEY -> todos.id ON DELETE SET NULL, NULLABLE | Compatibility project root |
 
 ### `messages`
 
@@ -67,6 +133,7 @@ Stores task/to-do items, created via conversation or direct API.
 | `id` | TEXT (UUID) | PRIMARY KEY | Unique todo identifier |
 | `title` | TEXT | NOT NULL | Task title |
 | `description` | TEXT | NULLABLE | Detailed task description |
+| `project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE SET NULL, NULLABLE | Owning Project |
 | `status` | TEXT | NOT NULL, DEFAULT 'pending', CHECK | Canonical lifecycle: 'pending', 'in_progress', 'completed', 'cancelled' |
 | `priority` | TEXT | NOT NULL, DEFAULT 'medium' | Priority: 'low', 'medium', 'high', 'urgent' |
 | `due_date` | TIMESTAMP | NULLABLE | Task deadline |
@@ -130,8 +197,8 @@ instead of recreating an empty table and erasing legacy dependencies.
 ### `task_graph_states`
 
 Stores the monotonic optimistic-concurrency revision for a task graph scope.
-PR 3 uses a single `global` row; the scoped key leaves room for project-local
-graphs later.
+The global row remains the revision for unscoped and all-task graph reads.
+First-class projects store their local revision in `projects.graph_revision`.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -139,8 +206,9 @@ graphs later.
 | `revision` | INTEGER | NOT NULL, CHECK >= 0 | Monotonic semantic graph revision |
 | `updated_at` | TIMESTAMP | NOT NULL | Last revision change |
 
-SQLite triggers increment the global revision for semantic Todo changes and
-task-relationship inserts, updates, and deletes. Pipeline-only fields such as
+SQLite triggers increment the global revision and each affected Project
+revision for semantic Todo changes and task-relationship inserts, updates, and
+deletes. Pipeline-only fields such as
 `inbox_state`, `automation_error`, and `updated_at` do not invalidate a plan.
 
 ### `plan_proposals`
@@ -153,6 +221,7 @@ are recorded in its change set when applied.
 |--------|------|-------------|-------------|
 | `id` | TEXT | PRIMARY KEY | Proposal identifier |
 | `root_task_id` | TEXT | FOREIGN KEY -> todos.id ON DELETE SET NULL, NULLABLE | Planned root task |
+| `project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE SET NULL, NULLABLE | Revision and review scope |
 | `agent_task_id` | TEXT | UNIQUE, FOREIGN KEY -> agent_tasks.id ON DELETE SET NULL, NULLABLE | Generation run |
 | `base_graph_revision` | INTEGER | NULLABLE, CHECK >= 0 | Preview revision; NULL only for imported legacy history |
 | `model_provider`, `model_name` | TEXT | NULLABLE | AI provider/model audit metadata |
@@ -223,6 +292,7 @@ Stores calendar events.
 | `id` | TEXT (UUID) | PRIMARY KEY | Unique event identifier |
 | `title` | TEXT | NOT NULL | Event title |
 | `description` | TEXT | NULLABLE | Event description or notes |
+| `project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE SET NULL, NULLABLE | Owning Project schedule |
 | `start_time` | TIMESTAMP | NOT NULL | Event start datetime |
 | `end_time` | TIMESTAMP | NULLABLE | Event end datetime |
 | `location` | TEXT | NULLABLE | Event location |
@@ -273,6 +343,26 @@ Stores asynchronous AI agent tasks (research, summarization, etc.).
 | `started_at` | TIMESTAMP | NULLABLE | When execution began |
 | `completed_at` | TIMESTAMP | NULLABLE | When execution finished |
 
+### `agent_runs` and `agent_run_events`
+
+Stores durable execution attempts separately from the requested AgentTask.
+
+| Table / column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `agent_runs.id` | TEXT | PRIMARY KEY | Stable execution-attempt identifier |
+| `agent_runs.agent_task_id` | TEXT | FOREIGN KEY -> agent_tasks.id ON DELETE CASCADE | Requested outcome |
+| `agent_runs.project_id` | TEXT | FOREIGN KEY -> projects.id ON DELETE SET NULL, NULLABLE | Project scope |
+| `agent_runs.attempt` | INTEGER | UNIQUE per AgentTask, CHECK >= 1 | Monotonic attempt number |
+| `agent_runs.instruction_snapshot` | TEXT | NOT NULL | Exact instructions used by this attempt |
+| `provider`, `model`, `host_id`, `workspace_id`, `external_run_id` | TEXT | External values nullable | Execution identity and Paseo agent linkage |
+| `agent_runs.status` | TEXT | NOT NULL, CHECK | Queued, active, waiting, or terminal run lifecycle |
+| `progress`, `progress_message`, `heartbeat_at` | Mixed | Progress CHECK 0..100 | Liveness and progress |
+| `result`, `result_summary`, `error`, `usage_json` | TEXT/JSON | NULLABLE | Attempt outcome and usage |
+| `is_adopted` | BOOLEAN | NOT NULL | Whether human review selected this result |
+| `agent_run_events.run_id` | TEXT | FOREIGN KEY -> agent_runs.id ON DELETE CASCADE | Owning attempt |
+| `agent_run_events.sequence` | INTEGER | UNIQUE per run | Ordered append-only event position |
+| `event_type`, `message`, `progress`, `payload_json` | Mixed | Progress CHECK 0..100 | Streamed execution event |
+
 ### Supporting persistence
 
 - `paired_devices` and `pairing_sessions` store trusted device metadata and short-lived pairing claims.
@@ -312,6 +402,9 @@ CREATE INDEX idx_attachments_todo_id ON attachments(todo_id);
 -- Agent task status monitoring
 CREATE INDEX idx_agent_tasks_status ON agent_tasks(status);
 CREATE INDEX idx_agent_tasks_conversation_id ON agent_tasks(conversation_id);
+CREATE INDEX idx_agent_runs_status_created ON agent_runs(status, created_at);
+CREATE INDEX idx_agent_runs_project_status ON agent_runs(project_id, status);
+CREATE INDEX idx_agent_run_events_run_sequence ON agent_run_events(run_id, sequence);
 
 -- Versioned planning and durable Vault delivery
 CREATE INDEX idx_plan_proposals_root_status ON plan_proposals(root_task_id, status);
@@ -319,6 +412,9 @@ CREATE INDEX idx_plan_proposals_created_at ON plan_proposals(created_at);
 CREATE INDEX idx_change_sets_status ON change_sets(status);
 CREATE INDEX idx_vault_sync_jobs_delivery ON vault_sync_jobs(status, available_at);
 CREATE INDEX idx_vault_sync_jobs_change_set_id ON vault_sync_jobs(change_set_id);
+CREATE INDEX idx_review_items_status_requested ON review_items(status, requested_at);
+CREATE INDEX idx_review_items_project_status ON review_items(project_id, status);
+CREATE INDEX idx_artifacts_project_updated ON artifacts(project_id, updated_at);
 ```
 
 ## Full-Text Search
@@ -339,9 +435,12 @@ FTS tables are backfilled at startup and kept in sync with SQLite triggers.
 
 Alembic is the versioned migration source for new schema changes. The current
 chain normalizes task status, migrates JSON dependencies into relationships,
-then adds graph revisions, versioned plan proposals, change sets, and the Vault
-outbox. Completed legacy `plan_todo` agent tasks are retained as non-actionable
-proposal history rather than silently discarded.
+then adds graph revisions, versioned plan proposals, first-class projects, the
+unified review queue, versioned artifacts, durable AgentRun attempts and event
+logs, Paseo external execution metadata, change sets, and the Vault outbox.
+Completed legacy `plan_todo` agent tasks are retained as non-actionable
+proposal history rather than silently discarded; existing proposal states are
+backfilled into review history.
 
 ```bash
 # Run from server/ (or pass -c server/alembic.ini from the repository root)

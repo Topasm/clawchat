@@ -10,8 +10,10 @@ from domain.task import TaskStatus
 from exceptions import AppError, NotFoundError
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from models.agent_task import AgentTask
+from models.agent_run import AgentRun
 from models.conversation import Conversation
 from models.plan_proposal import PlanProposal
+from models.project import Project
 from models.todo import Todo
 from schemas.bulk import BulkTodoResponse, BulkTodoUpdate
 from schemas.common import (
@@ -39,7 +41,10 @@ from schemas.todo import (
 )
 from services import (
     graph_insights_service,
+    agent_run_service,
+    agent_task_service,
     inbox_pipeline_service,
+    paseo_execution_service,
     plan_proposal_service,
     task_relationship_service,
     todo_service,
@@ -56,6 +61,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from utils import deserialize_tags, make_id, serialize_tags
 from utils.inbox_display import get_next_action
 from ws.notifications import notify_module_data_changed
+from ws.manager import ws_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -216,6 +222,7 @@ async def list_projects(
 
         resp = ProjectTodoResponse(
             id=todo.id,
+            project_id=todo.project_id,
             title=todo.title,
             description=todo.description,
             status=todo.status,
@@ -274,6 +281,7 @@ async def list_todos(
     status: TaskStatus | None = None,
     priority: str | None = None,
     due_before: datetime | None = None,
+    project_id: str | None = None,
     parent_id: str | None = None,
     root_only: bool = False,
     order_by: str = "created_at",
@@ -286,6 +294,7 @@ async def list_todos(
         status_filter=status,
         priority=priority,
         due_before=due_before,
+        project_id=project_id,
         parent_id=parent_id,
         root_only=root_only,
         order_by=order_by,
@@ -387,6 +396,7 @@ async def create_todo(
         db,
         title=body.title,
         description=body.description,
+        project_id=body.project_id,
         status=body.status,
         priority=body.priority,
         due_date=body.due_date,
@@ -611,6 +621,7 @@ async def generate_graph_plan(
             ),
         )
         await notify_module_data_changed("todos")
+        await notify_module_data_changed("reviews")
         return result
     except AppError:
         await notify_module_data_changed("todos")
@@ -649,6 +660,7 @@ async def apply_plan(
     )
     _schedule_vault_sync(background_tasks, request, job_id)
     await notify_module_data_changed("todos")
+    await notify_module_data_changed("reviews")
     return response
 
 
@@ -672,6 +684,7 @@ async def dismiss_plan(
         body.proposal_id,
     )
     await notify_module_data_changed("todos")
+    await notify_module_data_changed("reviews")
     return response
 
 
@@ -704,19 +717,59 @@ async def delegate_todo(
     )
     db.add(task)
     await db.flush()
-
-    ai_service = request.app.state.ai_service
-
-    if skill_id == "plan":
-        await inbox_pipeline_service.process_todo(db, ai_service, todo_id)
-    else:
-        # Use vault agent service (creates vault documents via skill template)
-        try:
-            from services.vault_agent_service import execute_agent_task
-            await execute_agent_task(db, ai_service, task)
-        except ImportError:
-            from services.agent_task_service import execute_task
-            await execute_task(db, ai_service, task.id)
+    active_ai = getattr(request.app.state, "active_ai", None) or getattr(
+        request.app.state, "ai_service", None
+    )
+    active_provider = getattr(request.app.state, "active_ai_provider", "openclaw")
+    project = await db.get(Project, todo.project_id) if todo.project_id else None
+    configured_provider = body.execution_provider or (
+        project.default_execution_provider if project else None
+    )
+    provider = (
+        "paseo"
+        if configured_provider == "paseo" and skill_id != "plan"
+        else active_provider
+    )
+    paseo_adapter = None
+    if provider == "paseo":
+        paseo_adapter = getattr(request.app.state, "paseo_adapter", None) or (
+            paseo_execution_service.adapter_from_settings()
+        )
+        if not paseo_adapter.enabled:
+            raise AppError(
+                code="PASEO_DISABLED",
+                message="Paseo execution is disabled on this ClawChat server",
+                status_code=503,
+            )
+        if project is None or not (project.execution_workspace_path or "").strip():
+            raise AppError(
+                code="PASEO_WORKSPACE_REQUIRED",
+                message="Configure the project's execution workspace path before using Paseo",
+                status_code=409,
+            )
+    elif active_ai is None:
+        raise AppError(
+            code="AI_UNAVAILABLE",
+            message="No execution provider is available",
+            status_code=503,
+        )
+    run_model = (
+        body.model
+        or (project.default_execution_model if project else None)
+        or (
+            settings.paseo_default_provider
+            if provider == "paseo"
+            else getattr(active_ai, "model", None)
+        )
+    )
+    run = await agent_run_service.create_run(
+        db,
+        task,
+        provider=provider,
+        model=run_model,
+        host_id=paseo_adapter.host_label if paseo_adapter else None,
+        update_todo_status=skill_id != "plan",
+    )
 
     # Update todo with skill assignment.
     todo.assignee = skill_id  # backward compat
@@ -727,9 +780,81 @@ async def delegate_todo(
     todo.enabled_skills = json.dumps(existing)
     await db.commit()
 
+    session_factory = request.app.state.session_factory
+
+    async def _execute_delegation() -> None:
+        async with session_factory() as run_db:
+            run_task = await run_db.get(AgentTask, task.id)
+            run_row = await run_db.get(AgentRun, run.id)
+            if run_task is None or run_row is None:
+                return
+            if skill_id == "plan":
+                try:
+                    await agent_run_service.mark_starting(run_db, run_row)
+                    await agent_run_service.mark_running(run_db, run_row)
+                    await run_db.commit()
+                    await inbox_pipeline_service.process_todo(
+                        run_db, active_ai, todo_id
+                    )
+                    run_task.status = "completed"
+                    run_task.result = "Plan proposal ready for review"
+                    run_task.progress = 100
+                    run_task.completed_at = datetime.now(timezone.utc)
+                    run_row.status = "completed"
+                    run_row.progress = 100
+                    run_row.result = run_task.result
+                    run_row.result_summary = run_task.result
+                    run_row.is_adopted = True
+                    run_row.completed_at = run_task.completed_at
+                    await agent_run_service.record_event(
+                        run_db,
+                        run_row,
+                        "completed",
+                        run_task.result,
+                        progress=100,
+                    )
+                    await run_db.commit()
+                except Exception as exc:
+                    run_task.status = "failed"
+                    run_task.error = str(exc)
+                    run_task.completed_at = datetime.now(timezone.utc)
+                    await agent_run_service.mark_failed(run_db, run_row, str(exc))
+                    await run_db.commit()
+            else:
+                await agent_task_service.execute_task(
+                    run_db,
+                    run_task,
+                    active_ai,
+                    ws_manager,
+                    _user,
+                    session_factory=session_factory,
+                    run=run_row,
+                    provider=provider,
+                    model=run_model,
+                )
+            await notify_module_data_changed("runs")
+            await notify_module_data_changed("reviews")
+            await notify_module_data_changed("projects")
+
+    if provider == "paseo":
+        agent_run_service.launch_execution(
+            run.id,
+            paseo_execution_service.execute_run(
+                session_factory,
+                run.id,
+                user_id=_user,
+                adapter=paseo_adapter,
+            ),
+        )
+    else:
+        agent_run_service.launch_execution(run.id, _execute_delegation())
+    await notify_module_data_changed("runs")
+    await notify_module_data_changed("projects")
+
     return {
         "status": "delegated",
         "task_id": task.id,
+        "run_id": run.id,
         "skill_id": skill_id,
         "skill_chain": [skill_id],
         "agent_type": skill_id,  # backward compat

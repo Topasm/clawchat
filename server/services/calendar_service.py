@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from exceptions import NotFoundError
 from models.event import Event
+from models.project import Project
 from services.recurrence_service import generate_occurrences
 from utils import apply_model_updates, make_id, serialize_tags
 
@@ -18,6 +19,7 @@ async def get_events(
     *,
     start_after: datetime | None = None,
     start_before: datetime | None = None,
+    project_id: str | None = None,
     page: int = 1,
     limit: int = 50,
 ) -> tuple[list[Event | dict], int]:
@@ -26,6 +28,8 @@ async def get_events(
         conditions.append(Event.start_time >= start_after)
     if start_before is not None:
         conditions.append(Event.start_time <= start_before)
+    if project_id is not None:
+        conditions.append(Event.project_id == project_id)
 
     # Fetch regular (non-recurring) events
     count_q = select(func.count(Event.id)).where(*conditions)
@@ -47,6 +51,8 @@ async def get_events(
             select(Event)
             .where(Event.recurrence_rule != None)  # noqa: E711
         )
+        if project_id is not None:
+            recurring_q = recurring_q.where(Event.project_id == project_id)
         recurring_events = (await db.execute(recurring_q)).scalars().all()
         for rev in recurring_events:
             occurrences = generate_occurrences(rev, start_after, start_before)
@@ -75,6 +81,7 @@ async def create_event(
     *,
     title: str,
     description: str | None = None,
+    project_id: str | None = None,
     start_time: datetime,
     end_time: datetime | None = None,
     location: str | None = None,
@@ -84,10 +91,13 @@ async def create_event(
     recurrence_end: datetime | None = None,
     tags: list[str] | None = None,
 ) -> Event:
+    if project_id is not None and await db.get(Project, project_id) is None:
+        raise NotFoundError(f"Project {project_id} not found")
     event = Event(
         id=make_id("evt_"),
         title=title,
         description=description,
+        project_id=project_id,
         start_time=start_time,
         end_time=end_time,
         location=location,
@@ -104,6 +114,12 @@ async def create_event(
 
 async def update_event(db: AsyncSession, event_id: str, **updates) -> Event:
     event = await get_event(db, event_id)
+    if (
+        "project_id" in updates
+        and updates["project_id"] is not None
+        and await db.get(Project, updates["project_id"]) is None
+    ):
+        raise NotFoundError(f"Project {updates['project_id']} not found")
     apply_model_updates(event, updates)
     await db.flush()
     return event

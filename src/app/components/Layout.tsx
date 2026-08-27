@@ -25,7 +25,7 @@ import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
 import { ChevronLeftIcon, ChevronRightIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
-import { useCapabilitiesQuery, useTodosQuery } from '../hooks/queries';
+import { useCapabilitiesQuery, useReviewsQuery, useTodosQuery } from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
@@ -43,6 +43,8 @@ import {
   SearchIcon,
   AdminIcon,
   NavCalendarIcon,
+  ReviewIcon,
+  RunsIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
@@ -93,10 +95,12 @@ const CONNECTION_LABEL_KEYS: Record<ConnectionStatus, string> = {
 const primaryNavItems = [
   { to: '/today', labelKey: 'nav.today', Icon: SunIcon },
   { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
-  { to: '/chats', labelKey: 'nav.projects', Icon: ChatIcon },
+  { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
 
 const secondaryNavItems = [
+  { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
+  { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
   { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/calendar', labelKey: 'nav.calendar', Icon: NavCalendarIcon },
@@ -125,6 +129,7 @@ export default function Layout() {
   const quickCapture = useQuickCaptureStore();
   const { data: capabilities } = useCapabilitiesQuery();
   const { data: todos = [] } = useTodosQuery();
+  const { data: pendingReviews = [] } = useReviewsQuery();
 
   // Conditionally filter nav items based on server capabilities
   const filteredPrimaryNavItems = useMemo(() => {
@@ -252,7 +257,7 @@ export default function Layout() {
   const canSwipeTabs = isMobile && !onChatPage && activeMobileTabIndex >= 0;
   const isDetailPage =
     isMobile &&
-    (/^\/(tasks|chats|events)\/[^/]+/.test(location.pathname) ||
+    (/^\/(tasks|chats|events|projects)\/[^/]+/.test(location.pathname) ||
       location.pathname === '/settings/system-prompt');
 
   const sidebar = (
@@ -321,6 +326,9 @@ export default function Layout() {
         >
           <item.Icon />
           <span className="cc-sidebar__label">{t(item.labelKey)}</span>
+          {item.to === '/review' && pendingReviews.length > 0 && (
+            <span className="cc-nav-badge">{pendingReviews.length}</span>
+          )}
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />

@@ -13,6 +13,11 @@ class Event(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: make_id("evt_"))
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    project_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     location: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -43,6 +48,7 @@ class Event(Base):
 
     __table_args__ = (
         Index("idx_events_start_time", "start_time"),
+        Index("idx_events_project_id", "project_id"),
         Index("idx_events_end_time", "end_time"),
         Index("idx_events_conversation_id", "conversation_id"),
     )

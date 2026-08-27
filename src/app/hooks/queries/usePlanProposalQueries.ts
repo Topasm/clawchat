@@ -96,6 +96,8 @@ async function invalidatePlanData(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: queryKeys.todos }),
     queryClient.invalidateQueries({ queryKey: queryKeys.today }),
     queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.reviews }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects }),
     invalidateTaskDerivedQueries(queryClient),
   ]);
 }

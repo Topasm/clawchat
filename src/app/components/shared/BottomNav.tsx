@@ -6,7 +6,7 @@ import { useTodosQuery } from '../../hooks/queries';
 export const mobileTabs = [
   { to: '/today', labelKey: 'nav.today', Icon: SunIcon, primary: true },
   { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon, primary: true, badge: true },
-  { to: '/chats', labelKey: 'nav.projects', Icon: ChatIcon, primary: true },
+  { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon, primary: true },
 ];
 
 export default function BottomNav() {

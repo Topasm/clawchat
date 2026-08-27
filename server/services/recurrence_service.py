@@ -72,6 +72,7 @@ def generate_occurrences(event, range_start: datetime, range_end: datetime) -> l
 
         occ = {
             "id": event.id,
+            "project_id": event.project_id,
             "title": event.title,
             "description": event.description,
             "start_time": dt,

@@ -1,6 +1,6 @@
 """REST endpoints for agent tasks."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +10,7 @@ from exceptions import NotFoundError
 from models.agent_task import AgentTask
 from schemas.common import PaginatedResponse
 from schemas.task import AgentTaskResponse
-from services import agent_task_service
+from services import agent_run_service, agent_task_service, paseo_execution_service
 
 router = APIRouter()
 
@@ -68,6 +68,7 @@ async def get_task(
 @router.post("/{task_id}/cancel", status_code=200)
 async def cancel_task(
     task_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
@@ -75,8 +76,30 @@ async def cancel_task(
     if not task:
         raise NotFoundError("Task not found")
 
+    run = await agent_run_service.current_run_for_task(db, task_id)
+    if run is not None and run.status in ("queued", "starting", "running", "waiting_input"):
+        await agent_run_service.cancel_run(db, run.id)
+        external_cancel_error = None
+        if run.provider == "paseo":
+            adapter = getattr(request.app.state, "paseo_adapter", None) or (
+                paseo_execution_service.adapter_from_settings()
+            )
+            external_cancel_error = await paseo_execution_service.cancel_external_run(
+                run, adapter=adapter
+            )
+        if external_cancel_error:
+            await agent_run_service.record_event(
+                db,
+                run,
+                "external_cancel_unconfirmed",
+                external_cancel_error,
+                progress=run.progress,
+            )
+            await db.commit()
+        return {"status": "cancelled", "task_id": task_id, "run_id": run.id}
+
     if task.status in ("queued", "running"):
-        task.status = "failed"
+        task.status = "cancelled"
         task.error = "Cancelled by user"
         await db.commit()
         return {"status": "cancelled", "task_id": task_id}

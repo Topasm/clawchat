@@ -40,6 +40,11 @@ class PlanProposal(Base):
         ForeignKey("todos.id", ondelete="SET NULL"),
         nullable=True,
     )
+    project_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     agent_task_id: Mapped[str | None] = mapped_column(
         String,
         ForeignKey("agent_tasks.id", ondelete="SET NULL"),
@@ -111,5 +116,6 @@ class PlanProposal(Base):
             name="uq_plan_proposals_agent_task_id",
         ),
         Index("idx_plan_proposals_root_status", "root_task_id", "status"),
+        Index("idx_plan_proposals_project_status", "project_id", "status"),
         Index("idx_plan_proposals_created_at", "created_at"),
     )

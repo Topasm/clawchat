@@ -34,6 +34,9 @@ export type {
 } from './usePlanProposalQueries';
 export {
   useProjectsQuery,
+  useProjectQuery,
+  useCreateProject,
+  useUpdateProject,
   useConversationsQuery,
   useMessagesQuery,
   useCreateConversation,
@@ -52,6 +55,21 @@ export {
   useDeleteTaskRelationship,
 } from './useTaskRelationshipQueries';
 export { useTaskGraphInsightsQuery } from './useTaskGraphInsightsQuery';
+export {
+  useReviewsQuery,
+  useDecideReview,
+  useArtifactsQuery,
+  useCreateArtifact,
+  useProposeArtifactRevision,
+} from './useReviewQueries';
+export {
+  useAgentRunsQuery,
+  useAgentRunEventsQuery,
+  useCancelAgentRun,
+  useRetryAgentRun,
+  useResumeAgentRun,
+} from './useAgentRunQueries';
+export { useExecutionProvidersQuery, useTestPaseoConnection } from './useExecutionProviderQueries';
 export {
   useAdminOverviewQuery,
   useAdminAIQuery,

@@ -87,6 +87,11 @@ self/duplicate edges, cancelled prerequisites, invalid estimates, lifecycle
 conflicts, and deadline ordering conflicts. Legitimate standalone tasks are
 not called orphaned; isolated task counts are informational.
 
+Malformed persisted structure remains visible even when it is historical, but
+deadline ordering conflicts are actionable schedule warnings and therefore
+only compare active (`pending` or `in_progress`) tasks. Completed and cancelled
+tasks do not keep obsolete deadline conflicts in the current health summary.
+
 Persisted cycles are always health errors. For the current execution forecast,
 completed nodes cut the runnable graph because they satisfy their dependents;
 only an active-node cycle is unschedulable. A cancelled node is not such a cut:
@@ -105,8 +110,9 @@ silently partial graph.
 - Critical-path and deadline values communicate uncertainty explicitly.
 - The Graph UI can explain direct blockers, transitive blockers, and downstream
   impact without asking an LLM.
-- Global graph revision changes may still invalidate unrelated projects until
-  first-class projects provide project-local revisions.
+- Project-scoped reads use the first-class Project revision, so unrelated
+  project mutations do not invalidate their snapshot. Global reads retain the
+  global revision. See [ADR 007](./007-first-class-project-identity.md).
 - Date-only AI deadlines are currently stored as midnight timestamps. Accurate
   end-of-day and working-hours scheduling requires future timezone/all-day and
   availability models.

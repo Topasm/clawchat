@@ -209,6 +209,19 @@ explicitly unknown, and critical-path duration is exact only when every
 relevant execution estimate is known. See
 [ADR 006](./adr/006-deterministic-execution-graph-insights.md).
 
+Graph presentation state is deliberately client-local. Web and Tauri store
+node positions, viewport, and collapsed structural nodes per project/root scope
+and Structure/Execution mode in LocalStorage. Resetting a layout removes only
+that presentation snapshot; canonical tasks, relationships, and server-derived
+execution insights are unchanged.
+
+Project identity is server-owned and distinct from the compatibility root
+Todo. Semantic task and relationship writes increment both the all-task graph
+revision and every affected Project revision. Project-scoped insights and AI
+plans compare the local revision, so activity in one project cannot stale a
+proposal in another. See
+[ADR 007](./adr/007-first-class-project-identity.md).
+
 ## Versioned AI Planning
 
 AI planning captures the current graph revision and the hash of all prompt
@@ -219,3 +232,44 @@ and relationships, updates the root, records forward/inverse operations, and
 enqueues Vault reconciliation. Repeated identical requests replay the stored
 result, while undo is refused after later graph or linked-data changes. See
 [ADR 005](./adr/005-versioned-ai-plan-proposals.md).
+
+## Unified Review and Project Artifacts
+
+`review_items` is the cross-feature human approval queue. Plan proposals and
+artifact revisions publish review subjects, but their own services remain the
+authoritative state machines. Approving a plan invokes the same graph-revision
+CAS and transactional apply used by the Task screen; approving an artifact
+revision promotes an exact next version. Direct plan actions synchronize the
+linked review in the same commit.
+
+Artifacts hold the latest approved project brief, requirements, decision,
+research note, report, or external output. Proposed content is stored in an
+immutable version slot and cannot replace the current artifact until review.
+See [ADR 008](./adr/008-unified-review-and-versioned-artifacts.md).
+
+## Agent Execution Attempts
+
+`AgentTask` describes an outcome while `AgentRun` records one execution attempt.
+Runs persist provider/model identity, heartbeats, progress, result/error,
+adoption, and an ordered event log. Built-in execution is registered by run ID
+so cancel requests stop the live coroutine as well as changing durable state.
+Successful top-level attempts enter the unified Review Inbox; only approval
+adopts the result and completes the linked Todo. See
+[ADR 009](./adr/009-agent-task-run-separation.md).
+
+### Paseo execution provider
+
+Projects can select `paseo` as their default execution provider and bind a
+repository path visible to the configured daemon. ClawChat invokes Paseo's
+official JSON CLI contract without a shell: it creates a local or worktree
+workspace, starts a background agent, persists the external workspace/agent
+IDs, polls provider state into heartbeats, and forwards follow-up or stop
+commands. The provider/model value remains a Paseo identifier such as
+`codex/gpt-5.5`.
+
+Paseo continues to own agent credentials, process supervision, worktrees, and
+remote transport. ClawChat owns the AgentTask/AgentRun state machine, output
+Artifact, ReviewItem, adoption, and linked Todo completion. Active Paseo runs
+survive a ClawChat restart: startup skips built-in interruption reconciliation
+for reattachable external IDs and launches fresh monitors. See
+[ADR 010](./adr/010-paseo-execution-provider.md).

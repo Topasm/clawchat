@@ -7,14 +7,16 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
-  useReactFlow,
   type Edge,
   type NodeMouseHandler,
+  type OnNodeDrag,
+  type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { TaskFlowNode } from './taskGraphTypes';
 import TaskGraphNode from './TaskGraphNode';
 import { GraphIcon } from '../shared/Icons';
+import { loadTaskGraphLayout, updateTaskGraphLayout } from './taskGraphPersistence';
 
 interface TaskGraphViewProps {
   nodes: TaskFlowNode[];
@@ -22,6 +24,7 @@ interface TaskGraphViewProps {
   isMobile: boolean;
   selectedTaskId?: string | null;
   onSelectTask: (taskId: string | null) => void;
+  persistenceScope?: string;
 }
 
 const nodeTypes = { task: TaskGraphNode };
@@ -32,27 +35,50 @@ function TaskGraphCanvas({
   isMobile,
   selectedTaskId,
   onSelectTask,
+  persistenceScope,
 }: TaskGraphViewProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<TaskFlowNode>(sourceNodes);
-  const { fitView } = useReactFlow<TaskFlowNode>();
-  const layoutKey = useMemo(
-    () => sourceNodes.map((node) => `${node.id}:${node.position.x}:${node.position.y}`).join('|'),
-    [sourceNodes],
+  const savedLayout = useMemo(
+    () => (persistenceScope ? loadTaskGraphLayout(persistenceScope) : undefined),
+    [persistenceScope],
   );
+  const initialNodes = useMemo(
+    () =>
+      sourceNodes.map((node) => ({
+        ...node,
+        position: savedLayout?.positions[node.id] ?? node.position,
+      })),
+    [savedLayout, sourceNodes],
+  );
+  const [nodes, setNodes, onNodesChange] = useNodesState<TaskFlowNode>(initialNodes);
 
   useEffect(() => {
-    setNodes(sourceNodes);
-  }, [setNodes, sourceNodes]);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      void fitView({ padding: isMobile ? 0.14 : 0.2, duration: 240, maxZoom: 1 });
+    setNodes((currentNodes) => {
+      if (!persistenceScope) return sourceNodes;
+      const currentPositions = new Map(currentNodes.map((node) => [node.id, node.position]));
+      return sourceNodes.map((node) => ({
+        ...node,
+        position: currentPositions.get(node.id) ?? savedLayout?.positions[node.id] ?? node.position,
+      }));
     });
-    return () => cancelAnimationFrame(frame);
-  }, [fitView, isMobile, layoutKey]);
+  }, [persistenceScope, savedLayout, setNodes, sourceNodes]);
 
   const handleNodeClick: NodeMouseHandler<TaskFlowNode> = (_event, node) => {
     onSelectTask(node.id);
+  };
+
+  const handleNodeDragStop: OnNodeDrag<TaskFlowNode> = (_event, node) => {
+    if (!persistenceScope) return;
+    const positions = Object.fromEntries(
+      nodes.map((current) => [
+        current.id,
+        current.id === node.id ? node.position : current.position,
+      ]),
+    );
+    updateTaskGraphLayout(persistenceScope, { positions });
+  };
+
+  const handleMoveEnd = (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+    if (persistenceScope) updateTaskGraphLayout(persistenceScope, { viewport });
   };
 
   const displayedNodes = useMemo(
@@ -66,6 +92,8 @@ function TaskGraphCanvas({
       edges={edges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
+      onNodeDragStop={handleNodeDragStop}
+      onMoveEnd={handleMoveEnd}
       onNodeClick={handleNodeClick}
       onPaneClick={() => onSelectTask(null)}
       nodesDraggable={!isMobile}
@@ -78,7 +106,8 @@ function TaskGraphCanvas({
       zoomOnDoubleClick={false}
       minZoom={0.3}
       maxZoom={1.4}
-      fitView
+      defaultViewport={savedLayout?.viewport}
+      fitView={!savedLayout?.viewport}
       fitViewOptions={{ padding: isMobile ? 0.14 : 0.2, maxZoom: 1 }}
       proOptions={{ hideAttribution: false }}
       aria-label="Task relationship graph"

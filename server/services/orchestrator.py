@@ -10,11 +10,14 @@ from constants import SYSTEM_PROMPT
 from domain.task import TaskStatus
 from exceptions import AIUnavailableError
 from models.agent_task import AgentTask
+from models.agent_run import AgentRun
 from models.conversation import Conversation
 from models.message import Message
+from models.project import Project
 from models.todo import Todo
 from services import (
     agent_task_service,
+    agent_run_service,
     briefing_service,
     calendar_service,
     scheduling_service,
@@ -177,6 +180,17 @@ class Orchestrator:
         # Set the skill chain on the new task.
         task.skill_chain = json.dumps(skill_chain)
         await db.flush()
+        provider = (
+            getattr(self._app_state, "active_ai_provider", "openclaw")
+            if self._app_state
+            else "openclaw"
+        )
+        run = await agent_run_service.create_run(
+            db,
+            task,
+            provider=provider,
+            model=getattr(self.active_ai, "model", None),
+        )
 
         is_multi_skill = len(skill_chain) > 1
         if is_multi_skill:
@@ -200,23 +214,31 @@ class Orchestrator:
             metadata={
                 "action_type": "task_delegated",
                 "task_id": task.id,
+                "run_id": run.id,
                 "agent_type": agent_type,
                 "skill_chain": skill_chain,
                 "is_multi_agent": is_multi_skill,
             },
         )
+        # Make the task and run visible to the fresh execution session before
+        # starting the coroutine.
+        await db.commit()
 
         # Fire background execution with a fresh DB session
         async def _run_task():
             async with self.session_factory() as task_db:
                 t = await task_db.get(AgentTask, task.id)
-                if t:
+                persisted_run = await task_db.get(AgentRun, run.id)
+                if t and persisted_run:
                     await agent_task_service.execute_task(
                         task_db, t, self.active_ai, self.ws, user_id,
                         session_factory=self.session_factory,
+                        run=persisted_run,
+                        provider=provider,
+                        model=getattr(self.active_ai, "model", None),
                     )
 
-        asyncio.create_task(_run_task())
+        agent_run_service.launch_execution(run.id, _run_task())
 
     async def _handle_daily_briefing(
         self,
@@ -260,7 +282,12 @@ class Orchestrator:
 
         system_content = SYSTEM_PROMPT
         conv = await db.get(Conversation, conversation_id)
-        if conv and conv.project_todo_id:
+        if conv and conv.project_id:
+            system_content += await self._build_first_class_project_context(
+                db,
+                conv.project_id,
+            )
+        elif conv and conv.project_todo_id:
             system_content += await self._build_project_context(db, conv.project_todo_id)
         messages = [{"role": "system", "content": system_content}]
         for msg in history:
@@ -366,16 +393,20 @@ class Orchestrator:
             if intent == "create_todo":
                 # Auto-associate with project if conversation is linked to one
                 parent_id = params.get("parent_id")
+                project_id = None
                 if not parent_id and conversation_id:
                     conv = await db.get(Conversation, conversation_id)
                     if conv and conv.project_todo_id:
                         parent_id = conv.project_todo_id
+                    if conv:
+                        project_id = conv.project_id
                 todo = await todo_service.create_todo(
                     db,
                     title=params.get("title", "Untitled task"),
                     description=params.get("description"),
                     priority=params.get("priority", "medium"),
                     parent_id=parent_id,
+                    project_id=project_id,
                     due_date=params.get("due_date"),
                     recurrence_rule=params.get("recurrence_rule"),
                 )
@@ -422,10 +453,16 @@ class Orchestrator:
                         "When should it be?",
                         None,
                     )
+                project_id = None
+                if conversation_id:
+                    conversation = await db.get(Conversation, conversation_id)
+                    if conversation is not None:
+                        project_id = conversation.project_id
                 event = await calendar_service.create_event(
                     db,
                     title=title,
                     description=params.get("description"),
+                    project_id=project_id,
                     start_time=datetime.fromisoformat(start_time),
                     end_time=(
                         datetime.fromisoformat(params["end_time"])
@@ -627,6 +664,39 @@ class Orchestrator:
                     ctx += f" ({t.priority})"
                 ctx += "\n"
         return ctx
+
+    async def _build_first_class_project_context(
+        self,
+        db: AsyncSession,
+        project_id: str,
+    ) -> str:
+        project = await db.get(Project, project_id)
+        if project is None:
+            return ""
+        tasks = list(
+            (
+                await db.execute(
+                    select(Todo)
+                    .where(
+                        Todo.project_id == project_id,
+                        Todo.id != project.root_task_id,
+                    )
+                    .order_by(Todo.sort_order, Todo.created_at)
+                )
+            ).scalars().all()
+        )
+        context = f"\n\n[Project: {project.title}]\n"
+        if project.goal:
+            context += f"Goal: {project.goal}\n"
+        if project.description:
+            context += f"Project Notes:\n{project.description}\n"
+        if project.deadline:
+            context += f"Deadline: {project.deadline.isoformat()}\n"
+        if tasks:
+            context += f"Tasks ({len(tasks)}):\n"
+            for task in tasks:
+                context += f"  - [{task.status}] {task.title}\n"
+        return context
 
     async def _generate_title(
         self,

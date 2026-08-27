@@ -267,6 +267,8 @@ class DelegateRequest(BaseModel):
 
     skill_id: str | None = None  # preferred
     agent_type: str | None = None  # legacy fallback
+    execution_provider: str | None = Field(default=None, max_length=100)
+    model: str | None = Field(default=None, max_length=200)
 
 
 class SkillResponse(BaseModel):

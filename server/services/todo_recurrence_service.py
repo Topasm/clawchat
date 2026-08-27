@@ -86,6 +86,7 @@ async def spawn_next_occurrence(db: AsyncSession, completed_todo: Todo) -> Todo 
     new_todo = Todo(
         id=make_id("todo_"),
         title=completed_todo.title,
+        project_id=completed_todo.project_id,
         description=completed_todo.description,
         status=TaskStatus.PENDING,
         priority=completed_todo.priority,
