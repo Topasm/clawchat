@@ -2176,6 +2176,44 @@
   outline-offset: 2px;
 }
 
+.cc-inbox-card--batch-selected {
+  background: color-mix(in srgb, var(--cc-primary) 6%, var(--cc-surface));
+  box-shadow: inset 3px 0 0 var(--cc-primary);
+}
+
+.cc-inbox-triage__batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: color-mix(in srgb, var(--cc-primary) 5%, var(--cc-surface));
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+}
+
+.cc-inbox-triage__batch-bar > div {
+  display: flex;
+  gap: 4px;
+}
+
+.cc-inbox-batch-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cc-inbox-batch-check input {
+  accent-color: var(--cc-primary);
+}
+
 .cc-inbox-tree {
   overflow: hidden;
 }

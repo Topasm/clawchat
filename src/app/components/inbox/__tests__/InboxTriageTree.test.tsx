@@ -37,9 +37,11 @@ describe('InboxTriageTree', () => {
         projects={[project]}
         todos={[task]}
         selectedTaskId="inbox-1"
+        batchTaskIds={[]}
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPlaceBatch={vi.fn()}
         onPreviewDependency={vi.fn()}
       />,
     );
@@ -55,9 +57,11 @@ describe('InboxTriageTree', () => {
         projects={[project]}
         todos={[task]}
         selectedTaskId="inbox-1"
+        batchTaskIds={[]}
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPlaceBatch={vi.fn()}
         onPreviewDependency={vi.fn()}
       />,
     );
@@ -73,9 +77,11 @@ describe('InboxTriageTree', () => {
         projects={[project]}
         todos={[task]}
         selectedTaskId="inbox-1"
+        batchTaskIds={[]}
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPlaceBatch={vi.fn()}
         onPreviewDependency={vi.fn()}
       />,
     );
@@ -90,9 +96,11 @@ describe('InboxTriageTree', () => {
         projects={[project]}
         todos={[task]}
         selectedTaskId={null}
+        batchTaskIds={[]}
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={vi.fn()}
+        onPlaceBatch={vi.fn()}
         onPreviewDependency={vi.fn()}
       />,
     );
@@ -107,9 +115,11 @@ describe('InboxTriageTree', () => {
         projects={[project]}
         todos={[task]}
         selectedTaskId={null}
+        batchTaskIds={[]}
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPlaceBatch={vi.fn()}
         onPreviewDependency={vi.fn()}
       />,
     );
@@ -117,7 +127,10 @@ describe('InboxTriageTree', () => {
     const projectTarget = screen.getByText('Paper').parentElement;
     expect(projectTarget).not.toBeNull();
     fireEvent.drop(projectTarget!, {
-      dataTransfer: { getData: () => 'inbox-1' },
+      dataTransfer: {
+        types: ['application/x-clawchat-task-id'],
+        getData: (type: string) => (type === 'application/x-clawchat-task-id' ? 'inbox-1' : ''),
+      },
     });
     expect(onPlace).toHaveBeenCalledWith('inbox-1', project.id, null);
   });
@@ -129,9 +142,11 @@ describe('InboxTriageTree', () => {
         projects={[project]}
         todos={[task]}
         selectedTaskId="inbox-1"
+        batchTaskIds={[]}
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={vi.fn()}
+        onPlaceBatch={vi.fn()}
         onPreviewDependency={onPreviewDependency}
       />,
     );
@@ -153,9 +168,11 @@ describe('InboxTriageTree', () => {
         projects={[project]}
         todos={[task]}
         selectedTaskId={null}
+        batchTaskIds={[]}
         disabled={false}
         onSelectTask={vi.fn()}
         onPlace={onPlace}
+        onPlaceBatch={vi.fn()}
         onPreviewDependency={onPreviewDependency}
       />,
     );
@@ -172,6 +189,39 @@ describe('InboxTriageTree', () => {
     });
 
     expect(onPreviewDependency).toHaveBeenCalledWith('dependent-1', task.id);
+    expect(onPlace).not.toHaveBeenCalled();
+  });
+
+  it('places a dragged batch through one atomic callback', () => {
+    const onPlace = vi.fn();
+    const onPlaceBatch = vi.fn();
+    render(
+      <InboxTriageTree
+        projects={[project]}
+        todos={[task]}
+        selectedTaskId="inbox-1"
+        batchTaskIds={['inbox-1', 'inbox-2']}
+        disabled={false}
+        onSelectTask={vi.fn()}
+        onPlace={onPlace}
+        onPlaceBatch={onPlaceBatch}
+        onPreviewDependency={vi.fn()}
+      />,
+    );
+
+    const projectTarget = screen.getByText('Paper').parentElement;
+    expect(projectTarget).not.toBeNull();
+    fireEvent.drop(projectTarget!, {
+      dataTransfer: {
+        types: ['application/x-clawchat-task-batch'],
+        getData: (type: string) =>
+          type === 'application/x-clawchat-task-batch'
+            ? JSON.stringify(['inbox-1', 'inbox-2'])
+            : '',
+      },
+    });
+
+    expect(onPlaceBatch).toHaveBeenCalledWith(['inbox-1', 'inbox-2'], project.id, null);
     expect(onPlace).not.toHaveBeenCalled();
   });
 });

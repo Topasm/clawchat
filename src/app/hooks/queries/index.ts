@@ -5,6 +5,7 @@ export {
   useCreateTodo,
   useUpdateTodo,
   usePlaceTodo,
+  usePlaceTodosBatch,
   useUndoTodoPlacement,
   useDeleteTodo,
   useToggleTodoComplete,

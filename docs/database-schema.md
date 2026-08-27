@@ -188,14 +188,15 @@ downgrade retain dependency data.
 
 ### `task_placement_changes`
 
-Stores the durable undo boundary for one atomic Project/hierarchy/order move.
-The Todo link is logical rather than a foreign key so placement history can
-remain inspectable if the Task is later deleted.
+Stores the durable undo boundary for one atomic Project/hierarchy/order move,
+including multi-Task batch moves. The Todo link is logical rather than a
+foreign key so placement history can remain inspectable if the Task is later
+deleted.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | TEXT | PRIMARY KEY | Placement change-set identifier |
-| `todo_id` | TEXT | NOT NULL | Task moved by the command |
+| `todo_id` | TEXT | NOT NULL | Single moved Task or first ordered Task in a batch; complete membership lives in the snapshots |
 | `base_graph_revision` | INTEGER | NOT NULL, CHECK >= 0 | Client revision claimed before placement |
 | `applied_graph_revision` | INTEGER | NOT NULL, CHECK >= 0 | Revision after the atomic move |
 | `reverted_graph_revision` | INTEGER | NULLABLE, CHECK >= 0 | Revision after a successful Undo |

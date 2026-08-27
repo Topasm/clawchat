@@ -85,23 +85,41 @@ def _renumber(items: list[Todo]) -> None:
         item.sort_order = index * 10
 
 
-async def place_task(
+async def place_tasks(
     db: AsyncSession,
     *,
-    todo_id: str,
+    todo_ids: list[str],
     project_id: str | None,
     parent_id: str | None,
     before_id: str | None,
     inbox_state: str | None,
     expected_graph_revision: int,
-) -> tuple[Todo, TaskPlacementChange, list[str], dict[str, int | None] | None]:
+) -> tuple[list[Todo], TaskPlacementChange, list[str], dict[str, int | None] | None]:
+    if not todo_ids:
+        raise ValidationError("At least one task is required for placement")
+    if len(todo_ids) != len(set(todo_ids)):
+        raise ValidationError("Task placement IDs must be unique")
     await claim_graph_revision(db, expected_graph_revision)
-    todo = await db.get(Todo, todo_id)
-    if todo is None:
-        raise NotFoundError(f"Todo {todo_id} not found")
+    rows = list(
+        (
+            await db.execute(select(Todo).where(Todo.id.in_(todo_ids)))
+        ).scalars()
+    )
+    by_id = {todo.id: todo for todo in rows}
+    missing = [todo_id for todo_id in todo_ids if todo_id not in by_id]
+    if missing:
+        raise NotFoundError(f"Todos not found: {', '.join(missing)}")
+    todos = [by_id[todo_id] for todo_id in todo_ids]
+
     project_root = (
-        await db.execute(select(Project.id).where(Project.root_task_id == todo.id))
-    ).scalar_one_or_none()
+        (
+            await db.execute(
+                select(Project.root_task_id).where(Project.root_task_id.in_(todo_ids))
+            )
+        )
+        .scalars()
+        .first()
+    )
     if project_root is not None:
         raise ValidationError("A project root cannot be moved through task placement")
 
@@ -120,27 +138,41 @@ async def place_task(
         parent = await db.get(Todo, effective_parent_id)
         if parent is None:
             raise NotFoundError(f"Parent todo {effective_parent_id} not found")
-        if parent.id == todo.id:
-            raise ValidationError("A task cannot be its own parent")
         if parent.project_id != project_id:
             raise ValidationError("Parent and task placement must belong to the same project")
 
-    subtree = await _subtree(db, todo.id)
-    subtree_ids = {item.id for item in subtree}
+    subtrees: dict[str, list[Todo]] = {}
+    subtree_ids: set[str] = set()
+    for todo in todos:
+        subtree = await _subtree(db, todo.id)
+        item_ids = {item.id for item in subtree}
+        overlap = subtree_ids & item_ids
+        if overlap:
+            raise ValidationError(
+                "Batch placement cannot include both a task and its descendant",
+                details={"overlapping_task_ids": sorted(overlap)},
+            )
+        subtrees[todo.id] = subtree
+        subtree_ids.update(item_ids)
     if effective_parent_id in subtree_ids:
         raise ValidationError(
             "This placement would create a parent cycle",
-            details={"todo_id": todo.id, "parent_id": effective_parent_id},
+            details={"todo_ids": todo_ids, "parent_id": effective_parent_id},
         )
 
     analysis_time = datetime.now(timezone.utc)
     before_insights = await load_graph_insights(db, generated_at=analysis_time)
 
-    old_scope = (todo.project_id, todo.parent_id)
-    new_scope = (project_id, effective_parent_id)
-    old_siblings = await _siblings(db, *old_scope)
-    new_siblings = old_siblings if new_scope == old_scope else await _siblings(db, *new_scope)
-    target_items = [item for item in new_siblings if item.id != todo.id]
+    target_scope = (project_id, effective_parent_id)
+    old_scopes = {(todo.project_id, todo.parent_id) for todo in todos}
+    selected_ids = set(todo_ids)
+    scope_siblings = {
+        scope: await _siblings(db, *scope)
+        for scope in old_scopes | {target_scope}
+    }
+    target_items = [
+        item for item in scope_siblings[target_scope] if item.id not in selected_ids
+    ]
     if before_id is not None:
         before_index = next(
             (index for index, item in enumerate(target_items) if item.id == before_id),
@@ -148,20 +180,27 @@ async def place_task(
         )
         if before_index is None:
             raise ValidationError("before_id must be a sibling in the target location")
-        target_items.insert(before_index, todo)
+        target_items[before_index:before_index] = todos
     else:
-        target_items.append(todo)
+        target_items.extend(todos)
 
-    changed_candidates = {
-        item.id: item for item in [*subtree, *old_siblings, *new_siblings]
-    }
+    changed_candidates: dict[str, Todo] = {}
+    for subtree in subtrees.values():
+        changed_candidates.update({item.id: item for item in subtree})
+    for siblings in scope_siblings.values():
+        changed_candidates.update({item.id: item for item in siblings})
     before = [_state(item) for item in changed_candidates.values()]
-    if new_scope != old_scope:
-        _renumber([item for item in old_siblings if item.id != todo.id])
-    todo.parent_id = effective_parent_id
-    for item in subtree:
-        item.project_id = project_id
-    todo.inbox_state = inbox_state or ("captured" if project_id is None else "none")
+    for scope in old_scopes - {target_scope}:
+        _renumber(
+            [item for item in scope_siblings[scope] if item.id not in selected_ids]
+        )
+    for todo in todos:
+        todo.parent_id = effective_parent_id
+        todo.inbox_state = inbox_state or (
+            "captured" if project_id is None else "none"
+        )
+        for item in subtrees[todo.id]:
+            item.project_id = project_id
     _renumber(target_items)
     await db.flush()
     after_insights = await load_graph_insights(db, generated_at=analysis_time)
@@ -179,7 +218,7 @@ async def place_task(
         expected_graph_revision,
     )
     change = TaskPlacementChange(
-        todo_id=todo.id,
+        todo_id=todos[0].id,
         base_graph_revision=expected_graph_revision,
         applied_graph_revision=applied_revision,
         before_json=json.dumps(before, sort_keys=True),
@@ -187,7 +226,29 @@ async def place_task(
     )
     db.add(change)
     await db.flush()
-    return todo, change, affected_ids, insight_delta(before_insights, after_insights)
+    return todos, change, affected_ids, insight_delta(before_insights, after_insights)
+
+
+async def place_task(
+    db: AsyncSession,
+    *,
+    todo_id: str,
+    project_id: str | None,
+    parent_id: str | None,
+    before_id: str | None,
+    inbox_state: str | None,
+    expected_graph_revision: int,
+) -> tuple[Todo, TaskPlacementChange, list[str], dict[str, int | None] | None]:
+    todos, change, affected_ids, delta = await place_tasks(
+        db,
+        todo_ids=[todo_id],
+        project_id=project_id,
+        parent_id=parent_id,
+        before_id=before_id,
+        inbox_state=inbox_state,
+        expected_graph_revision=expected_graph_revision,
+    )
+    return todos[0], change, affected_ids, delta
 
 
 async def undo_placement(

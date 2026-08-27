@@ -8,6 +8,7 @@ import {
   useCreateTodo,
   useDeleteTodo,
   usePlaceTodo,
+  usePlaceTodosBatch,
   useReorderTodos,
   useSetTaskStatus,
   useToggleTodoComplete,
@@ -258,5 +259,47 @@ describe('todo mutations', () => {
       ?.sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0));
     expect(reordered?.map((task) => task.id)).toEqual(['task-1', 'task-3', 'task-2']);
     expect(reordered?.[1].parent_id).toBe(project.root_task_id);
+  });
+
+  it('posts one batch placement and invalidates every task placement consumer', async () => {
+    apiMocks.post.mockResolvedValueOnce({
+      data: {
+        todos: [
+          { ...todo, id: 'task-1', project_id: 'project-1', inbox_state: 'none' },
+          { ...todo, id: 'task-2', project_id: 'project-1', inbox_state: 'none' },
+        ],
+        graph_revision: 8,
+        affected_task_ids: ['task-1', 'task-2'],
+        insights_delta: null,
+        change_set_id: 'placement-batch-1',
+      },
+    });
+    const { queryClient, wrapper } = createHarness();
+    const { result } = renderHook(() => usePlaceTodosBatch(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        todo_ids: ['task-1', 'task-2'],
+        project_id: 'project-1',
+        parent_id: null,
+        before_id: null,
+        inbox_state: 'none',
+        expected_graph_revision: 6,
+      });
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/todos/placements/batch', {
+      todo_ids: ['task-1', 'task-2'],
+      project_id: 'project-1',
+      parent_id: null,
+      before_id: null,
+      inbox_state: 'none',
+      expected_graph_revision: 6,
+    });
+    expect(queryClient.getQueryState(queryKeys.todos)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.taskGraphInsightScope(null))?.isInvalidated).toBe(
+      true,
+    );
   });
 });

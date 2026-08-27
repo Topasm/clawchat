@@ -62,5 +62,5 @@ dependency is a different semantic operation and remains owned by
 - Concurrent Graph edits fail with an explanatory revision conflict.
 - Undo is safe but intentionally unavailable after any later semantic Graph
   change.
-- Batch placement and dependency connectors can reuse the command/revision
-  boundary without overloading the meaning of a card drag.
+- Batch placement reuses the command/revision and conservative Undo boundary;
+  dependency connectors remain a distinct semantic drag type.

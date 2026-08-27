@@ -141,10 +141,10 @@ Inbox pipeline (new todos):
               Export to vault      Export to vault    Export to vault
 
 Inbox placement (same Task identity):
-    Capture → select or drag → Project / parent / sibling position
+    Capture → select one or many → Project / parent / sibling position
                                  │
                                  ▼
-                      revision-guarded transaction
+                 one revision-guarded transaction
                                  │
                 ┌────────────────┼────────────────┐
                 ▼                ▼                ▼

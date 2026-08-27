@@ -5653,6 +5653,130 @@
         "title": "TableCounts",
         "type": "object"
       },
+      "TaskBatchPlacementRequest": {
+        "properties": {
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "expected_graph_revision": {
+            "minimum": 0.0,
+            "title": "Expected Graph Revision",
+            "type": "integer"
+          },
+          "inbox_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "captured",
+                  "classifying",
+                  "questioning",
+                  "planning",
+                  "plan_ready",
+                  "error"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inbox State"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "todo_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Todo Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project_id",
+          "parent_id",
+          "expected_graph_revision",
+          "todo_ids"
+        ],
+        "title": "TaskBatchPlacementRequest",
+        "type": "object"
+      },
+      "TaskBatchPlacementResponse": {
+        "properties": {
+          "affected_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Task Ids",
+            "type": "array"
+          },
+          "change_set_id": {
+            "title": "Change Set Id",
+            "type": "string"
+          },
+          "graph_revision": {
+            "minimum": 0.0,
+            "title": "Graph Revision",
+            "type": "integer"
+          },
+          "insights_delta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskPlacementInsightsDelta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "todos": {
+            "items": {
+              "$ref": "#/components/schemas/TodoResponse"
+            },
+            "title": "Todos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "todos",
+          "graph_revision",
+          "affected_task_ids",
+          "change_set_id"
+        ],
+        "title": "TaskBatchPlacementResponse",
+        "type": "object"
+      },
       "TaskDependencyCommandRequest": {
         "additionalProperties": false,
         "description": "Revision-sensitive dependency connector command.",
@@ -11723,6 +11847,52 @@
           }
         ],
         "summary": "Get Graph Insights",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/placements/batch": {
+      "post": {
+        "operationId": "place_todos_batch_api_todos_placements_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskBatchPlacementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBatchPlacementResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Place Todos Batch",
         "tags": [
           "todos"
         ]

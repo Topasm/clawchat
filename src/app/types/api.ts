@@ -9,6 +9,8 @@ export type {
   TodoUpdate,
   TaskPlacementRequest,
   TaskPlacementResponse,
+  TaskBatchPlacementRequest,
+  TaskBatchPlacementResponse,
   TaskStatus,
   TaskRelationshipType,
   TaskRelationshipResponse,

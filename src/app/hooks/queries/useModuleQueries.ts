@@ -9,6 +9,7 @@ import {
   TodoResponseSchema,
   EventResponseSchema,
   AttachmentResponseSchema,
+  TaskBatchPlacementResponseSchema,
   TaskPlacementResponseSchema,
 } from '../../types/schemas';
 import type {
@@ -20,6 +21,8 @@ import type {
   EventUpdate,
   TaskStatus,
   BulkTodoUpdate,
+  TaskBatchPlacementRequest,
+  TaskBatchPlacementResponse,
   TaskPlacementRequest,
   TaskPlacementResponse,
   ProjectResponse,
@@ -259,6 +262,23 @@ export function useUndoTodoPlacement() {
     mutationFn: async (changeSetId: string): Promise<TaskPlacementResponse> => {
       const response = await apiClient.post(`/todos/placements/${changeSetId}/undo`);
       return TaskPlacementResponseSchema.parse(response.data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      void invalidateTaskDerivedQueries(queryClient);
+    },
+  });
+}
+
+export function usePlaceTodosBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      placement: TaskBatchPlacementRequest,
+    ): Promise<TaskBatchPlacementResponse> => {
+      const response = await apiClient.post('/todos/placements/batch', placement);
+      return TaskBatchPlacementResponseSchema.parse(response.data);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });

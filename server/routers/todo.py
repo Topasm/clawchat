@@ -32,7 +32,12 @@ from schemas.task import (
     PlanResponse,
     SkillResponse,
 )
-from schemas.task_placement import TaskPlacementRequest, TaskPlacementResponse
+from schemas.task_placement import (
+    TaskBatchPlacementRequest,
+    TaskBatchPlacementResponse,
+    TaskPlacementRequest,
+    TaskPlacementResponse,
+)
 from schemas.todo import (
     AnswerQuestionsRequest,
     ProjectTodoResponse,
@@ -493,6 +498,32 @@ async def place_todo(
     await notify_module_data_changed("todos")
     return TaskPlacementResponse(
         todo=await _enrich_todo_response(todo, db),
+        graph_revision=change.applied_graph_revision,
+        affected_task_ids=affected_ids,
+        insights_delta=insights_delta,
+        change_set_id=change.id,
+    )
+
+
+@router.post("/placements/batch", response_model=TaskBatchPlacementResponse)
+async def place_todos_batch(
+    body: TaskBatchPlacementRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    todos, change, affected_ids, insights_delta = (
+        await task_placement_service.place_tasks(
+            db,
+            todo_ids=body.todo_ids,
+            **body.model_dump(exclude={"todo_ids"}),
+        )
+    )
+    await db.commit()
+    for todo in todos:
+        await db.refresh(todo)
+    await notify_module_data_changed("todos")
+    return TaskBatchPlacementResponse(
+        todos=[await _enrich_todo_response(todo, db) for todo in todos],
         graph_revision=change.applied_graph_revision,
         affected_task_ids=affected_ids,
         insights_delta=insights_delta,

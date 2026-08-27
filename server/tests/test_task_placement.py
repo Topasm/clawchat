@@ -220,6 +220,79 @@ async def test_rejects_parent_cycle_and_stale_revision(db_session):
 
 
 @pytest.mark.asyncio
+async def test_batch_placement_preserves_request_order_and_undoes_atomically(db_session):
+    project = await _project(db_session)
+    parent = Todo(title="Experiments", project_id=project.id)
+    first = Todo(title="First Inbox", inbox_state="captured", sort_order=0)
+    second = Todo(title="Second Inbox", inbox_state="captured", sort_order=10)
+    db_session.add_all([parent, first, second])
+    await db_session.flush()
+    existing = Todo(
+        title="Existing",
+        project_id=project.id,
+        parent_id=parent.id,
+        sort_order=0,
+    )
+    db_session.add(existing)
+    await db_session.commit()
+
+    revision = await task_placement_service.current_graph_revision(db_session)
+    moved, change, affected, _ = await task_placement_service.place_tasks(
+        db_session,
+        todo_ids=[second.id, first.id],
+        project_id=project.id,
+        parent_id=parent.id,
+        before_id=existing.id,
+        inbox_state="none",
+        expected_graph_revision=revision,
+    )
+    await db_session.commit()
+
+    assert [todo.id for todo in moved] == [second.id, first.id]
+    assert [second.sort_order, first.sort_order, existing.sort_order] == [0, 10, 20]
+    assert second.project_id == first.project_id == project.id
+    assert second.parent_id == first.parent_id == parent.id
+    assert {first.id, second.id}.issubset(affected)
+
+    await task_placement_service.undo_placement(db_session, change.id)
+    await db_session.commit()
+    assert first.project_id is None
+    assert second.project_id is None
+    assert first.inbox_state == second.inbox_state == "captured"
+    assert existing.sort_order == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_placement_rejects_overlapping_subtrees_without_changes(db_session):
+    project = await _project(db_session)
+    parent = Todo(title="Parent", inbox_state="captured")
+    db_session.add(parent)
+    await db_session.flush()
+    child = Todo(title="Child", parent_id=parent.id, inbox_state="captured")
+    db_session.add(child)
+    await db_session.commit()
+    revision = await task_placement_service.current_graph_revision(db_session)
+
+    with pytest.raises(ValidationError, match="descendant"):
+        await task_placement_service.place_tasks(
+            db_session,
+            todo_ids=[parent.id, child.id],
+            project_id=project.id,
+            parent_id=None,
+            before_id=None,
+            inbox_state="none",
+            expected_graph_revision=revision,
+        )
+    await db_session.rollback()
+    await db_session.refresh(parent)
+    await db_session.refresh(child)
+    assert parent.project_id is None
+    assert child.project_id is None
+    assert child.parent_id == parent.id
+    assert await task_placement_service.current_graph_revision(db_session) == revision
+
+
+@pytest.mark.asyncio
 async def test_placement_http_contract_and_undo(client, auth_headers, db_session):
     project = await _project(db_session)
     parent = Todo(title="Figures", project_id=project.id)
@@ -255,3 +328,42 @@ async def test_placement_http_contract_and_undo(client, auth_headers, db_session
 
     openapi = (await client.get("/openapi.json")).json()
     assert "/api/todos/{todo_id}/placement" in openapi["paths"]
+    assert "/api/todos/placements/batch" in openapi["paths"]
+
+
+@pytest.mark.asyncio
+async def test_batch_placement_http_contract_and_shared_undo(client, auth_headers, db_session):
+    project = await _project(db_session)
+    first = Todo(title="Batch one", inbox_state="captured")
+    second = Todo(title="Batch two", inbox_state="captured")
+    db_session.add_all([first, second])
+    await db_session.commit()
+    revision = await task_placement_service.current_graph_revision(db_session)
+
+    response = await client.post(
+        "/api/todos/placements/batch",
+        headers=auth_headers,
+        json={
+            "todo_ids": [first.id, second.id],
+            "project_id": project.id,
+            "parent_id": None,
+            "before_id": None,
+            "inbox_state": "none",
+            "expected_graph_revision": revision,
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert [todo["id"] for todo in payload["todos"]] == [first.id, second.id]
+    assert all(todo["project_id"] == project.id for todo in payload["todos"])
+    assert payload["graph_revision"] > revision
+
+    undone = await client.post(
+        f"/api/todos/placements/{payload['change_set_id']}/undo",
+        headers=auth_headers,
+    )
+    assert undone.status_code == 200, undone.text
+    await db_session.refresh(first)
+    await db_session.refresh(second)
+    assert first.project_id is None
+    assert second.project_id is None

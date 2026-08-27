@@ -7,6 +7,7 @@ import usePlatform from '../hooks/usePlatform';
 import {
   useDeleteTodo,
   usePlaceTodo,
+  usePlaceTodosBatch,
   useCreateTaskDependency,
   usePreviewTaskDependency,
   useProjectsQuery,
@@ -25,6 +26,7 @@ import type { TaskDependencyPreviewResponse, TodoResponse } from '../types/schem
 import { isTerminalTaskStatus } from '../utils/taskStatus';
 import InboxTriageTree, {
   INBOX_DEPENDENCY_DRAG_TYPE,
+  INBOX_TASK_BATCH_DRAG_TYPE,
   INBOX_TASK_DRAG_TYPE,
 } from '../components/inbox/InboxTriageTree';
 
@@ -33,6 +35,19 @@ function transferHasType(event: React.DragEvent, type: string): boolean {
     Array.from(event.dataTransfer.types ?? []).includes(type) ||
     Boolean(event.dataTransfer.getData(type))
   );
+}
+
+function transferredBatchTaskIds(event: React.DragEvent): string[] {
+  const value = event.dataTransfer.getData(INBOX_TASK_BATCH_DRAG_TYPE);
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every((taskId) => typeof taskId === 'string')
+      ? parsed
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function QuestionnaireCard({ task }: { task: TodoResponse }) {
@@ -122,10 +137,12 @@ export default function InboxPage() {
   const toggleMutation = useToggleTodoComplete();
   const deleteMutation = useDeleteTodo();
   const placeMutation = usePlaceTodo();
+  const placeBatchMutation = usePlaceTodosBatch();
   const undoPlacement = useUndoTodoPlacement();
   const previewDependency = usePreviewTaskDependency();
   const createDependency = useCreateTaskDependency();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedInboxTaskIds, setSelectedInboxTaskIds] = useState<string[]>([]);
   const [placementRevision, setPlacementRevision] = useState<number | null>(null);
   const [dependencyPreview, setDependencyPreview] = useState<TaskDependencyPreviewResponse | null>(
     null,
@@ -196,6 +213,23 @@ export default function InboxPage() {
     childCountByParent,
     todoById,
   } = inboxData;
+
+  const batchTaskIds = useMemo(
+    () =>
+      needsOrganising
+        .filter((todo) => selectedInboxTaskIds.includes(todo.id))
+        .map((todo) => todo.id),
+    [needsOrganising, selectedInboxTaskIds],
+  );
+
+  const toggleBatchTask = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setSelectedInboxTaskIds((current) =>
+      current.includes(taskId)
+        ? current.filter((selectedId) => selectedId !== taskId)
+        : [...current, taskId],
+    );
+  };
 
   const handleDelete = useCallback(
     (id: string) => {
@@ -371,6 +405,67 @@ export default function InboxPage() {
     }
   };
 
+  const handleBatchPlacement = async (
+    taskIds: string[],
+    projectId: string | null,
+    parentId: string | null,
+    beforeId?: string,
+  ) => {
+    if (placementRevision == null) {
+      addToast('warning', 'The current graph revision is still loading');
+      return;
+    }
+    try {
+      const result = await placeBatchMutation.mutateAsync({
+        todo_ids: taskIds,
+        project_id: projectId,
+        parent_id: parentId,
+        before_id: beforeId ?? null,
+        inbox_state: projectId === null ? 'captured' : 'none',
+        expected_graph_revision: placementRevision,
+      });
+      setPlacementRevision(result.graph_revision);
+      setSelectedInboxTaskIds([]);
+      const impact = result.insights_delta;
+      const impactLabel = impact
+        ? ` · Ready ${impact.ready_count >= 0 ? '+' : ''}${impact.ready_count} · Blocked ${impact.blocked_count >= 0 ? '+' : ''}${impact.blocked_count}`
+        : '';
+      addToast('success', `Moved ${taskIds.length} tasks${impactLabel}`, {
+        duration: 6000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void undoPlacement
+              .mutateAsync(result.change_set_id)
+              .then((undone) => {
+                setPlacementRevision(undone.graph_revision);
+                addToast('info', `${taskIds.length} task placements reverted`);
+              })
+              .catch((error: unknown) => {
+                const response = (
+                  error as {
+                    response?: { status?: number; data?: { error?: { message?: string } } };
+                  }
+                ).response;
+                addToast(
+                  'error',
+                  response?.data?.error?.message ??
+                    (response?.status === 409
+                      ? 'Could not undo after later task changes'
+                      : 'Could not undo batch placement'),
+                );
+              });
+          },
+        },
+      });
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
+          ?.message ?? 'Could not place these tasks';
+      addToast('error', message);
+    }
+  };
+
   const selectedInsight = graphInsights.data?.nodes.find((node) => node.task_id === selectedTaskId);
 
   const handleOrganize = async (id: string) => {
@@ -420,9 +515,20 @@ export default function InboxPage() {
           <div
             className="cc-inbox-triage__inbox-target"
             onDragOver={(event) => {
-              if (transferHasType(event, INBOX_TASK_DRAG_TYPE)) event.preventDefault();
+              if (
+                transferHasType(event, INBOX_TASK_DRAG_TYPE) ||
+                transferHasType(event, INBOX_TASK_BATCH_DRAG_TYPE)
+              ) {
+                event.preventDefault();
+              }
             }}
             onDrop={(event) => {
+              const batchIds = transferredBatchTaskIds(event);
+              if (batchIds.length > 1 && !placeBatchMutation.isPending) {
+                event.preventDefault();
+                void handleBatchPlacement(batchIds, null, null);
+                return;
+              }
               const taskId = event.dataTransfer.getData(INBOX_TASK_DRAG_TYPE);
               if (taskId && !placeMutation.isPending) {
                 event.preventDefault();
@@ -506,14 +612,51 @@ export default function InboxPage() {
               variant="accent"
               defaultOpen
             >
+              <div className="cc-inbox-triage__batch-bar" aria-live="polite">
+                <span>
+                  {batchTaskIds.length
+                    ? `${batchTaskIds.length} selected`
+                    : 'Select tasks to move them together'}
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn--ghost"
+                    disabled={batchTaskIds.length === needsOrganising.length}
+                    onClick={() => {
+                      setSelectedInboxTaskIds(needsOrganising.map((todo) => todo.id));
+                      setSelectedTaskId(needsOrganising[0]?.id ?? null);
+                    }}
+                  >
+                    Select all
+                  </button>
+                  {batchTaskIds.length > 0 && (
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--ghost"
+                      onClick={() => setSelectedInboxTaskIds([])}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
               {needsOrganising.map((task) => {
+                const isBatchSelected = batchTaskIds.includes(task.id);
                 return (
                   <div
                     key={task.id}
-                    className={`cc-inbox-card${selectedTaskId === task.id ? ' cc-inbox-card--selected' : ''}`}
-                    draggable={!placeMutation.isPending}
+                    className={`cc-inbox-card${selectedTaskId === task.id ? ' cc-inbox-card--selected' : ''}${isBatchSelected ? ' cc-inbox-card--batch-selected' : ''}`}
+                    draggable={!placeMutation.isPending && !placeBatchMutation.isPending}
                     onDragStart={(event) => {
-                      event.dataTransfer.setData(INBOX_TASK_DRAG_TYPE, task.id);
+                      if (isBatchSelected && batchTaskIds.length > 1) {
+                        event.dataTransfer.setData(
+                          INBOX_TASK_BATCH_DRAG_TYPE,
+                          JSON.stringify(batchTaskIds),
+                        );
+                      } else {
+                        event.dataTransfer.setData(INBOX_TASK_DRAG_TYPE, task.id);
+                      }
                       event.dataTransfer.effectAllowed = 'move';
                       setSelectedTaskId(task.id);
                     }}
@@ -527,6 +670,16 @@ export default function InboxPage() {
                       subTaskCount={childCountByParent.get(task.id) ?? 0}
                     />
                     <div className="cc-inbox-card__actions">
+                      <label className="cc-inbox-batch-check">
+                        <input
+                          type="checkbox"
+                          checked={isBatchSelected}
+                          aria-label={`Select ${task.title} for batch placement`}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => toggleBatchTask(task.id)}
+                        />
+                        Batch
+                      </label>
                       <button
                         className="cc-inbox-dependency-handle"
                         type="button"
@@ -612,14 +765,17 @@ export default function InboxPage() {
             projects={projects}
             todos={todos}
             selectedTaskId={selectedTaskId}
+            batchTaskIds={batchTaskIds}
             disabled={
               placementRevision == null ||
               placeMutation.isPending ||
+              placeBatchMutation.isPending ||
               previewDependency.isPending ||
               createDependency.isPending
             }
             onSelectTask={setSelectedTaskId}
             onPlace={handlePlacement}
+            onPlaceBatch={handleBatchPlacement}
             onPreviewDependency={handleDependencyPreview}
           />
         )}
@@ -751,14 +907,17 @@ export default function InboxPage() {
                     projects={projects}
                     todos={todos}
                     selectedTaskId={selectedTaskId}
+                    batchTaskIds={batchTaskIds}
                     disabled={
                       placementRevision == null ||
                       placeMutation.isPending ||
+                      placeBatchMutation.isPending ||
                       previewDependency.isPending ||
                       createDependency.isPending
                     }
                     onSelectTask={setSelectedTaskId}
                     onPlace={handlePlacement}
+                    onPlaceBatch={handleBatchPlacement}
                     onPreviewDependency={handleDependencyPreview}
                   />
                 </details>

@@ -1,15 +1,23 @@
 import type { ProjectResponse, TodoResponse } from '../../types/api';
 
 export const INBOX_TASK_DRAG_TYPE = 'application/x-clawchat-task-id';
+export const INBOX_TASK_BATCH_DRAG_TYPE = 'application/x-clawchat-task-batch';
 export const INBOX_DEPENDENCY_DRAG_TYPE = 'application/x-clawchat-task-dependency';
 
 interface InboxTriageTreeProps {
   projects: ProjectResponse[];
   todos: TodoResponse[];
   selectedTaskId: string | null;
+  batchTaskIds: string[];
   disabled: boolean;
   onSelectTask: (taskId: string) => void;
   onPlace: (taskId: string, projectId: string, parentId: string | null, beforeId?: string) => void;
+  onPlaceBatch: (
+    taskIds: string[],
+    projectId: string,
+    parentId: string | null,
+    beforeId?: string,
+  ) => void;
   onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
 }
 
@@ -22,6 +30,29 @@ function sorted(items: TodoResponse[]) {
 
 function draggedTaskId(event: React.DragEvent): string | null {
   return event.dataTransfer.getData(INBOX_TASK_DRAG_TYPE) || null;
+}
+
+function draggedPlacementTaskIds(event: React.DragEvent): string[] {
+  const batch = event.dataTransfer.getData(INBOX_TASK_BATCH_DRAG_TYPE);
+  if (batch) {
+    try {
+      const parsed: unknown = JSON.parse(batch);
+      if (Array.isArray(parsed) && parsed.every((taskId) => typeof taskId === 'string')) {
+        return parsed;
+      }
+    } catch {
+      return [];
+    }
+  }
+  const taskId = draggedTaskId(event);
+  return taskId ? [taskId] : [];
+}
+
+function acceptsPlacementDrag(event: React.DragEvent): boolean {
+  return (
+    acceptsDragType(event, INBOX_TASK_DRAG_TYPE) ||
+    acceptsDragType(event, INBOX_TASK_BATCH_DRAG_TYPE)
+  );
 }
 
 function acceptsDragType(event: React.DragEvent, type: string): boolean {
@@ -39,9 +70,11 @@ export default function InboxTriageTree({
   projects,
   todos,
   selectedTaskId,
+  batchTaskIds,
   disabled,
   onSelectTask,
   onPlace,
+  onPlaceBatch,
   onPreviewDependency,
 }: InboxTriageTreeProps) {
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
@@ -51,7 +84,11 @@ export default function InboxTriageTree({
       <header className="cc-inbox-tree__header">
         <div>
           <strong>Project / Work Tree</strong>
-          <span>Drop a card to place the same task</span>
+          <span>
+            {batchTaskIds.length > 1
+              ? `${batchTaskIds.length} tasks selected for one atomic move`
+              : 'Drop a card to place the same task'}
+          </span>
         </div>
       </header>
       <div className="cc-inbox-tree__projects">
@@ -78,26 +115,37 @@ export default function InboxTriageTree({
               <div
                 className="cc-inbox-tree__project-target"
                 onDragOver={(event) => {
-                  if (!disabled && acceptsDragType(event, INBOX_TASK_DRAG_TYPE)) {
+                  if (!disabled && acceptsPlacementDrag(event)) {
                     event.preventDefault();
                   }
                 }}
                 onDrop={(event) => {
-                  const taskId = draggedTaskId(event);
-                  if (taskId && !disabled) {
+                  const taskIds = draggedPlacementTaskIds(event);
+                  if (taskIds.length && !disabled) {
                     event.preventDefault();
-                    onPlace(taskId, project.id, null);
+                    if (taskIds.length > 1) onPlaceBatch(taskIds, project.id, null);
+                    else onPlace(taskIds[0], project.id, null);
                   }
                 }}
               >
                 <strong>{project.title}</strong>
                 <span>{project.task_count} tasks</span>
-                {selectedTaskId && (
+                {(selectedTaskId || batchTaskIds.length > 1) && (
                   <button
                     type="button"
-                    aria-label={`Place selected task in ${project.title}`}
+                    aria-label={
+                      batchTaskIds.length > 1
+                        ? `Place ${batchTaskIds.length} selected tasks in ${project.title}`
+                        : `Place selected task in ${project.title}`
+                    }
                     disabled={disabled}
-                    onClick={() => onPlace(selectedTaskId, project.id, null)}
+                    onClick={() => {
+                      if (batchTaskIds.length > 1) {
+                        onPlaceBatch(batchTaskIds, project.id, null);
+                      } else if (selectedTaskId) {
+                        onPlace(selectedTaskId, project.id, null);
+                      }
+                    }}
                   >
                     Place here
                   </button>
@@ -115,9 +163,11 @@ export default function InboxTriageTree({
                       childrenByParent={childrenByParent}
                       depth={0}
                       selectedTaskId={selectedTaskId}
+                      batchTaskIds={batchTaskIds}
                       disabled={disabled}
                       onSelectTask={onSelectTask}
                       onPlace={onPlace}
+                      onPlaceBatch={onPlaceBatch}
                       onPreviewDependency={onPreviewDependency}
                     />
                   ))
@@ -140,9 +190,11 @@ function TreeNode({
   childrenByParent,
   depth,
   selectedTaskId,
+  batchTaskIds,
   disabled,
   onSelectTask,
   onPlace,
+  onPlaceBatch,
   onPreviewDependency,
 }: {
   task: TodoResponse;
@@ -150,9 +202,16 @@ function TreeNode({
   childrenByParent: Map<string | null, TodoResponse[]>;
   depth: number;
   selectedTaskId: string | null;
+  batchTaskIds: string[];
   disabled: boolean;
   onSelectTask: (taskId: string) => void;
   onPlace: (taskId: string, projectId: string, parentId: string | null, beforeId?: string) => void;
+  onPlaceBatch: (
+    taskIds: string[],
+    projectId: string,
+    parentId: string | null,
+    beforeId?: string,
+  ) => void;
   onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
 }) {
   const children = sorted(childrenByParent.get(task.id) ?? []);
@@ -162,13 +221,17 @@ function TreeNode({
         className="cc-inbox-tree__insert"
         style={{ marginLeft: depth * 18 }}
         onDragOver={(event) => {
-          if (!disabled && acceptsDragType(event, INBOX_TASK_DRAG_TYPE)) event.preventDefault();
+          if (!disabled && acceptsPlacementDrag(event)) event.preventDefault();
         }}
         onDrop={(event) => {
-          const taskId = draggedTaskId(event);
-          if (taskId && taskId !== task.id && !disabled) {
+          const taskIds = draggedPlacementTaskIds(event);
+          if (taskIds.length && !taskIds.includes(task.id) && !disabled) {
             event.preventDefault();
-            onPlace(taskId, projectId, task.parent_id ?? null, task.id);
+            if (taskIds.length > 1) {
+              onPlaceBatch(taskIds, projectId, task.parent_id ?? null, task.id);
+            } else {
+              onPlace(taskIds[0], projectId, task.parent_id ?? null, task.id);
+            }
           }
         }}
       />
@@ -181,14 +244,15 @@ function TreeNode({
           event.dataTransfer.effectAllowed = 'move';
         }}
         onDragOver={(event) => {
-          if (!disabled && acceptsDragType(event, INBOX_TASK_DRAG_TYPE)) event.preventDefault();
+          if (!disabled && acceptsPlacementDrag(event)) event.preventDefault();
         }}
         onDrop={(event) => {
-          const taskId = draggedTaskId(event);
-          if (taskId && taskId !== task.id && !disabled) {
+          const taskIds = draggedPlacementTaskIds(event);
+          if (taskIds.length && !taskIds.includes(task.id) && !disabled) {
             event.preventDefault();
             event.stopPropagation();
-            onPlace(taskId, projectId, task.id);
+            if (taskIds.length > 1) onPlaceBatch(taskIds, projectId, task.id);
+            else onPlace(taskIds[0], projectId, task.id);
           }
         }}
       >
@@ -238,23 +302,45 @@ function TreeNode({
         >
           <span aria-hidden="true">↝</span>
         </button>
-        {selectedTaskId && selectedTaskId !== task.id && (
+        {(batchTaskIds.length > 1
+          ? !batchTaskIds.includes(task.id)
+          : selectedTaskId && selectedTaskId !== task.id) && (
           <div className="cc-inbox-tree__placement-actions">
             <button
               type="button"
               className="cc-inbox-tree__place-button"
-              aria-label={`Place selected task before ${task.title}`}
+              aria-label={
+                batchTaskIds.length > 1
+                  ? `Place ${batchTaskIds.length} selected tasks before ${task.title}`
+                  : `Place selected task before ${task.title}`
+              }
               disabled={disabled}
-              onClick={() => onPlace(selectedTaskId, projectId, task.parent_id ?? null, task.id)}
+              onClick={() => {
+                if (batchTaskIds.length > 1) {
+                  onPlaceBatch(batchTaskIds, projectId, task.parent_id ?? null, task.id);
+                } else if (selectedTaskId) {
+                  onPlace(selectedTaskId, projectId, task.parent_id ?? null, task.id);
+                }
+              }}
             >
               Before
             </button>
             <button
               type="button"
               className="cc-inbox-tree__place-button"
-              aria-label={`Place selected task under ${task.title}`}
+              aria-label={
+                batchTaskIds.length > 1
+                  ? `Place ${batchTaskIds.length} selected tasks under ${task.title}`
+                  : `Place selected task under ${task.title}`
+              }
               disabled={disabled}
-              onClick={() => onPlace(selectedTaskId, projectId, task.id)}
+              onClick={() => {
+                if (batchTaskIds.length > 1) {
+                  onPlaceBatch(batchTaskIds, projectId, task.id);
+                } else if (selectedTaskId) {
+                  onPlace(selectedTaskId, projectId, task.id);
+                }
+              }}
             >
               Under
             </button>
@@ -269,9 +355,11 @@ function TreeNode({
           childrenByParent={childrenByParent}
           depth={depth + 1}
           selectedTaskId={selectedTaskId}
+          batchTaskIds={batchTaskIds}
           disabled={disabled}
           onSelectTask={onSelectTask}
           onPlace={onPlace}
+          onPlaceBatch={onPlaceBatch}
           onPreviewDependency={onPreviewDependency}
         />
       ))}

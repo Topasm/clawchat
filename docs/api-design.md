@@ -823,12 +823,31 @@ Runs the inbox pipeline as a background task. Classifies the todo and suggests a
 
 ```text
 POST /api/todos/:id/placement
+POST /api/todos/placements/batch
 POST /api/todos/placements/:change_set_id/undo
 ```
 
 Placement moves the existing Task; it never creates a copy. Project-root drops,
 parent drops, and sibling insertion are one atomic command guarded by the task
 graph revision.
+
+Batch placement accepts one to 100 unique Task IDs and uses their request order
+at the destination:
+
+```json
+{
+  "todo_ids": ["todo_variable_order", "todo_baseline", "todo_ablation"],
+  "project_id": "project_paper",
+  "parent_id": "todo_experiments",
+  "before_id": null,
+  "inbox_state": "none",
+  "expected_graph_revision": 35
+}
+```
+
+It returns `todos` rather than `todo` and one shared `change_set_id`. Overlapping
+ancestor/descendant selections and any invalid member reject the whole command;
+the existing Undo endpoint restores the entire batch.
 
 ```json
 {

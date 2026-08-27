@@ -137,6 +137,25 @@ export const TaskPlacementResponseSchema = z.object({
   reverted: z.boolean().optional(),
 });
 
+export const TaskBatchPlacementRequestSchema = TaskPlacementRequestSchema.extend({
+  todo_ids: z.array(z.string().min(1)).min(1).max(100),
+});
+
+export const TaskBatchPlacementResponseSchema = z.object({
+  todos: z.array(TodoResponseSchema),
+  graph_revision: z.number().int().nonnegative(),
+  affected_task_ids: z.array(z.string()),
+  insights_delta: z
+    .object({
+      ready_count: z.number().int(),
+      blocked_count: z.number().int(),
+      critical_path_minutes: z.number().int().nullable(),
+    })
+    .nullable()
+    .optional(),
+  change_set_id: z.string(),
+});
+
 export const ProjectTodoResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -690,6 +709,8 @@ export type TodoCreate = z.infer<typeof TodoCreateSchema>;
 export type TodoUpdate = z.infer<typeof TodoUpdateSchema>;
 export type TaskPlacementRequest = z.infer<typeof TaskPlacementRequestSchema>;
 export type TaskPlacementResponse = z.infer<typeof TaskPlacementResponseSchema>;
+export type TaskBatchPlacementRequest = z.infer<typeof TaskBatchPlacementRequestSchema>;
+export type TaskBatchPlacementResponse = z.infer<typeof TaskBatchPlacementResponseSchema>;
 export type ProjectTodoResponse = z.infer<typeof ProjectTodoResponseSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 export type ProjectResponse = z.infer<typeof ProjectResponseSchema>;

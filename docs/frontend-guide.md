@@ -45,7 +45,7 @@ src/
 │   │   │   ├── KanbanCard.tsx        # Draggable card wrapper (@hello-pangea/dnd)
 │   │   │   └── KanbanFilterBar.tsx   # Search, priority chips, tag dropdown, sort
 │   │   ├── inbox/
-│   │   │   └── InboxTriageTree.tsx   # Project/parent placement, sibling insertion, touch controls
+│   │   │   └── InboxTriageTree.tsx   # Single/batch placement, sibling insertion, dependency targets
 │   │   ├── chat-panel/
 │   │   │   ├── ChatPanel.tsx         # Collapsible bottom chat panel
 │   │   │   ├── ChatInput.tsx         # Textarea + send/stop buttons
