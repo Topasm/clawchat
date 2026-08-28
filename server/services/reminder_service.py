@@ -10,6 +10,7 @@ from domain.task import TaskStatus
 from models.event import Event
 from models.todo import Todo
 from services.recurrence_service import generate_occurrences
+from utils import match_timezone
 from ws.manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
@@ -37,16 +38,21 @@ async def check_event_reminders(
     sent = 0
 
     for event in events:
-        remind_at = event.start_time - timedelta(minutes=event.reminder_minutes)
+        # SQLite returns naive datetimes even for timezone-aware columns, and
+        # `now` is aware. Comparing them raises TypeError, which aborted every
+        # reminder check -- events, todos, and overdue alike, since this runs
+        # first -- so no reminder was ever delivered.
+        start_time = match_timezone(event.start_time, now)
+        remind_at = start_time - timedelta(minutes=event.reminder_minutes)
         if remind_at > now:
             continue  # Not yet time to remind
 
-        dedup_key = event.start_time.isoformat()
+        dedup_key = start_time.isoformat()
         key = ("event", event.id, dedup_key)
         if key in _sent_reminders:
             continue
 
-        minutes_until = max(0, int((event.start_time - now).total_seconds() / 60))
+        minutes_until = max(0, int((start_time - now).total_seconds() / 60))
         await ws_manager.send_json(user_id, {
             "type": "reminder",
             "data": {
@@ -76,6 +82,9 @@ async def check_event_reminders(
             occ_start = occ["start_time"]
             if isinstance(occ_start, str):
                 occ_start = datetime.fromisoformat(occ_start)
+            # Occurrences inherit the series' awareness, which came from the
+            # database and is therefore naive.
+            occ_start = match_timezone(occ_start, now)
 
             remind_at = occ_start - timedelta(minutes=event.reminder_minutes)
             if remind_at > now:
@@ -123,12 +132,13 @@ async def check_todo_reminders(
     sent = 0
 
     for todo in todos:
-        dedup_key = todo.due_date.isoformat()
+        due_date = match_timezone(todo.due_date, now)
+        dedup_key = due_date.isoformat()
         key = ("todo", todo.id, dedup_key)
         if key in _sent_reminders:
             continue
 
-        minutes_until = max(0, int((todo.due_date - now).total_seconds() / 60))
+        minutes_until = max(0, int((due_date - now).total_seconds() / 60))
         await ws_manager.send_json(user_id, {
             "type": "reminder",
             "data": {
