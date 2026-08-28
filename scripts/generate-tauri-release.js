@@ -114,12 +114,12 @@ function generateTauriRelease({
       ),
     },
   ];
+  // Tauri v2 signs the delivered bundle itself on Linux and Windows, so the
+  // updater artifact there is the installer, not a separate archive. Only
+  // macOS still ships a distinct .app.tar.gz. The v1 layout this used to
+  // expect (.AppImage.tar.gz, .nsis.zip) is never produced.
   const updaters = {
-    'linux-x86_64': selectUpdater(
-      platformFiles.linux,
-      'Linux updater archive',
-      '.AppImage.tar.gz',
-    ),
+    'linux-x86_64': selectUpdater(platformFiles.linux, 'Linux updater bundle', '.AppImage'),
     'darwin-aarch64': selectUpdater(
       platformFiles.macos,
       'macOS updater archive',
@@ -127,14 +127,20 @@ function generateTauriRelease({
     ),
     'windows-x86_64': selectUpdater(
       platformFiles.windows,
-      'Windows updater archive',
-      '.nsis.zip',
+      'Windows updater bundle',
+      '.exe',
     ),
   };
 
   prepareOutputDirectory(outputDir);
   const releaseNames = new Map();
   const copyArtifact = (platform, file) => {
+    // The same bundle is both the installer and the updater on Linux and
+    // Windows. Stage it once and reuse the name so the manifest points at the
+    // file people actually download.
+    const staged = releaseNames.get(file);
+    if (staged) return staged;
+
     const releaseName = `${platform}-${path.basename(file)}`;
     const destination = path.join(outputDir, releaseName);
     if (fs.existsSync(destination)) {
@@ -142,6 +148,7 @@ function generateTauriRelease({
     }
     fs.copyFileSync(file, destination);
     releaseNames.set(file, releaseName);
+    return releaseName;
   };
 
   for (const installer of installers) {
