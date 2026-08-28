@@ -10,6 +10,47 @@ const outputPath = path.join(
   'tauri.release.generated.conf.json',
 );
 
+const MINISIGN_PUBLIC_KEY_BYTES = 42;
+
+/**
+ * Validate the updater public key before it is baked into a release binary.
+ *
+ * `tauri signer generate` writes the public key as one line of base64 whose
+ * decoded form is a two-line Minisign public-key box. A wrong or truncated
+ * value here is silent: the build succeeds and ships an app that can never
+ * verify an update, and the key cannot be corrected for anyone who already
+ * installed it.
+ */
+function validatePublicKey(encoded) {
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+    throw new Error('TAURI_UPDATER_PUBKEY must be one line of base64');
+  }
+
+  const decoded = Buffer.from(encoded, 'base64');
+  if (decoded.toString('base64') !== encoded) {
+    throw new Error('TAURI_UPDATER_PUBKEY is not canonical base64');
+  }
+
+  const lines = decoded.toString('utf8').replace(/\r\n/g, '\n').trimEnd().split('\n');
+  if (lines.length !== 2 || !lines[0].startsWith('untrusted comment:')) {
+    throw new Error(
+      'TAURI_UPDATER_PUBKEY does not decode to a Minisign public key. ' +
+        'Use the contents of the .pub file from `tauri signer generate`, ' +
+        'not the private key and not the raw two-line file.',
+    );
+  }
+
+  const payload = Buffer.from(lines[1], 'base64');
+  if (payload.length !== MINISIGN_PUBLIC_KEY_BYTES) {
+    throw new Error('TAURI_UPDATER_PUBKEY contains a malformed key payload');
+  }
+  if (!['Ed', 'ED'].includes(payload.subarray(0, 2).toString('ascii'))) {
+    throw new Error('TAURI_UPDATER_PUBKEY is not an Ed25519 Minisign key');
+  }
+
+  return encoded;
+}
+
 async function main() {
   const publicKey = process.env.TAURI_UPDATER_PUBKEY?.trim();
   const repository = process.env.GITHUB_REPOSITORY?.trim();
@@ -26,6 +67,7 @@ async function main() {
   if (!publicKey) {
     throw new Error('TAURI_UPDATER_PUBKEY is required for a release build');
   }
+  validatePublicKey(publicKey);
   if (!endpoint) {
     throw new Error(
       'TAURI_UPDATER_ENDPOINT is required outside GitHub Actions (or set GITHUB_REPOSITORY)',
