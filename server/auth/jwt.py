@@ -100,4 +100,5 @@ def decode_token_any(token: str, allowed_types: set[str] | None = None) -> dict:
 
 
 def verify_pin(pin: str) -> bool:
-    return pin == settings.pin
+    """Compare in constant time so the PIN cannot be recovered digit by digit."""
+    return secrets.compare_digest(pin, settings.pin)

@@ -1,5 +1,5 @@
 import json
-import random
+import secrets
 import socket
 import string
 import uuid
@@ -23,6 +23,7 @@ from schemas.pairing import (
     DeviceListResponse,
 )
 from services.host_identity import get_or_create_host_identity
+from services.rate_limiter import client_key, pairing_claim_limiter
 from ws.manager import ws_manager
 
 router = APIRouter()
@@ -53,8 +54,12 @@ def _get_base_url(request: Request | None = None) -> str:
 
 
 def _generate_code() -> str:
-    """Generate a 6-digit numeric pairing code."""
-    return "".join(random.choices(string.digits, k=6))
+    """Generate a 6-digit numeric pairing code from a CSPRNG.
+
+    The code is the only credential guarding /pairing/claim, so it must not be
+    drawn from a predictable generator.
+    """
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
 def _create_device_token(device_id: str) -> str:
@@ -117,9 +122,16 @@ async def create_pairing_session(
 @router.post("/claim", response_model=PairingClaimResponse)
 async def claim_pairing_session(
     req: PairingClaimRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Mobile claims a pairing session using the code. No auth required -- the code IS the auth."""
+    """Mobile claims a pairing session using the code. No auth required -- the code IS the auth.
+
+    Because the code is the only credential, wrong guesses are throttled per
+    caller: a 6-digit space is small enough to sweep otherwise.
+    """
+    throttle_key = client_key(request, scope="pairing_claim")
+    await pairing_claim_limiter.check(throttle_key)
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
@@ -131,7 +143,10 @@ async def claim_pairing_session(
     )
     session = result.scalar_one_or_none()
     if not session:
+        await pairing_claim_limiter.record_failure(throttle_key)
         raise HTTPException(status_code=404, detail="Invalid or expired pairing code")
+
+    await pairing_claim_limiter.reset(throttle_key)
 
     # Create paired device
     device_id = str(uuid.uuid4())

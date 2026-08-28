@@ -20,6 +20,25 @@ class Settings(BaseSettings):
     jwt_expiry_hours: int = 24
     pin: str = "123456"
 
+    # Brute-force protection for the unauthenticated credential endpoints
+    # (PIN login and pairing claim). Failures only -- a successful login
+    # clears the caller's counter.
+    rate_limit_enabled: bool = True
+    login_max_failures: int = 5
+    login_failure_window_seconds: int = 300
+    login_lockout_seconds: int = 60
+    pairing_max_failures: int = 5
+    pairing_failure_window_seconds: int = 300
+    pairing_lockout_seconds: int = 60
+    # Honour X-Forwarded-For when the server sits behind a reverse proxy you
+    # control. Leave false on a directly exposed server: an untrusted client
+    # can spoof the header and bypass throttling.
+    trust_proxy_headers: bool = False
+
+    # CORS. Comma-separated origins, or "*" to allow any (development only --
+    # a wildcard lets any website in the browser call this server's API).
+    cors_allow_origins: str = ""
+
     # AI Provider — "ollama", "openai", or "claude_code"
     ai_provider: str = "ollama"
     ai_base_url: str = "http://localhost:11434"
@@ -105,6 +124,34 @@ class Settings(BaseSettings):
             )
             return generated
         return value
+
+    def resolved_cors_origins(self) -> list[str]:
+        """Return the CORS allowlist, defaulting to local development hosts.
+
+        An empty setting means "no explicit allowlist configured": fall back to
+        the local dev origins plus PUBLIC_URL when one is set, rather than to a
+        wildcard. Set CORS_ALLOW_ORIGINS="*" to opt into the permissive mode.
+        """
+        raw = self.cors_allow_origins.strip()
+        if raw == "*":
+            return ["*"]
+        if raw:
+            return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+        origins = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:1420",
+            "http://127.0.0.1:1420",
+            "tauri://localhost",
+            "capacitor://localhost",
+            "http://localhost",
+        ]
+        if self.public_url:
+            public = self.public_url.rstrip("/")
+            if public not in origins:
+                origins.append(public)
+        return origins
 
 
 settings = Settings()

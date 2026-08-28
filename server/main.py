@@ -228,10 +228,21 @@ app = FastAPI(title="ClawChat Server", version=APP_VERSION, lifespan=lifespan)
 
 app.add_exception_handler(AppError, app_error_handler)
 
+_cors_origins = settings.resolved_cors_origins()
+# A wildcard origin and credentialed requests are mutually exclusive per the
+# CORS spec -- browsers reject the combination -- so the wildcard mode drops
+# credentials rather than emitting a header pair no browser will honour.
+_cors_allow_credentials = _cors_origins != ["*"]
+if _cors_origins == ["*"]:
+    logger.warning(
+        "CORS_ALLOW_ORIGINS is '*': any website can call this server's API "
+        "from a browser. Set an explicit origin list for any exposed deployment."
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

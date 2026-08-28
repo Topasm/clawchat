@@ -13,7 +13,7 @@ from auth.jwt import (
 )
 from database import get_db
 from exceptions import UnauthorizedError
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from models.refresh_session import RefreshSession
 from schemas.auth import (
     LoginRequest,
@@ -22,6 +22,7 @@ from schemas.auth import (
     TokenResponse,
     WebSocketTicketResponse,
 )
+from services.rate_limiter import client_key, login_limiter
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,9 +30,17 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    body: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    throttle_key = client_key(request, scope="login")
+    await login_limiter.check(throttle_key)
     if not verify_pin(body.pin):
+        await login_limiter.record_failure(throttle_key)
         raise UnauthorizedError("Invalid PIN")
+    await login_limiter.reset(throttle_key)
     session_id = str(uuid.uuid4())
     token_id = create_refresh_token_id()
     refresh_token = create_refresh_token(
