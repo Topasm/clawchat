@@ -163,6 +163,14 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`Tauri package smoke failed: ${error instanceof Error ? error.message : error}`);
+  const message = `Tauri package smoke failed: ${error instanceof Error ? error.message : error}`;
+  console.error(message);
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    const annotation = message
+      .replaceAll('%', '%25')
+      .replaceAll('\r', '%0D')
+      .replaceAll('\n', '%0A');
+    console.error(`::error title=Tauri package verification failed::${annotation}`);
+  }
   process.exit(1);
 });

@@ -320,6 +320,18 @@ jobs:
           dpkg-deb --extract "$deb" "$extracted"
           node scripts/verify-tauri-package.js "$extracted" --run-server
 
+      - name: Smoke-test packaged macOS app startup
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          dmg="$(find src-tauri/target/release/bundle/dmg -name '*.dmg' -type f -print -quit)"
+          test -n "$dmg"
+          mount_dir="$(mktemp -d)"
+          cleanup() { hdiutil detach "$mount_dir" >/dev/null 2>&1 || true; rmdir "$mount_dir" || true; }
+          trap cleanup EXIT
+          hdiutil attach "$dmg" -readonly -nobrowse -mountpoint "$mount_dir"
+          bash scripts/smoke-test-tauri-macos-app.sh "$mount_dir"
+
       - name: Verify packaged macOS server resource
         if: runner.os == 'macOS'
         shell: bash
@@ -331,7 +343,6 @@ jobs:
           trap cleanup EXIT
           hdiutil attach "$dmg" -readonly -nobrowse -mountpoint "$mount_dir"
           node scripts/verify-tauri-package.js "$mount_dir" --run-server
-          bash scripts/smoke-test-tauri-macos-app.sh "$mount_dir"
 
       - name: Verify packaged Windows server resource
         if: runner.os == 'Windows'

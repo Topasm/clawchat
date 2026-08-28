@@ -31,9 +31,19 @@ test('preview and release workflows launch the packaged macOS app', () => {
   for (const workflow of [previewWorkflow, releaseWorkflow]) {
     assert.match(workflow, /os: macos-26/);
     assert.doesNotMatch(workflow, /os: macos-14/);
+    assert.match(workflow, /name: Smoke-test packaged macOS app startup/);
+    assert.match(workflow, /name: Verify packaged macOS server resource/);
     assert.match(workflow, /bash scripts\/smoke-test-tauri-macos-app\.sh "\$mount_dir"/);
   }
   assert.match(smokeScript, /CFBundleExecutable/);
   assert.match(smokeScript, /ClawChat exited during the macOS startup smoke test/);
   assert.match(smokeScript, /kill -0 "\$app_pid"/);
+  assert.match(smokeScript, /::error title=macOS app startup smoke failed/);
+});
+
+test('packaged server failures are exposed as GitHub annotations', () => {
+  const verifier = readNormalized(path.resolve(__dirname, 'verify-tauri-package.js'));
+
+  assert.match(verifier, /process\.env\.GITHUB_ACTIONS === 'true'/);
+  assert.match(verifier, /::error title=Tauri package verification failed/);
 });

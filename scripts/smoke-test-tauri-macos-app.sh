@@ -36,8 +36,16 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
     exit_code=$?
     set -e
     app_pid=''
-    echo "ClawChat exited during the macOS startup smoke test (exit code $exit_code)." >&2
+    failure_message="ClawChat exited during the macOS startup smoke test (exit code $exit_code)."
+    echo "$failure_message" >&2
     cat "$app_log" >&2
+    if [[ "${GITHUB_ACTIONS:-}" == 'true' ]]; then
+      diagnostic="$(tail -c 4000 "$app_log")"
+      diagnostic="${diagnostic//'%'/'%25'}"
+      diagnostic="${diagnostic//$'\r'/'%0D'}"
+      diagnostic="${diagnostic//$'\n'/'%0A'}"
+      echo "::error title=macOS app startup smoke failed::${failure_message} ${diagnostic}" >&2
+    fi
     exit 1
   fi
 done
