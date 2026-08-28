@@ -30,6 +30,7 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 | [ADR 015: AI-Proposed Workstreams](./adr/015-ai-proposed-workstreams.md)                       | Dashed structural proposals, preview-local references, atomic creation/placement, and creation-aware Undo |
 | [ADR 016: Task Execution Telemetry](./adr/016-task-execution-telemetry-overlay.md)             | Derived Task-level Run, Review, and Artifact overlays without duplicating canonical execution state       |
 | [ADR 017: Approved Agent Execution](./adr/017-ready-only-approved-agent-execution.md)          | Ready-only, provider-aware, single-Run execution with an explicit user confirmation gate                  |
+| [ADR 018: Agent Review Handoff](./adr/018-agent-review-ready-handoff.md)                        | CAS review decisions, downstream Ready handoff, and explicit unsuccessful-Run recovery                    |
 
 ## Key Features
 
@@ -38,6 +39,7 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 - **Task Graph** — Project hierarchy and execution-dependency views backed by parent/child links and normalized relationship edges
 - **Inbox Triage Canvas** — Place captured Tasks into a Project hierarchy, approve AI suggestions, connect dependencies, and inspect live Run, Review, and Artifact overlays
 - **Approved Agent Execution** — Start one provider-aware Run from a Ready leaf Task after reviewing its Skill and lifecycle impact
+- **Review-to-Ready Handoff** — Preview downstream unlocks, approve one Agent result, and continue directly with newly Ready Tasks
 - **Command Palette (Ctrl+K)** — Quick navigation and action launcher using cmdk, search across tasks, pages, and actions
 - **Keyboard Shortcuts** — Global and scoped hotkeys (?, N, /, Ctrl+Shift+C, G+T/I/C/A/S) using react-hotkeys-hook
 - **Toast Notifications** — User feedback on task moves, completions, and creation with auto-dismiss

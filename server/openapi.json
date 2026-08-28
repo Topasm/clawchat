@@ -300,6 +300,50 @@
         "title": "AgentRunHeartbeatRequest",
         "type": "object"
       },
+      "AgentRunRecoveryResponse": {
+        "properties": {
+          "direct_blocker_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Direct Blocker Ids",
+            "type": "array"
+          },
+          "execution_state": {
+            "$ref": "#/components/schemas/GraphExecutionState"
+          },
+          "graph_revision": {
+            "minimum": 0.0,
+            "title": "Graph Revision",
+            "type": "integer"
+          },
+          "is_ready": {
+            "title": "Is Ready",
+            "type": "boolean"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "todo_id": {
+            "title": "Todo Id",
+            "type": "string"
+          },
+          "todo_status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          }
+        },
+        "required": [
+          "run_id",
+          "todo_id",
+          "todo_status",
+          "graph_revision",
+          "execution_state",
+          "is_ready"
+        ],
+        "title": "AgentRunRecoveryResponse",
+        "type": "object"
+      },
       "AgentRunResponse": {
         "properties": {
           "agent_task_id": {
@@ -497,6 +541,16 @@
             ],
             "title": "Todo Id"
           },
+          "todo_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "todo_title": {
             "anyOf": [
               {
@@ -610,6 +664,70 @@
           }
         },
         "title": "AgentRunRetryRequest",
+        "type": "object"
+      },
+      "AgentRunReviewOutcome": {
+        "description": "Typed handoff returned after an Agent Run result is approved.",
+        "properties": {
+          "adopted": {
+            "title": "Adopted",
+            "type": "boolean"
+          },
+          "agent_task_id": {
+            "title": "Agent Task Id",
+            "type": "string"
+          },
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "graph_revision": {
+            "minimum": 0.0,
+            "title": "Graph Revision",
+            "type": "integer"
+          },
+          "newly_ready_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ReadyTaskReference"
+            },
+            "title": "Newly Ready Tasks",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "todo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Todo Id"
+          },
+          "todo_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "run_id",
+          "agent_task_id",
+          "graph_revision",
+          "adopted",
+          "attempt"
+        ],
+        "title": "AgentRunReviewOutcome",
         "type": "object"
       },
       "AgentRunStatus": {
@@ -5014,6 +5132,25 @@
         "title": "PurgeResponse",
         "type": "object"
       },
+      "ReadyTaskReference": {
+        "description": "A task released by an approved execution result.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ReadyTaskReference",
+        "type": "object"
+      },
       "RecentActivity": {
         "properties": {
           "created_at": {
@@ -5199,9 +5336,16 @@
       "ReviewDecisionResponse": {
         "properties": {
           "outcome": {
-            "additionalProperties": true,
-            "title": "Outcome",
-            "type": "object"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentRunReviewOutcome"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ],
+            "title": "Outcome"
           },
           "review": {
             "$ref": "#/components/schemas/ReviewItemResponse"
@@ -11118,6 +11262,53 @@
           }
         ],
         "summary": "Retry Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/return-to-ready": {
+      "post": {
+        "operationId": "return_run_task_to_ready_api_runs__run_id__return_to_ready_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunRecoveryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Return Run Task To Ready",
         "tags": [
           "runs"
         ]

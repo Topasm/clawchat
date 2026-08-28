@@ -3,7 +3,11 @@ import { z } from 'zod';
 import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useToastStore } from '../../stores/useToastStore';
-import { AgentRunEventResponseSchema, AgentRunResponseSchema } from '../../types/schemas';
+import {
+  AgentRunEventResponseSchema,
+  AgentRunRecoveryResponseSchema,
+  AgentRunResponseSchema,
+} from '../../types/schemas';
 import type { AgentRunResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
 
@@ -44,6 +48,8 @@ function invalidateRuns(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: queryKeys.projects });
   queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
   queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
+  queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+  queryClient.invalidateQueries({ queryKey: queryKeys.taskGraphInsights });
 }
 
 export function useCancelAgentRun() {
@@ -75,6 +81,27 @@ export function useRetryAgentRun() {
       useToastStore.getState().addToast('success', 'New agent attempt started');
     },
     onError: () => useToastStore.getState().addToast('error', 'Could not retry agent run'),
+  });
+}
+
+export function useReturnAgentRunToReady() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (runId: string) => {
+      const response = await apiClient.post(`/runs/${runId}/return-to-ready`);
+      return AgentRunRecoveryResponseSchema.parse(response.data);
+    },
+    onSuccess: (result) => {
+      invalidateRuns(queryClient);
+      useToastStore
+        .getState()
+        .addToast(
+          'success',
+          result.is_ready ? 'Task returned to Ready' : 'Task returned to the queue · Blocked',
+        );
+    },
+    onError: () =>
+      useToastStore.getState().addToast('error', 'Could not return task to the execution queue'),
   });
 }
 

@@ -6,6 +6,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from domain.agent_run import AgentRunStatus
+from domain.graph_insights import GraphExecutionState
+from domain.task import TaskStatus
 
 
 class AgentRunRetryRequest(BaseModel):
@@ -38,6 +40,16 @@ class AgentRunHeartbeatRequest(BaseModel):
     message: str | None = Field(default=None, max_length=10_000)
 
 
+class AgentRunRecoveryResponse(BaseModel):
+    run_id: str
+    todo_id: str
+    todo_status: TaskStatus
+    graph_revision: int = Field(ge=0)
+    execution_state: GraphExecutionState
+    is_ready: bool
+    direct_blocker_ids: list[str] = Field(default_factory=list)
+
+
 class AgentRunResponse(BaseModel):
     id: str
     agent_task_id: str
@@ -45,6 +57,7 @@ class AgentRunResponse(BaseModel):
     project_title: str | None = None
     todo_id: str | None = None
     todo_title: str | None = None
+    todo_status: TaskStatus | None = None
     task_type: str
     instruction: str
     instruction_snapshot: str

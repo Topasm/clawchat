@@ -275,6 +275,72 @@ must use the task-relationship endpoints below.
 }
 ```
 
+## Agent Run and Review Endpoints
+
+```text
+GET  /api/runs                              # List durable execution attempts
+GET  /api/runs/:run_id                      # Read one attempt and linked Todo status
+POST /api/runs/:run_id/retry                # Retry the latest unsuccessful attempt
+POST /api/runs/:run_id/resume               # Resume a Run waiting for input
+POST /api/runs/:run_id/cancel               # Cancel an executing Run
+POST /api/runs/:run_id/return-to-ready      # Release its Todo back to pending
+GET  /api/reviews                           # List unified pending/history review items
+POST /api/reviews/:review_id/decision       # Approve, reject, or request changes
+```
+
+For an Agent Run, each Review item contains a read-only impact snapshot:
+
+```json
+{
+  "metadata": {
+    "approval_impact": {
+      "todo_id": "todo_experiment",
+      "graph_revision": 33,
+      "newly_ready_tasks": [
+        { "id": "todo_analysis", "title": "Analyze experiment" }
+      ]
+    }
+  }
+}
+```
+
+Approval recomputes the graph after the compare-and-set decision and returns
+the actual handoff. Only one concurrent decision can change the Run:
+
+```json
+{
+  "outcome": {
+    "run_id": "run_123",
+    "agent_task_id": "task_123",
+    "todo_id": "todo_experiment",
+    "todo_status": "completed",
+    "graph_revision": 34,
+    "newly_ready_tasks": [
+      { "id": "todo_analysis", "title": "Analyze experiment" }
+    ],
+    "adopted": true,
+    "attempt": 1
+  }
+}
+```
+
+`return-to-ready` preserves the terminal Run and Review as history. It accepts
+only the latest failed, cancelled, or explicitly rejected Todo-backed attempt
+while the Todo is still `in_progress` and no active Run exists. Since graph
+dependencies may have changed, `pending` does not guarantee Ready:
+
+```json
+{
+  "run_id": "run_123",
+  "todo_id": "todo_experiment",
+  "todo_status": "pending",
+  "graph_revision": 35,
+  "execution_state": "blocked",
+  "is_ready": false,
+  "direct_blocker_ids": ["todo_dataset"]
+}
+```
+
 ## Task Relationship Endpoints
 
 ```text

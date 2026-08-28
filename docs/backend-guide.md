@@ -233,6 +233,15 @@ The `POST /api/todos/{id}/organize` endpoint triggers the pipeline as a backgrou
 
 Delegation: `POST /api/todos/{id}/delegate` accepts `{ "skill_id": "research" }`, creates an `AgentTask` with a `skill_chain`, and runs the skill executor. The user-approved path also sends `require_ready=true` and `approved=true`; it recomputes graph readiness and atomically claims `pending → in_progress` before creating a single Run. Legacy `agent_type` and delegation without the Ready guard remain supported for compatibility.
 
+Agent Run review items include a deterministic approval-impact projection from
+canonical Graph Insights. Approve, reject, and request-changes transitions use
+a Run-level compare-and-set so concurrent decisions have one winner. Approval
+returns the applied graph revision and the downstream Tasks that actually
+became Ready. A failed, cancelled, or Review-rejected latest Run can use
+`POST /api/runs/{run_id}/return-to-ready`; the service preserves Run history,
+conditionally changes only `Todo.in_progress → pending`, and reports whether
+the recovered Task is now Ready or Blocked.
+
 Skills are executed sequentially in a chain — each skill's output feeds as context to the next (e.g. `research → summarize → draft`). LLM-based skill selection (`skills/selector.py`) replaces the old keyword-based `detect_agent_type()` heuristic.
 
 ### `services/intent_classifier.py` — Intent Classification

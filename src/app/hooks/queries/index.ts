@@ -69,11 +69,13 @@ export {
   useCreateArtifact,
   useProposeArtifactRevision,
 } from './useReviewQueries';
+export type { ReviewDecisionResult } from './useReviewQueries';
 export {
   useAgentRunsQuery,
   useAgentRunEventsQuery,
   useCancelAgentRun,
   useRetryAgentRun,
+  useReturnAgentRunToReady,
   useResumeAgentRun,
 } from './useAgentRunQueries';
 export { useTaskExecutionTelemetryQuery } from './useTaskExecutionTelemetryQuery';

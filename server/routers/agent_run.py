@@ -13,6 +13,7 @@ from models.agent_task import AgentTask
 from schemas.agent_run import (
     AgentRunEventResponse,
     AgentRunHeartbeatRequest,
+    AgentRunRecoveryResponse,
     AgentRunResponse,
     AgentRunResumeRequest,
     AgentRunRetryRequest,
@@ -23,6 +24,7 @@ from services import (
     agent_task_service,
     paseo_execution_service,
     review_item_service,
+    task_execution_recovery_service,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from ws.manager import ws_manager
@@ -92,6 +94,7 @@ async def retry_run(
     task = await db.get(AgentTask, previous.agent_task_id)
     if task is None:
         raise NotFoundError("Agent task not found")
+    await task_execution_recovery_service.validate_retryable_run(db, previous, task)
     provider = body.provider or previous.provider
     instruction = previous.instruction_snapshot
     if body.follow_up_instruction:
@@ -105,6 +108,11 @@ async def retry_run(
         )
         if not paseo_adapter.enabled:
             raise ConflictError("Paseo execution is disabled")
+        await task_execution_recovery_service.claim_retryable_run(
+            db,
+            previous,
+            task,
+        )
         run = await agent_run_service.create_run(
             db,
             task,
@@ -125,6 +133,7 @@ async def retry_run(
             ),
         )
         await notify_module_data_changed("runs")
+        await notify_module_data_changed("todos")
         return await agent_run_service.build_run_response(db, run)
 
     active_provider, ai_service, active_model = _active_provider(request)
@@ -132,6 +141,11 @@ async def retry_run(
         raise ConflictError(
             f"Execution provider {provider!r} is unavailable; active provider is {active_provider!r}"
         )
+    await task_execution_recovery_service.claim_retryable_run(
+        db,
+        previous,
+        task,
+    )
     run = await agent_run_service.create_run(
         db,
         task,
@@ -162,6 +176,7 @@ async def retry_run(
 
     agent_run_service.launch_execution(run.id, execute())
     await notify_module_data_changed("runs")
+    await notify_module_data_changed("todos")
     return await agent_run_service.build_run_response(db, run)
 
 
@@ -285,6 +300,22 @@ async def cancel_run(
         await db.commit()
     await notify_module_data_changed("runs")
     return await agent_run_service.build_run_response(db, run)
+
+
+@router.post(
+    "/{run_id}/return-to-ready",
+    response_model=AgentRunRecoveryResponse,
+)
+async def return_run_task_to_ready(
+    run_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    result = await task_execution_recovery_service.return_task_to_ready(db, run_id)
+    await db.commit()
+    await notify_module_data_changed("runs")
+    await notify_module_data_changed("todos")
+    return result
 
 
 @router.post("/{run_id}/transition", response_model=AgentRunResponse)

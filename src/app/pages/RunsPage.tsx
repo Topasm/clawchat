@@ -6,6 +6,7 @@ import {
   useAgentRunEventsQuery,
   useAgentRunsQuery,
   useCancelAgentRun,
+  useReturnAgentRunToReady,
   useRetryAgentRun,
   useResumeAgentRun,
 } from '../hooks/queries';
@@ -25,7 +26,11 @@ function matchesFilter(run: AgentRunResponse, filter: RunFilter) {
   if (filter === 'active')
     return ['queued', 'starting', 'running', 'waiting_input'].includes(run.status);
   if (filter === 'review') return run.status === 'waiting_review';
-  return run.status === 'failed' || run.status === 'cancelled';
+  return (
+    run.status === 'failed' ||
+    run.status === 'cancelled' ||
+    (run.status === 'completed' && !run.is_adopted)
+  );
 }
 
 export default function RunsPage() {
@@ -103,10 +108,18 @@ function RunCard({
 }) {
   const cancel = useCancelAgentRun();
   const retry = useRetryAgentRun();
+  const returnToReady = useReturnAgentRunToReady();
   const resume = useResumeAgentRun();
   const [followUp, setFollowUp] = useState('');
   const active = ['queued', 'starting', 'running', 'waiting_input'].includes(run.status);
-  const canRetry = ['failed', 'cancelled', 'completed'].includes(run.status);
+  const unsuccessful =
+    run.status === 'failed' ||
+    run.status === 'cancelled' ||
+    (run.status === 'completed' && !run.is_adopted);
+  const canRetry = unsuccessful && (!run.todo_id || run.todo_status === 'in_progress');
+  const canReturnToReady = Boolean(
+    unsuccessful && run.todo_id && run.todo_status === 'in_progress',
+  );
 
   return (
     <article className={`cc-run-card cc-run-card--${run.status}`}>
@@ -181,6 +194,16 @@ function RunCard({
             onClick={() => retry.mutate({ runId: run.id })}
           >
             Retry
+          </button>
+        )}
+        {canReturnToReady && (
+          <button
+            type="button"
+            className="cc-btn"
+            disabled={returnToReady.isPending}
+            onClick={() => returnToReady.mutate(run.id)}
+          >
+            Return task to queue
           </button>
         )}
         {run.status === 'waiting_review' && (

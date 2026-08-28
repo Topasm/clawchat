@@ -22,7 +22,8 @@ from models.conversation import Conversation
 from models.project import Project
 from models.todo import Todo
 from schemas.agent_run import AgentRunEventResponse, AgentRunResponse
-from services import review_item_service
+from schemas.review import AgentRunReviewOutcome
+from services import agent_review_handoff_service, review_item_service
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -301,7 +302,7 @@ async def decide_run(
     db: AsyncSession,
     run_id: str,
     decision: ReviewStatus,
-) -> dict[str, Any]:
+) -> AgentRunReviewOutcome | dict[str, Any]:
     run = await require_run(db, run_id)
     task = await db.get(AgentTask, run.agent_task_id)
     if task is None:
@@ -311,10 +312,33 @@ async def decide_run(
         AgentRunStatus.WAITING_INPUT,
     }:
         raise ConflictError(f"Agent run cannot be reviewed from {run.status}")
+    expected_status = AgentRunStatus(run.status)
     if decision == ReviewStatus.APPROVED:
+        todo = await db.get(Todo, task.todo_id) if task.todo_id else None
+        before_insights = (
+            await agent_review_handoff_service.load_todo_graph_insights(db, todo)
+            if todo is not None
+            else None
+        )
+        claimed = (
+            await db.execute(
+                update(AgentRun)
+                .where(
+                    AgentRun.id == run.id,
+                    AgentRun.status == expected_status,
+                )
+                .values(status=AgentRunStatus.COMPLETED, is_adopted=True)
+                .returning(AgentRun.id)
+            )
+        ).scalar_one_or_none()
+        if claimed is None:
+            raise ConflictError("Agent run was already reviewed")
         await db.execute(
             update(AgentRun)
-            .where(AgentRun.agent_task_id == task.id)
+            .where(
+                AgentRun.agent_task_id == task.id,
+                AgentRun.id != run.id,
+            )
             .values(is_adopted=False)
         )
         run.status = AgentRunStatus.COMPLETED
@@ -322,22 +346,76 @@ async def decide_run(
         task.status = "completed"
         task.result = run.result
         task.error = None
-        if task.todo_id:
-            todo = await db.get(Todo, task.todo_id)
-            if todo is not None:
-                todo.status = TaskStatus.COMPLETED
-                todo.completed_at = datetime.now(timezone.utc)
+        if todo is not None:
+            todo.status = TaskStatus.COMPLETED
+            todo.completed_at = datetime.now(timezone.utc)
         if run.provider == "paseo":
             from services.paseo_execution_service import publish_adopted_output
 
             await publish_adopted_output(db, run=run, task=task)
         await record_event(db, run, "approved", "Run result approved", progress=100)
+        await db.flush()
+        if todo is not None and before_insights is not None:
+            after_insights = (
+                await agent_review_handoff_service.load_todo_graph_insights(db, todo)
+            )
+            graph_revision = after_insights.graph_revision
+            newly_ready_tasks = (
+                agent_review_handoff_service.newly_ready_after_approval(
+                    before_insights,
+                    after_insights,
+                )
+            )
+        else:
+            from services.graph_command_service import current_graph_revision
+
+            graph_revision = await current_graph_revision(db)
+            newly_ready_tasks = []
+        return AgentRunReviewOutcome(
+            run_id=run.id,
+            agent_task_id=task.id,
+            todo_id=todo.id if todo is not None else None,
+            todo_status=(TaskStatus(todo.status) if todo is not None else None),
+            graph_revision=graph_revision,
+            newly_ready_tasks=newly_ready_tasks,
+            adopted=run.is_adopted,
+            attempt=run.attempt,
+        )
     elif decision == ReviewStatus.CHANGES_REQUESTED:
+        if expected_status != AgentRunStatus.WAITING_REVIEW:
+            raise ConflictError("Changes were already requested for this agent run")
+        claimed = (
+            await db.execute(
+                update(AgentRun)
+                .where(
+                    AgentRun.id == run.id,
+                    AgentRun.status == expected_status,
+                )
+                .values(status=AgentRunStatus.WAITING_INPUT)
+                .returning(AgentRun.id)
+            )
+        ).scalar_one_or_none()
+        if claimed is None:
+            raise ConflictError("Agent run was already reviewed or changed")
         run.status = AgentRunStatus.WAITING_INPUT
         task.status = "running"
         await record_event(db, run, "changes_requested", "Changes requested", progress=100)
     elif decision == ReviewStatus.REJECTED:
+        claimed = (
+            await db.execute(
+                update(AgentRun)
+                .where(
+                    AgentRun.id == run.id,
+                    AgentRun.status == expected_status,
+                )
+                .values(status=AgentRunStatus.COMPLETED, is_adopted=False)
+                .returning(AgentRun.id)
+            )
+        ).scalar_one_or_none()
+        if claimed is None:
+            raise ConflictError("Agent run was already reviewed")
         run.status = AgentRunStatus.COMPLETED
+        run.is_adopted = False
         task.status = "failed"
         task.error = "Run result rejected"
         await record_event(db, run, "rejected", task.error, progress=100)
@@ -410,6 +488,7 @@ async def build_run_response(
         project_title=project.title if project else None,
         todo_id=task.todo_id,
         todo_title=todo.title if todo else None,
+        todo_status=TaskStatus(todo.status) if todo else None,
         task_type=task.task_type,
         instruction=task.instruction,
         usage=usage,

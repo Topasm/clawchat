@@ -238,6 +238,14 @@ and reveals the Start action only after a review step. The owning mutation
 sends the Ready guard and explicit approval, then invalidates Todos, Runs,
 Projects, graph insights, and Task execution telemetry together.
 
+`AgentRunReviewHandoff` renders the server-provided approval impact in Review,
+then retains the applied outcome after the pending card disappears. Newly Ready
+Tasks link directly to their detail pages and the approval mutation invalidates
+Graph Insights immediately. Runs exposes Retry and `Return task to queue` only
+for the latest Todo-backed unsuccessful attempt while its Todo is still
+`in_progress`; the recovery response distinguishes a genuinely Ready Task from
+one that returned to the queue in Blocked state.
+
 ### useToastStore
 
 ```typescript

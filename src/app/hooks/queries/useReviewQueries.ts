@@ -6,11 +6,21 @@ import { useToastStore } from '../../stores/useToastStore';
 import {
   ArtifactResponseSchema,
   ArtifactRevisionResponseSchema,
+  AgentRunReviewOutcomeSchema,
   ReviewDecisionResponseSchema,
   ReviewItemResponseSchema,
 } from '../../types/schemas';
-import type { ArtifactType, ReviewStatus } from '../../types/api';
+import type {
+  AgentRunReviewOutcome,
+  ArtifactType,
+  ReviewDecisionResponse,
+  ReviewStatus,
+} from '../../types/api';
 import { queryKeys } from './queryKeys';
+
+export type ReviewDecisionResult = ReviewDecisionResponse & {
+  agentRunOutcome: AgentRunReviewOutcome | null;
+};
 
 export function useReviewsQuery(status: ReviewStatus = 'pending', projectId?: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
@@ -37,18 +47,32 @@ export function useDecideReview() {
       reviewId: string;
       decision: Extract<ReviewStatus, 'approved' | 'changes_requested' | 'rejected'>;
       note?: string;
-    }) => {
+    }): Promise<ReviewDecisionResult> => {
       const response = await apiClient.post(`/reviews/${reviewId}/decision`, { decision, note });
-      return ReviewDecisionResponseSchema.parse(response.data);
+      const parsed = ReviewDecisionResponseSchema.parse(response.data);
+      const typedOutcome = AgentRunReviewOutcomeSchema.safeParse(parsed.outcome);
+      const agentRunOutcome =
+        parsed.review.subject_type === 'agent_run' && typedOutcome.success
+          ? typedOutcome.data
+          : null;
+      return { ...parsed, agentRunOutcome };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskGraphInsights });
       queryClient.invalidateQueries({ queryKey: ['artifacts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.runs });
       queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
-      useToastStore.getState().addToast('success', 'Review decision saved');
+      const newlyReadyCount = result.agentRunOutcome?.newly_ready_tasks?.length ?? 0;
+      const message =
+        result.review.status === 'approved' && result.review.subject_type === 'agent_run'
+          ? newlyReadyCount > 0
+            ? `Agent result approved · ${newlyReadyCount} task${newlyReadyCount === 1 ? '' : 's'} now Ready`
+            : 'Agent result approved'
+          : 'Review decision saved';
+      useToastStore.getState().addToast('success', message);
     },
     onError: () => useToastStore.getState().addToast('error', 'Could not save review decision'),
   });

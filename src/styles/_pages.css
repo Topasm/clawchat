@@ -1597,6 +1597,83 @@
   flex-wrap: wrap;
   gap: 7px;
 }
+.cc-agent-review-handoff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 35%, var(--cc-border));
+  border-radius: var(--cc-radius-md);
+  background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
+}
+.cc-agent-review-handoff--applied {
+  margin-top: 0;
+  border-color: color-mix(in srgb, var(--cc-success) 42%, var(--cc-border));
+  background: color-mix(in srgb, var(--cc-success) 8%, var(--cc-surface));
+}
+.cc-agent-review-handoff__topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--cc-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cc-agent-review-handoff--applied .cc-agent-review-handoff__topline {
+  color: var(--cc-success);
+}
+.cc-agent-review-handoff > strong {
+  color: var(--cc-text);
+  font-size: 13px;
+}
+.cc-agent-review-handoff > p {
+  margin: 0;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+}
+.cc-agent-review-handoff__tasks {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cc-agent-review-handoff__tasks li > span,
+.cc-agent-review-handoff__tasks button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font-size: 12px;
+  text-align: left;
+}
+.cc-agent-review-handoff__tasks button {
+  cursor: pointer;
+}
+.cc-agent-review-handoff__tasks button:hover {
+  border-color: var(--cc-primary);
+}
+.cc-agent-review-handoff__tasks button span {
+  color: var(--cc-primary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.cc-agent-review-handoff__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 2px;
+}
 
 /* --- Project artifacts ------------------------------------- */
 .cc-artifact-grid {

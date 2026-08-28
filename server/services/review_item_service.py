@@ -12,6 +12,7 @@ from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
 from schemas.review import ReviewItemResponse
+from services import agent_review_handoff_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import make_id
@@ -148,12 +149,16 @@ async def build_review_response(
             title = todo.title if todo else task.instruction[:120]
             description = run.result_summary
             href = f"/runs?run_id={run.id}"
+            approval_impact = (
+                await agent_review_handoff_service.build_approval_impact(db, todo)
+            )
             metadata = {
                 "run_id": run.id,
                 "agent_task_id": task.id,
                 "attempt": run.attempt,
                 "provider": run.provider,
                 "run_status": run.status,
+                "approval_impact": approval_impact.model_dump(mode="json"),
             }
     return ReviewItemResponse(
         **{

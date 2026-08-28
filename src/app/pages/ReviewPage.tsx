@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import AgentRunReviewHandoff from '../components/review/AgentRunReviewHandoff';
 import EmptyState from '../components/shared/EmptyState';
 import { CheckCircleIcon, ClipboardIcon } from '../components/shared/Icons';
 import { useDecideReview, useReviewsQuery } from '../hooks/queries';
-import type { ReviewItemResponse, ReviewStatus } from '../types/api';
+import type { AgentRunReviewOutcome, ReviewItemResponse, ReviewStatus } from '../types/api';
+import { AgentRunApprovalImpactSchema } from '../types/schemas';
 
 const FILTERS: Array<{ value: ReviewStatus; label: string }> = [
   { value: 'pending', label: 'Needs review' },
@@ -16,6 +18,18 @@ function subjectLabel(item: ReviewItemResponse) {
   return item.subject_type.replaceAll('_', ' ');
 }
 
+function approvalImpact(item: ReviewItemResponse) {
+  if (item.subject_type !== 'agent_run') return null;
+  const parsed = AgentRunApprovalImpactSchema.safeParse(item.metadata.approval_impact);
+  return parsed.success ? parsed.data : null;
+}
+
+interface ApprovedAgentRunHandoff {
+  reviewId: string;
+  taskTitle: string | null;
+  outcome: AgentRunReviewOutcome;
+}
+
 export default function ReviewPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,12 +38,34 @@ export default function ReviewPage() {
   const { data: items = [], isLoading } = useReviewsQuery(filter, projectId);
   const decide = useDecideReview();
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [approvedAgentRun, setApprovedAgentRun] = useState<ApprovedAgentRunHandoff | null>(null);
+  const visibleItems =
+    approvedAgentRun && (filter === 'pending' || filter === 'changes_requested')
+      ? items.filter((item) => item.id !== approvedAgentRun.reviewId)
+      : items;
 
   const decideItem = (
     item: ReviewItemResponse,
     decision: 'approved' | 'changes_requested' | 'rejected',
   ) => {
-    decide.mutate({ reviewId: item.id, decision, note: notes[item.id]?.trim() || undefined });
+    decide.mutate(
+      { reviewId: item.id, decision, note: notes[item.id]?.trim() || undefined },
+      {
+        onSuccess: (result) => {
+          if (decision !== 'approved' || item.subject_type !== 'agent_run') return;
+          const impact = approvalImpact(item);
+          setApprovedAgentRun({
+            reviewId: item.id,
+            taskTitle: item.subject_title,
+            outcome: {
+              ...(result.agentRunOutcome ?? {}),
+              todo_id: result.agentRunOutcome?.todo_id ?? impact?.todo_id,
+              graph_revision: result.agentRunOutcome?.graph_revision ?? impact?.graph_revision,
+            },
+          });
+        },
+      },
+    );
   };
 
   return (
@@ -50,6 +86,15 @@ export default function ReviewPage() {
         )}
       </header>
 
+      {approvedAgentRun && (
+        <AgentRunReviewHandoff
+          taskTitle={approvedAgentRun.taskTitle}
+          outcome={approvedAgentRun.outcome}
+          onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
+          onOpenInbox={() => navigate('/inbox')}
+        />
+      )}
+
       <div className="cc-review-filters" aria-label="Review status filters">
         {FILTERS.map((option) => (
           <button
@@ -69,7 +114,7 @@ export default function ReviewPage() {
 
       {isLoading ? (
         <div className="cc-project-workspace__loading">Loading reviews…</div>
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <EmptyState
           icon={filter === 'pending' ? <CheckCircleIcon size={28} /> : <ClipboardIcon size={28} />}
           message={
@@ -78,76 +123,89 @@ export default function ReviewPage() {
         />
       ) : (
         <div className="cc-review-list">
-          {items.map((item) => (
-            <article className="cc-review-card" key={item.id}>
-              <div className="cc-review-card__topline">
-                <span className={`cc-review-card__risk cc-review-card__risk--${item.risk_level}`}>
-                  {item.risk_level} risk
-                </span>
-                <span>{subjectLabel(item)}</span>
-                {item.project_title && <span>{item.project_title}</span>}
-                <time dateTime={item.requested_at}>
-                  {new Date(item.requested_at).toLocaleString()}
-                </time>
-              </div>
-              <h2>{item.subject_title || item.summary}</h2>
-              <p className="cc-review-card__summary">{item.summary}</p>
-              {item.subject_description && (
-                <pre className="cc-review-card__preview">{item.subject_description}</pre>
-              )}
-              {item.subject_href && (
-                <button
-                  className="cc-review-card__link"
-                  type="button"
-                  onClick={() => navigate(item.subject_href!)}
-                >
-                  Open full context
-                </button>
-              )}
-              {(item.status === 'pending' || item.status === 'changes_requested') && (
-                <div className="cc-review-card__decision">
-                  <textarea
-                    rows={2}
-                    value={notes[item.id] ?? item.review_note ?? ''}
-                    onChange={(event) =>
-                      setNotes((current) => ({ ...current, [item.id]: event.target.value }))
-                    }
-                    placeholder="Optional review note"
-                    aria-label={`Review note for ${item.subject_title || item.summary}`}
-                  />
-                  <div className="cc-review-card__actions">
-                    <button
-                      className="cc-btn cc-btn--primary"
-                      type="button"
-                      disabled={decide.isPending}
-                      onClick={() => decideItem(item, 'approved')}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="cc-btn"
-                      type="button"
-                      disabled={decide.isPending}
-                      onClick={() => decideItem(item, 'changes_requested')}
-                    >
-                      Request changes
-                    </button>
-                    <button
-                      className="cc-btn cc-btn--danger"
-                      type="button"
-                      disabled={decide.isPending}
-                      onClick={() => decideItem(item, 'rejected')}
-                    >
-                      Reject
-                    </button>
-                  </div>
+          {visibleItems.map((item) => {
+            const impact = approvalImpact(item);
+            return (
+              <article className="cc-review-card" key={item.id}>
+                <div className="cc-review-card__topline">
+                  <span className={`cc-review-card__risk cc-review-card__risk--${item.risk_level}`}>
+                    {item.risk_level} risk
+                  </span>
+                  <span>{subjectLabel(item)}</span>
+                  {item.project_title && <span>{item.project_title}</span>}
+                  <time dateTime={item.requested_at}>
+                    {new Date(item.requested_at).toLocaleString()}
+                  </time>
                 </div>
-              )}
-              {item.review_note && item.status !== 'pending' && (
-                <p className="cc-review-card__note">Review note: {item.review_note}</p>
-              )}
-            </article>
-          ))}
+                <h2>{item.subject_title || item.summary}</h2>
+                <p className="cc-review-card__summary">{item.summary}</p>
+                {item.subject_description && (
+                  <pre className="cc-review-card__preview">{item.subject_description}</pre>
+                )}
+                {item.subject_href && (
+                  <button
+                    className="cc-review-card__link"
+                    type="button"
+                    onClick={() => navigate(item.subject_href!)}
+                  >
+                    Open full context
+                  </button>
+                )}
+                {(item.status === 'pending' || item.status === 'changes_requested') && impact && (
+                  <AgentRunReviewHandoff
+                    taskTitle={item.subject_title}
+                    impact={impact}
+                    onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
+                    onOpenInbox={() => navigate('/inbox')}
+                  />
+                )}
+                {(item.status === 'pending' || item.status === 'changes_requested') && (
+                  <div className="cc-review-card__decision">
+                    <textarea
+                      rows={2}
+                      value={notes[item.id] ?? item.review_note ?? ''}
+                      onChange={(event) =>
+                        setNotes((current) => ({ ...current, [item.id]: event.target.value }))
+                      }
+                      placeholder="Optional review note"
+                      aria-label={`Review note for ${item.subject_title || item.summary}`}
+                    />
+                    <div className="cc-review-card__actions">
+                      <button
+                        className="cc-btn cc-btn--primary"
+                        type="button"
+                        disabled={decide.isPending}
+                        onClick={() => decideItem(item, 'approved')}
+                      >
+                        Approve
+                      </button>
+                      {item.status === 'pending' && (
+                        <button
+                          className="cc-btn"
+                          type="button"
+                          disabled={decide.isPending}
+                          onClick={() => decideItem(item, 'changes_requested')}
+                        >
+                          Request changes
+                        </button>
+                      )}
+                      <button
+                        className="cc-btn cc-btn--danger"
+                        type="button"
+                        disabled={decide.isPending}
+                        onClick={() => decideItem(item, 'rejected')}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {item.review_note && item.status !== 'pending' && (
+                  <p className="cc-review-card__note">Review note: {item.review_note}</p>
+                )}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

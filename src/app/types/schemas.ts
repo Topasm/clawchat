@@ -298,6 +298,27 @@ export const ReviewStatusSchema = z.enum([
   'expired',
 ]);
 export const ReviewRiskLevelSchema = z.enum(['low', 'medium', 'high']);
+export const ReviewReadyTaskSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+});
+export const AgentRunApprovalImpactSchema = z.object({
+  todo_id: z.string().nullable(),
+  graph_revision: z.number().int().nonnegative(),
+  newly_ready_tasks: z.array(ReviewReadyTaskSchema),
+});
+export const AgentRunReviewOutcomeSchema = z
+  .object({
+    run_id: z.string().optional(),
+    agent_task_id: z.string().optional(),
+    todo_id: z.string().nullable().optional(),
+    todo_status: TaskStatusSchema.nullable().optional(),
+    graph_revision: z.number().int().nonnegative().optional(),
+    newly_ready_tasks: z.array(ReviewReadyTaskSchema).optional(),
+    adopted: z.boolean().optional(),
+    attempt: z.number().int().positive().optional(),
+  })
+  .passthrough();
 export const ReviewItemResponseSchema = z.object({
   id: z.string(),
   project_id: z.string().nullable(),
@@ -780,6 +801,9 @@ export type ProjectUpdate = z.infer<typeof ProjectUpdateSchema>;
 export type ReviewSubjectType = z.infer<typeof ReviewSubjectTypeSchema>;
 export type ReviewStatus = z.infer<typeof ReviewStatusSchema>;
 export type ReviewRiskLevel = z.infer<typeof ReviewRiskLevelSchema>;
+export type ReviewReadyTask = z.infer<typeof ReviewReadyTaskSchema>;
+export type AgentRunApprovalImpact = z.infer<typeof AgentRunApprovalImpactSchema>;
+export type AgentRunReviewOutcome = z.infer<typeof AgentRunReviewOutcomeSchema>;
 export type ReviewItemResponse = z.infer<typeof ReviewItemResponseSchema>;
 export type ReviewDecisionResponse = z.infer<typeof ReviewDecisionResponseSchema>;
 export type ArtifactType = z.infer<typeof ArtifactTypeSchema>;
@@ -971,6 +995,7 @@ export const AgentRunResponseSchema = z.object({
   project_title: z.string().nullable(),
   todo_id: z.string().nullable(),
   todo_title: z.string().nullable(),
+  todo_status: TaskStatusSchema.nullable(),
   task_type: z.string(),
   instruction: z.string(),
   instruction_snapshot: z.string(),
@@ -1004,6 +1029,16 @@ export const AgentRunEventResponseSchema = z.object({
   progress: z.number().int().min(0).max(100).nullable(),
   payload: z.record(z.string(), z.unknown()).nullable(),
   created_at: z.string(),
+});
+
+export const AgentRunRecoveryResponseSchema = z.object({
+  run_id: z.string(),
+  todo_id: z.string(),
+  todo_status: TaskStatusSchema,
+  graph_revision: z.number().int().nonnegative(),
+  execution_state: GraphExecutionStateSchema,
+  is_ready: z.boolean(),
+  direct_blocker_ids: z.array(z.string()),
 });
 
 export const TaskExecutionTelemetryResponseSchema = z.object({
@@ -1273,6 +1308,7 @@ export type AgentTaskResponse = z.infer<typeof AgentTaskResponseSchema>;
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
 export type AgentRunResponse = z.infer<typeof AgentRunResponseSchema>;
 export type AgentRunEventResponse = z.infer<typeof AgentRunEventResponseSchema>;
+export type AgentRunRecoveryResponse = z.infer<typeof AgentRunRecoveryResponseSchema>;
 export type TaskExecutionTelemetryResponse = z.infer<typeof TaskExecutionTelemetryResponseSchema>;
 export type ExecutionProviderStatus = z.infer<typeof ExecutionProviderStatusSchema>;
 export type PlanSubtask = z.infer<typeof PlanSubtaskSchema>;

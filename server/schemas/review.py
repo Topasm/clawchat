@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
+from domain.task import TaskStatus
 
 
 class ReviewDecisionRequest(BaseModel):
@@ -43,6 +44,34 @@ class ReviewItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ReadyTaskReference(BaseModel):
+    """A task released by an approved execution result."""
+
+    id: str
+    title: str
+
+
+class AgentRunApprovalImpact(BaseModel):
+    """Read-only graph effect of completing an Agent Run's Todo."""
+
+    todo_id: str | None = None
+    graph_revision: int = Field(ge=0)
+    newly_ready_tasks: list[ReadyTaskReference] = Field(default_factory=list)
+
+
+class AgentRunReviewOutcome(BaseModel):
+    """Typed handoff returned after an Agent Run result is approved."""
+
+    run_id: str
+    agent_task_id: str
+    todo_id: str | None = None
+    todo_status: TaskStatus | None = None
+    graph_revision: int = Field(ge=0)
+    newly_ready_tasks: list[ReadyTaskReference] = Field(default_factory=list)
+    adopted: bool
+    attempt: int = Field(ge=1)
+
+
 class ReviewDecisionResponse(BaseModel):
     review: ReviewItemResponse
-    outcome: dict[str, Any] = Field(default_factory=dict)
+    outcome: AgentRunReviewOutcome | dict[str, Any] = Field(default_factory=dict)
