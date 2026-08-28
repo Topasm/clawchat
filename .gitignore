@@ -62,3 +62,9 @@ src/app/generated/*
 src/app/generated/contracts/*
 !src/app/generated/contracts/taskStatus.ts
 !src/app/generated/contracts/taskRelationshipType.ts
+
+# Coverage output
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
