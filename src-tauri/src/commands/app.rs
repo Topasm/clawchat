@@ -45,6 +45,34 @@ pub fn app_show_notification<R: Runtime>(
         .map_err(|error| format!("failed to show notification: {error}"))
 }
 
+/// Open the OS privacy pane where camera access is granted.
+///
+/// Deliberately not a generic "open this URL" bridge: the renderer can only
+/// ask for this one fixed destination.
+#[tauri::command]
+pub fn app_open_camera_settings<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    #[cfg(target_os = "macos")]
+    let target = "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera";
+    #[cfg(target_os = "windows")]
+    let target = "ms-settings:privacy-webcam";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let target = "";
+
+    if target.is_empty() {
+        return Err(
+            "This desktop environment has no standard camera privacy pane. Grant camera \
+             access in your system settings, or pair with a code instead."
+                .to_owned(),
+        );
+    }
+
+    app.opener()
+        .open_url(target, None::<&str>)
+        .map_err(|error| format!("failed to open camera settings: {error}"))
+}
+
 #[tauri::command]
 pub fn app_set_badge_count<R: Runtime>(app: AppHandle<R>, count: u32) -> Result<(), String> {
     let window = app

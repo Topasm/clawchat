@@ -38,5 +38,8 @@ export const webPlatformApi: NativePlatformApi = {
     getAppMode: () => unavailable('App mode'),
     onStatusChange: () => () => {},
   },
+  system: {
+    openCameraSettings: () => unavailable('Camera settings'),
+  },
   secureStorage: null,
 };

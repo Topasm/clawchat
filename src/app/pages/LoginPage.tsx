@@ -16,6 +16,7 @@ interface PairingClaimResult {
 }
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 import QRScanner from '../components/shared/QRScanner';
+import { logger } from '../services/logger';
 
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'error';
 
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const [showServerUrl, setShowServerUrl] = useState(!IS_DESKTOP && !IS_CAPACITOR);
   const [showScanner, setShowScanner] = useState(false);
   const [desktopClientMode, setDesktopClientMode] = useState(false);
+  const [switchingToHost, setSwitchingToHost] = useState(false);
   const biometricAttempted = useRef(false);
   const isPairingFirstMobile = IS_CAPACITOR;
 
@@ -86,6 +88,31 @@ export default function LoginPage() {
       }
     });
   }, []);
+
+  /**
+   * Switch the desktop app to hosting its own server and log straight in.
+   *
+   * Without this, a desktop install that starts in client mode can only be
+   * unlocked by pairing with another machine — so a failed camera or an
+   * unreachable host leaves no way into the app at all.
+   */
+  const handleUseThisComputer = async () => {
+    setSwitchingToHost(true);
+    setError('');
+    try {
+      const config = await platformApi.server.setAppMode('host');
+      const url = `http://localhost:${config.port}`;
+      setServerUrl(url);
+      await login(url, config.pin);
+      navigate('/today');
+    } catch (err) {
+      logger.error('Could not start the local server', err);
+      setError(
+        err instanceof Error ? err.message : 'Could not start the local server on this computer.',
+      );
+      setSwitchingToHost(false);
+    }
+  };
 
   const handleQRScan = async (data: string) => {
     setShowScanner(false);
@@ -334,6 +361,52 @@ export default function LoginPage() {
           </div>
         )}
 
+        {desktopClientMode && (
+          <div
+            style={{
+              marginBottom: 20,
+              padding: '14px 16px',
+              borderRadius: 10,
+              background: colors.background,
+              border: `1px solid ${colors.border}`,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 6 }}>
+              Use this computer
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                lineHeight: 1.5,
+                color: colors.textSecondary,
+                marginBottom: 14,
+              }}
+            >
+              Run ClawChat's own server here. No pairing, no network access — everything stays on
+              this machine.
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleUseThisComputer()}
+              disabled={switchingToHost}
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                background: colors.primary,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: switchingToHost ? 'default' : 'pointer',
+                opacity: switchingToHost ? 0.7 : 1,
+              }}
+            >
+              {switchingToHost ? 'Starting local server…' : 'Start local server'}
+            </button>
+          </div>
+        )}
+
         {showServerUrl ? (
           <>
             <label
@@ -506,7 +579,16 @@ export default function LoginPage() {
           </button>
         )}
       </form>
-      {showScanner && <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />}
+      {showScanner && (
+        <QRScanner
+          onScan={handleQRScan}
+          onClose={() => setShowScanner(false)}
+          onManualEntry={() => {
+            setShowScanner(false);
+            setShowServerUrl(true);
+          }}
+        />
+      )}
     </div>
   );
 }

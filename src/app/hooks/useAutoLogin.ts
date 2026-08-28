@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { platformApi } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
+import { logger } from '../services/logger';
 
 /**
  * Auto-login on a desktop host by reading server config from the native platform adapter.
@@ -22,13 +23,14 @@ export function useAutoLogin() {
 
     loginInFlight.current = true;
     try {
-      useAuthStore.setState({ serverUrl: null, token: null, refreshToken: null });
-
       const config = await platformApi.server.getConfig();
       const url = `http://localhost:${config.port}`;
+      // Only drop stored credentials once we know where we are logging in and
+      // are about to replace them. Clearing up front used to destroy a working
+      // session whenever the local host happened to be unreachable.
       await login(url, config.pin);
     } catch (err) {
-      console.error('Auto-login failed:', err);
+      logger.error('Auto-login failed:', err);
     } finally {
       loginInFlight.current = false;
     }
@@ -37,21 +39,31 @@ export function useAutoLogin() {
   useEffect(() => {
     if (!IS_DESKTOP || isLoading || token) return;
 
+    let cancelled = false;
+
     // Only auto-login in host mode (local server available)
-    platformApi.server.getAppMode().then((mode) => {
-      if (mode !== 'host') return;
+    platformApi.server
+      .getAppMode()
+      .then((mode) => {
+        if (cancelled || mode !== 'host') return;
 
-      tryLogin();
+        void tryLogin();
 
-      const cleanup = platformApi.server.onStatusChange((status) => {
-        if (status.state === 'running' && !useAuthStore.getState().token) {
-          tryLogin();
-        }
+        // The sidecar is usually still booting on a cold start, so retry once
+        // it reports itself running.
+        cleanupRef.current = platformApi.server.onStatusChange((status) => {
+          if (status.state === 'running' && !useAuthStore.getState().token) {
+            void tryLogin();
+          }
+        });
+      })
+      .catch((err: unknown) => {
+        // No native server bridge (plain web build) — manual login applies.
+        logger.debug('Auto-login unavailable:', err);
       });
-      cleanupRef.current = cleanup;
-    });
 
     return () => {
+      cancelled = true;
       cleanupRef.current?.();
       cleanupRef.current = null;
     };

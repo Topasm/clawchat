@@ -10,6 +10,7 @@ fn main() {
         "server_get_app_mode",
         "app_show_notification",
         "app_set_badge_count",
+        "app_open_camera_settings",
         "secure_storage_get",
         "secure_storage_set",
         "secure_storage_remove",

@@ -67,6 +67,15 @@ export interface NativeSecureStorageApi {
   remove: (key: string) => Promise<void>;
 }
 
+export interface NativeSystemApi {
+  /**
+   * Open the OS pane where camera access is granted. Rejects when the platform
+   * exposes no such pane (most Linux desktops) so callers can fall back to
+   * on-screen instructions.
+   */
+  openCameraSettings: () => Promise<void>;
+}
+
 export interface NativePlatformApi {
   runtime: {
     kind: NativeRuntimeKind;
@@ -87,5 +96,6 @@ export interface NativePlatformApi {
   };
   updater: NativeUpdaterApi;
   server: NativeServerApi;
+  system: NativeSystemApi;
   secureStorage: NativeSecureStorageApi | null;
 }
