@@ -238,10 +238,38 @@ export default function Layout() {
     () => todos.filter((todo) => !todo.due_date && todo.status === 'pending').length,
     [todos],
   );
-  // Sync inbox count to native app icon badge
+
+  // Tasks that are due now or already late — what "needs attention today" means.
+  const dueCount = useMemo(() => {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    return todos.filter((todo) => {
+      if (todo.status !== 'pending' || !todo.due_date) return false;
+      const due = new Date(todo.due_date);
+      return !Number.isNaN(due.getTime()) && due <= endOfToday;
+    }).length;
+  }, [todos]);
+
+  const openTaskCount = useMemo(
+    () => todos.filter((todo) => todo.status === 'pending' || todo.status === 'in_progress').length,
+    [todos],
+  );
+
+  const navBadgeCounts = useMemo<Record<string, number>>(
+    () => ({
+      '/today': dueCount,
+      '/inbox': inboxCount,
+      '/tasks': openTaskCount,
+      '/review': pendingReviews.length,
+    }),
+    [dueCount, inboxCount, openTaskCount, pendingReviews.length],
+  );
+
+  // The OS icon badge stands for "needs you now", so it counts unfiled work
+  // plus anything due or overdue -- not the whole open backlog.
   useEffect(() => {
-    void setAppBadge(inboxCount);
-  }, [inboxCount]);
+    void setAppBadge(inboxCount + dueCount);
+  }, [inboxCount, dueCount]);
 
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
@@ -311,8 +339,8 @@ export default function Layout() {
         >
           <item.Icon />
           <span className="cc-sidebar__label">{t(item.labelKey)}</span>
-          {item.to === '/inbox' && inboxCount > 0 && (
-            <span className="cc-nav-badge">{inboxCount}</span>
+          {navBadgeCounts[item.to] > 0 && (
+            <span className="cc-nav-badge">{navBadgeCounts[item.to]}</span>
           )}
         </NavLink>
       ))}
@@ -326,8 +354,8 @@ export default function Layout() {
         >
           <item.Icon />
           <span className="cc-sidebar__label">{t(item.labelKey)}</span>
-          {item.to === '/review' && pendingReviews.length > 0 && (
-            <span className="cc-nav-badge">{pendingReviews.length}</span>
+          {navBadgeCounts[item.to] > 0 && (
+            <span className="cc-nav-badge">{navBadgeCounts[item.to]}</span>
           )}
         </NavLink>
       ))}
