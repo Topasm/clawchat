@@ -89,6 +89,12 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
   fi
 done
 
+if [[ -f "$startup_log" ]] && grep -Fq 'system tray is unavailable' "$startup_log"; then
+  echo "Packaged macOS tray icon failed to initialize." >&2
+  cat "$startup_log" >&2
+  exit 1
+fi
+
 stop_app
 wait "$launch_waiter_pid" 2>/dev/null || true
 launch_waiter_pid=''

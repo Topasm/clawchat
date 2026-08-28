@@ -4,17 +4,16 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Chat bubble icon -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M54,26C38.54,26 26,36.74 26,50c0,4.8 1.72,9.24 4.64,12.96L28,74l12.24,-3.92C43.44,71.36 48.56,72.4 54,72.4c15.46,0 28,-10.74 28,-22.4S69.46,26 54,26z"/>
     <path
-        android:fillColor="#6C5CE7"
-        android:pathData="M42,46m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+        android:fillColor="#2196F3"
+        android:pathData="M38,64C34,54 39,42 53,34C45,44 41,54 42,63C41,66 39,66 38,64Z"/>
     <path
-        android:fillColor="#6C5CE7"
-        android:pathData="M54,46m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+        android:fillColor="#1976D2"
+        android:pathData="M50,66C46,55 52,43 65,36C57,45 53,56 55,65C53,67 51,68 50,66Z"/>
     <path
-        android:fillColor="#6C5CE7"
-        android:pathData="M66,46m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0"/>
+        android:fillColor="#0D47A1"
+        android:pathData="M63,64C59,55 64,45 77,39C69,47 66,56 67,63C66,65 64,66 63,64Z"/>
 </vector>

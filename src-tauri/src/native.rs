@@ -10,6 +10,13 @@ use crate::{models::AppMode, startup_log, state::AppState};
 
 const QUICK_CAPTURE_SHORTCUT: &str = "CommandOrControl+Shift+Space";
 
+#[cfg(target_os = "macos")]
+const TRAY_ICON: tauri::image::Image<'static> =
+    tauri::include_image!("./icons/tray-template-macos.png");
+
+#[cfg(not(target_os = "macos"))]
+const TRAY_ICON: tauri::image::Image<'static> = tauri::include_image!("./icons/tray-color.png");
+
 pub fn setup(app: &AppHandle) {
     if let Err(error) = setup_tray(app) {
         startup_log::report(&format!("[clawchat] system tray is unavailable: {error}"));
@@ -103,7 +110,9 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit ClawChat", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &stop, &restart, &separator, &quit])?;
-    let mut builder = TrayIconBuilder::with_id("main-tray")
+    let builder = TrayIconBuilder::with_id("main-tray")
+        .icon(TRAY_ICON)
+        .icon_as_template(cfg!(target_os = "macos"))
         .menu(&menu)
         .tooltip("ClawChat")
         .show_menu_on_left_click(false)
@@ -142,9 +151,6 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                 show_main_window(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon);
-    }
     builder.build(app)?;
     Ok(())
 }

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="clawchat-blue" x1="176" y1="96" x2="848" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35a8ff" />
+      <stop offset="0.52" stop-color="#1976d2" />
+      <stop offset="1" stop-color="#0d47a1" />
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#clawchat-blue)" />
+  <path
+    fill="#102a43"
+    opacity="0.28"
+    d="M252 246h520c92 0 166 74 166 166v190c0 92-74 166-166 166H496L296 886l36-118h-80c-92 0-166-74-166-166V412c0-92 74-166 166-166Z"
+    transform="translate(18 24)"
+  />
+  <path
+    fill="#fff"
+    d="M252 222h520c92 0 166 74 166 166v190c0 92-74 166-166 166H496L296 862l36-118h-80c-92 0-166-74-166-166V388c0-92 74-166 166-166Z"
+  />
+  <path
+    fill="#2196f3"
+    d="M360 612c-34-96 14-210 146-290-76 96-114 196-102 282-12 22-28 28-44 8Z"
+  />
+  <path
+    fill="#1976d2"
+    d="M478 632c-36-104 14-222 146-292-78 90-114 190-102 280-14 21-30 26-44 12Z"
+  />
+  <path
+    fill="#0d47a1"
+    d="M596 612c-30-86 12-182 134-240-72 74-104 158-92 230-12 18-28 23-42 10Z"
+  />
+</svg>

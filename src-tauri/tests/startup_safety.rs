@@ -14,6 +14,14 @@ fn optional_native_integrations_do_not_fail_application_setup() {
 }
 
 #[test]
+fn tray_uses_platform_specific_assets_without_reusing_the_app_icon() {
+    assert!(NATIVE_SOURCE.contains("./icons/tray-template-macos.png"));
+    assert!(NATIVE_SOURCE.contains("./icons/tray-color.png"));
+    assert!(NATIVE_SOURCE.contains(".icon_as_template(cfg!(target_os = \"macos\"))"));
+    assert!(!NATIVE_SOURCE.contains("default_window_icon()"));
+}
+
+#[test]
 fn quick_capture_is_registered_only_after_the_plugin_initializes() {
     let plugin_success = NATIVE_SOURCE
         .find("match app.plugin(global_shortcut_plugin)")

@@ -8,6 +8,9 @@
     />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#F7F8FA" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self' capacitor: https:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src *; img-src 'self' data: blob:;"
@@ -103,14 +106,10 @@
       }
 
       .cc-startup-shell__mark {
-        display: grid;
         width: 30px;
         height: 30px;
-        place-items: center;
         border-radius: 8px;
-        color: #ffffff;
-        background: #2563eb;
-        font-size: 16px;
+        object-fit: contain;
       }
 
       .cc-startup-shell__nav,
@@ -219,7 +218,7 @@
     >
       <aside class="cc-startup-shell__sidebar" aria-hidden="true">
         <div class="cc-startup-shell__brand">
-          <span class="cc-startup-shell__mark">C</span>
+          <img class="cc-startup-shell__mark" src="/icons/favicon-32.png" alt="" />
           <span>ClawChat</span>
         </div>
         <div class="cc-startup-shell__nav">

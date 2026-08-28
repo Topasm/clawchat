@@ -41,7 +41,7 @@
     "check:renderer-budget": "node scripts/check-renderer-performance-budget.js dist",
     "prepare:tauri-release": "node scripts/create-tauri-release-config.js",
     "generate:tauri-release": "node scripts/generate-tauri-release.js",
-    "generate:icons": "tauri icon src-tauri/icons/clawchat-app-icon-source.png --output src-tauri/icons",
+    "generate:icons": "node scripts/generate-brand-icons.js",
     "package:tauri": "npm run check:tauri-server && tauri build --config src-tauri/tauri.bundle.conf.json",
     "package:tauri:release": "npm run check:tauri-server && npm run prepare:tauri-release && tauri build --config src-tauri/tauri.release.generated.conf.json",
     "build:capacitor": "vite build && npx cap sync",
