@@ -8,6 +8,17 @@ from schemas.search import SearchHit
 ALL_TYPES = ["messages", "todos", "events"]
 
 
+def _to_fts_expression(query: str) -> str:
+    """Quote each token so FTS5 treats it as a literal, not as syntax.
+
+    A double quote inside a token has to be doubled: leaving it raw closed the
+    quoted string early and made SQLite reject the whole expression, so any
+    search containing a quote character failed outright.
+    """
+    tokens = [token.replace('"', '""') for token in query.split() if token]
+    return " ".join(f'"{token}"' for token in tokens)
+
+
 async def search(
     db: AsyncSession,
     query: str,
@@ -19,8 +30,7 @@ async def search(
     enabled = types or ALL_TYPES
     hits: list[SearchHit] = []
 
-    # Sanitize query for FTS5: wrap each token in double quotes to treat as literals
-    fts_query = " ".join(f'"{token}"' for token in query.split() if token)
+    fts_query = _to_fts_expression(query)
     if not fts_query:
         return [], 0
 
