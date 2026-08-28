@@ -75,4 +75,30 @@ mod tests {
         let persisted = fs::read_to_string(store.path()).expect("persisted config");
         assert!(persisted.contains("\"appMode\": \"host\""));
     }
+
+    #[test]
+    fn fresh_install_defaults_to_local_host_mode() {
+        // A first launch has no config file. It must come up as its own host so
+        // the app is usable immediately, without pairing to a remote server.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let store = ConfigStore::new(dir.path().join("server-config.json"));
+
+        let config = store.load().expect("load config");
+
+        assert!(matches!(config.app_mode, AppMode::Host));
+        // Running our own server must not also enrol the app in OS autostart:
+        // that stays an explicit opt-in.
+        assert!(!config.auto_start_host);
+    }
+
+    #[test]
+    fn explicit_client_mode_is_preserved() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let store = ConfigStore::new(dir.path().join("server-config.json"));
+        fs::write(store.path(), r#"{"appMode":"client","port":8000}"#).expect("client config");
+
+        let config = store.load().expect("load config");
+
+        assert!(matches!(config.app_mode, AppMode::Client));
+    }
 }

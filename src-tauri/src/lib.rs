@@ -71,6 +71,7 @@ pub fn run() {
             commands::server::server_get_app_mode,
             commands::app::app_show_notification,
             commands::app::app_set_badge_count,
+            commands::app::app_open_camera_settings,
             commands::app::secure_storage_get,
             commands::app::secure_storage_set,
             commands::app::secure_storage_remove,

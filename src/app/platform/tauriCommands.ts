@@ -9,6 +9,7 @@ export const TAURI_COMMANDS = {
   serverGetAppMode: 'server_get_app_mode',
   appShowNotification: 'app_show_notification',
   appSetBadgeCount: 'app_set_badge_count',
+  appOpenCameraSettings: 'app_open_camera_settings',
   secureStorageGet: 'secure_storage_get',
   secureStorageSet: 'secure_storage_set',
   secureStorageRemove: 'secure_storage_remove',

@@ -5,8 +5,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppMode {
-    #[default]
     Client,
+    /// A fresh install runs its own bundled server so the desktop app is
+    /// usable offline, with no pairing step. Client mode is an explicit
+    /// opt-in for "connect to a server running on another machine".
+    #[default]
     Host,
 }
 
@@ -25,7 +28,7 @@ pub struct ServerConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            app_mode: AppMode::Client,
+            app_mode: AppMode::Host,
             port: 8000,
             pin: "123456".to_owned(),
             obsidian_vault_path: String::new(),

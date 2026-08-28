@@ -37,43 +37,41 @@ export const tauriPlatformApi: NativePlatformApi = {
     isDesktop: true,
   },
   events: {
-    on: (channel, callback) => subscribe<unknown>(eventNames[channel], (payload) => {
-      if (Array.isArray(payload)) callback(...payload);
-      else callback(payload);
-    }),
+    on: (channel, callback) =>
+      subscribe<unknown>(eventNames[channel], (payload) => {
+        if (Array.isArray(payload)) callback(...payload);
+        else callback(payload);
+      }),
   },
   notifications: {
     show: (title, body, options) =>
       invoke<void>(TAURI_COMMANDS.appShowNotification, { title, body, options }),
-    setBadgeCount: (count) =>
-      invoke<void>(TAURI_COMMANDS.appSetBadgeCount, { count }),
+    setBadgeCount: (count) => invoke<void>(TAURI_COMMANDS.appSetBadgeCount, { count }),
   },
   updater: {
     checkForUpdates: () => invoke<UpdateInfo | null>(TAURI_COMMANDS.updaterCheck),
     downloadUpdate: () => invoke<void>(TAURI_COMMANDS.updaterDownload),
     installUpdate: () => invoke<void>(TAURI_COMMANDS.updaterInstall),
-    onUpdateAvailable: (callback) =>
-      subscribe<UpdateInfo>(TAURI_EVENTS.updateAvailable, callback),
-    onUpdateNotAvailable: (callback) =>
-      subscribe<void>(TAURI_EVENTS.updateNotAvailable, callback),
+    onUpdateAvailable: (callback) => subscribe<UpdateInfo>(TAURI_EVENTS.updateAvailable, callback),
+    onUpdateNotAvailable: (callback) => subscribe<void>(TAURI_EVENTS.updateNotAvailable, callback),
     onDownloadProgress: (callback) =>
       subscribe<UpdateDownloadProgress>(TAURI_EVENTS.updateDownloadProgress, callback),
-    onUpdateDownloaded: (callback) =>
-      subscribe<void>(TAURI_EVENTS.updateDownloaded, callback),
+    onUpdateDownloaded: (callback) => subscribe<void>(TAURI_EVENTS.updateDownloaded, callback),
   },
   server: {
     getStatus: () => invoke<ServerStatus>(TAURI_COMMANDS.serverGetStatus),
     getConfig: () => invoke<ServerConfig>(TAURI_COMMANDS.serverGetConfig),
     getNetworkInfo: () => invoke(TAURI_COMMANDS.serverGetNetworkInfo),
-    updateConfig: (updates) =>
-      invoke<ServerConfig>(TAURI_COMMANDS.serverUpdateConfig, { updates }),
+    updateConfig: (updates) => invoke<ServerConfig>(TAURI_COMMANDS.serverUpdateConfig, { updates }),
     selectFolder: () => invoke<string | null>(TAURI_COMMANDS.serverSelectFolder),
     openObsidianVault: () => invoke<void>(TAURI_COMMANDS.serverOpenObsidianVault),
-    setAppMode: (mode: AppMode) =>
-      invoke<ServerConfig>(TAURI_COMMANDS.serverSetAppMode, { mode }),
+    setAppMode: (mode: AppMode) => invoke<ServerConfig>(TAURI_COMMANDS.serverSetAppMode, { mode }),
     getAppMode: () => invoke<AppMode>(TAURI_COMMANDS.serverGetAppMode),
     onStatusChange: (callback) =>
       subscribe<ServerStatus>(TAURI_EVENTS.serverStatusChange, callback),
+  },
+  system: {
+    openCameraSettings: () => invoke<void>(TAURI_COMMANDS.appOpenCameraSettings),
   },
   secureStorage: {
     get: (key) => invoke<string | null>(TAURI_COMMANDS.secureStorageGet, { key }),
