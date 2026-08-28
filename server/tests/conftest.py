@@ -70,3 +70,13 @@ async def auth_headers(client: AsyncClient):
 async def db_session():
     async with _test_session_factory() as session:
         yield session
+
+
+@pytest.fixture
+def session_factory():
+    """The factory backing the test database.
+
+    Endpoints that open their own session (the SSE chat stream, the
+    orchestrator) need this because the test app never runs ``lifespan``.
+    """
+    return _test_session_factory

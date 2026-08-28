@@ -66,6 +66,10 @@ class MessageResponse(BaseModel):
 class SendMessageRequest(BaseModel):
     conversation_id: str
     content: str
+    # Clients generate one per send and reuse it across retries, so a request
+    # that fails after the server committed the message does not create a
+    # second copy. Optional: older clients omit it.
+    idempotency_key: str | None = None
 
 
 class SendMessageResponse(BaseModel):

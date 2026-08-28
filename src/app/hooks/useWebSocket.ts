@@ -13,6 +13,7 @@ import apiClient from '../services/apiClient';
 import { queryKeys } from './queries';
 import type { ConversationResponse } from '../types/api';
 import { invalidateTaskDerivedQueries } from './queries/invalidateTaskDerivedQueries';
+import { invalidateModuleQueries } from './queries/invalidateModuleQueries';
 
 /**
  * Connects to the server WebSocket on mount and wires up event handlers
@@ -75,41 +76,7 @@ export default function useWebSocket(): void {
     };
 
     const handleModuleChange = (data: unknown) => {
-      const d = data as { module?: string };
-      if (d.module === 'todos') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-        queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
-        void invalidateTaskDerivedQueries(queryClient);
-        queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
-      } else if (d.module === 'events') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.events });
-      } else if (d.module === 'reviews') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-        invalidateExecutionTelemetry();
-      } else if (d.module === 'artifacts') {
-        queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-        invalidateExecutionTelemetry();
-      } else if (d.module === 'projects') {
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-      } else if (d.module === 'runs') {
-        queryClient.invalidateQueries({ queryKey: ['runs'] });
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-        invalidateExecutionTelemetry();
-      } else {
-        // Refresh all
-        queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-        queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
-        void invalidateTaskDerivedQueries(queryClient);
-        queryClient.invalidateQueries({ queryKey: queryKeys.planProposals });
-        queryClient.invalidateQueries({ queryKey: queryKeys.events });
-        queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-        queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
-        queryClient.invalidateQueries({ queryKey: ['artifacts'] });
-        queryClient.invalidateQueries({ queryKey: ['runs'] });
-        invalidateExecutionTelemetry();
-      }
-      queryClient.invalidateQueries({ queryKey: queryKeys.today });
+      invalidateModuleQueries(queryClient, (data as { module?: string }).module);
     };
 
     const handleReminder = (data: unknown) => {

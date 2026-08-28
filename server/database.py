@@ -431,6 +431,12 @@ async def _apply_schema_corrections(session: AsyncSession):
 
         # -- paired_devices --
         "ALTER TABLE paired_devices ADD COLUMN public_key TEXT",
+
+        # -- messages --
+        "ALTER TABLE messages ADD COLUMN idempotency_key TEXT",
+        # Partial so the pre-existing NULL-keyed rows do not collide.
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_messages_conversation_idempotency_key "
+        "ON messages (conversation_id, idempotency_key) WHERE idempotency_key IS NOT NULL",
     ]
 
     for stmt in corrections:

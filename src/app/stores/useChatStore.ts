@@ -5,6 +5,8 @@ import { connectSSE } from '../services/sseClient';
 import apiClient from '../services/apiClient';
 import { logger } from '../services/logger';
 import type { StreamEventMeta } from '../types/api';
+import { queryClient } from '../config/queryClient';
+import { invalidateModuleQueries } from '../hooks/queries/invalidateModuleQueries';
 
 const MAX_MESSAGES = 500;
 
@@ -62,7 +64,8 @@ function dedupeMessages(msgs: ChatMessage[]): ChatMessage[] {
   const seen = new Set<string>();
   return msgs.filter((msg) => {
     const userId = msg.user?._id;
-    const timestamp = msg.createdAt instanceof Date ? msg.createdAt.toISOString() : String(msg.createdAt);
+    const timestamp =
+      msg.createdAt instanceof Date ? msg.createdAt.toISOString() : String(msg.createdAt);
     const text = msg.text;
 
     // If we can't build a reliable key, keep the message as-is
@@ -86,7 +89,11 @@ interface ChatState {
   setCurrentConversationId: (id: string | null) => void;
   addStreamingMessage: (message: ChatMessage) => void;
   appendToMessage: (messageId: string, content: string) => void;
-  finalizeStreamMessage: (messageId: string, fullContent: string, metadata?: Record<string, unknown>) => void;
+  finalizeStreamMessage: (
+    messageId: string,
+    fullContent: string,
+    metadata?: Record<string, unknown>,
+  ) => void;
   clearStreamingMessages: () => void;
   updateStreamingMessageId: (oldId: string, newId: string) => void;
   setStreamingState: (streaming: boolean) => void;
@@ -161,7 +168,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const idempotencyKey = crypto.randomUUID();
     const { serverUrl, token, connectionStatus, healthOK } = useAuthStore.getState();
     if (!healthOK) {
-      useToastStore.getState().addToast('warning', 'Server status looks uncertain. Trying anyway...');
+      useToastStore
+        .getState()
+        .addToast('warning', 'Server status looks uncertain. Trying anyway...');
     }
 
     // Orchestrator path: POST /send when WebSocket is connected
@@ -212,9 +221,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             streamingMessageId = meta.message_id;
             set((state) => {
               const updated = state.streamingMessages.map((msg) =>
-                msg._id === assistantPlaceholderId
-                  ? { ...msg, _id: meta.message_id }
-                  : msg,
+                msg._id === assistantPlaceholderId ? { ...msg, _id: meta.message_id } : msg,
               );
               return { streamingMessages: updated };
             });
@@ -223,14 +230,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             const targetId = streamingMessageId ?? assistantPlaceholderId;
             set((state) => ({
               streamingMessages: state.streamingMessages.map((msg) =>
-                msg._id === targetId
-                  ? { ...msg, text: msg.text + tokenText }
-                  : msg,
+                msg._id === targetId ? { ...msg, text: msg.text + tokenText } : msg,
               ),
             }));
           },
           onTitleGenerated: (_title: string) => {
             // Title updates will be handled by query invalidation after stream completes
+          },
+          onModuleDataChanged: (metadata) => {
+            // The stream performed a task or calendar action. On the WebSocket
+            // path the server pushes module_data_changed for this; on SSE it
+            // rides along with the response, and the caches still need it.
+            invalidateModuleQueries(queryClient, metadata?.module);
           },
           onDone: () => {
             clearPendingRunTimeout();
