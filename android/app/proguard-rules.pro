@@ -30,3 +30,13 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# In-app updater (GitHub release payloads)
+-keep,includedescriptorclasses class com.clawchat.android.core.update.**$$serializer { *; }
+-keepclassmembers class com.clawchat.android.core.update.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.clawchat.android.core.update.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,allowobfuscation interface com.clawchat.android.core.update.GithubReleaseApi

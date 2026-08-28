@@ -6,6 +6,30 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * Android refuses to install an APK whose versionCode is lower than the
+ * installed one, so the in-app updater needs the code to track the released
+ * semantic version rather than a hand-maintained counter.
+ */
+fun androidVersionCode(versionName: String): Int {
+    val match = Regex("""^(\d+)\.(\d+)\.(\d+)""").find(versionName)
+        ?: throw GradleException("versionName is not a semantic version: $versionName")
+    val (major, minor, patch) = match.destructured
+    return major.toInt() * 1_000_000 + minor.toInt() * 1_000 + patch.toInt()
+}
+
+/** Release signing is configured only when every keystore value is present. */
+fun releaseSigningProperty(name: String): String? =
+    (project.findProperty(name) as? String ?: System.getenv(name))?.takeIf { it.isNotBlank() }
+
+/**
+ * A half-configured keystore is a mistake rather than a choice: it would
+ * produce an APK signed with a different key, which no installed copy of
+ * ClawChat can accept as an update.
+ */
+fun requireSigningProperty(name: String): String = releaseSigningProperty(name)
+    ?: throw GradleException("$name is required when ANDROID_KEYSTORE_FILE is set")
+
 android {
     namespace = "com.clawchat.android"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -14,20 +38,49 @@ android {
         applicationId = "com.clawchat.android"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
         versionName = "0.1.0"
+        versionCode = androidVersionCode(versionName!!)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // The in-app updater reads published releases of this repository.
+        buildConfigField(
+            "String",
+            "UPDATE_REPOSITORY",
+            "\"${project.findProperty("UPDATE_REPOSITORY") as? String ?: "Topasm/clawchat"}\"",
+        )
+    }
+
+    signingConfigs {
+        val keystorePath = releaseSigningProperty("ANDROID_KEYSTORE_FILE")
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = requireSigningProperty("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = requireSigningProperty("ANDROID_KEY_ALIAS")
+                keyPassword = requireSigningProperty("ANDROID_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         debug {
             val debugUrl = project.findProperty("DEBUG_SERVER_URL") as? String ?: "http://10.0.2.2:8000"
             buildConfigField("String", "DEBUG_SERVER_URL", "\"$debugUrl\"")
+            // A debug build is signed with the debug key, so the system rejects
+            // a released APK installed over it. -PUPDATE_CHECK_IN_DEBUG=true
+            // turns the check back on while working on the updater itself.
+            buildConfigField(
+                "boolean",
+                "UPDATE_ENABLED",
+                (project.findProperty("UPDATE_CHECK_IN_DEBUG") as? String == "true").toString(),
+            )
         }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "DEBUG_SERVER_URL", "\"\"")
+            buildConfigField("boolean", "UPDATE_ENABLED", "true")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

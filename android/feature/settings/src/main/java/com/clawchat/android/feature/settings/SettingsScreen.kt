@@ -54,6 +54,7 @@ import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.theme.AccentColor
+import com.clawchat.android.core.ui.update.AppUpdateSection
 import com.clawchat.android.core.ui.theme.ThemeMode
 import com.clawchat.android.core.ui.icons.ClawIcons
 
@@ -66,6 +67,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
+    val updateState by viewModel.updateState.collectAsState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -162,6 +164,16 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            item {
+                AppUpdateSection(
+                    state = updateState,
+                    onCheck = viewModel::checkForUpdate,
+                    onDownload = viewModel::downloadUpdate,
+                    onInstall = viewModel::installUpdate,
+                    onToggleAutoCheck = viewModel::setAutoUpdateCheckEnabled,
+                )
             }
 
             item {

@@ -6,11 +6,14 @@ import com.clawchat.android.core.data.model.HealthResponse
 import com.clawchat.android.core.data.repository.DeviceRepository
 import com.clawchat.android.core.data.repository.SettingsRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.update.AppUpdateManager
+import com.clawchat.android.core.update.UpdateState
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -31,10 +34,12 @@ class SettingsViewModelTest {
     private val settingsRepository = mockk<SettingsRepository>()
     private val deviceRepository = mockk<DeviceRepository>()
     private val sessionStore = mockk<SessionStore>(relaxed = true)
+    private val updateManager = mockk<AppUpdateManager>(relaxed = true)
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        every { updateManager.state } returns MutableStateFlow(UpdateState())
     }
 
     @After
@@ -59,7 +64,7 @@ class SettingsViewModelTest {
         )
         coEvery { deviceRepository.listDevices() } returns ApiResult.Success(DeviceListResponse(emptyList()))
 
-        val viewModel = SettingsViewModel(settingsRepository, deviceRepository, sessionStore)
+        val viewModel = SettingsViewModel(settingsRepository, deviceRepository, sessionStore, updateManager)
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -82,7 +87,7 @@ class SettingsViewModelTest {
         coEvery { deviceRepository.listDevices() } returns ApiResult.Error("offline")
         coEvery { sessionStore.setThemeMode("system") } returns Unit
 
-        val viewModel = SettingsViewModel(settingsRepository, deviceRepository, sessionStore)
+        val viewModel = SettingsViewModel(settingsRepository, deviceRepository, sessionStore, updateManager)
         advanceUntilIdle()
 
         viewModel.setThemeMode("system")
