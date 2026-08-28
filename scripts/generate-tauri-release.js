@@ -191,7 +191,14 @@ if (require.main === module) {
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'),
   );
-  const tag = process.env.GITHUB_REF_NAME || `clawchat-v${packageJson.version}`;
+  // GitHub reserves the GITHUB_ prefix, so a workflow cannot hand the release
+  // tag over as GITHUB_REF_NAME: the runner's own value wins, which is the
+  // dispatch ref (`main`) rather than the tag being cut. Prefer an unreserved
+  // name, and keep GITHUB_REF_NAME as the fallback for tag-triggered runs.
+  const tag =
+    process.env.RELEASE_TAG ||
+    process.env.GITHUB_REF_NAME ||
+    `clawchat-v${packageJson.version}`;
   const repository = process.env.GITHUB_REPOSITORY || 'clawchat/clawchat';
   const result = generateTauriRelease({
     artifactsDir: path.resolve(repositoryRoot, artifactsArg),

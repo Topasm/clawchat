@@ -122,3 +122,22 @@ test('every job that compiles Rust installs the Linux desktop dependencies', () 
     );
   }
 });
+
+test('the release tag is passed under a name GitHub does not reserve', () => {
+  // GITHUB_* is reserved: setting GITHUB_REF_NAME in a step's env is ignored
+  // and the runner's own value wins, which for a workflow_dispatch run is the
+  // dispatch ref rather than the tag being cut. The manifest step then failed
+  // with "release tag main does not match package version".
+  const workflow = readWorkflow();
+
+  assert.match(
+    workflow,
+    /RELEASE_TAG: \$\{\{ needs\.preflight\.outputs\.tag \}\}/u,
+    'the manifest step must receive the tag as RELEASE_TAG',
+  );
+  assert.doesNotMatch(
+    workflow,
+    /GITHUB_REF_NAME: \$\{\{/u,
+    'a workflow cannot override a GITHUB_-prefixed variable',
+  );
+});
