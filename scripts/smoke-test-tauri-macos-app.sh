@@ -13,9 +13,15 @@ fi
 
 executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_path/Contents/Info.plist")"
 bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
+icon_file="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app_path/Contents/Info.plist")"
+if [[ "$icon_file" != *.icns ]]; then
+  icon_file="${icon_file}.icns"
+fi
+app_icon="$app_path/Contents/Resources/$icon_file"
 log_directory="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 app_log="$log_directory/clawchat-app-startup.log"
 startup_log="${HOME}/Library/Application Support/${bundle_identifier}/startup.log"
+icon_temp_root="$(mktemp -d)"
 launch_waiter_pid=''
 
 stop_app() {
@@ -35,8 +41,22 @@ cleanup() {
     kill "$launch_waiter_pid" 2>/dev/null || true
     wait "$launch_waiter_pid" 2>/dev/null || true
   fi
+  rm -rf "$icon_temp_root"
 }
 trap cleanup EXIT INT TERM
+
+if [[ ! -f "$app_icon" ]]; then
+  echo "Packaged macOS icon is missing: $app_icon" >&2
+  exit 1
+fi
+iconset_directory="$icon_temp_root/ClawChat.iconset"
+/usr/bin/iconutil -c iconset "$app_icon" -o "$iconset_directory"
+for required_icon in icon_16x16.png icon_128x128@2x.png icon_512x512@2x.png; do
+  if [[ ! -f "$iconset_directory/$required_icon" ]]; then
+    echo "Packaged macOS icon is missing required size: $required_icon" >&2
+    exit 1
+  fi
+done
 
 RUST_BACKTRACE=1 /usr/bin/open -n -W "$app_path" >"$app_log" 2>&1 &
 launch_waiter_pid=$!

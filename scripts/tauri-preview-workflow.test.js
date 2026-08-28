@@ -45,6 +45,9 @@ test('preview and release workflows launch the packaged macOS app', () => {
   }
   assert.match(smokeScript, /CFBundleExecutable/);
   assert.match(smokeScript, /CFBundleIdentifier/);
+  assert.match(smokeScript, /CFBundleIconFile/);
+  assert.match(smokeScript, /\/usr\/bin\/iconutil -c iconset/);
+  assert.match(smokeScript, /icon_512x512@2x\.png/);
   assert.match(smokeScript, /\/usr\/bin\/open -n -W "\$app_path"/);
   assert.match(smokeScript, /tell application id/);
   assert.match(smokeScript, /ClawChat exited during the macOS startup smoke test/);
