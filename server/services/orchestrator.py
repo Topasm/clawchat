@@ -22,6 +22,7 @@ from services import (
     calendar_service,
     scheduling_service,
     search_service,
+    todo_recurrence_service,
     todo_service,
 )
 from services.ai_service import AIService
@@ -479,10 +480,25 @@ class Orchestrator:
                     todo.id,
                     status=TaskStatus.COMPLETED,
                 )
-                return (
-                    f"Marked '{todo.title}' as complete.",
-                    {"action_type": "todo_completed", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
-                )
+                # Completing through chat must continue a recurring series the
+                # same way the REST update does; otherwise the series silently
+                # ends whenever the user says "done" instead of ticking the box.
+                message = f"Marked '{todo.title}' as complete."
+                metadata = {
+                    "action_type": "todo_completed",
+                    "module": "todos",
+                    "todo_id": todo.id,
+                    "todo_title": todo.title,
+                }
+                if todo.recurrence_rule:
+                    next_todo = await todo_recurrence_service.spawn_next_occurrence(db, todo)
+                    if next_todo is not None:
+                        metadata["next_todo_id"] = next_todo.id
+                        if next_todo.due_date:
+                            message += (
+                                f" Next one is due {next_todo.due_date.date().isoformat()}."
+                            )
+                return message, metadata
 
             elif intent == "create_event":
                 title = params.get("title", "Untitled event")

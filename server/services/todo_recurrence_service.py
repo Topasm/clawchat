@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.task import TaskStatus
 from models.todo import Todo
-from utils import make_id
+from utils import make_id, match_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +39,16 @@ def compute_next_occurrence(
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # Search forward from `after`
-    next_dt = rule.after(after, inc=False)
+    # Search forward from `after`. Align the comparison operands first: the
+    # reference may be built in memory (aware) while recurrence_end comes back
+    # from SQLite naive, and comparing those raises TypeError.
+    aligned_after = match_timezone(after, dtstart)
+    aligned_end = match_timezone(recurrence_end, dtstart) if recurrence_end else None
+
+    next_dt = rule.after(aligned_after, inc=False)
     while next_dt is not None:
         # Check recurrence end
-        if recurrence_end and next_dt > recurrence_end:
+        if aligned_end and next_dt > aligned_end:
             return None
 
         # Check exceptions

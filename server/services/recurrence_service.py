@@ -5,13 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from dateutil.rrule import rrulestr
 
-
-def _match_timezone(value: datetime, reference: datetime) -> datetime:
-    if reference.tzinfo is None:
-        return value.replace(tzinfo=None)
-    if value.tzinfo is None:
-        return value.replace(tzinfo=reference.tzinfo)
-    return value.astimezone(reference.tzinfo)
+from utils import match_timezone
 
 
 def parse_rrule(rule_string: str, dtstart: datetime, range_start: datetime, range_end: datetime) -> list[datetime]:
@@ -43,10 +37,10 @@ def generate_occurrences(event, range_start: datetime, range_end: datetime) -> l
     # SQLite may return naive datetimes even for timezone-aware columns. Match
     # the query range to the series timezone before dateutil comparisons.
     series_start = event.start_time
-    aligned_start = _match_timezone(range_start, series_start)
-    effective_end = _match_timezone(range_end, series_start)
+    aligned_start = match_timezone(range_start, series_start)
+    effective_end = match_timezone(range_end, series_start)
     recurrence_end = (
-        _match_timezone(event.recurrence_end, series_start)
+        match_timezone(event.recurrence_end, series_start)
         if event.recurrence_end
         else None
     )

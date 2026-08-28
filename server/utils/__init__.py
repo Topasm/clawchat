@@ -1,5 +1,20 @@
 import json
 import uuid
+from datetime import datetime
+
+
+def match_timezone(value: datetime, reference: datetime) -> datetime:
+    """Return *value* in the same awareness/zone as *reference*.
+
+    SQLite hands back naive datetimes even for ``DateTime(timezone=True)``
+    columns, so a value freshly built in memory (aware) and one loaded from the
+    database (naive) cannot be compared. Align before comparing.
+    """
+    if reference.tzinfo is None:
+        return value.replace(tzinfo=None)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=reference.tzinfo)
+    return value.astimezone(reference.tzinfo)
 
 
 def make_id(prefix: str) -> str:
