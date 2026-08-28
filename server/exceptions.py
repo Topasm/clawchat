@@ -4,16 +4,40 @@ from fastapi.responses import JSONResponse
 
 
 class AppError(Exception):
-    def __init__(self, code: str, message: str, status_code: int = 500, details: dict | None = None):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        status_code: int = 500,
+        details: dict | None = None,
+        headers: dict[str, str] | None = None,
+    ):
         self.code = code
         self.message = message
         self.status_code = status_code
         self.details = details
+        self.headers = headers
 
 
 class UnauthorizedError(AppError):
     def __init__(self, message: str = "Missing or invalid authentication token"):
         super().__init__(code="UNAUTHORIZED", message=message, status_code=401)
+
+
+class TooManyRequestsError(AppError):
+    def __init__(
+        self,
+        message: str = "Too many failed attempts. Try again later.",
+        *,
+        retry_after: int = 60,
+    ):
+        super().__init__(
+            code="TOO_MANY_REQUESTS",
+            message=message,
+            status_code=429,
+            details={"retry_after": retry_after},
+            headers={"Retry-After": str(retry_after)},
+        )
 
 
 class NotFoundError(AppError):
@@ -87,4 +111,8 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     body: dict = {"code": exc.code, "message": exc.message}
     if exc.details:
         body["details"] = exc.details
-    return JSONResponse(status_code=exc.status_code, content={"error": body})
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": body},
+        headers=exc.headers or None,
+    )
