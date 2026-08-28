@@ -12,7 +12,10 @@ const workflowPath = path.resolve(
 );
 
 function readWorkflow() {
-  return fs.readFileSync(workflowPath, 'utf8');
+  // Windows checkouts convert to CRLF, which breaks any pattern that expects a
+  // newline immediately after a token. Normalize so these assertions describe
+  // the file's content rather than the runner's line-ending policy.
+  return fs.readFileSync(workflowPath, 'utf8').replace(/\r\n/g, '\n');
 }
 
 test('publishing a release without Docker credentials does not fail the run', () => {
