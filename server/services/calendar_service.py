@@ -31,42 +31,47 @@ async def get_events(
     if project_id is not None:
         conditions.append(Event.project_id == project_id)
 
-    # Fetch regular (non-recurring) events
-    count_q = select(func.count(Event.id)).where(*conditions)
-    total = (await db.execute(count_q)).scalar() or 0
-
-    q = (
-        select(Event)
-        .where(*conditions)
-        .order_by(Event.start_time.asc())
-        .offset((page - 1) * limit)
-        .limit(limit)
-    )
-    rows = (await db.execute(q)).scalars().all()
-    results: list[Event | dict] = list(rows)
-
-    # Expand recurring events into virtual occurrences
-    if start_after and start_before:
-        recurring_q = (
-            select(Event)
-            .where(Event.recurrence_rule != None)  # noqa: E711
-        )
-        if project_id is not None:
-            recurring_q = recurring_q.where(Event.project_id == project_id)
-        recurring_events = (await db.execute(recurring_q)).scalars().all()
-        for rev in recurring_events:
-            occurrences = generate_occurrences(rev, start_after, start_before)
-            results.extend(occurrences)
-
-    # Sort combined results by start_time
-    def sort_key(item):
+    def sort_key(item: Event | dict):
         if isinstance(item, dict):
             st = item["start_time"]
             return st if isinstance(st, datetime) else datetime.fromisoformat(st)
         return item.start_time
 
+    expanding = bool(start_after and start_before)
+
+    if not expanding:
+        # No range to expand into, so the database can do the paging.
+        total = (await db.execute(select(func.count(Event.id)).where(*conditions))).scalar() or 0
+        rows = (
+            await db.execute(
+                select(Event)
+                .where(*conditions)
+                .order_by(Event.start_time.asc())
+                .offset((page - 1) * limit)
+                .limit(limit)
+            )
+        ).scalars().all()
+        return list(rows), total
+
+    # Occurrences are generated in memory, so they cannot be paged by the
+    # database. Paging the stored rows alone appended the whole expansion to
+    # every page, repeating occurrences and overrunning the limit. Build the
+    # combined series first, then page it.
+    stored = (
+        await db.execute(select(Event).where(*conditions).order_by(Event.start_time.asc()))
+    ).scalars().all()
+    results: list[Event | dict] = list(stored)
+
+    recurring_q = select(Event).where(Event.recurrence_rule != None)  # noqa: E711
+    if project_id is not None:
+        recurring_q = recurring_q.where(Event.project_id == project_id)
+    for recurring in (await db.execute(recurring_q)).scalars().all():
+        results.extend(generate_occurrences(recurring, start_after, start_before))
+
     results.sort(key=sort_key)
-    return results, total + len([r for r in results if isinstance(r, dict)])
+    total = len(results)
+    offset = (page - 1) * limit
+    return results[offset : offset + limit], total
 
 
 async def get_event(db: AsyncSession, event_id: str) -> Event:
@@ -148,8 +153,12 @@ async def delete_event_occurrence(
         return
 
     if mode == "this_and_future":
-        occ_dt = datetime.fromisoformat(occurrence_date)
-        event.recurrence_end = occ_dt.replace(tzinfo=timezone.utc)
+        # recurrence_end is inclusive during expansion, so ending the series
+        # exactly at the occurrence's date keeps that occurrence whenever it
+        # starts at midnight -- every all-day event. End the series just before
+        # the chosen date instead, which drops it at any time of day.
+        occ_dt = datetime.fromisoformat(occurrence_date).replace(tzinfo=timezone.utc)
+        event.recurrence_end = occ_dt - timedelta(microseconds=1)
         event.updated_at = datetime.now(timezone.utc)
         await db.flush()
         return
