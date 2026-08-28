@@ -77,3 +77,22 @@ test('platform code signing is optional but all-or-nothing per platform', () => 
   // Gatekeeper and stapler checks only apply to a notarized Developer ID build.
   assert.match(workflow, /if \[ "\$\{APPLE_SIGNING_ENABLED:-0\}" = '1' \]/);
 });
+
+test('every job that compiles Rust installs the Linux desktop dependencies', () => {
+  // The preflight job ran `npm run test:rust-core` without them and failed on
+  // libdbus-sys, so no release could be cut at all.
+  const workflow = readWorkflow();
+  const jobs = workflow.split(/\n  (?=[a-z][a-z-]*:\n)/u);
+
+  for (const job of jobs) {
+    const compilesRust = /npm run test:rust-core|npx tauri build/u.test(job);
+    if (!compilesRust) continue;
+    const linuxOnly = /runs-on: ubuntu/u.test(job) || /matrix\.os/u.test(job);
+    if (!linuxOnly) continue;
+    assert.match(
+      job,
+      /apt-get install -y libwebkit2gtk-4\.1-dev libayatana-appindicator3-dev/u,
+      'a job compiling Rust on Linux must install the desktop dependencies',
+    );
+  }
+});
