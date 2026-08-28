@@ -17,16 +17,16 @@ function fixture() {
     fs.writeFileSync(path.join(directory, name), content);
   };
 
+  // Mirrors a real Tauri v2 build: on Linux and Windows the signed bundle is
+  // the installer itself, so there is no separate updater archive there.
   write('linux', 'ClawChat.AppImage');
+  write('linux', 'ClawChat.AppImage.sig', 'linux-signature\n');
   write('linux', 'ClawChat.deb');
-  write('linux', 'ClawChat.AppImage.tar.gz');
-  write('linux', 'ClawChat.AppImage.tar.gz.sig', 'linux-signature\n');
   write('macos', 'ClawChat.dmg');
   write('macos', 'ClawChat.app.tar.gz');
   write('macos', 'ClawChat.app.tar.gz.sig', 'mac-signature\n');
   write('windows', 'ClawChat.exe');
-  write('windows', 'ClawChat.nsis.zip');
-  write('windows', 'ClawChat.nsis.zip.sig', 'windows-signature\n');
+  write('windows', 'ClawChat.exe.sig', 'windows-signature\n');
 
   return {
     root,
@@ -61,11 +61,20 @@ test('builds one complete cross-platform updater manifest and checksum file', ()
       manifest.platforms['darwin-aarch64'].url,
       /darwin-aarch64-ClawChat\.app\.tar\.gz$/,
     );
-    assert.equal(releaseFiles.length, 12);
+    // On Linux and Windows the updater serves the installer itself, so the
+    // manifest must point at the single staged copy rather than a second one.
+    assert.match(manifest.platforms['linux-x86_64'].url, /linux-ClawChat\.AppImage$/);
+    assert.match(manifest.platforms['windows-x86_64'].url, /windows-ClawChat\.exe$/);
+    assert.equal(
+      fs.readdirSync(project.outputDir).filter((name) => name.endsWith('.AppImage')).length,
+      1,
+      'the AppImage must be staged once, not once per role',
+    );
+    assert.equal(releaseFiles.length, 10);
 
     const checksumPath = path.join(project.outputDir, 'checksums.txt');
     const checksumLines = fs.readFileSync(checksumPath, 'utf8').trim().split('\n');
-    assert.equal(checksumLines.length, 11);
+    assert.equal(checksumLines.length, 9);
     assert.ok(checksumLines.some((line) => line.endsWith('  latest.json')));
     assert.ok(!checksumLines.some((line) => line.endsWith('  checksums.txt')));
     for (const line of checksumLines) {
@@ -85,7 +94,7 @@ test('fails closed when an installer, updater, or updater signature is missing',
   for (const [platform, file, expected] of [
     ['linux', 'ClawChat.deb', /Linux DEB installer, found 0/],
     ['macos', 'ClawChat.app.tar.gz', /macOS updater archive, found 0/],
-    ['windows', 'ClawChat.nsis.zip.sig', /missing updater signature/],
+    ['windows', 'ClawChat.exe.sig', /missing updater signature/],
   ]) {
     const project = fixture();
     try {
@@ -104,7 +113,7 @@ test('rejects empty signatures, duplicate artifacts, stale output, and mismatche
       path.join(
         emptySignature.artifactsDir,
         PLATFORM_DIRECTORIES.linux,
-        'ClawChat.AppImage.tar.gz.sig',
+        'ClawChat.AppImage.sig',
       ),
       ' \n',
     );
