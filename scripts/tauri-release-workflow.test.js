@@ -46,3 +46,34 @@ test('final inventory requires every platform updater and all expected release f
   assert.match(workflow, /fail_on_unmatched_files: true/);
   assert.match(workflow, /draft: true/);
 });
+
+test('platform code signing is optional but all-or-nothing per platform', () => {
+  // A first release has to be possible without a paid Apple or Windows
+  // certificate. Updater signing is a separate, free, mandatory system.
+  const workflow = readWorkflow();
+
+  for (const platform of ['Apple', 'Windows', 'Linux']) {
+    assert.match(
+      workflow,
+      new RegExp(`name: Resolve ${platform} signing configuration`),
+      `${platform} signing must resolve rather than hard-fail`,
+    );
+  }
+
+  // Updater signing stays mandatory.
+  assert.match(workflow, /name: Validate updater signing secret presence/);
+  assert.match(workflow, /TAURI_UPDATER_PUBKEY is required/);
+
+  // Each import step only runs once its platform resolved to "enabled".
+  assert.match(workflow, /Import Apple Developer ID certificate\n\s+if: runner\.os == 'macOS' && env\.APPLE_SIGNING_ENABLED == '1'/);
+  assert.match(workflow, /Import Windows code-signing certificate\n\s+if: runner\.os == 'Windows' && env\.WINDOWS_SIGNING_ENABLED == '1'/);
+  assert.match(workflow, /Import Linux AppImage signing key\n\s+if: runner\.os == 'Linux' && env\.LINUX_SIGNING_ENABLED == '1'/);
+
+  // An unsigned macOS bundle still gets an ad-hoc signature, which the
+  // updater needs in order to replace the app in place.
+  assert.match(workflow, /Ad-hoc sign macOS build\n\s+if: runner\.os == 'macOS' && env\.APPLE_SIGNING_ENABLED != '1'/);
+  assert.match(workflow, /APPLE_SIGNING_IDENTITY=-/);
+
+  // Gatekeeper and stapler checks only apply to a notarized Developer ID build.
+  assert.match(workflow, /if \[ "\$\{APPLE_SIGNING_ENABLED:-0\}" = '1' \]/);
+});
