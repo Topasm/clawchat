@@ -114,7 +114,11 @@ jobs:
           test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo 'TAURI_SIGNING_PRIVATE_KEY is required' >&2; exit 1; }
           test -n "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" || { echo 'TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required' >&2; exit 1; }
 
-      - name: Validate Apple secret presence
+      # Apple Developer ID signing is optional: it needs a paid account, and a
+      # project has to be able to cut its first release without one. Updater
+      # signing (below) is separate and stays mandatory. A partial Apple
+      # configuration is a mistake rather than a choice, so it still fails.
+      - name: Resolve Apple signing configuration
         if: runner.os == 'macOS'
         shell: bash
         env:
@@ -124,13 +128,20 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          test -n "$APPLE_CERTIFICATE" || { echo 'APPLE_CERTIFICATE is required' >&2; exit 1; }
-          test -n "$APPLE_CERTIFICATE_PASSWORD" || { echo 'APPLE_CERTIFICATE_PASSWORD is required' >&2; exit 1; }
-          test -n "$APPLE_ID" || { echo 'APPLE_ID is required' >&2; exit 1; }
-          test -n "$APPLE_PASSWORD" || { echo 'APPLE_PASSWORD is required' >&2; exit 1; }
-          test -n "$APPLE_TEAM_ID" || { echo 'APPLE_TEAM_ID is required' >&2; exit 1; }
+          set -euo pipefail
+          if [ -z "$APPLE_CERTIFICATE" ] && [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            printf 'APPLE_SIGNING_ENABLED=0\n' >> "$GITHUB_ENV"
+            echo '::warning title=macOS build is not Developer ID signed::No APPLE_CERTIFICATE configured. The app is ad-hoc signed, so macOS Gatekeeper warns on first launch and the build is not notarized.'
+            exit 0
+          fi
+          test -n "$APPLE_CERTIFICATE" || { echo 'APPLE_CERTIFICATE is required when APPLE_CERTIFICATE_PASSWORD is set' >&2; exit 1; }
+          test -n "$APPLE_CERTIFICATE_PASSWORD" || { echo 'APPLE_CERTIFICATE_PASSWORD is required when APPLE_CERTIFICATE is set' >&2; exit 1; }
+          test -n "$APPLE_ID" || { echo 'APPLE_ID is required for notarization' >&2; exit 1; }
+          test -n "$APPLE_PASSWORD" || { echo 'APPLE_PASSWORD is required for notarization' >&2; exit 1; }
+          test -n "$APPLE_TEAM_ID" || { echo 'APPLE_TEAM_ID is required for notarization' >&2; exit 1; }
+          printf 'APPLE_SIGNING_ENABLED=1\n' >> "$GITHUB_ENV"
 
-      - name: Validate Windows secret presence
+      - name: Resolve Windows signing configuration
         if: runner.os == 'Windows'
         shell: bash
         env:
@@ -138,11 +149,17 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
           TAURI_WINDOWS_TIMESTAMP_URL: ${{ vars.TAURI_WINDOWS_TIMESTAMP_URL }}
         run: |
-          test -n "$WINDOWS_CERTIFICATE" || { echo 'WINDOWS_CERTIFICATE is required' >&2; exit 1; }
-          test -n "$WINDOWS_CERTIFICATE_PASSWORD" || { echo 'WINDOWS_CERTIFICATE_PASSWORD is required' >&2; exit 1; }
-          test -n "$TAURI_WINDOWS_TIMESTAMP_URL" || { echo 'TAURI_WINDOWS_TIMESTAMP_URL is required' >&2; exit 1; }
+          set -euo pipefail
+          if [ -z "$WINDOWS_CERTIFICATE" ]; then
+            printf 'WINDOWS_SIGNING_ENABLED=0\n' >> "$GITHUB_ENV"
+            echo '::warning title=Windows build is not code signed::No WINDOWS_CERTIFICATE configured. SmartScreen warns users until the installer builds reputation.'
+            exit 0
+          fi
+          test -n "$WINDOWS_CERTIFICATE_PASSWORD" || { echo 'WINDOWS_CERTIFICATE_PASSWORD is required when WINDOWS_CERTIFICATE is set' >&2; exit 1; }
+          test -n "$TAURI_WINDOWS_TIMESTAMP_URL" || { echo 'TAURI_WINDOWS_TIMESTAMP_URL is required when signing Windows builds' >&2; exit 1; }
+          printf 'WINDOWS_SIGNING_ENABLED=1\n' >> "$GITHUB_ENV"
 
-      - name: Validate Linux signing secret presence
+      - name: Resolve Linux signing configuration
         if: runner.os == 'Linux'
         shell: bash
         env:
@@ -150,9 +167,15 @@ jobs:
           LINUX_GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
           LINUX_GPG_KEY_ID: ${{ vars.LINUX_GPG_KEY_ID }}
         run: |
-          test -n "$LINUX_GPG_PRIVATE_KEY" || { echo 'LINUX_GPG_PRIVATE_KEY is required' >&2; exit 1; }
-          test -n "$LINUX_GPG_PASSPHRASE" || { echo 'LINUX_GPG_PASSPHRASE is required' >&2; exit 1; }
-          test -n "$LINUX_GPG_KEY_ID" || { echo 'LINUX_GPG_KEY_ID is required' >&2; exit 1; }
+          set -euo pipefail
+          if [ -z "$LINUX_GPG_PRIVATE_KEY" ]; then
+            printf 'LINUX_SIGNING_ENABLED=0\n' >> "$GITHUB_ENV"
+            echo '::warning title=AppImage is not GPG signed::No LINUX_GPG_PRIVATE_KEY configured. The updater still verifies its own signature.'
+            exit 0
+          fi
+          test -n "$LINUX_GPG_PASSPHRASE" || { echo 'LINUX_GPG_PASSPHRASE is required when LINUX_GPG_PRIVATE_KEY is set' >&2; exit 1; }
+          test -n "$LINUX_GPG_KEY_ID" || { echo 'LINUX_GPG_KEY_ID is required when LINUX_GPG_PRIVATE_KEY is set' >&2; exit 1; }
+          printf 'LINUX_SIGNING_ENABLED=1\n' >> "$GITHUB_ENV"
 
       - name: Install Linux desktop dependencies
         if: runner.os == 'Linux'
@@ -189,7 +212,7 @@ jobs:
       - run: npm run check:tauri-server
 
       - name: Import Windows code-signing certificate
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && env.WINDOWS_SIGNING_ENABLED == '1'
         shell: pwsh
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
@@ -230,7 +253,7 @@ jobs:
           }
 
       - name: Import Apple Developer ID certificate
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.APPLE_SIGNING_ENABLED == '1'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -269,8 +292,18 @@ jobs:
           test -n "$identity" || { echo 'Developer ID Application identity was not found' >&2; exit 1; }
           printf 'APPLE_SIGNING_IDENTITY=%s\n' "$identity" >> "$GITHUB_ENV"
 
+      - name: Ad-hoc sign macOS build
+        if: runner.os == 'macOS' && env.APPLE_SIGNING_ENABLED != '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # "-" is codesign's ad-hoc identity. It does not establish trust, but
+          # it produces a valid signature, which the macOS updater needs in
+          # order to swap the bundle in place.
+          printf 'APPLE_SIGNING_IDENTITY=-\n' >> "$GITHUB_ENV"
+
       - name: Import Linux AppImage signing key
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && env.LINUX_SIGNING_ENABLED == '1'
         shell: bash
         env:
           LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY }}
@@ -376,7 +409,7 @@ jobs:
             }
           }
 
-      - name: Verify Apple signature and notarization ticket
+      - name: Verify macOS code signature
         if: runner.os == 'macOS'
         shell: bash
         run: |
@@ -385,12 +418,19 @@ jobs:
           dmg_path="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)"
           test -n "$app_path" || { echo 'No macOS app bundle was produced' >&2; exit 1; }
           test -n "$dmg_path" || { echo 'No macOS DMG was produced' >&2; exit 1; }
+          # An ad-hoc signature is still a signature, so this holds either way.
           codesign --verify --deep --strict --verbose=2 "$app_path"
-          spctl --assess --type execute --verbose=2 "$app_path"
-          xcrun stapler validate "$dmg_path"
+          if [ "${APPLE_SIGNING_ENABLED:-0}" = '1' ]; then
+            # Gatekeeper assessment and a stapled ticket only exist for a
+            # Developer ID build that went through notarization.
+            spctl --assess --type execute --verbose=2 "$app_path"
+            xcrun stapler validate "$dmg_path"
+          else
+            echo 'Ad-hoc signed build: skipping Gatekeeper assessment and notarization checks.'
+          fi
 
       - name: Verify embedded Linux AppImage signature
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && env.LINUX_SIGNING_ENABLED == '1'
         shell: bash
         run: |
           set -euo pipefail
