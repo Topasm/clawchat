@@ -15,6 +15,8 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.notification.ReminderNotificationHelper
 import com.clawchat.android.core.sync.SyncManager
+import com.clawchat.android.core.ui.update.AppUpdatePrompt
+import com.clawchat.android.core.update.AppUpdateManager
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
 import com.clawchat.android.navigation.ClawChatNavGraph
@@ -28,6 +30,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var sessionStore: SessionStore
     @Inject lateinit var syncManager: SyncManager
     @Inject lateinit var todoRepository: TodoRepository
+    @Inject lateinit var updateManager: AppUpdateManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +44,15 @@ class MainActivity : ComponentActivity() {
             val themeMode by sessionStore.themeMode.collectAsState(initial = "light")
 
             val context = LocalContext.current
+            val updateState by updateManager.state.collectAsState()
+
+            // A published GitHub release is offered once per launch window;
+            // the manager throttles the network call and honours the
+            // "check automatically" preference.
+            LaunchedEffect(Unit) {
+                updateManager.refreshPreferences()
+                updateManager.checkForUpdateIfDue()
+            }
 
             LaunchedEffect(isLoggedIn) {
                 if (isLoggedIn) {
@@ -88,6 +100,13 @@ class MainActivity : ComponentActivity() {
                 accentColorKey = accentColor,
             ) {
                 ClawChatNavGraph(isLoggedIn = isLoggedIn, onboardingSkipped = onboardingSkipped)
+                AppUpdatePrompt(
+                    state = updateState,
+                    onDownload = updateManager::downloadUpdate,
+                    onInstall = updateManager::installUpdate,
+                    onSkip = updateManager::skipPendingVersion,
+                    onDismiss = updateManager::dismissPrompt,
+                )
             }
         }
     }

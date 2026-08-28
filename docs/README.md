@@ -13,6 +13,7 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 | [Backend Guide](./backend-guide.md)                                                            | FastAPI project structure, modules, and dev setup                                                         |
 | [Frontend Guide](./frontend-guide.md)                                                          | Vite + React + TypeScript app structure and component reference                                           |
 | [Tauri Migration](./tauri-migration.md)                                                        | Desktop runtime architecture, data migration, updater, and signing                                        |
+| [Android Release](./android-release.md)                                                        | Signed Android releases, GitHub-release publishing, and the in-app updater                                |
 | [Electron Cutover](./electron-cutover.md)                                                      | Completed removal record and legacy data-import guarantees                                                |
 | [Build Performance](./build-performance.md)                                                    | Renderer/native build layers and performance budgets                                                      |
 | [Deployment](./deployment.md)                                                                  | Docker setup, environment variables, and production config                                                |

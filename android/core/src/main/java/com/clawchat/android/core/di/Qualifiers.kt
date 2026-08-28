@@ -13,3 +13,8 @@ annotation class UnauthenticatedClient
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class DebugServerUrl
+
+/** OkHttp client for GitHub release metadata and APK downloads. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class UpdateClient

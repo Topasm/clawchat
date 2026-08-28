@@ -8,6 +8,8 @@ import com.clawchat.android.core.data.model.PairedDevice
 import com.clawchat.android.core.data.repository.DeviceRepository
 import com.clawchat.android.core.data.repository.SettingsRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.update.AppUpdateManager
+import com.clawchat.android.core.update.UpdateState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,13 +35,18 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val deviceRepository: DeviceRepository,
     private val sessionStore: SessionStore,
+    private val updateManager: AppUpdateManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    /** Shared with the launch-time prompt, so a download started there keeps its progress. */
+    val updateState: StateFlow<UpdateState> = updateManager.state
+
     init {
         load()
+        updateManager.refreshPreferences()
     }
 
     fun load() {
@@ -100,6 +107,14 @@ class SettingsViewModel @Inject constructor(
             _uiState.update { it.copy(themeMode = key) }
         }
     }
+
+    fun checkForUpdate() = updateManager.checkForUpdate()
+
+    fun downloadUpdate() = updateManager.downloadUpdate()
+
+    fun installUpdate() = updateManager.installUpdate()
+
+    fun setAutoUpdateCheckEnabled(enabled: Boolean) = updateManager.setAutoCheckEnabled(enabled)
 
     fun logout() {
         viewModelScope.launch {
