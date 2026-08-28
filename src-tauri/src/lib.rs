@@ -2,6 +2,7 @@ mod commands;
 mod models;
 mod native;
 mod services;
+mod startup_log;
 mod state;
 
 use state::{AppState, PendingUpdateState};
@@ -19,30 +20,14 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--autostart"]),
-        ))
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if matches!(
-                        event.state(),
-                        tauri_plugin_global_shortcut::ShortcutState::Pressed
-                    ) {
-                        native::handle_quick_capture(app);
-                    }
-                })
-                .build(),
-        )
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let state = window.state::<AppState>();
-                if state
-                    .config()
+                let is_host = window
+                    .try_state::<AppState>()
+                    .and_then(|state| state.config().ok())
                     .map(|config| matches!(config.app_mode, models::AppMode::Host))
-                    .unwrap_or(false)
-                {
+                    .unwrap_or(false);
+                if is_host {
                     api.prevent_close();
                     let _ = window.hide();
                 } else {
@@ -51,11 +36,19 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            let state = AppState::initialize(app.handle()).map_err(std::io::Error::other)?;
+            let state = match AppState::initialize(app.handle()) {
+                Ok(state) => state,
+                Err(error) => {
+                    startup_log::report(&format!(
+                        "[clawchat] failed to initialize application state: {error}"
+                    ));
+                    app.handle().exit(1);
+                    return Ok(());
+                }
+            };
             let should_start_host = state.should_start_host();
             app.manage(state);
             app.manage(PendingUpdateState::default());
-            native::setup(app)?;
             if should_start_host {
                 let app_handle = app.handle().clone();
                 tauri::async_runtime::spawn_blocking(move || {
@@ -85,15 +78,36 @@ pub fn run() {
             commands::app::updater_download,
             commands::app::updater_install,
         ])
-        .build(tauri::generate_context!())
-        .expect("error while building ClawChat");
+        .build(tauri::generate_context!());
 
-    application.run(|app_handle, event| {
-        if matches!(event, tauri::RunEvent::Exit) {
-            let state = app_handle.state::<AppState>();
-            if let Err(error) = state.stop_server(app_handle) {
-                eprintln!("[clawchat] failed to stop server during shutdown: {error}");
+    let application = match application {
+        Ok(application) => application,
+        Err(error) => {
+            startup_log::report(&format!("[clawchat] failed to build application: {error}"));
+            std::process::exit(1);
+        }
+    };
+
+    application.run(|app_handle, event| match event {
+        tauri::RunEvent::Ready => {
+            if app_handle.try_state::<AppState>().is_some() {
+                let deferred_app_handle = app_handle.clone();
+                if let Err(error) = app_handle.run_on_main_thread(move || {
+                    native::setup(&deferred_app_handle);
+                }) {
+                    startup_log::report(&format!(
+                        "[clawchat] failed to schedule native startup integrations: {error}"
+                    ));
+                }
             }
         }
+        tauri::RunEvent::Exit => {
+            if let Some(state) = app_handle.try_state::<AppState>() {
+                if let Err(error) = state.stop_server(app_handle) {
+                    eprintln!("[clawchat] failed to stop server during shutdown: {error}");
+                }
+            }
+        }
+        _ => {}
     });
 }

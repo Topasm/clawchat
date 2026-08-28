@@ -1,10 +1,11 @@
-use tauri::{AppHandle, Runtime, State};
-use tauri_plugin_autostart::ManagerExt as AutostartExt;
+use tauri::{AppHandle, Manager, Runtime, State};
+use tauri_plugin_autostart::AutoLaunchManager;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
     models::{AppMode, NetworkAddress, NetworkInfo, ServerConfig, ServerConfigPatch, ServerStatus},
+    startup_log,
     state::AppState,
 };
 
@@ -113,14 +114,19 @@ pub fn server_get_app_mode(state: State<'_, AppState>) -> Result<AppMode, String
 }
 
 fn set_autostart<R: Runtime>(app: &AppHandle<R>, enabled: bool) {
-    let manager = app.autolaunch();
+    let Some(manager) = app.try_state::<AutoLaunchManager>() else {
+        startup_log::report("[clawchat] skipped system autostart update: plugin unavailable");
+        return;
+    };
     let result = if enabled {
         manager.enable()
     } else {
         manager.disable()
     };
     if let Err(error) = result {
-        eprintln!("[clawchat] failed to update system autostart: {error}");
+        startup_log::report(&format!(
+            "[clawchat] failed to update system autostart: {error}"
+        ));
     }
 }
 

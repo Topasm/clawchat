@@ -1,22 +1,21 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    App, Emitter, Manager, WebviewWindow,
+    AppHandle, Emitter, Manager, WebviewWindow,
 };
-use tauri_plugin_autostart::ManagerExt as AutostartExt;
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartExt};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-use crate::{models::AppMode, state::AppState};
+use crate::{models::AppMode, startup_log, state::AppState};
 
 const QUICK_CAPTURE_SHORTCUT: &str = "CommandOrControl+Shift+Space";
 
-pub fn setup(app: &mut App) -> tauri::Result<()> {
-    setup_tray(app)?;
-    if let Err(error) = app.global_shortcut().register(QUICK_CAPTURE_SHORTCUT) {
-        eprintln!("[clawchat] quick capture shortcut is unavailable: {error}");
+pub fn setup(app: &AppHandle) {
+    if let Err(error) = setup_tray(app) {
+        startup_log::report(&format!("[clawchat] system tray is unavailable: {error}"));
     }
-    sync_autostart(app);
-    Ok(())
+    setup_global_shortcut(app);
+    setup_autostart(app);
 }
 
 pub fn show_main_window(app: &tauri::AppHandle) {
@@ -36,8 +35,50 @@ fn show_window(window: &WebviewWindow) {
     let _ = window.set_focus();
 }
 
-fn sync_autostart(app: &App) {
-    let state = app.state::<AppState>();
+fn setup_global_shortcut(app: &AppHandle) {
+    let global_shortcut_plugin = tauri_plugin_global_shortcut::Builder::new()
+        .with_handler(|app, _shortcut, event| {
+            if matches!(
+                event.state(),
+                tauri_plugin_global_shortcut::ShortcutState::Pressed
+            ) {
+                handle_quick_capture(app);
+            }
+        })
+        .build();
+
+    match app.plugin(global_shortcut_plugin) {
+        Ok(()) => {
+            if let Err(error) = app.global_shortcut().register(QUICK_CAPTURE_SHORTCUT) {
+                startup_log::report(&format!(
+                    "[clawchat] quick capture shortcut is unavailable: {error}"
+                ));
+            }
+        }
+        Err(error) => {
+            startup_log::report(&format!(
+                "[clawchat] global shortcut plugin is unavailable: {error}"
+            ));
+        }
+    }
+}
+
+fn setup_autostart(app: &AppHandle) {
+    let autostart_plugin =
+        tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--autostart"]));
+    match app.plugin(autostart_plugin) {
+        Ok(()) => sync_autostart(app),
+        Err(error) => startup_log::report(&format!(
+            "[clawchat] autostart plugin is unavailable: {error}"
+        )),
+    }
+}
+
+fn sync_autostart(app: &AppHandle) {
+    let Some(state) = app.try_state::<AppState>() else {
+        startup_log::report("[clawchat] skipped autostart synchronization: app state unavailable");
+        return;
+    };
     let enabled = state
         .config()
         .map(|config| matches!(config.app_mode, AppMode::Host) && config.auto_start_host)
@@ -49,11 +90,13 @@ fn sync_autostart(app: &App) {
         manager.disable()
     };
     if let Err(error) = result {
-        eprintln!("[clawchat] failed to synchronize autostart: {error}");
+        startup_log::report(&format!(
+            "[clawchat] failed to synchronize autostart: {error}"
+        ));
     }
 }
 
-fn setup_tray(app: &App) -> tauri::Result<()> {
+fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show ClawChat", true, None::<&str>)?;
     let stop = MenuItem::with_id(app, "stop-server", "Stop Server", true, None::<&str>)?;
     let restart = MenuItem::with_id(app, "restart-server", "Restart Server", true, None::<&str>)?;

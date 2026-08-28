@@ -46,7 +46,7 @@
     "build:capacitor": "vite build && npx cap sync",
     "preview": "vite preview",
     "test": "vitest run && npm run test:scripts",
-    "test:scripts": "npm run generate:orval && node --test scripts/android-build-workflow.test.js scripts/check-release-version.test.js scripts/dependency-license-policy.test.js scripts/design-tokens.test.js scripts/generate-api-contracts.test.js scripts/generated-react-query-hooks.test.js scripts/generate-tauri-release.test.js scripts/github-actions-pinning.test.js scripts/icon-design.test.js scripts/prettier-baseline.test.js scripts/renderer-performance-budget.test.js scripts/runtime-boundary.test.js scripts/server-bundle-manifest.test.js scripts/startup-theme.test.js scripts/tauri-artifact-budget.test.js scripts/tauri-release-workflow.test.js",
+    "test:scripts": "npm run generate:orval && node --test scripts/android-build-workflow.test.js scripts/check-release-version.test.js scripts/dependency-license-policy.test.js scripts/design-tokens.test.js scripts/generate-api-contracts.test.js scripts/generated-react-query-hooks.test.js scripts/generate-tauri-release.test.js scripts/github-actions-pinning.test.js scripts/icon-design.test.js scripts/prettier-baseline.test.js scripts/renderer-performance-budget.test.js scripts/runtime-boundary.test.js scripts/server-bundle-manifest.test.js scripts/startup-theme.test.js scripts/tauri-artifact-budget.test.js scripts/tauri-preview-workflow.test.js scripts/tauri-release-workflow.test.js",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "check:rust": "cargo check --locked --manifest-path src-tauri/Cargo.toml",
