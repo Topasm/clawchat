@@ -513,7 +513,7 @@ jobs:
       - name: Build combined updater manifest and checksums
         run: npm run generate:tauri-release -- release-input release-artifacts
         env:
-          GITHUB_REF_NAME: ${{ needs.preflight.outputs.tag }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
 
       - name: Verify final release inventory
         shell: bash
