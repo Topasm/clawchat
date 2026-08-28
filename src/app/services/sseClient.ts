@@ -9,6 +9,8 @@ interface SSECallbacks {
   onMeta?: (meta: StreamEventMeta) => void;
   onToken?: (token: string) => void;
   onTitleGenerated?: (title: string) => void;
+  /** The stream performed a task/calendar action; affected data is stale. */
+  onModuleDataChanged?: (metadata: { module?: string }) => void;
   onDone?: (fullMessage: string) => void;
   onError?: (error: Error) => void;
 }
@@ -37,7 +39,7 @@ export function connectSSE(
   token: string,
   callbacks: SSECallbacks,
 ): AbortController {
-  const { onMeta, onToken, onTitleGenerated, onDone, onError } = callbacks;
+  const { onMeta, onToken, onTitleGenerated, onModuleDataChanged, onDone, onError } = callbacks;
   const abortController = new AbortController();
 
   let accumulated = '';
@@ -55,7 +57,10 @@ export function connectSSE(
   const resetInactivityTimer = () => {
     clearInactivityTimer();
     inactivityTimer = setTimeout(() => {
-      logger.warn('SSE connection timed out after inactivity', { url, accumulatedLength: accumulated.length });
+      logger.warn('SSE connection timed out after inactivity', {
+        url,
+        accumulatedLength: accumulated.length,
+      });
       abortController.abort();
     }, SSE_TIMEOUT_MS);
   };
@@ -126,6 +131,8 @@ export function connectSSE(
                 onToken?.(parsed.token);
               } else if (parsed.title_generated !== undefined) {
                 onTitleGenerated?.(parsed.title_generated);
+              } else if (parsed.module_data_changed !== undefined) {
+                onModuleDataChanged?.(parsed.module_data_changed);
               }
             } catch {
               // Skip malformed JSON events
@@ -159,6 +166,8 @@ export function connectSSE(
               onToken?.(parsed.token);
             } else if (parsed.title_generated !== undefined) {
               onTitleGenerated?.(parsed.title_generated);
+            } else if (parsed.module_data_changed !== undefined) {
+              onModuleDataChanged?.(parsed.module_data_changed);
             }
           } catch {
             // Skip malformed JSON events
@@ -194,11 +203,14 @@ export function connectSSE(
 
       // If tokens were already received, salvage the partial response
       if (accumulated) {
-        logger.warn('SSE connection lost after receiving partial response, returning accumulated data', {
-          url,
-          accumulatedLength: accumulated.length,
-          error: (error as Error).message,
-        });
+        logger.warn(
+          'SSE connection lost after receiving partial response, returning accumulated data',
+          {
+            url,
+            accumulatedLength: accumulated.length,
+            error: (error as Error).message,
+          },
+        );
         onDone?.(accumulated);
         return;
       }

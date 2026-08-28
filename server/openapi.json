@@ -5567,6 +5567,17 @@
           "conversation_id": {
             "title": "Conversation Id",
             "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
           }
         },
         "required": [
@@ -10289,7 +10300,7 @@
     },
     "/api/pairing/claim": {
       "post": {
-        "description": "Mobile claims a pairing session using the code. No auth required -- the code IS the auth.",
+        "description": "Mobile claims a pairing session using the code. No auth required -- the code IS the auth.\n\nBecause the code is the only credential, wrong guesses are throttled per\ncaller: a 6-digit space is small enough to sweep otherwise.",
         "operationId": "claim_pairing_session_api_pairing_claim_post",
         "requestBody": {
           "content": {

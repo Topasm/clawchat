@@ -25,6 +25,10 @@ from services import (
     todo_service,
 )
 from services.ai_service import AIService
+from services.conversation_context import (
+    build_first_class_project_context,
+    build_project_context,
+)
 from services.intent_classifier import classify_intent
 from utils import make_id
 from ws.manager import ConnectionManager
@@ -77,6 +81,37 @@ class Orchestrator:
         if self._app_state:
             return getattr(self._app_state, "active_ai", self.ai)
         return self.ai
+
+    async def resolve_intent_response(
+        self,
+        db: AsyncSession,
+        conversation_id: str,
+        intent: str,
+        params: dict,
+        content: str,
+    ) -> tuple[str, dict | None] | None:
+        """Produce the reply for an already-classified intent, without delivering it.
+
+        Returns ``None`` when the intent has no self-contained textual answer and
+        the caller should fall back to streaming a chat completion. That covers
+        ``general_chat`` and ``delegate_task``: delegation spawns an AgentTask and
+        reports progress over its own WebSocket events, which has no meaning on a
+        one-shot SSE response.
+
+        Splitting this out is what lets the SSE endpoint act on intents at all.
+        Previously only the WebSocket path classified anything, so a client that
+        streamed over SSE -- every Android client -- silently lost task and
+        calendar actions.
+        """
+        if intent in MODULE_INTENTS:
+            return await self._execute_module_intent(db, intent, params, conversation_id)
+        if intent == "search":
+            return await self._resolve_search(db, params, content)
+        if intent == "daily_briefing":
+            return await self._resolve_daily_briefing(db)
+        if intent == "weekly_review":
+            return await self._resolve_weekly_review(db)
+        return None
 
     async def handle_message(
         self,
@@ -240,15 +275,23 @@ class Orchestrator:
 
         agent_run_service.launch_execution(run.id, _run_task())
 
+    async def _resolve_daily_briefing(self, db: AsyncSession) -> tuple[str, dict | None]:
+        return await briefing_service.generate_briefing(db, self.active_ai), None
+
+    async def _resolve_weekly_review(self, db: AsyncSession) -> tuple[str, dict | None]:
+        from services import weekly_review_service
+
+        return await weekly_review_service.generate_weekly_review(db, self.active_ai), None
+
     async def _handle_daily_briefing(
         self,
         db: AsyncSession,
         user_id: str,
         conversation_id: str,
     ):
-        briefing = await briefing_service.generate_briefing(db, self.active_ai)
+        briefing, metadata = await self._resolve_daily_briefing(db)
         await self._send_assistant_message(
-            db, user_id, conversation_id, "daily_briefing", briefing
+            db, user_id, conversation_id, "daily_briefing", briefing, metadata=metadata
         )
 
     async def _handle_weekly_review(
@@ -257,10 +300,9 @@ class Orchestrator:
         user_id: str,
         conversation_id: str,
     ):
-        from services import weekly_review_service
-        review = await weekly_review_service.generate_weekly_review(db, self.active_ai)
+        review, metadata = await self._resolve_weekly_review(db)
         await self._send_assistant_message(
-            db, user_id, conversation_id, "weekly_review", review
+            db, user_id, conversation_id, "weekly_review", review, metadata=metadata
         )
 
     async def _handle_general_chat(
@@ -283,12 +325,9 @@ class Orchestrator:
         system_content = SYSTEM_PROMPT
         conv = await db.get(Conversation, conversation_id)
         if conv and conv.project_id:
-            system_content += await self._build_first_class_project_context(
-                db,
-                conv.project_id,
-            )
+            system_content += await build_first_class_project_context(db, conv.project_id)
         elif conv and conv.project_todo_id:
-            system_content += await self._build_project_context(db, conv.project_todo_id)
+            system_content += await build_project_context(db, conv.project_todo_id)
         messages = [{"role": "system", "content": system_content}]
         for msg in history:
             messages.append({"role": msg.role, "content": msg.content})
@@ -329,31 +368,21 @@ class Orchestrator:
             if not conv.title:
                 await self._generate_title(db, conv, content, user_id)
 
-    async def _handle_search(
+    async def _resolve_search(
         self,
         db: AsyncSession,
-        user_id: str,
-        conversation_id: str,
         params: dict,
         content: str,
-    ):
+    ) -> tuple[str, dict | None]:
         query = params.get("query", content)
         try:
             hits, total = await search_service.search(db, query)
         except Exception:
             logger.exception("Search failed for query: %s", query)
-            await self._send_assistant_message(
-                db, user_id, conversation_id, "search",
-                f"Sorry, I had trouble searching for '{query}'. Please try again.",
-            )
-            return
+            return f"Sorry, I had trouble searching for '{query}'. Please try again.", None
 
         if not hits:
-            await self._send_assistant_message(
-                db, user_id, conversation_id, "search",
-                f"No results found for '{query}'.",
-            )
-            return
+            return f"No results found for '{query}'.", None
 
         lines = [f"Found {total} result(s) for '{query}':"]
         for h in hits[:10]:
@@ -362,8 +391,19 @@ class Orchestrator:
             lines.append(f"- **[{h.type}]** {label}: {preview}")
         if total > 10:
             lines.append(f"...and {total - 10} more.")
+        return "\n".join(lines), None
+
+    async def _handle_search(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        conversation_id: str,
+        params: dict,
+        content: str,
+    ):
+        text, metadata = await self._resolve_search(db, params, content)
         await self._send_assistant_message(
-            db, user_id, conversation_id, "search", "\n".join(lines),
+            db, user_id, conversation_id, "search", text, metadata=metadata
         )
 
     async def _handle_module_action(
@@ -644,59 +684,6 @@ class Orchestrator:
             logger.exception("Module action failed for intent %s", intent)
             action = MODULE_INTENTS.get(intent, intent)
             return f"I tried to {action} but something went wrong. Please try again.", None
-
-    async def _build_project_context(self, db: AsyncSession, project_todo_id: str) -> str:
-        """Build project context string for AI system prompt."""
-        project = await db.get(Todo, project_todo_id)
-        if not project:
-            return ""
-        q = select(Todo).where(Todo.parent_id == project_todo_id)
-        subtasks = (await db.execute(q)).scalars().all()
-
-        ctx = f"\n\n[Project: {project.title}]\n"
-        if project.description:
-            ctx += f"Project Notes:\n{project.description}\n"
-        if subtasks:
-            ctx += f"Tasks ({len(subtasks)}):\n"
-            for t in subtasks:
-                ctx += f"  - [{t.status}] {t.title}"
-                if t.priority != "medium":
-                    ctx += f" ({t.priority})"
-                ctx += "\n"
-        return ctx
-
-    async def _build_first_class_project_context(
-        self,
-        db: AsyncSession,
-        project_id: str,
-    ) -> str:
-        project = await db.get(Project, project_id)
-        if project is None:
-            return ""
-        tasks = list(
-            (
-                await db.execute(
-                    select(Todo)
-                    .where(
-                        Todo.project_id == project_id,
-                        Todo.id != project.root_task_id,
-                    )
-                    .order_by(Todo.sort_order, Todo.created_at)
-                )
-            ).scalars().all()
-        )
-        context = f"\n\n[Project: {project.title}]\n"
-        if project.goal:
-            context += f"Goal: {project.goal}\n"
-        if project.description:
-            context += f"Project Notes:\n{project.description}\n"
-        if project.deadline:
-            context += f"Deadline: {project.deadline.isoformat()}\n"
-        if tasks:
-            context += f"Tasks ({len(tasks)}):\n"
-            for task in tasks:
-                context += f"  - [{task.status}] {task.title}\n"
-        return context
 
     async def _generate_title(
         self,

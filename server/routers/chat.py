@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 logger = logging.getLogger(__name__)
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
 from starlette.responses import StreamingResponse
@@ -28,64 +29,66 @@ from schemas.chat import (
     SendMessageResponse,
 )
 from schemas.common import PaginatedResponse
+from services.conversation_context import (
+    build_first_class_project_context,
+    build_project_context,
+)
+from services.intent_classifier import classify_intent
 from utils import make_id
 
 router = APIRouter()
 
 
-async def _build_project_context(db: AsyncSession, project_todo_id: str) -> str:
-    """Build project context string for AI system prompt."""
-    project = await db.get(Todo, project_todo_id)
-    if not project:
-        return ""
-    # Fetch sub-tasks
-    q = select(Todo).where(Todo.parent_id == project_todo_id)
-    subtasks = (await db.execute(q)).scalars().all()
-
-    ctx = f"\n\n[Project: {project.title}]\n"
-    if project.description:
-        ctx += f"Project Notes:\n{project.description}\n"
-    if subtasks:
-        ctx += f"Tasks ({len(subtasks)}):\n"
-        for t in subtasks:
-            ctx += f"  - [{t.status}] {t.title}"
-            if t.priority != "medium":
-                ctx += f" ({t.priority})"
-            ctx += "\n"
-    return ctx
-
-
-async def _build_first_class_project_context(
+async def _record_user_message(
     db: AsyncSession,
-    project_id: str,
-) -> str:
-    project = await db.get(Project, project_id)
-    if project is None:
-        return ""
-    tasks = list(
-        (
+    body: SendMessageRequest,
+) -> tuple[Message, bool]:
+    """Persist the inbound user message, collapsing retries of the same send.
+
+    Returns ``(message, is_replay)``. When the client resends with a key we have
+    already stored -- which happens whenever a request fails after the server
+    committed -- the stored message is returned untouched instead of a duplicate.
+    """
+    if body.idempotency_key:
+        existing = (
             await db.execute(
-                select(Todo)
-                .where(
-                    Todo.project_id == project_id,
-                    Todo.id != project.root_task_id,
+                select(Message).where(
+                    Message.conversation_id == body.conversation_id,
+                    Message.idempotency_key == body.idempotency_key,
                 )
-                .order_by(Todo.sort_order, Todo.created_at)
             )
-        ).scalars().all()
+        ).scalar_one_or_none()
+        if existing is not None:
+            return existing, True
+
+    message = Message(
+        id=make_id("msg_"),
+        conversation_id=body.conversation_id,
+        role="user",
+        content=body.content,
+        idempotency_key=body.idempotency_key,
     )
-    context = f"\n\n[Project: {project.title}]\n"
-    if project.goal:
-        context += f"Goal: {project.goal}\n"
-    if project.description:
-        context += f"Project Notes:\n{project.description}\n"
-    if project.deadline:
-        context += f"Deadline: {project.deadline.isoformat()}\n"
-    if tasks:
-        context += f"Tasks ({len(tasks)}):\n"
-        for task in tasks:
-            context += f"  - [{task.status}] {task.title}\n"
-    return context
+    db.add(message)
+    conv = await db.get(Conversation, body.conversation_id)
+    if conv:
+        conv.updated_at = datetime.now(timezone.utc)
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Two retries raced. The winner's row is the one that counts.
+        await db.rollback()
+        existing = (
+            await db.execute(
+                select(Message).where(
+                    Message.conversation_id == body.conversation_id,
+                    Message.idempotency_key == body.idempotency_key,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            raise
+        return existing, True
+    return message, False
 
 
 @router.get("/conversations", response_model=PaginatedResponse[ConversationResponse])
@@ -279,16 +282,7 @@ async def stream_chat(
     if not conv:
         raise NotFoundError("Conversation not found")
 
-    # Save user message
-    user_msg = Message(
-        id=make_id("msg_"),
-        conversation_id=body.conversation_id,
-        role="user",
-        content=body.content,
-    )
-    db.add(user_msg)
-    conv.updated_at = datetime.now(timezone.utc)
-    await db.commit()
+    user_msg, _replayed = await _record_user_message(db, body)
 
     # Build message history (last 20)
     q = (
@@ -302,9 +296,9 @@ async def stream_chat(
 
     system_content = SYSTEM_PROMPT
     if conv.project_id:
-        system_content += await _build_first_class_project_context(db, conv.project_id)
+        system_content += await build_first_class_project_context(db, conv.project_id)
     elif conv.project_todo_id:
-        system_content += await _build_project_context(db, conv.project_todo_id)
+        system_content += await build_project_context(db, conv.project_todo_id)
     messages = [{"role": "system", "content": system_content}]
     for msg in history:
         messages.append({"role": msg.role, "content": msg.content})
@@ -312,6 +306,8 @@ async def stream_chat(
     assistant_msg_id = make_id("msg_")
     ai_service = getattr(request.app.state, "active_ai", request.app.state.ai_service)
     session_factory = request.app.state.session_factory
+    orchestrator = getattr(request.app.state, "orchestrator", None)
+    user_msg_id = user_msg.id
 
     async def event_generator():
         meta = json.dumps(
@@ -320,18 +316,52 @@ async def stream_chat(
         yield f"data: {meta}\n\n"
 
         accumulated = ""
-        try:
-            async for token in ai_service.stream_completion(messages):
-                accumulated += token
-                yield f"data: {json.dumps({'token': token})}\n\n"
-        except Exception as exc:
-            logger.exception("Chat stream error: %s", exc)
-            if not accumulated:
-                error_text = f"Sorry, an error occurred while generating a response: {exc}"
-                accumulated = error_text
-                yield f"data: {json.dumps({'token': error_text})}\n\n"
+        resolved_intent = "general_chat"
+        action_metadata = None
 
-        yield "data: [DONE]\n\n"
+        # Classify first: without this, an SSE client could only ever chat.
+        # Task and calendar requests silently produced prose instead of doing
+        # anything, which is what every Android client experienced.
+        action_text = None
+        if orchestrator is not None:
+            try:
+                async with session_factory() as intent_db:
+                    intent_result = await classify_intent(body.content, ai_service)
+                    resolved_intent = intent_result.intent
+                    resolved = await orchestrator.resolve_intent_response(
+                        intent_db,
+                        body.conversation_id,
+                        intent_result.intent,
+                        intent_result.params,
+                        body.content,
+                    )
+                    if resolved is not None:
+                        action_text, action_metadata = resolved
+                    intent_user_msg = await intent_db.get(Message, user_msg_id)
+                    if intent_user_msg:
+                        intent_user_msg.intent = resolved_intent
+                    await intent_db.commit()
+            except Exception:
+                logger.exception("Intent handling failed; falling back to chat")
+                action_text = None
+                resolved_intent = "general_chat"
+
+        if action_text is not None:
+            accumulated = action_text
+            yield f"data: {json.dumps({'token': action_text})}\n\n"
+            if action_metadata:
+                yield f"data: {json.dumps({'module_data_changed': action_metadata})}\n\n"
+        else:
+            try:
+                async for token in ai_service.stream_completion(messages):
+                    accumulated += token
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+            except Exception as exc:
+                logger.exception("Chat stream error: %s", exc)
+                if not accumulated:
+                    error_text = f"Sorry, an error occurred while generating a response: {exc}"
+                    accumulated = error_text
+                    yield f"data: {json.dumps({'token': error_text})}\n\n"
 
         # Save assistant message with a fresh session
         async with session_factory() as save_db:
@@ -340,6 +370,8 @@ async def stream_chat(
                 conversation_id=body.conversation_id,
                 role="assistant",
                 content=accumulated,
+                intent=resolved_intent,
+                metadata_json=json.dumps(action_metadata) if action_metadata else None,
             )
             save_db.add(assistant_msg)
             save_conv = await save_db.get(Conversation, body.conversation_id)
@@ -354,6 +386,10 @@ async def stream_chat(
                     except Exception:
                         pass
             await save_db.commit()
+
+        # [DONE] must be last: every client stops reading here, so anything
+        # emitted after it -- the generated title, previously -- never arrived.
+        yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -374,25 +410,19 @@ async def send_message(
     if not conv:
         raise NotFoundError("Conversation not found")
 
-    msg = Message(
-        id=make_id("msg_"),
-        conversation_id=body.conversation_id,
-        role="user",
-        content=body.content,
-    )
-    db.add(msg)
-    conv.updated_at = datetime.now(timezone.utc)
-    await db.commit()
+    msg, replayed = await _record_user_message(db, body)
 
-    # Dispatch AI processing in background
-    orchestrator = request.app.state.orchestrator
-    background_tasks.add_task(
-        orchestrator.handle_message,
-        user_id=_user,
-        conversation_id=body.conversation_id,
-        message_id=msg.id,
-        content=body.content,
-    )
+    # A replay is a retry of a send we already accepted; dispatching again would
+    # run the orchestrator twice over the same message.
+    if not replayed:
+        orchestrator = request.app.state.orchestrator
+        background_tasks.add_task(
+            orchestrator.handle_message,
+            user_id=_user,
+            conversation_id=body.conversation_id,
+            message_id=msg.id,
+            content=body.content,
+        )
 
     return SendMessageResponse(
         message_id=msg.id,
