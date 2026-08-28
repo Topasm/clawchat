@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from domain.task import TaskStatus
 from exceptions import AIUnavailableError
 from models.todo import Todo
+from utils import match_timezone
 from services.ai_service import AIService
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,9 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
     2. Tasks due within 24 hours but still 'pending' (not started)
     3. Inbox items sitting for 2+ days
     """
+    # SQLite hands these columns back naive, so each stored value is aligned
+    # with `now` before any arithmetic. Skipping that raised TypeError in the
+    # first branch and aborted the whole scan, so no nudge was ever produced.
     now = datetime.now(timezone.utc)
     candidates: list[dict] = []
 
@@ -39,7 +43,7 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
     )
     stale_todos = (await db.execute(stale_q)).scalars().all()
     for t in stale_todos:
-        days = (now - t.updated_at).days
+        days = (now - match_timezone(t.updated_at, now)).days
         candidates.append({
             "todo_id": t.id,
             "title": t.title,
@@ -64,7 +68,7 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
     )
     soon_todos = (await db.execute(soon_q)).scalars().all()
     for t in soon_todos:
-        hours = max(1, int((t.due_date - now).total_seconds() / 3600))
+        hours = max(1, int((match_timezone(t.due_date, now) - now).total_seconds() / 3600))
         candidates.append({
             "todo_id": t.id,
             "title": t.title,
@@ -87,7 +91,7 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
     )
     inbox_todos = (await db.execute(inbox_q)).scalars().all()
     for t in inbox_todos:
-        days = (now - t.created_at).days
+        days = (now - match_timezone(t.created_at, now)).days
         candidates.append({
             "todo_id": t.id,
             "title": t.title,
