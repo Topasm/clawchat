@@ -41,8 +41,10 @@ test('final inventory requires every platform updater and all expected release f
   for (const platform of ['linux-x86_64', 'darwin-aarch64', 'windows-x86_64']) {
     assert.match(workflow, new RegExp(platform));
   }
+  // Eight artifacts plus latest.json and checksums.txt. Three signatures:
+  // one updater bundle per platform.
   assert.match(workflow, /-eq 3/);
-  assert.match(workflow, /-eq 12/);
+  assert.match(workflow, /-eq 10/);
   assert.match(workflow, /fail_on_unmatched_files: true/);
   assert.match(workflow, /draft: true/);
 });
