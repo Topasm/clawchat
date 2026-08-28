@@ -21,6 +21,14 @@ test('preview artifacts contain final installers instead of Tauri bundle support
   assert.doesNotMatch(workflow, /path:\s+src-tauri\/target\/release\/bundle\/\*\*/);
 });
 
+test('base Tauri config provides a deserializable disabled updater config', () => {
+  const config = JSON.parse(
+    readNormalized(path.resolve(__dirname, '..', 'src-tauri', 'tauri.conf.json')),
+  );
+
+  assert.deepEqual(config.plugins?.updater, { pubkey: '', endpoints: [] });
+});
+
 test('preview and release workflows launch the packaged macOS app', () => {
   const previewWorkflow = readNormalized(workflowPath);
   const releaseWorkflow = readNormalized(

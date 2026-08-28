@@ -92,11 +92,11 @@ pub async fn updater_check<R: Runtime>(
     }
 
     pending.clear()?;
-    let updater = app
-        .updater_builder()
-        .timeout(UPDATE_CHECK_TIMEOUT)
-        .build()
-        .map_err(|error| format!("failed to initialize updater: {error}"))?;
+    let updater = match app.updater_builder().timeout(UPDATE_CHECK_TIMEOUT).build() {
+        Ok(updater) => updater,
+        Err(tauri_plugin_updater::Error::EmptyEndpoints) => return Ok(None),
+        Err(error) => return Err(format!("failed to initialize updater: {error}")),
+    };
     let update = match updater.check().await {
         Ok(update) => update,
         Err(tauri_plugin_updater::Error::EmptyEndpoints) => return Ok(None),

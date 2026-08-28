@@ -1,5 +1,6 @@
 const LIB_SOURCE: &str = include_str!("../src/lib.rs");
 const NATIVE_SOURCE: &str = include_str!("../src/native.rs");
+const APP_COMMAND_SOURCE: &str = include_str!("../src/commands/app.rs");
 const SERVER_COMMAND_SOURCE: &str = include_str!("../src/commands/server.rs");
 
 #[test]
@@ -62,4 +63,10 @@ fn application_build_failure_is_logged_without_panicking() {
     assert!(LIB_SOURCE.contains("failed to build application: {error}"));
     assert!(LIB_SOURCE.contains("std::process::exit(1)"));
     assert!(!LIB_SOURCE.contains(".expect(\"error while building ClawChat\")"));
+}
+
+#[test]
+fn disabled_preview_updater_is_a_noop() {
+    assert!(APP_COMMAND_SOURCE
+        .contains("Err(tauri_plugin_updater::Error::EmptyEndpoints) => return Ok(None)"));
 }
