@@ -12,35 +12,54 @@ if [[ -z "$app_path" ]]; then
 fi
 
 executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_path/Contents/Info.plist")"
-app_binary="$app_path/Contents/MacOS/$executable_name"
+bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
 log_directory="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 app_log="$log_directory/clawchat-app-startup.log"
-app_pid=''
+startup_log="${HOME}/Library/Application Support/${bundle_identifier}/startup.log"
+launch_waiter_pid=''
+
+stop_app() {
+  /usr/bin/osascript -e "tell application id \"$bundle_identifier\" to quit" >/dev/null 2>&1 || true
+  for _ in 1 2 3 4 5; do
+    if [[ -z "$launch_waiter_pid" ]] || ! kill -0 "$launch_waiter_pid" 2>/dev/null; then
+      return
+    fi
+    sleep 1
+  done
+  pkill -TERM -x "$executable_name" 2>/dev/null || true
+}
 
 cleanup() {
-  if [[ -n "$app_pid" ]] && kill -0 "$app_pid" 2>/dev/null; then
-    kill "$app_pid" 2>/dev/null || true
-    wait "$app_pid" 2>/dev/null || true
+  stop_app
+  if [[ -n "$launch_waiter_pid" ]] && kill -0 "$launch_waiter_pid" 2>/dev/null; then
+    kill "$launch_waiter_pid" 2>/dev/null || true
+    wait "$launch_waiter_pid" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT INT TERM
 
-RUST_BACKTRACE=1 "$app_binary" >"$app_log" 2>&1 &
-app_pid=$!
+RUST_BACKTRACE=1 /usr/bin/open -n -W "$app_path" >"$app_log" 2>&1 &
+launch_waiter_pid=$!
 
 for ((second = 0; second < smoke_seconds; second += 1)); do
   sleep 1
-  if ! kill -0 "$app_pid" 2>/dev/null; then
+  if ! kill -0 "$launch_waiter_pid" 2>/dev/null; then
     set +e
-    wait "$app_pid"
+    wait "$launch_waiter_pid"
     exit_code=$?
     set -e
-    app_pid=''
+    launch_waiter_pid=''
     failure_message="ClawChat exited during the macOS startup smoke test (exit code $exit_code)."
     echo "$failure_message" >&2
     cat "$app_log" >&2
+    if [[ -f "$startup_log" ]]; then
+      cat "$startup_log" >&2
+    fi
     if [[ "${GITHUB_ACTIONS:-}" == 'true' ]]; then
-      diagnostic="$(tail -c 4000 "$app_log")"
+      diagnostic="$(tail -c 2000 "$app_log")"
+      if [[ -f "$startup_log" ]]; then
+        diagnostic+="$(tail -c 2000 "$startup_log")"
+      fi
       diagnostic="${diagnostic//'%'/'%25'}"
       diagnostic="${diagnostic//$'\r'/'%0D'}"
       diagnostic="${diagnostic//$'\n'/'%0A'}"
@@ -50,7 +69,7 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
   fi
 done
 
-kill "$app_pid"
-wait "$app_pid" 2>/dev/null || true
-app_pid=''
+stop_app
+wait "$launch_waiter_pid" 2>/dev/null || true
+launch_waiter_pid=''
 echo "ClawChat remained running for ${smoke_seconds}s; macOS startup smoke test passed."

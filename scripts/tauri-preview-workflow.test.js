@@ -44,8 +44,11 @@ test('preview and release workflows launch the packaged macOS app', () => {
     assert.match(workflow, /bash scripts\/smoke-test-tauri-macos-app\.sh "\$mount_dir"/);
   }
   assert.match(smokeScript, /CFBundleExecutable/);
+  assert.match(smokeScript, /CFBundleIdentifier/);
+  assert.match(smokeScript, /\/usr\/bin\/open -n -W "\$app_path"/);
+  assert.match(smokeScript, /tell application id/);
   assert.match(smokeScript, /ClawChat exited during the macOS startup smoke test/);
-  assert.match(smokeScript, /kill -0 "\$app_pid"/);
+  assert.match(smokeScript, /kill -0 "\$launch_waiter_pid"/);
   assert.match(smokeScript, /::error title=macOS app startup smoke failed/);
 });
 
