@@ -335,10 +335,18 @@ jobs:
 
       - name: Build signed updater artifacts
         shell: bash
-        run: >-
-          npx tauri build
-          --config src-tauri/tauri.release.generated.conf.json
-          --bundles "${{ matrix.bundles }}"
+        run: |
+          set -euo pipefail
+          # Tauri decides to notarize from the mere presence of these
+          # variables, and a missing secret still arrives as an empty string.
+          # Leaving them set made an unsigned macOS build fail with
+          # "Team ID must be at least 3 characters".
+          if [ "${APPLE_SIGNING_ENABLED:-0}" != '1' ]; then
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+          fi
+          npx tauri build \
+            --config src-tauri/tauri.release.generated.conf.json \
+            --bundles "${{ matrix.bundles }}"
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -399,7 +407,7 @@ jobs:
           node scripts/verify-tauri-package.js $extracted --run-server
 
       - name: Verify Windows Authenticode signatures
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && env.WINDOWS_SIGNING_ENABLED == '1'
         shell: pwsh
         run: |
           $installers = @(

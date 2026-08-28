@@ -78,6 +78,32 @@ test('platform code signing is optional but all-or-nothing per platform', () => 
   assert.match(workflow, /if \[ "\$\{APPLE_SIGNING_ENABLED:-0\}" = '1' \]/);
 });
 
+test('nothing verifies a platform signature that was never produced', () => {
+  // The Authenticode check ran unconditionally and failed an unsigned
+  // Windows release on assets that were never meant to be signed.
+  const workflow = readWorkflow();
+
+  for (const [step, flag] of [
+    ['Verify Windows Authenticode signatures', 'WINDOWS_SIGNING_ENABLED'],
+    ['Verify embedded Linux AppImage signature', 'LINUX_SIGNING_ENABLED'],
+  ]) {
+    const guard = new RegExp(`name: ${step}\\n\\s+if: [^\\n]*env\\.${flag} == '1'`);
+    assert.match(workflow, guard, `${step} must be guarded on ${flag}`);
+  }
+});
+
+test('an unsigned macOS build is not handed empty Apple credentials', () => {
+  // Tauri decides to notarize from the presence of these variables, and a
+  // missing secret still arrives as an empty string, so the build failed with
+  // "Team ID must be at least 3 characters".
+  const workflow = readWorkflow();
+
+  assert.match(
+    workflow,
+    /if \[ "\$\{APPLE_SIGNING_ENABLED:-0\}" != '1' \]; then\n\s+unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID/u,
+  );
+});
+
 test('every job that compiles Rust installs the Linux desktop dependencies', () => {
   // The preflight job ran `npm run test:rust-core` without them and failed on
   // libdbus-sys, so no release could be cut at all.
