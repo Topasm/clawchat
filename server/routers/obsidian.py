@@ -140,24 +140,6 @@ async def list_projects(
     }
 
 
-@router.get("/projects/{folder:path}/context")
-async def get_project_context(
-    folder: str,
-    _user: str = Depends(get_current_user),
-):
-    """Read TODO.md and related documents for a project folder."""
-    from services.vault.obsidian_context_service import read_project_context
-
-    vault_path = settings.obsidian_vault_path
-    if not vault_path:
-        return {"error": "Vault not configured"}
-
-    ctx = await asyncio.to_thread(
-        read_project_context, vault_path, folder, settings.obsidian_cli_command
-    )
-    return ctx
-
-
 # ---------------------------------------------------------------------------
 # Index management
 # ---------------------------------------------------------------------------

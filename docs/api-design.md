@@ -630,18 +630,28 @@ POST   /api/notifications/register-token   # Register a platform push token
 
 #### `POST /api/notifications/register-token`
 
+The token is stored on the caller's `paired_devices` row, which is where
+`PushService.send_to_all_devices` reads from. A device token identifies its own
+row and needs no `device_id`; a PIN-authenticated caller must supply one, and
+gets `{"status": "ignored", "reason": "no_device"}` if it omits it, because a
+token with no device attached can never be delivered to.
+
 ```json
 // Request
 {
   "token": "<platform-push-token>",
-  "device_id": "optional-device-id"
+  "device_id": "required only for PIN-authenticated callers"
 }
 
 // Response 200
 {
-  "status": "registered"
+  "status": "registered",
+  "device_id": "dev_..."
 }
 ```
+
+Registering an unknown `device_id` returns 404. Re-registering replaces the
+stored token, so rotation works without a separate call.
 
 ---
 

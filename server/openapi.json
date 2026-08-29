@@ -9792,6 +9792,7 @@
     },
     "/api/notifications/register-token": {
       "post": {
+        "description": "Store a device's push token on its ``paired_devices`` row.\n\n``PushService.send_to_all_devices`` reads tokens from that column, so a\ntoken that is not written there can never be delivered to.  A device token\nidentifies its own row; a PIN-authenticated caller must name the device.",
         "operationId": "register_push_token_api_notifications_register_token_post",
         "requestBody": {
           "content": {
@@ -10049,52 +10050,6 @@
           }
         ],
         "summary": "List Projects",
-        "tags": [
-          "obsidian"
-        ]
-      }
-    },
-    "/api/obsidian/projects/{folder}/context": {
-      "get": {
-        "description": "Read TODO.md and related documents for a project folder.",
-        "operationId": "get_project_context_api_obsidian_projects__folder__context_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "folder",
-            "required": true,
-            "schema": {
-              "title": "Folder",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Project Context",
         "tags": [
           "obsidian"
         ]
@@ -11542,31 +11497,6 @@
         "tags": [
           "settings",
           "settings"
-        ]
-      }
-    },
-    "/api/tags": {
-      "get": {
-        "operationId": "get_tags_api_tags_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Tags",
-        "tags": [
-          "tags",
-          "tags"
         ]
       }
     },

@@ -25,7 +25,6 @@ from routers import project as project_router
 from routers import review as review_router
 from routers import search as search_router
 from routers import settings as settings_router
-from routers import tags as tags_router
 from routers import task_relationship as task_relationship_router
 from routers import tasks as tasks_router
 from routers import today as today_router
@@ -265,7 +264,6 @@ app.include_router(search_router.router, prefix="/api/search", tags=["search"])
 app.include_router(today_router.router, prefix="/api/today", tags=["today"])
 app.include_router(notifications_router.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
-app.include_router(tags_router.router, prefix="/api/tags", tags=["tags"])
 app.include_router(tasks_router.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(attachment_router.router, prefix="/api/attachments", tags=["attachments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])

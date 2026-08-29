@@ -32,7 +32,6 @@ server/
 │   ├── obsidian.py             # Obsidian vault /api/obsidian/* (health, index, CLI, queue)
 │   ├── search.py               # GET /api/search
 │   ├── settings.py             # User settings /api/settings
-│   ├── tags.py                 # GET /api/tags (aggregated tags)
 │   ├── today.py                # GET /api/today (dashboard aggregation)
 │   ├── pairing.py              # Device pairing /api/pairing
 │   ├── capabilities.py         # Runtime/client capability discovery
