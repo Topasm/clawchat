@@ -18,6 +18,10 @@ import com.clawchat.android.core.R
  */
 object ReminderNotificationHelper {
 
+    /** Extras carried by the tap intent so the app can open the right screen. */
+    const val EXTRA_REMINDER_TYPE = "reminder_type"
+    const val EXTRA_ITEM_ID = "item_id"
+
     private const val CHANNEL_ID = "clawchat_reminders"
     private const val CHANNEL_NAME = "Reminders"
     private const val CHANNEL_DESCRIPTION = "Event and task reminders"
@@ -58,6 +62,11 @@ object ReminderNotificationHelper {
         title: String,
         message: String,
     ) {
+        // Android 13+ drops a notification posted without POST_NOTIFICATIONS,
+        // and the user can switch the channel off at any time. Bail out rather
+        // than build a notification nobody will see.
+        if (!NotificationPermission.isGranted(context)) return
+
         val pendingIntent = buildPendingIntent(context, reminderType, itemId)
         val notificationId = itemId.hashCode()
 
@@ -97,18 +106,23 @@ object ReminderNotificationHelper {
     // ── Private helpers ──────────────────────────────────────────────────
 
     /**
-     * Builds a [PendingIntent] that opens `MainActivity` with extras so the
-     * app can navigate to the relevant item.
+     * Builds a [PendingIntent] that opens the app's launcher activity with
+     * extras so it can navigate to the screen holding the item.
      */
     private fun buildPendingIntent(
         context: Context,
         reminderType: String,
         itemId: String,
     ): PendingIntent {
-        val intent = Intent(context, Class.forName("com.clawchat.android.MainActivity")).apply {
+        // The launcher intent resolves the app's entry activity without this
+        // module reaching into the app module by class name.
+        val intent = (
+            context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?: Intent(Intent.ACTION_MAIN).setPackage(context.packageName)
+            ).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("reminder_type", reminderType)
-            putExtra("item_id", itemId)
+            putExtra(EXTRA_REMINDER_TYPE, reminderType)
+            putExtra(EXTRA_ITEM_ID, itemId)
         }
         return PendingIntent.getActivity(
             context,

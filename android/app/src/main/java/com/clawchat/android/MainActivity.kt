@@ -4,8 +4,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,13 +15,16 @@ import androidx.compose.ui.platform.LocalContext
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.repository.TodoRepository
+import com.clawchat.android.core.notification.NotificationPermission
 import com.clawchat.android.core.notification.ReminderNotificationHelper
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.ui.update.AppUpdatePrompt
 import com.clawchat.android.core.update.AppUpdateManager
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
 import com.clawchat.android.navigation.ClawChatNavGraph
+import com.clawchat.android.navigation.reminderRoute
 import com.clawchat.android.ui.theme.ClawChatTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -32,10 +37,14 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var todoRepository: TodoRepository
     @Inject lateinit var updateManager: AppUpdateManager
 
+    /** Route a tapped reminder asked for, consumed once the graph navigates. */
+    private val pendingReminderRoute = MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleShareIntent(intent)
+        handleReminderIntent(intent)
 
         setContent {
             val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
@@ -45,6 +54,25 @@ class MainActivity : ComponentActivity() {
 
             val context = LocalContext.current
             val updateState by updateManager.state.collectAsState()
+            val reminderDeepLink by pendingReminderRoute.collectAsState()
+            val notificationPermissionRequested by sessionStore
+                .notificationPermissionRequested
+                .collectAsState(initial = true)
+
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { /* The system keeps the answer; a denial is not retried. */ }
+
+            // Android 13+ drops every reminder until the user grants this, and
+            // the system ignores a second request, so ask exactly once — after
+            // the app has a server to receive reminders from.
+            LaunchedEffect(isLoggedIn, notificationPermissionRequested) {
+                if (!isLoggedIn || notificationPermissionRequested) return@LaunchedEffect
+                if (!NotificationPermission.isRuntimePermission()) return@LaunchedEffect
+                if (NotificationPermission.isGranted(context)) return@LaunchedEffect
+                sessionStore.markNotificationPermissionRequested()
+                notificationPermissionLauncher.launch(NotificationPermission.PERMISSION)
+            }
 
             // A published GitHub release is offered once per launch window;
             // the manager throttles the network call and honours the
@@ -99,7 +127,12 @@ class MainActivity : ComponentActivity() {
                 themeModeKey = themeMode,
                 accentColorKey = accentColor,
             ) {
-                ClawChatNavGraph(isLoggedIn = isLoggedIn, onboardingSkipped = onboardingSkipped)
+                ClawChatNavGraph(
+                    isLoggedIn = isLoggedIn,
+                    onboardingSkipped = onboardingSkipped,
+                    deepLinkRoute = reminderDeepLink,
+                    onDeepLinkHandled = { pendingReminderRoute.value = null },
+                )
                 AppUpdatePrompt(
                     state = updateState,
                     onDownload = updateManager::downloadUpdate,
@@ -114,6 +147,20 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleShareIntent(intent)
+        handleReminderIntent(intent)
+    }
+
+    /**
+     * A reminder notification carries the item it is about. Route to the screen
+     * that shows it, and clear the extras so a configuration change does not
+     * navigate a second time.
+     */
+    private fun handleReminderIntent(intent: Intent?) {
+        val reminderType = intent?.getStringExtra(ReminderNotificationHelper.EXTRA_REMINDER_TYPE)
+            ?: return
+        intent.removeExtra(ReminderNotificationHelper.EXTRA_REMINDER_TYPE)
+        intent.removeExtra(ReminderNotificationHelper.EXTRA_ITEM_ID)
+        pendingReminderRoute.value = reminderRoute(reminderType)
     }
 
     private fun handleShareIntent(intent: Intent?) {

@@ -38,6 +38,17 @@ class SessionStoreTest {
         assertEquals("dark", store.themeMode.first())
     }
 
+    @Test
+    fun `the notification permission prompt is only remembered once asked`() = runTest {
+        val store = SessionStore(newDataStore(this))
+
+        assertEquals(false, store.notificationPermissionRequested.first())
+
+        store.markNotificationPermissionRequested()
+
+        assertEquals(true, store.notificationPermissionRequested.first())
+    }
+
     private fun newDataStore(scope: TestScope): DataStore<Preferences> {
         val file = File.createTempFile("session-store-test", ".preferences_pb").apply {
             deleteOnExit()

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -42,9 +43,27 @@ val bottomNavItems = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClawChatNavGraph(isLoggedIn: Boolean, onboardingSkipped: Boolean = false) {
+fun ClawChatNavGraph(
+    isLoggedIn: Boolean,
+    onboardingSkipped: Boolean = false,
+    /** Destination a tapped notification asked for, or null. */
+    deepLinkRoute: String? = null,
+    onDeepLinkHandled: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val startDestination = if (isLoggedIn || onboardingSkipped) NavRoute.Today.route else NavRoute.Onboarding.route
+
+    // Onboarding owns the screen until there is a session, so a reminder that
+    // arrives before then is dropped rather than queued behind the setup flow.
+    LaunchedEffect(deepLinkRoute, isLoggedIn, onboardingSkipped) {
+        val route = deepLinkRoute ?: return@LaunchedEffect
+        if (!isLoggedIn && !onboardingSkipped) return@LaunchedEffect
+        navController.navigate(route) {
+            popUpTo(NavRoute.Today.route)
+            launchSingleTop = true
+        }
+        onDeepLinkHandled()
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
