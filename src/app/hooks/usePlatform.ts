@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import {
   detectPlatform,
-  IS_MOBILE,
   IS_DESKTOP,
-  IS_WEB,
   IS_TAURI,
+  IS_WEB,
+  isMobileViewport,
+  subscribeToMobileViewport,
   type Platform,
 } from '../types/platform';
 
@@ -17,14 +18,18 @@ interface PlatformInfo {
 }
 
 export default function usePlatform(): PlatformInfo {
+  // Live, because the viewport can change under a running app — a rotated
+  // phone or a resized window must not leave the wrong shell mounted.
+  const isMobile = useSyncExternalStore(subscribeToMobileViewport, isMobileViewport, () => false);
+
   return useMemo(
     () => ({
       platform: detectPlatform(),
-      isMobile: IS_MOBILE,
+      isMobile,
       isDesktop: IS_DESKTOP,
       isWeb: IS_WEB,
       isTauri: IS_TAURI,
     }),
-    [],
+    [isMobile],
   );
 }

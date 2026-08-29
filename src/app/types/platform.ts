@@ -9,12 +9,36 @@ export const IS_WEB = !IS_DESKTOP;
 
 /**
  * The compact mobile shell (bottom navigation, swipe tabs, mobile status bar)
- * still ships in the renderer, but no supported runtime reports as mobile now
- * that the Capacitor/iOS wrapper is gone — web and Tauri both render the
- * desktop shell. Kept as an explicit flag so the shell can be re-enabled from a
- * real signal (viewport, or a future native wrapper) in one place.
+ * follows the viewport, not the platform.
+ *
+ * It used to be gated on ``IS_IOS || IS_ANDROID``, both of which required the
+ * Capacitor wrapper — so a phone *browser* never got it, and once the wrapper
+ * was removed nothing did. The breakpoint matches the dominant one in
+ * ``src/styles`` so the JS and CSS shells switch together.
+ *
+ * Desktop is excluded deliberately: a narrow Tauri window is still a desktop
+ * app, and that is how it behaved before.
  */
-export const IS_MOBILE: boolean = false;
+export const MOBILE_VIEWPORT_QUERY = '(max-width: 768px)';
+
+function mobileViewport(): MediaQueryList | null {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return null;
+  }
+  return window.matchMedia(MOBILE_VIEWPORT_QUERY);
+}
+
+export function isMobileViewport(): boolean {
+  return !IS_DESKTOP && (mobileViewport()?.matches ?? false);
+}
+
+/** Subscribe to viewport changes, for ``useSyncExternalStore``. */
+export function subscribeToMobileViewport(onChange: () => void): () => void {
+  const query = mobileViewport();
+  if (!query) return () => {};
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
 
 export function detectPlatform(): Platform {
   return IS_TAURI ? 'tauri' : 'web';
