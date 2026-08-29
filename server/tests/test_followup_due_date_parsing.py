@@ -12,9 +12,9 @@ from datetime import datetime
 
 import pytest
 
-from services import todo_service
-from services.intent_handlers import IntentContext
-from services.intent_handlers.todo_intents import create_todo, update_todo
+from services.tasks import todo_service
+from services.chat.intent_handlers import IntentContext
+from services.chat.intent_handlers.todo_intents import create_todo, update_todo
 
 
 def _ctx(db, **params) -> IntentContext:
@@ -116,7 +116,7 @@ async def test_a_malformed_due_date_raises_on_update(db_session):
 @pytest.mark.asyncio
 async def test_the_orchestrator_turns_the_failure_into_a_reply(db_session):
     """The user-visible half of the failure contract, for both intents."""
-    from services.orchestrator import Orchestrator
+    from services.chat.orchestrator import Orchestrator
 
     orchestrator = Orchestrator(None, None, None)
     await create_todo(_ctx(db_session, title="Orchestrated"))

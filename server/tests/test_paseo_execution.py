@@ -22,7 +22,7 @@ from models.artifact import Artifact
 from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
-from services import agent_run_service, paseo_execution_service
+from services.agents import agent_run_service, paseo_execution_service
 
 
 class FakePaseoAdapter:

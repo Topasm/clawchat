@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 
-from services.ai_service import AIService
+from services.ai.ai_service import AIService
 from skills import SkillDef, get_all_skills
 
 logger = logging.getLogger(__name__)

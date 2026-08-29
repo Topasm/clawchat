@@ -1,0 +1,206 @@
+/* --- Unified Review Inbox ---------------------------------- */
+.cc-review-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cc-review-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cc-review-page__header h1 {
+  margin: 0;
+}
+.cc-review-page__header p {
+  margin: 5px 0 0;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+}
+.cc-review-filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+.cc-review-filter {
+  padding: 7px 11px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface);
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cc-review-filter--active {
+  border-color: var(--cc-primary);
+  background: color-mix(in srgb, var(--cc-primary) 10%, var(--cc-surface));
+  color: var(--cc-primary);
+  font-weight: 600;
+}
+.cc-review-list {
+  display: grid;
+  gap: 12px;
+}
+.cc-review-card {
+  padding: 16px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  background: var(--cc-surface);
+}
+.cc-review-card__topline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cc-review-card__topline time {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.cc-review-card__risk {
+  padding: 2px 6px;
+  border-radius: var(--cc-radius-pill);
+  background: color-mix(in srgb, var(--cc-warning) 12%, transparent);
+  color: var(--cc-warning);
+  font-weight: 700;
+}
+.cc-review-card__risk--low {
+  background: color-mix(in srgb, var(--cc-success) 12%, transparent);
+  color: var(--cc-success);
+}
+.cc-review-card__risk--high {
+  background: color-mix(in srgb, var(--cc-error) 12%, transparent);
+  color: var(--cc-error);
+}
+.cc-review-card h2 {
+  margin: 12px 0 4px;
+  color: var(--cc-text);
+  font-size: 16px;
+}
+.cc-review-card__summary,
+.cc-review-card__note {
+  margin: 0 0 10px;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+}
+.cc-review-card__preview {
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.cc-review-card__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cc-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.cc-review-card__decision {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cc-border);
+}
+.cc-review-card__decision textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.cc-review-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.cc-agent-review-handoff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 35%, var(--cc-border));
+  border-radius: var(--cc-radius-md);
+  background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
+}
+.cc-agent-review-handoff--applied {
+  margin-top: 0;
+  border-color: color-mix(in srgb, var(--cc-success) 42%, var(--cc-border));
+  background: color-mix(in srgb, var(--cc-success) 8%, var(--cc-surface));
+}
+.cc-agent-review-handoff__topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--cc-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cc-agent-review-handoff--applied .cc-agent-review-handoff__topline {
+  color: var(--cc-success);
+}
+.cc-agent-review-handoff > strong {
+  color: var(--cc-text);
+  font-size: 13px;
+}
+.cc-agent-review-handoff > p {
+  margin: 0;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+}
+.cc-agent-review-handoff__tasks {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cc-agent-review-handoff__tasks li > span,
+.cc-agent-review-handoff__tasks button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font-size: 12px;
+  text-align: left;
+}
+.cc-agent-review-handoff__tasks button {
+  cursor: pointer;
+}
+.cc-agent-review-handoff__tasks button:hover {
+  border-color: var(--cc-primary);
+}
+.cc-agent-review-handoff__tasks button span {
+  color: var(--cc-primary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.cc-agent-review-handoff__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 2px;
+}

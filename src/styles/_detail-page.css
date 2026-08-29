@@ -1,0 +1,98 @@
+/* --- Detail page fields ----------------------------------- */
+.cc-detail {
+  max-width: 600px;
+}
+
+.cc-detail__title-input {
+  font-size: 20px;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: var(--cc-text);
+  width: 100%;
+  outline: none;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-detail__title-input::placeholder {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-detail__field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--cc-border) 50%, transparent);
+}
+
+.cc-detail__field-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cc-text-secondary);
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.cc-detail__field-value {
+  font-size: 14px;
+  color: var(--cc-text);
+  flex: 1;
+}
+
+.cc-detail__field-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: transparent;
+  font-size: 13px;
+  color: var(--cc-text);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.cc-detail__field-btn:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-detail__textarea {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--cc-text);
+  background: var(--cc-background);
+  outline: none;
+  resize: vertical;
+  margin-top: 12px;
+}
+
+.cc-detail__textarea:focus {
+  border-color: var(--cc-primary);
+}
+
+.cc-detail__textarea::placeholder {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-detail__delete-btn {
+  margin-top: 24px;
+}
+
+.cc-detail__section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--cc-border) 50%, transparent);
+}
+
+.cc-detail__section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cc-text-secondary);
+  margin-bottom: 8px;
+}

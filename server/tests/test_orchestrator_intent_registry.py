@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import select
 
 from models.todo import Todo
-from services.intent_handlers import (
+from services.chat.intent_handlers import (
     INTENT_HANDLERS,
     MODULE_INTENTS,
     IntentContext,
@@ -24,9 +24,9 @@ from services.intent_handlers import (
     is_module_intent,
     register_intent_handler,
 )
-from services.intent_handlers import event_intents, general_intents, todo_intents
-from services.intent_classifier import INTENT_TOOLS_SCHEMA
-from services.orchestrator import MODULE_INTENTS as ORCHESTRATOR_MODULE_INTENTS
+from services.chat.intent_handlers import event_intents, general_intents, todo_intents
+from services.chat.intent_classifier import INTENT_TOOLS_SCHEMA
+from services.chat.orchestrator import MODULE_INTENTS as ORCHESTRATOR_MODULE_INTENTS
 
 # Intents the orchestrator answers itself rather than through the registry:
 # both queue or stream work instead of returning a one-shot reply.
@@ -132,7 +132,7 @@ async def test_a_handler_reads_its_ai_from_the_context(db_session):
         calls.append(ai_service)
         return "your day"
 
-    import services.briefing_service as briefing_service
+    import services.notifications.briefing_service as briefing_service
 
     original = briefing_service.generate_briefing
     briefing_service.generate_briefing = _briefing

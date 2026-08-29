@@ -22,7 +22,7 @@ from schemas.pairing import (
     PairedDeviceResponse,
     DeviceListResponse,
 )
-from services.host_identity import get_or_create_host_identity
+from services.relay.host_identity import get_or_create_host_identity
 from services.rate_limiter import client_key, pairing_claim_limiter
 from ws.manager import ws_manager
 

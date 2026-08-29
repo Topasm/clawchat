@@ -14,7 +14,7 @@ from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
 from schemas.task import PlanPayload
-from services import review_item_service
+from services.review import review_item_service
 from sqlalchemy import select
 
 

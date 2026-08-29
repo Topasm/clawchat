@@ -55,15 +55,6 @@ PERSONA_TO_SKILL: dict[str, str] = {
     "executor": "obsidian_sync",
 }
 
-AGENT_TYPE_TO_SKILL: dict[str, str] = {
-    "general": "summarize",
-    "research": "research",
-    "drafting": "draft",
-    "analysis": "data_analysis",
-    "scheduling": "prioritize",
-    "planner": "plan",
-}
-
 
 # Auto-register builtins on import.
 from skills.builtins import register_builtins as _register_builtins  # noqa: E402

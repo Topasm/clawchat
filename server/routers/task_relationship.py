@@ -15,7 +15,7 @@ from schemas.task_relationship import (
     TaskRelationshipResponse,
     TaskRelationshipUpdate,
 )
-from services import task_relationship_service
+from services.tasks import task_relationship_service
 from ws.notifications import notify_module_data_changed
 
 router = APIRouter()

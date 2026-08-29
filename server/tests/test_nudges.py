@@ -11,7 +11,7 @@ import pytest
 
 from domain.task import TaskStatus
 from models.todo import Todo
-from services import nudge_service
+from services.notifications import nudge_service
 from utils import make_id
 
 UTC = timezone.utc

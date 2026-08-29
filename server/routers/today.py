@@ -12,7 +12,7 @@ from models.todo import Todo
 from schemas.calendar import EventResponse
 from schemas.today import TodayResponse
 from schemas.todo import TodoResponse
-from services.briefing_service import generate_briefing
+from services.notifications.briefing_service import generate_briefing
 from utils import deserialize_tags
 from utils.inbox_display import get_next_action
 

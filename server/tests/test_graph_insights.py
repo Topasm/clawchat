@@ -12,8 +12,8 @@ from exceptions import ConflictError
 from models.task_graph_state import TaskGraphState
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
-import services.graph_insights_service as graph_insights_service
-from services.graph_insights_service import (
+import services.tasks.graph_insights_service as graph_insights_service
+from services.tasks.graph_insights_service import (
     _analyze_snapshot,
     _EdgeSnapshot,
     _GraphSnapshot,

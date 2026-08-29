@@ -1,0 +1,21 @@
+/* --- System prompt page ----------------------------------- */
+.cc-sysprompt {
+  max-width: 640px;
+}
+
+.cc-sysprompt__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.cc-sysprompt__counter {
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-sysprompt__actions {
+  display: flex;
+  gap: 8px;
+}

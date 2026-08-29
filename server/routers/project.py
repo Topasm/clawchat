@@ -9,7 +9,7 @@ from schemas.project import (
     ProjectResponse,
     ProjectUpdate,
 )
-from services import project_service
+from services.tasks import project_service
 from sqlalchemy.ext.asyncio import AsyncSession
 from ws.notifications import notify_module_data_changed
 

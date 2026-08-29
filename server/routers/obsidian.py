@@ -16,7 +16,7 @@ from auth.dependencies import get_current_user
 from config import settings
 from database import get_db
 from models.todo import Todo
-from services.obsidian_export_service import (
+from services.vault.obsidian_export_service import (
     export_all_todos,
     get_last_export_time,
     set_last_export_time,
@@ -96,9 +96,9 @@ async def get_health(
     Returns vault availability, CLI status, companion node state,
     index freshness, write queue status, and sync status.
     """
-    from services.obsidian_vault_indexer import get_health_summary
-    from services.obsidian_cli_service import get_queue_status
-    from services.vault_watcher_service import get_sync_status
+    from services.vault.obsidian_vault_indexer import get_health_summary
+    from services.vault.obsidian_cli_service import get_queue_status
+    from services.vault.vault_watcher_service import get_sync_status
 
     health = await asyncio.to_thread(get_health_summary)
     health["write_queue"] = await asyncio.to_thread(get_queue_status)
@@ -116,7 +116,7 @@ async def list_projects(
     _user: str = Depends(get_current_user),
 ):
     """List project folders with cached metadata from the vault index."""
-    from services.obsidian_vault_indexer import ensure_fresh
+    from services.vault.obsidian_vault_indexer import ensure_fresh
 
     idx = await asyncio.to_thread(ensure_fresh)
     projects = []
@@ -146,7 +146,7 @@ async def get_project_context(
     _user: str = Depends(get_current_user),
 ):
     """Read TODO.md and related documents for a project folder."""
-    from services.obsidian_context_service import read_project_context
+    from services.vault.obsidian_context_service import read_project_context
 
     vault_path = settings.obsidian_vault_path
     if not vault_path:
@@ -168,7 +168,7 @@ async def trigger_reindex(
     _user: str = Depends(get_current_user),
 ):
     """Force a full vault index refresh."""
-    from services.obsidian_vault_indexer import refresh_index
+    from services.vault.obsidian_vault_indexer import refresh_index
 
     idx = await asyncio.to_thread(refresh_index)
     return {
@@ -190,7 +190,7 @@ async def get_write_queue(
     _user: str = Depends(get_current_user),
 ):
     """Return pending write queue operations."""
-    from services.obsidian_cli_service import get_queue_status
+    from services.vault.obsidian_cli_service import get_queue_status
 
     return await asyncio.to_thread(get_queue_status)
 
@@ -200,7 +200,7 @@ async def flush_write_queue(
     _user: str = Depends(get_current_user),
 ):
     """Attempt to replay all queued write operations."""
-    from services.obsidian_cli_service import flush_queue
+    from services.vault.obsidian_cli_service import flush_queue
 
     return await asyncio.to_thread(flush_queue)
 
@@ -210,7 +210,7 @@ async def clear_write_queue(
     _user: str = Depends(get_current_user),
 ):
     """Clear all queued write operations."""
-    from services.obsidian_cli_service import clear_queue
+    from services.vault.obsidian_cli_service import clear_queue
 
     cleared = await asyncio.to_thread(clear_queue)
     return {"cleared": cleared}
@@ -226,7 +226,7 @@ async def get_dead_letter(
     _user: str = Depends(get_current_user),
 ):
     """Return dead letter queue (operations that exceeded max retries)."""
-    from services.obsidian_cli_service import get_dead_letter_status
+    from services.vault.obsidian_cli_service import get_dead_letter_status
 
     return await asyncio.to_thread(get_dead_letter_status)
 
@@ -236,7 +236,7 @@ async def retry_dead_letter_queue(
     _user: str = Depends(get_current_user),
 ):
     """Move all dead letter items back to the main queue with reset retries."""
-    from services.obsidian_cli_service import retry_dead_letter
+    from services.vault.obsidian_cli_service import retry_dead_letter
 
     requeued = await asyncio.to_thread(retry_dead_letter)
     return {"requeued": requeued}
@@ -247,7 +247,7 @@ async def clear_dead_letter_queue(
     _user: str = Depends(get_current_user),
 ):
     """Clear all dead letter operations."""
-    from services.obsidian_cli_service import clear_dead_letter
+    from services.vault.obsidian_cli_service import clear_dead_letter
 
     cleared = await asyncio.to_thread(clear_dead_letter)
     return {"cleared": cleared}
@@ -263,7 +263,7 @@ async def get_cli_errors(
     _user: str = Depends(get_current_user),
 ):
     """Return recent CLI error log (up to 50 entries, newest first)."""
-    from services.obsidian_cli_service import get_cli_error_log
+    from services.vault.obsidian_cli_service import get_cli_error_log
 
     errors = await asyncio.to_thread(get_cli_error_log)
     return {"errors": errors, "total": len(errors)}
@@ -280,7 +280,7 @@ async def trigger_vault_scan(
     _user: str = Depends(get_current_user),
 ):
     """Scan the vault for external changes and sync them to the database."""
-    from services.vault_watcher_service import scan_vault
+    from services.vault.vault_watcher_service import scan_vault
 
     result = await scan_vault(db)
     return {
@@ -298,7 +298,7 @@ async def get_sync_status_endpoint(
     _user: str = Depends(get_current_user),
 ):
     """Return bidirectional sync status."""
-    from services.vault_watcher_service import get_sync_status
+    from services.vault.vault_watcher_service import get_sync_status
 
     return get_sync_status()
 
@@ -313,7 +313,7 @@ async def list_cli_commands(
     _user: str = Depends(get_current_user),
 ):
     """List available Obsidian CLI plugin commands."""
-    from services.obsidian_cli_service import list_cli_commands
+    from services.vault.obsidian_cli_service import list_cli_commands
 
     commands = await asyncio.to_thread(list_cli_commands)
     return {"commands": commands, "total": len(commands)}
@@ -325,7 +325,7 @@ async def execute_cli_command(
     _user: str = Depends(get_current_user),
 ):
     """Execute a specific Obsidian CLI plugin command."""
-    from services.obsidian_cli_service import _run_cli
+    from services.vault.obsidian_cli_service import _run_cli
 
     result = await asyncio.to_thread(_run_cli, "command", f"id={command_id}")
     if result is None:

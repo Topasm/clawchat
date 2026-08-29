@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from exceptions import NotFoundError
-from services import calendar_service
+from services.calendar import calendar_service
 from utils import make_id
 
 UTC = timezone.utc

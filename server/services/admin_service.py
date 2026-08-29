@@ -17,7 +17,7 @@ from models.todo import Todo
 from models.event import Event
 from models.agent_task import AgentTask
 from models.attachment import Attachment
-from services import task_relationship_service
+from services.tasks import task_relationship_service
 
 logger = logging.getLogger(__name__)
 

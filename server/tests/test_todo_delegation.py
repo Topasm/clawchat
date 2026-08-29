@@ -51,7 +51,7 @@ async def delegation_runtime(session_factory, monkeypatch):
         launched.append(run_id)
         coroutine.close()  # never scheduled, so close it to avoid a warning
 
-    monkeypatch.setattr("services.agent_run_service.launch_execution", _capture)
+    monkeypatch.setattr("services.agents.agent_run_service.launch_execution", _capture)
 
     previous = {
         key: getattr(app.state, key, None)

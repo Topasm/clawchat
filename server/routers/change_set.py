@@ -7,7 +7,8 @@ from database import get_db
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from schemas.common import ErrorResponse
 from schemas.task import PlanUndoResponse
-from services import plan_proposal_service, vault_sync_service
+from services.planning import plan_proposal_service
+from services.vault import vault_sync_service
 from sqlalchemy.ext.asyncio import AsyncSession
 from ws.notifications import notify_module_data_changed
 

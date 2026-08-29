@@ -24,12 +24,14 @@ from models.task_graph_state import TaskGraphState
 from models.todo import Todo
 from models.vault_sync_job import VaultSyncJob
 from schemas.task import PlanPayload
-from services import (
+from services.planning import (
     plan_proposal_service,
     todo_planning_service,
+)
+from services.vault import (
     vault_sync_service,
 )
-from services.todo_planning_service import ExternalPlanningContext
+from services.planning.todo_planning_service import ExternalPlanningContext
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 

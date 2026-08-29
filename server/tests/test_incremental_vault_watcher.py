@@ -7,8 +7,8 @@ from unittest.mock import patch
 import pytest
 
 from models.todo import Todo
-from services import obsidian_vault_indexer as indexer
-from services import vault_watcher_service as watcher
+from services.vault import obsidian_vault_indexer as indexer
+from services.vault import vault_watcher_service as watcher
 from services.scheduler import _is_watchable_vault_path
 
 
@@ -34,7 +34,7 @@ async def test_incremental_scan_reads_only_changed_todo_file(db_session, tmp_pat
 
     with patch.object(watcher.settings, "obsidian_vault_path", str(tmp_path)), \
          patch.object(watcher.settings, "obsidian_project_todo_filename", "TODO.md"), \
-         patch("services.vault_watcher_service.os.walk", side_effect=AssertionError("walked")):
+         patch("services.vault.vault_watcher_service.os.walk", side_effect=AssertionError("walked")):
         result = await watcher.scan_vault(db_session, {str(changed_file)})
 
     await db_session.refresh(changed_todo)
@@ -59,7 +59,7 @@ def test_incremental_index_refresh_updates_only_affected_project(tmp_path):
         indexer.refresh_index()
         note.write_text("new summary", encoding="utf-8")
         with patch(
-            "services.obsidian_vault_indexer.list_project_folders",
+            "services.vault.obsidian_vault_indexer.list_project_folders",
             side_effect=AssertionError("full refresh used"),
         ):
             refreshed = indexer.refresh_changed_paths({str(note)})

@@ -1,0 +1,208 @@
+/* --- Inbox Tree ------------------------------------------- */
+
+.cc-inbox-tree {
+  overflow: hidden;
+}
+
+.cc-inbox-tree__header,
+.cc-inbox-tree__project-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cc-inbox-tree__header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-inbox-tree__header div,
+.cc-inbox-tree__project-target {
+  min-width: 0;
+}
+
+.cc-inbox-tree__header span,
+.cc-inbox-tree__project-target > span {
+  display: block;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
+.cc-inbox-tree__projects {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.cc-inbox-tree__project {
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+}
+
+.cc-inbox-tree__project-target {
+  padding: 10px;
+  background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
+}
+
+.cc-inbox-tree__project-target:has(button:hover),
+.cc-inbox-tree__project-target:hover {
+  background: color-mix(in srgb, var(--cc-primary) 13%, var(--cc-surface));
+}
+
+.cc-inbox-tree__project-target button,
+.cc-inbox-tree__place-button {
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  padding: 4px 7px;
+  background: var(--cc-primary);
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.cc-inbox-tree__placement-actions {
+  display: flex;
+  gap: 3px;
+  padding-right: 4px;
+}
+
+.cc-inbox-tree__dependency-handle,
+.cc-inbox-dependency-handle {
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 45%, var(--cc-border));
+  border-radius: var(--cc-radius-pill);
+  background: color-mix(in srgb, var(--cc-primary) 8%, var(--cc-surface));
+  color: var(--cc-primary);
+  cursor: alias;
+}
+
+.cc-inbox-tree__dependency-handle:hover,
+.cc-inbox-tree__dependency-handle:focus-visible,
+.cc-inbox-dependency-handle:hover,
+.cc-inbox-dependency-handle:focus-visible {
+  border-color: var(--cc-primary);
+  background: color-mix(in srgb, var(--cc-primary) 18%, var(--cc-surface));
+}
+
+.cc-inbox-dependency-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+.cc-inbox-tree__nodes {
+  padding: 5px 8px 8px;
+}
+
+.cc-inbox-tree__insert {
+  height: 10px;
+  border-radius: var(--cc-radius-pill);
+}
+
+.cc-inbox-tree__insert:hover {
+  background: var(--cc-primary);
+}
+
+.cc-inbox-tree__node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--cc-radius-sm);
+}
+
+.cc-inbox-tree__node:hover {
+  border-color: color-mix(in srgb, var(--cc-primary) 42%, var(--cc-border));
+  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
+}
+
+.cc-inbox-tree__node--selected {
+  border-color: var(--cc-primary);
+}
+
+.cc-inbox-tree__node > button:first-child {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 0;
+  padding: 6px;
+  background: transparent;
+  color: var(--cc-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-inbox-tree__node strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-inbox-tree__identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cc-inbox-tree__telemetry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cc-inbox-tree__telemetry-badge {
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--cc-radius-pill);
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--cc-text-tertiary) 12%, transparent);
+  color: var(--cc-text-secondary);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='active'] {
+  background: color-mix(in srgb, var(--cc-primary) 13%, transparent);
+  color: var(--cc-primary);
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='attention'] {
+  background: color-mix(in srgb, var(--cc-warning) 13%, transparent);
+  color: var(--cc-warning);
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='success'] {
+  background: color-mix(in srgb, var(--cc-success) 13%, transparent);
+  color: var(--cc-success);
+}
+
+.cc-inbox-tree__telemetry-badge[data-tone='error'] {
+  background: color-mix(in srgb, var(--cc-error) 13%, transparent);
+  color: var(--cc-error);
+}
+
+.cc-inbox-tree__node small {
+  color: var(--cc-text-tertiary);
+  font-size: 9px;
+}
+
+.cc-inbox-tree__empty {
+  display: block;
+  padding: 12px;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}

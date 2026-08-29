@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from domain.task import TaskStatus
 from models.todo import Todo
-from services.orchestrator import Orchestrator
+from services.chat.orchestrator import Orchestrator
 from utils import make_id
 
 

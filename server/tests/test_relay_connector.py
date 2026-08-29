@@ -5,8 +5,8 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
-from services.relay_connector import RelayHostConnector
-from services.relay_crypto import RelayCipher, encode_bytes
+from services.relay.relay_connector import RelayHostConnector
+from services.relay.relay_crypto import RelayCipher, encode_bytes
 from ws.manager import ConnectionManager
 
 

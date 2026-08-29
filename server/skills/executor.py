@@ -17,8 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.agent_task import AgentTask
 from models.todo import Todo
-from services.ai_service import AIService
-from services.agent_task_service import mark_completed, mark_failed, mark_running, update_progress
+from services.ai.ai_service import AIService
+from services.agents.agent_task_service import mark_completed, mark_failed, mark_running, update_progress
 from skills import SKILL_REGISTRY, get_skill
 from ws.manager import ConnectionManager
 
@@ -145,7 +145,7 @@ async def _write_vault_document(
 ) -> None:
     """Write a vault document using the skill's template."""
     from config import settings
-    from services import obsidian_cli_service as cli
+    from services.vault import obsidian_cli_service as cli
 
     vault = settings.obsidian_vault_path
     if not vault:

@@ -14,7 +14,7 @@ from models.agent_task import AgentTask
 from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
-from services import agent_run_service, agent_task_service
+from services.agents import agent_run_service, agent_task_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 

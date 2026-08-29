@@ -13,7 +13,7 @@ from domain.plan_proposal import VaultSyncJobStatus
 from models.task_graph_state import TaskGraphState
 from models.todo import Todo
 from models.vault_sync_job import VaultSyncJob
-from services import vault_sync_service
+from services.vault import vault_sync_service
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,

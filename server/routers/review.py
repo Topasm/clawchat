@@ -10,11 +10,17 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from models.plan_proposal import PlanProposal
 from schemas.review import ReviewDecisionRequest, ReviewDecisionResponse, ReviewItemResponse
 from schemas.task import PlanApplyRequest
-from services import (
+from services.agents import (
     agent_run_service,
-    artifact_service,
+)
+from services.planning import (
     plan_proposal_service,
+)
+from services.review import (
+    artifact_service,
     review_item_service,
+)
+from services.vault import (
     vault_sync_service,
 )
 from sqlalchemy.ext.asyncio import AsyncSession

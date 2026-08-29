@@ -22,8 +22,8 @@ from models.event import Event
 from models.message import Message
 from models.project import Project
 from models.todo import Todo
-from services import orchestrator as orchestrator_module
-from services.orchestrator import MODULE_INTENTS, Orchestrator
+from services.chat import orchestrator as orchestrator_module
+from services.chat.orchestrator import MODULE_INTENTS, Orchestrator
 from utils import make_id
 
 
@@ -449,7 +449,7 @@ async def test_suggest_time_without_slots(orchestrator, db_session, monkeypatch)
         return []
 
     monkeypatch.setattr(
-        "services.scheduling_service.suggest_best_time", _none, raising=True
+        "services.calendar.scheduling_service.suggest_best_time", _none, raising=True
     )
     text, metadata = await resolve(orchestrator, db_session, "suggest_time", {})
     assert text == (
@@ -473,7 +473,7 @@ async def test_suggest_time_formats_the_slots(orchestrator, db_session, ai, monk
         return suggestions
 
     monkeypatch.setattr(
-        "services.scheduling_service.suggest_best_time", _suggest, raising=True
+        "services.calendar.scheduling_service.suggest_best_time", _suggest, raising=True
     )
     text, metadata = await resolve(
         orchestrator,
@@ -506,7 +506,7 @@ async def test_suggest_time_defaults(orchestrator, db_session, monkeypatch):
         return []
 
     monkeypatch.setattr(
-        "services.scheduling_service.suggest_best_time", _suggest, raising=True
+        "services.calendar.scheduling_service.suggest_best_time", _suggest, raising=True
     )
     await resolve(orchestrator, db_session, "suggest_time", {})
     assert captured == {"title": "Meeting", "duration": 60, "preferred": None}
@@ -516,7 +516,7 @@ async def test_check_conflicts_when_free(orchestrator, db_session, monkeypatch):
     async def _none(*args, **kwargs):
         return []
 
-    monkeypatch.setattr("services.scheduling_service.find_conflicts", _none, raising=True)
+    monkeypatch.setattr("services.calendar.scheduling_service.find_conflicts", _none, raising=True)
     text, metadata = await resolve(
         orchestrator,
         db_session,
@@ -537,7 +537,7 @@ async def test_check_conflicts_defaults_the_window_to_one_hour(
         return [{"title": "Standup", "start_time": "2026-09-01T09:00:00+00:00"}]
 
     monkeypatch.setattr(
-        "services.scheduling_service.find_conflicts", _conflicts, raising=True
+        "services.calendar.scheduling_service.find_conflicts", _conflicts, raising=True
     )
     text, metadata = await resolve(
         orchestrator,
@@ -563,7 +563,7 @@ async def test_check_conflicts_without_a_start_time_uses_now(
         return []
 
     monkeypatch.setattr(
-        "services.scheduling_service.find_conflicts", _conflicts, raising=True
+        "services.calendar.scheduling_service.find_conflicts", _conflicts, raising=True
     )
     await resolve(orchestrator, db_session, "check_conflicts", {})
     assert abs(
@@ -601,7 +601,7 @@ async def test_module_intent_failure_falls_back_to_a_generic_apology(
     async def _boom(*args, **kwargs):
         raise RuntimeError("db down")
 
-    monkeypatch.setattr("services.todo_service.get_todos", _boom, raising=True)
+    monkeypatch.setattr("services.tasks.todo_service.get_todos", _boom, raising=True)
     text, metadata = await resolve(orchestrator, db_session, "query_todos")
     assert text == "I tried to list your todos but something went wrong. Please try again."
     assert metadata is None
@@ -717,7 +717,7 @@ async def test_daily_briefing_delegates_to_the_briefing_service(
         return "your day"
 
     monkeypatch.setattr(
-        "services.briefing_service.generate_briefing", _briefing, raising=True
+        "services.notifications.briefing_service.generate_briefing", _briefing, raising=True
     )
     text, metadata = await resolve(orchestrator, db_session, "daily_briefing")
     assert text == "your day"
@@ -735,7 +735,7 @@ async def test_weekly_review_delegates_to_the_review_service(
         return "your week"
 
     monkeypatch.setattr(
-        "services.weekly_review_service.generate_weekly_review", _review, raising=True
+        "services.notifications.weekly_review_service.generate_weekly_review", _review, raising=True
     )
     text, metadata = await resolve(orchestrator, db_session, "weekly_review")
     assert text == "your week"
@@ -752,7 +752,7 @@ async def test_briefing_failures_propagate_to_the_caller(
         raise RuntimeError("no ai")
 
     monkeypatch.setattr(
-        "services.briefing_service.generate_briefing", _boom, raising=True
+        "services.notifications.briefing_service.generate_briefing", _boom, raising=True
     )
     with pytest.raises(RuntimeError):
         await resolve(orchestrator, db_session, "daily_briefing")
@@ -854,7 +854,7 @@ async def test_daily_briefing_sends_one_assistant_message(
         return "your day"
 
     monkeypatch.setattr(
-        "services.briefing_service.generate_briefing", _briefing, raising=True
+        "services.notifications.briefing_service.generate_briefing", _briefing, raising=True
     )
     await orchestrator.handle_message("user-1", conv_id, msg_id, "brief me")
 
@@ -878,7 +878,7 @@ async def test_weekly_review_sends_one_assistant_message(
         return "your week"
 
     monkeypatch.setattr(
-        "services.weekly_review_service.generate_weekly_review", _review, raising=True
+        "services.notifications.weekly_review_service.generate_weekly_review", _review, raising=True
     )
     await orchestrator.handle_message("user-1", conv_id, msg_id, "review my week")
 
@@ -971,7 +971,7 @@ async def test_delegate_task_queues_a_background_task(
 
     monkeypatch.setattr("skills.selector.select_skills", _select, raising=True)
     monkeypatch.setattr(
-        "services.agent_run_service.launch_execution", _launch, raising=True
+        "services.agents.agent_run_service.launch_execution", _launch, raising=True
     )
 
     await orchestrator.handle_message("user-1", conv_id, msg_id, "research widgets")
@@ -1003,7 +1003,7 @@ async def test_delegate_task_announces_a_multi_skill_chain(
 
     monkeypatch.setattr("skills.selector.select_skills", _select, raising=True)
     monkeypatch.setattr(
-        "services.agent_run_service.launch_execution", _launch, raising=True
+        "services.agents.agent_run_service.launch_execution", _launch, raising=True
     )
 
     await orchestrator.handle_message("user-1", conv_id, msg_id, "plan the launch")

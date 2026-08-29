@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
-from services import obsidian_cli_service as cli
-from services import todo_service
+from services.vault import obsidian_cli_service as cli
+from services.tasks import todo_service
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ async def test_todo_delete_removes_from_vault_off_the_event_loop_thread(db_sessi
 async def test_reindex_endpoint_offloads_the_full_vault_scan():
     """`refresh_index` walks the whole vault and shells out to the CLI twice."""
     from routers import obsidian as obsidian_router
-    from services import obsidian_vault_indexer as indexer
+    from services.vault import obsidian_vault_indexer as indexer
 
     loop_thread = threading.current_thread()
     seen: list[threading.Thread] = []

@@ -4,7 +4,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
-from services.relay_crypto import RelayCipher, encode_bytes
+from services.relay.relay_crypto import RelayCipher, encode_bytes
 
 
 def keypair() -> tuple[str, str]:

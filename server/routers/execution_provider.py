@@ -4,7 +4,7 @@ from auth.dependencies import get_current_user
 from execution.paseo_cli import PaseoCLIAdapter
 from fastapi import APIRouter, Depends, Request
 from schemas.execution_provider import ExecutionProviderStatus
-from services.paseo_execution_service import adapter_from_settings
+from services.agents.paseo_execution_service import adapter_from_settings
 
 
 router = APIRouter()

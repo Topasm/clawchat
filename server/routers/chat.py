@@ -29,11 +29,11 @@ from schemas.chat import (
     SendMessageResponse,
 )
 from schemas.common import PaginatedResponse
-from services.conversation_context import (
+from services.chat.conversation_context import (
     build_first_class_project_context,
     build_project_context,
 )
-from services.intent_classifier import classify_intent
+from services.chat.intent_classifier import classify_intent
 from utils import make_id
 
 router = APIRouter()

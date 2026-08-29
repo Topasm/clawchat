@@ -21,8 +21,8 @@ os.environ.setdefault("OBSIDIAN_SYNC_MODE", "filesystem")
 os.environ.setdefault("OBSIDIAN_CLI_COMMAND", "")
 os.environ.setdefault("ENABLE_SCHEDULER", "false")
 
-from services import obsidian_cli_service as cli_svc  # noqa: E402
-from services.obsidian_export_service import export_todo  # noqa: E402
+from services.vault import obsidian_cli_service as cli_svc # noqa: E402
+from services.vault.obsidian_export_service import export_todo  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

@@ -1,0 +1,128 @@
+/* --- Quick Capture Modal --------------------------------- */
+.cc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  z-index: 1000;
+  /* animation handled by framer-motion */
+}
+
+@keyframes cc-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cc-modal {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  box-shadow: var(--cc-shadow-overlay);
+  width: 480px;
+  max-width: 90vw;
+  /* animation handled by framer-motion */
+}
+
+@keyframes cc-slide-down {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.cc-quick-capture__input {
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  border-bottom: 1px solid var(--cc-border);
+  background: transparent;
+  font-size: 15px;
+  color: var(--cc-text);
+  outline: none;
+  box-sizing: border-box;
+  border-radius: var(--cc-radius-lg) var(--cc-radius-lg) 0 0;
+}
+
+.cc-quick-capture__input::placeholder {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-quick-capture__preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-quick-capture__time {
+  font-size: 12px;
+  color: var(--cc-primary);
+  font-weight: 500;
+}
+
+.cc-quick-capture__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+@media (max-width: 768px) {
+  .cc-page-header {
+    margin-bottom: 12px;
+  }
+
+  .cc-page-header__title {
+    font-size: 20px;
+  }
+
+  .cc-page-header__subtitle {
+    font-size: 12px;
+  }
+
+  .cc-detail__field {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 5px;
+    padding: 11px 0;
+  }
+
+  .cc-detail__field-label {
+    width: auto;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .cc-detail__field-btn {
+    min-height: var(--cc-control-height);
+    align-self: flex-start;
+  }
+
+  .cc-today-progress {
+    padding: 9px 12px;
+    margin-bottom: 12px;
+  }
+
+  .cc-today-progress__header {
+    margin-bottom: 6px;
+  }
+
+  .cc-today-progress__label,
+  .cc-inbox-banner__text {
+    font-size: 12px;
+  }
+}

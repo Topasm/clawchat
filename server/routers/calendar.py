@@ -8,7 +8,7 @@ from auth.dependencies import get_current_user
 from database import get_db
 from schemas.calendar import EventCreate, EventResponse, EventUpdate
 from schemas.common import PaginatedResponse
-from services import calendar_service
+from services.calendar import calendar_service
 from utils import deserialize_tags
 from ws.notifications import notify_module_data_changed
 

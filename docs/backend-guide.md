@@ -70,33 +70,30 @@ server/
 │   ├── pairing.py              # Device pairing schemas
 │   ├── capabilities.py         # Capability response schemas
 │   ├── claude_code.py          # Claude Code integration schemas
-├── services/
-│   ├── __init__.py
-│   ├── ai_service.py           # LLM client (Ollama native + OpenAI-compatible)
-│   ├── intent_classifier.py    # Intent classification via function calling (16 intents)
-│   ├── orchestrator.py         # Routes intents to services, streams via WebSocket
-│   ├── todo_service.py         # Async todo CRUD with completed_at auto-set
-│   ├── task_relationship_service.py # Edge validation, DAG checks, JSON compatibility shadow
-│   ├── todo_planning_service.py # Prompt/context capture and strict plan generation
-│   ├── plan_validation_service.py # Deterministic proposal/schema/graph validation
-│   ├── plan_proposal_service.py # Versioned apply, idempotency, change sets, undo
-│   ├── calendar_service.py     # Async event CRUD with recurrence support
-│   ├── scheduling_service.py   # Event scheduling suggestions and conflict detection
-│   ├── search_service.py       # FTS5 full-text search
-│   ├── claude_code_provider.py # Claude Code integration provider
-│   ├── agent_task_service.py   # Background task execution pipeline (routes to skill chain)
-│   ├── inbox_pipeline_service.py # Inbox classification + skill suggestion
-│   ├── obsidian_cli_service.py  # Obsidian CLI wrapper + write queue
-│   ├── obsidian_context_service.py # Vault project context for AI planning
-│   ├── obsidian_export_service.py  # Export todos/plans to vault markdown
-│   ├── vault_sync_service.py       # Durable post-commit Vault outbox delivery
-│   ├── obsidian_vault_indexer.py   # Vault file indexing + companion health
-│   ├── vault_watcher_service.py   # Vault file watching service
-│   ├── briefing_service.py     # Daily briefing generation
-│   ├── admin_service.py        # Admin: table counts, storage, uptime, activity, purge, reindex, backup
-│   ├── reminder_service.py     # Event/todo reminder checks
-│   ├── recurrence_service.py   # Recurring event expansion
-│   └── scheduler.py            # Background loops (reminders, briefing, queue flush)
+├── services/                    # Domain packages; the import graph is a DAG,
+│   │                            # leaf-first: vault < tasks < ai < review <
+│   │                            # calendar < planning < notifications < agents < chat
+│   ├── ai/                      # Provider clients: ai_service (Ollama + OpenAI-compatible),
+│   │                            # claude_code_provider
+│   ├── vault/                   # Obsidian CLI wrapper + write queue, vault context/export,
+│   │                            # file indexing, watcher, durable post-commit outbox
+│   ├── tasks/                   # Todo CRUD, relationships (DAG checks), placement,
+│   │                            # execution + telemetry, projects, recurrence,
+│   │                            # graph revision/insight primitives
+│   ├── review/                  # Review items, artifacts, agent-run review handoff
+│   ├── calendar/                # Event CRUD, recurring expansion, scheduling suggestions
+│   ├── planning/                # Plan capture/validation/versioned apply, inbox triage
+│   ├── notifications/           # Daily briefing, weekly review, reminders, nudges, push
+│   ├── agents/                  # Agent task pipeline, run lifecycle, delegation,
+│   │                            # Paseo provider, interrupted-run recovery
+│   ├── relay/                   # Host identity, relay connector + crypto
+│   ├── chat/                    # orchestrator (routes intents, streams over WebSocket),
+│   │                            # intent_classifier, conversation_context,
+│   │                            # intent_handlers/ (per-intent registry)
+│   ├── admin_service.py         # Cross-domain read model: counts, storage, uptime, purge
+│   ├── search_service.py        # Cross-domain read model: FTS5 full-text search
+│   ├── rate_limiter.py          # Transport-level login/pairing throttles
+│   └── scheduler.py             # Process-wide loops (reminders, briefing, queue flush)
 ├── ws/
 │   ├── __init__.py
 │   ├── manager.py              # WebSocket ConnectionManager
@@ -141,7 +138,7 @@ async def lifespan(app: FastAPI):
     await ai_service.close()
 ```
 
-### `services/ai_service.py` — AI Service
+### `services/ai/ai_service.py` — AI Service
 
 Supports two LLM providers with automatic routing based on the `provider` config:
 
@@ -174,7 +171,7 @@ Message CRUD:
 - `DELETE .../messages/:id` — delete a message
 - `PUT .../messages/:id` — edit message content
 
-### `services/orchestrator.py` — Intent Orchestrator
+### `services/chat/orchestrator.py` — Intent Orchestrator
 
 Routes classified intents to real service calls:
 
@@ -243,7 +240,7 @@ the recovered Task is now Ready or Blocked.
 
 Skills are executed sequentially in a chain — each skill's output feeds as context to the next (e.g. `research → summarize → draft`). LLM-based skill selection (`skills/selector.py`) replaces the old keyword-based `detect_agent_type()` heuristic.
 
-### `services/intent_classifier.py` — Intent Classification
+### `services/chat/intent_classifier.py` — Intent Classification
 
 Uses LLM function calling to classify user messages into 16 actionable intents with parameter extraction.
 

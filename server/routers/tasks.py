@@ -10,7 +10,7 @@ from exceptions import NotFoundError
 from models.agent_task import AgentTask
 from schemas.common import PaginatedResponse
 from schemas.task import AgentTaskResponse
-from services import agent_run_service, agent_task_service, paseo_execution_service
+from services.agents import agent_run_service, agent_task_service, paseo_execution_service
 
 router = APIRouter()
 

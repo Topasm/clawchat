@@ -1,0 +1,251 @@
+/* --- Execution Panel (TaskDetailPage) --------------------- */
+.cc-exec-panel {
+  max-width: 640px;
+}
+
+.cc-exec-panel__top {
+  margin-bottom: 20px;
+}
+
+.cc-exec-panel__top-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.cc-exec-panel__badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cc-exec-panel__section {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+}
+
+.cc-exec-panel__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cc-text-secondary);
+  margin-bottom: 10px;
+}
+
+.cc-exec-panel__next-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-exec-panel__remaining {
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
+  padding-left: 28px;
+}
+
+.cc-exec-panel__next-step-empty {
+  padding: 8px 0;
+}
+
+.cc-exec-panel__done-label {
+  font-size: 13px;
+  color: var(--cc-success);
+  font-weight: 500;
+}
+
+.cc-exec-panel__do-this {
+  font-size: 13px;
+  color: var(--cc-text-secondary);
+}
+
+.cc-exec-panel__info-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cc-exec-panel__info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface-secondary);
+  min-width: 100px;
+}
+
+.cc-exec-panel__info-item--overdue {
+  background: color-mix(in srgb, var(--cc-error) 10%, transparent);
+}
+
+.cc-exec-panel__info-item--overdue .cc-exec-panel__info-value {
+  color: var(--cc-error);
+}
+
+.cc-exec-panel__info-item--today .cc-exec-panel__info-value {
+  color: var(--cc-primary);
+}
+
+.cc-exec-panel__info-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-exec-panel__info-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cc-text);
+}
+
+.cc-exec-panel__context {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cc-exec-panel__context-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cc-exec-panel__context-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cc-text-secondary);
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.cc-exec-panel__context-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: var(--cc-radius-xs);
+}
+
+.cc-exec-panel__context-badge--synced {
+  background: color-mix(in srgb, var(--cc-success) 12%, transparent);
+  color: var(--cc-success);
+}
+
+.cc-exec-panel__context-link {
+  font-size: 13px;
+  color: var(--cc-primary);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.cc-exec-panel__context-link:hover {
+  text-decoration: underline;
+}
+
+.cc-exec-panel__action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.cc-exec-panel__delegate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cc-exec-panel__delegate-label {
+  font-size: 12px;
+  color: var(--cc-text-secondary);
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+.cc-exec-panel__delegate-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: var(--cc-radius-xs);
+}
+
+.cc-exec-panel__delegate-btn--active {
+  background: #6366f1;
+  color: #fff;
+}
+
+.cc-exec-panel__delegate-btn--active:hover {
+  background: #6366f1;
+  color: #fff;
+  opacity: 0.85;
+}
+
+.cc-exec-panel__agent-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.cc-exec-panel__agent-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: var(--cc-radius-xs);
+  background: #6366f1;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cc-exec-panel__agent-state {
+  color: var(--cc-text-secondary);
+  font-style: italic;
+}
+
+.cc-exec-panel__details-toggle {
+  margin-top: 12px;
+}
+
+.cc-exec-panel__details-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: transparent;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cc-exec-panel__details-btn:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-exec-panel__details-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--cc-text-tertiary);
+  margin-left: auto;
+}
+
+.cc-exec-panel__details {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+}

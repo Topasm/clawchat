@@ -1,0 +1,40 @@
+/* --- Quick Chats Section (ChatListPage) ------------------- */
+.cc-quick-chats {
+  margin-top: 8px;
+}
+
+.cc-quick-chats__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cc-text-tertiary);
+  margin-bottom: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cc-quick-chats__toggle:hover {
+  color: var(--cc-text-secondary);
+}
+
+.cc-quick-chats__list {
+  height: calc(100vh - 360px);
+  overflow-y: auto;
+  border-top: 1px solid color-mix(in srgb, var(--cc-border) 50%, transparent);
+  padding-top: 4px;
+}
+
+.cc-quick-chats__chevron {
+  flex: 0 0 auto;
+  transition: transform var(--cc-transition-base);
+}
+
+.cc-quick-chats__chevron--open {
+  transform: rotate(90deg);
+}

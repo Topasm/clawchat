@@ -4,10 +4,14 @@ import type {
   TodoResponse,
 } from '../../types/api';
 import { getTaskExecutionBadges } from '../../utils/taskExecutionTelemetry';
-
-export const INBOX_TASK_DRAG_TYPE = 'application/x-clawchat-task-id';
-export const INBOX_TASK_BATCH_DRAG_TYPE = 'application/x-clawchat-task-batch';
-export const INBOX_DEPENDENCY_DRAG_TYPE = 'application/x-clawchat-task-dependency';
+import {
+  acceptsPlacementDrag,
+  draggedDependencyTaskId,
+  draggedPlacementTaskIds,
+  INBOX_DEPENDENCY_DRAG_TYPE,
+  INBOX_TASK_DRAG_TYPE,
+  transferHasType,
+} from './inboxDragTransfer';
 
 interface InboxTriageTreeProps {
   projects: ProjectResponse[];
@@ -32,44 +36,6 @@ function sorted(items: TodoResponse[]) {
     (left, right) =>
       (left.sort_order ?? 0) - (right.sort_order ?? 0) || left.title.localeCompare(right.title),
   );
-}
-
-function draggedTaskId(event: React.DragEvent): string | null {
-  return event.dataTransfer.getData(INBOX_TASK_DRAG_TYPE) || null;
-}
-
-function draggedPlacementTaskIds(event: React.DragEvent): string[] {
-  const batch = event.dataTransfer.getData(INBOX_TASK_BATCH_DRAG_TYPE);
-  if (batch) {
-    try {
-      const parsed: unknown = JSON.parse(batch);
-      if (Array.isArray(parsed) && parsed.every((taskId) => typeof taskId === 'string')) {
-        return parsed;
-      }
-    } catch {
-      return [];
-    }
-  }
-  const taskId = draggedTaskId(event);
-  return taskId ? [taskId] : [];
-}
-
-function acceptsPlacementDrag(event: React.DragEvent): boolean {
-  return (
-    acceptsDragType(event, INBOX_TASK_DRAG_TYPE) ||
-    acceptsDragType(event, INBOX_TASK_BATCH_DRAG_TYPE)
-  );
-}
-
-function acceptsDragType(event: React.DragEvent, type: string): boolean {
-  return (
-    Array.from(event.dataTransfer.types ?? []).includes(type) ||
-    Boolean(event.dataTransfer.getData(type))
-  );
-}
-
-function draggedDependencyTaskId(event: React.DragEvent): string | null {
-  return event.dataTransfer.getData(INBOX_DEPENDENCY_DRAG_TYPE) || null;
 }
 
 export default function InboxTriageTree({
@@ -311,7 +277,7 @@ function TreeNode({
             event.dataTransfer.effectAllowed = 'link';
           }}
           onDragOver={(event) => {
-            if (!disabled && acceptsDragType(event, INBOX_DEPENDENCY_DRAG_TYPE)) {
+            if (!disabled && transferHasType(event, INBOX_DEPENDENCY_DRAG_TYPE)) {
               event.preventDefault();
               event.stopPropagation();
               event.dataTransfer.dropEffect = 'link';

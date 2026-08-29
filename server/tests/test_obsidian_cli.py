@@ -16,7 +16,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("JWT_SECRET", "test")
 os.environ.setdefault("PIN", "123456")
 
-from services import obsidian_cli_service as svc  # noqa: E402
+from services.vault import obsidian_cli_service as svc # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ class TestCreateDocument:
     @patch.object(svc.settings, "obsidian_cli_command", "/usr/bin/obsidian")
     def test_cli_success(self, tmp_path):
         with patch.object(svc.settings, "obsidian_vault_path", str(tmp_path)):
-            with patch("services.obsidian_cli_service.subprocess.run", return_value=_make_proc()):
+            with patch("services.vault.obsidian_cli_service.subprocess.run", return_value=_make_proc()):
                 result = svc.create_document("notes/test.md", "content")
         assert result is True
 
@@ -118,7 +118,7 @@ class TestCreateDocument:
     @patch.object(svc.settings, "obsidian_cli_command", "/usr/bin/obsidian")
     def test_cli_fail_filesystem_fallback(self, tmp_path):
         with patch.object(svc.settings, "obsidian_vault_path", str(tmp_path)):
-            with patch("services.obsidian_cli_service.subprocess.run", return_value=_make_proc(returncode=1, stderr="fail")):
+            with patch("services.vault.obsidian_cli_service.subprocess.run", return_value=_make_proc(returncode=1, stderr="fail")):
                 result = svc.create_document("notes/test.md", "content")
         assert result is True
         assert (tmp_path / "notes" / "test.md").read_text() == "content"
@@ -321,7 +321,7 @@ class TestCliErrorLog:
     @patch.object(svc.settings, "obsidian_cli_command", "/usr/bin/obsidian")
     @patch.object(svc.settings, "obsidian_vault_path", "/tmp/vault")
     def test_failed_cli_logs_error(self):
-        with patch("services.obsidian_cli_service.subprocess.run",
+        with patch("services.vault.obsidian_cli_service.subprocess.run",
                    return_value=_make_proc(returncode=1, stderr="bad args")):
             result = svc._run_cli("create", "path=test.md")
         assert result is None
@@ -333,7 +333,7 @@ class TestCliErrorLog:
     @patch.object(svc.settings, "obsidian_cli_command", "/usr/bin/obsidian")
     @patch.object(svc.settings, "obsidian_vault_path", "/tmp/vault")
     def test_successful_cli_updates_timestamp(self):
-        with patch("services.obsidian_cli_service.subprocess.run",
+        with patch("services.vault.obsidian_cli_service.subprocess.run",
                    return_value=_make_proc(stdout="v1.0")):
             result = svc._run_cli("version")
         assert result is not None
@@ -342,7 +342,7 @@ class TestCliErrorLog:
     @patch.object(svc.settings, "obsidian_cli_command", "/nonexistent")
     @patch.object(svc.settings, "obsidian_vault_path", "/tmp/vault")
     def test_cli_not_found_logs_error(self):
-        with patch("services.obsidian_cli_service.subprocess.run",
+        with patch("services.vault.obsidian_cli_service.subprocess.run",
                    side_effect=FileNotFoundError("not found")):
             result = svc._run_cli("version")
         assert result is None

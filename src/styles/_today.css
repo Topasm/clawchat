@@ -1,0 +1,83 @@
+/* --- Today Progress --------------------------------------- */
+.cc-today-progress {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+}
+
+.cc-today-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cc-today-progress__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cc-text);
+}
+
+.cc-today-progress__streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cc-warning);
+}
+
+.cc-today-progress__track {
+  height: 6px;
+  background: var(--cc-surface-secondary);
+  border-radius: var(--cc-radius-xs);
+  overflow: hidden;
+}
+
+.cc-today-progress__bar {
+  height: 100%;
+  background: var(--cc-primary);
+  border-radius: var(--cc-radius-xs);
+  transition: width 0.4s ease;
+  min-width: 0;
+}
+
+.cc-today-progress__bar--complete {
+  background: var(--cc-success);
+}
+
+/* --- Inbox banner ----------------------------------------- */
+.cc-inbox-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--cc-inbox-yellow) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cc-inbox-yellow) 25%, transparent);
+  border-radius: var(--cc-radius-md);
+  margin-top: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cc-inbox-banner:hover {
+  background: color-mix(in srgb, var(--cc-inbox-yellow) 18%, transparent);
+}
+
+.cc-inbox-banner__text {
+  font-size: 13px;
+  color: var(--cc-text);
+}
+
+.cc-link-btn {
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cc-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

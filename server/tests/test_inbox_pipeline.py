@@ -3,7 +3,7 @@ import json
 
 import pytest
 from models.todo import Todo
-from services import inbox_pipeline_service
+from services.planning import inbox_pipeline_service
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

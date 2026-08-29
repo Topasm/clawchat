@@ -12,8 +12,8 @@ from main import app
 from models.conversation import Conversation
 from models.message import Message
 from models.todo import Todo
-from services.intent_classifier import IntentResult
-from services.orchestrator import Orchestrator
+from services.chat.intent_classifier import IntentResult
+from services.chat.orchestrator import Orchestrator
 
 
 class StubAI:

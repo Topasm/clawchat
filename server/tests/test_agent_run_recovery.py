@@ -10,7 +10,7 @@ from models.project import Project
 from models.review_item import ReviewItem
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
-from services import agent_run_service
+from services.agents import agent_run_service
 from sqlalchemy import select
 
 

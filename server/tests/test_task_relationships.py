@@ -23,8 +23,8 @@ from exceptions import ValidationError
 from main import app
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
-from services.graph_command_service import current_graph_revision
-from services.task_relationship_service import (
+from services.tasks.graph_command_service import current_graph_revision
+from services.tasks.task_relationship_service import (
     _assert_dependency_dag,
     replace_task_dependencies,
 )

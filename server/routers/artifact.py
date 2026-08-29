@@ -9,7 +9,7 @@ from schemas.artifact import (
     ArtifactRevisionCreate,
     ArtifactRevisionResponse,
 )
-from services import artifact_service
+from services.review import artifact_service
 from sqlalchemy.ext.asyncio import AsyncSession
 from ws.notifications import notify_module_data_changed
 

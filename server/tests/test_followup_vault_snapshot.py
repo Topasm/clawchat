@@ -19,8 +19,9 @@ from unittest.mock import patch
 import pytest
 
 from models.todo import Todo
-from services import obsidian_export_service, todo_service
-from services.obsidian_export_service import (
+from services.tasks import todo_service
+from services.vault import obsidian_export_service
+from services.vault.obsidian_export_service import (
     TodoSnapshot,
     _todo_to_md_line,
     export_todo,

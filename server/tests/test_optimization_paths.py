@@ -11,8 +11,8 @@ from models.message import Message
 from models.todo import Todo
 from routers.chat import list_conversations
 from routers.todo import list_projects
-from services.obsidian_export_service import export_all_todos
-from services.scheduling_service import _merge_intervals, find_conflicts, find_free_slots
+from services.vault.obsidian_export_service import export_all_todos
+from services.calendar.scheduling_service import _merge_intervals, find_conflicts, find_free_slots
 
 
 @pytest.mark.asyncio
@@ -93,7 +93,7 @@ def test_full_obsidian_export_walks_vault_once(tmp_path):
     ]
 
     with patch(
-        "services.obsidian_export_service.os.walk",
+        "services.vault.obsidian_export_service.os.walk",
         wraps=os.walk,
     ) as walk:
         result = export_all_todos(str(tmp_path), todos)

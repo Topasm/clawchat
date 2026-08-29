@@ -7,8 +7,8 @@ from sqlalchemy import select
 
 from domain.task import TaskStatus
 from models.todo import Todo
-from services.recurrence_service import generate_occurrences, parse_rrule
-from services.todo_recurrence_service import compute_next_occurrence, spawn_next_occurrence
+from services.calendar.recurrence_service import generate_occurrences, parse_rrule
+from services.tasks.todo_recurrence_service import compute_next_occurrence, spawn_next_occurrence
 from utils import make_id
 
 

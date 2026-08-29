@@ -31,12 +31,12 @@ from routers import tasks as tasks_router
 from routers import today as today_router
 from routers import todo as todo_router
 from routers import voice as voice_router
-from services.ai_service import AIService
-from services.claude_code_provider import (
+from services.ai.ai_service import AIService
+from services.ai.claude_code_provider import (
     ClaudeCodeProvider,
     ClaudeCodeStatus,
 )
-from services.orchestrator import Orchestrator
+from services.chat.orchestrator import Orchestrator
 from services.scheduler import Scheduler
 from ws.handler import websocket_endpoint
 from ws.manager import ws_manager
@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
 
     app.state.session_factory = async_session_factory
 
-    from services import paseo_execution_service
+    from services.agents import paseo_execution_service
 
     app.state.paseo_adapter = paseo_execution_service.adapter_from_settings()
 
@@ -85,13 +85,13 @@ async def lifespan(app: FastAPI):
     async def _init_vault():
         if settings.obsidian_vault_path:
             try:
-                from services.obsidian_cli_service import load_queue
+                from services.vault.obsidian_cli_service import load_queue
                 await asyncio.to_thread(load_queue)
                 logger.info("Obsidian CLI write queue loaded")
             except Exception:
                 logger.debug("Could not load Obsidian CLI write queue")
             try:
-                from services.obsidian_vault_indexer import refresh_index
+                from services.vault.obsidian_vault_indexer import refresh_index
                 idx = await asyncio.to_thread(refresh_index)
                 logger.info(
                     "Obsidian vault index: %d projects (CLI=%s, companion=%s)",
@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI):
             except Exception:
                 logger.debug("Could not build initial vault index")
         try:
-            from services.vault_sync_service import process_pending_vault_sync_jobs
+            from services.vault.vault_sync_service import process_pending_vault_sync_jobs
 
             async with async_session_factory() as vault_job_db:
                 await process_pending_vault_sync_jobs(vault_job_db)
@@ -138,7 +138,7 @@ async def lifespan(app: FastAPI):
             )
 
     # Initialize push notification service (no-op if not configured)
-    from services.push_service import PushService
+    from services.notifications.push_service import PushService
     push_service = PushService(settings.firebase_credentials_path)
     app.state.push_service = push_service
 
@@ -164,7 +164,7 @@ async def lifespan(app: FastAPI):
         app.state.scheduler = None
 
     async def _vault_outbox_loop() -> None:
-        from services.vault_sync_service import process_pending_vault_sync_jobs
+        from services.vault.vault_sync_service import process_pending_vault_sync_jobs
 
         while True:
             try:
@@ -188,7 +188,7 @@ async def lifespan(app: FastAPI):
     app.state.relay_connector = None
     app.state.relay_task = None
     if settings.relay_url:
-        from services.relay_connector import RelayHostConnector
+        from services.relay.relay_connector import RelayHostConnector
 
         relay_connector = RelayHostConnector(settings.relay_url, settings.port, ws_manager)
         app.state.relay_connector = relay_connector

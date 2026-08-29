@@ -8,15 +8,15 @@
       "maxBytes": 271000
     },
     "initialJavaScript.gzipBytes": {
-      "baselineBytes": 86278,
+      "baselineBytes": 86277,
       "maxBytes": 90000
     },
     "allJavaScript.rawBytes": {
-      "baselineBytes": 1931948,
+      "baselineBytes": 1935600,
       "maxBytes": 1986000
     },
     "allRendererFiles.rawBytes": {
-      "baselineBytes": 2110744,
+      "baselineBytes": 2114396,
       "maxBytes": 2158000
     }
   }

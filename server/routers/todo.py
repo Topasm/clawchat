@@ -47,19 +47,25 @@ from schemas.todo import (
     TodoResponse,
     TodoUpdate,
 )
-from services import (
-    graph_insights_service,
+from services.agents import (
+    task_delegation_service,
+)
+from services.planning import (
     inbox_pipeline_service,
     inbox_triage_service,
     plan_proposal_service,
-    task_delegation_service,
+)
+from services.tasks import (
+    graph_insights_service,
     task_placement_service,
     task_execution_telemetry_service,
     task_relationship_service,
     todo_service,
+)
+from services.vault import (
     vault_sync_service,
 )
-from services.obsidian_export_service import (
+from services.vault.obsidian_export_service import (
     export_todos_batch,
     remove_todos_from_vault,
     snapshot_todo,
@@ -489,7 +495,7 @@ async def update_todo(
         and data["status"] == TaskStatus.COMPLETED
         and todo.recurrence_rule
     ):
-        from services.todo_recurrence_service import spawn_next_occurrence
+        from services.tasks.todo_recurrence_service import spawn_next_occurrence
         next_todo = await spawn_next_occurrence(db, todo)
         if next_todo:
             next_todo_id = next_todo.id

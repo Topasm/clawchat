@@ -732,7 +732,7 @@ async def _run_data_migrations(
     without ever having been backfilled.  All of them are idempotent.
     """
     from models.data_migration_marker import DataMigrationMarker
-    from services.task_relationship_service import (
+    from services.tasks.task_relationship_service import (
         backfill_legacy_dependencies,
         reconcile_dependency_shadows,
     )
@@ -758,7 +758,7 @@ async def _run_data_migrations(
     await _backfill_first_class_projects(session)
     await _backfill_review_items(session)
     await _backfill_agent_runs(session)
-    from services.agent_run_service import reconcile_interrupted_runs
+    from services.agents.agent_run_service import reconcile_interrupted_runs
 
     await reconcile_interrupted_runs(session)
     await session.commit()

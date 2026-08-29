@@ -16,7 +16,8 @@ from models.project import Project
 from models.review_item import ReviewItem
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
-from services import agent_run_service, graph_insights_service
+from services.agents import agent_run_service
+from services.tasks import graph_insights_service
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 

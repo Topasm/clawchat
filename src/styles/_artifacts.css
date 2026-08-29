@@ -1,0 +1,53 @@
+/* --- Project artifacts ------------------------------------- */
+.cc-artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+.cc-artifact-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface-secondary);
+}
+.cc-artifact-card__meta,
+.cc-artifact-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.cc-artifact-card h3 {
+  margin: 0;
+  color: var(--cc-text);
+  font-size: 15px;
+}
+.cc-artifact-card pre {
+  min-height: 80px;
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  color: var(--cc-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.cc-artifact-card__footer {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--cc-border);
+  text-transform: none;
+}
+.cc-artifact-dialog__hint {
+  margin: 0;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+}

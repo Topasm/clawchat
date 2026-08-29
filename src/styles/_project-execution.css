@@ -1,0 +1,74 @@
+/* --- Project execution provider --------------------------------------- */
+.cc-project-execution-settings__health {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cc-project-execution-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cc-project-execution-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cc-project-execution-form input,
+.cc-project-execution-form select {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.cc-project-execution-form__path,
+.cc-project-execution-form__actions {
+  grid-column: 1 / -1;
+}
+
+.cc-project-execution-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.cc-project-execution-form__actions small {
+  margin-right: auto;
+  color: var(--cc-error);
+}
+
+.cc-run-card__external {
+  overflow-wrap: anywhere;
+  color: var(--cc-text-tertiary) !important;
+  font-family: monospace;
+  font-size: 11px !important;
+}
+
+@media (max-width: 700px) {
+  .cc-project-execution-settings__health,
+  .cc-project-execution-form__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cc-project-execution-form {
+    grid-template-columns: 1fr;
+  }
+
+  .cc-project-execution-form__path,
+  .cc-project-execution-form__actions {
+    grid-column: auto;
+  }
+}

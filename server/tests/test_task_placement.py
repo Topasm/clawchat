@@ -3,7 +3,7 @@
 import pytest
 from exceptions import ConflictError, ValidationError
 from models.todo import Todo
-from services import graph_insights_service, project_service, task_placement_service
+from services.tasks import graph_insights_service, project_service, task_placement_service
 from sqlalchemy import select
 
 

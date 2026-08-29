@@ -8,8 +8,13 @@ from datetime import datetime, time, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from config import settings
-from services import briefing_service, reminder_service, nudge_service, weekly_review_service
-from services.ai_service import AIService
+from services.notifications import (
+    briefing_service,
+    reminder_service,
+    nudge_service,
+    weekly_review_service,
+)
+from services.ai.ai_service import AIService
 from ws.manager import ConnectionManager
 
 
@@ -279,8 +284,8 @@ class Scheduler:
         )
 
         try:
-            from services.obsidian_vault_indexer import refresh_index
-            from services.vault_watcher_service import scan_vault
+            from services.vault.obsidian_vault_indexer import refresh_index
+            from services.vault.vault_watcher_service import scan_vault
 
             await asyncio.to_thread(refresh_index)
             async with self.session_factory() as db:
@@ -323,8 +328,8 @@ class Scheduler:
             await self._vault_poll_loop(interval)
 
     async def _sync_changed_vault_paths(self, changed_paths: set[str]) -> None:
-        from services.obsidian_vault_indexer import refresh_changed_paths
-        from services.vault_watcher_service import scan_vault
+        from services.vault.obsidian_vault_indexer import refresh_changed_paths
+        from services.vault.vault_watcher_service import scan_vault
 
         async with self.session_factory() as db:
             result = await scan_vault(db, changed_paths)
@@ -336,8 +341,8 @@ class Scheduler:
         await asyncio.to_thread(refresh_changed_paths, changed_paths)
 
     async def _vault_full_audit_loop(self) -> None:
-        from services.obsidian_vault_indexer import refresh_index
-        from services.vault_watcher_service import scan_vault
+        from services.vault.obsidian_vault_indexer import refresh_index
+        from services.vault.vault_watcher_service import scan_vault
 
         try:
             while True:
@@ -352,8 +357,8 @@ class Scheduler:
             logger.debug("Vault full audit loop cancelled")
 
     async def _vault_poll_loop(self, interval: int) -> None:
-        from services.obsidian_vault_indexer import refresh_index
-        from services.vault_watcher_service import scan_vault
+        from services.vault.obsidian_vault_indexer import refresh_index
+        from services.vault.vault_watcher_service import scan_vault
 
         try:
             while True:
@@ -374,7 +379,7 @@ class Scheduler:
             while True:
                 await asyncio.sleep(60)
                 try:
-                    from services.obsidian_cli_service import flush_queue, get_queue_status
+                    from services.vault.obsidian_cli_service import flush_queue, get_queue_status
 
                     status = await asyncio.to_thread(get_queue_status)
                     if status["pending"] > 0:

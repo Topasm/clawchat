@@ -14,7 +14,7 @@ import pytest_asyncio
 from domain.task import TaskStatus
 from models.event import Event
 from models.todo import Todo
-from services import reminder_service
+from services.notifications import reminder_service
 from utils import make_id
 
 

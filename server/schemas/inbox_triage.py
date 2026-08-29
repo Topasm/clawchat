@@ -2,19 +2,12 @@
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from schemas.common import TodoIdList
+
 
 class InboxTriagePreviewRequest(BaseModel):
-    todo_ids: list[str] = Field(min_length=1, max_length=50)
+    todo_ids: TodoIdList = Field(min_length=1, max_length=50)
     expected_graph_revision: int = Field(ge=0)
-
-    @field_validator("todo_ids")
-    @classmethod
-    def _validate_todo_ids(cls, value: list[str]) -> list[str]:
-        if any(not todo_id.strip() for todo_id in value):
-            raise ValueError("todo_ids must contain non-empty task IDs")
-        if len(value) != len(set(value)):
-            raise ValueError("todo_ids must not contain duplicates")
-        return value
 
 
 class InboxTriageSuggestion(BaseModel):

@@ -6,7 +6,8 @@ import pytest
 from exceptions import AppError
 from main import app
 from models.todo import Todo
-from services import inbox_triage_service, project_service, task_placement_service
+from services.planning import inbox_triage_service
+from services.tasks import project_service, task_placement_service
 
 
 def _tool_response(

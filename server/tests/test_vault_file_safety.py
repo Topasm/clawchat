@@ -11,10 +11,10 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("JWT_SECRET", "test")
 os.environ.setdefault("PIN", "123456")
 
-from services import obsidian_cli_service as cli_svc  # noqa: E402
+from services.vault import obsidian_cli_service as cli_svc # noqa: E402
 from schemas.todo import TodoCreate, TodoUpdate  # noqa: E402
-from services.obsidian_context_service import read_project_context  # noqa: E402
-from services.obsidian_export_service import (  # noqa: E402
+from services.vault.obsidian_context_service import read_project_context  # noqa: E402
+from services.vault.obsidian_export_service import (  # noqa: E402
     TodoSnapshot,
     _get_file_path,
     export_todos_batch,

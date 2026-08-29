@@ -288,7 +288,7 @@ async def switch_ai_provider(
         if not claude_code:
             raise ValidationError("Claude Code provider not initialized.")
         # Re-check availability
-        from services.claude_code_provider import ClaudeCodeStatus
+        from services.ai.claude_code_provider import ClaudeCodeStatus
         status, version = await claude_code.check_availability()
         request.app.state.claude_code_status = status.value
         request.app.state.claude_code_version = version
@@ -334,7 +334,7 @@ async def recheck_claude_code(
     """Re-check Claude Code CLI availability."""
     claude_code = getattr(request.app.state, "claude_code", None)
     if not claude_code:
-        from services.claude_code_provider import ClaudeCodeProvider
+        from services.ai.claude_code_provider import ClaudeCodeProvider
         claude_code = ClaudeCodeProvider()
         request.app.state.claude_code = claude_code
 
