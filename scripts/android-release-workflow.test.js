@@ -59,7 +59,7 @@ test('runs the same test and lint gate as the pull-request build', () => {
   assert.match(workflow, /node scripts\/generate-api-contracts\.js --check/);
   assert.match(
     workflow,
-    /\.\/gradlew testDebugUnitTest lintDebug assembleRelease bundleRelease --warning-mode all/,
+    /\.\/gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all/,
   );
 });
 

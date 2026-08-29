@@ -44,7 +44,7 @@ jobs:
 
       - name: Test, lint, and build Android artifacts
         working-directory: android
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug bundleRelease --warning-mode all
+        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug bundleRelease --warning-mode all
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

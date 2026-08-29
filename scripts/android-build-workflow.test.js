@@ -21,12 +21,12 @@ test('gates Android compilation on generated API contract drift', () => {
   assert.ok(contractIndex >= 0 && contractIndex < gradleIndex);
 });
 
-test('keeps tests, lint, installable debug output, and the release bundle in one gate', () => {
+test('keeps tests, debug and release lint, installable debug output, and the release bundle in one gate', () => {
   const workflow = readWorkflow();
 
   assert.match(
     workflow,
-    /\.\/gradlew testDebugUnitTest lintDebug assembleDebug bundleRelease --warning-mode all/,
+    /\.\/gradlew testDebugUnitTest lintDebug lintRelease assembleDebug bundleRelease --warning-mode all/,
   );
   assert.match(workflow, /android\/app\/build\/outputs\/apk\/debug\/app-debug\.apk/);
   assert.match(workflow, /android\/app\/build\/outputs\/bundle\/release\/app-release\.aab/);

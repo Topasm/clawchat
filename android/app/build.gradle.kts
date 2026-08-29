@@ -77,6 +77,9 @@ android {
         }
         release {
             isMinifyEnabled = true
+            // The updater downloads this APK over a phone connection, so the
+            // unused-resource pass is worth the build time.
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("String", "DEBUG_SERVER_URL", "\"\"")
             buildConfigField("boolean", "UPDATE_ENABLED", "true")

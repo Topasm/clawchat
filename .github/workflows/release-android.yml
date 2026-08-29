@@ -98,7 +98,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew testDebugUnitTest lintDebug assembleRelease bundleRelease --warning-mode all
+        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all
 
       - name: Verify the APK signature and version
         env:
