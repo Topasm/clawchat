@@ -8,6 +8,7 @@ export const queryKeys = {
   latestPlanProposal: (todoId: string) => ['plan-proposals', 'latest', todoId] as const,
   planProposal: (proposalId: string) => ['plan-proposals', 'detail', proposalId] as const,
   events: ['events'] as const,
+  calendarSubscription: ['calendar-subscription'] as const,
   conversations: ['conversations'] as const,
   projects: ['projects'] as const,
   project: (id: string) => ['projects', id] as const,

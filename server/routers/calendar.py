@@ -1,18 +1,32 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from config import settings
+from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from database import get_db
-from schemas.calendar import EventCreate, EventResponse, EventUpdate
+from schemas.calendar import (
+    CalendarSubscriptionSecret,
+    CalendarSubscriptionStatus,
+    EventCreate,
+    EventResponse,
+    EventUpdate,
+)
 from schemas.common import PaginatedResponse
-from services.calendar import calendar_service
+from services.calendar import calendar_service, feed_token_service
 from utils import deserialize_tags
 from ws.notifications import notify_module_data_changed
 
 router = APIRouter()
+
+# Returned with every .ics body. A subscription URL is a credential, so no
+# shared cache between the client and this server may keep a copy of the feed.
+_ICS_HEADERS = {
+    "Content-Disposition": 'attachment; filename="clawchat.ics"',
+    "Cache-Control": "private, no-store",
+}
 
 
 def _event_to_response(row) -> EventResponse:
@@ -76,12 +90,130 @@ async def export_ics(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    """Export all events as an iCalendar (.ics) file."""
+    """Export all events as an iCalendar (.ics) file.
+
+    The bearer-authenticated download, unchanged: this is what an in-app
+    "export my calendar" button uses. External subscriptions cannot send the
+    header and use ``/api/events/feed/{token}.ics`` instead.
+    """
     ics_data = await calendar_service.export_events_ical(db)
     return Response(
         content=ics_data,
         media_type="text/calendar",
-        headers={"Content-Disposition": 'attachment; filename="clawchat.ics"'},
+        headers=_ICS_HEADERS,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Calendar subscription
+#
+# These three routes are declared before ``/{event_id}`` so the literal path
+# segments win over the event-id parameter.
+#
+# The management routes below are bearer-authenticated like everything else.
+# Only ``read_feed`` accepts a feed token, and it is the single place in the
+# application that calls ``resolve_feed_token``. A feed token is an opaque
+# random string rather than a JWT, so it additionally cannot survive
+# ``decode_token_any``; the isolation does not rest on route wiring alone.
+# ---------------------------------------------------------------------------
+
+
+def _feed_urls(request: Request, token: str) -> tuple[str, str]:
+    """Build the subscribable URL pair for *token*.
+
+    ``PUBLIC_URL`` wins when configured because that is the address reachable
+    from outside the LAN, which is the whole point of a subscription. The
+    request's own base URL is the fallback for a plain local install.
+    """
+    base = (settings.public_url or str(request.base_url)).rstrip("/")
+    url = f"{base}/api/events/feed/{token}.ics"
+    # webcal:// makes Apple Calendar and Outlook subscribe on click instead of
+    # downloading a one-off snapshot.
+    _, _, remainder = url.partition("://")
+    return url, f"webcal://{remainder}"
+
+
+def _status(row) -> CalendarSubscriptionStatus:
+    if row is None:
+        return CalendarSubscriptionStatus(active=False)
+    return CalendarSubscriptionStatus(
+        active=True,
+        created_at=row.created_at,
+        last_used_at=row.last_used_at,
+    )
+
+
+@router.get("/subscription", response_model=CalendarSubscriptionStatus)
+async def get_subscription(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Report whether a subscription feed is live.
+
+    The URL is deliberately absent: only a hash of the token is stored, so it
+    cannot be reconstructed. Losing it means reissuing.
+    """
+    return _status(await feed_token_service.get_active_feed_token(db))
+
+
+@router.post(
+    "/subscription",
+    response_model=CalendarSubscriptionSecret,
+    status_code=201,
+)
+async def create_subscription(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Issue a subscription URL, invalidating any previous one immediately.
+
+    This is the only response that ever contains the feed URL. Anyone who holds
+    it can read every event in the calendar without logging in, so it should be
+    treated like a password.
+    """
+    token, row = await feed_token_service.issue_feed_token(db)
+    await db.commit()
+    await db.refresh(row)
+
+    url, webcal_url = _feed_urls(request, token)
+    return CalendarSubscriptionSecret(
+        active=True,
+        created_at=row.created_at,
+        last_used_at=row.last_used_at,
+        url=url,
+        webcal_url=webcal_url,
+    )
+
+
+@router.delete("/subscription", status_code=204)
+async def delete_subscription(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Revoke the subscription URL. Subsequent fetches get 401."""
+    await feed_token_service.revoke_feed_tokens(db)
+    await db.commit()
+
+
+@router.get("/feed/{token}.ics")
+async def read_feed(
+    token: str = Path(..., min_length=16, max_length=128),
+    db: AsyncSession = Depends(get_db),
+):
+    """Serve the iCalendar feed to an unauthenticated subscriber.
+
+    No bearer dependency: a calendar client cannot supply one. The path token
+    is the entire credential and grants read access to this feed and nothing
+    else. It is never written to a log, in full or in part.
+    """
+    await feed_token_service.resolve_feed_token(db, token)
+    ics_data = await calendar_service.export_events_ical(db)
+    await db.commit()
+    return Response(
+        content=ics_data,
+        media_type="text/calendar",
+        headers=_ICS_HEADERS,
     )
 
 

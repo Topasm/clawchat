@@ -19,6 +19,7 @@ from models.attachment import Attachment  # noqa: F401
 from models.paired_device import PairedDevice, PairingSession  # noqa: F401
 from models.host_identity import HostIdentity  # noqa: F401
 from models.refresh_session import RefreshSession  # noqa: F401
+from models.calendar_feed_token import CalendarFeedToken  # noqa: F401
 
 # Sentinel used by database.init_db to ensure all models are imported
 _register_all = True

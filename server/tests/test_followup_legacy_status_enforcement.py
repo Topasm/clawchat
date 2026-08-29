@@ -29,8 +29,12 @@ _SERVER_ROOT = Path(__file__).resolve().parents[1]
 
 #: The revision a pre-Alembic database gets stamped at -- past c5e936c9d7b1.
 _ADOPTION_REVISION = "e2b7c4d81a35"
-_HEAD_REVISION = "a3f1c72b8d94"
+_HEAD_REVISION = "d1e94a7c3f28"
 _BASELINE_REVISION = "9927ab512428"
+# The revision just below a3f1c72b8d94, which installs the status triggers.
+# Named rather than reached with "-1" so a later head does not silently
+# retarget this file's downgrade test at some other revision.
+_BELOW_TRIGGER_REVISION = "f0d5c8a12b64"
 
 _INVALID_STATUS_MESSAGE = "ck_todos_status_valid"
 
@@ -446,9 +450,12 @@ def test_downgrade_removes_the_triggers_without_touching_rows(tmp_path: Path):
     database_path = _make_legacy_database(tmp_path, "downgrade.db")
     _run_init_db(database_path)
 
-    _run_alembic(database_path, "downgrade", "-1")
+    _run_alembic(database_path, "downgrade", _BELOW_TRIGGER_REVISION)
 
     with sqlite3.connect(database_path) as connection:
+        assert connection.execute(
+            "SELECT version_num FROM alembic_version"
+        ).fetchone() == (_BELOW_TRIGGER_REVISION,)
         assert connection.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' "
             "AND name LIKE 'ck_todos_status_valid%'"

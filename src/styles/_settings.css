@@ -13,10 +13,18 @@
   font-size: 12px;
 }
 
-.cc-settings-status--success { color: var(--cc-success); }
-.cc-settings-status--error { color: var(--cc-error); }
-.cc-settings-status--muted { color: var(--cc-text-secondary); }
-.cc-settings-status--subtle { color: var(--cc-text-tertiary); }
+.cc-settings-status--success {
+  color: var(--cc-success);
+}
+.cc-settings-status--error {
+  color: var(--cc-error);
+}
+.cc-settings-status--muted {
+  color: var(--cc-text-secondary);
+}
+.cc-settings-status--subtle {
+  color: var(--cc-text-tertiary);
+}
 
 .cc-settings-status-dot {
   display: inline-block;
@@ -26,8 +34,12 @@
   border-radius: 50%;
 }
 
-.cc-settings-status-dot--success { background: var(--cc-success); }
-.cc-settings-status-dot--muted { background: var(--cc-text-tertiary); }
+.cc-settings-status-dot--success {
+  background: var(--cc-success);
+}
+.cc-settings-status-dot--muted {
+  background: var(--cc-text-tertiary);
+}
 
 .cc-toggle {
   width: 44px;
@@ -121,7 +133,9 @@
   font-weight: 500;
   cursor: pointer;
   color: var(--cc-text-secondary);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
   white-space: nowrap;
 }
 
@@ -184,6 +198,28 @@
   margin-left: 16px;
 }
 
+/* Read-only credential fields (calendar subscription URLs) */
+
+.cc-settings-input {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--cc-text);
+  background: var(--cc-surface-secondary);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  padding: 6px 8px;
+  min-width: 0;
+  width: 260px;
+  max-width: 100%;
+}
+
+.cc-settings-hint {
+  font-size: 12px;
+  color: var(--cc-text-secondary);
+  line-height: 1.5;
+  padding: 8px 12px 2px;
+}
+
 @media (max-width: 768px) {
   .cc-settings-section {
     margin-bottom: 16px;
@@ -203,5 +239,9 @@
 
   .cc-settings-row__sublabel {
     font-size: 11px;
+  }
+
+  .cc-settings-input {
+    width: 100%;
   }
 }

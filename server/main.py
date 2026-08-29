@@ -37,6 +37,7 @@ from services.ai.claude_code_provider import (
 )
 from services.chat.orchestrator import Orchestrator
 from services.scheduler import Scheduler
+from utils.access_log import install_access_log_redaction
 from ws.handler import websocket_endpoint
 from ws.manager import ws_manager
 
@@ -45,6 +46,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # The calendar feed authenticates by URL, so the access log would
+    # otherwise record a working credential on every poll.
+    install_access_log_redaction()
+
     await init_db()
 
     # Create AI service — relays to OpenClaw

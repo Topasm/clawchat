@@ -12,6 +12,7 @@ import apiClient from '../services/apiClient';
 import { openObsidianVault } from '../utils/openObsidian';
 import SettingsSection from '../components/shared/SettingsSection';
 import SettingsRow from '../components/shared/SettingsRow';
+import CalendarSubscriptionCard from '../components/shared/CalendarSubscriptionCard';
 import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import Toggle from '../components/shared/Toggle';
 import Slider from '../components/shared/Slider';
@@ -482,6 +483,8 @@ export default function SettingsPage() {
           </button>
         </SettingsRow>
       </SettingsSection>
+
+      <CalendarSubscriptionCard />
 
       <ObsidianStatusCard />
 

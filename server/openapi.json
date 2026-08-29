@@ -1526,6 +1526,92 @@
         "title": "BulkTodoUpdate",
         "type": "object"
       },
+      "CalendarSubscriptionSecret": {
+        "description": "The issue/reissue response -- the only place the feed URL is returned.\n\n``url`` embeds the feed token and is therefore a bearer credential in its\nown right: anyone holding it can read every event. It is shown once.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "webcal_url": {
+            "title": "Webcal Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "active",
+          "url",
+          "webcal_url"
+        ],
+        "title": "CalendarSubscriptionSecret",
+        "type": "object"
+      },
+      "CalendarSubscriptionStatus": {
+        "description": "Metadata about the live subscription feed, without the secret.\n\nThe token itself is unrecoverable after issue, so a read of this resource\ncan only ever report *that* a feed exists, never how to fetch it.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "title": "CalendarSubscriptionStatus",
+        "type": "object"
+      },
       "CapabilitiesResponse": {
         "properties": {
           "ai": {
@@ -9494,7 +9580,7 @@
     },
     "/api/events/export.ics": {
       "get": {
-        "description": "Export all events as an iCalendar (.ics) file.",
+        "description": "Export all events as an iCalendar (.ics) file.\n\nThe bearer-authenticated download, unchanged: this is what an in-app\n\"export my calendar\" button uses. External subscriptions cannot send the\nheader and use ``/api/events/feed/{token}.ics`` instead.",
         "operationId": "export_ics_api_events_export_ics_get",
         "responses": {
           "200": {
@@ -9512,6 +9598,119 @@
           }
         ],
         "summary": "Export Ics",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/events/feed/{token}.ics": {
+      "get": {
+        "description": "Serve the iCalendar feed to an unauthenticated subscriber.\n\nNo bearer dependency: a calendar client cannot supply one. The path token\nis the entire credential and grants read access to this feed and nothing\nelse. It is never written to a log, in full or in part.",
+        "operationId": "read_feed_api_events_feed__token__ics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 16,
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Feed",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/events/subscription": {
+      "delete": {
+        "description": "Revoke the subscription URL. Subsequent fetches get 401.",
+        "operationId": "delete_subscription_api_events_subscription_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Subscription",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "get": {
+        "description": "Report whether a subscription feed is live.\n\nThe URL is deliberately absent: only a hash of the token is stored, so it\ncannot be reconstructed. Losing it means reissuing.",
+        "operationId": "get_subscription_api_events_subscription_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscriptionStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Subscription",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "post": {
+        "description": "Issue a subscription URL, invalidating any previous one immediately.\n\nThis is the only response that ever contains the feed URL. Anyone who holds\nit can read every event in the calendar without logging in, so it should be\ntreated like a password.",
+        "operationId": "create_subscription_api_events_subscription_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSubscriptionSecret"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Subscription",
         "tags": [
           "calendar"
         ]

@@ -42,5 +42,11 @@ a new attempt and preserves prior results.
 - `/runs` can display global or project-scoped execution state and event logs.
 - Actual built-in cancellation works while the process is alive.
 - External provider adapters can use heartbeat and controlled transition APIs.
+  This half is unrealised as of 2026-08-29: `POST /runs/{id}/heartbeat` and
+  `POST /runs/{id}/transition` exist but have no caller. The bundled Paseo
+  adapter runs in-process and sets `run.heartbeat_at` through the ORM instead,
+  and both routes sit behind the user's PIN-issued JWT, which an out-of-process
+  runner has no way to hold. Wiring up a real external runner therefore needs a
+  scoped credential for it first — the routes alone are not sufficient.
 - Process resumption across hosts still requires a provider-specific adapter;
   the built-in provider safely fails interrupted work for explicit retry.

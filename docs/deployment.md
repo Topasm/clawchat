@@ -182,6 +182,36 @@ your-domain.com {
 }
 ```
 
+## Calendar Subscription URLs in Logs
+
+The calendar feed at `/api/events/feed/<token>.ics` authenticates by URL,
+because a calendar app cannot send an `Authorization` header. The URL is
+therefore a credential, and anything that logs request paths logs a working
+one on every poll.
+
+The server redacts the token from its own uvicorn access log. **A reverse proxy
+in front of it does not** — Nginx `access_log` and Caddy's logger both record
+the full path by default. Either drop the path for that route or turn its
+access log off:
+
+```caddy
+# Caddyfile — inside the site block
+@calendar_feed path /api/events/feed/*
+log_skip @calendar_feed
+```
+
+```nginx
+# nginx — inside the server block
+location ^~ /api/events/feed/ {
+    access_log off;
+    proxy_pass http://clawchat:8000;
+}
+```
+
+If a subscription URL does leak, revoke it with
+`DELETE /api/events/subscription`; issuing a new one also invalidates the old
+immediately.
+
 ## Remote Access
 
 ClawChat supports three remote access methods. With a tunnel, only the reverse proxy

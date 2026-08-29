@@ -484,6 +484,11 @@ POST   /api/events                 # Create an event
 GET    /api/events/:id             # Get a specific event
 PATCH  /api/events/:id             # Update an event
 DELETE /api/events/:id             # Delete an event
+GET    /api/events/export.ics      # Download all events as iCalendar (bearer auth)
+GET    /api/events/subscription    # Subscription status (bearer auth)
+POST   /api/events/subscription    # Issue/reissue the subscription URL (bearer auth)
+DELETE /api/events/subscription    # Revoke the subscription URL (bearer auth)
+GET    /api/events/feed/:token.ics # The subscribable feed itself (no header)
 ```
 
 #### `GET /api/events`
@@ -509,6 +514,115 @@ DELETE /api/events/:id             # Delete an event
   "limit": 50
 }
 ```
+
+### Calendar Subscription (ICS feed)
+
+`GET /api/events/export.ics` is a bearer-authenticated *download*. External
+calendar applications cannot use it: Google Calendar, Apple Calendar, Outlook
+and Thunderbird fetch a subscribed URL on their own schedule and have no way to
+attach an `Authorization` header. Subscription therefore has a second entry
+point whose credential lives in the URL.
+
+#### Security properties — read before sharing the URL
+
+> **Anyone who has the feed URL can read your entire calendar.**
+> Every event title, description, location and time is served to any client
+> that requests that URL, with no login, from anywhere the server is reachable.
+> The URL *is* the credential. Treat it like a password: do not post it in a
+> shared document, a chat channel, or a public issue.
+>
+> This is the same property as Google Calendar's "secret address in iCal
+> format" and Apple Calendar's public share link — an unguessable URL is the
+> whole access-control mechanism — and it is why the URL can be revoked.
+
+The design bounds the damage a leaked URL can do:
+
+- **The feed token is not a session.** It is an opaque 256-bit random string,
+  not a JWT. It carries no claims, decodes nowhere, and is rejected by the
+  bearer authentication path (`decode_token_any` / `get_current_principal`).
+  Presented as `Authorization: Bearer <feed token>` it returns 401 on every
+  endpoint in the API, including the subscription endpoints themselves.
+- **Read-only, calendar-only.** The token unlocks exactly one route,
+  `GET /api/events/feed/:token.ics`. It cannot create, modify or delete
+  anything, and it exposes no todos, chats, documents or settings.
+- **Not recoverable from the database.** Only a SHA-256 hash of the token is
+  stored, in `calendar_feed_tokens`, the same way refresh tokens are handled.
+  A stolen database copy yields no working URL.
+- **Revocable, and revocation is immediate.** See below.
+- **Not cached.** The feed is served with `Cache-Control: private, no-store`.
+
+The token does not expire on its own — an expiring subscription would silently
+go stale in the user's calendar app — so a URL stays valid until it is revoked.
+
+#### How to revoke
+
+Either of these invalidates the outstanding URL immediately; the next fetch
+from any subscribed calendar app gets `401`:
+
+- `DELETE /api/events/subscription` — revoke and issue nothing new.
+- `POST /api/events/subscription` — reissue. The previous URL stops working at
+  the same moment the new one starts, so reissuing is the right move if a URL
+  was shared by accident and the subscription is still wanted.
+
+Re-subscribing in the calendar app is required after either, because the URL
+changes. Revoked rows are retained with a `revoked_at` timestamp rather than
+deleted, so the record of which feed was live when survives a reissue.
+
+#### `POST /api/events/subscription`
+
+Issues a new subscription URL, revoking any previous one. **This is the only
+response that ever contains the URL** — it cannot be read back afterwards, so
+the client must show it to the user immediately. If it is lost, reissue.
+
+```json
+// Response 201
+{
+  "active": true,
+  "created_at": "2026-03-01T09:12:00Z",
+  "last_used_at": null,
+  "url": "https://home.example.com/api/events/feed/kZ8x...Qw.ics",
+  "webcal_url": "webcal://home.example.com/api/events/feed/kZ8x...Qw.ics"
+}
+```
+
+`url` is the `http(s)` form, for pasting into Google Calendar's "From URL".
+`webcal_url` is the same address under the `webcal://` scheme, which makes
+Apple Calendar and Outlook subscribe on click instead of importing a one-off
+snapshot. The host comes from `PUBLIC_URL` when it is configured, and from the
+incoming request otherwise — a calendar app on the public internet can only
+reach a feed whose host is reachable from there.
+
+#### `GET /api/events/subscription`
+
+Reports whether a feed is live. The URL is deliberately absent: the server
+stores only a hash and cannot reconstruct it.
+
+```json
+// Response 200
+{
+  "active": true,
+  "created_at": "2026-03-01T09:12:00Z",
+  "last_used_at": "2026-03-01T10:00:04Z"
+}
+
+// Response 200 when no feed has been issued (or it was revoked)
+{ "active": false, "created_at": null, "last_used_at": null }
+```
+
+`last_used_at` is the last time a calendar client fetched the feed. It is the
+signal to surface if a user wants to check whether the subscription is actually
+being polled, or whether an unexpected client is polling it.
+
+#### `DELETE /api/events/subscription`
+
+Revokes the live feed. Returns `204` whether or not one existed.
+
+#### `GET /api/events/feed/:token.ics`
+
+The feed. No `Authorization` header; the path token is the entire credential.
+Returns `200` with `text/calendar`, or `401 UNAUTHORIZED` for a token that is
+unknown, revoked, or malformed — the three are deliberately indistinguishable
+in the response.
 
 ---
 

@@ -565,6 +565,14 @@ _LEGACY_REVISION_PROBES: tuple[tuple[str, Callable[[_SchemaFacts], bool]], ...] 
     ("c4a8e2f91d30", _probe_paseo_execution_provider),
     ("d6f8a1c3e520", _probe_task_placement_changes),
     ("e2b7c4d81a35", _probe_message_idempotency_key),
+    # The list deliberately stops here rather than tracking head. Adoption
+    # stamps at the *last* probe that passes, so a probe for a revision with
+    # unprobed revisions before it would skip them: adding one for
+    # d1e94a7c3f28 (calendar_feed_tokens) would strand f0d5c8a12b64's data
+    # transforms and a3f1c72b8d94's status triggers on any database that
+    # already had the table. A revision after this point that creates a table
+    # must therefore be idempotent (guard on ``inspect(bind).has_table``)
+    # instead of earning an entry here.
 )
 
 # The columns a probe may read. Reflecting every table on every startup is

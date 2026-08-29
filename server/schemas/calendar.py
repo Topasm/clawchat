@@ -59,3 +59,26 @@ class EventResponse(BaseModel):
         if isinstance(v, str):
             return json.loads(v)
         return v  # type: ignore[return-value]
+
+
+class CalendarSubscriptionStatus(BaseModel):
+    """Metadata about the live subscription feed, without the secret.
+
+    The token itself is unrecoverable after issue, so a read of this resource
+    can only ever report *that* a feed exists, never how to fetch it.
+    """
+
+    active: bool
+    created_at: datetime | None = None
+    last_used_at: datetime | None = None
+
+
+class CalendarSubscriptionSecret(CalendarSubscriptionStatus):
+    """The issue/reissue response -- the only place the feed URL is returned.
+
+    ``url`` embeds the feed token and is therefore a bearer credential in its
+    own right: anyone holding it can read every event. It is shown once.
+    """
+
+    url: str
+    webcal_url: str
