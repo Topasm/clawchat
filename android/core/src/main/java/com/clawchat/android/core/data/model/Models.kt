@@ -162,6 +162,19 @@ data class EventUpdate(
     @SerialName("recurrence_rule") val recurrenceRule: String? = null,
 )
 
+// --- Search ---
+
+/** One full-text search result. [type] is `message`, `todo`, or `event`. */
+@Serializable
+data class SearchHit(
+    val type: String,
+    val id: String,
+    val title: String? = null,
+    val preview: String = "",
+    val rank: Double = 0.0,
+    @SerialName("created_at") val createdAt: String = "",
+)
+
 // --- Conversations ---
 
 @Serializable

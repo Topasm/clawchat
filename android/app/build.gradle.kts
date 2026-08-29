@@ -110,6 +110,7 @@ dependencies {
     implementation(project(":feature:chat"))
     implementation(project(":feature:tasks"))
     implementation(project(":feature:inbox"))
+    implementation(project(":feature:search"))
     implementation(project(":feature:settings"))
     implementation(project(":widget"))
 

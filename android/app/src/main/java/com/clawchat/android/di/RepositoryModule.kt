@@ -6,6 +6,8 @@ import com.clawchat.android.core.data.repository.DeviceRepository
 import com.clawchat.android.core.data.repository.DeviceRepositoryImpl
 import com.clawchat.android.core.data.repository.EventRepository
 import com.clawchat.android.core.data.repository.EventRepositoryImpl
+import com.clawchat.android.core.data.repository.SearchRepository
+import com.clawchat.android.core.data.repository.SearchRepositoryImpl
 import com.clawchat.android.core.data.repository.SettingsRepository
 import com.clawchat.android.core.data.repository.SettingsRepositoryImpl
 import com.clawchat.android.core.data.repository.TodayRepository
@@ -45,4 +47,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindEventRepository(impl: EventRepositoryImpl): EventRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSearchRepository(impl: SearchRepositoryImpl): SearchRepository
 }

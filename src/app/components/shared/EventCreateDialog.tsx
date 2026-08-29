@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import Dialog from './Dialog';
 import Toggle from './Toggle';
 import RecurrenceSelector from './RecurrenceSelector';
-import { useToastStore } from '../../stores/useToastStore';
-import { queryKeys } from '../../hooks/queries/queryKeys';
-import type { EventResponse } from '../../types/api';
+import { useCreateEvent } from '../../hooks/queries';
+import type { EventCreate } from '../../types/api';
 
 interface EventCreateDialogProps {
   open: boolean;
@@ -44,7 +42,7 @@ export default function EventCreateDialog({
   initialDate,
   initialTime,
 }: EventCreateDialogProps) {
-  const queryClient = useQueryClient();
+  const createEvent = useCreateEvent();
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -81,10 +79,7 @@ export default function EventCreateDialog({
   }, [open, initialDate, initialTime]);
 
   const handleSave = () => {
-    if (!title.trim()) return;
-
-    const now = new Date().toISOString();
-    const id = `local-${Date.now()}`;
+    if (!title.trim() || createEvent.isPending) return;
 
     let startIso: string;
     let endIso: string | undefined;
@@ -103,8 +98,7 @@ export default function EventCreateDialog({
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const newEvent: EventResponse = {
-      id,
+    const payload: EventCreate = {
       title: title.trim(),
       description: description.trim() || undefined,
       start_time: startIso,
@@ -114,20 +108,20 @@ export default function EventCreateDialog({
       reminder_minutes: reminder ? Number(reminder) : undefined,
       recurrence_rule: recurrenceRule || undefined,
       tags: tags.length > 0 ? tags : undefined,
-      created_at: now,
-      updated_at: now,
     };
-    queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [newEvent, ...(old ?? [])]);
 
-    useToastStore.getState().addToast('success', 'Event created');
-    onOpenChange(false);
+    // The dialog only closes once the server has the event; useCreateEvent
+    // reports both the success toast and any failure.
+    createEvent.mutate(payload, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title="New Event" className="cc-event-dialog">
       <div className="cc-event-form">
         <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-title">Title</label>
+          <label className="cc-event-form__label" htmlFor="evt-title">
+            Title
+          </label>
           <input
             id="evt-title"
             className="cc-event-form__input"
@@ -140,7 +134,9 @@ export default function EventCreateDialog({
         </div>
 
         <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-date">Date</label>
+          <label className="cc-event-form__label" htmlFor="evt-date">
+            Date
+          </label>
           <input
             id="evt-date"
             className="cc-event-form__input"
@@ -158,7 +154,9 @@ export default function EventCreateDialog({
         {!isAllDay && (
           <div className="cc-event-form__time-row">
             <div className="cc-event-form__field cc-event-form__field--half">
-              <label className="cc-event-form__label" htmlFor="evt-start">Start time</label>
+              <label className="cc-event-form__label" htmlFor="evt-start">
+                Start time
+              </label>
               <input
                 id="evt-start"
                 className="cc-event-form__input"
@@ -168,7 +166,9 @@ export default function EventCreateDialog({
               />
             </div>
             <div className="cc-event-form__field cc-event-form__field--half">
-              <label className="cc-event-form__label" htmlFor="evt-end">End time</label>
+              <label className="cc-event-form__label" htmlFor="evt-end">
+                End time
+              </label>
               <input
                 id="evt-end"
                 className="cc-event-form__input"
@@ -181,7 +181,9 @@ export default function EventCreateDialog({
         )}
 
         <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-location">Location</label>
+          <label className="cc-event-form__label" htmlFor="evt-location">
+            Location
+          </label>
           <input
             id="evt-location"
             className="cc-event-form__input"
@@ -193,7 +195,9 @@ export default function EventCreateDialog({
         </div>
 
         <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-desc">Description</label>
+          <label className="cc-event-form__label" htmlFor="evt-desc">
+            Description
+          </label>
           <textarea
             id="evt-desc"
             className="cc-event-form__textarea"
@@ -205,7 +209,9 @@ export default function EventCreateDialog({
         </div>
 
         <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-tags">Tags</label>
+          <label className="cc-event-form__label" htmlFor="evt-tags">
+            Tags
+          </label>
           <input
             id="evt-tags"
             className="cc-event-form__input"
@@ -217,7 +223,9 @@ export default function EventCreateDialog({
         </div>
 
         <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-reminder">Reminder</label>
+          <label className="cc-event-form__label" htmlFor="evt-reminder">
+            Reminder
+          </label>
           <select
             id="evt-reminder"
             className="cc-event-form__select"
@@ -245,10 +253,10 @@ export default function EventCreateDialog({
           <button
             type="button"
             className="cc-btn cc-btn--primary"
-            disabled={!title.trim()}
+            disabled={!title.trim() || createEvent.isPending}
             onClick={handleSave}
           >
-            Save
+            {createEvent.isPending ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>

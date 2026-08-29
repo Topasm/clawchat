@@ -29,6 +29,7 @@ import com.clawchat.android.feature.onboarding.OnboardingScreen
 import com.clawchat.android.feature.settings.SettingsScreen
 import com.clawchat.android.feature.tasks.TasksScreen
 import com.clawchat.android.feature.calendar.CalendarScreen
+import com.clawchat.android.feature.search.SearchScreen
 import com.clawchat.android.feature.today.TodayScreen
 
 data class BottomNavItem(
@@ -163,8 +164,27 @@ fun ClawChatNavGraph(
                             restoreState = true
                         }
                     },
+                    onNavigateToSearch = {
+                        navController.navigate(NavRoute.Search.route)
+                    },
                     onNavigateToSettings = {
                         navController.navigate(NavRoute.Settings.route)
+                    },
+                )
+            }
+            composable(NavRoute.Search.route) {
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenHit = { hit ->
+                        searchHitRoute(hit.type)?.let { route ->
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     },
                 )
             }
