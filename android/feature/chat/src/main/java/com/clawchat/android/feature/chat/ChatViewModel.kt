@@ -2,19 +2,16 @@ package com.clawchat.android.feature.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.repository.ConversationRepository
-import com.clawchat.android.core.di.AuthenticatedClient
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.network.ChatStreamer
 import com.clawchat.android.core.network.SseEvent
-import com.clawchat.android.core.network.streamChat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
 import javax.inject.Inject
 
 private const val TOKEN_BATCH_SIZE = 4
@@ -33,8 +30,7 @@ data class ChatUiState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
-    private val sessionStore: SessionStore,
-    @param:AuthenticatedClient private val httpClient: OkHttpClient,
+    private val chatStreamer: ChatStreamer,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -105,12 +101,10 @@ class ChatViewModel @Inject constructor(
         }
 
         streamJob = viewModelScope.launch {
-            val baseUrl = sessionStore.apiBaseUrl.first() ?: return@launch
-            val token = sessionStore.token.first() ?: return@launch
             streamBuffer.clear()
             var tokenCount = 0
 
-            streamChat(httpClient, baseUrl, conversationId, text, token)
+            chatStreamer.stream(conversationId, text)
                 .collect { event ->
                     when (event) {
                         is SseEvent.Token -> {
