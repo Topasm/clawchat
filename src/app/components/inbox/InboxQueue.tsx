@@ -13,9 +13,9 @@ import {
   transferHasType,
   transferredBatchTaskIds,
 } from './inboxDragTransfer';
-import type { InboxAiTriage } from './useInboxAiTriage';
-import type { InboxSections } from './useInboxSections';
-import type { InboxSelection } from './useInboxSelection';
+import type { InboxAiTriage } from '../../hooks/useInboxAiTriage';
+import type { InboxSections } from '../../hooks/useInboxSections';
+import type { InboxSelection } from '../../hooks/useInboxSelection';
 
 interface InboxQueueProps {
   sections: InboxSections;

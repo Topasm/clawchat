@@ -266,3 +266,11 @@
   transform: translateY(-50%);
   flex-shrink: 0;
 }
+
+/* --- Mobile ----------------------------------------------- */
+
+@media (max-width: 768px) {
+  .cc-project-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

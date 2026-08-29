@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
-import type { TodoResponse } from '../../types/api';
-import { isTerminalTaskStatus } from '../../utils/taskStatus';
+import type { TodoResponse } from '../types/api';
+import { isTerminalTaskStatus } from '../utils/taskStatus';
 
 export interface InboxSections {
   /** Tasks the classifier or planner is still working on. */

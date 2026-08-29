@@ -1,7 +1,7 @@
-import { usePlaceTodo, usePlaceTodosBatch, useUndoTodoPlacement } from '../../hooks/queries';
-import { useToastStore } from '../../stores/useToastStore';
-import type { TodoResponse } from '../../types/api';
-import { inboxErrorMessage, undoErrorMessage } from './inboxErrors';
+import { usePlaceTodo, usePlaceTodosBatch, useUndoTodoPlacement } from './queries';
+import { useToastStore } from '../stores/useToastStore';
+import type { TodoResponse } from '../types/api';
+import { inboxErrorMessage, undoErrorMessage } from '../components/inbox/inboxErrors';
 
 interface PlacementImpact {
   ready_count: number;

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
-import { useCreateTaskDependency, usePreviewTaskDependency } from '../../hooks/queries';
-import { useToastStore } from '../../stores/useToastStore';
-import type { TaskDependencyPreviewResponse, TodoResponse } from '../../types/api';
-import { dependencyErrorMessage, isGraphRevisionConflict } from './inboxErrors';
+import { useCreateTaskDependency, usePreviewTaskDependency } from './queries';
+import { useToastStore } from '../stores/useToastStore';
+import type { TaskDependencyPreviewResponse, TodoResponse } from '../types/api';
+import { dependencyErrorMessage, isGraphRevisionConflict } from '../components/inbox/inboxErrors';
 
 interface InboxDependencyPreviewOptions {
   todoById: ReadonlyMap<string, TodoResponse>;

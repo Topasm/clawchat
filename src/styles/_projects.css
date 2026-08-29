@@ -207,3 +207,30 @@
   border-bottom: 2px solid var(--cc-primary);
   font-weight: 600;
 }
+
+/* --- Mobile ----------------------------------------------- */
+
+@media (max-width: 768px) {
+  .cc-projects-header {
+    margin-bottom: 12px;
+  }
+
+  .cc-project-workspace__header {
+    align-items: center;
+  }
+
+  .cc-project-workspace__header .cc-btn {
+    font-size: 0;
+    padding: 9px;
+  }
+
+  .cc-project-card {
+    padding: 12px 14px;
+  }
+
+  .cc-project-card__icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+}

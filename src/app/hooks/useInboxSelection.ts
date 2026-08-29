@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import type { TodoResponse } from '../../types/api';
+import type { TodoResponse } from '../types/api';
 
 export interface InboxSelection {
   /** The task the inspector and the tree act on. */

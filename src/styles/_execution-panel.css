@@ -249,3 +249,25 @@
   border-radius: var(--cc-radius-md);
   background: var(--cc-surface);
 }
+
+/* --- Mobile ----------------------------------------------- */
+
+@media (max-width: 768px) {
+  .cc-exec-panel__section {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+
+  .cc-exec-panel__info-grid {
+    gap: 8px;
+  }
+
+  .cc-exec-panel__info-item {
+    min-width: 80px;
+    padding: 6px 10px;
+  }
+
+  .cc-exec-panel__delegate {
+    flex-wrap: wrap;
+  }
+}

@@ -1,14 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import {
-  usePlaceTodoGroups,
-  usePreviewInboxTriage,
-  useUndoTodoPlacement,
-} from '../../hooks/queries';
-import { useToastStore } from '../../stores/useToastStore';
-import type { InboxTriagePreviewResponse } from '../../types/api';
-import { buildInboxTriagePlacementGroups } from '../../utils/inboxTriage';
-import { inboxErrorMessage, isGraphRevisionConflict } from './inboxErrors';
+import { usePlaceTodoGroups, usePreviewInboxTriage, useUndoTodoPlacement } from './queries';
+import { useToastStore } from '../stores/useToastStore';
+import type { InboxTriagePreviewResponse } from '../types/api';
+import { buildInboxTriagePlacementGroups } from '../utils/inboxTriage';
+import { inboxErrorMessage, isGraphRevisionConflict } from '../components/inbox/inboxErrors';
 
 interface InboxAiTriageOptions {
   placementRevision: number | null;

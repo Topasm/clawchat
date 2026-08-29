@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { TaskGraphInsightsResponse } from '../../types/api';
+import type { TaskGraphInsightsResponse } from '../types/api';
 
 interface GraphInsightsSource {
   data?: TaskGraphInsightsResponse;

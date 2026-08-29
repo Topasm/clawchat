@@ -20,12 +20,12 @@ import InboxInspector from '../components/inbox/InboxInspector';
 import InboxQueue from '../components/inbox/InboxQueue';
 import InboxTriageTree from '../components/inbox/InboxTriageTree';
 import type { ReadyTaskExecutionRequest } from '../components/inbox/ReadyTaskExecutionPanel';
-import useInboxAiTriage from '../components/inbox/useInboxAiTriage';
-import useInboxDependencyPreview from '../components/inbox/useInboxDependencyPreview';
-import useInboxGraphRevision from '../components/inbox/useInboxGraphRevision';
-import useInboxPlacement from '../components/inbox/useInboxPlacement';
-import useInboxSections from '../components/inbox/useInboxSections';
-import useInboxSelection from '../components/inbox/useInboxSelection';
+import useInboxAiTriage from '../hooks/useInboxAiTriage';
+import useInboxDependencyPreview from '../hooks/useInboxDependencyPreview';
+import useInboxGraphRevision from '../hooks/useInboxGraphRevision';
+import useInboxPlacement from '../hooks/useInboxPlacement';
+import useInboxSections from '../hooks/useInboxSections';
+import useInboxSelection from '../hooks/useInboxSelection';
 
 /**
  * Inbox triage: the capture queue on the left, the project tree in the middle, and the

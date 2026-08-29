@@ -38,3 +38,11 @@
 .cc-quick-chats__chevron--open {
   transform: rotate(90deg);
 }
+
+/* --- Mobile ----------------------------------------------- */
+
+@media (max-width: 768px) {
+  .cc-quick-chats__list {
+    height: calc(100dvh - 340px);
+  }
+}

@@ -12,7 +12,7 @@ import type {
 import InboxDependencyPreviewPanel from './InboxDependencyPreviewPanel';
 import InboxExecutionTelemetryPanel from './InboxExecutionTelemetryPanel';
 import ReadyTaskExecutionPanel, { type ReadyTaskExecutionRequest } from './ReadyTaskExecutionPanel';
-import type { InboxDependencyPreview } from './useInboxDependencyPreview';
+import type { InboxDependencyPreview } from '../../hooks/useInboxDependencyPreview';
 
 interface InboxInspectorProps {
   task: TodoResponse | null;
