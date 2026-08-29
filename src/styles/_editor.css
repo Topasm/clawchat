@@ -1,179 +1,6 @@
 /* ============================================================
-   Editor Components — Lexical RTE, CodeMirror, Drop Zone, Attachments
+   Editor Components — CodeMirror, Drop Zone, Attachments
    ============================================================ */
-
-/* -- Lexical Rich Text Editor ---------------------------------------------- */
-
-.cc-rte {
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
-  background: var(--cc-surface);
-  overflow: hidden;
-}
-
-.cc-rte__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--cc-border);
-  background: var(--cc-surface-secondary, var(--cc-surface));
-}
-
-.cc-rte__toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 28px;
-  border: none;
-  border-radius: var(--cc-radius-xs);
-  background: transparent;
-  color: var(--cc-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.cc-rte__toolbar-btn:hover {
-  background: var(--cc-surface-secondary);
-  color: var(--cc-text);
-}
-
-.cc-rte__toolbar-btn--active {
-  background: color-mix(in srgb, var(--cc-primary) 15%, transparent);
-  color: var(--cc-primary);
-}
-
-.cc-rte__toolbar-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--cc-border);
-  margin: 0 4px;
-}
-
-.cc-rte__editor-wrapper {
-  position: relative;
-}
-
-.cc-rte__content {
-  min-height: 60px;
-  padding: 10px 12px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--cc-text);
-  outline: none;
-}
-
-.cc-rte__placeholder {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  color: var(--cc-text-tertiary, var(--cc-text-secondary));
-  font-size: 14px;
-  pointer-events: none;
-  user-select: none;
-}
-
-/* Theme classes for Lexical nodes */
-.cc-rte__paragraph {
-  margin: 0 0 4px;
-}
-
-.cc-rte__h1 {
-  font-size: 1.5em;
-  font-weight: 700;
-  margin: 12px 0 6px;
-  line-height: 1.3;
-}
-
-.cc-rte__h2 {
-  font-size: 1.25em;
-  font-weight: 600;
-  margin: 10px 0 4px;
-  line-height: 1.3;
-}
-
-.cc-rte__h3 {
-  font-size: 1.1em;
-  font-weight: 600;
-  margin: 8px 0 4px;
-  line-height: 1.3;
-}
-
-.cc-rte__ul,
-.cc-rte__ol {
-  margin: 4px 0;
-  padding-left: 24px;
-}
-
-.cc-rte__li {
-  margin: 2px 0;
-}
-
-.cc-rte__link {
-  color: var(--cc-primary);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.cc-rte__bold {
-  font-weight: 700;
-}
-
-.cc-rte__italic {
-  font-style: italic;
-}
-
-.cc-rte__underline {
-  text-decoration: underline;
-}
-
-.cc-rte__strikethrough {
-  text-decoration: line-through;
-}
-
-.cc-rte__inline-code {
-  background: var(--cc-surface-secondary);
-  padding: 1px 4px;
-  border-radius: var(--cc-radius-xs);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 0.9em;
-}
-
-.cc-rte__code-block {
-  background: var(--cc-surface-secondary);
-  padding: 10px 12px;
-  border-radius: var(--cc-radius-sm);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 13px;
-  overflow-x: auto;
-  margin: 6px 0;
-}
-
-.cc-rte__blockquote {
-  border-left: 3px solid var(--cc-primary);
-  margin: 6px 0;
-  padding: 4px 12px;
-  color: var(--cc-text-secondary);
-  font-style: italic;
-}
-
-/* Read-only mode */
-.cc-rte--readonly {
-  border: none;
-  background: transparent;
-}
-
-.cc-rte--readonly .cc-rte__toolbar {
-  display: none;
-}
-
-.cc-rte--readonly .cc-rte__content {
-  min-height: 0;
-  padding: 0;
-}
 
 /* -- CodeMirror Wrapper ---------------------------------------------------- */
 
@@ -206,7 +33,9 @@
   border: 2px dashed var(--cc-border);
   border-radius: var(--cc-radius-md);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
   margin: 8px 0;
 }
 
@@ -322,7 +151,9 @@
   cursor: pointer;
   padding: 4px 8px;
   border-radius: var(--cc-radius-xs);
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 
 .cc-attachments__item:hover .cc-attachments__delete {

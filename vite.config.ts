@@ -30,15 +30,8 @@ export default defineConfig({
           // Framework runtime shared by every route. Keeping it explicit prevents
           // lazy feature chunks from becoming accidental entry dependencies.
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          // Rich-text / code editor — heaviest deps, rarely needed on first load
+          // Code editor — heaviest dep, only needed by the system-prompt route
           'vendor-editor': [
-            'lexical',
-            '@lexical/rich-text',
-            '@lexical/list',
-            '@lexical/link',
-            '@lexical/code',
-            '@lexical/markdown',
-            '@lexical/utils',
             '@uiw/react-codemirror',
             '@codemirror/lang-markdown',
             '@codemirror/theme-one-dark',

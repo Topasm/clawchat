@@ -368,7 +368,7 @@ export default function Layout() {
     const target = e.target as HTMLElement;
     if (
       target.closest(
-        'input, textarea, button, [role="button"], [contenteditable="true"], .cc-chat-input, .cc-lexical-editor, .cc-rich-editor',
+        'input, textarea, button, [role="button"], [contenteditable="true"], .cc-chat-input',
       )
     ) {
       touchStartX.current = null;
