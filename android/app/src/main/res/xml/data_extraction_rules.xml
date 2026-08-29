@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The session DataStore holds the device token that authenticates this device
+  to the user's server, and the Room cache holds task and event content. Neither
+  belongs in a cloud backup or on a transferred device: a restored copy would
+  carry a live session the user never re-authorized.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore" />
+        <exclude domain="database" path="clawchat_cache" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore" />
+        <exclude domain="database" path="clawchat_cache" />
+    </device-transfer>
+</data-extraction-rules>
