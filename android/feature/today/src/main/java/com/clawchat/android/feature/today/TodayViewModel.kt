@@ -34,6 +34,8 @@ data class TodayUiState(
     val briefing: BriefingResponse? = null,
     val isBriefingLoading: Boolean = false,
     val isRefreshing: Boolean = false,
+    /** True while the screen is showing the last synced day instead of live data. */
+    val isOffline: Boolean = false,
     val error: String? = null,
 )
 
@@ -103,10 +105,31 @@ class TodayViewModel @Inject constructor(
                             inboxCount = today.inboxCount,
                             inboxPreview = inboxPreviewItems,
                             isRefreshing = false,
+                            isOffline = false,
+                            error = null,
                         )
                     }
                 }
-                is ApiResult.Error -> _uiState.update { it.copy(isRefreshing = false, error = todayResult.message) }
+                is ApiResult.Error -> {
+                    // An unreachable server is the normal case for a
+                    // self-hosted app on the move; fall back to the last day
+                    // that synced rather than showing an empty screen.
+                    val cached = todayRepository.getCachedToday()
+                    _uiState.update {
+                        if (cached.isEmpty) {
+                            it.copy(isRefreshing = false, isOffline = false, error = todayResult.message)
+                        } else {
+                            it.copy(
+                                todayTodos = cached.todayTodos,
+                                overdueTodos = cached.overdueTodos,
+                                todayEvents = cached.todayEvents,
+                                isRefreshing = false,
+                                isOffline = true,
+                                error = null,
+                            )
+                        }
+                    }
+                }
                 is ApiResult.Loading -> { /* not used here */ }
             }
         }

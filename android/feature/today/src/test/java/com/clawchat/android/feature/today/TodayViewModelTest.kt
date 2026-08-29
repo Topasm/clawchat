@@ -7,6 +7,7 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.model.TodayResponse
+import com.clawchat.android.core.data.repository.CachedToday
 import com.clawchat.android.core.data.repository.TodayRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
@@ -66,6 +67,7 @@ class TodayViewModelTest {
         every { syncManager.todoChanged } returns MutableSharedFlow()
         every { syncManager.eventChanged } returns MutableSharedFlow()
         coEvery { todayRepository.getBriefing() } returns ApiResult.Error("Unavailable")
+        coEvery { todayRepository.getCachedToday(any()) } returns CachedToday()
     }
 
     @After
@@ -96,7 +98,7 @@ class TodayViewModelTest {
     }
 
     @Test
-    fun `initial refresh error sets error state`() = runTest {
+    fun `initial refresh error sets error state when nothing is cached`() = runTest {
         coEvery { todayRepository.getToday() } returns ApiResult.Error("Connection refused")
 
         viewModel = createViewModel()
@@ -105,6 +107,37 @@ class TodayViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(false, state.isRefreshing)
         assertEquals("Connection refused", state.error)
+        assertEquals(false, state.isOffline)
+    }
+
+    @Test
+    fun `an unreachable server falls back to the last synced day`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Error("Connection refused")
+        coEvery { todayRepository.getCachedToday(any()) } returns CachedToday(
+            todayTodos = listOf(sampleTodo),
+            overdueTodos = listOf(sampleOverdueTodo),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(true, state.isOffline)
+        assertEquals(listOf(sampleTodo), state.todayTodos)
+        assertEquals(listOf(sampleOverdueTodo), state.overdueTodos)
+        assertNull(state.error)
+    }
+
+    @Test
+    fun `a successful refresh clears the offline fallback`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.isOffline)
     }
 
     @Test

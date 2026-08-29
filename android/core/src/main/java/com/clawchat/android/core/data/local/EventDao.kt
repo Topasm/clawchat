@@ -13,4 +13,14 @@ interface EventDao {
 
     @Query("DELETE FROM events")
     suspend fun deleteAll()
+
+    /**
+     * Replaces the cached events. Only the current day is ever fetched, so
+     * upserting alone would let yesterday's events linger in the cache.
+     */
+    @Transaction
+    suspend fun replaceAll(events: List<EventEntity>) {
+        deleteAll()
+        upsertAll(events)
+    }
 }

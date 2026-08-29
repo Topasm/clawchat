@@ -138,6 +138,15 @@ fun TodayScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                if (state.isOffline) {
+                    item {
+                        ClawStatusChip(
+                            text = "Offline — showing the last synced day",
+                            tone = ClawTone.Error,
+                        )
+                    }
+                }
+
                 item {
                     TodayHeroCard(
                         greeting = state.greeting.ifBlank { "Ready when you are" },
