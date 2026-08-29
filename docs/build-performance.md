@@ -40,12 +40,24 @@ the complete renderer. The initial metrics guard startup cost; complete-renderer
 route splitting from hiding overall growth. CI and every Tauri package job fail when a threshold
 is exceeded.
 
-The current conservative Tauri baseline is 258.58 KiB raw / 85.82 KiB gzip for initial JavaScript,
-1.84 MiB for all JavaScript, and 2.02 MiB for all renderer files. These numbers come from
+The current conservative Tauri baseline is 310.54 KiB raw / 100.42 KiB gzip for initial JavaScript,
+1.90 MiB for all JavaScript, and 2.07 MiB for all renderer files. These numbers come from
 `build:tauri-renderer`, not the smaller ES2022 standalone web build, so the local measurement and
 CI evaluate the same Safari 13-compatible output. Each ceiling retains approximately two to three
 percent of measured headroom. New feature libraries should be measured and preferably route-loaded before
 they are accepted.
+
+The 2026-08-29 React 19 update is the one ceiling rise recorded here. React 18 to 19 costs 49,051
+raw bytes (14,219 gzip) of initial JavaScript on its own — measured by upgrading in isolation, with
+`framer-motion` held at 11 to confirm it contributes nothing. That is a real cost, not a regression
+to fix, so the initial ceilings rise about 19 percent and the complete-renderer ceilings about 2.5
+percent; each keeps three percent headroom.
+
+React 19 also required `manualChunks` to change from a package-name array to a path-matching
+function. React 19 splits its runtime across `react-dom/client`, `react/jsx-runtime` and
+`scheduler`, which the name form does not follow: React was emitted into `vendor-react` *and* the
+entry chunk at once, and `vendor-react` imported React back out of `vendor-query`. The totals above
+are after that fix; without it the same upgrade also scrambles which chunk loads first.
 
 The 2026-08-27 baseline update records the route-loaded Project Workspace, Review Inbox, Agent Run,
 and Inbox Triage features. Their pages remain lazy chunks; the initial raw and gzip ceilings did not

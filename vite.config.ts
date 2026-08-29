@@ -26,22 +26,31 @@ export default defineConfig({
     chunkSizeWarningLimit: 650,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Framework runtime shared by every route. Keeping it explicit prevents
-          // lazy feature chunks from becoming accidental entry dependencies.
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+        // Matched on resolved paths rather than package names. React 19
+        // splits its runtime across subpaths (`react-dom/client`,
+        // `react/jsx-runtime`, `scheduler`), which the name-array form does
+        // not follow — it left React in two chunks at once, adding ~57 KiB to
+        // the initial payload.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          const vendor = (...names: string[]) =>
+            names.some((name) => id.includes(`node_modules/${name}/`));
+
+          // Framework runtime shared by every route. Keeping it explicit
+          // prevents lazy feature chunks from becoming entry dependencies.
+          if (vendor('react', 'react-dom', 'scheduler', 'react-router-dom')) {
+            return 'vendor-react';
+          }
           // Code editor — heaviest dep, only needed by the system-prompt route
-          'vendor-editor': [
-            '@uiw/react-codemirror',
-            '@codemirror/lang-markdown',
-            '@codemirror/theme-one-dark',
-          ],
-          // Drag-and-drop
-          'vendor-dnd': ['@hello-pangea/dnd'],
+          if (vendor('@uiw/react-codemirror', '@codemirror/lang-markdown', '@codemirror/theme-one-dark')) {
+            return 'vendor-editor';
+          }
+          if (vendor('@hello-pangea/dnd')) return 'vendor-dnd';
           // React Query is required by the application shell, while Axios is
           // first used by lazy routes. Keep HTTP out of the initial preload.
-          'vendor-query': ['@tanstack/react-query'],
-          'vendor-http': ['axios'],
+          if (vendor('@tanstack/react-query')) return 'vendor-query';
+          if (vendor('axios')) return 'vendor-http';
+          return undefined;
         },
       },
     },
