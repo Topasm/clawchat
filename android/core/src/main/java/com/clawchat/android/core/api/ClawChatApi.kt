@@ -61,6 +61,11 @@ interface ClawChatApi {
         @Query("mode") mode: String,
     )
 
+    // --- Search ---
+
+    @GET("api/search")
+    suspend fun search(@QueryMap params: Map<String, String>): PaginatedResponse<SearchHit>
+
     // --- Conversations ---
 
     @GET("api/chat/conversations")

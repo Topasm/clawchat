@@ -8,5 +8,6 @@ sealed class NavRoute(val route: String) {
     data object Chat : NavRoute("chat")
     data object Inbox : NavRoute("inbox")
     data object Tasks : NavRoute("tasks")
+    data object Search : NavRoute("search")
     data object Settings : NavRoute("settings")
 }

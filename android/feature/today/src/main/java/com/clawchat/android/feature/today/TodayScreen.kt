@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -74,6 +75,7 @@ import com.clawchat.android.core.ui.icons.ClawIcons
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     onNavigateToInbox: () -> Unit = {},
+    onNavigateToSearch: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -100,6 +102,12 @@ fun TodayScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToSearch) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = "Search",
+                        )
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(
                             Icons.Default.Settings,
