@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -345,13 +345,6 @@ def get_sync_status() -> dict:
             for c in (scan.changes or [])[:20]
         ],
     }
-
-
-def get_sync_lag() -> float | None:
-    """Return seconds since last scan, or None if never scanned."""
-    if not _last_scan or not _last_scan.scanned_at:
-        return None
-    return time.time() - _last_scan.scanned_at
 
 
 def is_scan_stuck(timeout_seconds: int = _STUCK_TIMEOUT) -> bool:

@@ -2,7 +2,6 @@
 
 import os
 from concurrent.futures import ThreadPoolExecutor
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -16,6 +15,7 @@ from services import obsidian_cli_service as cli_svc  # noqa: E402
 from schemas.todo import TodoCreate, TodoUpdate  # noqa: E402
 from services.obsidian_context_service import read_project_context  # noqa: E402
 from services.obsidian_export_service import (  # noqa: E402
+    TodoSnapshot,
     _get_file_path,
     export_todos_batch,
 )
@@ -73,8 +73,11 @@ def test_todo_schemas_reject_unsafe_source_id_early():
 
 
 def test_batch_export_skips_unsafe_legacy_source_without_blocking_safe_items(tmp_path):
-    def todo(todo_id: str, source_id: str):
-        return SimpleNamespace(
+    def todo(todo_id: str, source_id: str) -> TodoSnapshot:
+        # The value type the export actually consumes, rather than a
+        # hand-listed stand-in that has to be updated whenever the export
+        # reads one more field.
+        return TodoSnapshot(
             id=todo_id,
             title=todo_id,
             source_id=source_id,
@@ -85,6 +88,7 @@ def test_batch_export_skips_unsafe_legacy_source_without_blocking_safe_items(tmp
             tags=None,
             enabled_skills=None,
             assignee=None,
+            parent_id=None,
         )
 
     result = export_todos_batch(

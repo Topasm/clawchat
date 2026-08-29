@@ -10,22 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.event import Event
 from services.ai_service import AIService
 from services.recurrence_service import generate_occurrences
-from utils import strip_markdown_fences
+from utils import match_timezone, strip_markdown_fences
 
 logger = logging.getLogger(__name__)
 
 # Default working hours
 DEFAULT_WORK_START = 9  # 9 AM
 DEFAULT_WORK_END = 17  # 5 PM
-
-
-def _match_timezone(value: datetime, reference: datetime) -> datetime:
-    """Align SQLite-naive datetimes with an API range's timezone."""
-    if reference.tzinfo is None:
-        return value.replace(tzinfo=None)
-    if value.tzinfo is None:
-        return value.replace(tzinfo=reference.tzinfo)
-    return value.astimezone(reference.tzinfo)
 
 
 def _busy_entry(
@@ -60,8 +51,8 @@ async def _collect_busy_entries(
 
     entries = []
     for event in regular_events:
-        event_start = _match_timezone(event.start_time, range_start)
-        event_end = _match_timezone(event.end_time, range_start) if event.end_time else None
+        event_start = match_timezone(event.start_time, range_start)
+        event_end = match_timezone(event.end_time, range_start) if event.end_time else None
         effective_end = event_end or (event_start + timedelta(minutes=30))
         if effective_end > range_start:
             entries.append(_busy_entry(event, event_start, event_end))
@@ -73,8 +64,8 @@ async def _collect_busy_entries(
     )
     recurring_events = (await db.execute(recurring_q)).scalars().all()
     for event in recurring_events:
-        event_start = _match_timezone(event.start_time, range_start)
-        event_end = _match_timezone(event.end_time, range_start) if event.end_time else None
+        event_start = match_timezone(event.start_time, range_start)
+        event_end = match_timezone(event.end_time, range_start) if event.end_time else None
         base_end = event_end or (event_start + timedelta(minutes=30))
         if event_start < range_end and base_end > range_start:
             entries.append(_busy_entry(event, event_start, event_end))
@@ -86,9 +77,9 @@ async def _collect_busy_entries(
             range_end,
         )
         for occurrence in occurrences:
-            occurrence_start = _match_timezone(occurrence["start_time"], range_start)
+            occurrence_start = match_timezone(occurrence["start_time"], range_start)
             occurrence_end = (
-                _match_timezone(occurrence["end_time"], range_start)
+                match_timezone(occurrence["end_time"], range_start)
                 if occurrence["end_time"]
                 else None
             ) or (

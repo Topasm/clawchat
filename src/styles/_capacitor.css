@@ -101,17 +101,6 @@
     color: #fff;
   }
 
-  /* Chat panel becomes full screen on mobile */
-  .cc-root--mobile .cc-chat-panel--expanded {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 100%;
-    z-index: 50;
-  }
-
   /* Larger touch targets */
   .cc-root--mobile .cc-card {
     padding: 12px 14px;

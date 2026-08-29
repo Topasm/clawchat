@@ -29,8 +29,6 @@ from utils.vault_paths import (
 
 logger = logging.getLogger(__name__)
 
-# Default staleness threshold in seconds (5 minutes).
-_DEFAULT_STALE_SECONDS = 300
 
 
 @dataclass
@@ -67,21 +65,6 @@ _index_lock = threading.RLock()
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
-
-
-def get_index() -> VaultIndex:
-    """Return the current vault index (may be stale)."""
-    return _index
-
-
-def get_project_entry(folder: str) -> ProjectEntry | None:
-    """Return cached metadata for a specific project folder."""
-    return _index.projects.get(folder)
-
-
-def get_project_names() -> list[str]:
-    """Return a sorted list of known project folder names."""
-    return sorted(e.name for e in _index.projects.values())
 
 
 def is_stale(max_age_seconds: int | None = None) -> bool:

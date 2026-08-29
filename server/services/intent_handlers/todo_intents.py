@@ -26,6 +26,28 @@ def _not_found(title: str) -> str:
     return f"I couldn't find a task matching '{title}'. Try listing your tasks first."
 
 
+def _parse_due_date(raw: object) -> datetime | None:
+    """Coerce a classifier-supplied due date into a ``datetime``.
+
+    Creating and updating a task receive the *same* LLM-produced ISO string in
+    ``params["due_date"]``, so they have to read it the same way.  The update
+    path has always parsed it; the create path used to hand the raw string to
+    ``todo_service.create_todo``, which types the column as ``DateTime`` and so
+    blew up at flush time with a driver-level error.
+
+    A malformed value raises, exactly as the update path does.  The orchestrator
+    turns that into the "I tried to create a todo but something went wrong"
+    reply for module intents, so the user is told.  Silently substituting
+    ``None`` would be worse: the task would be created without the due date the
+    user explicitly asked for, and nothing would say so.
+    """
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, datetime):
+        return raw
+    return datetime.fromisoformat(str(raw))
+
+
 async def _resolve_target(ctx: IntentContext, action: str):
     """Return ``(todo, error_reply)`` — exactly one of the two is set."""
     title = ctx.params.get("title", "")
@@ -55,7 +77,7 @@ async def create_todo(ctx: IntentContext) -> IntentReply:
         priority=ctx.params.get("priority", "medium"),
         parent_id=parent_id,
         project_id=project_id,
-        due_date=ctx.params.get("due_date"),
+        due_date=_parse_due_date(ctx.params.get("due_date")),
         recurrence_rule=ctx.params.get("recurrence_rule"),
     )
     return (
@@ -117,7 +139,7 @@ async def update_todo(ctx: IntentContext) -> IntentReply:
     if params.get("priority"):
         updates["priority"] = params["priority"]
     if params.get("due_date"):
-        updates["due_date"] = datetime.fromisoformat(params["due_date"])
+        updates["due_date"] = _parse_due_date(params["due_date"])
     if params.get("status"):
         updates["status"] = params["status"]
     if not updates:

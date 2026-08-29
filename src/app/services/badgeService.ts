@@ -64,10 +64,3 @@ export async function setAppBadge(count: number): Promise<void> {
     // Badge updates are best-effort
   }
 }
-
-/**
- * Clears the app icon badge.
- */
-export async function clearAppBadge(): Promise<void> {
-  return setAppBadge(0);
-}

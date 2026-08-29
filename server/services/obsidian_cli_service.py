@@ -9,17 +9,14 @@ where possible.
 import json
 import logging
 import os
-import posixpath
-import shutil
 import subprocess
 import threading
 import time
 from collections import deque
 from dataclasses import dataclass
-from pathlib import Path
 
 from config import settings
-from utils.atomic_files import atomic_write_text, synchronized_path, synchronized_paths
+from utils.atomic_files import atomic_write_text, synchronized_path
 from utils.vault_paths import normalize_vault_relative_path, resolve_vault_path
 
 logger = logging.getLogger(__name__)
@@ -276,87 +273,6 @@ def append_to_document(
                 args={"path": vault_relative_path, "content": content},
                 queued_at=time.time(),
             ))
-        return False
-
-
-def rename_document(
-    vault_relative_path: str,
-    new_name: str,
-    *,
-    use_cli: bool = True,
-) -> bool:
-    """Rename a document (CLI preferred to update internal links)."""
-    if not is_sync_enabled():
-        return False
-
-    vault = settings.obsidian_vault_path
-    if not vault:
-        return False
-
-    vault_relative_path = _normalize_vault_path(vault_relative_path)
-    new_name = _normalize_vault_path(new_name)
-    if "/" in new_name:
-        raise ValueError(f"New document name must be a filename: {new_name}")
-    parent_relative = posixpath.dirname(vault_relative_path)
-    new_relative_path = posixpath.join(parent_relative, new_name)
-    abs_old = resolve_vault_path(vault, vault_relative_path)
-    abs_new = resolve_vault_path(vault, new_relative_path)
-
-    # CLI is strongly preferred for rename — it updates internal links
-    if use_cli:
-        result = _run_cli("rename", f"path={vault_relative_path}", f"name={new_name}")
-        if result is not None:
-            logger.debug("Renamed document via CLI: %s -> %s", vault_relative_path, new_name)
-            return True
-
-    # Filesystem fallback (no link update)
-    try:
-        with synchronized_paths(abs_old, abs_new):
-            os.rename(abs_old, abs_new)
-        logger.debug("Renamed document via filesystem (no link update): %s -> %s", vault_relative_path, new_name)
-        return True
-    except OSError as exc:
-        logger.error("Failed to rename %s: %s", vault_relative_path, exc)
-        return False
-
-
-def move_document(
-    vault_relative_path: str,
-    new_folder: str,
-    *,
-    use_cli: bool = True,
-) -> bool:
-    """Move a document to a different folder (CLI preferred for link update)."""
-    if not is_sync_enabled():
-        return False
-
-    vault = settings.obsidian_vault_path
-    if not vault:
-        return False
-
-    vault_relative_path = _normalize_vault_path(vault_relative_path)
-    new_folder = _normalize_vault_path(new_folder, allow_empty=True)
-    filename = posixpath.basename(vault_relative_path)
-    new_path = posixpath.join(new_folder, filename)
-    abs_old = resolve_vault_path(vault, vault_relative_path)
-    abs_new = resolve_vault_path(vault, new_path)
-
-    # CLI preferred for move — updates internal links
-    if use_cli:
-        result = _run_cli("move", f"path={vault_relative_path}", f"to={new_path}")
-        if result is not None:
-            logger.debug("Moved document via CLI: %s -> %s", vault_relative_path, new_path)
-            return True
-
-    # Filesystem fallback
-    try:
-        with synchronized_paths(abs_old, abs_new):
-            os.makedirs(os.path.dirname(abs_new), exist_ok=True)
-            shutil.move(abs_old, abs_new)
-        logger.debug("Moved document via filesystem (no link update): %s -> %s", vault_relative_path, new_path)
-        return True
-    except OSError as exc:
-        logger.error("Failed to move %s: %s", vault_relative_path, exc)
         return False
 
 

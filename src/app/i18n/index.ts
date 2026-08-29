@@ -94,5 +94,3 @@ export function useTranslation() {
   );
   return { t: translate, i18n };
 }
-
-export { LANGUAGE_STORAGE_KEY };

@@ -492,10 +492,19 @@ def _probe_canonical_task_status(facts: _SchemaFacts) -> bool:
     ``c5e936c9d7b1`` only adds the ``ck_todos_status_valid`` CHECK constraint,
     which SQLite can express only by rebuilding ``todos``. Rebuilding would drop
     and recreate the table and so cascade-delete every ``task_relationships``
-    row that references it. Legacy databases therefore keep the
-    application-level status guarantee (plus the idempotent normalisation in
-    revision ``f0d5c8a12b64``) instead of the table constraint, exactly as they
-    do today.
+    row that references it, along with every ``attachments`` row and every
+    SET NULL link into ``todos``. That cannot be prevented from inside a
+    revision: ``PRAGMA foreign_keys=OFF`` is a silent no-op within Alembic's
+    transaction and ``defer_foreign_keys`` only defers reporting, not the
+    cascade actions themselves.
+
+    So the alias stays, and a legacy database still never receives the CHECK
+    constraint itself. What it does receive is equivalent enforcement:
+    revision ``a3f1c72b8d94`` installs BEFORE INSERT/UPDATE triggers on
+    ``todos`` that reject the same values, and needs no table rewrite to do it.
+    Together with the idempotent normalisation in ``f0d5c8a12b64``, an adopted
+    database is guarded at the database level exactly like a fresh one -- the
+    guarantee differs only in which SQLite object carries it.
     """
     return _probe_baseline(facts)
 

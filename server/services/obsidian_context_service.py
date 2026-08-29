@@ -128,49 +128,6 @@ def read_project_context(
     return {"todo_md": todo_md, "related_docs": related_docs}
 
 
-def resolve_project_folder(
-    vault_path: str,
-    project_name: str,
-    cli_command: str = "",
-) -> str | None:
-    """Find the best-matching project folder for *project_name*.
-
-    Matching strategy (case-insensitive):
-    1. Exact folder-name match.
-    2. Prefix match (folder name starts with query).
-    3. Substring match (query appears anywhere in folder name).
-
-    Returns the relative folder path, or ``None`` if no match is found.
-    """
-    folders = list_project_folders(vault_path, cli_command)
-    if not folders:
-        return None
-
-    query = project_name.lower()
-
-    # Pass 1: exact match
-    for entry in folders:
-        if entry["name"].lower() == query:
-            return entry["folder"]
-
-    # Pass 2: prefix match
-    for entry in folders:
-        if entry["name"].lower().startswith(query):
-            return entry["folder"]
-
-    # Pass 3: substring match
-    for entry in folders:
-        if query in entry["name"].lower():
-            return entry["folder"]
-
-    return None
-
-
-# ---------------------------------------------------------------------------
-# CLI helpers
-# ---------------------------------------------------------------------------
-
-
 def _list_via_cli(vault_path: str, cli_command: str) -> list[dict[str, str]] | None:
     """Use the configured CLI to list files, then filter for TODO.md entries."""
     try:

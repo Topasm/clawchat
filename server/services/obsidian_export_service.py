@@ -34,12 +34,69 @@ class ExportResult:
     file_count: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class TodoSnapshot:
+    """The todo fields the vault export reads, detached from any ORM session.
+
+    Every async caller hands the export to ``asyncio.to_thread``.  Passing a
+    session-bound ``Todo`` across that boundary is a latent ``MissingGreenlet``:
+    the worker thread has no greenlet context, so the moment an attribute it
+    touches is expired -- which is exactly what happens if a session factory is
+    ever built with ``expire_on_commit=True`` -- the lazy load raises from a
+    thread that cannot recover.  Callers snapshot on the event loop thread,
+    while the attributes are guaranteed loaded, and the worker only ever sees
+    plain values.
+
+    ``export_todo``/``export_todos_batch``/``export_all_todos`` still accept a
+    ``Todo`` so synchronous callers are unaffected; they normalise on entry.
+    """
+
+    id: str
+    title: str
+    status: str
+    priority: str | None
+    due_date: datetime | None
+    completed_at: datetime | None
+    tags: str | None
+    enabled_skills: str | None
+    assignee: str | None
+    source_id: str | None
+    parent_id: str | None
+
+
+def snapshot_todo(todo: "Todo | TodoSnapshot") -> TodoSnapshot:
+    """Freeze the export-visible fields of *todo* into a session-free value.
+
+    Call this on the event loop thread, before ``asyncio.to_thread``.  Passing
+    a ``TodoSnapshot`` back in is a no-op, so normalising twice is harmless.
+    """
+    if isinstance(todo, TodoSnapshot):
+        return todo
+    return TodoSnapshot(
+        id=todo.id,
+        title=todo.title,
+        status=todo.status,
+        priority=todo.priority,
+        due_date=todo.due_date,
+        completed_at=todo.completed_at,
+        tags=todo.tags,
+        enabled_skills=todo.enabled_skills,
+        assignee=todo.assignee,
+        source_id=todo.source_id,
+        parent_id=todo.parent_id,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 
-def export_todo(vault_path: str, todo: Todo, project_name: str | None = None) -> None:
+def export_todo(
+    vault_path: str,
+    todo: Todo | TodoSnapshot,
+    project_name: str | None = None,
+) -> None:
     """Export a single todo to the Obsidian vault (create or update).
 
     For new files that don't yet exist, tries CLI creation first (so the
@@ -81,7 +138,7 @@ def remove_todos_from_vault(vault_path: str, todo_ids: set[str]) -> None:
         logger.exception("Failed to remove %d todos from vault", len(todo_ids))
 
 
-def export_all_todos(vault_path: str, todos: list[Todo]) -> ExportResult:
+def export_all_todos(vault_path: str, todos: list[Todo | TodoSnapshot]) -> ExportResult:
     """Full export of all todos to the vault.
 
     Groups todos by project (parent title) and writes each group to its own
@@ -89,6 +146,7 @@ def export_all_todos(vault_path: str, todos: list[Todo]) -> ExportResult:
     appended under a ``## ClawChat`` section header.
     """
     # Build a parent-id → title lookup.
+    todos = [snapshot_todo(todo) for todo in todos]
     parent_titles: dict[str, str] = {}
     for t in todos:
         if t.parent_id is None:
@@ -108,7 +166,7 @@ def export_all_todos(vault_path: str, todos: list[Todo]) -> ExportResult:
 
 def export_todos_batch(
     vault_path: str,
-    items: list[tuple[Todo, str | None]],
+    items: list[tuple[Todo | TodoSnapshot, str | None]],
     *,
     remove_existing: bool = True,
 ) -> ExportResult:
@@ -117,10 +175,12 @@ def export_todos_batch(
     if not items:
         return result
 
+    items = [(snapshot_todo(todo), project_name) for todo, project_name in items]
+
     if remove_existing:
         _remove_markers_from_vault(vault_path, {todo.id for todo, _ in items})
 
-    grouped: dict[str, list[Todo]] = {}
+    grouped: dict[str, list[TodoSnapshot]] = {}
     for todo, project_name in items:
         try:
             abs_path = _get_file_path(
@@ -153,7 +213,7 @@ def export_todos_batch(
 
 def reconcile_todos_in_vault(
     vault_path: str,
-    items: list[tuple[Todo, str | None]],
+    items: list[tuple[Todo | TodoSnapshot, str | None]],
     removed_todo_ids: set[str],
 ) -> ExportResult:
     """Strictly reconcile managed markers for an outbox delivery.
@@ -196,7 +256,7 @@ def _get_file_path(
     return resolve_vault_path(vault_path, "00_Inbox/TODO.md")
 
 
-def _todo_to_md_line(todo: Todo) -> str:
+def _todo_to_md_line(todo: TodoSnapshot) -> str:
     marker = "x" if todo.status == TaskStatus.COMPLETED else " "
     parts = [f"- [{marker}] {todo.title}"]
 
@@ -304,7 +364,7 @@ def _ensure_section_header(lines: list[str]) -> None:
     lines.append(f"{_SECTION_HEADER}\n")
 
 
-def _export_group(path: str, todos: list[Todo]) -> None:
+def _export_group(path: str, todos: list[TodoSnapshot]) -> None:
     """Replace all exported lines in *path* and append missing ones."""
     with synchronized_path(path):
         lines = _read_lines(path)

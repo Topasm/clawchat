@@ -91,7 +91,6 @@ server/
 │   ├── obsidian_export_service.py  # Export todos/plans to vault markdown
 │   ├── vault_sync_service.py       # Durable post-commit Vault outbox delivery
 │   ├── obsidian_vault_indexer.py   # Vault file indexing + companion health
-│   ├── vault_agent_service.py      # AI agent for vault-aware planning (skill-chain aware)
 │   ├── vault_watcher_service.py   # Vault file watching service
 │   ├── briefing_service.py     # Daily briefing generation
 │   ├── admin_service.py        # Admin: table counts, storage, uptime, activity, purge, reindex, backup

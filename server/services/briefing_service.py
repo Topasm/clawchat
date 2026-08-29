@@ -167,7 +167,6 @@ def _format_briefing_prompt(data: dict) -> str:
         lines.append(f"Background tasks: {len(data['agent_tasks'])} queued/running.")
         lines.append("")
 
-    total_items = len(data["events"]) + len(data["pending_todos"]) + len(data["overdue_todos"])
     lines.append(f"Load: {len(data['events'])} meetings + {len(data['pending_todos'])} tasks due + {len(data['overdue_todos'])} overdue. High/urgent items: {data.get('high_priority_count', 0)}.")
 
     return "\n".join(lines)

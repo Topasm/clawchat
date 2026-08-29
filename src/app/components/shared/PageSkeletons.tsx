@@ -34,34 +34,6 @@ export function ChatListSkeleton() {
   );
 }
 
-export function ChatPageSkeleton() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 16px' }}>
-      {/* Header bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Skeleton variant="circular" width={32} height={32} />
-        <Skeleton variant="text" width="30%" height={16} />
-      </div>
-      {/* Message bubbles */}
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div
-          key={i}
-          style={{
-            display: 'flex',
-            justifyContent: i % 2 === 0 ? 'flex-start' : 'flex-end',
-          }}
-        >
-          <Skeleton
-            variant="rectangular"
-            width={i % 2 === 0 ? '55%' : '40%'}
-            height={i % 3 === 0 ? 56 : 36}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function BriefingSkeleton() {
   return (
     <div className="cc-briefing-card">

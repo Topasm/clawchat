@@ -1,7 +1,7 @@
 """Recurrence service — RRULE parsing and occurrence expansion."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from dateutil.rrule import rrulestr
 

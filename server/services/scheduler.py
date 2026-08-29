@@ -12,8 +12,6 @@ from services import briefing_service, reminder_service, nudge_service, weekly_r
 from services.ai_service import AIService
 from ws.manager import ConnectionManager
 
-# Lazy imports for optional vault services
-_vault_services_loaded = False
 
 logger = logging.getLogger(__name__)
 

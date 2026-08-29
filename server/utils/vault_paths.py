@@ -1,7 +1,6 @@
 """Canonical path boundary for all Obsidian vault filesystem access."""
 
 import ntpath
-import os
 from pathlib import Path
 
 

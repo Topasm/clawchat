@@ -258,10 +258,6 @@ class PlanUndoResponse(BaseModel):
     vault_sync_status: VaultSyncJobStatus = VaultSyncJobStatus.PENDING
 
 
-class OrganizeRequest(BaseModel):
-    """Trigger inbox organization for a todo."""
-
-
 class DelegateRequest(BaseModel):
     """Delegate a todo to a skill (or legacy agent persona)."""
 

@@ -13,7 +13,11 @@ from domain.task import TaskStatus
 from exceptions import NotFoundError, ValidationError
 from models.project import Project
 from models.todo import Todo
-from services.obsidian_export_service import export_todo, remove_todo_from_vault
+from services.obsidian_export_service import (
+    export_todo,
+    remove_todo_from_vault,
+    snapshot_todo,
+)
 from services import task_relationship_service
 from utils import apply_model_updates, make_id, serialize_tags
 
@@ -153,8 +157,15 @@ async def create_todo(
             parent = await db.get(Todo, todo.parent_id)
             if parent:
                 project_name = parent.title
+        # Snapshot on the event loop thread.  ``export_todo`` runs on a worker
+        # thread with no greenlet context, so it must never be handed a
+        # session-bound ORM instance: one expired attribute there would raise
+        # ``MissingGreenlet`` instead of lazy-loading.  See ``TodoSnapshot``.
         await asyncio.to_thread(
-            export_todo, settings.obsidian_vault_path, todo, project_name
+            export_todo,
+            settings.obsidian_vault_path,
+            snapshot_todo(todo),
+            project_name,
         )
 
     return todo
@@ -199,8 +210,15 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
             parent = await db.get(Todo, todo.parent_id)
             if parent:
                 project_name = parent.title
+        # Snapshot on the event loop thread.  ``export_todo`` runs on a worker
+        # thread with no greenlet context, so it must never be handed a
+        # session-bound ORM instance: one expired attribute there would raise
+        # ``MissingGreenlet`` instead of lazy-loading.  See ``TodoSnapshot``.
         await asyncio.to_thread(
-            export_todo, settings.obsidian_vault_path, todo, project_name
+            export_todo,
+            settings.obsidian_vault_path,
+            snapshot_todo(todo),
+            project_name,
         )
 
     return todo

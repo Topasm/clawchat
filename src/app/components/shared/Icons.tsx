@@ -447,43 +447,6 @@ export function GripIcon({ size = ICON_SIZE.feature, className, label, style }: 
   );
 }
 
-export function DevicePhoneIcon({ size = ICON_SIZE.feature, className, label, style }: IconProps) {
-  return (
-    <IconBase size={size} className={className} label={label} style={style}>
-      <rect x="5" y="1.5" width="8" height="15" rx="2" />
-      <path d="M8 14h2" />
-    </IconBase>
-  );
-}
-
-export function DeviceAndroidIcon({
-  size = ICON_SIZE.feature,
-  className,
-  label,
-  style,
-}: IconProps) {
-  return (
-    <IconBase size={size} className={className} label={label} style={style}>
-      <rect x="5" y="4" width="8" height="12.5" rx="2" />
-      <path d="M7 1.5L8 4M11 4l1-2.5" />
-    </IconBase>
-  );
-}
-
-export function DeviceDesktopIcon({
-  size = ICON_SIZE.feature,
-  className,
-  label,
-  style,
-}: IconProps) {
-  return (
-    <IconBase size={size} className={className} label={label} style={style}>
-      <rect x="2" y="3" width="14" height="10" rx="2" />
-      <path d="M6 16h6M9 13v3" />
-    </IconBase>
-  );
-}
-
 export function GraphIcon({ size = ICON_SIZE.feature, className, label, style }: IconProps) {
   return (
     <IconBase size={size} className={className} label={label} style={style}>

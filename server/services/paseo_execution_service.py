@@ -21,7 +21,6 @@ from models.todo import Todo
 from services import agent_run_service, agent_task_service, artifact_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from ws.manager import ws_manager
 from ws.notifications import notify_module_data_changed
 
 

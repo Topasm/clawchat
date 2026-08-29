@@ -3,7 +3,7 @@ import { platformApi } from '../platform';
 /**
  * Opens Obsidian to a specific vault using the obsidian:// URI scheme.
  */
-export function getVaultName(vaultPath: string): string {
+function getVaultName(vaultPath: string): string {
   const trimmed = vaultPath.replace(/[/\\]+$/, '');
   return trimmed.split(/[/\\]/).pop() || '';
 }

@@ -3,12 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-# --- Pairing Session ---
-class PairingSessionCreate(BaseModel):
-    """Desktop creates a pairing session."""
-    pass  # no input needed, server generates code
-
-
 class PairingSessionResponse(BaseModel):
     code: str
     expires_at: datetime

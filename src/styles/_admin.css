@@ -17,7 +17,9 @@
   border-bottom: 2px solid transparent;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
   font-family: inherit;
 }
 
@@ -119,8 +121,12 @@
   flex-shrink: 0;
 }
 
-.cc-admin-status__dot--ok { background: var(--cc-success); }
-.cc-admin-status__dot--error { background: var(--cc-error); }
+.cc-admin-status__dot--ok {
+  background: var(--cc-success);
+}
+.cc-admin-status__dot--error {
+  background: var(--cc-error);
+}
 
 /* Agent tasks table */
 .cc-admin-tasks-table {
@@ -210,11 +216,4 @@
   background: var(--cc-surface-secondary);
   color: var(--cc-text-secondary);
   font-family: monospace;
-}
-
-/* Button row */
-.cc-admin-btn-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
 }

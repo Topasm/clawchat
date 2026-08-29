@@ -4,7 +4,7 @@ import os
 import stat
 import tempfile
 import threading
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from typing import Iterator
 
 
@@ -23,16 +23,6 @@ def synchronized_path(path: str) -> Iterator[None]:
     with _locks_guard:
         lock = _path_locks.setdefault(key, threading.RLock())
     with lock:
-        yield
-
-
-@contextmanager
-def synchronized_paths(*paths: str) -> Iterator[None]:
-    """Lock multiple paths in stable order to avoid cross-move deadlocks."""
-    keys_and_paths = sorted({_lock_key(path): path for path in paths}.items())
-    with ExitStack() as stack:
-        for _key, path in keys_and_paths:
-            stack.enter_context(synchronized_path(path))
         yield
 
 

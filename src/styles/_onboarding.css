@@ -40,7 +40,10 @@
   font-weight: 600;
   color: var(--cc-text-tertiary);
   flex-shrink: 0;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .cc-onboarding__step-dot--active {
@@ -134,7 +137,9 @@
 }
 
 @keyframes cc-onboarding-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .cc-onboarding__status-label {
@@ -184,29 +189,6 @@
   font-size: 11px;
   color: var(--cc-text-tertiary);
   margin-top: 4px;
-}
-
-/* --- Pairing Code ---------------------------------------- */
-.cc-onboarding__pairing-code {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin: 16px 0;
-}
-
-.cc-onboarding__pairing-digit {
-  width: 40px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--cc-surface-secondary);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
-  font-size: 22px;
-  font-weight: 700;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  color: var(--cc-text);
 }
 
 .cc-onboarding__qr-placeholder {
@@ -290,7 +272,9 @@
   border-radius: var(--cc-radius-lg);
   background: var(--cc-surface-secondary);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .cc-onboarding__role-card:hover {
@@ -346,12 +330,6 @@
   }
 
   .cc-onboarding__card-title {
-    font-size: 20px;
-  }
-
-  .cc-onboarding__pairing-digit {
-    width: 36px;
-    height: 44px;
     font-size: 20px;
   }
 

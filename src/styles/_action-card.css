@@ -48,11 +48,6 @@
   color: var(--cc-success);
 }
 
-.cc-action-card__icon--memo {
-  background: color-mix(in srgb, var(--cc-secondary) 15%, transparent);
-  color: var(--cc-secondary);
-}
-
 .cc-action-card__icon--warning {
   background: color-mix(in srgb, var(--cc-warning) 15%, transparent);
   color: var(--cc-warning);

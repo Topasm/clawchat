@@ -62,6 +62,7 @@ from services import (
 from services.obsidian_export_service import (
     export_todos_batch,
     remove_todos_from_vault,
+    snapshot_todo,
 )
 from skills import SKILL_REGISTRY, get_skill
 from sqlalchemy import case, func, select
@@ -399,7 +400,10 @@ async def bulk_update_todos(
             export_todos_batch,
             settings.obsidian_vault_path,
             [
-                (todo, parent_titles.get(todo.parent_id) if todo.parent_id else None)
+                (
+                    snapshot_todo(todo),
+                    parent_titles.get(todo.parent_id) if todo.parent_id else None,
+                )
                 for todo in updated_todos
             ],
             remove_existing=False,

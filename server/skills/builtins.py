@@ -1,7 +1,7 @@
 """Built-in skill definitions for ClawChat.
 
-System prompts are migrated from the former AGENT_PROMPTS dict in
-agent_task_service.py and the per-persona prompts in vault_agent_service.py.
+System prompts were migrated here from the former AGENT_PROMPTS dict in
+agent_task_service.py and from the removed per-persona vault agent prompts.
 """
 
 from __future__ import annotations

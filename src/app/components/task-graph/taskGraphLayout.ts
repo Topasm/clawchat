@@ -270,5 +270,3 @@ export function buildExecutionGraphLayout(
 
   return { nodes, edges, ...canvasSize(nodes) };
 }
-
-export const buildTaskGraphLayout = buildStructureGraphLayout;
