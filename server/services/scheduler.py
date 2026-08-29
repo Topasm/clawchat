@@ -378,9 +378,9 @@ class Scheduler:
                 try:
                     from services.obsidian_cli_service import flush_queue, get_queue_status
 
-                    status = get_queue_status()
+                    status = await asyncio.to_thread(get_queue_status)
                     if status["pending"] > 0:
-                        result = flush_queue()
+                        result = await asyncio.to_thread(flush_queue)
                         if result["succeeded"]:
                             logger.info(
                                 "Queue flush: %d/%d succeeded",

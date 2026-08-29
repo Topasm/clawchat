@@ -1,5 +1,6 @@
 """Async service layer for todo CRUD operations."""
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -152,7 +153,9 @@ async def create_todo(
             parent = await db.get(Todo, todo.parent_id)
             if parent:
                 project_name = parent.title
-        export_todo(settings.obsidian_vault_path, todo, project_name)
+        await asyncio.to_thread(
+            export_todo, settings.obsidian_vault_path, todo, project_name
+        )
 
     return todo
 
@@ -196,7 +199,9 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
             parent = await db.get(Todo, todo.parent_id)
             if parent:
                 project_name = parent.title
-        export_todo(settings.obsidian_vault_path, todo, project_name)
+        await asyncio.to_thread(
+            export_todo, settings.obsidian_vault_path, todo, project_name
+        )
 
     return todo
 
@@ -217,4 +222,6 @@ async def delete_todo(db: AsyncSession, todo_id: str) -> None:
     await db.flush()
 
     if settings.obsidian_vault_path:
-        remove_todo_from_vault(settings.obsidian_vault_path, deleted_id)
+        await asyncio.to_thread(
+            remove_todo_from_vault, settings.obsidian_vault_path, deleted_id
+        )

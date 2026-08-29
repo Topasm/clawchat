@@ -28,6 +28,7 @@
     "check:icon-design": "node scripts/check-icon-design.js",
     "check:release-version": "node scripts/check-release-version.js",
     "check:api-contract": "node scripts/generate-api-contracts.js --check",
+    "check:schema-drift": "node scripts/check-schema-contract-drift.js",
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "lint:prune": "eslint src --prune-suppressions",
@@ -35,7 +36,7 @@
     "format:check": "node scripts/check-prettier-baseline.mjs",
     "format:baseline": "node scripts/check-prettier-baseline.mjs --write-baseline",
     "format:check:all": "prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:design-tokens && npm run check:icon-design && npm run check:licenses && npm run check:runtime-boundary && npm run check:api-contract && npm run format:rust:check",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:design-tokens && npm run check:icon-design && npm run check:licenses && npm run check:runtime-boundary && npm run check:api-contract && npm run check:schema-drift && npm run format:rust:check",
     "pre-commit": "npm run check && npm test",
     "measure:renderer": "node scripts/measure-renderer-bundle.js dist",
     "check:renderer-budget": "node scripts/check-renderer-performance-budget.js dist",
@@ -47,7 +48,7 @@
     "build:capacitor": "vite build && npx cap sync",
     "preview": "vite preview",
     "test": "vitest run && npm run test:scripts",
-    "test:scripts": "npm run generate:orval && node --test scripts/android-build-workflow.test.js scripts/android-release-workflow.test.js scripts/check-release-version.test.js scripts/create-tauri-release-config.test.js scripts/dependency-license-policy.test.js scripts/docker-publish-workflow.test.js scripts/design-tokens.test.js scripts/generate-api-contracts.test.js scripts/generated-react-query-hooks.test.js scripts/generate-tauri-release.test.js scripts/github-actions-pinning.test.js scripts/icon-design.test.js scripts/prettier-baseline.test.js scripts/renderer-performance-budget.test.js scripts/runtime-boundary.test.js scripts/server-bundle-manifest.test.js scripts/startup-theme.test.js scripts/tauri-artifact-budget.test.js scripts/tauri-preview-workflow.test.js scripts/tauri-release-workflow.test.js",
+    "test:scripts": "node --test scripts/android-build-workflow.test.js scripts/android-release-workflow.test.js scripts/check-release-version.test.js scripts/create-tauri-release-config.test.js scripts/dependency-license-policy.test.js scripts/docker-publish-workflow.test.js scripts/design-tokens.test.js scripts/generate-api-contracts.test.js scripts/schema-contract-drift.test.js scripts/generate-tauri-release.test.js scripts/github-actions-pinning.test.js scripts/icon-design.test.js scripts/prettier-baseline.test.js scripts/renderer-performance-budget.test.js scripts/runtime-boundary.test.js scripts/server-bundle-manifest.test.js scripts/startup-theme.test.js scripts/tauri-artifact-budget.test.js scripts/tauri-preview-workflow.test.js scripts/tauri-release-workflow.test.js",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "check:rust": "cargo check --locked --manifest-path src-tauri/Cargo.toml",
@@ -66,8 +67,7 @@
     "cap:ios": "npx cap open ios",
     "generate:openapi": "uv run --project server --locked python scripts/export-openapi.py",
     "generate:contracts": "node scripts/generate-api-contracts.js",
-    "generate:orval": "orval",
-    "generate:api": "npm run generate:openapi && npm run generate:contracts && npm run generate:orval"
+    "generate:api": "npm run generate:openapi && npm run generate:contracts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -125,7 +125,6 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.11.0",
     "jsdom": "^28.1.0",
-    "orval": "^8.26.0",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
     "typescript": "^5.6.3",

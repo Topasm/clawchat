@@ -4,6 +4,7 @@ Provides export/sync, project listing, health checks, vault scanning,
 write queue management, dead letter queue, CLI error log, and reindexing.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -44,7 +45,7 @@ async def trigger_export(
     stmt = select(Todo)
     todos = list((await db.execute(stmt)).scalars().all())
 
-    result = export_all_todos(vault_path, todos)
+    result = await asyncio.to_thread(export_all_todos, vault_path, todos)
     set_last_export_time(datetime.now(timezone.utc))
 
     return {
@@ -99,8 +100,8 @@ async def get_health(
     from services.obsidian_cli_service import get_queue_status
     from services.vault_watcher_service import get_sync_status
 
-    health = get_health_summary()
-    health["write_queue"] = get_queue_status()
+    health = await asyncio.to_thread(get_health_summary)
+    health["write_queue"] = await asyncio.to_thread(get_queue_status)
     health["bidirectional_sync"] = get_sync_status()
     return health
 
@@ -117,7 +118,7 @@ async def list_projects(
     """List project folders with cached metadata from the vault index."""
     from services.obsidian_vault_indexer import ensure_fresh
 
-    idx = ensure_fresh()
+    idx = await asyncio.to_thread(ensure_fresh)
     projects = []
     for entry in sorted(idx.projects.values(), key=lambda e: e.name.lower()):
         projects.append({
@@ -151,7 +152,9 @@ async def get_project_context(
     if not vault_path:
         return {"error": "Vault not configured"}
 
-    ctx = read_project_context(vault_path, folder, settings.obsidian_cli_command)
+    ctx = await asyncio.to_thread(
+        read_project_context, vault_path, folder, settings.obsidian_cli_command
+    )
     return ctx
 
 
@@ -167,7 +170,7 @@ async def trigger_reindex(
     """Force a full vault index refresh."""
     from services.obsidian_vault_indexer import refresh_index
 
-    idx = refresh_index()
+    idx = await asyncio.to_thread(refresh_index)
     return {
         "project_count": len(idx.projects),
         "scan_duration_ms": idx.scan_duration_ms,
@@ -189,7 +192,7 @@ async def get_write_queue(
     """Return pending write queue operations."""
     from services.obsidian_cli_service import get_queue_status
 
-    return get_queue_status()
+    return await asyncio.to_thread(get_queue_status)
 
 
 @router.post("/queue/flush")
@@ -199,7 +202,7 @@ async def flush_write_queue(
     """Attempt to replay all queued write operations."""
     from services.obsidian_cli_service import flush_queue
 
-    return flush_queue()
+    return await asyncio.to_thread(flush_queue)
 
 
 @router.delete("/queue")
@@ -209,7 +212,7 @@ async def clear_write_queue(
     """Clear all queued write operations."""
     from services.obsidian_cli_service import clear_queue
 
-    cleared = clear_queue()
+    cleared = await asyncio.to_thread(clear_queue)
     return {"cleared": cleared}
 
 
@@ -225,7 +228,7 @@ async def get_dead_letter(
     """Return dead letter queue (operations that exceeded max retries)."""
     from services.obsidian_cli_service import get_dead_letter_status
 
-    return get_dead_letter_status()
+    return await asyncio.to_thread(get_dead_letter_status)
 
 
 @router.post("/dead-letter/retry")
@@ -235,7 +238,7 @@ async def retry_dead_letter_queue(
     """Move all dead letter items back to the main queue with reset retries."""
     from services.obsidian_cli_service import retry_dead_letter
 
-    requeued = retry_dead_letter()
+    requeued = await asyncio.to_thread(retry_dead_letter)
     return {"requeued": requeued}
 
 
@@ -246,7 +249,7 @@ async def clear_dead_letter_queue(
     """Clear all dead letter operations."""
     from services.obsidian_cli_service import clear_dead_letter
 
-    cleared = clear_dead_letter()
+    cleared = await asyncio.to_thread(clear_dead_letter)
     return {"cleared": cleared}
 
 
@@ -262,7 +265,7 @@ async def get_cli_errors(
     """Return recent CLI error log (up to 50 entries, newest first)."""
     from services.obsidian_cli_service import get_cli_error_log
 
-    errors = get_cli_error_log()
+    errors = await asyncio.to_thread(get_cli_error_log)
     return {"errors": errors, "total": len(errors)}
 
 
@@ -312,7 +315,7 @@ async def list_cli_commands(
     """List available Obsidian CLI plugin commands."""
     from services.obsidian_cli_service import list_cli_commands
 
-    commands = list_cli_commands()
+    commands = await asyncio.to_thread(list_cli_commands)
     return {"commands": commands, "total": len(commands)}
 
 
@@ -324,7 +327,7 @@ async def execute_cli_command(
     """Execute a specific Obsidian CLI plugin command."""
     from services.obsidian_cli_service import _run_cli
 
-    result = _run_cli("command", f"id={command_id}")
+    result = await asyncio.to_thread(_run_cli, "command", f"id={command_id}")
     if result is None:
         return {"success": False, "error": "CLI command failed or not available"}
     return {"success": True, "output": result.stdout.strip()}

@@ -147,7 +147,12 @@ async def _do_scan(
 ) -> ScanResult:
     """Core scan logic, separated for clean try/finally in caller."""
     todo_filename = settings.obsidian_project_todo_filename
-    todo_files = _todo_files_for_scan(vault_path, todo_filename, changed_paths)
+
+    # Walking the vault and reading every TODO.md is blocking disk I/O; keep it
+    # off the event loop so in-flight SSE streams and websockets keep running.
+    todo_files = await asyncio.to_thread(
+        _todo_files_for_scan, vault_path, todo_filename, changed_paths
+    )
 
     if changed_paths is None:
         active_paths = set(todo_files)
@@ -157,37 +162,11 @@ async def _do_scan(
     result.files_scanned = len(todo_files)
 
     # Parse each file for claw markers
-    all_markers: dict[str, dict] = {}  # todo_id -> parsed data
-
-    for fpath in todo_files:
-        try:
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-        except OSError:
-            result.errors += 1
-            continue
-
-        # File hash check — skip unchanged files
-        content_hash = hashlib.md5(content.encode()).hexdigest()
-        if _file_hashes.get(fpath) == content_hash:
-            continue
-        _file_hashes[fpath] = content_hash
-
-        rel_path = os.path.relpath(fpath, vault_path)
-
-        for line in content.splitlines():
-            marker_match = _MARKER_RE.search(line)
-            if not marker_match:
-                continue
-
-            todo_id = marker_match.group(1)
-            if todo_id.startswith("progress:"):
-                continue  # Skip progress markers
-
-            result.markers_found += 1
-            parsed = _parse_todo_line(line)
-            parsed["source_file"] = rel_path
-            all_markers[todo_id] = parsed
+    all_markers, read_errors, markers_found = await asyncio.to_thread(
+        _read_markers, vault_path, todo_files
+    )
+    result.errors += read_errors
+    result.markers_found += markers_found
 
     # Compare with database and apply changes
     if all_markers:
@@ -229,6 +208,56 @@ async def _do_scan(
                 result.changes_applied = 0
 
     return result
+
+
+def _read_markers(
+    vault_path: str,
+    todo_files: list[str],
+) -> tuple[dict[str, dict], int, int]:
+    """Read and parse the given TODO files.
+
+    Pure blocking disk work — always invoked through ``asyncio.to_thread`` from
+    :func:`_do_scan`, never directly from a coroutine. Mutating the module-level
+    ``_file_hashes`` cache from the worker thread is safe because ``_scan_lock``
+    admits one scan at a time.
+
+    Returns ``(markers_by_todo_id, read_errors, markers_found)``.
+    """
+    all_markers: dict[str, dict] = {}  # todo_id -> parsed data
+    errors = 0
+    markers_found = 0
+
+    for fpath in todo_files:
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except OSError:
+            errors += 1
+            continue
+
+        # File hash check — skip unchanged files
+        content_hash = hashlib.md5(content.encode()).hexdigest()
+        if _file_hashes.get(fpath) == content_hash:
+            continue
+        _file_hashes[fpath] = content_hash
+
+        rel_path = os.path.relpath(fpath, vault_path)
+
+        for line in content.splitlines():
+            marker_match = _MARKER_RE.search(line)
+            if not marker_match:
+                continue
+
+            todo_id = marker_match.group(1)
+            if todo_id.startswith("progress:"):
+                continue  # Skip progress markers
+
+            markers_found += 1
+            parsed = _parse_todo_line(line)
+            parsed["source_file"] = rel_path
+            all_markers[todo_id] = parsed
+
+    return all_markers, errors, markers_found
 
 
 def _todo_files_for_scan(

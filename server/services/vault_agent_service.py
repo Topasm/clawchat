@@ -8,6 +8,7 @@ Three agent roles create and update vault documents:
 All document operations use the CLI service (with filesystem fallback).
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -150,7 +151,12 @@ async def _handle_planner(
 
     if todo.source_id:
         try:
-            ctx = read_project_context(vault, todo.source_id, settings.obsidian_cli_command)
+            ctx = await asyncio.to_thread(
+                read_project_context,
+                vault,
+                todo.source_id,
+                settings.obsidian_cli_command,
+            )
             if ctx.get("todo_md"):
                 context_parts.append(f"Project TODO:\n{ctx['todo_md']}")
             for doc in ctx.get("related_docs", []):
@@ -185,7 +191,7 @@ async def _handle_planner(
         f"{plan_content}\n"
     )
 
-    created = cli.create_document(doc_path, full_content)
+    created = await asyncio.to_thread(cli.create_document, doc_path, full_content)
 
     return {
         "document_created": created,
@@ -236,7 +242,12 @@ async def _handle_researcher(
 
     if todo.source_id:
         try:
-            ctx = read_project_context(vault, todo.source_id, settings.obsidian_cli_command)
+            ctx = await asyncio.to_thread(
+                read_project_context,
+                vault,
+                todo.source_id,
+                settings.obsidian_cli_command,
+            )
             for doc in ctx.get("related_docs", []):
                 context_parts.append(f"Existing doc ({doc['name']}):\n{doc['content'][:500]}")
         except Exception:
@@ -269,7 +280,7 @@ async def _handle_researcher(
         f"{research_content}\n"
     )
 
-    created = cli.create_document(doc_path, full_content)
+    created = await asyncio.to_thread(cli.create_document, doc_path, full_content)
 
     return {
         "document_created": created,
@@ -315,7 +326,7 @@ async def _handle_executor(
 
     if todo.source_id:
         todo_md_path = f"{todo.source_id}/{settings.obsidian_project_todo_filename}"
-        cli.append_to_document(todo_md_path, progress_line)
+        await asyncio.to_thread(cli.append_to_document, todo_md_path, progress_line)
 
     # Re-export the todo to sync state
     project_name = None
@@ -323,11 +334,11 @@ async def _handle_executor(
         parent = await db.get(Todo, todo.parent_id)
         if parent:
             project_name = parent.title
-    export_todo(vault, todo, project_name)
+    await asyncio.to_thread(export_todo, vault, todo, project_name)
 
     # Export children too
     for child in children:
-        export_todo(vault, child, todo.title)
+        await asyncio.to_thread(export_todo, vault, child, todo.title)
 
     return {
         "updated": True,

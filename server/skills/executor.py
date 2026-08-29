@@ -7,6 +7,7 @@ has a ``vault_template``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -181,6 +182,6 @@ async def _write_vault_document(
     )
 
     try:
-        cli.create_document(doc_path, full_content)
+        await asyncio.to_thread(cli.create_document, doc_path, full_content)
     except Exception:
         logger.warning("Failed to write vault document %s", doc_path, exc_info=True)

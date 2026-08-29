@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import (
 
 from database import (
     Base,
-    _apply_schema_corrections,
+    _apply_legacy_baseline_corrections,
     _run_data_migrations,
     _setup_task_graph_revision,
 )
@@ -184,7 +184,25 @@ async def test_legacy_create_all_defers_todo_triggers_until_corrections(
             }
             assert await _graph_revision(session) == 0
 
-            await _apply_schema_corrections(session)
+            connection = await session.connection()
+            await connection.run_sync(_apply_legacy_baseline_corrections)
+            # ``todos.project_id`` is owned by Alembic revision 1f6b9c4d2a70,
+            # not by the frozen legacy correction list, so stand in for the
+            # migration here. The trigger set still must not appear until the
+            # full semantic column set exists.
+            await session.execute(
+                text(
+                    "ALTER TABLE todos ADD COLUMN project_id VARCHAR "
+                    "REFERENCES projects(id) ON DELETE SET NULL"
+                )
+            )
+            await session.commit()
+            assert not {
+                name
+                for name in await _revision_trigger_names(session)
+                if name.startswith("todos_")
+            }
+
             await _setup_task_graph_revision(session)
             assert await _revision_trigger_names(session) == _REVISION_TRIGGER_NAMES
 

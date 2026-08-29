@@ -290,11 +290,24 @@ describe('Zod schemas', () => {
         today_tasks: [],
         overdue_tasks: [],
         today_events: [],
+        needs_review: [],
         inbox_count: 5,
         greeting: 'Good morning',
         date: '2026-02-22',
       };
       expect(TodayResponseSchema.parse(data)).toEqual(data);
+    });
+
+    it('defaults needs_review when the server omits it', () => {
+      const parsed = TodayResponseSchema.parse({
+        today_tasks: [],
+        overdue_tasks: [],
+        today_events: [],
+        inbox_count: 0,
+        greeting: 'Good evening',
+        date: '2026-02-22',
+      });
+      expect(parsed.needs_review).toEqual([]);
     });
   });
 

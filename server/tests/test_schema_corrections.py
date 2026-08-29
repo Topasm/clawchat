@@ -1,4 +1,10 @@
-"""Verify that schema corrections bring old schemas up to date."""
+"""Startup-path coverage for the pre-Alembic schema adoption and reconcilers.
+
+Alembic owns the schema. What is exercised here is the part of startup Alembic
+cannot own: the frozen correction list that lifts a pre-Alembic database onto
+the baseline revision so it can be stamped, the FTS5 objects that ORM metadata
+cannot express, and the dependency reconciliation that must run on every boot.
+"""
 import uuid
 from datetime import datetime, timezone
 
@@ -9,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from database import (
     Base,
-    _apply_schema_corrections,
+    _apply_legacy_baseline_corrections,
     _run_data_migrations,
     _setup_fts,
 )
@@ -25,6 +31,13 @@ _engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
 _session_factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
 
 _NOW = datetime.now(timezone.utc).isoformat()
+
+
+async def _apply_corrections(session: AsyncSession) -> None:
+    """Run the legacy baseline corrections against an async session."""
+    connection = await session.connection()
+    await connection.run_sync(_apply_legacy_baseline_corrections)
+    await session.commit()
 
 
 def _todo_insert(extra_cols: str = "", extra_vals: str = "", extra_params: dict | None = None):
@@ -59,9 +72,9 @@ async def fresh_db():
 
 @pytest.mark.asyncio
 async def test_corrections_idempotent(fresh_db: AsyncSession):
-    """Running _apply_schema_corrections twice must not raise."""
-    await _apply_schema_corrections(fresh_db)
-    await _apply_schema_corrections(fresh_db)
+    """The legacy corrections must survive a second startup unchanged."""
+    await _apply_corrections(fresh_db)
+    await _apply_corrections(fresh_db)
 
 
 @pytest.mark.asyncio
@@ -74,83 +87,154 @@ async def test_fts_setup_idempotent(fresh_db: AsyncSession):
 # ---- Schema correction tests ----
 
 
+# The shape a ClawChat database had before any of the baseline columns were
+# introduced. The corrections must lift exactly this onto the baseline schema,
+# because that is what makes it stampable.
+_PRE_BASELINE_TABLES = (
+    """
+    CREATE TABLE todos (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL,
+        priority TEXT NOT NULL,
+        due_date DATETIME,
+        completed_at DATETIME,
+        conversation_id TEXT,
+        message_id TEXT,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        tags TEXT
+    )
+    """,
+    """
+    CREATE TABLE conversations (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        is_archived BOOLEAN NOT NULL,
+        metadata TEXT
+    )
+    """,
+    """
+    CREATE TABLE agent_tasks (
+        id TEXT PRIMARY KEY,
+        task_type TEXT NOT NULL,
+        instruction TEXT NOT NULL,
+        status TEXT NOT NULL,
+        result TEXT,
+        error TEXT,
+        parent_task_id TEXT,
+        agent_type TEXT NOT NULL,
+        progress INTEGER NOT NULL,
+        progress_message TEXT,
+        sub_task_count INTEGER NOT NULL,
+        completed_sub_tasks INTEGER NOT NULL,
+        conversation_id TEXT,
+        message_id TEXT,
+        created_at DATETIME NOT NULL,
+        started_at DATETIME,
+        completed_at DATETIME
+    )
+    """,
+    """
+    CREATE TABLE paired_devices (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        device_type TEXT NOT NULL,
+        device_token TEXT NOT NULL UNIQUE,
+        paired_at DATETIME NOT NULL,
+        last_seen DATETIME NOT NULL,
+        is_active BOOLEAN NOT NULL,
+        push_token TEXT
+    )
+    """,
+)
+
+_BASELINE_COLUMNS = {
+    "todos": (
+        "parent_id", "sort_order", "source", "source_id", "assignee",
+        "inbox_state", "estimated_minutes", "automation_error",
+        "enabled_skills", "clarification_questions", "clarification_answers",
+        "depends_on", "recurrence_rule", "recurrence_end",
+        "recurrence_exceptions", "recurring_source_id",
+    ),
+    "conversations": ("project_todo_id",),
+    "agent_tasks": (
+        "todo_id", "payload_json", "skill_chain", "current_skill_index",
+    ),
+    "paired_devices": ("public_key",),
+}
+
+
 @pytest.mark.asyncio
-async def test_corrections_add_missing_columns(fresh_db: AsyncSession):
-    """After corrections, expected columns exist on their tables."""
-    await _apply_schema_corrections(fresh_db)
+async def test_corrections_add_missing_columns(tmp_path):
+    """A pre-baseline schema gains every column the baseline revision expects.
 
-    # Check todos columns
-    rows = await fresh_db.execute(text("PRAGMA table_info(todos)"))
-    todo_cols = {r[1] for r in rows.fetchall()}
-    for col in (
-        "parent_id", "sort_order", "source", "source_id",
-        "assignee", "inbox_state", "estimated_minutes",
-        "automation_error", "enabled_skills", "depends_on",
-    ):
-        assert col in todo_cols, f"Missing column todos.{col}"
+    This is what makes ``_detect_legacy_revision`` able to stamp such a
+    database: without these columns the baseline probe would be lying, and the
+    revisions that follow reference the columns in their triggers.
+    """
+    engine = create_async_engine(
+        f"sqlite+aiosqlite:///{(tmp_path / 'pre-baseline.db').as_posix()}"
+    )
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with engine.begin() as connection:
+            for statement in _PRE_BASELINE_TABLES:
+                await connection.execute(text(statement))
 
-    # Check conversations columns
-    rows = await fresh_db.execute(text("PRAGMA table_info(conversations)"))
-    conv_cols = {r[1] for r in rows.fetchall()}
-    assert "project_todo_id" in conv_cols
+        async with factory() as session:
+            await _apply_corrections(session)
 
-    # Check agent_tasks columns
-    rows = await fresh_db.execute(text("PRAGMA table_info(agent_tasks)"))
-    task_cols = {r[1] for r in rows.fetchall()}
-    for col in ("todo_id", "payload_json", "skill_chain", "current_skill_index"):
-        assert col in task_cols, f"Missing column agent_tasks.{col}"
+            for table, expected in _BASELINE_COLUMNS.items():
+                rows = await session.execute(text(f"PRAGMA table_info({table})"))
+                present = {row[1] for row in rows.fetchall()}
+                missing = sorted(set(expected) - present)
+                assert not missing, f"Missing columns on {table}: {missing}"
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_corrections_leave_post_baseline_columns_to_alembic(
+    fresh_db: AsyncSession,
+):
+    """The frozen list must not shadow a column an Alembic revision owns.
+
+    ``todos.project_id``, ``messages.idempotency_key`` and the Paseo execution
+    columns are added by revisions. If a correction added them too, a legacy
+    database would be stamped below those revisions and then fail the upgrade
+    with a duplicate column.
+    """
+    from database import _LEGACY_BASELINE_CORRECTIONS
+
+    revision_owned = (
+        "project_id",
+        "idempotency_key",
+        "execution_workspace_isolation",
+        "external_run_id",
+        "default_execution_model",
+        "execution_workspace_path",
+        "execution_base_branch",
+    )
+    offenders = [
+        statement
+        for statement in _LEGACY_BASELINE_CORRECTIONS
+        if statement.startswith("ALTER TABLE")
+        and any(f" ADD COLUMN {column} " in statement for column in revision_owned)
+    ]
+    assert not offenders, offenders
 
 
 # ---- Data migration tests ----
 
 
-@pytest.mark.asyncio
-async def test_skill_migration(fresh_db: AsyncSession):
-    """Legacy assignee values are converted to enabled_skills."""
-    await _apply_schema_corrections(fresh_db)
-
-    # Insert test todos with legacy assignee values and no enabled_skills
-    for assignee in ("planner", "researcher", "executor"):
-        tid, stmt, params = _todo_insert(
-            extra_cols=", assignee",
-            extra_vals=", :assignee",
-            extra_params={"assignee": assignee},
-        )
-        params["title"] = f"task-{assignee}"
-        await fresh_db.execute(stmt, params)
-    await fresh_db.commit()
-
-    await _run_data_migrations(fresh_db)
-
-    rows = await fresh_db.execute(
-        text("SELECT assignee, enabled_skills FROM todos ORDER BY title")
-    )
-    results = {r[0]: r[1] for r in rows.fetchall()}
-    assert results["executor"] == '[\"obsidian_sync\"]'
-    assert results["planner"] == '[\"plan\"]'
-    assert results["researcher"] == '[\"research\"]'
-
-
-@pytest.mark.asyncio
-async def test_skill_migration_idempotent(fresh_db: AsyncSession):
-    """Running skill migration twice doesn't overwrite existing enabled_skills."""
-    await _apply_schema_corrections(fresh_db)
-
-    tid, stmt, params = _todo_insert(
-        extra_cols=", assignee, enabled_skills",
-        extra_vals=", 'planner', '[\"custom\"]'",
-    )
-    params["title"] = "already set"
-    await fresh_db.execute(stmt, params)
-    await fresh_db.commit()
-
-    await _run_data_migrations(fresh_db)
-
-    row = await fresh_db.execute(
-        text("SELECT enabled_skills FROM todos WHERE id = :id"),
-        {"id": tid},
-    )
-    assert row.scalar() == '[\"custom\"]', "Should not overwrite existing enabled_skills"
+# ``test_skill_migration`` / ``test_skill_migration_idempotent`` moved to
+# tests/test_legacy_startup_migration.py: the assignee -> enabled_skills
+# transform is now Alembic revision f0d5c8a12b64, so it is covered against a
+# real migration run instead of against ``_run_data_migrations``.
 
 
 @pytest.mark.asyncio
@@ -259,7 +343,6 @@ async def test_repeated_startup_does_not_resurrect_deleted_dependency(
 @pytest.mark.asyncio
 async def test_fts_trigger_sync(fresh_db: AsyncSession):
     """Inserting a todo should automatically populate todos_fts via trigger."""
-    await _apply_schema_corrections(fresh_db)
     await _setup_fts(fresh_db)
 
     tid = str(uuid.uuid4())
@@ -285,8 +368,6 @@ async def test_fts_trigger_sync(fresh_db: AsyncSession):
 @pytest.mark.asyncio
 async def test_fts_backfill(fresh_db: AsyncSession):
     """Existing todos inserted before FTS setup get backfilled."""
-    await _apply_schema_corrections(fresh_db)
-
     # Insert a todo BEFORE FTS tables exist
     tid = str(uuid.uuid4())
     await fresh_db.execute(

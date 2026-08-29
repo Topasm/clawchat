@@ -89,6 +89,7 @@ export const TodoCreateSchema = z.object({
   assignee: z.string().nullable().optional(),
   enabled_skills: z.array(z.string()).nullable().optional(),
   depends_on: z.array(z.string()).nullable().optional(),
+  estimated_minutes: z.number().int().nullable().optional(),
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
@@ -109,6 +110,10 @@ export const TodoUpdateSchema = z.object({
   assignee: z.string().nullable().optional(),
   enabled_skills: z.array(z.string()).nullable().optional(),
   depends_on: z.array(z.string()).nullable().optional(),
+  estimated_minutes: z.number().int().nullable().optional(),
+  source: z.string().nullable().optional(),
+  source_id: z.string().nullable().optional(),
+  inbox_state: InboxStateSchema.optional(),
   recurrence_rule: z.string().nullable().optional(),
   recurrence_end: z.string().nullable().optional(),
 });
@@ -214,6 +219,7 @@ export const ProjectTodoResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().nullable().optional(),
+  project_id: z.string().nullable().optional(),
   status: TaskStatusSchema,
   priority: PrioritySchema.optional(),
   due_date: z.string().nullable().optional(),
@@ -608,6 +614,8 @@ export const EventUpdateSchema = z.object({
   is_all_day: z.boolean().optional(),
   reminder_minutes: z.number().optional(),
   tags: z.array(z.string()).optional(),
+  recurrence_rule: z.string().nullable().optional(),
+  recurrence_end: z.string().nullable().optional(),
 });
 
 // -- Chat -------------------------------------------------------------------
@@ -636,12 +644,14 @@ export const MessageResponseSchema = z.object({
   content: z.string(),
   intent: z.string().optional(),
   message_type: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: z.string(),
 });
 
 export const SendMessageRequestSchema = z.object({
   conversation_id: z.string(),
   content: z.string().min(1, 'Message is required'),
+  idempotency_key: z.string().nullable().optional(),
 });
 
 // -- SSE stream events ------------------------------------------------------
@@ -679,6 +689,7 @@ export const TodayResponseSchema = z.object({
   today_tasks: z.array(TodoResponseSchema),
   overdue_tasks: z.array(TodoResponseSchema),
   today_events: z.array(EventResponseSchema),
+  needs_review: z.array(TodoResponseSchema).default([]),
   inbox_count: z.number(),
   greeting: z.string(),
   date: z.string(),
@@ -975,6 +986,9 @@ export const AgentTaskResponseSchema = z.object({
   created_at: z.string(),
   started_at: z.string().nullable().optional(),
   completed_at: z.string().nullable().optional(),
+  get sub_tasks() {
+    return z.array(AgentTaskResponseSchema).nullable().optional();
+  },
 });
 
 export const AgentRunStatusSchema = z.enum([

@@ -417,6 +417,12 @@ def test_init_db_recovers_partial_unmarked_relationship_import(tmp_path: Path):
             "VALUES ('rel_partial', 'todo_execute', 'todo_prerequisite', "
             "'depends_on', 'legacy', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
         )
+        # This half-finished state only ever came from the pre-Alembic startup
+        # path, which created the normalized tables from ORM metadata and left
+        # no version row behind. Drop the stamp so the database looks the way a
+        # real interrupted upgrade would: modern tables, no ``alembic_version``,
+        # and no completion marker.
+        connection.execute("DROP TABLE alembic_version")
         connection.commit()
 
     _run_init_db(database_path)

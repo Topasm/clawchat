@@ -1,17 +1,27 @@
+import asyncio
 import json
+import logging
 import os
+import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable, Mapping
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import event, inspect, select, text
-from sqlalchemy.engine import Engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.exc import DatabaseError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from config import settings
 from domain.plan_proposal import GLOBAL_TASK_GRAPH_SCOPE_ID, PlanProposalStatus
-from domain.task import TASK_STATUS_SQL_VALUES, TaskStatus
+from domain.task import TaskStatus
 from domain.task_relationship import TASK_RELATIONSHIP_MIGRATION_MARKER
+
+logger = logging.getLogger(__name__)
 
 
 @event.listens_for(Engine, "connect")
@@ -332,12 +342,12 @@ def _install_task_graph_state_sync(connection) -> None:
     if connection.dialect.name != "sqlite":
         return
 
-    # ``create_all`` also runs against legacy databases before
-    # ``_apply_schema_corrections`` has added every modern Todo column.  A
-    # trigger that refers to a missing ``OLD.<column>``/``NEW.<column>`` makes
-    # SQLite reject startup, so defer all Todo triggers until the complete
-    # semantic column set is present.  ``_setup_task_graph_revision`` retries
-    # installation after the corrections have run.
+    # This also fires from ``Base.metadata.create_all`` in the test fixtures,
+    # and from ``_setup_task_graph_revision`` on a database that is only part
+    # way up the revision chain.  A trigger that refers to a missing
+    # ``OLD.<column>``/``NEW.<column>`` makes SQLite reject startup, so defer
+    # all Todo triggers until the complete semantic column set is present.
+    # ``_setup_task_graph_revision`` retries after the migrations have run.
     todo_columns: set[str] = set()
     if inspector.has_table("todos"):
         todo_columns = {
@@ -380,82 +390,317 @@ def _ensure_data_dir():
     os.makedirs(app_settings.upload_dir, exist_ok=True)
 
 
-async def _apply_schema_corrections(session: AsyncSession):
-    """Add columns that may be missing from older schemas.
+# ---------------------------------------------------------------------------
+# Alembic is the single source of truth for the schema.
+#
+# ``init_db`` runs ``alembic upgrade head`` on every startup.  Databases that
+# predate the Alembic adoption were built by ``Base.metadata.create_all`` plus
+# the hand-written corrections below and therefore carry no ``alembic_version``
+# row.  Those are recognised by their schema shape, stamped at the matching
+# revision, and then upgraded like everything else.  After that first startup a
+# legacy database is indistinguishable from a fresh one.
+# ---------------------------------------------------------------------------
 
-    Each statement is idempotent -- duplicate column errors are silently ignored.
-    Grouped by table for readability.
+def _migrations_dir() -> Path:
+    """Locate ``migrations/`` in both a source checkout and a frozen build.
+
+    PyInstaller unpacks bundled data next to the executable rather than beside
+    this module, so the packaged desktop sidecar has to look at ``_MEIPASS``.
     """
-    corrections = [
-        # -- todos --
-        "ALTER TABLE todos ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
-        "ALTER TABLE todos ADD COLUMN parent_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
-        "ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE todos ADD COLUMN source TEXT",
-        "ALTER TABLE todos ADD COLUMN source_id TEXT",
-        "ALTER TABLE todos ADD COLUMN assignee TEXT",
-        "ALTER TABLE todos ADD COLUMN inbox_state TEXT NOT NULL DEFAULT 'none'",
-        "ALTER TABLE todos ADD COLUMN estimated_minutes INTEGER",
-        "ALTER TABLE todos ADD COLUMN automation_error TEXT",
-        "ALTER TABLE todos ADD COLUMN enabled_skills TEXT",
-        "ALTER TABLE todos ADD COLUMN clarification_questions TEXT",
-        "ALTER TABLE todos ADD COLUMN clarification_answers TEXT",
-        "ALTER TABLE todos ADD COLUMN depends_on TEXT",
-        "ALTER TABLE todos ADD COLUMN recurrence_rule TEXT",
-        "ALTER TABLE todos ADD COLUMN recurrence_end DATETIME",
-        "ALTER TABLE todos ADD COLUMN recurrence_exceptions TEXT",
-        "ALTER TABLE todos ADD COLUMN recurring_source_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+    frozen_root = getattr(sys, "_MEIPASS", None)
+    base = Path(frozen_root) if frozen_root else Path(__file__).resolve().parent
+    return base / "migrations"
 
-        # -- conversations --
-        "ALTER TABLE conversations ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
-        "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
 
-        # -- events --
-        "ALTER TABLE events ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
+_MIGRATIONS_DIR = _migrations_dir()
 
-        # -- plan proposals --
-        "ALTER TABLE plan_proposals ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL",
+# Column additions that predate the Alembic baseline revision. They exist only
+# to lift a pre-Alembic database onto the baseline schema so it can be stamped;
+# every column added after the baseline belongs to a revision instead. This list
+# is frozen -- do not extend it. New columns go into a new Alembic revision.
+_LEGACY_BASELINE_CORRECTIONS = (
+    # -- todos --
+    "ALTER TABLE todos ADD COLUMN parent_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+    "ALTER TABLE todos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE todos ADD COLUMN source TEXT",
+    "ALTER TABLE todos ADD COLUMN source_id TEXT",
+    "ALTER TABLE todos ADD COLUMN assignee TEXT",
+    "ALTER TABLE todos ADD COLUMN inbox_state TEXT NOT NULL DEFAULT 'none'",
+    "ALTER TABLE todos ADD COLUMN estimated_minutes INTEGER",
+    "ALTER TABLE todos ADD COLUMN automation_error TEXT",
+    "ALTER TABLE todos ADD COLUMN enabled_skills TEXT",
+    "ALTER TABLE todos ADD COLUMN clarification_questions TEXT",
+    "ALTER TABLE todos ADD COLUMN clarification_answers TEXT",
+    "ALTER TABLE todos ADD COLUMN depends_on TEXT",
+    "ALTER TABLE todos ADD COLUMN recurrence_rule TEXT",
+    "ALTER TABLE todos ADD COLUMN recurrence_end DATETIME",
+    "ALTER TABLE todos ADD COLUMN recurrence_exceptions TEXT",
+    "ALTER TABLE todos ADD COLUMN recurring_source_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+    # -- conversations --
+    "ALTER TABLE conversations ADD COLUMN project_todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+    # -- agent_tasks --
+    "ALTER TABLE agent_tasks ADD COLUMN todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
+    "ALTER TABLE agent_tasks ADD COLUMN payload_json TEXT",
+    "ALTER TABLE agent_tasks ADD COLUMN skill_chain TEXT",
+    "ALTER TABLE agent_tasks ADD COLUMN current_skill_index INTEGER NOT NULL DEFAULT 0",
+    # -- paired_devices --
+    "ALTER TABLE paired_devices ADD COLUMN public_key TEXT",
+    # -- baseline indexes over the columns above --
+    "CREATE INDEX IF NOT EXISTS idx_todos_parent_id ON todos(parent_id)",
+    "CREATE INDEX IF NOT EXISTS idx_todos_sort_order ON todos(sort_order)",
+    "CREATE INDEX IF NOT EXISTS idx_todos_source ON todos(source)",
+    "CREATE INDEX IF NOT EXISTS idx_todos_recurrence_rule ON todos(recurrence_rule)",
+    "CREATE INDEX IF NOT EXISTS idx_conversations_project_todo_id "
+    "ON conversations(project_todo_id)",
+)
 
-        # -- agent_tasks --
-        "ALTER TABLE agent_tasks ADD COLUMN todo_id TEXT REFERENCES todos(id) ON DELETE SET NULL",
-        "ALTER TABLE agent_tasks ADD COLUMN payload_json TEXT",
-        "ALTER TABLE agent_tasks ADD COLUMN skill_chain TEXT",
-        "ALTER TABLE agent_tasks ADD COLUMN current_skill_index INTEGER NOT NULL DEFAULT 0",
+_BASELINE_TABLES = frozenset(
+    {
+        "agent_tasks",
+        "attachments",
+        "conversations",
+        "events",
+        "host_identity",
+        "messages",
+        "paired_devices",
+        "pairing_sessions",
+        "refresh_sessions",
+        "todos",
+        "user_settings",
+    }
+)
 
-        # -- projects / agent_runs (Paseo execution metadata) --
-        "ALTER TABLE projects ADD COLUMN default_execution_model TEXT",
-        "ALTER TABLE projects ADD COLUMN execution_workspace_path TEXT",
-        "ALTER TABLE projects ADD COLUMN execution_workspace_isolation TEXT NOT NULL DEFAULT 'local'",
-        "ALTER TABLE projects ADD COLUMN execution_base_branch TEXT",
-        "ALTER TABLE agent_runs ADD COLUMN external_run_id TEXT",
 
-        # -- paired_devices --
-        "ALTER TABLE paired_devices ADD COLUMN public_key TEXT",
+@dataclass(frozen=True)
+class _SchemaFacts:
+    """The table and column inventory a revision probe is allowed to use."""
 
-        # -- messages --
-        "ALTER TABLE messages ADD COLUMN idempotency_key TEXT",
-        # Partial so the pre-existing NULL-keyed rows do not collide.
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_messages_conversation_idempotency_key "
-        "ON messages (conversation_id, idempotency_key) WHERE idempotency_key IS NOT NULL",
-    ]
+    tables: frozenset[str]
+    columns: Mapping[str, frozenset[str]]
 
-    for stmt in corrections:
+    def has_column(self, table: str, column: str) -> bool:
+        return column in self.columns.get(table, frozenset())
+
+
+def _probe_baseline(facts: _SchemaFacts) -> bool:
+    return _BASELINE_TABLES <= facts.tables
+
+
+def _probe_canonical_task_status(facts: _SchemaFacts) -> bool:
+    """Deliberately identical to the baseline probe.
+
+    ``c5e936c9d7b1`` only adds the ``ck_todos_status_valid`` CHECK constraint,
+    which SQLite can express only by rebuilding ``todos``. Rebuilding would drop
+    and recreate the table and so cascade-delete every ``task_relationships``
+    row that references it. Legacy databases therefore keep the
+    application-level status guarantee (plus the idempotent normalisation in
+    revision ``f0d5c8a12b64``) instead of the table constraint, exactly as they
+    do today.
+    """
+    return _probe_baseline(facts)
+
+
+def _probe_normalized_task_relationships(facts: _SchemaFacts) -> bool:
+    return {"task_relationships", "data_migration_markers"} <= facts.tables
+
+
+def _probe_versioned_plan_proposals(facts: _SchemaFacts) -> bool:
+    return {
+        "task_graph_states",
+        "plan_proposals",
+        "change_sets",
+        "vault_sync_jobs",
+    } <= facts.tables
+
+
+def _probe_first_class_projects(facts: _SchemaFacts) -> bool:
+    return "projects" in facts.tables and facts.has_column("todos", "project_id")
+
+
+def _probe_unified_review_and_artifacts(facts: _SchemaFacts) -> bool:
+    return {"artifacts", "artifact_revisions", "review_items"} <= facts.tables
+
+
+def _probe_agent_run_lifecycle(facts: _SchemaFacts) -> bool:
+    return {"agent_runs", "agent_run_events"} <= facts.tables
+
+
+def _probe_paseo_execution_provider(facts: _SchemaFacts) -> bool:
+    return facts.has_column(
+        "projects", "execution_workspace_isolation"
+    ) and facts.has_column("agent_runs", "external_run_id")
+
+
+def _probe_task_placement_changes(facts: _SchemaFacts) -> bool:
+    return "task_placement_changes" in facts.tables
+
+
+def _probe_message_idempotency_key(facts: _SchemaFacts) -> bool:
+    return facts.has_column("messages", "idempotency_key")
+
+
+# Revision chain order. Each entry answers "was this revision's schema already
+# materialised by the pre-Alembic startup path?" using tables and columns only:
+# those are what ``create_all`` guarantees, and probing them never requires a
+# destructive table rebuild. A revision that changes no schema object (a pure
+# data migration) needs no probe -- it simply runs during the upgrade that
+# follows the stamp.
+_LEGACY_REVISION_PROBES: tuple[tuple[str, Callable[[_SchemaFacts], bool]], ...] = (
+    ("9927ab512428", _probe_baseline),
+    ("c5e936c9d7b1", _probe_canonical_task_status),
+    ("4d8f2a1c7b90", _probe_normalized_task_relationships),
+    ("7a31c9e5d204", _probe_versioned_plan_proposals),
+    ("1f6b9c4d2a70", _probe_first_class_projects),
+    ("8c2d4e6f901b", _probe_unified_review_and_artifacts),
+    ("b7e3a19d4c52", _probe_agent_run_lifecycle),
+    ("c4a8e2f91d30", _probe_paseo_execution_provider),
+    ("d6f8a1c3e520", _probe_task_placement_changes),
+    ("e2b7c4d81a35", _probe_message_idempotency_key),
+)
+
+# The columns a probe may read. Reflecting every table on every startup is
+# wasted work on a database that already carries an ``alembic_version`` row.
+_PROBED_TABLES = ("todos", "messages", "projects", "agent_runs")
+
+
+@dataclass(frozen=True)
+class _StartupSchemaState:
+    """Everything ``init_db`` must know *before* any migration runs."""
+
+    tables: frozenset[str]
+    current_revision: str | None
+    relationship_table_exists: bool
+    relationship_marker_exists: bool
+
+
+def _alembic_config() -> Config:
+    """Build the runtime Alembic config.
+
+    Deliberately constructed without ``alembic.ini``: ``env.py`` calls
+    ``fileConfig`` when a config file is present, which would tear down the
+    application's own logging setup mid-startup. The CLI keeps using the ini.
+    """
+    config = Config()
+    config.set_main_option("script_location", str(_MIGRATIONS_DIR))
+    # ``env.py`` re-reads the URL from settings; set it too so the config is
+    # self-contained and any Alembic internals see the same target.
+    config.set_main_option(
+        "sqlalchemy.url", settings.database_url.replace("%", "%%")
+    )
+    return config
+
+
+def _read_startup_schema_state(sync_connection: Connection) -> _StartupSchemaState:
+    inspector = inspect(sync_connection)
+    tables = frozenset(inspector.get_table_names())
+
+    current_revision: str | None = None
+    if "alembic_version" in tables:
+        current_revision = sync_connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalars().first()
+
+    relationship_marker_exists = False
+    if "data_migration_markers" in tables:
+        relationship_marker_exists = (
+            sync_connection.execute(
+                text("SELECT 1 FROM data_migration_markers WHERE name = :name"),
+                {"name": TASK_RELATIONSHIP_MIGRATION_MARKER},
+            ).scalar_one_or_none()
+            is not None
+        )
+
+    return _StartupSchemaState(
+        tables=tables,
+        current_revision=current_revision,
+        relationship_table_exists="task_relationships" in tables,
+        relationship_marker_exists=relationship_marker_exists,
+    )
+
+
+def _apply_legacy_baseline_corrections(sync_connection: Connection) -> None:
+    """Lift a pre-Alembic schema onto the baseline revision's column set.
+
+    Only ever runs for a database with no ``alembic_version`` row. Each
+    statement is additive and idempotent; a duplicate column is expected and
+    ignored, and each attempt is isolated in its own savepoint so one skipped
+    statement cannot poison the rest.
+    """
+    for statement in _LEGACY_BASELINE_CORRECTIONS:
+        savepoint = sync_connection.begin_nested()
         try:
-            await session.execute(text(stmt))
-        except (OperationalError, Exception):
-            pass  # column already exists
-    for stmt in (
-        "CREATE INDEX IF NOT EXISTS idx_todos_project_id ON todos(project_id)",
-        "CREATE INDEX IF NOT EXISTS idx_conversations_project_id ON conversations(project_id)",
-        "CREATE INDEX IF NOT EXISTS idx_events_project_id ON events(project_id)",
-        "CREATE INDEX IF NOT EXISTS idx_plan_proposals_project_status ON plan_proposals(project_id, status)",
-        "CREATE INDEX IF NOT EXISTS idx_agent_runs_external_run_id ON agent_runs(external_run_id)",
-    ):
-        try:
-            await session.execute(text(stmt))
-        except OperationalError:
-            pass
-    await session.commit()
+            sync_connection.execute(text(statement))
+        except DatabaseError:
+            savepoint.rollback()
+        else:
+            savepoint.commit()
+
+
+def _collect_schema_facts(sync_connection: Connection) -> _SchemaFacts:
+    inspector = inspect(sync_connection)
+    tables = frozenset(inspector.get_table_names())
+    columns = {
+        table: frozenset(
+            column["name"] for column in inspector.get_columns(table)
+        )
+        for table in _PROBED_TABLES
+        if table in tables
+    }
+    return _SchemaFacts(tables=tables, columns=columns)
+
+
+def _detect_legacy_revision(facts: _SchemaFacts) -> str:
+    """Map a pre-Alembic schema onto the revision that produced it.
+
+    Fails closed. A schema that is not a clean prefix of the revision chain is
+    an unrecognised database, and stamping it would either re-create existing
+    tables or silently strand missing columns.
+    """
+    results = [(revision, probe(facts)) for revision, probe in _LEGACY_REVISION_PROBES]
+    flags = [satisfied for _revision, satisfied in results]
+    boundary = flags.index(False) if False in flags else len(flags)
+
+    if any(flags[boundary:]):
+        present = [revision for revision, satisfied in results if satisfied]
+        missing = [revision for revision, satisfied in results if not satisfied]
+        raise RuntimeError(
+            "Refusing to migrate an unrecognised pre-Alembic database: its "
+            "schema matches revisions "
+            f"{', '.join(present)} but not {', '.join(missing)}, which is not a "
+            "contiguous prefix of the migration history. Restore a backup or "
+            "stamp the database manually with `alembic stamp <revision>`."
+        )
+    if boundary == 0:
+        raise RuntimeError(
+            "Refusing to migrate an unrecognised pre-Alembic database: the "
+            "baseline tables "
+            f"{', '.join(sorted(_BASELINE_TABLES - facts.tables))} are missing. "
+            "Restore a backup or stamp the database manually with "
+            "`alembic stamp <revision>`."
+        )
+    return results[boundary - 1][0]
+
+
+async def _upgrade_schema_to_head(state: _StartupSchemaState) -> None:
+    """Bring the database to the head revision, adopting legacy schemas first."""
+    config = _alembic_config()
+
+    is_pre_alembic = state.current_revision is None and bool(
+        state.tables - {"alembic_version"}
+    )
+    if is_pre_alembic:
+        async with engine.begin() as conn:
+            await conn.run_sync(_apply_legacy_baseline_corrections)
+            facts = await conn.run_sync(_collect_schema_facts)
+        revision = _detect_legacy_revision(facts)
+        logger.info(
+            "Adopting pre-Alembic database: stamping revision %s", revision
+        )
+        # ``command.stamp``/``command.upgrade`` are synchronous and drive their
+        # own event loop inside ``env.py``, so they must not run on this one.
+        await asyncio.to_thread(command.stamp, config, revision)
+
+    await asyncio.to_thread(command.upgrade, config, "head")
 
 
 async def _run_data_migrations(
@@ -467,26 +712,16 @@ async def _run_data_migrations(
 
     The relationship marker is committed in the same transaction as the
     legacy import.  This makes an interrupted first startup retryable even
-    after ``create_all`` has already created the normalized table.  Once the
-    marker exists, normalized rows are authoritative and only the legacy JSON
-    shadow is reconciled.
+    after the normalized table already exists.  Once the marker exists,
+    normalized rows are authoritative and only the legacy JSON shadow is
+    reconciled.
+
+    Column-level and value-level transforms live in Alembic revisions.  What
+    remains here is reconciliation that must run on *every* startup, plus the
+    object backfills that a revision cannot own: a revision only backfills when
+    it creates its table, and a pre-Alembic database can already have the table
+    without ever having been backfilled.  All of them are idempotent.
     """
-    migrations = [
-        (
-            f"UPDATE todos SET status = '{TaskStatus.PENDING.value}', completed_at = NULL "
-            f"WHERE status IS NULL OR status NOT IN ({TASK_STATUS_SQL_VALUES})"
-        ),
-        "UPDATE todos SET enabled_skills = '[\"plan\"]' WHERE assignee = 'planner' AND enabled_skills IS NULL",
-        "UPDATE todos SET enabled_skills = '[\"research\"]' WHERE assignee = 'researcher' AND enabled_skills IS NULL",
-        "UPDATE todos SET enabled_skills = '[\"obsidian_sync\"]' WHERE assignee = 'executor' AND enabled_skills IS NULL",
-    ]
-
-    for stmt in migrations:
-        try:
-            await session.execute(text(stmt))
-        except OperationalError:
-            pass
-
     from models.data_migration_marker import DataMigrationMarker
     from services.task_relationship_service import (
         backfill_legacy_dependencies,
@@ -914,45 +1149,44 @@ async def _setup_fts(session: AsyncSession):
 
 
 async def init_db():
-    """Initialize database: create tables, apply corrections, setup FTS."""
+    """Migrate the database to head, then install the non-declarative objects.
+
+    Alembic owns the schema. FTS5 virtual tables, their sync triggers, the
+    dependency-cycle triggers, and the task-graph revision triggers are
+    re-asserted afterwards: none of them can be expressed in ORM metadata, all
+    of them are ``IF NOT EXISTS`` idempotent, and re-asserting them heals a
+    database restored from a dump that carried tables but no triggers.
+    """
     _ensure_data_dir()
 
     async with engine.begin() as conn:
         from models import _register_all  # noqa: F401
 
-        relationship_table_existed = await conn.run_sync(
-            lambda sync_conn: inspect(sync_conn).has_table("task_relationships")
+        state = await conn.run_sync(_read_startup_schema_state)
+
+    # Fail closed before any DDL runs. A marker without its table means the
+    # normalized dependency rows were lost; recreating an empty table would let
+    # the reconciler overwrite the legacy JSON shadow with nothing.
+    if state.relationship_marker_exists and not state.relationship_table_exists:
+        raise RuntimeError(
+            "Task relationship migration marker exists but the "
+            "task_relationships table is missing; refusing to recreate "
+            "an empty table over legacy dependency data"
         )
-        marker_table_existed = await conn.run_sync(
-            lambda sync_conn: inspect(sync_conn).has_table(
-                "data_migration_markers"
-            )
-        )
-        relationship_marker_exists = False
-        if marker_table_existed:
-            relationship_marker_exists = (
-                await conn.execute(
-                    text(
-                        "SELECT 1 FROM data_migration_markers "
-                        "WHERE name = :name"
-                    ),
-                    {"name": TASK_RELATIONSHIP_MIGRATION_MARKER},
-                )
-            ).scalar_one_or_none() is not None
-        if relationship_marker_exists and not relationship_table_existed:
-            raise RuntimeError(
-                "Task relationship migration marker exists but the "
-                "task_relationships table is missing; refusing to recreate "
-                "an empty table over legacy dependency data"
-            )
-        await conn.run_sync(Base.metadata.create_all)
+
+    await _upgrade_schema_to_head(state)
 
     async with AsyncSession(engine) as session:
-        await _apply_schema_corrections(session)
         await _setup_task_relationship_integrity(session)
         await _run_data_migrations(
             session,
-            relationship_table_existed=relationship_table_existed,
+            # The guard above already rejected "marker without table". Anything
+            # the migrations just created is, by construction, backfilled by the
+            # revision that created it.
+            relationship_table_existed=(
+                state.relationship_table_exists
+                or not state.relationship_marker_exists
+            ),
         )
         await _setup_task_graph_revision(session)
         await _setup_fts(session)

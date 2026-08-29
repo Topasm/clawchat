@@ -1,69 +1,46 @@
-import asyncio
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from constants import SYSTEM_PROMPT
-from domain.task import TaskStatus
 from exceptions import AIUnavailableError
 from models.agent_task import AgentTask
 from models.agent_run import AgentRun
 from models.conversation import Conversation
 from models.message import Message
-from models.project import Project
-from models.todo import Todo
-from services import (
-    agent_task_service,
-    agent_run_service,
-    briefing_service,
-    calendar_service,
-    scheduling_service,
-    search_service,
-    todo_recurrence_service,
-    todo_service,
-)
+from services import agent_task_service, agent_run_service
 from services.ai_service import AIService
 from services.conversation_context import (
     build_first_class_project_context,
     build_project_context,
 )
 from services.intent_classifier import classify_intent
+from services.intent_handlers import (
+    MODULE_INTENTS,
+    IntentContext,
+    get_intent_handler,
+    is_module_intent,
+)
 from utils import make_id
 from ws.manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
 
-# Intents that map to module actions
-MODULE_INTENTS = {
-    "create_todo": "create a todo",
-    "query_todos": "list your todos",
-    "update_todo": "update a todo",
-    "delete_todo": "delete a todo",
-    "complete_todo": "complete a todo",
-    "create_event": "create a calendar event",
-    "query_events": "check your calendar",
-    "update_event": "update a calendar event",
-    "delete_event": "delete a calendar event",
-    "suggest_time": "suggest a time for an event",
-    "check_conflicts": "check for scheduling conflicts",
-    "analyze_schedule": "analyze your schedule",
-}
-
-
-def _find_by_title(items, title: str):
-    """Case-insensitive title substring match; prefers exact match."""
-    title_lower = title.lower()
-    matches = [x for x in items if title_lower in x.title.lower()]
-    if len(matches) == 1:
-        return matches[0]
-    exact = [x for x in matches if x.title.lower() == title_lower]
-    return exact[0] if exact else (matches[0] if matches else None)
+# ``MODULE_INTENTS`` lives with the handler registry now; it stays importable
+# from here because that is where callers have always found it.
+__all__ = ["MODULE_INTENTS", "Orchestrator"]
 
 
 class Orchestrator:
+    """Routes a classified intent to its handler and delivers the reply.
+
+    Everything intent-specific lives in ``services.intent_handlers``; what is
+    left here is routing, streaming, message persistence and error handling.
+    """
+
     def __init__(
         self,
         ai_service: AIService,
@@ -104,15 +81,39 @@ class Orchestrator:
         streamed over SSE -- every Android client -- silently lost task and
         calendar actions.
         """
-        if intent in MODULE_INTENTS:
-            return await self._execute_module_intent(db, intent, params, conversation_id)
-        if intent == "search":
-            return await self._resolve_search(db, params, content)
-        if intent == "daily_briefing":
-            return await self._resolve_daily_briefing(db)
-        if intent == "weekly_review":
-            return await self._resolve_weekly_review(db)
-        return None
+        definition = get_intent_handler(intent)
+        if definition is None:
+            if intent in MODULE_INTENTS:
+                return self._unimplemented_module_intent(intent, params)
+            return None
+
+        ctx = IntentContext(
+            db=db,
+            ai=self.active_ai,
+            ws=self.ws,
+            intent=intent,
+            params=params,
+            content=content,
+            conversation_id=conversation_id,
+        )
+        if not definition.module_intent:
+            return await definition.handle(ctx)
+        # Module intents act on user data, so a failure is reported as a reply
+        # rather than raised: the user still gets an answer in the thread.
+        try:
+            return await definition.handle(ctx)
+        except Exception:
+            logger.exception("Module action failed for intent %s", intent)
+            action = MODULE_INTENTS.get(intent, intent)
+            return f"I tried to {action} but something went wrong. Please try again.", None
+
+    @staticmethod
+    def _unimplemented_module_intent(intent: str, params: dict) -> tuple[str, None]:
+        """Reply for an intent the classifier knows but no handler implements."""
+        action = MODULE_INTENTS.get(intent, intent)
+        title = params.get("title", "")
+        detail = f": '{title}'" if title else ""
+        return f"I understood you want to {action}{detail}. This action is coming soon!", None
 
     async def handle_message(
         self,
@@ -133,33 +134,19 @@ class Orchestrator:
                 if user_msg:
                     user_msg.intent = intent
 
-                # 2. Route based on intent
-                if intent == "general_chat":
-                    await self._handle_general_chat(
-                        db, user_id, conversation_id, content
-                    )
-                elif intent in MODULE_INTENTS:
-                    await self._handle_module_action(
-                        db, user_id, conversation_id, intent, params
-                    )
-                elif intent == "search":
-                    await self._handle_search(
-                        db, user_id, conversation_id, params, content
-                    )
-                elif intent == "delegate_task":
+                # 2. Route based on intent. Delegation is special-cased because
+                # it has no one-shot reply: it queues background work and then
+                # reports over its own events.
+                if intent == "delegate_task":
                     await self._handle_delegate_task(
                         db, user_id, conversation_id, message_id, params, content
                     )
-                elif intent == "daily_briefing":
-                    await self._handle_daily_briefing(
-                        db, user_id, conversation_id
-                    )
-                elif intent == "weekly_review":
-                    await self._handle_weekly_review(
-                        db, user_id, conversation_id
+                elif get_intent_handler(intent) is not None or intent in MODULE_INTENTS:
+                    await self._handle_resolved_intent(
+                        db, user_id, conversation_id, intent, params, content
                     )
                 else:
-                    # Fallback to general chat
+                    # general_chat and anything unrecognised
                     await self._handle_general_chat(
                         db, user_id, conversation_id, content
                     )
@@ -187,6 +174,36 @@ class Orchestrator:
                     "Something went wrong processing your message. Please try again.",
                 )
                 await db.commit()
+
+    async def _handle_resolved_intent(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        conversation_id: str,
+        intent: str,
+        params: dict,
+        content: str,
+    ):
+        """Deliver a registry-resolved reply as an assistant message."""
+        resolved = await self.resolve_intent_response(
+            db, conversation_id, intent, params, content
+        )
+        if resolved is None:
+            # A handler that declines leaves nothing to say; fall back to chat.
+            await self._handle_general_chat(db, user_id, conversation_id, content)
+            return
+
+        response_text, action_metadata = resolved
+        await self._send_assistant_message(
+            db, user_id, conversation_id, intent, response_text, metadata=action_metadata
+        )
+
+        # Notify frontend to refresh module data
+        if action_metadata and is_module_intent(intent):
+            await self.ws.send_json(user_id, {
+                "type": "module_data_changed",
+                "data": {"module": action_metadata.get("module")},
+            })
 
     async def _handle_delegate_task(
         self,
@@ -276,36 +293,6 @@ class Orchestrator:
 
         agent_run_service.launch_execution(run.id, _run_task())
 
-    async def _resolve_daily_briefing(self, db: AsyncSession) -> tuple[str, dict | None]:
-        return await briefing_service.generate_briefing(db, self.active_ai), None
-
-    async def _resolve_weekly_review(self, db: AsyncSession) -> tuple[str, dict | None]:
-        from services import weekly_review_service
-
-        return await weekly_review_service.generate_weekly_review(db, self.active_ai), None
-
-    async def _handle_daily_briefing(
-        self,
-        db: AsyncSession,
-        user_id: str,
-        conversation_id: str,
-    ):
-        briefing, metadata = await self._resolve_daily_briefing(db)
-        await self._send_assistant_message(
-            db, user_id, conversation_id, "daily_briefing", briefing, metadata=metadata
-        )
-
-    async def _handle_weekly_review(
-        self,
-        db: AsyncSession,
-        user_id: str,
-        conversation_id: str,
-    ):
-        review, metadata = await self._resolve_weekly_review(db)
-        await self._send_assistant_message(
-            db, user_id, conversation_id, "weekly_review", review, metadata=metadata
-        )
-
     async def _handle_general_chat(
         self,
         db: AsyncSession,
@@ -368,338 +355,6 @@ class Orchestrator:
             conv.updated_at = datetime.now(timezone.utc)
             if not conv.title:
                 await self._generate_title(db, conv, content, user_id)
-
-    async def _resolve_search(
-        self,
-        db: AsyncSession,
-        params: dict,
-        content: str,
-    ) -> tuple[str, dict | None]:
-        query = params.get("query", content)
-        try:
-            hits, total = await search_service.search(db, query)
-        except Exception:
-            logger.exception("Search failed for query: %s", query)
-            return f"Sorry, I had trouble searching for '{query}'. Please try again.", None
-
-        if not hits:
-            return f"No results found for '{query}'.", None
-
-        lines = [f"Found {total} result(s) for '{query}':"]
-        for h in hits[:10]:
-            label = h.title or h.type
-            preview = h.preview[:80] + "..." if len(h.preview) > 80 else h.preview
-            lines.append(f"- **[{h.type}]** {label}: {preview}")
-        if total > 10:
-            lines.append(f"...and {total - 10} more.")
-        return "\n".join(lines), None
-
-    async def _handle_search(
-        self,
-        db: AsyncSession,
-        user_id: str,
-        conversation_id: str,
-        params: dict,
-        content: str,
-    ):
-        text, metadata = await self._resolve_search(db, params, content)
-        await self._send_assistant_message(
-            db, user_id, conversation_id, "search", text, metadata=metadata
-        )
-
-    async def _handle_module_action(
-        self,
-        db: AsyncSession,
-        user_id: str,
-        conversation_id: str,
-        intent: str,
-        params: dict,
-    ):
-        response_text, action_metadata = await self._execute_module_intent(db, intent, params, conversation_id)
-        await self._send_assistant_message(
-            db, user_id, conversation_id, intent, response_text, metadata=action_metadata
-        )
-
-        # Notify frontend to refresh module data
-        if action_metadata:
-            await self.ws.send_json(user_id, {
-                "type": "module_data_changed",
-                "data": {"module": action_metadata.get("module")},
-            })
-
-    async def _execute_module_intent(
-        self, db: AsyncSession, intent: str, params: dict, conversation_id: str | None = None
-    ) -> tuple[str, dict | None]:
-        try:
-            if intent == "create_todo":
-                # Auto-associate with project if conversation is linked to one
-                parent_id = params.get("parent_id")
-                project_id = None
-                if not parent_id and conversation_id:
-                    conv = await db.get(Conversation, conversation_id)
-                    if conv and conv.project_todo_id:
-                        parent_id = conv.project_todo_id
-                    if conv:
-                        project_id = conv.project_id
-                todo = await todo_service.create_todo(
-                    db,
-                    title=params.get("title", "Untitled task"),
-                    description=params.get("description"),
-                    priority=params.get("priority", "medium"),
-                    parent_id=parent_id,
-                    project_id=project_id,
-                    due_date=params.get("due_date"),
-                    recurrence_rule=params.get("recurrence_rule"),
-                )
-                return (
-                    f"Created task: '{todo.title}' with {todo.priority} priority.",
-                    {"action_type": "todo_created", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
-                )
-
-            elif intent == "query_todos":
-                todos, total = await todo_service.get_todos(db)
-                if not todos:
-                    return "You don't have any tasks yet.", None
-                lines = [f"You have {total} task(s):"]
-                for t in todos[:5]:
-                    lines.append(f"- [{t.status}] {t.title}")
-                if total > 5:
-                    lines.append(f"...and {total - 5} more.")
-                return "\n".join(lines), None
-
-            elif intent == "complete_todo":
-                title = params.get("title", "")
-                if not title:
-                    return "Which task would you like to complete? Please mention the task name.", None
-                todos, _ = await todo_service.get_todos(db, limit=100)
-                todo = _find_by_title(todos, title)
-                if not todo:
-                    return f"I couldn't find a task matching '{title}'. Try listing your tasks first.", None
-                todo = await todo_service.update_todo(
-                    db,
-                    todo.id,
-                    status=TaskStatus.COMPLETED,
-                )
-                # Completing through chat must continue a recurring series the
-                # same way the REST update does; otherwise the series silently
-                # ends whenever the user says "done" instead of ticking the box.
-                message = f"Marked '{todo.title}' as complete."
-                metadata = {
-                    "action_type": "todo_completed",
-                    "module": "todos",
-                    "todo_id": todo.id,
-                    "todo_title": todo.title,
-                }
-                if todo.recurrence_rule:
-                    next_todo = await todo_recurrence_service.spawn_next_occurrence(db, todo)
-                    if next_todo is not None:
-                        metadata["next_todo_id"] = next_todo.id
-                        if next_todo.due_date:
-                            message += (
-                                f" Next one is due {next_todo.due_date.date().isoformat()}."
-                            )
-                return message, metadata
-
-            elif intent == "create_event":
-                title = params.get("title", "Untitled event")
-                start_time = params.get("start_time")
-                if not start_time:
-                    return (
-                        f"I'd create event '{title}', but I need a start time. "
-                        "When should it be?",
-                        None,
-                    )
-                project_id = None
-                if conversation_id:
-                    conversation = await db.get(Conversation, conversation_id)
-                    if conversation is not None:
-                        project_id = conversation.project_id
-                event = await calendar_service.create_event(
-                    db,
-                    title=title,
-                    description=params.get("description"),
-                    project_id=project_id,
-                    start_time=datetime.fromisoformat(start_time),
-                    end_time=(
-                        datetime.fromisoformat(params["end_time"])
-                        if params.get("end_time")
-                        else None
-                    ),
-                    location=params.get("location"),
-                )
-                return (
-                    f"Created event: '{event.title}' starting at {event.start_time}.",
-                    {"action_type": "event_created", "module": "events", "event_id": event.id, "event_title": event.title, "event_start_time": event.start_time.isoformat()},
-                )
-
-            elif intent == "query_events":
-                events, total = await calendar_service.get_events(db)
-                if not events:
-                    return "You don't have any upcoming events.", None
-                lines = [f"You have {total} event(s):"]
-                for e in events[:5]:
-                    st = e["start_time"] if isinstance(e, dict) else e.start_time
-                    t = e["title"] if isinstance(e, dict) else e.title
-                    lines.append(f"- {t} at {st}")
-                if total > 5:
-                    lines.append(f"...and {total - 5} more.")
-                return "\n".join(lines), None
-
-            elif intent == "update_todo":
-                title = params.get("title", "")
-                if not title:
-                    return "Which task would you like to update? Please mention the task name.", None
-                todos, _ = await todo_service.get_todos(db, limit=100)
-                todo = _find_by_title(todos, title)
-                if not todo:
-                    return f"I couldn't find a task matching '{title}'. Try listing your tasks first.", None
-                updates = {}
-                if params.get("description"):
-                    updates["description"] = params["description"]
-                if params.get("priority"):
-                    updates["priority"] = params["priority"]
-                if params.get("due_date"):
-                    updates["due_date"] = datetime.fromisoformat(params["due_date"])
-                if params.get("status"):
-                    updates["status"] = params["status"]
-                if not updates:
-                    return f"I found '{todo.title}', but I'm not sure what to change. What would you like to update?", None
-                todo = await todo_service.update_todo(db, todo.id, **updates)
-                return (
-                    f"Updated task '{todo.title}'.",
-                    {"action_type": "todo_updated", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
-                )
-
-            elif intent == "delete_todo":
-                title = params.get("title", "")
-                if not title:
-                    return "Which task would you like to delete? Please mention the task name.", None
-                todos, _ = await todo_service.get_todos(db, limit=100)
-                todo = _find_by_title(todos, title)
-                if not todo:
-                    return f"I couldn't find a task matching '{title}'. Try listing your tasks first.", None
-                deleted_title = todo.title
-                deleted_id = todo.id
-                await todo_service.delete_todo(db, todo.id)
-                return (
-                    f"Deleted task '{deleted_title}'.",
-                    {"action_type": "todo_deleted", "module": "todos", "todo_id": deleted_id, "todo_title": deleted_title},
-                )
-
-            elif intent == "update_event":
-                title = params.get("title", "")
-                if not title:
-                    return "Which event would you like to update? Please mention the event name.", None
-                events, _ = await calendar_service.get_events(db, limit=100)
-                event = _find_by_title(events, title)
-                if not event:
-                    return f"I couldn't find an event matching '{title}'. Try checking your calendar first.", None
-                updates = {}
-                if params.get("description"):
-                    updates["description"] = params["description"]
-                if params.get("start_time"):
-                    updates["start_time"] = datetime.fromisoformat(params["start_time"])
-                if params.get("end_time"):
-                    updates["end_time"] = datetime.fromisoformat(params["end_time"])
-                if params.get("location"):
-                    updates["location"] = params["location"]
-                if not updates:
-                    return f"I found '{event.title}', but I'm not sure what to change. What would you like to update?", None
-                event = await calendar_service.update_event(db, event.id, **updates)
-                return (
-                    f"Updated event '{event.title}'.",
-                    {"action_type": "event_updated", "module": "events", "event_id": event.id, "event_title": event.title},
-                )
-
-            elif intent == "delete_event":
-                title = params.get("title", "")
-                if not title:
-                    return "Which event would you like to delete? Please mention the event name.", None
-                events, _ = await calendar_service.get_events(db, limit=100)
-                event = _find_by_title(events, title)
-                if not event:
-                    return f"I couldn't find an event matching '{title}'. Try checking your calendar first.", None
-                deleted_title = event.title
-                deleted_id = event.id
-                await calendar_service.delete_event(db, event.id)
-                return (
-                    f"Deleted event '{deleted_title}'.",
-                    {"action_type": "event_deleted", "module": "events", "event_id": deleted_id, "event_title": deleted_title},
-                )
-
-            elif intent == "suggest_time":
-                title = params.get("title", "Meeting")
-                duration = params.get("duration", 60)
-                preferred = None
-                if params.get("preferred_date"):
-                    preferred = datetime.fromisoformat(params["preferred_date"])
-                suggestions = await scheduling_service.suggest_best_time(
-                    db, self.active_ai, title, int(duration), preferred,
-                )
-                if not suggestions:
-                    return "I couldn't find any available time slots in the next week. Your schedule looks quite full!", None
-                lines = [f"Here are my top suggestions for '{title}':"]
-                for i, s in enumerate(suggestions, 1):
-                    start_dt = datetime.fromisoformat(s["start"])
-                    lines.append(f"{i}. {start_dt.strftime('%A, %b %d at %I:%M %p')} — {s.get('reason', '')}")
-                lines.append("\nJust say 'schedule it at [time]' to create the event.")
-                return (
-                    "\n".join(lines),
-                    {"action_type": "scheduling_suggestions", "suggestions": suggestions, "title": title},
-                )
-
-            elif intent == "check_conflicts":
-                start_time = params.get("start_time")
-                if not start_time:
-                    now = datetime.now(timezone.utc)
-                    start_time = now.isoformat()
-                st = datetime.fromisoformat(start_time)
-                end_time = params.get("end_time")
-                et = datetime.fromisoformat(end_time) if end_time else st + timedelta(hours=1)
-                conflicts = await scheduling_service.find_conflicts(db, st, et)
-                if not conflicts:
-                    return (
-                        "You're free during that time! No scheduling conflicts found.",
-                        {"action_type": "no_conflicts"},
-                    )
-                lines = [f"You have {len(conflicts)} conflict(s):"]
-                for c in conflicts:
-                    lines.append(f"- {c['title']} ({c['start_time']})")
-                return (
-                    "\n".join(lines),
-                    {"action_type": "conflicts_found", "conflicts": conflicts},
-                )
-
-            elif intent == "analyze_schedule":
-                now = datetime.now(timezone.utc)
-                range_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                range_end = range_start + timedelta(days=7)
-                events, total = await calendar_service.get_events(db, start_after=range_start, start_before=range_end, limit=100)
-                if not events:
-                    return "Your schedule for the next 7 days is completely clear!", None
-                # Build summary for AI
-                event_lines = []
-                for e in events:
-                    t = e["title"] if isinstance(e, dict) else e.title
-                    st = e["start_time"] if isinstance(e, dict) else e.start_time
-                    event_lines.append(f"- {t} at {st}")
-                event_summary = "\n".join(event_lines)
-                analysis = await self.active_ai.generate_completion(
-                    system_prompt="You are a scheduling analyst. Summarize the user's week concisely — highlight busy days, free days, and any potential issues like back-to-back meetings.",
-                    user_message=f"Here are my events for the next 7 days:\n{event_summary}",
-                )
-                return analysis, None
-
-            else:
-                action = MODULE_INTENTS.get(intent, intent)
-                title = params.get("title", "")
-                detail = f": '{title}'" if title else ""
-                return f"I understood you want to {action}{detail}. This action is coming soon!", None
-
-        except Exception:
-            logger.exception("Module action failed for intent %s", intent)
-            action = MODULE_INTENTS.get(intent, intent)
-            return f"I tried to {action} but something went wrong. Please try again.", None
 
     async def _generate_title(
         self,

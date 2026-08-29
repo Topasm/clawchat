@@ -39,14 +39,39 @@ class WriteOp:
     error: str | None = None
 
 
-# In-memory write queue
+# In-memory write queue.
+#
+# Every mutation and every read of ``_write_queue`` / ``_dead_letter_queue``
+# must hold ``_flush_lock``.  These helpers are synchronous and are called from
+# async code via ``asyncio.to_thread(...)``, so they genuinely run on several
+# worker threads at once.
+#
+# The lock is *reentrant* because ``flush_queue()`` holds it for the whole
+# replay pass and calls ``_persist_queue()`` (which needs the same lock to
+# snapshot the queue) from inside that critical section.  A plain
+# ``threading.Lock`` would self-deadlock there.
 _write_queue: list[WriteOp] = []
 _dead_letter_queue: list[WriteOp] = []
-_flush_lock = threading.Lock()
+_flush_lock = threading.RLock()
 
-# CLI error tracking
+# CLI error tracking.  ``_run_cli`` is now offloaded to worker threads, so the
+# error log and the last-success timestamp need their own lock.  It is always
+# the innermost lock (``_flush_lock`` -> ``_cli_state_lock``, never the
+# reverse), so no ordering cycle is possible.
 _cli_error_log: deque[dict] = deque(maxlen=50)
 _last_successful_cli_at: float = 0.0
+_cli_state_lock = threading.Lock()
+
+
+def _record_cli_error(command: str, error: str, returncode: int | None) -> None:
+    """Append an entry to the bounded CLI error log."""
+    with _cli_state_lock:
+        _cli_error_log.append({
+            "timestamp": time.time(),
+            "command": command,
+            "error": error,
+            "returncode": returncode,
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -111,41 +136,26 @@ def _run_cli(*args: str, timeout: int = 15) -> subprocess.CompletedProcess | Non
                 " ".join(cmd),
                 proc.stderr.strip(),
             )
-            _cli_error_log.append({
-                "timestamp": time.time(),
-                "command": " ".join(args),
-                "error": proc.stderr.strip() or f"exit code {proc.returncode}",
-                "returncode": proc.returncode,
-            })
+            _record_cli_error(
+                " ".join(args),
+                proc.stderr.strip() or f"exit code {proc.returncode}",
+                proc.returncode,
+            )
             return None
-        _last_successful_cli_at = time.time()
+        with _cli_state_lock:
+            _last_successful_cli_at = time.time()
         return proc
     except FileNotFoundError:
         logger.warning("Obsidian CLI not found: %s", cli)
-        _cli_error_log.append({
-            "timestamp": time.time(),
-            "command": " ".join(args),
-            "error": f"CLI not found: {cli}",
-            "returncode": None,
-        })
+        _record_cli_error(" ".join(args), f"CLI not found: {cli}", None)
         return None
     except subprocess.TimeoutExpired:
         logger.warning("Obsidian CLI timed out: %s", " ".join(cmd))
-        _cli_error_log.append({
-            "timestamp": time.time(),
-            "command": " ".join(args),
-            "error": f"Timeout after {timeout}s",
-            "returncode": None,
-        })
+        _record_cli_error(" ".join(args), f"Timeout after {timeout}s", None)
         return None
     except OSError as exc:
         logger.warning("Obsidian CLI error: %s", exc)
-        _cli_error_log.append({
-            "timestamp": time.time(),
-            "command": " ".join(args),
-            "error": str(exc),
-            "returncode": None,
-        })
+        _record_cli_error(" ".join(args), str(exc), None)
         return None
 
 
@@ -159,12 +169,14 @@ def is_cli_available() -> bool:
 
 def get_cli_error_log() -> list[dict]:
     """Return the recent CLI error log (up to 50 entries, newest first)."""
-    return list(reversed(_cli_error_log))
+    with _cli_state_lock:
+        return list(reversed(_cli_error_log))
 
 
 def get_last_successful_cli_at() -> float:
     """Return the timestamp of the last successful CLI call."""
-    return _last_successful_cli_at
+    with _cli_state_lock:
+        return _last_successful_cli_at
 
 
 # ---------------------------------------------------------------------------
@@ -401,28 +413,30 @@ def list_cli_commands() -> list[str]:
 
 def _enqueue(op: WriteOp) -> None:
     """Add an operation to the write queue."""
-    _write_queue.append(op)
-    _persist_queue()
+    with _flush_lock:
+        _write_queue.append(op)
+        _persist_queue()
     logger.info("Queued write operation: %s for %s", op.op, op.args.get("path", "?"))
 
 
 def get_queue_status() -> dict:
     """Return the current write queue status."""
-    oldest = min((op.queued_at for op in _write_queue), default=0.0)
-    return {
-        "pending": len(_write_queue),
-        "oldest_age_seconds": round(time.time() - oldest, 1) if oldest else None,
-        "operations": [
-            {
-                "op": op.op,
-                "path": op.args.get("path", ""),
-                "queued_at": op.queued_at,
-                "retries": op.retries,
-                "error": op.error,
-            }
-            for op in _write_queue
-        ],
-    }
+    with _flush_lock:
+        oldest = min((op.queued_at for op in _write_queue), default=0.0)
+        return {
+            "pending": len(_write_queue),
+            "oldest_age_seconds": round(time.time() - oldest, 1) if oldest else None,
+            "operations": [
+                {
+                    "op": op.op,
+                    "path": op.args.get("path", ""),
+                    "queued_at": op.queued_at,
+                    "retries": op.retries,
+                    "error": op.error,
+                }
+                for op in _write_queue
+            ],
+        }
 
 
 def flush_queue() -> dict:
@@ -489,9 +503,10 @@ def flush_queue() -> dict:
 
 def clear_queue() -> int:
     """Clear all queued operations. Returns the number cleared."""
-    count = len(_write_queue)
-    _write_queue.clear()
-    _persist_queue()
+    with _flush_lock:
+        count = len(_write_queue)
+        _write_queue.clear()
+        _persist_queue()
     return count
 
 
@@ -502,19 +517,20 @@ def clear_queue() -> int:
 
 def get_dead_letter_status() -> dict:
     """Return the current dead letter queue status."""
-    return {
-        "count": len(_dead_letter_queue),
-        "operations": [
-            {
-                "op": op.op,
-                "path": op.args.get("path", ""),
-                "queued_at": op.queued_at,
-                "retries": op.retries,
-                "error": op.error,
-            }
-            for op in _dead_letter_queue
-        ],
-    }
+    with _flush_lock:
+        return {
+            "count": len(_dead_letter_queue),
+            "operations": [
+                {
+                    "op": op.op,
+                    "path": op.args.get("path", ""),
+                    "queued_at": op.queued_at,
+                    "retries": op.retries,
+                    "error": op.error,
+                }
+                for op in _dead_letter_queue
+            ],
+        }
 
 
 def retry_dead_letter() -> int:
@@ -522,21 +538,23 @@ def retry_dead_letter() -> int:
 
     Returns the number of items requeued.
     """
-    count = len(_dead_letter_queue)
-    for op in _dead_letter_queue:
-        op.retries = 0
-        op.queued_at = time.time()
-        _write_queue.append(op)
-    _dead_letter_queue.clear()
-    _persist_queue()
+    with _flush_lock:
+        count = len(_dead_letter_queue)
+        for op in _dead_letter_queue:
+            op.retries = 0
+            op.queued_at = time.time()
+            _write_queue.append(op)
+        _dead_letter_queue.clear()
+        _persist_queue()
     return count
 
 
 def clear_dead_letter() -> int:
     """Clear all dead letter operations. Returns the number cleared."""
-    count = len(_dead_letter_queue)
-    _dead_letter_queue.clear()
-    _persist_dead_letter()
+    with _flush_lock:
+        count = len(_dead_letter_queue)
+        _dead_letter_queue.clear()
+        _persist_dead_letter()
     return count
 
 
@@ -571,46 +589,57 @@ def _replay_op(op: WriteOp) -> bool:
 
 
 def _persist_queue() -> None:
-    """Save the write queue to disk for crash recovery."""
-    try:
-        data = [
-            {
-                "op": op.op,
-                "args": op.args,
-                "queued_at": op.queued_at,
-                "retries": op.retries,
-                "error": op.error,
-            }
-            for op in _write_queue
-        ]
-        os.makedirs(os.path.dirname(_QUEUE_FILE), exist_ok=True)
-        with open(_QUEUE_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-    except OSError:
-        logger.debug("Could not persist write queue")
+    """Save the write queue to disk for crash recovery.
 
-    # Also persist dead letter
-    _persist_dead_letter()
+    Holds ``_flush_lock`` (reentrant) across the snapshot *and* the write, so
+    concurrent persists cannot interleave.  Reentrancy is what makes this safe
+    to call from inside ``flush_queue()``'s critical section.
+    """
+    with _flush_lock:
+        try:
+            data = [
+                {
+                    "op": op.op,
+                    "args": op.args,
+                    "queued_at": op.queued_at,
+                    "retries": op.retries,
+                    "error": op.error,
+                }
+                for op in _write_queue
+            ]
+            os.makedirs(os.path.dirname(_QUEUE_FILE), exist_ok=True)
+            with open(_QUEUE_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except OSError:
+            logger.debug("Could not persist write queue")
+
+        # Also persist dead letter
+        _persist_dead_letter()
 
 
 def _persist_dead_letter() -> None:
-    """Save the dead letter queue to disk."""
-    try:
-        data = [
-            {
-                "op": op.op,
-                "args": op.args,
-                "queued_at": op.queued_at,
-                "retries": op.retries,
-                "error": op.error,
-            }
-            for op in _dead_letter_queue
-        ]
-        os.makedirs(os.path.dirname(_DEAD_LETTER_FILE), exist_ok=True)
-        with open(_DEAD_LETTER_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-    except OSError:
-        logger.debug("Could not persist dead letter queue")
+    """Save the dead letter queue to disk.
+
+    Holds ``_flush_lock`` (reentrant) across the snapshot *and* the write so
+    concurrent persists cannot interleave and leave a stale file on disk.
+    """
+    with _flush_lock:
+        try:
+            data = [
+                {
+                    "op": op.op,
+                    "args": op.args,
+                    "queued_at": op.queued_at,
+                    "retries": op.retries,
+                    "error": op.error,
+                }
+                for op in _dead_letter_queue
+            ]
+            os.makedirs(os.path.dirname(_DEAD_LETTER_FILE), exist_ok=True)
+            with open(_DEAD_LETTER_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except OSError:
+            logger.debug("Could not persist dead letter queue")
 
 
 def _load_ops_from_file(filepath: str) -> list[WriteOp]:
@@ -639,11 +668,15 @@ def load_queue() -> None:
     global _write_queue, _dead_letter_queue
 
     loaded = _load_ops_from_file(_QUEUE_FILE)
-    if loaded:
-        _write_queue = loaded
-        logger.info("Loaded %d queued write operations from disk", len(_write_queue))
-
     dead = _load_ops_from_file(_DEAD_LETTER_FILE)
+
+    with _flush_lock:
+        if loaded:
+            _write_queue = loaded
+        if dead:
+            _dead_letter_queue = dead
+
+    if loaded:
+        logger.info("Loaded %d queued write operations from disk", len(loaded))
     if dead:
-        _dead_letter_queue = dead
-        logger.info("Loaded %d dead letter operations from disk", len(_dead_letter_queue))
+        logger.info("Loaded %d dead letter operations from disk", len(dead))

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -382,7 +383,8 @@ async def bulk_update_todos(
     await db.commit()
 
     if settings.obsidian_vault_path:
-        remove_todos_from_vault(
+        await asyncio.to_thread(
+            remove_todos_from_vault,
             settings.obsidian_vault_path,
             set(deleted_ids) | {todo.id for todo in updated_todos},
         )
@@ -393,7 +395,8 @@ async def bulk_update_todos(
                 select(Todo.id, Todo.title).where(Todo.id.in_(parent_ids))
             )
             parent_titles = dict(parent_rows.all())
-        export_todos_batch(
+        await asyncio.to_thread(
+            export_todos_batch,
             settings.obsidian_vault_path,
             [
                 (todo, parent_titles.get(todo.parent_id) if todo.parent_id else None)

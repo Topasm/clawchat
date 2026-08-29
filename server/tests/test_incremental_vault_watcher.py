@@ -1,6 +1,7 @@
 """Incremental vault watcher and index refresh tests."""
 
 import os
+import threading
 from unittest.mock import patch
 
 import pytest
@@ -92,3 +93,43 @@ def test_vault_event_filter_ignores_hidden_and_temporary_files(tmp_path):
     assert not _is_watchable_vault_path(
         str(tmp_path), str(tmp_path.parent / "outside.md")
     )
+
+
+@pytest.mark.asyncio
+async def test_vault_scan_reads_files_off_the_event_loop_thread(db_session, tmp_path):
+    """Vault disk I/O must be offloaded, or a big scan stalls SSE/WebSocket traffic."""
+    todo = Todo(title="Offloaded")
+    db_session.add(todo)
+    await db_session.commit()
+
+    todo_file = tmp_path / "Project" / "TODO.md"
+    todo_file.parent.mkdir()
+    todo_file.write_text(f"- [x] Offloaded <!-- claw:{todo.id} -->\n", encoding="utf-8")
+    watcher._file_hashes.clear()
+
+    loop_thread = threading.current_thread()
+    worker_threads: list[threading.Thread] = []
+    real_walk = watcher._todo_files_for_scan
+    real_read = watcher._read_markers
+
+    def spy_walk(*args, **kwargs):
+        worker_threads.append(threading.current_thread())
+        return real_walk(*args, **kwargs)
+
+    def spy_read(*args, **kwargs):
+        worker_threads.append(threading.current_thread())
+        return real_read(*args, **kwargs)
+
+    with patch.object(watcher.settings, "obsidian_vault_path", str(tmp_path)), \
+         patch.object(watcher.settings, "obsidian_project_todo_filename", "TODO.md"), \
+         patch.object(watcher, "_todo_files_for_scan", spy_walk), \
+         patch.object(watcher, "_read_markers", spy_read):
+        result = await watcher.scan_vault(db_session)
+
+    assert result.files_scanned == 1
+    assert result.markers_found == 1
+    assert len(worker_threads) == 2
+    assert all(thread is not loop_thread for thread in worker_threads)
+
+    await db_session.refresh(todo)
+    assert todo.status == "completed"

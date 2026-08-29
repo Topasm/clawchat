@@ -1,5 +1,6 @@
 """Inbox pipeline — classifies and plans newly captured todos via AI."""
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -371,7 +372,9 @@ async def _classify_todo(ai_service: AIService, todo: Todo) -> dict:
     # Include project folder context when an Obsidian vault is configured
     if settings.obsidian_vault_path:
         try:
-            folders = list_project_folders(settings.obsidian_vault_path)
+            folders = await asyncio.to_thread(
+                list_project_folders, settings.obsidian_vault_path
+            )
             if folders:
                 parts.append(f"Known project folders: {', '.join(folders)}")
         except Exception:  # noqa: BLE001 - optional vault context must not block capture

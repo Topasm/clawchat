@@ -35,7 +35,6 @@ from services.ai_service import AIService
 from services.claude_code_provider import (
     ClaudeCodeProvider,
     ClaudeCodeStatus,
-    _find_claude_cli,
 )
 from services.orchestrator import Orchestrator
 from services.scheduler import Scheduler
@@ -76,27 +75,18 @@ async def lifespan(app: FastAPI):
         return await ai_service.health_check()
 
     async def _check_claude_code():
-        import subprocess as _sp
+        # check_availability() already runs the CLI probe through asyncio.to_thread
+        # and resolves _cli_path itself; calling subprocess.run here would stall the
+        # event loop for up to 10s during startup.
         cc = ClaudeCodeProvider()
-        cli = _find_claude_cli()
-        if not cli:
-            return cc, ClaudeCodeStatus.NOT_INSTALLED, None
-        cc._cli_path = cli
-        try:
-            result = _sp.run([cli, "--version"], capture_output=True, text=True, timeout=10)
-            if result.returncode != 0:
-                return cc, ClaudeCodeStatus.ERROR, None
-            version = result.stdout.strip()
-            return cc, ClaudeCodeStatus.AVAILABLE, version
-        except Exception as e:
-            logger.warning("Claude Code startup check failed: %s", e)
-            return cc, ClaudeCodeStatus.ERROR, None
+        status, version = await cc.check_availability()
+        return cc, status, version
 
     async def _init_vault():
         if settings.obsidian_vault_path:
             try:
                 from services.obsidian_cli_service import load_queue
-                load_queue()
+                await asyncio.to_thread(load_queue)
                 logger.info("Obsidian CLI write queue loaded")
             except Exception:
                 logger.debug("Could not load Obsidian CLI write queue")

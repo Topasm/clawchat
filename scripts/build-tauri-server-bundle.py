@@ -123,6 +123,15 @@ def main() -> None:
             "watchfiles",
             "--collect-submodules",
             "jose",
+            # ``init_db`` runs ``alembic upgrade head`` at startup, so the
+            # revision scripts and env.py must travel with the binary, and
+            # Alembic resolves its dialect implementations lazily.
+            "--collect-submodules",
+            "alembic",
+            "--add-data",
+            f"migrations{os.pathsep}migrations",
+            "--add-data",
+            f"alembic.ini{os.pathsep}.",
             "--paths",
             ".",
         ]
