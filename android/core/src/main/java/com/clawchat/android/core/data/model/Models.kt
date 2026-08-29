@@ -115,8 +115,51 @@ data class Event(
     val location: String? = null,
     @SerialName("is_all_day") val isAllDay: Boolean = false,
     @SerialName("reminder_minutes") val reminderMinutes: Int? = null,
+    @SerialName("project_id") val projectId: String? = null,
+    @SerialName("recurrence_rule") val recurrenceRule: String? = null,
+    @SerialName("recurrence_end") val recurrenceEnd: String? = null,
+    /**
+     * True for a repeat the server expanded in memory. Such an entry shares
+     * [id] with the stored event it repeats, so [occurrenceDate] is what tells
+     * two repeats apart.
+     */
+    @SerialName("is_occurrence") val isOccurrence: Boolean = false,
+    @SerialName("occurrence_date") val occurrenceDate: String? = null,
+    @SerialName("recurring_event_id") val recurringEventId: String? = null,
+    val tags: List<String>? = null,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = "",
+) {
+    /** Stable identity for a list key: a repeat is not its own row on the server. */
+    val occurrenceKey: String get() = occurrenceDate?.let { "$id@$it" } ?: id
+}
+
+@Serializable
+data class EventCreate(
+    val title: String,
+    val description: String? = null,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String? = null,
+    val location: String? = null,
+    @SerialName("is_all_day") val isAllDay: Boolean = false,
+    @SerialName("reminder_minutes") val reminderMinutes: Int? = null,
+    @SerialName("recurrence_rule") val recurrenceRule: String? = null,
+)
+
+/**
+ * Only the fields set here are sent, and the server updates exactly those, so
+ * a null stays "leave it alone" rather than "clear it".
+ */
+@Serializable
+data class EventUpdate(
+    val title: String? = null,
+    val description: String? = null,
+    @SerialName("start_time") val startTime: String? = null,
+    @SerialName("end_time") val endTime: String? = null,
+    val location: String? = null,
+    @SerialName("is_all_day") val isAllDay: Boolean? = null,
+    @SerialName("reminder_minutes") val reminderMinutes: Int? = null,
+    @SerialName("recurrence_rule") val recurrenceRule: String? = null,
 )
 
 // --- Conversations ---

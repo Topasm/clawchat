@@ -14,13 +14,21 @@ interface EventDao {
     @Query("DELETE FROM events")
     suspend fun deleteAll()
 
+    @Query("SELECT * FROM events WHERE substr(startTime, 1, 10) BETWEEN :from AND :to ORDER BY startTime ASC")
+    suspend fun getBetween(from: String, to: String): List<EventEntity>
+
+    @Query("DELETE FROM events WHERE substr(startTime, 1, 10) BETWEEN :from AND :to")
+    suspend fun deleteBetween(from: String, to: String)
+
     /**
-     * Replaces the cached events. Only the current day is ever fetched, so
-     * upserting alone would let yesterday's events linger in the cache.
+     * Replaces the cache for one date range. Upserting alone would leave an
+     * event that has since been deleted or moved out of the range behind, and
+     * clearing the whole table would throw away the ranges another screen
+     * cached.
      */
     @Transaction
-    suspend fun replaceAll(events: List<EventEntity>) {
-        deleteAll()
+    suspend fun replaceRange(from: String, to: String, events: List<EventEntity>) {
+        deleteBetween(from, to)
         upsertAll(events)
     }
 }

@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +28,7 @@ import com.clawchat.android.feature.inbox.InboxScreen
 import com.clawchat.android.feature.onboarding.OnboardingScreen
 import com.clawchat.android.feature.settings.SettingsScreen
 import com.clawchat.android.feature.tasks.TasksScreen
+import com.clawchat.android.feature.calendar.CalendarScreen
 import com.clawchat.android.feature.today.TodayScreen
 
 data class BottomNavItem(
@@ -36,6 +39,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(NavRoute.Today.route, ClawIcons.Today, "Today"),
+    BottomNavItem(NavRoute.Calendar.route, Icons.Default.DateRange, "Calendar"),
     BottomNavItem(NavRoute.Inbox.route, ClawIcons.Inbox, "Inbox"),
     BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, "Chat"),
     BottomNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, "Tasks"),
@@ -163,6 +167,9 @@ fun ClawChatNavGraph(
                         navController.navigate(NavRoute.Settings.route)
                     },
                 )
+            }
+            composable(NavRoute.Calendar.route) {
+                CalendarScreen()
             }
             composable(NavRoute.Inbox.route) {
                 InboxScreen()

@@ -48,10 +48,11 @@ class TodayRepositoryImpl @Inject constructor(
         val result = apiCall { api.getToday() }
         if (result is ApiResult.Success) {
             val today = result.data
+            val day = LocalDate.now().toString()
             todoDao.upsertAll((today.todayTodos + today.overdueTodos).map { it.toEntity() })
-            // Only the current day is ever fetched, so replacing keeps
-            // yesterday's events from showing up as today's.
-            eventDao.replaceAll(today.todayEvents.map { it.toEntity() })
+            // Scoped to today so this does not clear the range the calendar
+            // cached, while still dropping an event that was deleted upstream.
+            eventDao.replaceRange(day, day, today.todayEvents.map { it.toEntity() })
         }
         return result
     }

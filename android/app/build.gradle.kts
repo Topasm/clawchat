@@ -106,6 +106,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":feature:onboarding"))
     implementation(project(":feature:today"))
+    implementation(project(":feature:calendar"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:tasks"))
     implementation(project(":feature:inbox"))

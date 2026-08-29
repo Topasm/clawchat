@@ -4,6 +4,7 @@ package com.clawchat.android.navigation
 sealed class NavRoute(val route: String) {
     data object Onboarding : NavRoute("onboarding")
     data object Today : NavRoute("today")
+    data object Calendar : NavRoute("calendar")
     data object Chat : NavRoute("chat")
     data object Inbox : NavRoute("inbox")
     data object Tasks : NavRoute("tasks")

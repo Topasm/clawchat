@@ -40,6 +40,27 @@ interface ClawChatApi {
     @POST("api/todos/{todoId}/organize")
     suspend fun organizeTodo(@Path("todoId") todoId: String): Response<Unit>
 
+    // --- Events ---
+
+    @GET("api/events")
+    suspend fun listEvents(@QueryMap params: Map<String, String> = emptyMap()): PaginatedResponse<Event>
+
+    @POST("api/events")
+    suspend fun createEvent(@Body body: EventCreate): Event
+
+    @PATCH("api/events/{id}")
+    suspend fun updateEvent(@Path("id") id: String, @Body body: EventUpdate): Event
+
+    @DELETE("api/events/{id}")
+    suspend fun deleteEvent(@Path("id") id: String)
+
+    @DELETE("api/events/{id}/occurrences/{date}")
+    suspend fun deleteEventOccurrence(
+        @Path("id") id: String,
+        @Path("date") date: String,
+        @Query("mode") mode: String,
+    )
+
     // --- Conversations ---
 
     @GET("api/chat/conversations")
