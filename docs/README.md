@@ -1,6 +1,6 @@
 # ClawChat Documentation
 
-ClawChat is a privacy-first, self-hosted AI project execution workspace that unifies tasks, dependency graphs, calendar, documents, agents, and chat. Web/Tauri and native Android clients share one FastAPI contract and a user-owned SQLite database; Capacitor iOS remains provisional.
+ClawChat is a privacy-first, self-hosted AI project execution workspace that unifies tasks, dependency graphs, calendar, documents, agents, and chat. Web/Tauri and native Android clients share one FastAPI contract and a user-owned SQLite database.
 
 ## Documentation Index
 
@@ -56,7 +56,7 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 - **File Attachments** — Drag-and-drop task attachments with image preview, download links, and size/type validation (10MB limit)
 - **Full-Text Search** — Server search across tasks, events, and messages; the current search page presents task and event results
 - **Dialog System** — Accessible animated modals using @radix-ui/react-dialog with focus trap and ESC support
-- **Cross-Platform** — Runs through Tauri on desktop, native Compose on Android, provisional Capacitor on iOS, and Vite in browsers
+- **Cross-Platform** — Runs through Tauri on desktop, native Compose on Android, and Vite in browsers
 - **Private Remote Access** — Publish via Cloudflare Tunnel or Tailscale without exposing the backend directly to the internet
 - **Demo Mode** — Fully functional UI with seeded demo data when no backend is connected
 

@@ -8,8 +8,7 @@
 │   Platform Targets                                       │
 │   ├── Tauri 2 (Windows, macOS, Linux)                    │
 │   ├── Web Browser (Vite dev server / static build)       │
-│   ├── Native Android (Kotlin + Compose)                  │
-│   └── Capacitor iOS (provisional)                       │
+│   └── Native Android (Kotlin + Compose)                  │
 │                                                          │
 │   Pages                         State (Zustand)          │
 │   ├── TodayPage                 ├── useAuthStore         │
@@ -47,7 +46,7 @@
 │   ├── _layout, _components      ├── helpers (isDemoMode) │
 │   ├── _chat, _pages, _kanban    └── platform detection   │
 │   ├── _settings, _utilities                              │
-│   └── _capacitor                                         │
+│   └── _mobile                                            │
 │                                                          │
 └──────────────────────┬───────────────────────────────────┘
                        │ REST (HTTPS) + SSE Streaming
@@ -97,7 +96,7 @@ Natural language chat is the primary way users interact with all features. Direc
 Todos, calendar events, messages, and conversations live in a single SQLite database, enabling cross-module awareness, full-text search, and traceability. Project documents remain user-owned Markdown files in an optional Obsidian vault and are integrated through indexing, context, and export services.
 
 ### 4. Deliberate Platform Boundaries
-React + TypeScript is shared by the web and Tauri desktop targets. Native Android owns Android-specific UI, widgets, notifications, and background behavior. Capacitor is provisional for iOS only; Capacitor Android is deprecated and receives no new feature work. Platform differences in the React application are handled through the neutral platform adapter. See [platform-matrix.md](./architecture/platform-matrix.md).
+React + TypeScript is shared by the web and Tauri desktop targets. Native Android owns Android-specific UI, widgets, notifications, and background behavior. iOS is not a supported target; the provisional Capacitor shell was removed. Platform differences in the React application are handled through the neutral platform adapter. See [platform-matrix.md](./architecture/platform-matrix.md).
 
 ### 5. Local by Default, Cloud by Choice
 The system works fully offline with demo data. Cloud services (LLM APIs, server sync) are optional enhancements.

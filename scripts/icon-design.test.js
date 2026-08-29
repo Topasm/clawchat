@@ -102,7 +102,6 @@ test('keeps web, mobile, and tray branding synchronized with platform-safe asset
     ['src/assets/favicon.png', 48, 48, 6],
     ['src/assets/icon.png', 192, 192, 6],
     ['src/assets/adaptive-icon.png', 192, 192, 2],
-    ['ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', 1024, 1024, 2],
     ['src-tauri/icons/tray-template-macos.png', 36, 36, 6],
     ['src-tauri/icons/tray-color.png', 32, 32, 6],
   ];

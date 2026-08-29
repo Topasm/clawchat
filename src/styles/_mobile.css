@@ -1,5 +1,6 @@
-/* --- Capacitor / Mobile Overrides ------------------------- */
-/* Applied when running inside Capacitor on iOS/Android.      */
+/* --- Mobile / touch overrides ----------------------------- */
+/* Safe-area insets and touch affordances for the web build,   */
+/* plus the compact `.cc-root--mobile` shell.                  */
 
 /* Safe area insets for notch / bottom bar */
 .cc-root {
@@ -9,7 +10,7 @@
   padding-right: env(safe-area-inset-right);
 }
 
-/* On mobile, hide the sidebar and show a bottom nav instead.
+/* In the compact shell, hide the sidebar and show a bottom nav instead.
    Scoped to .cc-root--mobile so narrow desktop windows keep the sidebar. */
 @media (max-width: 768px) {
   .cc-root--mobile .cc-sidebar {

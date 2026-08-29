@@ -11,7 +11,6 @@ export default tseslint.config(
       'node_modules/**',
       'src-tauri/target/**',
       'android/**',
-      'ios/**',
     ],
     linterOptions: {
       reportUnusedDisableDirectives: false,

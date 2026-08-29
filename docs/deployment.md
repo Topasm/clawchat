@@ -101,7 +101,7 @@ Set `AI_PROVIDER=ollama` and `AI_BASE_URL=http://ollama:11434` in `.env`.
 | `ALLOWED_EXTENSIONS` | `jpg,jpeg,...,zip` | Comma-separated allowed file extensions |
 | `PUBLIC_URL` | *(empty)* | Public-facing URL for reverse proxy deployments (used in pairing QR codes) |
 | `RELAY_URL` | *(empty)* | Optional ClawChat E2EE relay URL; enables automatic remote fallback without opening an inbound port |
-| `VITE_DEFAULT_SERVER_URL` | *(empty)* | Build-time frontend default server URL (login page, Capacitor app) |
+| `VITE_DEFAULT_SERVER_URL` | *(empty)* | Build-time frontend default server URL (login page) |
 | `ENABLE_SCHEDULER` | `true` | Enable background scheduler |
 | `BRIEFING_TIME` | `08:00` | Daily briefing time (HH:MM, 24h) |
 | `REMINDER_CHECK_INTERVAL` | `60` | Seconds between reminder checks |
@@ -239,7 +239,7 @@ See the [Remote Access Runbook](./remote-access-runbook.md) for step-by-step set
 
 When testing from a phone or tablet:
 
-1. Open the ClawChat URL in a browser, or configure the same HTTPS server URL in native Android/Capacitor iOS.
+1. Open the ClawChat URL in a browser, or configure the same HTTPS server URL in the native Android app.
 2. Leave the `Server URL` field as the prefilled site URL unless you intentionally changed it.
 3. Enter the ClawChat PIN and confirm the health indicator shows the server is reachable.
 4. If the app loads but login fails, verify the reverse proxy and tunnel are running on the host, and that `curl http://127.0.0.1:8080/api/health` succeeds locally.

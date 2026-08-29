@@ -79,7 +79,7 @@ try {
   const trayTemplateOutput = path.join(temporaryRoot, 'tray-template');
   const trayColorOutput = path.join(temporaryRoot, 'tray-color');
   generate(appSource, regularOutput, '32,48,192');
-  generate(fullBleedSource, fullBleedOutput, '180,192,512,1024');
+  generate(fullBleedSource, fullBleedOutput, '180,192,512');
   generate(trayTemplateSource, trayTemplateOutput, '36');
   generate(trayColorSource, trayColorOutput, '32');
 
@@ -97,19 +97,6 @@ try {
   flattenPngToRgb(
     path.join(fullBleedOutput, '192x192.png'),
     path.join(legacyAssets, 'adaptive-icon.png'),
-  );
-
-  flattenPngToRgb(
-    path.join(fullBleedOutput, '1024x1024.png'),
-    path.join(
-      repositoryRoot,
-      'ios',
-      'App',
-      'App',
-      'Assets.xcassets',
-      'AppIcon.appiconset',
-      'AppIcon-512@2x.png',
-    ),
   );
 
   copy(

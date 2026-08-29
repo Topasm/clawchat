@@ -3,8 +3,8 @@
 Privacy-first, self-hosted AI project execution workspace for tasks, dependency
 graphs, calendar, documents, agents, and chat.
 
-ClawChat ships a shared web/Tauri client, a native Android app, and a provisional
-Capacitor iOS shell. They connect to one FastAPI server and one SQLite database.
+ClawChat ships a shared web/Tauri client and a native Android app. They connect to
+one FastAPI server and one SQLite database.
 
 ## Quick Start (local)
 

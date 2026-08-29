@@ -1,14 +1,14 @@
-import { IS_CAPACITOR, IS_DESKTOP } from '../types/platform';
+import { IS_DESKTOP } from '../types/platform';
 
 /**
  * Plays a short reminder chime. Used when reminderSound is enabled.
- * On Capacitor/Tauri, the OS handles notification sound via the `silent` flag.
+ * On Tauri, the OS handles notification sound via the `silent` flag.
  * On web, we play an audio cue since the Notification API `silent` property
  * isn't reliably supported across browsers.
  */
 export function playReminderSound(): void {
-  // Capacitor and Tauri handle sound natively via notification options
-  if (IS_CAPACITOR || IS_DESKTOP) return;
+  // Tauri handles sound natively via notification options
+  if (IS_DESKTOP) return;
 
   try {
     // Use Web Audio API for a short chime — no audio file needed

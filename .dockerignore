@@ -3,6 +3,5 @@ dist/
 dist-electron/
 release/
 android/
-ios/
 .git/
 *.log

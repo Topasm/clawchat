@@ -1,6 +1,6 @@
 # Frontend Guide
 
-The ClawChat frontend is built with React 18, TypeScript, and Vite. It runs in browsers, in a Tauri 2 desktop shell, and in the Capacitor iOS shell.
+The ClawChat frontend is built with React 18, TypeScript, and Vite. It runs in browsers and in a Tauri 2 desktop shell.
 
 ## Directory Structure
 
@@ -13,7 +13,7 @@ src/
 │   ├── types/
 │   │   ├── api.ts                     # API request/response interfaces (Pydantic mirrors)
 │   │   ├── schemas.ts                # Zod schemas for API validation
-│   │   └── platform.ts               # Platform detection (Tauri, Capacitor, Web)
+│   │   └── platform.ts               # Platform detection (Tauri, Web)
 │   ├── generated/contracts/
 │   │   └── taskStatus.ts             # Generated canonical task-status values (do not edit)
 │   ├── stores/
@@ -116,10 +116,7 @@ src/
 │   │   ├── wsClient.ts             # WebSocket for real-time sync
 │   │   ├── platform.ts             # Platform detection + secure storage
 │   │   ├── logger.ts               # Structured logging utility
-│   │   ├── eventReminders.ts       # Client-side event reminder scheduling
-│   │   ├── offlineQueue.ts         # Offline action queue (sync on reconnect)
-│   │   ├── capacitor-init.ts       # Capacitor plugin initialization
-│   │   └── widgetSync.ts           # Android widget data sync
+│   │   └── offlineQueue.ts         # Offline action queue (sync on reconnect)
 │   ├── config/
 │   │   ├── theme.ts                # Color palettes (light/dark) + ColorPalette type
 │   │   ├── ThemeContext.tsx         # React context for theme colors
@@ -145,7 +142,7 @@ src/
 │   ├── _pages.css                    # Page headers, detail pages, chat page
 │   ├── _settings.css                 # Toggle, slider, segmented control, settings rows
 │   ├── _utilities.css                # Margin, flex, gap helpers
-│   ├── _capacitor.css                # Mobile-specific overrides
+│   ├── _mobile.css                   # Safe-area insets, touch affordances, compact shell
 │   ├── _editor.css                   # Lexical RTE, CodeMirror, drop zone, attachments
 │   └── _admin.css                    # Admin dashboard tabs, stat cards, activity feed, tables
 └── src-tauri/                        # Rust desktop shell and native commands
@@ -374,13 +371,13 @@ Runtime detection inside the shared React client:
 
 ```typescript
 IS_TAURI     // running inside the Tauri shell
-IS_CAPACITOR // window.Capacitor exists
-IS_IOS / IS_ANDROID / IS_MOBILE
-IS_WEB       // Not Tauri, not Capacitor
-detectPlatform(): 'web' | 'tauri' | 'ios' | 'android'
+IS_DESKTOP   // desktop runtime reported by the platform adapter
+IS_WEB       // not the desktop runtime
+IS_MOBILE    // always false: no supported runtime reports as mobile
+detectPlatform(): 'web' | 'tauri'
 ```
 
-On Capacitor iOS, resizable panels are skipped and a fixed layout is used instead. Native Android is a separate Kotlin/Compose client under `android/`; Capacitor Android remains only as a deprecated transitional artifact.
+Web and Tauri are the only runtimes of this client. The compact `.cc-root--mobile` shell (bottom navigation, swipe tabs, mobile status bar) is still in the tree but unreachable while `IS_MOBILE` is false; re-enable it from a real signal rather than reintroducing a platform flag. Native Android is a separate Kotlin/Compose client under `android/` and does not use this renderer.
 
 ## API Types
 

@@ -1,5 +1,5 @@
 import { platformApi } from '../platform';
-import { IS_CAPACITOR, IS_DESKTOP } from '../types/platform';
+import { IS_DESKTOP } from '../types/platform';
 
 export interface NotifyOptions {
   /** Silent notification (no sound). Defaults to false. */
@@ -13,7 +13,6 @@ export interface NotifyOptions {
 /**
  * Cross-platform desktop notification with optional action buttons.
  * - Tauri: uses the native notification command
- * - Capacitor: uses LocalNotifications plugin with actionTypeId
  * - Web: uses the browser Notification API
  *
  * When itemType + itemId are provided, a "Mark Done" action button is shown.
@@ -27,27 +26,6 @@ export async function notify(
 
   if (IS_DESKTOP) {
     await platformApi.notifications.show(title, body, { silent, itemType, itemId });
-  } else if (IS_CAPACITOR) {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
-    const perm = await LocalNotifications.checkPermissions();
-    if (perm.display === 'prompt') await LocalNotifications.requestPermissions();
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          title,
-          body,
-          id: Date.now() % 100000,
-          schedule: { at: new Date(Date.now() + 100) },
-          smallIcon: 'ic_stat_clawchat',
-          ...(itemId
-            ? {
-                actionTypeId: 'REMINDER_ACTIONS',
-                extra: { itemType, itemId },
-              }
-            : {}),
-        },
-      ],
-    });
   } else if (typeof Notification !== 'undefined') {
     if (Notification.permission === 'granted') {
       showWebNotification(title, body, { silent, itemType, itemId });
@@ -80,42 +58,27 @@ function showWebNotification(
 }
 
 /**
- * Storage abstraction — uses Capacitor Preferences on mobile,
- * localStorage everywhere else.
+ * Storage abstraction — localStorage on every supported runtime. The async
+ * signature is kept so callers stay agnostic about the backing store.
  */
 export const storage = {
   async get(key: string): Promise<string | null> {
-    if (IS_CAPACITOR) {
-      const { Preferences } = await import('@capacitor/preferences');
-      const { value } = await Preferences.get({ key });
-      return value;
-    }
     return localStorage.getItem(key);
   },
 
   async set(key: string, value: string): Promise<void> {
-    if (IS_CAPACITOR) {
-      const { Preferences } = await import('@capacitor/preferences');
-      await Preferences.set({ key, value });
-      return;
-    }
     localStorage.setItem(key, value);
   },
 
   async remove(key: string): Promise<void> {
-    if (IS_CAPACITOR) {
-      const { Preferences } = await import('@capacitor/preferences');
-      await Preferences.remove({ key });
-      return;
-    }
     localStorage.removeItem(key);
   },
 };
 
 /**
  * Secure storage uses the desktop OS credential vault when available. A legacy
- * local value is promoted on first read; web/mobile and unavailable OS vaults
- * retain the existing storage fallback.
+ * local value is promoted on first read; the web build and unavailable OS
+ * vaults retain the existing storage fallback.
  */
 export const secureStorage = {
   async get(key: string): Promise<string | null> {

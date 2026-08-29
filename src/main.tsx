@@ -1,7 +1,6 @@
 import { StrictMode, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './app/i18n';
-import { logger } from './app/services/logger';
 import { markStartupPhase, markStartupPhaseAfterPaint } from './app/services/startupPerformance';
 import { useAuthStore } from './app/stores/useAuthStore';
 import './styles/index.css';
@@ -15,12 +14,7 @@ void import('./app/services/runtimePerformance').then(({ installRuntimePerforman
   installRuntimePerformance();
 });
 
-void import('./app/services/capacitor-init')
-  .then(({ initCapacitor }) => initCapacitor())
-  .then(() => markStartupPhase('platform_ready'))
-  .catch((error: unknown) => {
-    logger.error('Capacitor initialization failed; continuing with the web shell.', error);
-  });
+markStartupPhase('platform_ready');
 
 function StartupShellGuard({ children }: { children: ReactNode }) {
   const isLoading = useAuthStore((state) => state.isLoading);

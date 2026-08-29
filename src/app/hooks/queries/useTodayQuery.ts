@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import apiClient from '../../services/apiClient';
@@ -7,8 +6,6 @@ import { TodayResponseSchema, TodoResponseSchema, EventResponseSchema } from '..
 import { getGreeting } from '../../utils/formatters';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
-import { syncWidgetData } from '../../services/widgetSync';
-import { scheduleEventReminders } from '../../services/eventReminders';
 import { isTerminalTaskStatus } from '../../utils/taskStatus';
 
 interface TodayData {
@@ -131,15 +128,6 @@ export default function useTodayData(): TodayData {
     enabled: !!serverUrl,
     refetchOnWindowFocus: true,
   });
-
-  // Side effects: sync widget data and schedule event reminders
-  // These run in a useEffect that depends on query.data rather than during render
-  useEffect(() => {
-    if (query.data) {
-      syncWidgetData();
-      scheduleEventReminders(query.data.todayEvents);
-    }
-  }, [query.data]);
 
   // In demo mode (no serverUrl), derive from cache
   if (!serverUrl) {

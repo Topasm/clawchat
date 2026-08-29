@@ -32,7 +32,7 @@ Feature code must not read an Electron bridge or import `@tauri-apps/*` directly
 - [ ] Configure production credentials and verify OS-signed/notarized installers.
 - [x] Retire the Electron workflow and runtime after preserving the read-only data-import path.
 
-Android Compose and iOS Capacitor clients are outside this migration. Their HTTP and WebSocket contracts remain unchanged.
+The native Android Compose client is outside this migration. Its HTTP and WebSocket contracts remain unchanged.
 
 ## Initial native command surface
 

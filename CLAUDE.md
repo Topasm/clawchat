@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ClawChat is a privacy-first, self-hosted AI project execution workspace that unifies tasks, graphs, calendar, documents, agents, and chat. Primary clients are web, Tauri desktop, and native Android; Capacitor is provisional for iOS. All clients use one FastAPI server and one SQLite database.
+ClawChat is a privacy-first, self-hosted AI project execution workspace that unifies tasks, graphs, calendar, documents, agents, and chat. Clients are web, Tauri desktop, and native Android. All clients use one FastAPI server and one SQLite database.
 
 ## Setup & Development
 
@@ -41,7 +41,7 @@ Server config is via environment variables (see `.env.example`). Key vars: `AI_P
 
 ### Two-process system
 
-- **Frontend:** React 18 + TypeScript, built with Vite. Runs in browsers and Tauri; Capacitor is retained for provisional iOS packaging.
+- **Frontend:** React 18 + TypeScript, built with Vite. Runs in browsers and Tauri. iOS is not a supported target.
 - **Backend:** Python FastAPI async server. Communicates via REST + SSE (streaming chat) + WebSocket (real-time sync).
 
 ### Frontend (`src/`)
@@ -80,10 +80,6 @@ The Rust shell supervises the FastAPI sidecar and provides secure storage, tray,
 ### Android (`android/`)
 
 Native Kotlin + Jetpack Compose app. Multi-module Gradle project (app, core, feature modules, widget). Uses Hilt DI, Retrofit/OkHttp, DataStore, Navigation Compose. Connects to the backend via REST + SSE. Pairs with desktop via 6-digit code or QR, or falls back to PIN login.
-
-### iOS (`ios/`)
-
-Capacitor wraps the web build. Capacitor plugins: local notifications, keyboard, preferences, splash screen.
 
 ## Key Conventions
 

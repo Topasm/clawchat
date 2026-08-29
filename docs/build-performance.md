@@ -40,23 +40,29 @@ the complete renderer. The initial metrics guard startup cost; complete-renderer
 route splitting from hiding overall growth. CI and every Tauri package job fail when a threshold
 is exceeded.
 
-The current conservative Tauri baseline is 258.87 KiB raw / 85.67 KiB gzip for initial JavaScript,
-1.84 MiB for all JavaScript, and 2.00 MiB for all renderer files. These numbers come from
+The current conservative Tauri baseline is 258.58 KiB raw / 85.82 KiB gzip for initial JavaScript,
+1.84 MiB for all JavaScript, and 2.02 MiB for all renderer files. These numbers come from
 `build:tauri-renderer`, not the smaller ES2022 standalone web build, so the local measurement and
-CI evaluate the same Safari 13-compatible output. Each ceiling retains approximately three percent
-of measured headroom. New feature libraries should be measured and preferably route-loaded before
+CI evaluate the same Safari 13-compatible output. Each ceiling retains approximately two to three
+percent of measured headroom. New feature libraries should be measured and preferably route-loaded before
 they are accepted.
 
 The 2026-08-27 baseline update records the route-loaded Project Workspace, Review Inbox, Agent Run,
 and Inbox Triage features. Their pages remain lazy chunks; the initial raw and gzip ceilings did not
 need to increase, while the complete-renderer ceilings retain approximately three percent headroom.
 
+The 2026-08-29 update re-measures after the Capacitor and iOS removal: initial JavaScript fell by
+2,003 raw bytes (778 gzip) and the complete renderer fell by roughly 35 KB across fourteen fewer
+chunks. Every ceiling is unchanged; only the baselines moved down. The previous baselines had been
+recorded from the ES2022 web build rather than `build:tauri-renderer`, so they understated the
+output CI actually measures; they are now taken from `build:tauri-renderer` as this document
+requires.
+
 Do not raise a threshold solely to make CI pass. Measure the new output, identify which entry or
 route owns the increase, and record an intentional baseline change in the same commit.
 
-Axios is emitted as `vendor-http` separately from the initial React Query chunk. Capacitor startup
-is dynamically imported, so web and Tauri first paint do not preload the HTTP client solely for a
-mobile-only initialization path.
+Axios is emitted as `vendor-http` separately from the initial React Query chunk, so web and Tauri
+first paint do not preload the HTTP client before a lazy route actually needs it.
 
 ## Runtime diagnostics
 

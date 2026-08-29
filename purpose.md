@@ -2,7 +2,7 @@
 
 ## Overview
 
-**ClawChat** is a privacy-first, self-hosted AI project execution workspace. It unifies tasks, dependency graphs, calendar, documents, agents, and AI-powered conversation across web, Tauri desktop, and native Android clients backed by a user-owned server. A Capacitor iOS client remains provisional.
+**ClawChat** is a privacy-first, self-hosted AI project execution workspace. It unifies tasks, dependency graphs, calendar, documents, agents, and AI-powered conversation across web, Tauri desktop, and native Android clients backed by a user-owned server.
 
 Unlike existing productivity tools that scatter user data across multiple third-party cloud services, ClawChat keeps primary application data on the user's own infrastructure. The AI assistant serves as a central interface — users interact through natural language conversation, and the system intelligently routes requests to the appropriate internal modules.
 
@@ -114,7 +114,7 @@ To maintain focus and avoid scope creep, the following are explicitly **not** go
 │                                                      │
 │   Tauri (desktop)       Pages (thin re-exports)      │
 │   Web Browser (Vite)    ├── Today, Inbox, Chat       │
-│   Capacitor iOS         ├── Kanban + Task Graph      │
+│   Native Android        ├── Kanban + Task Graph      │
 │                         ├── Task/Event Detail        │
 │                         ├── Calendar, Admin          │
 │                         └── Settings                 │

@@ -31,7 +31,7 @@ Active foundation work is tracked separately from release status:
 
 - [x] Migrate from React Native (Expo) to Vite + React + TypeScript
 - [x] Tauri 2 integration for desktop (Windows, macOS, Linux); legacy Electron shell retired
-- [x] Native Kotlin/Compose Android client; Capacitor retained provisionally for iOS
+- [x] Native Kotlin/Compose Android client; the provisional Capacitor iOS shell was removed
 - [x] Shared-client platform detection runtime (`IS_TAURI`, `IS_WEB`, `IS_MOBILE`)
 - [x] Unified monorepo structure (`src/app/`, `src/styles/`, `src-tauri/`)
 
@@ -289,9 +289,7 @@ Active foundation work is tracked separately from release status:
 - [x] Native Android app with Compose feature modules, widgets, notifications, and background work
 - [x] Bottom navigation for native Android and the shared mobile layout
 - [x] Complete Android release CI validation for the canonical task contract
-- [ ] Touch-optimize the provisional Capacitor iOS kanban
-- [x] Retain Capacitor iOS packaging while native iOS priority is undecided
-- [x] Deprecate Capacitor Android; no new product work targets it
+- [x] Remove Capacitor and the provisional iOS shell; iOS is no longer a supported target
 
 ### Phase 7: Polish & Deploy
 

@@ -3,7 +3,6 @@ dist-electron/
 node_modules/
 src-tauri/target/
 android/
-ios/
 relay/
 server/
 src-tauri/gen/

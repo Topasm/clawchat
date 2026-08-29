@@ -18,7 +18,6 @@ import Toggle from '../components/shared/Toggle';
 import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
-import { IS_CAPACITOR } from '../types/platform';
 import { platformApi, type ServerStatus } from '../platform';
 import {
   checkForAppUpdate,
@@ -48,7 +47,6 @@ export default function SettingsPage() {
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
   const addToast = useToastStore((s) => s.addToast);
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
   const [aiProviderSwitching, setAiProviderSwitching] = useState(false);
   const [claudeCodeChecking, setClaudeCodeChecking] = useState(false);
@@ -103,55 +101,6 @@ export default function SettingsPage() {
       addToast('success', enabled ? 'Server will start on login.' : 'Auto-start disabled.');
     },
     [addToast],
-  );
-
-  useEffect(() => {
-    if (IS_CAPACITOR) {
-      import('@capacitor/core').then(({ Capacitor, registerPlugin }) => {
-        const Biometric = Capacitor.isPluginAvailable('Biometric')
-          ? registerPlugin<{
-              isAvailable(): Promise<{ available: boolean }>;
-            }>('Biometric')
-          : undefined;
-        if (Biometric) {
-          Biometric.isAvailable().then((res) => setBiometricAvailable(res.available));
-        }
-      });
-    }
-  }, []);
-
-  const handleBiometricToggle = useCallback(
-    async (enabled: boolean) => {
-      if (enabled) {
-        // Verify identity before enabling
-        try {
-          const { Capacitor, registerPlugin } = await import('@capacitor/core');
-          const Biometric = Capacitor.isPluginAvailable('Biometric')
-            ? registerPlugin<{
-                authenticate(opts: {
-                  title: string;
-                  subtitle: string;
-                }): Promise<{ success: boolean }>;
-              }>('Biometric')
-            : undefined;
-          if (!Biometric) return;
-          const result = await Biometric.authenticate({
-            title: 'Enable Biometric Lock',
-            subtitle: 'Verify your identity to enable',
-          });
-          if (result.success) {
-            settings.setBiometricEnabled(true);
-            addToast('success', 'Biometric lock enabled');
-          }
-        } catch {
-          addToast('error', 'Biometric verification failed');
-        }
-      } else {
-        settings.setBiometricEnabled(false);
-        addToast('success', 'Biometric lock disabled');
-      }
-    },
-    [settings, addToast],
   );
 
   // Fetch AI provider status on mount
@@ -426,14 +375,6 @@ export default function SettingsPage() {
           <Toggle checked={settings.reminderSound} onChange={settings.setReminderSound} />
         </SettingsRow>
       </SettingsSection>
-
-      {biometricAvailable && (
-        <SettingsSection title="Security">
-          <SettingsRow label="Biometric lock" sublabel="Require fingerprint or face to open app">
-            <Toggle checked={settings.biometricEnabled} onChange={handleBiometricToggle} />
-          </SettingsRow>
-        </SettingsSection>
-      )}
 
       <SettingsSection title="Privacy & Storage">
         <SettingsRow label="Save history">

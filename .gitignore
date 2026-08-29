@@ -22,9 +22,6 @@ android/*/*/build/
 android/app/build/
 android/local.properties
 
-# Capacitor / iOS
-ios/App/Pods
-
 # IDE
 .idea
 .vscode

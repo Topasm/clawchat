@@ -1,10 +1,9 @@
-import { useState, useEffect, type FormEvent, useCallback, useRef } from 'react';
+import { useState, useEffect, type FormEvent, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
-import { useSettingsStore } from '../stores/useSettingsStore';
 import { platformApi } from '../platform';
-import { IS_DESKTOP, IS_CAPACITOR } from '../types/platform';
+import { IS_DESKTOP } from '../types/platform';
 import { relayClient } from '../services/relayClient';
 
 interface PairingClaimResult {
@@ -30,48 +29,10 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
-  const [showServerUrl, setShowServerUrl] = useState(!IS_DESKTOP && !IS_CAPACITOR);
+  const [showServerUrl, setShowServerUrl] = useState(!IS_DESKTOP);
   const [showScanner, setShowScanner] = useState(false);
   const [desktopClientMode, setDesktopClientMode] = useState(false);
   const [switchingToHost, setSwitchingToHost] = useState(false);
-  const biometricAttempted = useRef(false);
-  const isPairingFirstMobile = IS_CAPACITOR;
-
-  // Attempt biometric login on mount if enabled and token exists
-  useEffect(() => {
-    if (biometricAttempted.current) return;
-    biometricAttempted.current = true;
-
-    const biometricEnabled = useSettingsStore.getState().biometricEnabled;
-    const storedToken = useAuthStore.getState().token;
-
-    if (!IS_CAPACITOR || !biometricEnabled || !storedToken) return;
-
-    (async () => {
-      try {
-        const { Capacitor, registerPlugin } = await import('@capacitor/core');
-        const Biometric = Capacitor.isPluginAvailable('Biometric')
-          ? registerPlugin<{
-              authenticate(opts: {
-                title: string;
-                subtitle: string;
-              }): Promise<{ success: boolean }>;
-            }>('Biometric')
-          : undefined;
-        if (!Biometric) return;
-
-        const result = await Biometric.authenticate({
-          title: 'Unlock ClawChat',
-          subtitle: 'Verify your identity to continue',
-        });
-        if (result.success) {
-          navigate('/today');
-        }
-      } catch {
-        // Biometric failed — fall through to PIN login
-      }
-    })();
-  }, [navigate]);
 
   // On desktop client mode: show server URL + QR, pre-fill from stored hostServerUrl
   useEffect(() => {
@@ -299,68 +260,6 @@ export default function LoginPage() {
           ClawChat
         </h1>
 
-        {isPairingFirstMobile && !showServerUrl && (
-          <div
-            style={{
-              marginBottom: 20,
-              padding: '14px 16px',
-              borderRadius: 10,
-              background: colors.background,
-              border: `1px solid ${colors.border}`,
-            }}
-          >
-            <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 6 }}>
-              Connect to your host desktop
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                lineHeight: 1.5,
-                color: colors.textSecondary,
-                marginBottom: 14,
-              }}
-            >
-              Scan the QR code shown on your main desktop. Manual server login is still available if
-              you need it.
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowScanner(true)}
-              style={{
-                width: '100%',
-                padding: '12px 0',
-                background: colors.primary,
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Scan Host QR
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowServerUrl(true)}
-              style={{
-                width: '100%',
-                padding: '10px 0',
-                marginTop: 10,
-                background: 'transparent',
-                color: colors.textSecondary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Use Server URL Instead
-            </button>
-          </div>
-        )}
-
         {desktopClientMode && (
           <div
             style={{
@@ -451,27 +350,8 @@ export default function LoginPage() {
               When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current
               site URL is usually correct.
             </div>
-            {isPairingFirstMobile && (
-              <button
-                type="button"
-                onClick={() => setShowServerUrl(false)}
-                style={{
-                  marginTop: -4,
-                  marginBottom: 16,
-                  padding: 0,
-                  background: 'none',
-                  border: 'none',
-                  color: colors.textSecondary,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
-              >
-                Back to QR pairing
-              </button>
-            )}
           </>
-        ) : !isPairingFirstMobile ? (
+        ) : (
           <div
             style={{
               display: 'flex',
@@ -496,69 +376,61 @@ export default function LoginPage() {
               Change
             </button>
           </div>
-        ) : null}
-
-        {(!isPairingFirstMobile || showServerUrl) && (
-          <>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: 6,
-                fontSize: 13,
-                color: colors.textSecondary,
-              }}
-            >
-              PIN
-            </label>
-            <input
-              type="password"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="Enter your PIN"
-              required={!isPairingFirstMobile || showServerUrl}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                marginBottom: 20,
-                border: `1px solid ${colors.border}`,
-                borderRadius: 8,
-                fontSize: 14,
-                background: colors.background,
-                color: colors.text,
-                boxSizing: 'border-box',
-                outline: 'none',
-              }}
-            />
-
-            {error && (
-              <div style={{ color: colors.error, fontSize: 13, marginBottom: 16 }}>{error}</div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px 0',
-                background: loading ? colors.disabled : colors.primary,
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {loading ? 'Connecting...' : 'Login'}
-            </button>
-          </>
         )}
 
-        {error && isPairingFirstMobile && !showServerUrl && (
-          <div style={{ color: colors.error, fontSize: 13, marginTop: 16 }}>{error}</div>
+        <label
+          style={{
+            display: 'block',
+            marginBottom: 6,
+            fontSize: 13,
+            color: colors.textSecondary,
+          }}
+        >
+          PIN
+        </label>
+        <input
+          type="password"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          placeholder="Enter your PIN"
+          required
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            marginBottom: 20,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 8,
+            fontSize: 14,
+            background: colors.background,
+            color: colors.text,
+            boxSizing: 'border-box',
+            outline: 'none',
+          }}
+        />
+
+        {error && (
+          <div style={{ color: colors.error, fontSize: 13, marginBottom: 16 }}>{error}</div>
         )}
 
-        {(!IS_DESKTOP || desktopClientMode) && !isPairingFirstMobile && (
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: '12px 0',
+            background: loading ? colors.disabled : colors.primary,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? 'Connecting...' : 'Login'}
+        </button>
+
+        {(!IS_DESKTOP || desktopClientMode) && (
           <button
             type="button"
             onClick={() => setShowScanner(true)}

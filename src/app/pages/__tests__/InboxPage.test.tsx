@@ -70,7 +70,6 @@ vi.mock('../../hooks/usePlatform', () => ({
     isMobile: mocks.isMobile,
     isDesktop: !mocks.isMobile,
     isWeb: true,
-    isCapacitor: false,
     isTauri: false,
   }),
 }));
