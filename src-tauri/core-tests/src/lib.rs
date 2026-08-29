@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+mod startup_log {
+    include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/startup_log.rs"));
+}
+
 mod models {
     include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/models.rs"));
 }

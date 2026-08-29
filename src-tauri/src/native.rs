@@ -121,7 +121,9 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             "stop-server" => {
                 let state = app.state::<AppState>();
                 if let Err(error) = state.stop_server(app) {
-                    eprintln!("[clawchat] failed to stop server from tray: {error}");
+                    startup_log::report(&format!(
+                        "[clawchat] failed to stop server from tray: {error}"
+                    ));
                 }
             }
             "restart-server" => {
@@ -132,7 +134,9 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                     .unwrap_or(false)
                 {
                     if let Err(error) = state.restart_server(app) {
-                        eprintln!("[clawchat] failed to restart server from tray: {error}");
+                        startup_log::report(&format!(
+                            "[clawchat] failed to restart server from tray: {error}"
+                        ));
                     }
                 }
             }

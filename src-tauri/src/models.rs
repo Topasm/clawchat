@@ -99,6 +99,31 @@ pub struct ServerStatus {
     pub error: Option<String>,
 }
 
+impl ServerStatus {
+    /// Describe a startup outcome that left the sidecar unusable, or `None`
+    /// when the server came up.
+    ///
+    /// A blocked host start (a failed legacy import, a missing server binary,
+    /// a health check that never passed) is reported as an `Error` *status*,
+    /// not as an `Err`, so callers that only inspect the `Result` see nothing
+    /// at all. This is what they should ask instead.
+    pub fn startup_failure(&self) -> Option<String> {
+        match self.state {
+            ServerState::Running | ServerState::Starting => None,
+            ServerState::Stopped => Some(
+                self.error
+                    .clone()
+                    .unwrap_or_else(|| "server stopped without starting".to_owned()),
+            ),
+            ServerState::Error => Some(
+                self.error
+                    .clone()
+                    .unwrap_or_else(|| "server reported an unspecified failure".to_owned()),
+            ),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkAddress {
@@ -135,4 +160,52 @@ pub struct NativePaths {
     pub pid_path: PathBuf,
     pub resource_dir: PathBuf,
     pub development_server_dir: PathBuf,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn status(state: ServerState, error: Option<&str>) -> ServerStatus {
+        ServerStatus {
+            state,
+            port: 8000,
+            pid: None,
+            error: error.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn running_and_starting_hosts_are_not_startup_failures() {
+        assert!(status(ServerState::Running, None)
+            .startup_failure()
+            .is_none());
+        assert!(status(ServerState::Starting, None)
+            .startup_failure()
+            .is_none());
+    }
+
+    #[test]
+    fn blocked_startup_reports_the_underlying_reason() {
+        assert_eq!(
+            status(
+                ServerState::Error,
+                Some("legacy data import failed; host startup blocked: db is corrupt"),
+            )
+            .startup_failure(),
+            Some("legacy data import failed; host startup blocked: db is corrupt".to_owned())
+        );
+    }
+
+    #[test]
+    fn failed_startup_without_a_reason_still_reports_something() {
+        assert_eq!(
+            status(ServerState::Error, None).startup_failure(),
+            Some("server reported an unspecified failure".to_owned())
+        );
+        assert_eq!(
+            status(ServerState::Stopped, None).startup_failure(),
+            Some("server stopped without starting".to_owned())
+        );
+    }
 }

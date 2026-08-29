@@ -53,8 +53,22 @@ pub fn run() {
                 let app_handle = app.handle().clone();
                 tauri::async_runtime::spawn_blocking(move || {
                     let state = app_handle.state::<AppState>();
-                    if let Err(error) = state.start_server(&app_handle) {
-                        eprintln!("[clawchat] automatic host startup failed: {error}");
+                    match state.start_server(&app_handle) {
+                        // `start_server` reports a blocked or crashed sidecar as an
+                        // `Error` status rather than an `Err`, so the reason is only
+                        // durable if this arm records it too.
+                        Ok(status) => {
+                            if let Some(error) = status.startup_failure() {
+                                startup_log::report(&format!(
+                                    "[clawchat] automatic host startup failed: {error}"
+                                ));
+                            }
+                        }
+                        Err(error) => {
+                            startup_log::report(&format!(
+                                "[clawchat] automatic host startup failed: {error}"
+                            ));
+                        }
                     }
                 });
             }
@@ -105,7 +119,9 @@ pub fn run() {
         tauri::RunEvent::Exit => {
             if let Some(state) = app_handle.try_state::<AppState>() {
                 if let Err(error) = state.stop_server(app_handle) {
-                    eprintln!("[clawchat] failed to stop server during shutdown: {error}");
+                    startup_log::report(&format!(
+                        "[clawchat] failed to stop server during shutdown: {error}"
+                    ));
                 }
             }
         }

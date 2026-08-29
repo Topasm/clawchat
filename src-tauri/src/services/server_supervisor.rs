@@ -8,7 +8,10 @@ use std::{
     time::Duration,
 };
 
-use crate::models::{NativePaths, ServerConfig, ServerState, ServerStatus};
+use crate::{
+    models::{NativePaths, ServerConfig, ServerState, ServerStatus},
+    startup_log,
+};
 
 const MAX_HEALTH_RETRIES: usize = 30;
 
@@ -97,7 +100,7 @@ impl ServerSupervisor {
                 let pid = child.id();
                 self.child = Some(child);
                 if let Err(error) = write_pid(&self.paths.pid_path, pid) {
-                    eprintln!("[clawchat] {error}");
+                    startup_log::report(&format!("[clawchat] {error}"));
                 }
                 if wait_for_health(port) {
                     self.status = ServerStatus {

@@ -16,8 +16,63 @@ interface PairingClaimResult {
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 import QRScanner from '../components/shared/QRScanner';
 import { logger } from '../services/logger';
+import { describeStartupLogLocation } from '../services/startupDiagnostics';
+import {
+  useHostSessionStore,
+  type HostLoginFailure,
+  type HostSessionPhase,
+} from '../stores/useHostSessionStore';
+import type { ServerStatus } from '../platform';
 
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'error';
+
+/**
+ * Turn a dead-end host handshake into something a user can act on.
+ *
+ * The server status carries the only machine-readable reason a packaged app
+ * has (a blocked legacy import, a missing server binary, a failed health
+ * check), and it used to be dropped on the floor — the user just got a PIN
+ * form that could never succeed. Show it verbatim.
+ */
+export function describeHostBlock(
+  status: ServerStatus | null,
+  failure: HostLoginFailure | null,
+): string {
+  const reasons: string[] = [];
+  if (status?.error) reasons.push(status.error);
+  if (failure) {
+    const headline =
+      failure.kind === 'unreachable'
+        ? 'The local server did not answer.'
+        : failure.kind === 'rejected'
+          ? 'The local server refused the saved PIN.'
+          : 'Sign-in failed.';
+    reasons.push(failure.message ? `${headline} ${failure.message}` : headline);
+  }
+  if (reasons.length === 0) {
+    reasons.push('The local server is not running, and it did not report a reason.');
+  }
+  return reasons.join(' ');
+}
+
+const HOST_PHASE_HEADINGS: Record<HostSessionPhase, string> = {
+  idle: 'Sign in',
+  checking: 'Preparing ClawChat',
+  starting: 'Starting the local server',
+  connecting: 'Connecting',
+  connected: 'Connected',
+  blocked: 'ClawChat could not start its local server',
+};
+
+const HOST_PHASE_DETAILS: Record<HostSessionPhase, string> = {
+  idle: '',
+  checking: 'Checking whether this computer runs its own ClawChat server.',
+  starting:
+    'ClawChat is bringing up its own server on this computer. This usually takes a few seconds.',
+  connecting: 'The local server is up. Signing in with the PIN stored on this computer.',
+  connected: 'Taking you to your workspace.',
+  blocked: '',
+};
 
 export default function LoginPage() {
   const { colors } = useTheme();
@@ -33,6 +88,38 @@ export default function LoginPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [desktopClientMode, setDesktopClientMode] = useState(false);
   const [switchingToHost, setSwitchingToHost] = useState(false);
+  const [showManualLogin, setShowManualLogin] = useState(false);
+
+  // The host handshake is owned by the store so that reading it here cannot
+  // start a second auto-login alongside the router's.
+  const hostPhase = useHostSessionStore((s) => s.phase);
+  const hostStatus = useHostSessionStore((s) => s.status);
+  const hostFailure = useHostSessionStore((s) => s.failure);
+  const isHostMode = useHostSessionStore((s) => s.isHostMode);
+  const retryHostStartup = useHostSessionStore((s) => s.retryHostStartup);
+
+  /**
+   * A desktop host install must never be met by a bare PIN form: the server
+   * it would authenticate against may not even be running, and nothing on
+   * screen would say so.
+   */
+  const hostPanelActive =
+    IS_DESKTOP && !desktopClientMode && (isHostMode || hostPhase === 'checking');
+  const showCredentialFields = !hostPanelActive || showManualLogin;
+  const startupLog = describeStartupLogLocation();
+
+  /**
+   * Reveal the manual fallback pointed at the local server.
+   *
+   * `DEFAULT_SERVER_URL` falls back to the page origin, which inside the
+   * packaged shell is the `tauri://` scheme — useless as a login target. The
+   * status tells us the port the sidecar was asked to use, so seed that.
+   */
+  const toggleManualLogin = () => {
+    const next = !showManualLogin;
+    setShowManualLogin(next);
+    if (next && hostStatus) setServerUrl(`http://localhost:${hostStatus.port}`);
+  };
 
   // On desktop client mode: show server URL + QR, pre-fill from stored hostServerUrl
   useEffect(() => {
@@ -60,19 +147,20 @@ export default function LoginPage() {
   const handleUseThisComputer = async () => {
     setSwitchingToHost(true);
     setError('');
-    try {
-      const config = await platformApi.server.setAppMode('host');
-      const url = `http://localhost:${config.port}`;
-      setServerUrl(url);
-      await login(url, config.pin);
+    // Switching the mode only *asks* the shell to boot the sidecar. Signing in
+    // immediately afterwards used to race a server that had not bound its port
+    // yet, so wait for the status to settle and report what it settled on.
+    await retryHostStartup();
+    const { phase, status, failure } = useHostSessionStore.getState();
+    if (phase === 'connected') {
       navigate('/today');
-    } catch (err) {
-      logger.error('Could not start the local server', err);
-      setError(
-        err instanceof Error ? err.message : 'Could not start the local server on this computer.',
-      );
-      setSwitchingToHost(false);
+      return;
     }
+    if (status) setServerUrl(`http://localhost:${status.port}`);
+    const reason = describeHostBlock(status, failure);
+    logger.error('Could not start the local server', reason);
+    setError(reason);
+    setSwitchingToHost(false);
   };
 
   const handleQRScan = async (data: string) => {
@@ -260,6 +348,107 @@ export default function LoginPage() {
           ClawChat
         </h1>
 
+        {hostPanelActive && (
+          <div
+            data-testid="host-startup-panel"
+            style={{
+              marginBottom: 20,
+              padding: '14px 16px',
+              borderRadius: 10,
+              background: colors.background,
+              border: `1px solid ${colors.border}`,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 6 }}>
+              {HOST_PHASE_HEADINGS[hostPhase]}
+            </div>
+            {hostPhase === 'blocked' ? (
+              <>
+                <div
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    color: colors.textSecondary,
+                    marginBottom: 10,
+                  }}
+                >
+                  ClawChat runs its own server on this computer, and that server is not answering —
+                  so there is nothing to sign in to yet.
+                </div>
+                <div
+                  data-testid="host-startup-reason"
+                  style={{
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    fontSize: 11,
+                    lineHeight: 1.5,
+                    color: colors.error,
+                    background: colors.surface,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    marginBottom: 10,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {describeHostBlock(hostStatus, hostFailure)}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    lineHeight: 1.5,
+                    color: colors.textTertiary,
+                    marginBottom: 12,
+                  }}
+                >
+                  Startup records are kept in {startupLog.startupLog}, and the server's own output
+                  in {startupLog.serverLog}.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void retryHostStartup()}
+                  style={{
+                    width: '100%',
+                    padding: '12px 0',
+                    background: colors.primary,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Try starting the server again
+                </button>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: colors.textSecondary }}>
+                {HOST_PHASE_DETAILS[hostPhase]}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={toggleManualLogin}
+              style={{
+                display: 'block',
+                marginTop: 12,
+                padding: 0,
+                background: 'none',
+                border: 'none',
+                color: colors.textSecondary,
+                fontSize: 11,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              {showManualLogin
+                ? 'Hide manual sign-in'
+                : 'If this keeps happening, sign in manually'}
+            </button>
+          </div>
+        )}
+
         {desktopClientMode && (
           <div
             style={{
@@ -306,129 +495,140 @@ export default function LoginPage() {
           </div>
         )}
 
-        {showServerUrl ? (
+        {showCredentialFields && (
           <>
+            {showServerUrl ? (
+              <>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: 6,
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                  }}
+                >
+                  Server URL
+                  {healthIndicator()}
+                </label>
+                <input
+                  type="url"
+                  value={serverUrl}
+                  onChange={(e) => {
+                    setServerUrl(e.target.value);
+                    setHealthStatus('idle');
+                  }}
+                  onBlur={handleServerUrlBlur}
+                  placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    marginBottom: 16,
+                    border: `1px solid ${healthStatus === 'ok' ? colors.success : healthStatus === 'error' ? colors.error : colors.border}`,
+                    borderRadius: 8,
+                    fontSize: 14,
+                    background: colors.background,
+                    color: colors.text,
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: colors.textTertiary,
+                    marginTop: -10,
+                    marginBottom: 16,
+                  }}
+                >
+                  When ClawChat is opened through a reverse proxy or tunnel, leaving this as the
+                  current site URL is usually correct.
+                </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 16,
+                }}
+              >
+                <span style={{ fontSize: 12, color: colors.textTertiary }}>
+                  Server: {serverUrl}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowServerUrl(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: colors.textSecondary,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Change
+                </button>
+              </div>
+            )}
+
             <label
               style={{
-                display: 'flex',
-                alignItems: 'center',
+                display: 'block',
                 marginBottom: 6,
                 fontSize: 13,
                 color: colors.textSecondary,
               }}
             >
-              Server URL
-              {healthIndicator()}
+              PIN
             </label>
             <input
-              type="url"
-              value={serverUrl}
-              onChange={(e) => {
-                setServerUrl(e.target.value);
-                setHealthStatus('idle');
-              }}
-              onBlur={handleServerUrlBlur}
-              placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="Enter your PIN"
               required
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                marginBottom: 16,
-                border: `1px solid ${healthStatus === 'ok' ? colors.success : healthStatus === 'error' ? colors.error : colors.border}`,
+                marginBottom: 20,
+                border: `1px solid ${colors.border}`,
                 borderRadius: 8,
                 fontSize: 14,
                 background: colors.background,
                 color: colors.text,
                 boxSizing: 'border-box',
                 outline: 'none',
-                transition: 'border-color 0.2s',
               }}
             />
-            <div
-              style={{ fontSize: 11, color: colors.textTertiary, marginTop: -10, marginBottom: 16 }}
-            >
-              When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current
-              site URL is usually correct.
-            </div>
-          </>
-        ) : (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 16,
-            }}
-          >
-            <span style={{ fontSize: 12, color: colors.textTertiary }}>Server: {serverUrl}</span>
+
+            {error && (
+              <div style={{ color: colors.error, fontSize: 13, marginBottom: 16 }}>{error}</div>
+            )}
+
             <button
-              type="button"
-              onClick={() => setShowServerUrl(true)}
+              type="submit"
+              disabled={loading}
               style={{
-                background: 'none',
+                width: '100%',
+                padding: '12px 0',
+                background: loading ? colors.disabled : colors.primary,
+                color: '#fff',
                 border: 'none',
-                color: colors.textSecondary,
-                fontSize: 11,
-                cursor: 'pointer',
-                textDecoration: 'underline',
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              Change
+              {loading ? 'Connecting...' : 'Login'}
             </button>
-          </div>
+          </>
         )}
-
-        <label
-          style={{
-            display: 'block',
-            marginBottom: 6,
-            fontSize: 13,
-            color: colors.textSecondary,
-          }}
-        >
-          PIN
-        </label>
-        <input
-          type="password"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="Enter your PIN"
-          required
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            marginBottom: 20,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 8,
-            fontSize: 14,
-            background: colors.background,
-            color: colors.text,
-            boxSizing: 'border-box',
-            outline: 'none',
-          }}
-        />
-
-        {error && (
-          <div style={{ color: colors.error, fontSize: 13, marginBottom: 16 }}>{error}</div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%',
-            padding: '12px 0',
-            background: loading ? colors.disabled : colors.primary,
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {loading ? 'Connecting...' : 'Login'}
-        </button>
 
         {(!IS_DESKTOP || desktopClientMode) && (
           <button

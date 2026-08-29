@@ -546,6 +546,7 @@ name = "clawchat-core-tests"
 version = "0.1.0"
 dependencies = [
  "atomicwrites",
+ "dirs 6.0.0",
  "keyring",
  "serde",
  "serde_json",

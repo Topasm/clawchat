@@ -14,6 +14,7 @@ use crate::{
         paths::{electron_user_data_candidates, resolve_native_paths},
         server_supervisor::ServerSupervisor,
     },
+    startup_log,
 };
 
 pub struct AppState {
@@ -253,6 +254,6 @@ impl AppState {
 
 fn emit_status<R: Runtime>(app: &AppHandle<R>, status: &ServerStatus) {
     if let Err(error) = app.emit("server-status-change", status) {
-        eprintln!("[clawchat] failed to emit server status: {error}");
+        startup_log::report(&format!("[clawchat] failed to emit server status: {error}"));
     }
 }
