@@ -1,12 +1,17 @@
 import { useEffect } from 'react';
-import { useWorkspaceRuntimeStore } from '../../stores/useWorkspaceRuntimeStore';
 
 export default function WorkspaceRuntimeInitializer() {
-  const initializeRuntime = useWorkspaceRuntimeStore((state) => state.initialize);
-
   useEffect(() => {
-    void initializeRuntime();
-  }, [initializeRuntime]);
+    let disposed = false;
+
+    void import('../../stores/useWorkspaceRuntimeStore').then(({ useWorkspaceRuntimeStore }) => {
+      if (!disposed) void useWorkspaceRuntimeStore.getState().initialize();
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   return null;
 }
