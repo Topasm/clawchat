@@ -147,7 +147,14 @@ on run arguments
   tell application "System Events"
     tell process processName
       set frontmost to true
-      keystroke "," using command down
+      tell menu 1 of menu bar item 1 of menu bar 1
+        set settingsItem to first menu item whose name starts with "Settings"
+        set commandCharacter to value of attribute "AXMenuItemCmdChar" of settingsItem
+        if commandCharacter is not "," then
+          error "Settings menu does not advertise the Command-Comma shortcut."
+        end if
+        click settingsItem
+      end tell
     end tell
   end tell
 end run
