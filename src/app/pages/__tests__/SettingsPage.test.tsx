@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { changeAppLanguage } from '../../i18n';
+import { useToastStore } from '../../stores/useToastStore';
 import SettingsPage from '../SettingsPage';
 
 const apiMocks = vi.hoisted(() => ({
@@ -42,7 +44,9 @@ const providerState = {
 };
 
 describe('SettingsPage Codex provider', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await changeAppLanguage('en');
+    useToastStore.setState({ toasts: [] });
     apiMocks.get.mockReset();
     apiMocks.post.mockReset();
     apiMocks.put.mockReset();
@@ -51,6 +55,10 @@ describe('SettingsPage Codex provider', () => {
       if (path === '/obsidian/status') return Promise.resolve({ data: { vaultPath: '' } });
       return Promise.reject(new Error(`Unexpected GET ${path}`));
     });
+  });
+
+  afterEach(async () => {
+    await changeAppLanguage('en');
   });
 
   it('configures and activates Codex without echoing an existing key', async () => {
@@ -86,5 +94,38 @@ describe('SettingsPage Codex provider', () => {
     await waitFor(() => expect(input).toHaveValue(''));
     expect(screen.getByText('Using Codex API — gpt-5.3-codex')).toBeInTheDocument();
     expect(screen.getByText('Ready — gpt-5.3-codex')).toBeInTheDocument();
+  });
+
+  it('renders Codex settings and stable provider errors in Korean', async () => {
+    await changeAppLanguage('ko');
+    apiMocks.put.mockRejectedValue({
+      response: {
+        data: {
+          error: {
+            message: 'OpenAI rejected this API key.',
+            details: { reason: 'codex_authentication_failed' },
+          },
+        },
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('워크스페이스 설정')).toBeInTheDocument();
+    expect(screen.getByText('설정되지 않음 — OpenAI API 키를 추가하세요')).toBeInTheDocument();
+
+    const input = screen.getByLabelText('OpenAI API 키');
+    fireEvent.change(input, { target: { value: 'sk-user-entered-secret-key-for-codex-provider' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장 후 사용' }));
+
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+        '설정된 OpenAI API 키가 거부되었습니다.',
+      ),
+    );
   });
 });

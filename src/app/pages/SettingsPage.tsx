@@ -9,6 +9,7 @@ import SettingsSection from '../components/shared/SettingsSection';
 import { StatusDot } from '../components/shared/WorkspacePrimitives';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
 import usePlatform from '../hooks/usePlatform';
+import { useTranslation } from '../i18n';
 import { platformApi } from '../platform';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -33,32 +34,73 @@ const AI_PROVIDER_LABELS: Record<string, string> = {
   codex: 'Codex API',
 };
 
-function codexStatusLabel(provider: AIProviderState): string {
-  switch (provider.codex_api_status) {
+type Translate = (key: string, options?: Record<string, string | number>) => string;
+
+const AI_ERROR_TRANSLATIONS: Record<string, string> = {
+  invalid_provider: 'workspaceSettings.ai.errors.invalidProvider',
+  claude_not_initialized: 'workspaceSettings.ai.errors.claudeNotInitialized',
+  claude_unavailable: 'workspaceSettings.ai.errors.claudeUnavailable',
+  codex_not_initialized: 'workspaceSettings.ai.errors.codexNotInitialized',
+  codex_not_configured: 'workspaceSettings.ai.errors.codexNotConfigured',
+  codex_authentication_failed: 'workspaceSettings.ai.errors.codexAuthenticationFailed',
+  codex_unavailable: 'workspaceSettings.ai.errors.codexUnavailable',
+  codex_key_too_short: 'workspaceSettings.ai.errors.codexKeyTooShort',
+  codex_model_unavailable: 'workspaceSettings.ai.errors.codexModelUnavailable',
+  codex_key_persist_failed: 'workspaceSettings.ai.errors.codexKeyPersistFailed',
+};
+
+function providerStatusLabel(status: string, t: Translate): string {
+  switch (status) {
     case 'available':
-      return `Ready — ${provider.codex_model}`;
+      return t('workspaceSettings.ai.statusAvailable');
     case 'not_configured':
-      return 'Not configured — add an OpenAI API key';
+      return t('workspaceSettings.ai.statusNotConfigured');
     case 'authentication_failed':
-      return 'The configured API key was rejected';
+      return t('workspaceSettings.ai.statusAuthenticationFailed');
     case 'unavailable':
-      return `Unavailable — check network and access to ${provider.codex_model}`;
+      return t('workspaceSettings.ai.statusUnavailable');
+    case 'not_installed':
+      return t('workspaceSettings.ai.claudeNotInstalled');
+    case 'not_authenticated':
+      return t('workspaceSettings.ai.claudeNotAuthenticated');
     default:
-      return `Status: ${provider.codex_api_status}`;
+      return status;
   }
 }
 
-function apiErrorMessage(error: unknown, fallback: string): string {
+function codexStatusLabel(provider: AIProviderState, t: Translate): string {
+  switch (provider.codex_api_status) {
+    case 'available':
+      return t('workspaceSettings.ai.codexReady', { model: provider.codex_model });
+    case 'not_configured':
+      return t('workspaceSettings.ai.codexNotConfigured');
+    case 'authentication_failed':
+      return t('workspaceSettings.ai.codexAuthenticationFailed');
+    case 'unavailable':
+      return t('workspaceSettings.ai.codexUnavailable', { model: provider.codex_model });
+    default:
+      return t('workspaceSettings.ai.status', { status: provider.codex_api_status });
+  }
+}
+
+function apiErrorMessage(error: unknown, t: Translate, fallbackKey: string): string {
   const response = (
     error as {
-      response?: { data?: { detail?: string; error?: { message?: string } } };
+      response?: {
+        data?: {
+          error?: { details?: { reason?: string } };
+        };
+      };
     }
   )?.response;
-  return response?.data?.detail ?? response?.data?.error?.message ?? fallback;
+  const reason = response?.data?.error?.details?.reason;
+  const translationKey = reason ? AI_ERROR_TRANSLATIONS[reason] : undefined;
+  return t(translationKey ?? fallbackKey);
 }
 
 /** Settings backed by the currently connected workspace server. */
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isDesktop } = usePlatform();
   const token = useAuthStore((state) => state.token);
@@ -92,14 +134,19 @@ export default function SettingsPage() {
           { queueOfflineMutation: false },
         );
         setAiProvider(response.data);
-        addToast('success', `Switched to ${AI_PROVIDER_LABELS[provider] ?? provider}`);
+        addToast(
+          'success',
+          t('workspaceSettings.ai.switchedProvider', {
+            provider: AI_PROVIDER_LABELS[provider] ?? provider,
+          }),
+        );
       } catch (error: unknown) {
-        addToast('error', apiErrorMessage(error, 'Failed to switch provider'));
+        addToast('error', apiErrorMessage(error, t, 'workspaceSettings.ai.failedSwitch'));
       } finally {
         setAiProviderSwitching(false);
       }
     },
-    [addToast],
+    [addToast, t],
   );
 
   const handleRecheckClaudeCode = useCallback(async () => {
@@ -119,14 +166,18 @@ export default function SettingsPage() {
       );
       addToast(
         'success',
-        `Claude Code: ${response.data.status}${response.data.version ? ` (${response.data.version})` : ''}`,
+        t('workspaceSettings.ai.providerCheckResult', {
+          provider: 'Claude Code',
+          status: providerStatusLabel(response.data.status, t),
+          version: response.data.version ? ` (${response.data.version})` : '',
+        }),
       );
     } catch {
-      addToast('error', 'Failed to check Claude Code status');
+      addToast('error', t('workspaceSettings.ai.failedClaudeCheck'));
     } finally {
       setClaudeCodeChecking(false);
     }
-  }, [addToast]);
+  }, [addToast, t]);
 
   const handleRecheckCodex = useCallback(async () => {
     setCodexChecking(true);
@@ -144,17 +195,24 @@ export default function SettingsPage() {
             }
           : previous,
       );
-      addToast('success', `Codex API: ${response.data.status}`);
+      addToast(
+        'success',
+        t('workspaceSettings.ai.providerCheckResult', {
+          provider: 'Codex API',
+          status: providerStatusLabel(response.data.status, t),
+          version: '',
+        }),
+      );
     } catch {
-      addToast('error', 'Failed to check Codex API status');
+      addToast('error', t('workspaceSettings.ai.failedCodexCheck'));
     } finally {
       setCodexChecking(false);
     }
-  }, [addToast]);
+  }, [addToast, t]);
 
   const handleConfigureCodex = useCallback(async () => {
     if (!codexApiKey.trim()) {
-      addToast('error', 'Enter an OpenAI API key');
+      addToast('error', t('workspaceSettings.ai.enterApiKey'));
       return;
     }
     setCodexConfiguring(true);
@@ -166,13 +224,16 @@ export default function SettingsPage() {
       );
       setAiProvider(response.data);
       setCodexApiKey('');
-      addToast('success', `Codex API is ready with ${response.data.codex_model}`);
+      addToast(
+        'success',
+        t('workspaceSettings.ai.codexConfigured', { model: response.data.codex_model }),
+      );
     } catch (error: unknown) {
-      addToast('error', apiErrorMessage(error, 'Failed to configure Codex API'));
+      addToast('error', apiErrorMessage(error, t, 'workspaceSettings.ai.failedCodexConfigure'));
     } finally {
       setCodexConfiguring(false);
     }
-  }, [addToast, codexApiKey]);
+  }, [addToast, codexApiKey, t]);
 
   useEffect(() => {
     if (isDesktop) {
@@ -191,59 +252,62 @@ export default function SettingsPage() {
   return (
     <div className="cc-settings-page">
       <div className="cc-page-header">
-        <div className="cc-page-header__title">Workspace Settings</div>
+        <div className="cc-page-header__title">{t('workspaceSettings.title')}</div>
       </div>
 
-      <SettingsSection title="Application">
+      <SettingsSection title={t('workspaceSettings.sections.application')}>
         <SettingsRow
-          label="Application settings"
-          sublabel="Appearance, notifications, updates, and local preferences"
+          label={t('workspaceSettings.application.settings')}
+          sublabel={t('workspaceSettings.application.settingsHint')}
         >
           <button
             type="button"
             className="cc-btn cc-btn--secondary cc-btn--compact"
             onClick={() => navigate('/settings/app')}
           >
-            Open
+            {t('workspaceSettings.actions.open')}
           </button>
         </SettingsRow>
         {isDesktop && (
-          <SettingsRow label="Connections" sublabel="Local server policy and remote workspaces">
+          <SettingsRow
+            label={t('workspaceSettings.application.connections')}
+            sublabel={t('workspaceSettings.application.connectionsHint')}
+          >
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
               onClick={() => navigate('/connections')}
             >
-              Manage
+              {t('workspaceSettings.actions.manage')}
             </button>
           </SettingsRow>
         )}
       </SettingsSection>
 
-      <SettingsSection title="AI">
-        <SettingsRow label="System prompt">
+      <SettingsSection title={t('workspaceSettings.sections.ai')}>
+        <SettingsRow label={t('workspaceSettings.ai.systemPrompt')}>
           <button
             type="button"
             className="cc-btn cc-btn--secondary cc-btn--compact"
             onClick={() => navigate('/settings/system-prompt')}
           >
-            Edit
+            {t('workspaceSettings.actions.edit')}
           </button>
         </SettingsRow>
         {aiProvider && (
           <>
             <SettingsRow
-              label="AI Provider"
+              label={t('workspaceSettings.ai.provider')}
               sublabel={
                 aiProvider.active_provider === 'claude_code'
-                  ? 'Using Claude Code CLI'
+                  ? t('workspaceSettings.ai.usingClaudeCode')
                   : aiProvider.active_provider === 'codex'
-                    ? `Using Codex API — ${aiProvider.codex_model}`
-                    : 'Using OpenClaw gateway'
+                    ? t('workspaceSettings.ai.usingCodex', { model: aiProvider.codex_model })
+                    : t('workspaceSettings.ai.usingOpenClaw')
               }
             >
               <SegmentedControl
-                ariaLabel="AI provider"
+                ariaLabel={t('workspaceSettings.ai.providerAria')}
                 options={[
                   { label: 'OpenClaw', value: 'openclaw' },
                   { label: 'Claude Code', value: 'claude_code' },
@@ -253,7 +317,10 @@ export default function SettingsPage() {
                 onChange={(provider) => !aiProviderSwitching && void handleSwitchProvider(provider)}
               />
             </SettingsRow>
-            <SettingsRow label="Codex API" sublabel={codexStatusLabel(aiProvider)}>
+            <SettingsRow
+              label={t('workspaceSettings.ai.codexApi')}
+              sublabel={codexStatusLabel(aiProvider, t)}
+            >
               <div className="cc-settings-inline-actions">
                 <StatusDot
                   className="cc-settings-status-dot"
@@ -265,20 +332,22 @@ export default function SettingsPage() {
                   onClick={() => void handleRecheckCodex()}
                   disabled={codexChecking || !aiProvider.codex_api_configured}
                 >
-                  {codexChecking ? 'Checking...' : 'Recheck'}
+                  {codexChecking
+                    ? t('workspaceSettings.actions.checking')
+                    : t('workspaceSettings.actions.recheck')}
                 </button>
               </div>
             </SettingsRow>
             <SettingsRow
-              label="OpenAI API key"
+              label={t('workspaceSettings.ai.openaiApiKey')}
               sublabel={
                 aiProvider.codex_api_configured
                   ? aiProvider.codex_api_key_persistent
-                    ? 'Stored for this workspace; enter a new key only to replace it'
-                    : 'Configured by the environment or for the current server session'
+                    ? t('workspaceSettings.ai.keyStored')
+                    : t('workspaceSettings.ai.keyEnvironment')
                   : aiProvider.codex_api_key_persistent
-                    ? 'Validated before it is stored in the local app data folder'
-                    : 'Validated for this server session; use CODEX_API_KEY to persist it'
+                    ? t('workspaceSettings.ai.keyWillPersist')
+                    : t('workspaceSettings.ai.keySessionOnly')
               }
             >
               <div className="cc-settings-inline-actions">
@@ -287,10 +356,14 @@ export default function SettingsPage() {
                   type="password"
                   value={codexApiKey}
                   onChange={(event) => setCodexApiKey(event.target.value)}
-                  placeholder={aiProvider.codex_api_configured ? 'Configured' : 'sk-...'}
+                  placeholder={
+                    aiProvider.codex_api_configured
+                      ? t('workspaceSettings.ai.configuredPlaceholder')
+                      : 'sk-...'
+                  }
                   autoComplete="off"
                   spellCheck={false}
-                  aria-label="OpenAI API key"
+                  aria-label={t('workspaceSettings.ai.apiKeyAria')}
                 />
                 <button
                   type="button"
@@ -298,20 +371,28 @@ export default function SettingsPage() {
                   onClick={() => void handleConfigureCodex()}
                   disabled={codexConfiguring || !codexApiKey.trim()}
                 >
-                  {codexConfiguring ? 'Validating...' : 'Save & Use'}
+                  {codexConfiguring
+                    ? t('workspaceSettings.actions.validating')
+                    : t('workspaceSettings.actions.saveUse')}
                 </button>
               </div>
             </SettingsRow>
             <SettingsRow
-              label="Claude Code CLI"
+              label={t('workspaceSettings.ai.claudeCodeCli')}
               sublabel={
                 aiProvider.claude_code_status === 'available'
-                  ? `Installed${aiProvider.claude_code_version ? ` — ${aiProvider.claude_code_version}` : ''}`
+                  ? t('workspaceSettings.ai.claudeInstalled', {
+                      version: aiProvider.claude_code_version
+                        ? ` — ${aiProvider.claude_code_version}`
+                        : '',
+                    })
                   : aiProvider.claude_code_status === 'not_installed'
-                    ? 'Not installed'
+                    ? t('workspaceSettings.ai.claudeNotInstalled')
                     : aiProvider.claude_code_status === 'not_authenticated'
-                      ? 'Not authenticated — run `claude login`'
-                      : `Status: ${aiProvider.claude_code_status}`
+                      ? t('workspaceSettings.ai.claudeNotAuthenticated')
+                      : t('workspaceSettings.ai.status', {
+                          status: aiProvider.claude_code_status,
+                        })
               }
             >
               <div className="cc-settings-inline-actions">
@@ -325,7 +406,9 @@ export default function SettingsPage() {
                   onClick={() => void handleRecheckClaudeCode()}
                   disabled={claudeCodeChecking}
                 >
-                  {claudeCodeChecking ? 'Checking...' : 'Recheck'}
+                  {claudeCodeChecking
+                    ? t('workspaceSettings.actions.checking')
+                    : t('workspaceSettings.actions.recheck')}
                 </button>
               </div>
             </SettingsRow>
@@ -333,32 +416,38 @@ export default function SettingsPage() {
         )}
       </SettingsSection>
 
-      <SettingsSection title="Workspace">
-        <SettingsRow label="Calendar view" sublabel="Optional planning view">
+      <SettingsSection title={t('workspaceSettings.sections.workspace')}>
+        <SettingsRow
+          label={t('workspaceSettings.workspace.calendarView')}
+          sublabel={t('workspaceSettings.workspace.calendarViewHint')}
+        >
           <button
             type="button"
             className="cc-btn cc-btn--secondary cc-btn--compact"
             onClick={() => navigate('/calendar')}
           >
-            Open
+            {t('workspaceSettings.actions.open')}
           </button>
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Import / Export">
+      <SettingsSection title={t('workspaceSettings.sections.importExport')}>
         <SettingsRow
-          label="Export all data"
-          sublabel="Download todos, events, and conversations as JSON"
+          label={t('workspaceSettings.importExport.exportAll')}
+          sublabel={t('workspaceSettings.importExport.exportHint')}
         >
           <button
             type="button"
             className="cc-btn cc-btn--secondary cc-btn--compact"
             onClick={handleExport}
           >
-            Export
+            {t('workspaceSettings.actions.export')}
           </button>
         </SettingsRow>
-        <SettingsRow label="Import data" sublabel="Restore from a previously exported JSON file">
+        <SettingsRow
+          label={t('workspaceSettings.importExport.importData')}
+          sublabel={t('workspaceSettings.importExport.importHint')}
+        >
           <input
             ref={fileInputRef}
             type="file"
@@ -371,7 +460,7 @@ export default function SettingsPage() {
             className="cc-btn cc-btn--secondary cc-btn--compact"
             onClick={() => fileInputRef.current?.click()}
           >
-            Import
+            {t('workspaceSettings.actions.import')}
           </button>
         </SettingsRow>
       </SettingsSection>
@@ -380,8 +469,11 @@ export default function SettingsPage() {
       <ObsidianStatusCard />
 
       {isDesktop && isHost && (
-        <SettingsSection title="Obsidian Desktop">
-          <SettingsRow label="Vault path" sublabel={obsidianVaultPath || 'Not configured'}>
+        <SettingsSection title={t('workspaceSettings.sections.obsidianDesktop')}>
+          <SettingsRow
+            label={t('workspaceSettings.obsidianDesktop.vaultPath')}
+            sublabel={obsidianVaultPath || t('workspaceSettings.obsidianDesktop.notConfigured')}
+          >
             <div className="cc-settings-inline-actions">
               <button
                 type="button"
@@ -391,10 +483,10 @@ export default function SettingsPage() {
                   if (!folder) return;
                   setObsidianVaultPath(folder);
                   await platformApi.server.updateConfig({ obsidianVaultPath: folder });
-                  addToast('success', 'Vault path saved. Restarting server...');
+                  addToast('success', t('workspaceSettings.obsidianDesktop.vaultSaved'));
                 }}
               >
-                Browse
+                {t('workspaceSettings.actions.browse')}
               </button>
               {obsidianVaultPath && (
                 <button
@@ -403,33 +495,44 @@ export default function SettingsPage() {
                   onClick={async () => {
                     setObsidianVaultPath('');
                     await platformApi.server.updateConfig({ obsidianVaultPath: '' });
-                    addToast('success', 'Vault path cleared.');
+                    addToast('success', t('workspaceSettings.obsidianDesktop.vaultCleared'));
                   }}
                 >
-                  Clear
+                  {t('workspaceSettings.actions.clear')}
                 </button>
               )}
             </div>
           </SettingsRow>
-          <SettingsRow label="Open in Obsidian" sublabel="Launch Obsidian to view your vault">
+          <SettingsRow
+            label={t('workspaceSettings.obsidianDesktop.openInObsidian')}
+            sublabel={t('workspaceSettings.obsidianDesktop.openHint')}
+          >
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
               disabled={!obsidianVaultPath}
               onClick={() => openObsidianVault(obsidianVaultPath)}
             >
-              Open
+              {t('workspaceSettings.actions.open')}
             </button>
           </SettingsRow>
         </SettingsSection>
       )}
 
       {!isDesktop && (
-        <SettingsSection title="Server Connection">
-          <SettingsRow label="Server" sublabel={serverUrl ?? 'Unknown'}>
-            <span className="cc-settings-status cc-settings-status--success">Connected</span>
+        <SettingsSection title={t('workspaceSettings.sections.serverConnection')}>
+          <SettingsRow
+            label={t('workspaceSettings.serverConnection.server')}
+            sublabel={serverUrl ?? t('workspaceSettings.serverConnection.unknown')}
+          >
+            <span className="cc-settings-status cc-settings-status--success">
+              {t('connection.connected')}
+            </span>
           </SettingsRow>
-          <SettingsRow label="Logout" sublabel="Disconnect from server">
+          <SettingsRow
+            label={t('workspaceSettings.serverConnection.logout')}
+            sublabel={t('workspaceSettings.serverConnection.logoutHint')}
+          >
             <button
               type="button"
               className="cc-btn cc-btn--danger"
@@ -438,14 +541,14 @@ export default function SettingsPage() {
                 navigate('/login');
               }}
             >
-              Logout
+              {t('workspaceSettings.actions.logout')}
             </button>
           </SettingsRow>
         </SettingsSection>
       )}
 
       {isDesktop && isHost && token && (
-        <SettingsSection title="Connect Mobile Device">
+        <SettingsSection title={t('workspaceSettings.sections.connectMobile')}>
           <PairingCodeDisplay />
         </SettingsSection>
       )}

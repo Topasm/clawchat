@@ -352,13 +352,17 @@ async def switch_ai_provider(
     if body.provider not in ("openclaw", "claude_code", "codex"):
         raise ValidationError(
             f"Invalid provider: {body.provider}. "
-            "Use 'openclaw', 'claude_code', or 'codex'."
+            "Use 'openclaw', 'claude_code', or 'codex'.",
+            details={"reason": "invalid_provider"},
         )
 
     if body.provider == "claude_code":
         claude_code = getattr(request.app.state, "claude_code", None)
         if not claude_code:
-            raise ValidationError("Claude Code provider not initialized.")
+            raise ValidationError(
+                "Claude Code provider not initialized.",
+                details={"reason": "claude_not_initialized"},
+            )
         # Re-check availability
         from services.ai.claude_code_provider import ClaudeCodeStatus
         status, version = await claude_code.check_availability()
@@ -367,7 +371,11 @@ async def switch_ai_provider(
         if status != ClaudeCodeStatus.AVAILABLE:
             raise ValidationError(
                 f"Claude Code is not available (status: {status.value}). "
-                "Make sure it's installed and authenticated."
+                "Make sure it's installed and authenticated.",
+                details={
+                    "reason": "claude_unavailable",
+                    "provider_status": status.value,
+                },
             )
         request.app.state.active_ai = claude_code
         request.app.state.active_ai_provider = "claude_code"
@@ -375,17 +383,23 @@ async def switch_ai_provider(
     elif body.provider == "codex":
         codex_api = getattr(request.app.state, "codex_api", None)
         if not codex_api:
-            raise ValidationError("Codex API provider not initialized.")
+            raise ValidationError(
+                "Codex API provider not initialized.",
+                details={"reason": "codex_not_initialized"},
+            )
         status = await codex_api.check_availability()
         request.app.state.codex_api_status = status.value
         if status != CodexAPIStatus.AVAILABLE:
             if status == CodexAPIStatus.NOT_CONFIGURED:
                 message = "Configure an OpenAI API key before using Codex."
+                reason = "codex_not_configured"
             elif status == CodexAPIStatus.AUTHENTICATION_FAILED:
                 message = "The configured OpenAI API key was rejected."
+                reason = "codex_authentication_failed"
             else:
                 message = "The Codex API or configured model is unavailable."
-            raise ValidationError(message)
+                reason = "codex_unavailable"
+            raise ValidationError(message, details={"reason": reason})
         request.app.state.active_ai = codex_api
         request.app.state.active_ai_provider = "codex"
         logger.info("Switched active AI provider to Codex API (%s)", codex_api.model)
@@ -406,11 +420,17 @@ async def configure_codex_api(
     """Validate, securely persist when possible, and activate a Codex API key."""
     codex_api = getattr(request.app.state, "codex_api", None)
     if not codex_api:
-        raise ValidationError("Codex API provider not initialized.")
+        raise ValidationError(
+            "Codex API provider not initialized.",
+            details={"reason": "codex_not_initialized"},
+        )
 
     api_key = body.api_key.get_secret_value().strip()
     if len(api_key) < 32:
-        raise ValidationError("OpenAI API key is empty or too short.")
+        raise ValidationError(
+            "OpenAI API key is empty or too short.",
+            details={"reason": "codex_key_too_short"},
+        )
 
     previous_key = codex_api.api_key
     previous_status = getattr(
@@ -422,9 +442,13 @@ async def configure_codex_api(
         codex_api.set_api_key(previous_key)
         request.app.state.codex_api_status = previous_status
         if status == CodexAPIStatus.AUTHENTICATION_FAILED:
-            raise ValidationError("OpenAI rejected this API key.")
+            raise ValidationError(
+                "OpenAI rejected this API key.",
+                details={"reason": "codex_authentication_failed"},
+            )
         raise ValidationError(
-            "Could not access the configured Codex model. Check the network and model access."
+            "Could not access the configured Codex model. Check the network and model access.",
+            details={"reason": "codex_model_unavailable"},
         )
 
     if settings.codex_api_key_file:
@@ -434,7 +458,10 @@ async def configure_codex_api(
             codex_api.set_api_key(previous_key)
             request.app.state.codex_api_status = previous_status
             logger.exception("Could not persist the Codex API key")
-            raise ValidationError("Could not securely save the OpenAI API key.")
+            raise ValidationError(
+                "Could not securely save the OpenAI API key.",
+                details={"reason": "codex_key_persist_failed"},
+            )
 
     settings.codex_api_key = api_key
     request.app.state.codex_api_status = CodexAPIStatus.AVAILABLE.value
@@ -456,7 +483,10 @@ async def recheck_codex_api(
     """Re-check OpenAI credentials and access to the configured Codex model."""
     codex_api = getattr(request.app.state, "codex_api", None)
     if not codex_api:
-        raise ValidationError("Codex API provider not initialized.")
+        raise ValidationError(
+            "Codex API provider not initialized.",
+            details={"reason": "codex_not_initialized"},
+        )
     status = await codex_api.check_availability()
     request.app.state.codex_api_status = status.value
     return CodexAPIStatusResponse(

@@ -5,6 +5,7 @@ import {
   useRevokeCalendarSubscription,
   type CalendarSubscriptionSecret,
 } from '../../hooks/queries/useCalendarSubscriptionQueries';
+import { useTranslation } from '../../i18n';
 import { useToastStore } from '../../stores/useToastStore';
 import SettingsRow from './SettingsRow';
 
@@ -16,6 +17,7 @@ import SettingsRow from './SettingsRow';
  * hash and this card can report that a subscription exists, but not what it is.
  */
 export default function CalendarSubscriptionCard() {
+  const { t, i18n } = useTranslation();
   const addToast = useToastStore((s) => s.addToast);
   const { data: subscription, isLoading } = useCalendarSubscriptionQuery();
   const createMutation = useCreateCalendarSubscription();
@@ -27,9 +29,9 @@ export default function CalendarSubscriptionCard() {
   const copy = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      addToast('success', 'Copied');
+      addToast('success', t('workspaceSettings.calendarSubscription.copied'));
     } catch {
-      addToast('error', 'Could not copy — select the URL and copy it manually');
+      addToast('error', t('workspaceSettings.calendarSubscription.copyFailed'));
     }
   };
 
@@ -45,18 +47,22 @@ export default function CalendarSubscriptionCard() {
 
   return (
     <div className="cc-settings-section">
-      <div className="cc-settings-section__title">Calendar subscription</div>
+      <div className="cc-settings-section__title">
+        {t('workspaceSettings.calendarSubscription.title')}
+      </div>
 
       <SettingsRow
-        label="Subscribe from another calendar"
+        label={t('workspaceSettings.calendarSubscription.subscribe')}
         sublabel={
           isLoading
-            ? 'Checking…'
+            ? t('workspaceSettings.calendarSubscription.checking')
             : active
               ? subscription?.last_used_at
-                ? `Active — last fetched ${new Date(subscription.last_used_at).toLocaleString()}`
-                : 'Active — not fetched yet'
-              : 'No subscription URL yet'
+                ? t('workspaceSettings.calendarSubscription.activeLastFetched', {
+                    date: new Date(subscription.last_used_at).toLocaleString(i18n.language),
+                  })
+                : t('workspaceSettings.calendarSubscription.activeNotFetched')
+              : t('workspaceSettings.calendarSubscription.noUrl')
         }
       >
         <div className="cc-settings-inline-actions">
@@ -66,7 +72,11 @@ export default function CalendarSubscriptionCard() {
             disabled={busy}
             onClick={issue}
           >
-            {createMutation.isPending ? 'Working…' : active ? 'Replace URL' : 'Create URL'}
+            {createMutation.isPending
+              ? t('workspaceSettings.actions.working')
+              : active
+                ? t('workspaceSettings.actions.replaceUrl')
+                : t('workspaceSettings.actions.createUrl')}
           </button>
           {active && (
             <button
@@ -75,7 +85,9 @@ export default function CalendarSubscriptionCard() {
               disabled={busy}
               onClick={revoke}
             >
-              {revokeMutation.isPending ? 'Revoking…' : 'Revoke'}
+              {revokeMutation.isPending
+                ? t('workspaceSettings.actions.revoking')
+                : t('workspaceSettings.actions.revoke')}
             </button>
           )}
         </div>
@@ -84,8 +96,8 @@ export default function CalendarSubscriptionCard() {
       {issued && (
         <>
           <SettingsRow
-            label="Subscription URL"
-            sublabel="Anyone with this link can read your whole calendar. It is shown only now — copy it before leaving this page."
+            label={t('workspaceSettings.calendarSubscription.subscriptionUrl')}
+            sublabel={t('workspaceSettings.calendarSubscription.subscriptionWarning')}
           >
             <div className="cc-settings-inline-actions">
               <input className="cc-settings-input" readOnly value={issued.url} />
@@ -94,13 +106,13 @@ export default function CalendarSubscriptionCard() {
                 className="cc-btn cc-btn--secondary cc-btn--compact"
                 onClick={() => copy(issued.url)}
               >
-                Copy
+                {t('workspaceSettings.actions.copy')}
               </button>
             </div>
           </SettingsRow>
           <SettingsRow
-            label="webcal link"
-            sublabel="Apple Calendar and Outlook subscribe from this form instead of downloading a one-off copy."
+            label={t('workspaceSettings.calendarSubscription.webcalLink')}
+            sublabel={t('workspaceSettings.calendarSubscription.webcalHint')}
           >
             <div className="cc-settings-inline-actions">
               <input className="cc-settings-input" readOnly value={issued.webcal_url} />
@@ -109,7 +121,7 @@ export default function CalendarSubscriptionCard() {
                 className="cc-btn cc-btn--secondary cc-btn--compact"
                 onClick={() => copy(issued.webcal_url)}
               >
-                Copy
+                {t('workspaceSettings.actions.copy')}
               </button>
             </div>
           </SettingsRow>
@@ -118,9 +130,7 @@ export default function CalendarSubscriptionCard() {
 
       {active && !issued && (
         <div className="cc-settings-hint">
-          The existing URL cannot be shown again — the server keeps only a hash of it. Replacing it
-          issues a new one and stops the old link working immediately, so any calendar already
-          subscribed will need the new URL.
+          {t('workspaceSettings.calendarSubscription.existingUrlHint')}
         </div>
       )}
     </div>

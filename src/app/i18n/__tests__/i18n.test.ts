@@ -25,6 +25,9 @@ describe('i18n', () => {
 
     expect(i18n.t('nav.today')).toBe('오늘');
     expect(i18n.t('connection.pending', { count: 3 })).toBe('대기 중인 작업 3개');
+    expect(i18n.t('workspaceSettings.ai.errors.codexAuthenticationFailed')).toBe(
+      '설정된 OpenAI API 키가 거부되었습니다.',
+    );
     expect(document.documentElement.lang).toBe('ko');
   });
 });

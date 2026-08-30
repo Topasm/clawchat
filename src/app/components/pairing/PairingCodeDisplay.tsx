@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { useTranslation } from '../../i18n';
 import apiClient from '../../services/apiClient';
 import { CheckCircleIcon } from '../shared/Icons';
 
@@ -13,6 +14,7 @@ import type { PairingSession } from '../../types/connection';
 type DisplayState = 'loading' | 'active' | 'paired' | 'error';
 
 export default function PairingCodeDisplay({ onPaired, compact = false }: PairingCodeDisplayProps) {
+  const { t } = useTranslation();
   const [session, setSession] = useState<PairingSession | null>(null);
   const [state, setState] = useState<DisplayState>('loading');
   const [error, setError] = useState('');
@@ -87,11 +89,11 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
           // Polling error, keep trying
         }
       }, 3000);
-    } catch (err) {
+    } catch {
       setState('error');
-      setError(err instanceof Error ? err.message : 'Failed to generate pairing code');
+      setError(t('workspaceSettings.pairing.generateFailed'));
     }
-  }, [clearTimers, onPaired]);
+  }, [clearTimers, onPaired, t]);
 
   useEffect(() => {
     generateCode();
@@ -111,7 +113,7 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
       >
         <div className="cc-pairing-code-display__loading">
           <div className="cc-pairing-code-display__spinner" />
-          <span>Generating pairing code...</span>
+          <span>{t('workspaceSettings.pairing.generating')}</span>
         </div>
       </div>
     );
@@ -130,7 +132,7 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
             onClick={generateCode}
             style={{ fontSize: 12, padding: '4px 10px' }}
           >
-            Retry
+            {t('workspaceSettings.actions.retry')}
           </button>
         </div>
       </div>
@@ -144,9 +146,11 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
       >
         <div className="cc-pairing-code-display__success">
           <CheckCircleIcon size={48} style={{ color: 'var(--cc-success)' }} />
-          <span className="cc-pairing-code-display__success-text">Paired!</span>
+          <span className="cc-pairing-code-display__success-text">
+            {t('workspaceSettings.pairing.paired')}
+          </span>
           <span className="cc-pairing-code-display__success-sub">
-            Device successfully connected
+            {t('workspaceSettings.pairing.connected')}
           </span>
         </div>
       </div>
@@ -157,9 +161,11 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
     <div className={`cc-pairing-code-display ${compact ? 'cc-pairing-code-display--compact' : ''}`}>
       {!compact && (
         <div className="cc-pairing-code-display__header">
-          <span className="cc-pairing-code-display__title">Pair a Mobile Device</span>
+          <span className="cc-pairing-code-display__title">
+            {t('workspaceSettings.pairing.title')}
+          </span>
           <span className="cc-pairing-code-display__subtitle">
-            Scan the QR code with the ClawChat mobile app, or enter the code manually
+            {t('workspaceSettings.pairing.subtitle')}
           </span>
         </div>
       )}
@@ -183,10 +189,12 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
             <span
               className={secondsLeft <= 30 ? 'cc-pairing-code-display__countdown--warning' : ''}
             >
-              Expires in {formatTime(secondsLeft)}
+              {t('workspaceSettings.pairing.expiresIn', { time: formatTime(secondsLeft) })}
             </span>
           ) : (
-            <span className="cc-pairing-code-display__countdown--expired">Refreshing...</span>
+            <span className="cc-pairing-code-display__countdown--expired">
+              {t('workspaceSettings.pairing.refreshing')}
+            </span>
           )}
         </div>
       </div>
@@ -197,7 +205,7 @@ export default function PairingCodeDisplay({ onPaired, compact = false }: Pairin
         onClick={generateCode}
         style={{ fontSize: 12, padding: '4px 10px' }}
       >
-        Generate new code
+        {t('workspaceSettings.actions.generateNewCode')}
       </button>
     </div>
   );

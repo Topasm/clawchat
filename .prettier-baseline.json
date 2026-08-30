@@ -25,7 +25,6 @@
     "src/app/components/shared/CommandPalette.tsx": "5e03d946c0b80c0cc494da189e5bf8003497d4a3f4ae54c75d0d1f13117e5290",
     "src/app/components/shared/EventCard.tsx": "7ed769a0e19477da82aa01e6863fa133efefc4a918a86949d9a68dc0add1b321",
     "src/app/components/shared/FileDropZone.tsx": "890fd77be5c8bad4e7f84297421558a2c321417eb656560ba8741b0100ef2e06",
-    "src/app/components/shared/ObsidianStatusCard.tsx": "8d77032c1f1976033644d2513ed6e00937a85cae7c25f20910de257b24b911b3",
     "src/app/components/shared/SectionHeader.tsx": "9bcd7a8f52766aa7a5d08edaeb6d4a7d6baa57f0117db2c6cc321f7a7ca3f618",
     "src/app/components/shared/SegmentedControl.tsx": "8c91d1f15a81b7f05f0039fe6a39928705bb666a38f7b65cc7ff8c8ad07fa647",
     "src/app/components/shared/ShortcutsHelp.tsx": "534dc34f24ac5f41bfdb7dec30d496e3064ead54f1273db0bfb2d811db718a8c",

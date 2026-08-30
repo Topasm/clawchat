@@ -165,5 +165,6 @@ async def test_rejected_codex_key_does_not_replace_current_credential(
 
     assert response.status_code == 400
     assert response.json()["error"]["message"] == "OpenAI rejected this API key."
+    assert response.json()["error"]["details"]["reason"] == "codex_authentication_failed"
     assert ai_provider_state.api_key == original_key
     assert not key_path.exists()
