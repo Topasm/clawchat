@@ -152,14 +152,14 @@ test('keeps web, mobile, and tray branding synchronized with platform-safe asset
     assert.ok(coverage >= 0.1 && coverage <= 0.65, `${relativePath} alpha coverage is ${coverage}`);
   }
 
-  const nativeSource = fs.readFileSync(
-    path.join(repositoryRoot, 'src-tauri', 'src', 'native.rs'),
+  const nativeTraySource = fs.readFileSync(
+    path.join(repositoryRoot, 'src-tauri', 'src', 'native', 'tray.rs'),
     'utf8',
   );
-  assert.match(nativeSource, /include_image!\("\.\/icons\/tray-template-macos\.png"\)/);
-  assert.match(nativeSource, /include_image!\("\.\/icons\/tray-color\.png"\)/);
-  assert.match(nativeSource, /\.icon_as_template\(cfg!\(target_os = "macos"\)\)/);
-  assert.doesNotMatch(nativeSource, /default_window_icon/);
+  assert.match(nativeTraySource, /include_image!\("\.\.\/icons\/tray-template-macos\.png"\)/);
+  assert.match(nativeTraySource, /include_image!\("\.\.\/icons\/tray-color\.png"\)/);
+  assert.match(nativeTraySource, /\.icon_as_template\(cfg!\(target_os = "macos"\)\)/);
+  assert.doesNotMatch(nativeTraySource, /default_window_icon/);
 
   const androidBackground = fs.readFileSync(
     path.join(repositoryRoot, 'android/app/src/main/res/drawable/ic_launcher_background.xml'),

@@ -405,6 +405,24 @@
           "markdownDescription": "Enables the server_get_status command without any pre-configured scope."
         },
         {
+          "description": "Enables the server_issue_local_session command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-server-issue-local-session",
+          "markdownDescription": "Enables the server_issue_local_session command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the server_open_data_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-server-open-data-folder",
+          "markdownDescription": "Enables the server_open_data_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the server_open_log_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-server-open-log-folder",
+          "markdownDescription": "Enables the server_open_log_folder command without any pre-configured scope."
+        },
+        {
           "description": "Enables the server_open_obsidian_vault command without any pre-configured scope.",
           "type": "string",
           "const": "allow-server-open-obsidian-vault",
@@ -505,6 +523,24 @@
           "type": "string",
           "const": "deny-server-get-status",
           "markdownDescription": "Denies the server_get_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the server_issue_local_session command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-server-issue-local-session",
+          "markdownDescription": "Denies the server_issue_local_session command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the server_open_data_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-server-open-data-folder",
+          "markdownDescription": "Denies the server_open_data_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the server_open_log_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-server-open-log-folder",
+          "markdownDescription": "Denies the server_open_log_folder command without any pre-configured scope."
         },
         {
           "description": "Denies the server_open_obsidian_vault command without any pre-configured scope.",

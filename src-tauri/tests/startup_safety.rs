@@ -1,5 +1,10 @@
 const LIB_SOURCE: &str = include_str!("../src/lib.rs");
 const NATIVE_SOURCE: &str = include_str!("../src/native.rs");
+const NATIVE_COMMAND_SOURCE: &str = include_str!("../src/native/command.rs");
+const NATIVE_MENU_SOURCE: &str = include_str!("../src/native/menu.rs");
+const NATIVE_SHORTCUT_SOURCE: &str = include_str!("../src/native/shortcuts.rs");
+const NATIVE_TRAY_SOURCE: &str = include_str!("../src/native/tray.rs");
+const NATIVE_WINDOW_SOURCE: &str = include_str!("../src/native/window.rs");
 const APP_COMMAND_SOURCE: &str = include_str!("../src/commands/app.rs");
 const SERVER_COMMAND_SOURCE: &str = include_str!("../src/commands/server.rs");
 
@@ -7,29 +12,29 @@ const SERVER_COMMAND_SOURCE: &str = include_str!("../src/commands/server.rs");
 fn optional_native_integrations_do_not_fail_application_setup() {
     assert!(!LIB_SOURCE.contains("tauri_plugin_global_shortcut::Builder"));
     assert!(!LIB_SOURCE.contains("tauri_plugin_autostart::init"));
-    assert!(NATIVE_SOURCE.contains("if let Err(error) = setup_tray(app)"));
-    assert!(!NATIVE_SOURCE.contains("setup_tray(app)?"));
-    assert!(NATIVE_SOURCE.contains("match app.plugin(global_shortcut_plugin)"));
+    assert!(NATIVE_SOURCE.contains("if let Err(error) = tray::setup(app)"));
+    assert!(!NATIVE_SOURCE.contains("tray::setup(app)?"));
+    assert!(NATIVE_SHORTCUT_SOURCE.contains("match app.plugin(global_shortcut_plugin)"));
     assert!(NATIVE_SOURCE.contains("match app.plugin(autostart_plugin)"));
 }
 
 #[test]
 fn tray_uses_platform_specific_assets_without_reusing_the_app_icon() {
-    assert!(NATIVE_SOURCE.contains("./icons/tray-template-macos.png"));
-    assert!(NATIVE_SOURCE.contains("./icons/tray-color.png"));
-    assert!(NATIVE_SOURCE.contains(".icon_as_template(cfg!(target_os = \"macos\"))"));
-    assert!(!NATIVE_SOURCE.contains("default_window_icon()"));
+    assert!(NATIVE_TRAY_SOURCE.contains("../icons/tray-template-macos.png"));
+    assert!(NATIVE_TRAY_SOURCE.contains("../icons/tray-color.png"));
+    assert!(NATIVE_TRAY_SOURCE.contains(".icon_as_template(cfg!(target_os = \"macos\"))"));
+    assert!(!NATIVE_TRAY_SOURCE.contains("default_window_icon()"));
 }
 
 #[test]
 fn quick_capture_is_registered_only_after_the_plugin_initializes() {
-    let plugin_success = NATIVE_SOURCE
+    let plugin_success = NATIVE_SHORTCUT_SOURCE
         .find("match app.plugin(global_shortcut_plugin)")
         .expect("dynamic global shortcut plugin registration must remain in setup");
-    let shortcut_registration = NATIVE_SOURCE
+    let shortcut_registration = NATIVE_SHORTCUT_SOURCE
         .find("app.global_shortcut().register(QUICK_CAPTURE_SHORTCUT)")
         .expect("quick capture shortcut registration must remain in setup");
-    let plugin_failure = NATIVE_SOURCE
+    let plugin_failure = NATIVE_SHORTCUT_SOURCE
         .find("global shortcut plugin is unavailable")
         .expect("plugin initialization failures must be logged");
 
@@ -90,14 +95,15 @@ fn unix_termination_signals_exit_through_the_tauri_lifecycle() {
 
 #[test]
 fn every_native_restore_path_reports_window_failures() {
-    assert!(NATIVE_SOURCE
-        .contains("pub fn show_main_window(app: &tauri::AppHandle) -> Result<(), String>"));
-    assert!(NATIVE_SOURCE.contains("failed to unminimize"));
-    assert!(NATIVE_SOURCE.contains("failed to show"));
-    assert!(NATIVE_SOURCE.contains("failed to focus"));
-    assert!(NATIVE_SOURCE.contains("pub fn restore_main_window"));
+    assert!(NATIVE_WINDOW_SOURCE
+        .contains("pub fn show_main_window(app: &AppHandle) -> Result<(), String>"));
+    assert!(NATIVE_WINDOW_SOURCE.contains("failed to unminimize"));
+    assert!(NATIVE_WINDOW_SOURCE.contains("failed to show"));
+    assert!(NATIVE_WINDOW_SOURCE.contains("failed to focus"));
+    assert!(NATIVE_WINDOW_SOURCE.contains("pub fn restore_main_window"));
     assert!(LIB_SOURCE.contains("restore_main_window(app, \"second instance\")"));
-    assert!(NATIVE_SOURCE.contains("restore_main_window(tray.app_handle(), \"tray icon\")"));
+    assert!(NATIVE_TRAY_SOURCE.contains("NativeCommand::ShowMain"));
+    assert!(NATIVE_TRAY_SOURCE.contains("\"tray icon\""));
 }
 
 #[test]
@@ -110,12 +116,14 @@ fn macos_reopen_and_close_share_the_observable_restore_lifecycle() {
 
 #[test]
 fn macos_menu_and_tray_expose_recovery_safe_application_commands() {
-    assert!(NATIVE_SOURCE.contains("fn setup_app_menu"));
-    assert!(NATIVE_SOURCE.contains("\"Settings…\""));
-    assert!(NATIVE_SOURCE.contains("Some(\"CmdOrCtrl+Comma\")"));
-    assert!(NATIVE_SOURCE.contains("\"Quick Capture\""));
-    assert!(NATIVE_SOURCE.contains("\"Connections & Diagnostics…\""));
-    assert!(NATIVE_SOURCE.contains("app.emit(\"open-settings\", ())"));
-    assert!(NATIVE_SOURCE.contains("navigate_main_window(app, \"/diagnostics\""));
-    assert!(NATIVE_SOURCE.contains("\"settings\" => open_settings(app, \"tray Settings\")"));
+    assert!(NATIVE_SOURCE.contains("menu::setup(app)"));
+    assert!(NATIVE_MENU_SOURCE.contains("\"Settings…\""));
+    assert!(NATIVE_MENU_SOURCE.contains("Some(\"CmdOrCtrl+Comma\")"));
+    assert!(NATIVE_MENU_SOURCE.contains("\"Quick Capture\""));
+    assert!(NATIVE_MENU_SOURCE.contains("\"Connections & Diagnostics…\""));
+    assert!(NATIVE_COMMAND_SOURCE.contains("app.emit(\"open-settings\", ())"));
+    assert!(NATIVE_COMMAND_SOURCE.contains("navigate(app, \"/diagnostics\", source)"));
+    assert!(NATIVE_COMMAND_SOURCE.contains("pub(super) enum AppMenuCommand"));
+    assert!(NATIVE_COMMAND_SOURCE.contains("pub(super) enum TrayMenuCommand"));
+    assert!(NATIVE_TRAY_SOURCE.contains("TrayMenuCommand::Settings"));
 }
