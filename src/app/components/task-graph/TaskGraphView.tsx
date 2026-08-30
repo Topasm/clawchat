@@ -17,7 +17,7 @@ import type { TaskFlowNode } from './taskGraphTypes';
 import TaskGraphNode from './TaskGraphNode';
 import { GraphIcon } from '../shared/Icons';
 import { loadTaskGraphLayout, updateTaskGraphLayout } from './taskGraphPersistence';
-
+import { translateUi } from '../../i18n';
 interface TaskGraphViewProps {
   nodes: TaskFlowNode[];
   edges: Edge[];
@@ -26,9 +26,7 @@ interface TaskGraphViewProps {
   onSelectTask: (taskId: string | null) => void;
   persistenceScope?: string;
 }
-
 const nodeTypes = { task: TaskGraphNode };
-
 function TaskGraphCanvas({
   nodes: sourceNodes,
   edges,
@@ -50,7 +48,6 @@ function TaskGraphCanvas({
     [savedLayout, sourceNodes],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<TaskFlowNode>(initialNodes);
-
   useEffect(() => {
     setNodes((currentNodes) => {
       if (!persistenceScope) return sourceNodes;
@@ -61,11 +58,9 @@ function TaskGraphCanvas({
       }));
     });
   }, [persistenceScope, savedLayout, setNodes, sourceNodes]);
-
   const handleNodeClick: NodeMouseHandler<TaskFlowNode> = (_event, node) => {
     onSelectTask(node.id);
   };
-
   const handleNodeDragStop: OnNodeDrag<TaskFlowNode> = (_event, node) => {
     if (!persistenceScope) return;
     const positions = Object.fromEntries(
@@ -76,16 +71,13 @@ function TaskGraphCanvas({
     );
     updateTaskGraphLayout(persistenceScope, { positions });
   };
-
   const handleMoveEnd = (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
     if (persistenceScope) updateTaskGraphLayout(persistenceScope, { viewport });
   };
-
   const displayedNodes = useMemo(
     () => nodes.map((node) => ({ ...node, selected: node.id === selectedTaskId })),
     [nodes, selectedTaskId],
   );
-
   return (
     <ReactFlow<TaskFlowNode>
       nodes={displayedNodes}
@@ -110,7 +102,7 @@ function TaskGraphCanvas({
       fitView={!savedLayout?.viewport}
       fitViewOptions={{ padding: isMobile ? 0.14 : 0.2, maxZoom: 1 }}
       proOptions={{ hideAttribution: false }}
-      aria-label="Task relationship graph"
+      aria-label={translateUi('Task relationship graph')}
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
       <Controls showInteractive={false} position="bottom-right" />
@@ -139,18 +131,16 @@ function TaskGraphCanvas({
     </ReactFlow>
   );
 }
-
 export default function TaskGraphView(props: TaskGraphViewProps) {
   if (props.nodes.length === 0) {
     return (
       <div className="cc-task-flow__empty">
         <GraphIcon size={48} />
-        <strong>No tasks to map</strong>
-        <span>Create a task or clear the active filters to build your graph.</span>
+        <strong>{translateUi('No tasks to map')}</strong>
+        <span>{translateUi('Create a task or clear the active filters to build your graph.')}</span>
       </div>
     );
   }
-
   return (
     <div className="cc-task-flow__canvas">
       <ReactFlowProvider>

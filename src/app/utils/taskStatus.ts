@@ -1,4 +1,5 @@
 import type { TaskStatus } from '../types/api';
+import { translateUi } from '../i18n';
 
 /** Completed and cancelled tasks no longer participate in active-work views. */
 export function isTerminalTaskStatus(status: TaskStatus): boolean {
@@ -8,12 +9,12 @@ export function isTerminalTaskStatus(status: TaskStatus): boolean {
 export function getTaskStatusLabel(status: TaskStatus): string {
   switch (status) {
     case 'pending':
-      return 'Todo';
+      return translateUi('Todo');
     case 'in_progress':
-      return 'In Progress';
+      return translateUi('In Progress');
     case 'completed':
-      return 'Done';
+      return translateUi('Done');
     case 'cancelled':
-      return 'Cancelled';
+      return translateUi('Cancelled');
   }
 }

@@ -2,28 +2,24 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { logger } from '../../services/logger';
 import { redactSensitiveText } from '../../services/sensitiveData';
 import { hideStartupShell } from '../../services/startupSurface';
-
+import { translateUi } from '../../i18n';
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
   name?: string;
 }
-
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
-
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
-
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
-
   componentDidCatch(error: Error, info: ErrorInfo): void {
     hideStartupShell();
     const label = this.props.name ?? 'Unknown';
@@ -31,38 +27,33 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       componentStack: info.componentStack ?? '',
     });
   }
-
   handleReset = (): void => {
     this.setState({ hasError: false, error: null });
   };
-
   render(): ReactNode {
     if (!this.state.hasError) {
       return this.props.children;
     }
-
     if (this.props.fallback) {
       return this.props.fallback;
     }
-
     const errorMessage =
       import.meta.env.DEV && this.state.error
         ? redactSensitiveText(this.state.error.message)
         : 'An unexpected error occurred. Try again or restart the app.';
-
     return (
       <div className="cc-error-boundary">
         <div className="cc-error-boundary__icon" aria-hidden="true">
           !
         </div>
-        <h2 className="cc-error-boundary__title">Something went wrong</h2>
+        <h2 className="cc-error-boundary__title">{translateUi('Something went wrong')}</h2>
         <p className="cc-error-boundary__message">{errorMessage}</p>
         <button
           type="button"
           className="cc-btn cc-btn--primary cc-error-boundary__btn"
           onClick={this.handleReset}
         >
-          Try again
+          {translateUi('\n          Try again\n        ')}
         </button>
       </div>
     );

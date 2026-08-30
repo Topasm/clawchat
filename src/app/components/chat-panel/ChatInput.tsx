@@ -3,7 +3,7 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import useVoiceInput from '../../hooks/useVoiceInput';
 import { CheckIcon, CloseIcon, MicrophoneIcon, SendIcon, StopIcon } from '../shared/Icons';
-
+import { translateUi } from '../../i18n';
 interface ChatInputProps {
   onSend: (text: string) => void;
   isStreaming: boolean;
@@ -13,7 +13,6 @@ interface ChatInputProps {
   editingText?: string;
   onCancelEdit?: () => void;
 }
-
 export default function ChatInput({
   onSend,
   isStreaming,
@@ -28,8 +27,13 @@ export default function ChatInput({
   const sendOnEnter = useSettingsStore((s) => s.sendOnEnter);
   const healthOK = useAuthStore((s) => s.healthOK);
   const isEditing = !!editingMessageId;
-  const { isListening, transcript, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput();
-
+  const {
+    isListening,
+    transcript,
+    isSupported: voiceSupported,
+    startListening,
+    stopListening,
+  } = useVoiceInput();
   // Append voice transcript to text when available
   useEffect(() => {
     if (transcript) {
@@ -41,7 +45,6 @@ export default function ChatInput({
       }
     }
   }, [transcript]);
-
   // Pre-fill textarea when entering edit mode
   useEffect(() => {
     if (editingMessageId && editingText != null) {
@@ -54,7 +57,6 @@ export default function ChatInput({
       }
     }
   }, [editingMessageId, editingText]);
-
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -64,7 +66,6 @@ export default function ChatInput({
       textareaRef.current.style.height = 'auto';
     }
   }, [text, onSend]);
-
   const handleCancel = useCallback(() => {
     setText('');
     if (textareaRef.current) {
@@ -72,7 +73,6 @@ export default function ChatInput({
     }
     onCancelEdit?.();
   }, [onCancelEdit]);
-
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isEditing && e.key === 'Escape') {
       e.preventDefault();
@@ -89,7 +89,6 @@ export default function ChatInput({
       handleSend();
     }
   };
-
   const handleInput = () => {
     const ta = textareaRef.current;
     if (ta) {
@@ -97,16 +96,18 @@ export default function ChatInput({
       ta.style.height = Math.min(ta.scrollHeight, 96) + 'px';
     }
   };
-
   return (
     <div className={`cc-chat-input${isEditing ? ' cc-chat-input--editing' : ''}`}>
       <textarea
         ref={textareaRef}
         className="cc-chat-input__textarea"
         value={text}
-        onChange={(e) => { setText(e.target.value); handleInput(); }}
+        onChange={(e) => {
+          setText(e.target.value);
+          handleInput();
+        }}
         onKeyDown={handleKeyDown}
-        placeholder={isEditing ? 'Edit message...' : placeholder}
+        placeholder={isEditing ? translateUi('Edit message...') : placeholder}
         rows={1}
       />
       {isStreaming ? (
@@ -114,8 +115,8 @@ export default function ChatInput({
           type="button"
           className="cc-chat-input__btn cc-chat-input__btn--stop"
           onClick={onStop}
-          title="Stop"
-          aria-label="Stop response"
+          title={translateUi('Stop')}
+          aria-label={translateUi('Stop response')}
         >
           <StopIcon size={14} />
         </button>
@@ -126,8 +127,8 @@ export default function ChatInput({
               type="button"
               className="cc-chat-input__cancel-btn"
               onClick={handleCancel}
-              title="Cancel edit"
-              aria-label="Cancel edit"
+              title={translateUi('Cancel edit')}
+              aria-label={translateUi('Cancel edit')}
             >
               <CloseIcon size={14} />
             </button>
@@ -137,8 +138,10 @@ export default function ChatInput({
               type="button"
               className={`cc-chat-input__btn cc-chat-input__btn--mic${isListening ? ' cc-chat-input__btn--active' : ''}`}
               onClick={isListening ? stopListening : startListening}
-              title={isListening ? 'Stop listening' : 'Voice input'}
-              aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
+              title={isListening ? translateUi('Stop listening') : translateUi('Voice input')}
+              aria-label={
+                isListening ? translateUi('Stop voice input') : translateUi('Start voice input')
+              }
             >
               <MicrophoneIcon size={16} />
             </button>
@@ -148,14 +151,18 @@ export default function ChatInput({
             className="cc-chat-input__btn cc-chat-input__btn--send"
             onClick={handleSend}
             disabled={!text.trim()}
-            title={!healthOK ? 'Server status uncertain — try sending anyway' : isEditing ? 'Save edit' : 'Send'}
-            aria-label={isEditing ? 'Save edited message' : 'Send message'}
+            title={
+              !healthOK
+                ? translateUi('Server status uncertain \u2014 try sending anyway')
+                : isEditing
+                  ? translateUi('Save edit')
+                  : translateUi('Send')
+            }
+            aria-label={
+              isEditing ? translateUi('Save edited message') : translateUi('Send message')
+            }
           >
-            {isEditing ? (
-              <CheckIcon size={16} />
-            ) : (
-              <SendIcon size={16} />
-            )}
+            {isEditing ? <CheckIcon size={16} /> : <SendIcon size={16} />}
           </button>
         </>
       )}

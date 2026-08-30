@@ -10,9 +10,8 @@ import {
 } from '../../types/schemas';
 import type { AgentRunResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
-
+import { translateUi } from '../../i18n';
 const ACTIVE = new Set(['queued', 'starting', 'running']);
-
 export function useAgentRunsQuery(projectId?: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
@@ -26,11 +25,10 @@ export function useAgentRunsQuery(projectId?: string | null) {
     enabled: !!serverUrl,
     refetchInterval: (query) => {
       const runs = query.state.data as AgentRunResponse[] | undefined;
-      return runs?.some((run) => ACTIVE.has(run.status)) ? 3_000 : false;
+      return runs?.some((run) => ACTIVE.has(run.status)) ? 3000 : false;
     },
   });
 }
-
 export function useAgentRunEventsQuery(runId: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
@@ -42,7 +40,6 @@ export function useAgentRunEventsQuery(runId: string | null) {
     enabled: !!serverUrl && !!runId,
   });
 }
-
 function invalidateRuns(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: queryKeys.runs });
   queryClient.invalidateQueries({ queryKey: queryKeys.projects });
@@ -51,7 +48,6 @@ function invalidateRuns(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: queryKeys.todos });
   queryClient.invalidateQueries({ queryKey: queryKeys.taskGraphInsights });
 }
-
 export function useCancelAgentRun() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -61,12 +57,12 @@ export function useCancelAgentRun() {
     },
     onSuccess: () => {
       invalidateRuns(queryClient);
-      useToastStore.getState().addToast('success', 'Agent run cancelled');
+      useToastStore.getState().addToast('success', translateUi('Agent run cancelled'));
     },
-    onError: () => useToastStore.getState().addToast('error', 'Could not cancel agent run'),
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Could not cancel agent run')),
   });
 }
-
 export function useRetryAgentRun() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -78,12 +74,12 @@ export function useRetryAgentRun() {
     },
     onSuccess: () => {
       invalidateRuns(queryClient);
-      useToastStore.getState().addToast('success', 'New agent attempt started');
+      useToastStore.getState().addToast('success', translateUi('New agent attempt started'));
     },
-    onError: () => useToastStore.getState().addToast('error', 'Could not retry agent run'),
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Could not retry agent run')),
   });
 }
-
 export function useReturnAgentRunToReady() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -97,14 +93,17 @@ export function useReturnAgentRunToReady() {
         .getState()
         .addToast(
           'success',
-          result.is_ready ? 'Task returned to Ready' : 'Task returned to the queue · Blocked',
+          translateUi(
+            result.is_ready ? 'Task returned to Ready' : 'Task returned to the queue · Blocked',
+          ),
         );
     },
     onError: () =>
-      useToastStore.getState().addToast('error', 'Could not return task to the execution queue'),
+      useToastStore
+        .getState()
+        .addToast('error', translateUi('Could not return task to the execution queue')),
   });
 }
-
 export function useResumeAgentRun() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -116,8 +115,9 @@ export function useResumeAgentRun() {
     },
     onSuccess: () => {
       invalidateRuns(queryClient);
-      useToastStore.getState().addToast('success', 'Agent run resumed');
+      useToastStore.getState().addToast('success', translateUi('Agent run resumed'));
     },
-    onError: () => useToastStore.getState().addToast('error', 'Could not resume agent run'),
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Could not resume agent run')),
   });
 }

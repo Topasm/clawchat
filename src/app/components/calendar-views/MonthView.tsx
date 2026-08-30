@@ -8,7 +8,7 @@ import {
   isSameDay,
 } from '../../utils/calendarUtils';
 import EventPill from './EventPill';
-
+import { translateUi } from '../../i18n';
 interface MonthViewProps {
   year: number;
   month: number;
@@ -17,7 +17,6 @@ interface MonthViewProps {
   onDayClick: (date: Date) => void;
   onEventClick: (ev: EventResponse, e: React.MouseEvent) => void;
 }
-
 export default function MonthView({
   year,
   month,
@@ -27,13 +26,14 @@ export default function MonthView({
   onEventClick,
 }: MonthViewProps) {
   const grid = useMemo(() => getMonthGrid(year, month), [year, month]);
-
   return (
     <div className="cc-calendar__month">
       {/* Day-of-week headers */}
       <div className="cc-calendar__dow-row">
         {DAY_NAMES.map((name) => (
-          <div key={name} className="cc-calendar__dow">{name}</div>
+          <div key={name} className="cc-calendar__dow">
+            {name}
+          </div>
         ))}
       </div>
 
@@ -45,18 +45,14 @@ export default function MonthView({
           const isCurrentMonth = date.getMonth() === month;
           const isToday = isSameDay(date, today);
           const overflow = dayEvents.length - MAX_VISIBLE_PILLS;
-
           let cellClass = 'cc-calendar__cell';
           if (!isCurrentMonth) cellClass += ' cc-calendar__cell--other-month';
           if (isToday) cellClass += ' cc-calendar__cell--today';
-
           return (
-            <div
-              key={idx}
-              className={cellClass}
-              onClick={() => onDayClick(date)}
-            >
-              <span className={`cc-calendar__day-number${isToday ? ' cc-calendar__day-number--today' : ''}`}>
+            <div key={idx} className={cellClass} onClick={() => onDayClick(date)}>
+              <span
+                className={`cc-calendar__day-number${isToday ? ' cc-calendar__day-number--today' : ''}`}
+              >
                 {date.getDate()}
               </span>
               <div className="cc-calendar__cell-events">
@@ -64,7 +60,10 @@ export default function MonthView({
                   <EventPill key={ev.id} event={ev} onClick={(e) => onEventClick(ev, e)} />
                 ))}
                 {overflow > 0 && (
-                  <span className="cc-calendar__more">+{overflow} more</span>
+                  <span className="cc-calendar__more">
+                    +{overflow}
+                    {translateUi(' more')}
+                  </span>
                 )}
               </div>
             </div>

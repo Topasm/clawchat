@@ -21,12 +21,11 @@ import type {
 } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
-
+import { translateUi } from '../../i18n';
 export interface GeneratePlanProposalVariables {
   todoId: string;
   instructions?: string;
 }
-
 export interface ApplyPlanProposalVariables {
   todoId: string;
   proposalId: string;
@@ -34,25 +33,21 @@ export interface ApplyPlanProposalVariables {
   selectedIndices?: number[];
   subtasks?: PlanSubtask[];
 }
-
 export interface DismissPlanProposalVariables {
   todoId: string;
   proposalId: string;
 }
-
 export interface PlanProposalMutationError {
   status?: number;
   code?: string;
   message: string;
   staleDetails?: StalePlanProposalDetails;
 }
-
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object'
     ? (value as Record<string, unknown>)
     : undefined;
 }
-
 /** Normalize both ClawChat and FastAPI error envelopes for inline proposal feedback. */
 export function getPlanProposalMutationError(error: unknown): PlanProposalMutationError {
   const errorRecord = asRecord(error);
@@ -62,7 +57,6 @@ export function getPlanProposalMutationError(error: unknown): PlanProposalMutati
   const errorEnvelope = asRecord(data?.error);
   const code = typeof errorEnvelope?.code === 'string' ? errorEnvelope.code : undefined;
   const staleDetailsResult = StalePlanProposalDetailsSchema.safeParse(errorEnvelope?.details);
-
   let message =
     typeof errorEnvelope?.message === 'string'
       ? errorEnvelope.message
@@ -71,12 +65,10 @@ export function getPlanProposalMutationError(error: unknown): PlanProposalMutati
         : typeof errorRecord?.message === 'string'
           ? errorRecord.message
           : 'The plan request failed';
-
   if (Array.isArray(data?.detail)) {
     const firstDetail = asRecord(data.detail[0]);
     if (typeof firstDetail?.msg === 'string') message = firstDetail.msg;
   }
-
   return {
     status,
     code,
@@ -84,12 +76,10 @@ export function getPlanProposalMutationError(error: unknown): PlanProposalMutati
     staleDetails: staleDetailsResult.success ? staleDetailsResult.data : undefined,
   };
 }
-
 export function isStalePlanProposalError(error: unknown): boolean {
   const normalized = getPlanProposalMutationError(error);
   return normalized.status === 409 && normalized.code === 'STALE_PLAN_PROPOSAL';
 }
-
 async function invalidatePlanData(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.planProposals }),
@@ -101,17 +91,14 @@ async function invalidatePlanData(queryClient: QueryClient): Promise<void> {
     invalidateTaskDerivedQueries(queryClient),
   ]);
 }
-
 async function revertPlanChangeSet(changeSetId: string): Promise<PlanUndoResponse> {
   const response = await apiClient.post(`/change-sets/${changeSetId}/revert`, undefined, {
     queueOfflineMutation: false,
   });
   return PlanUndoResponseSchema.parse(response.data);
 }
-
 export function useLatestPlanProposalQuery(todoId?: string, enabled = true) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
-
   return useQuery({
     queryKey: queryKeys.latestPlanProposal(todoId ?? ''),
     queryFn: async (): Promise<PlanProposalResponse> => {
@@ -122,10 +109,8 @@ export function useLatestPlanProposalQuery(todoId?: string, enabled = true) {
     retry: false,
   });
 }
-
 export function useGeneratePlanProposal() {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({
       todoId,
@@ -147,16 +132,15 @@ export function useGeneratePlanProposal() {
         .getState()
         .addToast(
           'error',
-          getPlanProposalMutationError(error).message || 'AI could not generate a task plan',
+          getPlanProposalMutationError(error).message ||
+            translateUi('AI could not generate a task plan'),
         );
     },
     onSettled: () => invalidatePlanData(queryClient),
   });
 }
-
 export function useApplyPlanProposal() {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({
       todoId,
@@ -181,13 +165,13 @@ export function useApplyPlanProposal() {
       useToastStore.getState().addToast(
         'success',
         result.already_applied
-          ? 'This proposal was already applied'
-          : `Created ${created} task${created === 1 ? '' : 's'}`,
+          ? translateUi('This proposal was already applied')
+          : translateUi('Created {{count}} tasks', { count: created }),
         result.can_undo
           ? {
-              duration: 10_000,
+              duration: 10000,
               action: {
-                label: 'Undo',
+                label: translateUi('Undo'),
                 onClick: () => {
                   void (async () => {
                     try {
@@ -198,8 +182,8 @@ export function useApplyPlanProposal() {
                         .addToast(
                           'success',
                           undoResult.already_reverted
-                            ? 'Plan was already undone'
-                            : 'Plan changes undone',
+                            ? translateUi('Plan was already undone')
+                            : translateUi('Plan changes undone'),
                         );
                     } catch (error) {
                       useToastStore
@@ -220,10 +204,8 @@ export function useApplyPlanProposal() {
     onSettled: () => invalidatePlanData(queryClient),
   });
 }
-
 export function useDismissPlanProposal() {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async ({ todoId, proposalId }: DismissPlanProposalVariables) => {
       const body = PlanDismissRequestSchema.parse({ proposal_id: proposalId });
@@ -238,10 +220,8 @@ export function useDismissPlanProposal() {
     onSettled: () => invalidatePlanData(queryClient),
   });
 }
-
 export function useRevertPlanChangeSet() {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: revertPlanChangeSet,
     onSuccess: (result) => {
@@ -249,7 +229,7 @@ export function useRevertPlanChangeSet() {
         .getState()
         .addToast(
           'success',
-          result.already_reverted ? 'Plan was already undone' : 'Plan changes undone',
+          translateUi(result.already_reverted ? 'Plan was already undone' : 'Plan changes undone'),
         );
     },
     onError: (error) => {

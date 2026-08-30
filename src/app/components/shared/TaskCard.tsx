@@ -5,7 +5,7 @@ import { getDependsOnCountBySource } from '../../utils/taskRelationships';
 import Checkbox from './Checkbox';
 import Badge from './Badge';
 import { RepeatIcon } from './Icons';
-
+import { translateUi } from '../../i18n';
 const EMPTY_RELATIONSHIPS = [] as const;
 const SKILL_BADGE_LABELS: Record<string, string> = {
   plan: 'Plan',
@@ -17,7 +17,6 @@ const SKILL_BADGE_LABELS: Record<string, string> = {
   obsidian_sync: 'Sync',
   prioritize: 'Priority',
 };
-
 interface TaskCardProps {
   task: TodoResponse;
   onToggle: () => void;
@@ -28,7 +27,6 @@ interface TaskCardProps {
   subTaskCount?: number;
   isCompletedOverride?: boolean;
 }
-
 export default function TaskCard({
   task,
   onToggle,
@@ -43,11 +41,13 @@ export default function TaskCard({
   const { data: relationships } = useTaskRelationshipsQuery();
   const dependencyCount =
     getDependsOnCountBySource(relationships ?? EMPTY_RELATIONSHIPS).get(task.id) ?? 0;
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       if (!onDelete) return;
@@ -57,7 +57,6 @@ export default function TaskCard({
     },
     [onDelete],
   );
-
   const handleTouchStart = useCallback(() => {
     if (!onDelete) return;
     longPressTimer.current = setTimeout(() => {
@@ -65,14 +64,12 @@ export default function TaskCard({
       setMenu({ x: -1, y: -1 }); // -1 signals centered menu on mobile
     }, 500);
   }, [onDelete]);
-
   const handleTouchEnd = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
   }, []);
-
   // Close menu on outside click
   useEffect(() => {
     if (!menu) return;
@@ -82,19 +79,16 @@ export default function TaskCard({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [menu]);
-
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setMenu(null);
     setConfirmDelete(true);
   };
-
   const handleConfirmDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     setConfirmDelete(false);
     onDelete?.();
   };
-
   return (
     <>
       <div
@@ -126,14 +120,14 @@ export default function TaskCard({
                   verticalAlign: 'middle',
                 }}
               >
-                OB
+                {translateUi('\n                OB\n              ')}
               </span>
             )}
           </div>
           <div className="cc-card__meta">
             {task.is_recurring && (
               <span
-                title="Recurring"
+                title={translateUi('Recurring')}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -193,25 +187,29 @@ export default function TaskCard({
                 }}
               >
                 {task.assignee === 'openclaw'
-                  ? 'AI'
+                  ? translateUi('AI')
                   : task.assignee === 'planner'
-                    ? 'Plan'
+                    ? translateUi('Plan')
                     : task.assignee === 'researcher'
-                      ? 'Research'
-                      : 'Exec'}
+                      ? translateUi('Research')
+                      : translateUi('Exec')}
               </span>
             ) : null}
             {dependencyCount > 0 && (
               <span
                 className="cc-badge cc-badge--blocker"
-                title={`Depends on ${dependencyCount} task(s)`}
+                title={translateUi('Depends on {{count}} tasks', { count: dependencyCount })}
               >
-                {dependencyCount} dep{dependencyCount !== 1 ? 's' : ''}
+                {dependencyCount}
+                {translateUi(' dep')}
+                {dependencyCount !== 1 ? 's' : ''}
               </span>
             )}
             {(subTaskCount ?? 0) > 0 && (
               <span className="cc-badge cc-badge--count">
-                {subTaskCount} sub-task{subTaskCount !== 1 ? 's' : ''}
+                {subTaskCount}
+                {translateUi(' sub-task')}
+                {subTaskCount !== 1 ? 's' : ''}
               </span>
             )}
           </div>
@@ -239,7 +237,7 @@ export default function TaskCard({
             className="cc-context-menu__item cc-context-menu__item--danger"
             onClick={handleDeleteClick}
           >
-            Delete
+            {translateUi('\n            Delete\n          ')}
           </button>
         </div>
       )}
@@ -254,8 +252,12 @@ export default function TaskCard({
           }}
         >
           <div className="cc-modal cc-modal--sm" onClick={(e) => e.stopPropagation()}>
-            <div className="cc-dialog__title">Delete Task</div>
-            <p className="cc-dialog__description">Delete "{task.title}"? This cannot be undone.</p>
+            <div className="cc-dialog__title">{translateUi('Delete Task')}</div>
+            <p className="cc-dialog__description">
+              {translateUi('Delete "')}
+              {task.title}
+              {translateUi('"? This cannot be undone.')}
+            </p>
             <div className="cc-dialog__actions">
               <button
                 className="cc-btn cc-btn--secondary"
@@ -264,10 +266,10 @@ export default function TaskCard({
                   setConfirmDelete(false);
                 }}
               >
-                Cancel
+                {translateUi('\n                Cancel\n              ')}
               </button>
               <button className="cc-btn cc-btn--danger" onClick={handleConfirmDelete}>
-                Delete
+                {translateUi('\n                Delete\n              ')}
               </button>
             </div>
           </div>

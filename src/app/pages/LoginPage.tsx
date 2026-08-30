@@ -4,7 +4,6 @@ import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
 import { IS_DESKTOP } from '../types/platform';
 import { relayClient } from '../services/relayClient';
-
 interface PairingClaimResult {
   device_token: string;
   api_base_url?: string;
@@ -24,9 +23,8 @@ import {
 import type { ServerStatus } from '../platform';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { verifyClawChatHealth } from '../services/workspaceHealth';
-
+import { translateUi } from '../i18n';
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'error';
-
 /**
  * Turn a dead-end host handshake into something a user can act on.
  *
@@ -55,7 +53,6 @@ export function describeHostBlock(
   }
   return reasons.join(' ');
 }
-
 const HOST_PHASE_HEADINGS: Record<HostSessionPhase, string> = {
   idle: 'Sign in',
   checking: 'Preparing ClawChat',
@@ -64,7 +61,6 @@ const HOST_PHASE_HEADINGS: Record<HostSessionPhase, string> = {
   connected: 'Workspace ready',
   blocked: 'ClawChat could not open its local workspace',
 };
-
 const HOST_PHASE_DETAILS: Record<HostSessionPhase, string> = {
   idle: '',
   checking: 'Checking the private workspace stored on this device.',
@@ -74,7 +70,6 @@ const HOST_PHASE_DETAILS: Record<HostSessionPhase, string> = {
   connected: 'Taking you to your workspace.',
   blocked: '',
 };
-
 export default function LoginPage() {
   const { colors } = useTheme();
   const login = useAuthStore((s) => s.login);
@@ -83,7 +78,6 @@ export default function LoginPage() {
   const profiles = useWorkspaceStore((state) => state.profiles);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
   const upsertRemote = useWorkspaceStore((state) => state.upsertRemote);
-
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -94,7 +88,6 @@ export default function LoginPage() {
   const [desktopClientMode, setDesktopClientMode] = useState(false);
   const [switchingToHost, setSwitchingToHost] = useState(false);
   const [showManualLogin, setShowManualLogin] = useState(false);
-
   // The host handshake is owned by the store so that reading it here cannot
   // start a second auto-login alongside the router's.
   const hostPhase = useHostSessionStore((s) => s.phase);
@@ -102,7 +95,6 @@ export default function LoginPage() {
   const hostFailure = useHostSessionStore((s) => s.failure);
   const isHostMode = useHostSessionStore((s) => s.isHostMode);
   const retryHostStartup = useHostSessionStore((s) => s.retryHostStartup);
-
   /**
    * A desktop host install must never be met by a bare PIN form: the server
    * it would authenticate against may not even be running, and nothing on
@@ -112,7 +104,6 @@ export default function LoginPage() {
     IS_DESKTOP && !desktopClientMode && (isHostMode || hostPhase === 'checking');
   const showCredentialFields = !hostPanelActive || showManualLogin;
   const startupLog = describeStartupLogLocation();
-
   /**
    * Reveal the manual fallback pointed at the local server.
    *
@@ -125,7 +116,6 @@ export default function LoginPage() {
     setShowManualLogin(next);
     if (next && hostStatus) setServerUrl(`http://localhost:${hostStatus.port}`);
   };
-
   // A remote workspace selection controls what the renderer connects to. It
   // does not control whether this computer continues hosting in the tray.
   useEffect(() => {
@@ -138,7 +128,6 @@ export default function LoginPage() {
       if (activeProfile.serverUrl) setServerUrl(activeProfile.serverUrl);
     }
   }, [activeWorkspaceId, profiles]);
-
   /**
    * Switch the desktop app to hosting its own server and log straight in.
    *
@@ -165,7 +154,6 @@ export default function LoginPage() {
     setError(reason);
     setSwitchingToHost(false);
   };
-
   const handleQRScan = async (data: string) => {
     setShowScanner(false);
     try {
@@ -216,7 +204,11 @@ export default function LoginPage() {
               body: claimBody,
             });
             if (relayResponse.status >= 400) {
-              const detail = (relayResponse.data as { detail?: string } | null)?.detail;
+              const detail = (
+                relayResponse.data as {
+                  detail?: string;
+                } | null
+              )?.detail;
               throw new Error(detail || 'Pairing failed through relay', { cause: directError });
             }
             result = relayResponse.data as PairingClaimResult;
@@ -264,10 +256,9 @@ export default function LoginPage() {
         }
       }
     } catch {
-      setError('Invalid QR code');
+      setError(translateUi('Invalid QR code'));
     }
   };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -297,7 +288,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
   const checkHealth = useCallback(async () => {
     const url = serverUrl.replace(/\/+$/, '');
     if (!url) {
@@ -313,38 +303,35 @@ export default function LoginPage() {
       setHealthStatus('error');
     }
   }, [activeWorkspaceId, profiles, serverUrl]);
-
   const handleServerUrlBlur = () => {
     if (serverUrl.trim()) {
       checkHealth();
     }
   };
-
   const healthIndicator = () => {
     switch (healthStatus) {
       case 'checking':
         return (
           <span style={{ fontSize: 12, color: colors.textTertiary, marginLeft: 8 }}>
-            checking...
+            {translateUi('\n            checking...\n          ')}
           </span>
         );
       case 'ok':
         return (
           <span style={{ fontSize: 12, color: colors.success, marginLeft: 8 }}>
-            Server reachable
+            {translateUi('\n            Server reachable\n          ')}
           </span>
         );
       case 'error':
         return (
           <span style={{ fontSize: 12, color: colors.error, marginLeft: 8 }}>
-            Server unreachable
+            {translateUi('\n            Server unreachable\n          ')}
           </span>
         );
       default:
         return null;
     }
   };
-
   return (
     <div
       style={{
@@ -376,12 +363,12 @@ export default function LoginPage() {
           }}
         >
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: colors.primary }}>
-            ClawChat
+            {translateUi('\n            ClawChat\n          ')}
           </h1>
           {IS_DESKTOP && (
             <button
               type="button"
-              aria-label="Open connections"
+              aria-label={translateUi('Open connections')}
               onClick={() => navigate('/connections')}
               style={{
                 padding: '6px 9px',
@@ -393,7 +380,7 @@ export default function LoginPage() {
                 fontSize: 12,
               }}
             >
-              Connections
+              {translateUi('\n              Connections\n            ')}
             </button>
           )}
         </div>
@@ -422,8 +409,9 @@ export default function LoginPage() {
                     marginBottom: 10,
                   }}
                 >
-                  Your tasks and calendar stay on this device. ClawChat could not prepare that local
-                  workspace yet.
+                  {translateUi(
+                    '\n                  Your tasks and calendar stay on this device. ClawChat could not prepare that local\n                  workspace yet.\n                ',
+                  )}
                 </div>
                 <div
                   data-testid="host-startup-reason"
@@ -451,8 +439,10 @@ export default function LoginPage() {
                     marginBottom: 12,
                   }}
                 >
-                  Startup records are kept in {startupLog.startupLog}, and the server's own output
-                  in {startupLog.serverLog}.
+                  {translateUi('\n                  Startup records are kept in ')}
+                  {startupLog.startupLog}
+                  {translateUi(", and the server's own output\n                  in ")}
+                  {startupLog.serverLog}.
                 </div>
                 <button
                   type="button"
@@ -469,7 +459,9 @@ export default function LoginPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Try opening the workspace again
+                  {translateUi(
+                    '\n                  Try opening the workspace again\n                ',
+                  )}
                 </button>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
@@ -486,7 +478,7 @@ export default function LoginPage() {
                       fontSize: 11,
                     }}
                   >
-                    Connect elsewhere
+                    {translateUi('\n                    Connect elsewhere\n                  ')}
                   </button>
                   <button
                     type="button"
@@ -502,7 +494,7 @@ export default function LoginPage() {
                       fontSize: 11,
                     }}
                   >
-                    Diagnostics
+                    {translateUi('\n                    Diagnostics\n                  ')}
                   </button>
                 </div>
               </>
@@ -527,8 +519,8 @@ export default function LoginPage() {
               }}
             >
               {showManualLogin
-                ? 'Hide manual sign-in'
-                : 'If this keeps happening, sign in manually'}
+                ? translateUi('Hide manual sign-in')
+                : translateUi('If this keeps happening, sign in manually')}
             </button>
           </div>
         )}
@@ -544,7 +536,7 @@ export default function LoginPage() {
             }}
           >
             <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 6 }}>
-              Use this computer
+              {translateUi('\n              Use this computer\n            ')}
             </div>
             <div
               style={{
@@ -554,8 +546,9 @@ export default function LoginPage() {
                 marginBottom: 14,
               }}
             >
-              Keep tasks and calendar on this device. No server address, pairing, account, or PIN is
-              required.
+              {translateUi(
+                '\n              Keep tasks and calendar on this device. No server address, pairing, account, or PIN is\n              required.\n            ',
+              )}
             </div>
             <button
               type="button"
@@ -574,7 +567,9 @@ export default function LoginPage() {
                 opacity: switchingToHost ? 0.7 : 1,
               }}
             >
-              {switchingToHost ? 'Preparing local workspace…' : 'Use local workspace'}
+              {switchingToHost
+                ? translateUi('Preparing local workspace\u2026')
+                : translateUi('Use local workspace')}
             </button>
           </div>
         )}
@@ -592,7 +587,7 @@ export default function LoginPage() {
                     color: colors.textSecondary,
                   }}
                 >
-                  Server URL
+                  {translateUi('\n                  Server URL\n                  ')}
                   {healthIndicator()}
                 </label>
                 <input
@@ -627,8 +622,9 @@ export default function LoginPage() {
                     marginBottom: 16,
                   }}
                 >
-                  When ClawChat is opened through a reverse proxy or tunnel, leaving this as the
-                  current site URL is usually correct.
+                  {translateUi(
+                    '\n                  When ClawChat is opened through a reverse proxy or tunnel, leaving this as the\n                  current site URL is usually correct.\n                ',
+                  )}
                 </div>
               </>
             ) : (
@@ -641,7 +637,8 @@ export default function LoginPage() {
                 }}
               >
                 <span style={{ fontSize: 12, color: colors.textTertiary }}>
-                  Server: {serverUrl}
+                  {translateUi('\n                  Server: ')}
+                  {serverUrl}
                 </span>
                 <button
                   type="button"
@@ -655,7 +652,7 @@ export default function LoginPage() {
                     textDecoration: 'underline',
                   }}
                 >
-                  Change
+                  {translateUi('\n                  Change\n                ')}
                 </button>
               </div>
             )}
@@ -668,13 +665,13 @@ export default function LoginPage() {
                 color: colors.textSecondary,
               }}
             >
-              PIN
+              {translateUi('\n              PIN\n            ')}
             </label>
             <input
               type="password"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              placeholder="Enter your PIN"
+              placeholder={translateUi('Enter your PIN')}
               required
               style={{
                 width: '100%',
@@ -709,7 +706,7 @@ export default function LoginPage() {
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              {loading ? 'Connecting...' : 'Login'}
+              {loading ? translateUi('Connecting...') : translateUi('Login')}
             </button>
           </>
         )}
@@ -731,7 +728,7 @@ export default function LoginPage() {
               cursor: 'pointer',
             }}
           >
-            Scan QR Code
+            {translateUi('\n            Scan QR Code\n          ')}
           </button>
         )}
       </form>

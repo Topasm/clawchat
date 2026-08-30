@@ -9,7 +9,7 @@ import {
   UserIcon,
 } from '../shared/Icons';
 import ActionCard from './ActionCard';
-
+import { translateUi } from '../../i18n';
 const INTENT_LABELS: Record<string, string> = {
   create_todo: 'Created task',
   query_todos: 'Searched tasks',
@@ -27,7 +27,6 @@ const INTENT_LABELS: Record<string, string> = {
   check_conflicts: 'Checking conflicts',
   analyze_schedule: 'Analyzing schedule',
 };
-
 interface MessageBubbleProps {
   message: ChatMessage;
   projectIcon?: string;
@@ -35,13 +34,17 @@ interface MessageBubbleProps {
   onRegenerate?: () => void;
   onEdit?: (messageId: string) => void;
 }
-
-export default function MessageBubble({ message, projectIcon, onDelete, onRegenerate, onEdit }: MessageBubbleProps) {
+export default function MessageBubble({
+  message,
+  projectIcon,
+  onDelete,
+  onRegenerate,
+  onEdit,
+}: MessageBubbleProps) {
   const showTimestamps = useSettingsStore((s) => s.showTimestamps);
   const showAvatars = useSettingsStore((s) => s.showAvatars);
   const isUser = message.user._id === 'user';
   const role = isUser ? 'user' : 'assistant';
-
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(message.text);
@@ -49,44 +52,71 @@ export default function MessageBubble({ message, projectIcon, onDelete, onRegene
       // Clipboard API not available in this context
     }
   };
-
   const intent = message.metadata?.intent as string | undefined;
   const intentLabel = intent && intent !== 'general_chat' ? INTENT_LABELS[intent] : null;
-
   return (
     <div className={`cc-bubble-row cc-bubble-row--${role}`}>
       {!isUser && showAvatars && (
         <div className="cc-avatar cc-avatar--assistant">
-          {projectIcon ? <span style={{ fontSize: 16, lineHeight: 1 }}>{projectIcon}</span> : <SparkleIcon size={16} />}
+          {projectIcon ? (
+            <span style={{ fontSize: 16, lineHeight: 1 }}>{projectIcon}</span>
+          ) : (
+            <SparkleIcon size={16} />
+          )}
         </div>
       )}
       <div className={`cc-bubble cc-bubble--${role}`}>
-        {!isUser && intentLabel && (
-          <div className="cc-bubble__intent">{intentLabel}</div>
-        )}
+        {!isUser && intentLabel && <div className="cc-bubble__intent">{intentLabel}</div>}
         <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{message.text}</span>
         {message.metadata && <ActionCard metadata={message.metadata} />}
         {showTimestamps && (
           <div className="cc-bubble__time">
-            {new Date(message.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            {new Date(message.createdAt).toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
           </div>
         )}
         <div className="cc-bubble__actions">
-          <button type="button" className="cc-bubble__action-btn" onClick={handleCopy} title="Copy" aria-label="Copy message">
+          <button
+            type="button"
+            className="cc-bubble__action-btn"
+            onClick={handleCopy}
+            title={translateUi('Copy')}
+            aria-label={translateUi('Copy message')}
+          >
             <CopyIcon size={12} />
           </button>
           {isUser && onEdit && (
-            <button type="button" className="cc-bubble__action-btn" onClick={() => onEdit(message._id)} title="Edit" aria-label="Edit message">
+            <button
+              type="button"
+              className="cc-bubble__action-btn"
+              onClick={() => onEdit(message._id)}
+              title={translateUi('Edit')}
+              aria-label={translateUi('Edit message')}
+            >
               <EditIcon size={12} />
             </button>
           )}
           {!isUser && onRegenerate && (
-            <button type="button" className="cc-bubble__action-btn" onClick={onRegenerate} title="Regenerate" aria-label="Regenerate response">
+            <button
+              type="button"
+              className="cc-bubble__action-btn"
+              onClick={onRegenerate}
+              title={translateUi('Regenerate')}
+              aria-label={translateUi('Regenerate response')}
+            >
               <SpinArrowsIcon size={12} />
             </button>
           )}
           {onDelete && (
-            <button type="button" className="cc-bubble__action-btn" onClick={onDelete} title="Delete" aria-label="Delete message">
+            <button
+              type="button"
+              className="cc-bubble__action-btn"
+              onClick={onDelete}
+              title={translateUi('Delete')}
+              aria-label={translateUi('Delete message')}
+            >
               <TrashIcon size={12} />
             </button>
           )}

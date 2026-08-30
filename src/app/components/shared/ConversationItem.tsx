@@ -1,13 +1,12 @@
 import type { ConversationResponse } from '../../types/api';
 import { formatRelativeTime, truncate } from '../../utils/formatters';
 import { ChatBubbleIcon, TrashIcon } from './Icons';
-
+import { translateUi } from '../../i18n';
 interface ConversationItemProps {
   conversation: ConversationResponse;
   onClick: () => void;
   onDelete?: () => void;
 }
-
 export default function ConversationItem({
   conversation,
   onClick,
@@ -19,7 +18,9 @@ export default function ConversationItem({
         <ChatBubbleIcon size={24} />
       </div>
       <div className="cc-convo-item__body">
-        <div className="cc-convo-item__title">{conversation.title || 'New Conversation'}</div>
+        <div className="cc-convo-item__title">
+          {conversation.title || translateUi('New Conversation')}
+        </div>
         {conversation.last_message && (
           <div className="cc-convo-item__preview">{truncate(conversation.last_message, 60)}</div>
         )}
@@ -34,8 +35,8 @@ export default function ConversationItem({
             e.stopPropagation();
             onDelete();
           }}
-          title="Delete conversation"
-          aria-label="Delete conversation"
+          title={translateUi('Delete conversation')}
+          aria-label={translateUi('Delete conversation')}
         >
           <TrashIcon size={14} />
         </button>

@@ -3,7 +3,7 @@ import { Handle, Position } from '@xyflow/react';
 import { formatDueDate } from '../../utils/formatters';
 import type { TaskFlowNodeProps } from './taskGraphTypes';
 import { ChevronRightIcon } from '../shared/Icons';
-
+import { translateUi } from '../../i18n';
 function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
   const {
     todo,
@@ -40,7 +40,6 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
     insight?.is_on_critical_path && 'critical path',
     isAtRisk && 'at risk',
   ].filter(Boolean);
-
   return (
     <article
       className={`cc-task-flow-node cc-task-flow-node--${status}${proposalSelection ? ` cc-task-flow-node--proposal-${proposalSelection}` : ''}${insightClasses ? ` ${insightClasses}` : ''}`}
@@ -51,23 +50,25 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
       <div className="cc-task-flow-node__topline">
         <span className={`cc-task-flow-node__status cc-task-flow-node__status--${status}`}>
           {status === 'in_progress'
-            ? 'In progress'
+            ? translateUi('In progress')
             : status === 'completed'
-              ? 'Done'
+              ? translateUi('Done')
               : status === 'cancelled'
-                ? 'Cancelled'
-                : 'Todo'}
+                ? translateUi('Cancelled')
+                : translateUi('Todo')}
         </span>
-        {childCount > 0 && <span className="cc-task-flow-node__kind">Project</span>}
+        {childCount > 0 && (
+          <span className="cc-task-flow-node__kind">{translateUi('Project')}</span>
+        )}
         {proposalSelection && (
           <span
             className={`cc-task-flow-node__proposal-state cc-task-flow-node__proposal-state--${proposalSelection}`}
           >
             {proposalSelection === 'fixed'
-              ? 'Goal'
+              ? translateUi('Goal')
               : proposalSelection === 'selected'
-                ? 'Included'
-                : 'Excluded'}
+                ? translateUi('Included')
+                : translateUi('Excluded')}
           </span>
         )}
         {contextLabel && (
@@ -80,32 +81,45 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
         {todo.title}
       </div>
       {insight && (
-        <div className="cc-task-flow-node__insights" aria-label="Execution insights">
-          {insight.is_ready && <span className="cc-task-flow-node__insight--ready">Ready</span>}
+        <div className="cc-task-flow-node__insights" aria-label={translateUi('Execution insights')}>
+          {insight.is_ready && (
+            <span className="cc-task-flow-node__insight--ready">{translateUi('Ready')}</span>
+          )}
           {insight.is_blocked && !insight.is_unschedulable && (
-            <span className="cc-task-flow-node__insight--blocked">Blocked</span>
+            <span className="cc-task-flow-node__insight--blocked">{translateUi('Blocked')}</span>
           )}
           {insight.is_on_critical_path && (
             <span className="cc-task-flow-node__insight--critical">
-              {insight.estimate_complete ? 'Critical' : 'Provisional critical'}
+              {insight.estimate_complete
+                ? translateUi('Critical')
+                : translateUi('Provisional critical')}
             </span>
           )}
           {insight.is_unschedulable && (
-            <span className="cc-task-flow-node__insight--blocked">Unschedulable</span>
+            <span className="cc-task-flow-node__insight--blocked">
+              {translateUi('Unschedulable')}
+            </span>
           )}
-          {isAtRisk && <span className="cc-task-flow-node__insight--risk">At risk</span>}
+          {isAtRisk && (
+            <span className="cc-task-flow-node__insight--risk">{translateUi('At risk')}</span>
+          )}
           {insight.due_risk === 'unknown_estimate' && (
-            <span className="cc-task-flow-node__insight--unknown">Estimate needed</span>
+            <span className="cc-task-flow-node__insight--unknown">
+              {translateUi('Estimate needed')}
+            </span>
           )}
           {insight.scope_role === 'context' && (
-            <span className="cc-task-flow-node__insight--context">External prerequisite</span>
+            <span className="cc-task-flow-node__insight--context">
+              {translateUi('External prerequisite')}
+            </span>
           )}
         </div>
       )}
       <div className="cc-task-flow-node__meta">
         {childCount > 0 && (
           <span>
-            {completedChildCount}/{childCount} sub-tasks
+            {completedChildCount}/{childCount}
+            {translateUi(' sub-tasks\n          ')}
           </span>
         )}
         {dueLabel && (
@@ -113,8 +127,18 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
             {dueLabel}
           </span>
         )}
-        {dependencyCount > 0 && <span>{dependencyCount} dependencies</span>}
-        {childCount === 0 && !dueLabel && dependencyCount === 0 && <span>{priority} priority</span>}
+        {dependencyCount > 0 && (
+          <span>
+            {dependencyCount}
+            {translateUi(' dependencies')}
+          </span>
+        )}
+        {childCount === 0 && !dueLabel && dependencyCount === 0 && (
+          <span>
+            {priority}
+            {translateUi(' priority')}
+          </span>
+        )}
       </div>
 
       {hasVisibleChildren && !proposalSelection && (
@@ -127,7 +151,7 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
           }}
           aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${todo.title}`}
           aria-expanded={!isCollapsed}
-          title={isCollapsed ? 'Show sub-tasks' : 'Hide sub-tasks'}
+          title={isCollapsed ? translateUi('Show sub-tasks') : translateUi('Hide sub-tasks')}
         >
           <ChevronRightIcon
             size={16}
@@ -139,5 +163,4 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
     </article>
   );
 }
-
 export default memo(TaskGraphNode);

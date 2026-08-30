@@ -7,11 +7,9 @@ import { logger } from '../services/logger';
 import type { StreamEventMeta } from '../types/api';
 import { queryClient } from '../config/queryClient';
 import { invalidateModuleQueries } from '../hooks/queries/invalidateModuleQueries';
-
+import { translateUi } from '../i18n';
 const MAX_MESSAGES = 500;
-
 let pendingRunTimer: ReturnType<typeof setTimeout> | null = null;
-
 function armPendingRunTimeout() {
   clearPendingRunTimeout();
   pendingRunTimer = setTimeout(() => {
@@ -21,39 +19,44 @@ function armPendingRunTimeout() {
         isStreaming: false,
         streamAbortController: null,
       });
-      useToastStore.getState().addToast('error', 'Response timed out. Please try again.');
+      useToastStore
+        .getState()
+        .addToast('error', translateUi('Response timed out. Please try again.'));
     }
-  }, 120_000);
+  }, 120000);
 }
-
 export function clearPendingRunTimeout() {
   if (pendingRunTimer) {
     clearTimeout(pendingRunTimer);
     pendingRunTimer = null;
   }
 }
-
 export interface TaskProgressData {
   status?: string;
   progress?: number;
   message?: string;
   result?: string;
   error?: string;
-  sub_tasks?: Array<{ id: string; instruction: string; status: string; progress: number }>;
+  sub_tasks?: Array<{
+    id: string;
+    instruction: string;
+    status: string;
+    progress: number;
+  }>;
 }
-
 export interface ChatMessage {
   _id: string;
   text: string;
   createdAt: Date;
-  user: { _id: string; name: string };
+  user: {
+    _id: string;
+    name: string;
+  };
   metadata?: Record<string, unknown>;
 }
-
 function trimMessages(msgs: ChatMessage[]): ChatMessage[] {
   return msgs.length > MAX_MESSAGES ? msgs.slice(0, MAX_MESSAGES) : msgs;
 }
-
 /**
  * Remove duplicate messages that can appear when the same message arrives
  * via both a WebSocket event and a React Query refetch.  Uses a composite
@@ -67,17 +70,14 @@ function dedupeMessages(msgs: ChatMessage[]): ChatMessage[] {
     const timestamp =
       msg.createdAt instanceof Date ? msg.createdAt.toISOString() : String(msg.createdAt);
     const text = msg.text;
-
     // If we can't build a reliable key, keep the message as-is
     if (!userId || !timestamp || text == null) return true;
-
     const key = `${userId}|${timestamp}|${text}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
-
 interface ChatState {
   // Streaming messages are ephemeral UI state — they live here until finalized
   streamingMessages: ChatMessage[];
@@ -85,7 +85,6 @@ interface ChatState {
   isStreaming: boolean;
   streamAbortController: AbortController | null;
   taskProgress: Record<string, TaskProgressData>;
-
   setCurrentConversationId: (id: string | null) => void;
   addStreamingMessage: (message: ChatMessage) => void;
   appendToMessage: (messageId: string, content: string) => void;
@@ -98,53 +97,42 @@ interface ChatState {
   updateStreamingMessageId: (oldId: string, newId: string) => void;
   setStreamingState: (streaming: boolean) => void;
   updateTaskProgress: (taskId: string, data: Partial<TaskProgressData>) => void;
-
   resetToDemo: () => void;
-
   sendMessageStreaming: (conversationId: string, text: string) => Promise<void>;
   clearStreamingState: () => void;
   stopGeneration: () => void;
 }
-
 export const useChatStore = create<ChatState>()((set, get) => ({
   streamingMessages: [],
   currentConversationId: null,
   isStreaming: false,
   streamAbortController: null,
   taskProgress: {},
-
   setCurrentConversationId: (id) => set({ currentConversationId: id }),
-
   addStreamingMessage: (message) =>
     set((state) => ({
       streamingMessages: trimMessages(dedupeMessages([message, ...state.streamingMessages])),
     })),
-
   appendToMessage: (messageId, content) =>
     set((state) => ({
       streamingMessages: state.streamingMessages.map((m) =>
         m._id === messageId ? { ...m, text: m.text + content } : m,
       ),
     })),
-
   finalizeStreamMessage: (messageId, fullContent, metadata) =>
     set((state) => ({
       streamingMessages: state.streamingMessages.map((m) =>
         m._id === messageId ? { ...m, text: fullContent, metadata } : m,
       ),
     })),
-
   clearStreamingMessages: () => set({ streamingMessages: [] }),
-
   updateStreamingMessageId: (oldId, newId) =>
     set((state) => ({
       streamingMessages: state.streamingMessages.map((m) =>
         m._id === oldId ? { ...m, _id: newId } : m,
       ),
     })),
-
   setStreamingState: (streaming) => set({ isStreaming: streaming }),
-
   updateTaskProgress: (taskId, data) =>
     set((state) => ({
       taskProgress: {
@@ -152,7 +140,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         [taskId]: { ...state.taskProgress[taskId], ...data },
       },
     })),
-
   resetToDemo: () =>
     set({
       streamingMessages: [],
@@ -161,18 +148,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       streamAbortController: null,
       taskProgress: {},
     }),
-
   // --- Streaming ---
-
   sendMessageStreaming: async (conversationId, text) => {
     const idempotencyKey = crypto.randomUUID();
     const { serverUrl, token, connectionStatus, healthOK } = useAuthStore.getState();
     if (!healthOK) {
       useToastStore
         .getState()
-        .addToast('warning', 'Server status looks uncertain. Trying anyway...');
+        .addToast('warning', translateUi('Server status looks uncertain. Trying anyway...'));
     }
-
     // Orchestrator path: POST /send when WebSocket is connected
     // Response arrives via WS stream_start/chunk/end events (handled in useWebSocket)
     if (connectionStatus === 'connected') {
@@ -192,11 +176,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         // Fall through to SSE fallback
       }
     }
-
     // Fallback: SSE streaming via /stream
     return new Promise<void>((resolve, reject) => {
       const url = `${serverUrl}/api/chat/stream`;
-
       const assistantPlaceholderId = `streaming-${Date.now()}`;
       let streamingMessageId: string | null = null;
       const assistantMessage: ChatMessage = {
@@ -205,13 +187,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         createdAt: new Date(),
         user: { _id: 'assistant', name: 'ClawChat' },
       };
-
       set((state) => ({
         streamingMessages: [assistantMessage, ...state.streamingMessages],
         isStreaming: true,
       }));
       armPendingRunTimeout();
-
       const abortController = connectSSE(
         url,
         { conversation_id: conversationId, content: text, idempotency_key: idempotencyKey },
@@ -264,11 +244,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           },
         },
       );
-
       set({ streamAbortController: abortController });
     });
   },
-
   clearStreamingState: () => {
     const { streamAbortController } = get();
     if (streamAbortController) {
@@ -276,7 +254,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
     set({ isStreaming: false, streamAbortController: null, streamingMessages: [] });
   },
-
   stopGeneration: () => {
     clearPendingRunTimeout();
     const { streamAbortController } = get();

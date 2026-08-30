@@ -2,14 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/apiClient';
 import { useToastStore } from '../../stores/useToastStore';
 import { queryKeys } from './queryKeys';
-
+import { translateUi } from '../../i18n';
 /** What the server will tell us about an existing subscription. */
 export interface CalendarSubscriptionStatus {
   active: boolean;
   created_at?: string | null;
   last_used_at?: string | null;
 }
-
 /**
  * The status plus the URLs, which only ever come back from a create.
  *
@@ -20,7 +19,6 @@ export interface CalendarSubscriptionSecret extends CalendarSubscriptionStatus {
   url: string;
   webcal_url: string;
 }
-
 export function useCalendarSubscriptionQuery(enabled = true) {
   return useQuery<CalendarSubscriptionStatus>({
     queryKey: queryKeys.calendarSubscription,
@@ -31,7 +29,6 @@ export function useCalendarSubscriptionQuery(enabled = true) {
     enabled,
   });
 }
-
 export function useCreateCalendarSubscription() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -40,14 +37,13 @@ export function useCreateCalendarSubscription() {
       return response.data as CalendarSubscriptionSecret;
     },
     onSuccess: () => {
-      useToastStore.getState().addToast('success', 'Subscription URL created');
+      useToastStore.getState().addToast('success', translateUi('Subscription URL created'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendarSubscription });
     },
   });
 }
-
 export function useRevokeCalendarSubscription() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -55,7 +51,7 @@ export function useRevokeCalendarSubscription() {
       await apiClient.delete('/events/subscription');
     },
     onSuccess: () => {
-      useToastStore.getState().addToast('success', 'Subscription revoked');
+      useToastStore.getState().addToast('success', translateUi('Subscription revoked'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendarSubscription });

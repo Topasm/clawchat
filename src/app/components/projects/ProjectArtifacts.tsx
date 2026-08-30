@@ -9,8 +9,11 @@ import {
   useProposeArtifactRevision,
 } from '../../hooks/queries';
 import type { ArtifactResponse, ArtifactType } from '../../types/api';
-
-const TYPES: Array<{ value: ArtifactType; label: string }> = [
+import { translateUi } from '../../i18n';
+const TYPES: Array<{
+  value: ArtifactType;
+  label: string;
+}> = [
   { value: 'project_brief', label: 'Project brief' },
   { value: 'requirements', label: 'Requirements' },
   { value: 'acceptance_criteria', label: 'Acceptance criteria' },
@@ -19,7 +22,6 @@ const TYPES: Array<{ value: ArtifactType; label: string }> = [
   { value: 'report', label: 'Report' },
   { value: 'external_link', label: 'External link' },
 ];
-
 export default function ProjectArtifacts({ projectId }: { projectId: string }) {
   const { data: artifacts = [], isLoading } = useArtifactsQuery(projectId);
   const createArtifact = useCreateArtifact(projectId);
@@ -29,20 +31,17 @@ export default function ProjectArtifacts({ projectId }: { projectId: string }) {
   const [type, setType] = useState<ArtifactType>('project_brief');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-
   const resetCreate = () => {
     setType('project_brief');
     setTitle('');
     setContent('');
   };
-
   const submitCreate = async (event: FormEvent) => {
     event.preventDefault();
     await createArtifact.mutateAsync({ type, title: title.trim(), content });
     setCreateOpen(false);
     resetCreate();
   };
-
   const submitRevision = async (event: FormEvent) => {
     event.preventDefault();
     if (!editing) return;
@@ -54,34 +53,36 @@ export default function ProjectArtifacts({ projectId }: { projectId: string }) {
     setEditing(null);
     resetCreate();
   };
-
   const openRevision = (artifact: ArtifactResponse) => {
     setEditing(artifact);
     setTitle(artifact.title);
     setContent(artifact.content);
   };
-
   return (
     <section className="cc-project-workspace__section">
       <div className="cc-project-workspace__section-header">
         <div>
-          <h2>Artifacts</h2>
-          <p>Durable project context with reviewed version history.</p>
+          <h2>{translateUi('Artifacts')}</h2>
+          <p>{translateUi('Durable project context with reviewed version history.')}</p>
         </div>
         <button
           type="button"
           className="cc-btn cc-btn--primary"
           onClick={() => setCreateOpen(true)}
         >
-          New artifact
+          {translateUi('\n          New artifact\n        ')}
         </button>
       </div>
       {isLoading ? (
-        <div className="cc-project-workspace__loading">Loading artifacts…</div>
+        <div className="cc-project-workspace__loading">
+          {translateUi('Loading artifacts\u2026')}
+        </div>
       ) : artifacts.length === 0 ? (
         <EmptyState
           icon={<MemoIcon size={28} />}
-          message="Create a brief, requirements, decision, or report for this project."
+          message={translateUi(
+            'Create a brief, requirements, decision, or report for this project.',
+          )}
         />
       ) : (
         <div className="cc-artifact-grid">
@@ -92,11 +93,14 @@ export default function ProjectArtifacts({ projectId }: { projectId: string }) {
                 <span>v{artifact.current_version}</span>
               </div>
               <h3>{artifact.title}</h3>
-              <pre>{artifact.content || 'No content yet.'}</pre>
+              <pre>{artifact.content || translateUi('No content yet.')}</pre>
               <div className="cc-artifact-card__footer">
-                <span>Updated {new Date(artifact.updated_at).toLocaleDateString()}</span>
+                <span>
+                  {translateUi('Updated ')}
+                  {new Date(artifact.updated_at).toLocaleDateString()}
+                </span>
                 <button type="button" className="cc-btn" onClick={() => openRevision(artifact)}>
-                  Propose revision
+                  {translateUi('\n                  Propose revision\n                ')}
                 </button>
               </div>
             </article>
@@ -104,14 +108,14 @@ export default function ProjectArtifacts({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen} title="New artifact">
+      <Dialog open={createOpen} onOpenChange={setCreateOpen} title={translateUi('New artifact')}>
         <form className="cc-project-form" onSubmit={submitCreate}>
           <label className="cc-project-form__field">
-            <span>Type</span>
+            <span>{translateUi('Type')}</span>
             <select value={type} onChange={(event) => setType(event.target.value as ArtifactType)}>
               {TYPES.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {translateUi(option.label)}
                 </option>
               ))}
             </select>
@@ -133,11 +137,13 @@ export default function ProjectArtifacts({ projectId }: { projectId: string }) {
       <Dialog
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
-        title="Propose artifact revision"
+        title={translateUi('Propose artifact revision')}
       >
         <form className="cc-project-form" onSubmit={submitRevision}>
           <p className="cc-artifact-dialog__hint">
-            The current artifact stays unchanged until this revision is approved in Review.
+            {translateUi(
+              '\n            The current artifact stays unchanged until this revision is approved in Review.\n          ',
+            )}
           </p>
           <ArtifactFields
             title={title}
@@ -155,7 +161,6 @@ export default function ProjectArtifacts({ projectId }: { projectId: string }) {
     </section>
   );
 }
-
 function ArtifactFields({
   title,
   content,
@@ -170,11 +175,11 @@ function ArtifactFields({
   return (
     <>
       <label className="cc-project-form__field">
-        <span>Title</span>
+        <span>{translateUi('Title')}</span>
         <input required value={title} onChange={(event) => setTitle(event.target.value)} />
       </label>
       <label className="cc-project-form__field">
-        <span>Content</span>
+        <span>{translateUi('Content')}</span>
         <textarea
           required
           rows={12}
@@ -185,7 +190,6 @@ function ArtifactFields({
     </>
   );
 }
-
 function FormActions({
   pending,
   submitLabel,
@@ -198,10 +202,10 @@ function FormActions({
   return (
     <div className="cc-project-form__actions">
       <button type="button" className="cc-btn" onClick={onCancel}>
-        Cancel
+        {translateUi('\n        Cancel\n      ')}
       </button>
       <button type="submit" className="cc-btn cc-btn--primary" disabled={pending}>
-        {pending ? 'Saving…' : submitLabel}
+        {pending ? translateUi('Saving\u2026') : submitLabel}
       </button>
     </div>
   );

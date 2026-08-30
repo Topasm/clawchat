@@ -4,7 +4,7 @@ import Toggle from './Toggle';
 import RecurrenceSelector from './RecurrenceSelector';
 import { useCreateEvent } from '../../hooks/queries';
 import type { EventCreate } from '../../types/api';
-
+import { translateUi } from '../../i18n';
 interface EventCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -13,7 +13,6 @@ interface EventCreateDialogProps {
   /** Pre-fill the start time (HH:MM, 24h). */
   initialTime?: string;
 }
-
 const REMINDER_OPTIONS = [
   { label: 'None', value: '' },
   { label: '5 minutes before', value: '5' },
@@ -22,20 +21,17 @@ const REMINDER_OPTIONS = [
   { label: '1 hour before', value: '60' },
   { label: '1 day before', value: '1440' },
 ];
-
 function toLocalDateStr(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
-
 function toLocalTimeStr(date: Date): string {
   const h = String(date.getHours()).padStart(2, '0');
   const min = String(date.getMinutes()).padStart(2, '0');
   return `${h}:${min}`;
 }
-
 export default function EventCreateDialog({
   open,
   onOpenChange,
@@ -43,7 +39,6 @@ export default function EventCreateDialog({
   initialTime,
 }: EventCreateDialogProps) {
   const createEvent = useCreateEvent();
-
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
@@ -54,7 +49,6 @@ export default function EventCreateDialog({
   const [tagsInput, setTagsInput] = useState('');
   const [reminder, setReminder] = useState('');
   const [recurrenceRule, setRecurrenceRule] = useState<string | undefined>();
-
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
@@ -77,13 +71,10 @@ export default function EventCreateDialog({
       setRecurrenceRule(undefined);
     }
   }, [open, initialDate, initialTime]);
-
   const handleSave = () => {
     if (!title.trim() || createEvent.isPending) return;
-
     let startIso: string;
     let endIso: string | undefined;
-
     if (isAllDay) {
       // All-day events: set to midnight of that day
       startIso = new Date(`${date}T00:00:00`).toISOString();
@@ -92,12 +83,10 @@ export default function EventCreateDialog({
       startIso = new Date(`${date}T${startTime}:00`).toISOString();
       endIso = new Date(`${date}T${endTime}:00`).toISOString();
     }
-
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-
     const payload: EventCreate = {
       title: title.trim(),
       description: description.trim() || undefined,
@@ -109,18 +98,21 @@ export default function EventCreateDialog({
       recurrence_rule: recurrenceRule || undefined,
       tags: tags.length > 0 ? tags : undefined,
     };
-
     // The dialog only closes once the server has the event; useCreateEvent
     // reports both the success toast and any failure.
     createEvent.mutate(payload, { onSuccess: () => onOpenChange(false) });
   };
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="New Event" className="cc-event-dialog">
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={translateUi('New Event')}
+      className="cc-event-dialog"
+    >
       <div className="cc-event-form">
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-title">
-            Title
+            {translateUi('\n            Title\n          ')}
           </label>
           <input
             id="evt-title"
@@ -128,14 +120,14 @@ export default function EventCreateDialog({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Event title"
+            placeholder={translateUi('Event title')}
             autoFocus
           />
         </div>
 
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-date">
-            Date
+            {translateUi('\n            Date\n          ')}
           </label>
           <input
             id="evt-date"
@@ -147,7 +139,7 @@ export default function EventCreateDialog({
         </div>
 
         <div className="cc-event-form__row">
-          <span className="cc-event-form__label">All day</span>
+          <span className="cc-event-form__label">{translateUi('All day')}</span>
           <Toggle checked={isAllDay} onChange={setIsAllDay} />
         </div>
 
@@ -155,7 +147,7 @@ export default function EventCreateDialog({
           <div className="cc-event-form__time-row">
             <div className="cc-event-form__field cc-event-form__field--half">
               <label className="cc-event-form__label" htmlFor="evt-start">
-                Start time
+                {translateUi('\n                Start time\n              ')}
               </label>
               <input
                 id="evt-start"
@@ -167,7 +159,7 @@ export default function EventCreateDialog({
             </div>
             <div className="cc-event-form__field cc-event-form__field--half">
               <label className="cc-event-form__label" htmlFor="evt-end">
-                End time
+                {translateUi('\n                End time\n              ')}
               </label>
               <input
                 id="evt-end"
@@ -182,7 +174,7 @@ export default function EventCreateDialog({
 
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-location">
-            Location
+            {translateUi('\n            Location\n          ')}
           </label>
           <input
             id="evt-location"
@@ -190,27 +182,27 @@ export default function EventCreateDialog({
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Add location (optional)"
+            placeholder={translateUi('Add location (optional)')}
           />
         </div>
 
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-desc">
-            Description
+            {translateUi('\n            Description\n          ')}
           </label>
           <textarea
             id="evt-desc"
             className="cc-event-form__textarea"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add description (optional)"
+            placeholder={translateUi('Add description (optional)')}
             rows={3}
           />
         </div>
 
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-tags">
-            Tags
+            {translateUi('\n            Tags\n          ')}
           </label>
           <input
             id="evt-tags"
@@ -218,13 +210,13 @@ export default function EventCreateDialog({
             type="text"
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
-            placeholder="Comma-separated tags (optional)"
+            placeholder={translateUi('Comma-separated tags (optional)')}
           />
         </div>
 
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-reminder">
-            Reminder
+            {translateUi('\n            Reminder\n          ')}
           </label>
           <select
             id="evt-reminder"
@@ -234,7 +226,7 @@ export default function EventCreateDialog({
           >
             {REMINDER_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label}
+                {translateUi(opt.label)}
               </option>
             ))}
           </select>
@@ -248,7 +240,7 @@ export default function EventCreateDialog({
             className="cc-btn cc-btn--ghost"
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {translateUi('\n            Cancel\n          ')}
           </button>
           <button
             type="button"
@@ -256,7 +248,7 @@ export default function EventCreateDialog({
             disabled={!title.trim() || createEvent.isPending}
             onClick={handleSave}
           >
-            {createEvent.isPending ? 'Saving...' : 'Save'}
+            {createEvent.isPending ? translateUi('Saving...') : translateUi('Save')}
           </button>
         </div>
       </div>

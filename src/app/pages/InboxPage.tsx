@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
 import usePlatform from '../hooks/usePlatform';
@@ -26,7 +25,7 @@ import useInboxGraphRevision from '../hooks/useInboxGraphRevision';
 import useInboxPlacement from '../hooks/useInboxPlacement';
 import useInboxSections from '../hooks/useInboxSections';
 import useInboxSelection from '../hooks/useInboxSelection';
-
+import { translateUi } from '../i18n';
 /**
  * Inbox triage: the capture queue on the left, the project tree in the middle, and the
  * inspector for the selected task on the right. The page wires the triage hooks to those
@@ -43,7 +42,6 @@ export default function InboxPage() {
   const addToast = useToastStore((s) => s.addToast);
   const toggleMutation = useToggleTodoComplete();
   const deleteMutation = useDeleteTodo();
-
   const sections = useInboxSections(todos);
   const selection = useInboxSelection(sections.needsOrganising);
   const { data: skillsData } = useSkillsQuery(Boolean(selection.selectedTaskId));
@@ -74,14 +72,12 @@ export default function InboxPage() {
     setPlacementRevision,
     refreshPlacementRevision,
   });
-
   const handleDelete = useCallback(
     (id: string) => {
       deleteMutation.mutate(id);
     },
     [deleteMutation],
   );
-
   const handleToggle = useCallback(
     (id: string) => {
       const todo = sections.todoById.get(id);
@@ -89,30 +85,26 @@ export default function InboxPage() {
     },
     [sections.todoById, toggleMutation],
   );
-
   const handleOrganize = async (id: string) => {
     try {
       await apiClient.post(`/todos/${id}/organize`);
-      addToast('info', 'Organizing...');
+      addToast('info', translateUi('Organizing...'));
     } catch {
-      addToast('error', 'Failed to organize');
+      addToast('error', translateUi('Failed to organize'));
     }
   };
-
   const handleRetry = async (id: string) => {
     try {
       await apiClient.post(`/todos/${id}/organize`);
-      addToast('info', 'Retrying...');
+      addToast('info', translateUi('Retrying...'));
     } catch {
-      addToast('error', 'Failed to retry');
+      addToast('error', translateUi('Failed to retry'));
     }
   };
-
   const executionTelemetryByTaskId = useMemo(
     () => new Map(executionTelemetry.map((item) => [item.task_id, item])),
     [executionTelemetry],
   );
-
   const selectedTask = todos.find((todo) => todo.id === selection.selectedTaskId) ?? null;
   const selectedInsight = graphInsights.data?.nodes.find(
     (node) => node.task_id === selection.selectedTaskId,
@@ -120,7 +112,6 @@ export default function InboxPage() {
   const selectedProject = selectedTask?.project_id
     ? projects.find((project) => project.id === selectedTask.project_id)
     : undefined;
-
   const dependencyCandidates = useMemo(() => {
     if (!selectedTask) return [];
     const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
@@ -132,7 +123,6 @@ export default function InboxPage() {
         return leftSameProject - rightSameProject || left.title.localeCompare(right.title);
       });
   }, [projects, selectedTask, todos]);
-
   const treeProps = {
     projects,
     todos,
@@ -150,7 +140,6 @@ export default function InboxPage() {
     placement.isBatchPlacing ||
     dependency.isPreviewing ||
     dependency.isCreating;
-
   return (
     <div>
       <div
@@ -158,11 +147,11 @@ export default function InboxPage() {
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
       >
         <div>
-          <div className="cc-page-header__title">Inbox</div>
+          <div className="cc-page-header__title">{translateUi('Inbox')}</div>
           <div className="cc-page-header__subtitle">
             {sections.totalItems > 0
-              ? `${sections.totalItems} item${sections.totalItems !== 1 ? 's' : ''}`
-              : 'Capture first, organise later'}
+              ? translateUi('{{count}} items', { count: sections.totalItems })
+              : translateUi('Capture first, organise later')}
           </div>
         </div>
         {!isMobile && (
@@ -170,7 +159,7 @@ export default function InboxPage() {
             className="cc-btn cc-btn--primary"
             onClick={() => useQuickCaptureStore.getState().open()}
           >
-            + New
+            {translateUi('\n            + New\n          ')}
           </button>
         )}
       </div>

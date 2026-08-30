@@ -1,5 +1,7 @@
 export type AdminTab = 'overview' | 'ai' | 'database' | 'activity' | 'sessions' | 'config' | 'data';
 
+import { translateUi } from '../../i18n';
+
 const TABS: { key: AdminTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'ai', label: 'AI Config' },
@@ -24,7 +26,7 @@ export default function AdminTabBar({ activeTab, onTabChange }: AdminTabBarProps
           className={`cc-admin-tab${activeTab === tab.key ? ' cc-admin-tab--active' : ''}`}
           onClick={() => onTabChange(tab.key)}
         >
-          {tab.label}
+          {translateUi(tab.label)}
         </button>
       ))}
     </div>

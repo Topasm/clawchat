@@ -14,7 +14,7 @@ import { queryKeys } from './queries';
 import type { ConversationResponse } from '../types/api';
 import { invalidateTaskDerivedQueries } from './queries/invalidateTaskDerivedQueries';
 import { invalidateModuleQueries } from './queries/invalidateModuleQueries';
-
+import { translateUi } from '../i18n';
 /**
  * Connects to the server WebSocket on mount and wires up event handlers
  * for real-time updates (module data changes, reminders, task progress).
@@ -23,15 +23,11 @@ export default function useWebSocket(): void {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const token = useAuthStore((s) => s.token);
   const queryClient = useQueryClient();
-
   useEffect(() => {
     if (!serverUrl || !token) return;
-
     wsClient.connect(serverUrl, token);
-
     const invalidateExecutionTelemetry = () =>
       void queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
-
     // Sync connection status to auth store
     const unsubStatus = wsClient.onStatusChange((status) => {
       useAuthStore.getState().setConnectionStatus(status);
@@ -57,13 +53,13 @@ export default function useWebSocket(): void {
         }
       }
     });
-
     // Auth failure (server rejected token) — log out immediately
     wsClient.onAuthFailure = () => {
-      useToastStore.getState().addToast('error', 'Session expired. Please log in again.');
+      useToastStore
+        .getState()
+        .addToast('error', translateUi('Session expired. Please log in again.'));
       useAuthStore.getState().logout();
     };
-
     // Fail pending streaming state on disconnect so the UI doesn't get stuck
     wsClient.onDisconnect = () => {
       const { isStreaming, clearStreamingState } = useChatStore.getState();
@@ -71,14 +67,19 @@ export default function useWebSocket(): void {
         clearStreamingState();
         useToastStore
           .getState()
-          .addToast('error', 'Connection lost during response. Reconnecting...');
+          .addToast('error', translateUi('Connection lost during response. Reconnecting...'));
       }
     };
-
     const handleModuleChange = (data: unknown) => {
-      invalidateModuleQueries(queryClient, (data as { module?: string }).module);
+      invalidateModuleQueries(
+        queryClient,
+        (
+          data as {
+            module?: string;
+          }
+        ).module,
+      );
     };
-
     const handleReminder = (data: unknown) => {
       const d = data as {
         title?: string;
@@ -98,12 +99,14 @@ export default function useWebSocket(): void {
         });
       }
     };
-
     const handleTaskCompleted = (data: unknown) => {
-      const d = data as { task_id?: string; result?: string };
+      const d = data as {
+        task_id?: string;
+        result?: string;
+      };
       const chatStore = useChatStore.getState();
       chatStore.updateTaskProgress?.(d.task_id ?? '', { status: 'completed', result: d.result });
-      useToastStore.getState().addToast('success', 'Background task completed');
+      useToastStore.getState().addToast('success', translateUi('Background task completed'));
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       queryClient.invalidateQueries({ queryKey: ['runs'] });
@@ -112,35 +115,43 @@ export default function useWebSocket(): void {
         void notify('Task Complete', 'Background task finished');
       }
     };
-
     const handleTaskFailed = (data: unknown) => {
-      const d = data as { task_id?: string; error?: string };
+      const d = data as {
+        task_id?: string;
+        error?: string;
+      };
       const chatStore = useChatStore.getState();
       chatStore.updateTaskProgress?.(d.task_id ?? '', { status: 'failed', error: d.error });
       const errorMsg = d.error ?? 'Unknown error';
       queryClient.invalidateQueries({ queryKey: ['runs'] });
       invalidateExecutionTelemetry();
-      useToastStore.getState().addToast('error', `Background task failed: ${errorMsg}`);
+      useToastStore
+        .getState()
+        .addToast('error', translateUi('Background task failed: {{error}}', { error: errorMsg }));
       if (useSettingsStore.getState().notificationsEnabled) {
         void notify('Task Failed', errorMsg);
       }
     };
-
     const handleTaskProgress = (data: unknown) => {
-      const d = data as { task_id?: string; progress?: number; message?: string; status?: string };
+      const d = data as {
+        task_id?: string;
+        progress?: number;
+        message?: string;
+        status?: string;
+      };
       const chatStore = useChatStore.getState();
       chatStore.updateTaskProgress?.(d.task_id ?? '', d);
       queryClient.invalidateQueries({ queryKey: ['runs'] });
       invalidateExecutionTelemetry();
     };
-
     // --- AI stream events (from orchestrator /send path) ---
-
     const handleStreamStart = (data: unknown) => {
-      const d = data as { message_id: string; conversation_id: string };
+      const d = data as {
+        message_id: string;
+        conversation_id: string;
+      };
       const chatStore = useChatStore.getState();
       if (d.conversation_id !== chatStore.currentConversationId) return;
-
       const placeholder: ChatMessage = {
         _id: d.message_id,
         text: '',
@@ -150,12 +161,13 @@ export default function useWebSocket(): void {
       chatStore.addStreamingMessage(placeholder);
       chatStore.setStreamingState(true);
     };
-
     const handleStreamChunk = (data: unknown) => {
-      const d = data as { message_id: string; content: string };
+      const d = data as {
+        message_id: string;
+        content: string;
+      };
       useChatStore.getState().appendToMessage(d.message_id, d.content);
     };
-
     const handleStreamEnd = (data: unknown) => {
       const d = data as {
         message_id: string;
@@ -174,9 +186,12 @@ export default function useWebSocket(): void {
         queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
       }
     };
-
     const handleStreamError = (data: unknown) => {
-      const d = data as { conversation_id?: string; error_message?: string; message?: string };
+      const d = data as {
+        conversation_id?: string;
+        error_message?: string;
+        message?: string;
+      };
       clearPendingRunTimeout();
       const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
       useChatStore.setState({
@@ -191,9 +206,10 @@ export default function useWebSocket(): void {
         queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
       }
     };
-
     const handleStreamAborted = (data: unknown) => {
-      const d = data as { conversation_id?: string };
+      const d = data as {
+        conversation_id?: string;
+      };
       clearPendingRunTimeout();
       const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
       useChatStore.setState({
@@ -205,9 +221,11 @@ export default function useWebSocket(): void {
         queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
       }
     };
-
     const handleConversationUpdated = (data: unknown) => {
-      const d = data as { conversation_id: string; title?: string };
+      const d = data as {
+        conversation_id: string;
+        title?: string;
+      };
       if (d.title) {
         // Update conversation title in query cache
         queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) =>
@@ -215,7 +233,6 @@ export default function useWebSocket(): void {
         );
       }
     };
-
     // Desktop: handle "Mark Done" action from a native notification
     let unsubNotifAction: (() => void) | undefined;
     if (IS_DESKTOP) {
@@ -235,7 +252,6 @@ export default function useWebSocket(): void {
         }
       });
     }
-
     const handleNudge = (data: unknown) => {
       const d = data as {
         title?: string;
@@ -250,34 +266,38 @@ export default function useWebSocket(): void {
         void notify('Nudge', message, { itemType: 'todo', itemId: d.todo_id });
       }
     };
-
     const handleWeeklyReview = (data: unknown) => {
-      const d = data as { content?: string };
+      const d = data as {
+        content?: string;
+      };
       useToastStore
         .getState()
-        .addToast('info', 'Weekly review is ready! Check your chat.', { duration: 15000 });
+        .addToast('info', translateUi('Weekly review is ready! Check your chat.'), {
+          duration: 15000,
+        });
       const settings = useSettingsStore.getState();
       if (settings.notificationsEnabled) {
         void notify('Weekly Review', d.content?.slice(0, 100) ?? 'Your weekly review is ready');
       }
     };
-
     const handleDailyBriefing = (data: unknown) => {
-      const d = data as { content?: string };
-      useToastStore.getState().addToast('info', 'Morning briefing is ready!', { duration: 10000 });
+      const d = data as {
+        content?: string;
+      };
+      useToastStore
+        .getState()
+        .addToast('info', translateUi('Morning briefing is ready!'), { duration: 10000 });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
       const settings = useSettingsStore.getState();
       if (settings.notificationsEnabled) {
         void notify('Daily Briefing', d.content?.slice(0, 100) ?? 'Your daily briefing is ready');
       }
     };
-
     // Server liveness signals — wsClient already tracked lastMessageTime; ignore here
     const handleLivenessNoop = () => {};
     wsClient.on('tick', handleLivenessNoop);
     wsClient.on('heartbeat', handleLivenessNoop);
     wsClient.on('pong', handleLivenessNoop);
-
     wsClient.on('module_data_changed', handleModuleChange);
     wsClient.on('reminder', handleReminder);
     wsClient.on('nudge', handleNudge);
@@ -292,7 +312,6 @@ export default function useWebSocket(): void {
     wsClient.on('stream_error', handleStreamError);
     wsClient.on('stream_aborted', handleStreamAborted);
     wsClient.on('conversation_updated', handleConversationUpdated);
-
     return () => {
       unsubNotifAction?.();
       unsubStatus();

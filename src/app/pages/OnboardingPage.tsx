@@ -9,12 +9,10 @@ import QRScanner from '../components/shared/QRScanner';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
 import { verifyClawChatHealth } from '../services/workspaceHealth';
-
+import { translateUi } from '../i18n';
 type Step = 'welcome' | 'role' | 'server' | 'claude' | 'pairing' | 'ready';
-
 type ServerStatus = 'checking' | 'online' | 'offline' | 'error';
 type ClaudeStatus = 'checking' | 'ready' | 'not-installed' | 'not-authenticated' | 'unavailable';
-
 function getSteps(isDesktop: boolean, chosenRole: 'host' | 'client' | null): Step[] {
   if (!isDesktop) {
     return ['welcome', 'server', 'claude', 'pairing', 'ready'];
@@ -25,7 +23,6 @@ function getSteps(isDesktop: boolean, chosenRole: 'host' | 'client' | null): Ste
   // Host or not yet chosen
   return ['welcome', 'role', 'server', 'claude', 'pairing', 'ready'];
 }
-
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const token = useAuthStore((s) => s.token);
@@ -36,7 +33,6 @@ export default function OnboardingPage() {
   const updateLocalServerPolicy = useWorkspaceRuntimeStore(
     (state) => state.updateLocalServerPolicy,
   );
-
   const [chosenRole, setChosenRole] = useState<'host' | 'client' | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
   const [serverStatus, setServerStatus] = useState<ServerStatus>('checking');
@@ -45,10 +41,8 @@ export default function OnboardingPage() {
   const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('checking');
   const [pairingComplete, setPairingComplete] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
-
   const steps = getSteps(IS_DESKTOP, chosenRole);
   const currentIndex = steps.indexOf(currentStep);
-
   // The onboarding choice selects the workspace to view. Hosting remains an
   // independent policy and defaults to enabled on desktop.
   useEffect(() => {
@@ -56,14 +50,12 @@ export default function OnboardingPage() {
       setChosenRole(activeWorkspaceId === LOCAL_WORKSPACE_ID ? 'host' : 'client');
     }
   }, [activeWorkspaceId, chosenRole]);
-
   // Redirect if already logged in
   useEffect(() => {
     if (token) {
       navigate('/today', { replace: true });
     }
   }, [token, navigate]);
-
   // Check the embedded server status through the active desktop adapter.
   const checkEmbeddedServer = useCallback(async () => {
     if (!IS_DESKTOP) return;
@@ -81,7 +73,6 @@ export default function OnboardingPage() {
       setServerStatus('error');
     }
   }, []);
-
   // Check server health via HTTP
   const checkServerHealth = useCallback(
     async (url?: string) => {
@@ -100,11 +91,9 @@ export default function OnboardingPage() {
     },
     [manualServerUrl],
   );
-
   // Auto-check server when entering the server step
   useEffect(() => {
     if (currentStep !== 'server') return;
-
     if (IS_DESKTOP && chosenRole === 'host') {
       checkEmbeddedServer();
       const unsub = platformApi.server.onStatusChange((status) => {
@@ -123,7 +112,6 @@ export default function OnboardingPage() {
       checkServerHealth();
     }
   }, [currentStep, chosenRole, checkEmbeddedServer, checkServerHealth]);
-
   // Auto-retry the embedded server check while it is starting.
   useEffect(() => {
     if (
@@ -136,25 +124,21 @@ export default function OnboardingPage() {
     const interval = setInterval(checkEmbeddedServer, 2000);
     return () => clearInterval(interval);
   }, [currentStep, chosenRole, serverStatus, checkEmbeddedServer]);
-
   // Check Claude Code availability
   const checkClaudeCode = useCallback(async () => {
     setClaudeStatus('checking');
     const baseUrl = IS_DESKTOP
       ? (serverUrl ?? DEFAULT_SERVER_URL)
       : manualServerUrl.replace(/\/+$/, '');
-
     try {
       const response = await fetch(`${baseUrl}/api/health`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       });
-
       if (!response.ok) {
         setClaudeStatus('unavailable');
         return;
       }
-
       const data = await response.json();
       if (data.claude_code === 'authenticated' || data.claudeCode === 'authenticated') {
         setClaudeStatus('ready');
@@ -172,27 +156,23 @@ export default function OnboardingPage() {
       setClaudeStatus('unavailable');
     }
   }, [serverUrl, manualServerUrl]);
-
   useEffect(() => {
     if (currentStep === 'claude') {
       checkClaudeCode();
     }
   }, [currentStep, checkClaudeCode]);
-
   const goNext = () => {
     const nextIndex = currentIndex + 1;
     if (nextIndex < steps.length) {
       setCurrentStep(steps[nextIndex]);
     }
   };
-
   const goBack = () => {
     const prevIndex = currentIndex - 1;
     if (prevIndex >= 0) {
       setCurrentStep(steps[prevIndex]);
     }
   };
-
   const enterApp = () => {
     try {
       localStorage.setItem('cc-onboarding-complete', 'true');
@@ -201,7 +181,6 @@ export default function OnboardingPage() {
     }
     navigate('/login', { replace: true });
   };
-
   const handleRoleSelect = async (role: 'host' | 'client') => {
     setChosenRole(role);
     if (IS_DESKTOP && role === 'host') {
@@ -215,7 +194,6 @@ export default function OnboardingPage() {
       setCurrentStep(nextSteps[roleIndex + 1]);
     }
   };
-
   const handleQRScan = async (data: string) => {
     setShowScanner(false);
     try {
@@ -271,9 +249,7 @@ export default function OnboardingPage() {
       // Not valid JSON / QR
     }
   };
-
   // ── Step renderers ──────────────────────────────────────────
-
   const renderStepDot = (index: number) => {
     let className = 'cc-onboarding__step-dot';
     if (index === currentIndex) {
@@ -287,7 +263,6 @@ export default function OnboardingPage() {
       </div>
     );
   };
-
   const renderStepLine = (index: number) => {
     let className = 'cc-onboarding__step-line';
     if (index < currentIndex) {
@@ -295,7 +270,6 @@ export default function OnboardingPage() {
     }
     return <div key={`line-${index}`} className={className} />;
   };
-
   const renderStepper = () => {
     const elements: React.ReactNode[] = [];
     steps.forEach((_, i) => {
@@ -306,7 +280,6 @@ export default function OnboardingPage() {
     });
     return <div className="cc-onboarding__stepper">{elements}</div>;
   };
-
   const getServerStatusDot = () => {
     switch (serverStatus) {
       case 'checking':
@@ -318,32 +291,30 @@ export default function OnboardingPage() {
         return 'cc-onboarding__status-dot cc-onboarding__status-dot--red';
     }
   };
-
   const getServerStatusLabel = () => {
     if (IS_DESKTOP && chosenRole === 'host') {
       switch (serverStatus) {
         case 'checking':
-          return 'Starting embedded server...';
+          return translateUi('Starting embedded server...');
         case 'online':
-          return 'Server is running';
+          return translateUi('Server is running');
         case 'offline':
-          return `Server is ${embeddedServerStatus}`;
+          return translateUi('Server is {{status}}', { status: embeddedServerStatus });
         case 'error':
-          return 'Failed to start server';
+          return translateUi('Failed to start server');
       }
     }
     switch (serverStatus) {
       case 'checking':
-        return 'Checking server...';
+        return translateUi('Checking server...');
       case 'online':
-        return 'Server is reachable';
+        return translateUi('Server is reachable');
       case 'offline':
-        return 'Server is unreachable';
+        return translateUi('Server is unreachable');
       case 'error':
-        return 'Connection error';
+        return translateUi('Connection error');
     }
   };
-
   const getClaudeStatusDot = () => {
     switch (claudeStatus) {
       case 'checking':
@@ -358,32 +329,31 @@ export default function OnboardingPage() {
         return 'cc-onboarding__status-dot cc-onboarding__status-dot--gray';
     }
   };
-
   const renderWelcome = () => (
     <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">Welcome to ClawChat</h2>
+      <h2 className="cc-onboarding__card-title">{translateUi('Welcome to ClawChat')}</h2>
       <p className="cc-onboarding__card-description">
-        ClawChat is your personal productivity hub with AI-powered chat, tasks, calendar, and notes
-        &mdash; all in one place. This wizard will help you get everything set up in a few quick
-        steps.
+        {translateUi(
+          '\n        ClawChat is your personal productivity hub with AI-powered chat, tasks, calendar, and notes\n        &mdash; all in one place. This wizard will help you get everything set up in a few quick\n        steps.\n      ',
+        )}
       </p>
       <div className="cc-onboarding__actions">
         <span />
         <div className="cc-onboarding__actions-right">
           <button className="cc-btn cc-btn--primary" onClick={goNext}>
-            Get Started
+            {translateUi('\n            Get Started\n          ')}
           </button>
         </div>
       </div>
     </div>
   );
-
   const renderRole = () => (
     <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">Choose where to start</h2>
+      <h2 className="cc-onboarding__card-title">{translateUi('Choose where to start')}</h2>
       <p className="cc-onboarding__card-description">
-        You can use the private workspace on this computer or connect to an existing ClawChat. This
-        can be changed at any time.
+        {translateUi(
+          '\n        You can use the private workspace on this computer or connect to an existing ClawChat. This\n        can be changed at any time.\n      ',
+        )}
       </p>
 
       <div className="cc-onboarding__role-grid">
@@ -393,10 +363,11 @@ export default function OnboardingPage() {
         >
           <div className="cc-onboarding__role-icon">{'\uD83D\uDDA5'}</div>
           <div className="cc-onboarding__role-content">
-            <div className="cc-onboarding__role-title">Start on this computer</div>
+            <div className="cc-onboarding__role-title">{translateUi('Start on this computer')}</div>
             <p className="cc-onboarding__role-description">
-              Start with the private workspace on this computer. Other devices can connect to its
-              local server later.
+              {translateUi(
+                '\n              Start with the private workspace on this computer. Other devices can connect to its\n              local server later.\n            ',
+              )}
             </p>
           </div>
         </div>
@@ -407,10 +378,13 @@ export default function OnboardingPage() {
         >
           <div className="cc-onboarding__role-icon">{'\uD83D\uDD17'}</div>
           <div className="cc-onboarding__role-content">
-            <div className="cc-onboarding__role-title">Connect to an existing ClawChat</div>
+            <div className="cc-onboarding__role-title">
+              {translateUi('Connect to an existing ClawChat')}
+            </div>
             <p className="cc-onboarding__role-description">
-              View a ClawChat workspace running on another device. This computer can still keep its
-              own local server available.
+              {translateUi(
+                '\n              View a ClawChat workspace running on another device. This computer can still keep its\n              own local server available.\n            ',
+              )}
             </p>
           </div>
         </div>
@@ -418,26 +392,26 @@ export default function OnboardingPage() {
 
       <div className="cc-onboarding__actions">
         <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-          Back
+          {translateUi('\n          Back\n        ')}
         </button>
         <span />
       </div>
     </div>
   );
-
   const renderServer = () => {
     const isDesktopHost = IS_DESKTOP && chosenRole === 'host';
     const showUrlInput = !isDesktopHost;
-
     return (
       <div className="cc-onboarding__card">
         <h2 className="cc-onboarding__card-title">
-          {isDesktopHost ? 'Server Status' : 'Connect to Host'}
+          {isDesktopHost ? translateUi('Server Status') : translateUi('Connect to Host')}
         </h2>
         <p className="cc-onboarding__card-description">
           {isDesktopHost
-            ? 'ClawChat includes an embedded server. It should start automatically.'
-            : 'Connect to your ClawChat host by scanning a QR code or entering the server URL.'}
+            ? translateUi('ClawChat includes an embedded server. It should start automatically.')
+            : translateUi(
+                'Connect to your ClawChat host by scanning a QR code or entering the server URL.',
+              )}
         </p>
 
         <div className="cc-onboarding__status-row">
@@ -445,7 +419,9 @@ export default function OnboardingPage() {
           <div>
             <div className="cc-onboarding__status-label">{getServerStatusLabel()}</div>
             {isDesktopHost && serverStatus === 'checking' && (
-              <div className="cc-onboarding__status-sublabel">This usually takes a few seconds</div>
+              <div className="cc-onboarding__status-sublabel">
+                {translateUi('This usually takes a few seconds')}
+              </div>
             )}
           </div>
         </div>
@@ -453,7 +429,7 @@ export default function OnboardingPage() {
         {showUrlInput && (
           <>
             <div className="cc-onboarding__input-group">
-              <label className="cc-onboarding__input-label">Server URL</label>
+              <label className="cc-onboarding__input-label">{translateUi('Server URL')}</label>
               <input
                 type="url"
                 className="cc-onboarding__input"
@@ -463,7 +439,9 @@ export default function OnboardingPage() {
                 placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
               />
               <div className="cc-onboarding__input-hint">
-                Enter the URL where your ClawChat host is running, or scan a QR code from the host.
+                {translateUi(
+                  '\n                Enter the URL where your ClawChat host is running, or scan a QR code from the host.\n              ',
+                )}
               </div>
             </div>
 
@@ -472,7 +450,7 @@ export default function OnboardingPage() {
               onClick={() => setShowScanner(true)}
               style={{ marginBottom: 8 }}
             >
-              Scan QR Code
+              {translateUi('\n              Scan QR Code\n            ')}
             </button>
           </>
         )}
@@ -483,7 +461,7 @@ export default function OnboardingPage() {
             onClick={checkEmbeddedServer}
             style={{ marginTop: 8 }}
           >
-            Retry
+            {translateUi('\n            Retry\n          ')}
           </button>
         )}
 
@@ -493,41 +471,42 @@ export default function OnboardingPage() {
             onClick={() => checkServerHealth()}
             style={{ marginTop: 8 }}
           >
-            Retry
+            {translateUi('\n            Retry\n          ')}
           </button>
         )}
 
         <div className="cc-onboarding__actions">
           <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-            Back
+            {translateUi('\n            Back\n          ')}
           </button>
           <div className="cc-onboarding__actions-right">
             <button className="cc-btn cc-btn--primary" onClick={goNext}>
-              {serverStatus === 'online' ? 'Next' : 'Skip'}
+              {serverStatus === 'online' ? translateUi('Next') : translateUi('Skip')}
             </button>
           </div>
         </div>
       </div>
     );
   };
-
   const renderClaudeCode = () => (
     <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">Claude Code</h2>
+      <h2 className="cc-onboarding__card-title">{translateUi('Claude Code')}</h2>
       <p className="cc-onboarding__card-description">
-        ClawChat can use Claude Code for AI-powered features like smart task suggestions, natural
-        language chat, and more. This is optional &mdash; all non-AI features work without it.
+        {translateUi(
+          '\n        ClawChat can use Claude Code for AI-powered features like smart task suggestions, natural\n        language chat, and more. This is optional &mdash; all non-AI features work without it.\n      ',
+        )}
       </p>
 
       <div className="cc-onboarding__status-row">
         <div className={getClaudeStatusDot()} />
         <div>
           <div className="cc-onboarding__status-label">
-            {claudeStatus === 'checking' && 'Checking Claude Code...'}
-            {claudeStatus === 'ready' && 'Claude Code is installed and authenticated'}
-            {claudeStatus === 'not-installed' && 'Claude Code is not installed'}
-            {claudeStatus === 'not-authenticated' && 'Claude Code is not authenticated'}
-            {claudeStatus === 'unavailable' && 'Could not check Claude Code status'}
+            {claudeStatus === 'checking' && translateUi('Checking Claude Code...')}
+            {claudeStatus === 'ready' && translateUi('Claude Code is installed and authenticated')}
+            {claudeStatus === 'not-installed' && translateUi('Claude Code is not installed')}
+            {claudeStatus === 'not-authenticated' &&
+              translateUi('Claude Code is not authenticated')}
+            {claudeStatus === 'unavailable' && translateUi('Could not check Claude Code status')}
           </div>
         </div>
       </div>
@@ -541,16 +520,16 @@ export default function OnboardingPage() {
             lineHeight: 1.6,
           }}
         >
-          Install Claude Code from{' '}
+          {translateUi('\n          Install Claude Code from')}{' '}
           <a
             href="https://docs.anthropic.com/en/docs/claude-code"
             target="_blank"
             rel="noopener noreferrer"
             className="cc-onboarding__link"
           >
-            docs.anthropic.com
+            {translateUi('\n            docs.anthropic.com\n          ')}
           </a>
-          , then return here and click Retry.
+          {translateUi('\n          , then return here and click Retry.\n        ')}
         </div>
       )}
 
@@ -563,8 +542,9 @@ export default function OnboardingPage() {
             lineHeight: 1.6,
           }}
         >
-          Run <code className="cc-onboarding__code">claude login</code> in your terminal to
-          authenticate, then click Retry.
+          {translateUi('\n          Run ')}
+          <code className="cc-onboarding__code">{translateUi('claude login')}</code>
+          {translateUi(' in your terminal to\n          authenticate, then click Retry.\n        ')}
         </div>
       )}
 
@@ -576,34 +556,34 @@ export default function OnboardingPage() {
           onClick={checkClaudeCode}
           style={{ marginTop: 8 }}
         >
-          Retry
+          {translateUi('\n          Retry\n        ')}
         </button>
       )}
 
       <div className="cc-onboarding__actions">
         <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-          Back
+          {translateUi('\n          Back\n        ')}
         </button>
         <div className="cc-onboarding__actions-right">
           {claudeStatus !== 'ready' && (
             <button className="cc-btn cc-btn--ghost" onClick={goNext}>
-              Skip for now
+              {translateUi('\n              Skip for now\n            ')}
             </button>
           )}
           <button className="cc-btn cc-btn--primary" onClick={goNext}>
-            Next
+            {translateUi('\n            Next\n          ')}
           </button>
         </div>
       </div>
     </div>
   );
-
   const renderPairing = () => (
     <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">Mobile Pairing</h2>
+      <h2 className="cc-onboarding__card-title">{translateUi('Mobile Pairing')}</h2>
       <p className="cc-onboarding__card-description">
-        Optionally pair a mobile device to access ClawChat on the go. You can always set this up
-        later in Settings.
+        {translateUi(
+          '\n        Optionally pair a mobile device to access ClawChat on the go. You can always set this up\n        later in Settings.\n      ',
+        )}
       </p>
 
       {serverStatus === 'online' && token ? (
@@ -612,9 +592,9 @@ export default function OnboardingPage() {
         <>
           <div className="cc-onboarding__qr-placeholder">
             <span>
-              Log in to the server first
+              {translateUi('\n              Log in to the server first\n              ')}
               <br />
-              to generate a pairing code
+              {translateUi('\n              to generate a pairing code\n            ')}
             </span>
           </div>
           <div
@@ -625,42 +605,45 @@ export default function OnboardingPage() {
               marginTop: 8,
             }}
           >
-            You can pair devices later from Settings after logging in.
+            {translateUi(
+              '\n            You can pair devices later from Settings after logging in.\n          ',
+            )}
           </div>
         </>
       )}
 
       <div className="cc-onboarding__actions">
         <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-          Back
+          {translateUi('\n          Back\n        ')}
         </button>
         <div className="cc-onboarding__actions-right">
           {!pairingComplete && (
             <button className="cc-btn cc-btn--ghost" onClick={goNext}>
-              Skip
+              {translateUi('\n              Skip\n            ')}
             </button>
           )}
           <button className="cc-btn cc-btn--primary" onClick={goNext}>
-            Next
+            {translateUi('\n            Next\n          ')}
           </button>
         </div>
       </div>
     </div>
   );
-
   const renderReady = () => (
     <div className="cc-onboarding__card" style={{ textAlign: 'center' }}>
       <div className="cc-onboarding__ready-icon">
         <span>{'\u2713'}</span>
       </div>
       <h2 className="cc-onboarding__card-title" style={{ textAlign: 'center' }}>
-        You&apos;re all set!
+        {translateUi('\n        You&apos;re all set!\n      ')}
       </h2>
       <p className="cc-onboarding__card-description" style={{ textAlign: 'center' }}>
         {IS_DESKTOP && chosenRole === 'host'
-          ? 'Your ClawChat host is running. Other devices can connect to this machine.'
-          : 'ClawChat is ready to use.'}{' '}
-        You can adjust any of these settings later from the Settings page.
+          ? translateUi('Your ClawChat host is running. Other devices can connect to this machine.')
+          : translateUi('ClawChat is ready to use.')}{' '}
+        {translateUi(
+          '\n        You can adjust any of these settings later from the Settings page.\n      ',
+        )}
       </p>
       <div className="cc-onboarding__actions" style={{ justifyContent: 'center' }}>
         <button
@@ -668,12 +651,11 @@ export default function OnboardingPage() {
           onClick={enterApp}
           style={{ padding: '12px 32px', fontSize: 15 }}
         >
-          Enter ClawChat
+          {translateUi('\n          Enter ClawChat\n        ')}
         </button>
       </div>
     </div>
   );
-
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 'welcome':
@@ -690,7 +672,6 @@ export default function OnboardingPage() {
         return renderReady();
     }
   };
-
   return (
     <div className="cc-onboarding">
       <div className="cc-onboarding__container">

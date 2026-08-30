@@ -17,11 +17,10 @@ import type {
   ReviewStatus,
 } from '../../types/api';
 import { queryKeys } from './queryKeys';
-
+import { translateUi } from '../../i18n';
 export type ReviewDecisionResult = ReviewDecisionResponse & {
   agentRunOutcome: AgentRunReviewOutcome | null;
 };
-
 export function useReviewsQuery(status: ReviewStatus = 'pending', projectId?: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
@@ -35,7 +34,6 @@ export function useReviewsQuery(status: ReviewStatus = 'pending', projectId?: st
     enabled: !!serverUrl,
   });
 }
-
 export function useDecideReview() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -74,10 +72,10 @@ export function useDecideReview() {
           : 'Review decision saved';
       useToastStore.getState().addToast('success', message);
     },
-    onError: () => useToastStore.getState().addToast('error', 'Could not save review decision'),
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Could not save review decision')),
   });
 }
-
 export function useArtifactsQuery(projectId: string | undefined) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
@@ -89,7 +87,6 @@ export function useArtifactsQuery(projectId: string | undefined) {
     enabled: !!serverUrl && !!projectId,
   });
 }
-
 export function useCreateArtifact(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -100,12 +97,12 @@ export function useCreateArtifact(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.artifacts(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
-      useToastStore.getState().addToast('success', 'Artifact created');
+      useToastStore.getState().addToast('success', translateUi('Artifact created'));
     },
-    onError: () => useToastStore.getState().addToast('error', 'Could not create artifact'),
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Could not create artifact')),
   });
 }
-
 export function useProposeArtifactRevision(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -129,8 +126,9 @@ export function useProposeArtifactRevision(projectId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
       queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.taskExecutionTelemetry });
-      useToastStore.getState().addToast('success', 'Revision sent to review');
+      useToastStore.getState().addToast('success', translateUi('Revision sent to review'));
     },
-    onError: () => useToastStore.getState().addToast('error', 'Could not propose revision'),
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Could not propose revision')),
   });
 }

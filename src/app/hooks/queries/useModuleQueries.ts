@@ -34,20 +34,16 @@ import type {
 import { queryKeys } from './queryKeys';
 import { getTaskStatusLabel } from '../../utils/taskStatus';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
-
+import { translateUi } from '../../i18n';
 // ---------------------------------------------------------------------------
 // Pending delete timers (for undo-on-delete pattern)
 // ---------------------------------------------------------------------------
-
 const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
-
 // ---------------------------------------------------------------------------
 // Query hooks — fetch + validate, data lives in TanStack Query cache
 // ---------------------------------------------------------------------------
-
 export function useTodosQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-
   return useQuery({
     queryKey: queryKeys.todos,
     queryFn: async () => {
@@ -58,10 +54,8 @@ export function useTodosQuery() {
     enabled: !!serverUrl,
   });
 }
-
 export function useEventsQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-
   return useQuery({
     queryKey: queryKeys.events,
     queryFn: async () => {
@@ -72,11 +66,9 @@ export function useEventsQuery() {
     enabled: !!serverUrl,
   });
 }
-
 // ---------------------------------------------------------------------------
 // Mutation hooks — optimistic updates in query cache
 // ---------------------------------------------------------------------------
-
 export function useCreateTodo() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -87,7 +79,6 @@ export function useCreateTodo() {
     onMutate: async (newTodo) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
       const previous = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos);
-
       // Optimistic insert with temporary ID
       const optimistic: TodoResponse = {
         id: `temp-${Date.now()}`,
@@ -109,17 +100,16 @@ export function useCreateTodo() {
         optimistic,
         ...(old ?? []),
       ]);
-
       return { previous };
     },
     onError: (_err, _newTodo, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.todos, context.previous);
       }
-      useToastStore.getState().addToast('error', 'Failed to create task');
+      useToastStore.getState().addToast('error', translateUi('Failed to create task'));
     },
     onSuccess: () => {
-      useToastStore.getState().addToast('success', 'Task created');
+      useToastStore.getState().addToast('success', translateUi('Task created'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
@@ -128,7 +118,6 @@ export function useCreateTodo() {
     },
   });
 }
-
 export function useUpdateTodo() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -138,7 +127,6 @@ export function useUpdateTodo() {
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
       const previous = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos);
-
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
         (old ?? []).map((t) =>
           t.id === id
@@ -146,7 +134,6 @@ export function useUpdateTodo() {
             : t,
         ),
       );
-
       return { previous };
     },
     onError: (_err, _vars, context) => {
@@ -155,7 +142,7 @@ export function useUpdateTodo() {
       }
       useToastStore
         .getState()
-        .addToast('error', 'Failed to update task on server, changes reverted');
+        .addToast('error', translateUi('Failed to update task on server, changes reverted'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
@@ -164,7 +151,6 @@ export function useUpdateTodo() {
     },
   });
 }
-
 export function usePlaceTodo() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -197,7 +183,6 @@ export function usePlaceTodo() {
           }
         });
       }
-
       const moved = previous?.find((todo) => todo.id === id);
       const orderUpdates = new Map<string, number>();
       const inScope = (todo: TodoResponse, projectId: string | null, parentId: string | null) =>
@@ -208,7 +193,6 @@ export function usePlaceTodo() {
         (left.sort_order ?? 0) - (right.sort_order ?? 0) || left.id.localeCompare(right.id);
       const renumber = (items: TodoResponse[]) =>
         items.forEach((todo, index) => orderUpdates.set(todo.id, index * 10));
-
       if (moved && previous) {
         const oldScope = [moved.project_id ?? null, moved.parent_id ?? null] as const;
         const newScope = [placement.project_id, effectiveParentId ?? null] as const;
@@ -229,7 +213,6 @@ export function usePlaceTodo() {
         target.splice(beforeIndex >= 0 ? beforeIndex : target.length, 0, moved);
         renumber(target);
       }
-
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (current) =>
         (current ?? []).map((todo) => {
           if (!descendants.has(todo.id) && !orderUpdates.has(todo.id)) return todo;
@@ -259,7 +242,6 @@ export function usePlaceTodo() {
     },
   });
 }
-
 export function useUndoTodoPlacement() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -274,7 +256,6 @@ export function useUndoTodoPlacement() {
     },
   });
 }
-
 export function usePlaceTodosBatch() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -291,7 +272,6 @@ export function usePlaceTodosBatch() {
     },
   });
 }
-
 export function usePlaceTodoGroups() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -308,7 +288,6 @@ export function usePlaceTodoGroups() {
     },
   });
 }
-
 export function usePreviewInboxTriage() {
   return useMutation({
     mutationFn: async (request: InboxTriagePreviewRequest): Promise<InboxTriagePreviewResponse> => {
@@ -317,7 +296,6 @@ export function usePreviewInboxTriage() {
     },
   });
 }
-
 export function useDeleteTodo() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -336,7 +314,9 @@ export function useDeleteTodo() {
             logger.warn('Failed to delete todo on server:', err);
             // Rollback: refetch to restore
             queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-            useToastStore.getState().addToast('error', 'Failed to delete task on server');
+            useToastStore
+              .getState()
+              .addToast('error', translateUi('Failed to delete task on server'));
           }
         }, 5000);
         pendingDeletes.set(id, timeoutId);
@@ -347,18 +327,16 @@ export function useDeleteTodo() {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
       const previous = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos);
       const deleted = previous?.find((t) => t.id === id);
-
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
         (old ?? []).filter((t) => t.id !== id),
       );
-
       return { previous, deleted };
     },
     onSuccess: (_data, id, context) => {
-      useToastStore.getState().addToast('success', 'Task deleted', {
+      useToastStore.getState().addToast('success', translateUi('Task deleted'), {
         duration: 5000,
         action: {
-          label: 'Undo',
+          label: translateUi('Undo'),
           onClick: () => {
             // Cancel the pending server delete
             const timer = pendingDeletes.get(id);
@@ -382,7 +360,6 @@ export function useDeleteTodo() {
     },
   });
 }
-
 export function useToggleTodoComplete() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -395,15 +372,15 @@ export function useToggleTodoComplete() {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
       const previous = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos);
       const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
         (old ?? []).map((t) => (t.id === id ? { ...t, status: newStatus } : t)),
       );
-
       useToastStore
         .getState()
-        .addToast('success', newStatus === 'completed' ? 'Task completed' : 'Task reopened');
-
+        .addToast(
+          'success',
+          translateUi(newStatus === 'completed' ? 'Task completed' : 'Task reopened'),
+        );
       return { previous };
     },
     onError: (_err, _variables, context) => {
@@ -412,7 +389,7 @@ export function useToggleTodoComplete() {
       }
       useToastStore
         .getState()
-        .addToast('error', 'Failed to update task on server, change reverted');
+        .addToast('error', translateUi('Failed to update task on server, change reverted'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
@@ -421,7 +398,6 @@ export function useToggleTodoComplete() {
     },
   });
 }
-
 export function useSetTaskStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -431,20 +407,24 @@ export function useSetTaskStatus() {
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
       const prevTodos = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos);
-
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
         (old ?? []).map((t) => (t.id === id ? { ...t, status } : t)),
       );
-
-      useToastStore.getState().addToast('success', `Task moved to ${getTaskStatusLabel(status)}`);
-
+      useToastStore
+        .getState()
+        .addToast(
+          'success',
+          translateUi('Task moved to {{status}}', { status: getTaskStatusLabel(status) }),
+        );
       return { prevTodos };
     },
     onError: (_err, _variables, context) => {
       if (context?.prevTodos) {
         queryClient.setQueryData(queryKeys.todos, context.prevTodos);
       }
-      useToastStore.getState().addToast('error', 'Failed to move task on server, change reverted');
+      useToastStore
+        .getState()
+        .addToast('error', translateUi('Failed to move task on server, change reverted'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
@@ -453,7 +433,6 @@ export function useSetTaskStatus() {
     },
   });
 }
-
 export function useReorderTodos() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -467,20 +446,18 @@ export function useReorderTodos() {
     onMutate: async ({ updates }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
       const previous = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos);
-
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
         (old ?? []).map((t) =>
           updates[t.id] !== undefined ? { ...t, sort_order: updates[t.id] } : t,
         ),
       );
-
       return { previous };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.todos, context.previous);
       }
-      useToastStore.getState().addToast('error', 'Failed to save reorder on server');
+      useToastStore.getState().addToast('error', translateUi('Failed to save reorder on server'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
@@ -488,7 +465,6 @@ export function useReorderTodos() {
     },
   });
 }
-
 export function useCreateEvent() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -497,7 +473,7 @@ export function useCreateEvent() {
       return response.data as EventResponse;
     },
     onSuccess: () => {
-      useToastStore.getState().addToast('success', 'Event created');
+      useToastStore.getState().addToast('success', translateUi('Event created'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events });
@@ -505,7 +481,6 @@ export function useCreateEvent() {
     },
   });
 }
-
 export function useUpdateEvent() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -515,7 +490,6 @@ export function useUpdateEvent() {
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.events });
       const previous = queryClient.getQueryData<EventResponse[]>(queryKeys.events);
-
       queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) =>
         (old ?? []).map((e) =>
           e.id === id
@@ -523,7 +497,6 @@ export function useUpdateEvent() {
             : e,
         ),
       );
-
       return { previous };
     },
     onError: (_err, _vars, context) => {
@@ -532,7 +505,7 @@ export function useUpdateEvent() {
       }
       useToastStore
         .getState()
-        .addToast('error', 'Failed to update event on server, changes reverted');
+        .addToast('error', translateUi('Failed to update event on server, changes reverted'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events });
@@ -540,7 +513,6 @@ export function useUpdateEvent() {
     },
   });
 }
-
 export function useDeleteEvent() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -553,7 +525,9 @@ export function useDeleteEvent() {
           } catch (err) {
             logger.warn('Failed to delete event on server:', err);
             queryClient.invalidateQueries({ queryKey: queryKeys.events });
-            useToastStore.getState().addToast('error', 'Failed to delete event on server');
+            useToastStore
+              .getState()
+              .addToast('error', translateUi('Failed to delete event on server'));
           }
         }, 5000);
         pendingDeletes.set(id, timeoutId);
@@ -564,18 +538,16 @@ export function useDeleteEvent() {
       await queryClient.cancelQueries({ queryKey: queryKeys.events });
       const previous = queryClient.getQueryData<EventResponse[]>(queryKeys.events);
       const deleted = previous?.find((e) => e.id === id);
-
       queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) =>
         (old ?? []).filter((e) => e.id !== id),
       );
-
       return { previous, deleted };
     },
     onSuccess: (_data, id, context) => {
-      useToastStore.getState().addToast('success', 'Event deleted', {
+      useToastStore.getState().addToast('success', translateUi('Event deleted'), {
         duration: 5000,
         action: {
-          label: 'Undo',
+          label: translateUi('Undo'),
           onClick: () => {
             const timer = pendingDeletes.get(id);
             if (timer) {
@@ -597,7 +569,6 @@ export function useDeleteEvent() {
     },
   });
 }
-
 export function useDeleteEventOccurrence() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -613,7 +584,7 @@ export function useDeleteEventOccurrence() {
       await apiClient.delete(`/events/${eventId}/occurrences/${date}`, { params: { mode } });
     },
     onSuccess: () => {
-      useToastStore.getState().addToast('success', 'Occurrence deleted');
+      useToastStore.getState().addToast('success', translateUi('Occurrence deleted'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.events });
@@ -621,14 +592,11 @@ export function useDeleteEventOccurrence() {
     },
   });
 }
-
 // ---------------------------------------------------------------------------
 // Attachments
 // ---------------------------------------------------------------------------
-
 export function useAttachmentsQuery(ownerId: string, ownerType: 'todo') {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-
   return useQuery({
     queryKey: queryKeys.attachments(ownerId),
     queryFn: async () => {
@@ -639,7 +607,6 @@ export function useAttachmentsQuery(ownerId: string, ownerType: 'todo') {
     enabled: !!serverUrl && !!ownerId,
   });
 }
-
 export function useUploadAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -657,7 +624,6 @@ export function useUploadAttachment() {
     },
   });
 }
-
 export function useDeleteAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -669,7 +635,6 @@ export function useDeleteAttachment() {
     },
   });
 }
-
 export function useBulkUpdateTodos() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -678,10 +643,10 @@ export function useBulkUpdateTodos() {
     },
     onSuccess: () => {
       useModuleStore.setState({ selectedTodoIds: new Set<string>() });
-      useToastStore.getState().addToast('success', 'Bulk operation completed');
+      useToastStore.getState().addToast('success', translateUi('Bulk operation completed'));
     },
     onError: () => {
-      useToastStore.getState().addToast('error', 'Bulk operation failed');
+      useToastStore.getState().addToast('error', translateUi('Bulk operation failed'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });

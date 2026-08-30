@@ -20,12 +20,11 @@ import { useKanbanShortcuts } from '../../keyboard';
 import KanbanBoardView from './KanbanBoardView';
 import type { TasksViewMode } from './TasksHeader';
 import { ClipboardIcon, SpinArrowsIcon, CheckCircleIcon, CloseIcon } from '../shared/Icons';
-
+import { translateUi } from '../../i18n';
 interface KanbanBoardProps {
   viewMode: TasksViewMode;
   onViewModeChange: (mode: TasksViewMode) => void;
 }
-
 export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardProps) {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
@@ -34,15 +33,12 @@ export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardP
   const selectedTodoIds = useModuleStore((s) => s.selectedTodoIds);
   const toggleTodoSelection = useModuleStore((s) => s.toggleTodoSelection);
   const clearTodoSelection = useModuleStore((s) => s.clearTodoSelection);
-
   const toggleMutation = useToggleTodoComplete();
   const deleteMutation = useDeleteTodo();
   const setTaskStatusMutation = useSetTaskStatus();
   const reorderMutation = useReorderTodos();
   const updateTodoMutation = useUpdateTodo();
-
   const isMultiSelectMode = selectedTodoIds.size > 0;
-
   useKanbanShortcuts({ onNewTask: () => useQuickCaptureStore.getState().open() });
   useHotkeys(
     'Escape',
@@ -51,12 +47,10 @@ export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardP
     },
     { enableOnFormTags: true },
   );
-
   const filteredTodos = useKanbanFilters(todos, kanbanFilters);
   const visibleTodos = kanbanFilters.showSubTasks
     ? filteredTodos
     : filteredTodos.filter((t) => !t.parent_id);
-
   const todoTasks = useMemo(
     () => visibleTodos.filter((t) => t.status === 'pending'),
     [visibleTodos],
@@ -73,12 +67,10 @@ export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardP
     () => visibleTodos.filter((t) => t.status === 'cancelled'),
     [visibleTodos],
   );
-
   const allTasksFlat = useMemo(
     () => [...todoTasks, ...inProgressTasks, ...doneTasks, ...cancelledTasks],
     [todoTasks, inProgressTasks, doneTasks, cancelledTasks],
   );
-
   const handleToggle = useCallback(
     (id: string) => {
       const todo = todos.find((t) => t.id === id);
@@ -86,27 +78,23 @@ export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardP
     },
     [todos, toggleMutation],
   );
-
   const handleDelete = useCallback(
     (id: string) => {
       deleteMutation.mutate(id);
     },
     [deleteMutation],
   );
-
   const { focusedTaskId, setFocusedTaskId } = useKanbanKeyboardNav({
     allTasksFlat,
     toggleTodoComplete: handleToggle,
     deleteTodo: handleDelete,
   });
-
   const handleSetTaskStatus = useCallback(
     (id: string, status: TaskStatus) => {
       setTaskStatusMutation.mutate({ id, status });
     },
     [setTaskStatusMutation],
   );
-
   const handleReorder = useCallback(
     (todoId: string, newIndex: number, columnStatus: TaskStatus) => {
       const columnTodos = todos
@@ -124,21 +112,18 @@ export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardP
     },
     [todos, reorderMutation],
   );
-
   const handleSetParent = useCallback(
     (childId: string, parentId: string) => {
       updateTodoMutation.mutate({ id: childId, data: { parent_id: parentId } });
     },
     [updateTodoMutation],
   );
-
   const handleClearParent = useCallback(
     (childId: string) => {
       updateTodoMutation.mutate({ id: childId, data: { parent_id: null } });
     },
     [updateTodoMutation],
   );
-
   const getParentId = useCallback(
     (todoId: string) => {
       const todo = todos.find((t) => t.id === todoId);
@@ -146,14 +131,12 @@ export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardP
     },
     [todos],
   );
-
   const getChildIds = useCallback(
     (todoId: string) => {
       return todos.filter((t) => t.parent_id === todoId).map((t) => t.id);
     },
     [todos],
   );
-
   const { handleDragStart, handleDragEnd } = useKanbanDragDrop({
     setTaskStatus: handleSetTaskStatus,
     reorderTodoInColumn: handleReorder,
@@ -162,37 +145,34 @@ export default function KanbanBoard({ viewMode, onViewModeChange }: KanbanBoardP
     getParentId,
     getChildIds,
   });
-
   const handleClickTask = (id: string) => navigate(`/tasks/${id}`);
   const handleMove = (id: string, status: TaskStatus) => handleSetTaskStatus(id, status);
-
   const columnDefs = [
     {
       status: 'pending' as const,
-      title: 'Todo',
+      title: translateUi('Todo'),
       icon: <ClipboardIcon size={14} />,
       tasks: todoTasks,
     },
     {
       status: 'in_progress' as const,
-      title: 'In Progress',
+      title: translateUi('In Progress'),
       icon: <SpinArrowsIcon size={14} />,
       tasks: inProgressTasks,
     },
     {
       status: 'completed' as const,
-      title: 'Done',
+      title: translateUi('Done'),
       icon: <CheckCircleIcon size={14} />,
       tasks: doneTasks,
     },
     {
       status: 'cancelled' as const,
-      title: 'Cancelled',
+      title: translateUi('Cancelled'),
       icon: <CloseIcon size={14} />,
       tasks: cancelledTasks,
     },
   ];
-
   return (
     <KanbanBoardView
       todos={todos}

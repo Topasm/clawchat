@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useTodosQuery } from '../../hooks/queries';
 import { MagnifyingGlassIcon } from '../shared/Icons';
-
+import { translateUi } from '../../i18n';
 const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 const SORT_OPTIONS = [
   { value: 'created_at', label: 'Date Created' },
@@ -12,11 +12,9 @@ const SORT_OPTIONS = [
   { value: 'updated_at', label: 'Last Updated' },
   { value: 'sort_order', label: 'Manual Order' },
 ] as const;
-
 interface KanbanFilterBarProps {
   showSubtaskToggle?: boolean;
 }
-
 export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilterBarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filters = useModuleStore((s) => s.kanbanFilters);
@@ -27,16 +25,13 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
   const clearFilters = useModuleStore((s) => s.clearKanbanFilters);
   const toggleSubTasks = useModuleStore((s) => s.toggleShowSubTasks);
   const { data: todos = [] } = useTodosQuery();
-
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
     todos.forEach((t) => t.tags?.forEach((tag) => tagSet.add(tag)));
     return Array.from(tagSet).sort();
   }, [todos]);
-
   const hasActiveFilters =
     filters.searchQuery || filters.priorities.length > 0 || filters.tags.length > 0;
-
   return (
     <div className="cc-kanban-filter">
       <div className="cc-kanban-filter__search">
@@ -45,8 +40,8 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
           ref={searchInputRef}
           className="cc-kanban-filter__search-input"
           type="text"
-          aria-label="Search tasks"
-          placeholder="Search tasks…"
+          aria-label={translateUi('Search tasks')}
+          placeholder={translateUi('Search tasks\u2026')}
           value={filters.searchQuery}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -60,7 +55,7 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
             aria-pressed={filters.priorities.includes(p)}
             onClick={() => togglePriority(p)}
           >
-            {p.charAt(0).toUpperCase() + p.slice(1)}
+            {translateUi(p.charAt(0).toUpperCase() + p.slice(1))}
           </button>
         ))}
       </div>
@@ -68,18 +63,21 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
       {allTags.length > 0 && (
         <select
           className="cc-kanban-filter__select"
-          aria-label="Filter tasks by tag"
+          aria-label={translateUi('Filter tasks by tag')}
           value=""
           onChange={(e) => {
             if (e.target.value) toggleTag(e.target.value);
           }}
         >
           <option value="">
-            {filters.tags.length > 0 ? `Tags (${filters.tags.length})` : 'Filter by tag'}
+            {filters.tags.length > 0
+              ? translateUi('Tags ({{count}})', { count: filters.tags.length })
+              : translateUi('Filter by tag')}
           </option>
           {allTags.map((tag) => (
             <option key={tag} value={tag}>
-              {filters.tags.includes(tag) ? '✓ ' : ''}{tag}
+              {filters.tags.includes(tag) ? '✓ ' : ''}
+              {tag}
             </option>
           ))}
         </select>
@@ -87,18 +85,25 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
 
       <select
         className="cc-kanban-filter__select"
-        aria-label="Sort tasks"
+        aria-label={translateUi('Sort tasks')}
         value={`${filters.sortField}-${filters.sortDirection}`}
         onChange={(e) => {
-          const [field, dir] = e.target.value.split('-') as [typeof filters.sortField, typeof filters.sortDirection];
+          const [field, dir] = e.target.value.split('-') as [
+            typeof filters.sortField,
+            typeof filters.sortDirection,
+          ];
           setSort(field, dir);
         }}
       >
         {SORT_OPTIONS.map((opt) => (
-          <option key={`${opt.value}-desc`} value={`${opt.value}-desc`}>↓ {opt.label}</option>
+          <option key={`${opt.value}-desc`} value={`${opt.value}-desc`}>
+            ↓ {translateUi(opt.label)}
+          </option>
         ))}
         {SORT_OPTIONS.map((opt) => (
-          <option key={`${opt.value}-asc`} value={`${opt.value}-asc`}>↑ {opt.label}</option>
+          <option key={`${opt.value}-asc`} value={`${opt.value}-asc`}>
+            ↑ {translateUi(opt.label)}
+          </option>
         ))}
       </select>
 
@@ -108,19 +113,18 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
           aria-pressed={filters.showSubTasks}
           onClick={toggleSubTasks}
         >
-          Sub-tasks
+          {translateUi('\n          Sub-tasks\n        ')}
         </button>
       )}
 
       {hasActiveFilters && (
         <button className="cc-kanban-filter__clear" onClick={clearFilters}>
-          Clear
+          {translateUi('\n          Clear\n        ')}
         </button>
       )}
     </div>
   );
 }
-
 export function focusKanbanSearch() {
   const el = document.querySelector<HTMLInputElement>('.cc-kanban-filter__search-input');
   el?.focus();

@@ -5,6 +5,7 @@ import KanbanCard from './KanbanCard';
 import SwipeActions from './SwipeActions';
 import EmptyState from '../shared/EmptyState';
 import { ClipboardIcon } from '../shared/Icons';
+import { translateUi } from '../../i18n';
 
 interface KanbanColumnProps {
   status: TaskStatus;
@@ -126,7 +127,7 @@ export default function KanbanColumn({
             {rootTasks.length === 0 && !snapshot.isDraggingOver ? (
               <EmptyState
                 icon={<ClipboardIcon size={20} />}
-                message={`No ${title.toLowerCase()} tasks`}
+                message={translateUi('No {{status}} tasks', { status: translateUi(title) })}
               />
             ) : (
               rootTasks.map((task) => {

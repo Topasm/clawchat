@@ -6,12 +6,15 @@ import { queryClient } from './app/config/queryClient';
 import { initializeQueryCachePersistence } from './app/config/queryCachePersistence';
 import ErrorBoundary from './app/components/shared/ErrorBoundary';
 import AppRuntimeServices from './app/components/app-shell/AppRuntimeServices';
+import { useTranslation } from './app/i18n';
 import AppRouter from './router';
 import { initializeUpdateLifecycle } from './app/services/updateLifecycle';
 
 initializeQueryCachePersistence();
 
 export default function App() {
+  const { i18n } = useTranslation();
+
   useEffect(() => {
     initializeUpdateLifecycle();
   }, []);
@@ -22,7 +25,7 @@ export default function App() {
         <ThemeProvider>
           <BrowserRouter>
             <AppRuntimeServices />
-            <AppRouter />
+            <AppRouter key={i18n.language} />
           </BrowserRouter>
         </ThemeProvider>
       </QueryClientProvider>

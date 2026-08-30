@@ -1,12 +1,11 @@
 import type { TaskExecutionTelemetryResponse } from '../../types/api';
 import { getTaskExecutionBadges } from '../../utils/taskExecutionTelemetry';
-
+import { translateUi } from '../../i18n';
 interface InboxExecutionTelemetryPanelProps {
   telemetry: TaskExecutionTelemetryResponse;
   projectId?: string | null;
   onNavigate: (path: string) => void;
 }
-
 /** Agent run and artifact activity for the inspected task. */
 export default function InboxExecutionTelemetryPanel({
   telemetry,
@@ -14,9 +13,12 @@ export default function InboxExecutionTelemetryPanel({
   onNavigate,
 }: InboxExecutionTelemetryPanelProps) {
   return (
-    <section className="cc-inbox-triage__execution-telemetry" aria-label="Task execution activity">
+    <section
+      className="cc-inbox-triage__execution-telemetry"
+      aria-label={translateUi('Task execution activity')}
+    >
       <div className="cc-inbox-triage__execution-heading">
-        <strong>Execution activity</strong>
+        <strong>{translateUi('Execution activity')}</strong>
         <div className="cc-inbox-tree__telemetry">
           {getTaskExecutionBadges(telemetry).map((badge) => (
             <span key={badge.key} className="cc-inbox-tree__telemetry-badge" data-tone={badge.tone}>
@@ -27,7 +29,10 @@ export default function InboxExecutionTelemetryPanel({
       </div>
       {telemetry.latest_run_progress_message && <p>{telemetry.latest_run_progress_message}</p>}
       {telemetry.latest_artifact_title && (
-        <small>Latest artifact: {telemetry.latest_artifact_title}</small>
+        <small>
+          {translateUi('Latest artifact: ')}
+          {telemetry.latest_artifact_title}
+        </small>
       )}
       <div className="cc-inbox-triage__execution-actions">
         {telemetry.latest_run_id && (
@@ -36,7 +41,7 @@ export default function InboxExecutionTelemetryPanel({
             className="cc-btn cc-btn--ghost"
             onClick={() => onNavigate(`/runs?run_id=${telemetry.latest_run_id}`)}
           >
-            Open run
+            {translateUi('\n            Open run\n          ')}
           </button>
         )}
         {telemetry.pending_review_count > 0 && (
@@ -45,7 +50,7 @@ export default function InboxExecutionTelemetryPanel({
             className="cc-btn cc-btn--ghost"
             onClick={() => onNavigate(`/review${projectId ? `?project_id=${projectId}` : ''}`)}
           >
-            Review
+            {translateUi('\n            Review\n          ')}
           </button>
         )}
         {telemetry.artifact_count > 0 && projectId && (
@@ -54,7 +59,7 @@ export default function InboxExecutionTelemetryPanel({
             className="cc-btn cc-btn--ghost"
             onClick={() => onNavigate(`/projects/${projectId}?section=artifacts`)}
           >
-            Artifacts
+            {translateUi('\n            Artifacts\n          ')}
           </button>
         )}
       </div>

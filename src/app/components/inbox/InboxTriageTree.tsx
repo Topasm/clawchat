@@ -13,7 +13,7 @@ import {
   INBOX_TASK_DRAG_TYPE,
   transferHasType,
 } from './inboxDragTransfer';
-
+import { translateUi } from '../../i18n';
 interface InboxTriageTreeProps {
   projects: ProjectResponse[];
   todos: TodoResponse[];
@@ -31,14 +31,12 @@ interface InboxTriageTreeProps {
   ) => void;
   onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
 }
-
 function sorted(items: TodoResponse[]) {
   return [...items].sort(
     (left, right) =>
       (left.sort_order ?? 0) - (right.sort_order ?? 0) || left.title.localeCompare(right.title),
   );
 }
-
 export default function InboxTriageTree({
   projects,
   todos,
@@ -52,16 +50,17 @@ export default function InboxTriageTree({
   onPreviewDependency,
 }: InboxTriageTreeProps) {
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
-
   return (
-    <Pane as="section" className="cc-inbox-tree" aria-label="Project work tree">
+    <Pane as="section" className="cc-inbox-tree" aria-label={translateUi('Project work tree')}>
       <header className="cc-inbox-tree__header">
         <div>
-          <strong>Project / Work Tree</strong>
+          <strong>{translateUi('Project / Work Tree')}</strong>
           <span>
             {batchTaskIds.length > 1
-              ? `${batchTaskIds.length} tasks selected for one atomic move`
-              : 'Drop a card to place the same task'}
+              ? translateUi('{{count}} tasks selected for one atomic move', {
+                  count: batchTaskIds.length,
+                })
+              : translateUi('Drop a card to place the same task')}
           </span>
         </div>
       </header>
@@ -103,14 +102,22 @@ export default function InboxTriageTree({
                 }}
               >
                 <strong>{project.title}</strong>
-                <span>{project.task_count} tasks</span>
+                <span>
+                  {project.task_count}
+                  {translateUi(' tasks')}
+                </span>
                 {(selectedTaskId || batchTaskIds.length > 1) && (
                   <button
                     type="button"
                     aria-label={
                       batchTaskIds.length > 1
-                        ? `Place ${batchTaskIds.length} selected tasks in ${project.title}`
-                        : `Place selected task in ${project.title}`
+                        ? translateUi('Place {{count}} selected tasks in {{title}}', {
+                            count: batchTaskIds.length,
+                            title: project.title,
+                          })
+                        : translateUi('Place selected task in {{title}}', {
+                            title: project.title,
+                          })
                     }
                     disabled={disabled}
                     onClick={() => {
@@ -121,13 +128,15 @@ export default function InboxTriageTree({
                       }
                     }}
                   >
-                    Place here
+                    {translateUi('\n                    Place here\n                  ')}
                   </button>
                 )}
               </div>
               <div className="cc-inbox-tree__nodes">
                 {roots.length === 0 ? (
-                  <span className="cc-inbox-tree__empty">Drop here to start this project</span>
+                  <span className="cc-inbox-tree__empty">
+                    {translateUi('Drop here to start this project')}
+                  </span>
                 ) : (
                   roots.map((task) => (
                     <TreeNode
@@ -152,13 +161,14 @@ export default function InboxTriageTree({
           );
         })}
         {projects.length === 0 && (
-          <div className="cc-inbox-tree__empty">Create a project before placing Inbox tasks.</div>
+          <div className="cc-inbox-tree__empty">
+            {translateUi('Create a project before placing Inbox tasks.')}
+          </div>
         )}
       </div>
     </Pane>
   );
 }
-
 function TreeNode({
   task,
   projectId,
@@ -239,7 +249,10 @@ function TreeNode({
           <span className="cc-inbox-tree__identity">
             <strong>{task.title}</strong>
             {executionBadges.length > 0 && (
-              <span className="cc-inbox-tree__telemetry" aria-label="Execution activity">
+              <span
+                className="cc-inbox-tree__telemetry"
+                aria-label={translateUi('Execution activity')}
+              >
                 {executionBadges.map((badge) => (
                   <span
                     key={badge.key}
@@ -257,11 +270,14 @@ function TreeNode({
         <button
           type="button"
           className="cc-inbox-tree__dependency-handle"
-          aria-label={`Dependency connector for ${task.title}. Drag to a prerequisite or drop a dependent here.`}
+          aria-label={translateUi(
+            'Dependency connector for {{title}}. Drag to a prerequisite or drop a dependent here.',
+            { title: task.title },
+          )}
           title={
             selectedTaskId && selectedTaskId !== task.id
-              ? `Make selected task wait for ${task.title}`
-              : 'Drag to the task that must finish first'
+              ? translateUi('Make selected task wait for {{title}}', { title: task.title })
+              : translateUi('Drag to the task that must finish first')
           }
           draggable={!disabled}
           disabled={disabled}
@@ -304,8 +320,11 @@ function TreeNode({
               className="cc-inbox-tree__place-button"
               aria-label={
                 batchTaskIds.length > 1
-                  ? `Place ${batchTaskIds.length} selected tasks before ${task.title}`
-                  : `Place selected task before ${task.title}`
+                  ? translateUi('Place {{count}} selected tasks before {{title}}', {
+                      count: batchTaskIds.length,
+                      title: task.title,
+                    })
+                  : translateUi('Place selected task before {{title}}', { title: task.title })
               }
               disabled={disabled}
               onClick={() => {
@@ -316,15 +335,18 @@ function TreeNode({
                 }
               }}
             >
-              Before
+              {translateUi('\n              Before\n            ')}
             </button>
             <button
               type="button"
               className="cc-inbox-tree__place-button"
               aria-label={
                 batchTaskIds.length > 1
-                  ? `Place ${batchTaskIds.length} selected tasks under ${task.title}`
-                  : `Place selected task under ${task.title}`
+                  ? translateUi('Place {{count}} selected tasks under {{title}}', {
+                      count: batchTaskIds.length,
+                      title: task.title,
+                    })
+                  : translateUi('Place selected task under {{title}}', { title: task.title })
               }
               disabled={disabled}
               onClick={() => {
@@ -335,7 +357,7 @@ function TreeNode({
                 }
               }}
             >
-              Under
+              {translateUi('\n              Under\n            ')}
             </button>
           </div>
         )}

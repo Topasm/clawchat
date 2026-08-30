@@ -18,14 +18,12 @@ import type {
   ProjectUpdate,
 } from '../../types/api';
 import { queryKeys } from './queryKeys';
-
+import { translateUi } from '../../i18n';
 // ---------------------------------------------------------------------------
 // Query hooks — data lives in TanStack Query cache
 // ---------------------------------------------------------------------------
-
 export function useProjectsQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-
   return useQuery({
     queryKey: queryKeys.projects,
     queryFn: async () => {
@@ -36,7 +34,6 @@ export function useProjectsQuery() {
     enabled: !!serverUrl,
   });
 }
-
 export function useProjectQuery(projectId: string | undefined) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
@@ -48,7 +45,6 @@ export function useProjectQuery(projectId: string | undefined) {
     enabled: !!serverUrl && !!projectId,
   });
 }
-
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -62,14 +58,13 @@ export function useCreateProject() {
         ...(current ?? []),
       ]);
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-      useToastStore.getState().addToast('success', 'Project created');
+      useToastStore.getState().addToast('success', translateUi('Project created'));
     },
     onError: () => {
-      useToastStore.getState().addToast('error', 'Failed to create project');
+      useToastStore.getState().addToast('error', translateUi('Failed to create project'));
     },
   });
 }
-
 export function useUpdateProject(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -82,17 +77,15 @@ export function useUpdateProject(projectId: string) {
         current?.map((item) => (item.id === project.id ? project : item)),
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.project(project.id) });
-      useToastStore.getState().addToast('success', 'Project execution settings saved');
+      useToastStore.getState().addToast('success', translateUi('Project execution settings saved'));
     },
     onError: () => {
-      useToastStore.getState().addToast('error', 'Could not save project settings');
+      useToastStore.getState().addToast('error', translateUi('Could not save project settings'));
     },
   });
 }
-
 export function useConversationsQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-
   return useQuery({
     queryKey: queryKeys.conversations,
     queryFn: async () => {
@@ -103,10 +96,8 @@ export function useConversationsQuery() {
     enabled: !!serverUrl,
   });
 }
-
 export function useMessagesQuery(conversationId: string | null) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
-
   return useQuery({
     queryKey: queryKeys.messages(conversationId ?? ''),
     queryFn: async () => {
@@ -124,18 +115,19 @@ export function useMessagesQuery(conversationId: string | null) {
     enabled: !!serverUrl && !!conversationId,
   });
 }
-
 // ---------------------------------------------------------------------------
 // Mutation hooks — optimistic updates in query cache
 // ---------------------------------------------------------------------------
-
 export function useCreateConversation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
       title,
       projectTodoId,
-    }: { title?: string; projectTodoId?: string } = {}) => {
+    }: {
+      title?: string;
+      projectTodoId?: string;
+    } = {}) => {
       const convoTitle = title || 'New Conversation';
       try {
         const payload: Record<string, string> = { title: convoTitle };
@@ -150,7 +142,9 @@ export function useCreateConversation() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
-        useToastStore.getState().addToast('warning', 'Created locally, server sync failed');
+        useToastStore
+          .getState()
+          .addToast('warning', translateUi('Created locally, server sync failed'));
         return localConvo;
       }
     },
@@ -166,7 +160,6 @@ export function useCreateConversation() {
     },
   });
 }
-
 export function useDeleteConversation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -179,21 +172,22 @@ export function useDeleteConversation() {
       queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) =>
         (old ?? []).filter((c) => c.id !== id),
       );
-      useToastStore.getState().addToast('success', 'Conversation deleted');
+      useToastStore.getState().addToast('success', translateUi('Conversation deleted'));
       return { previous };
     },
     onError: (_err, _id, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.conversations, context.previous);
       }
-      useToastStore.getState().addToast('error', 'Failed to delete conversation on server');
+      useToastStore
+        .getState()
+        .addToast('error', translateUi('Failed to delete conversation on server'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
     },
   });
 }
-
 export function useGetOrCreateProjectConversation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -211,7 +205,6 @@ export function useGetOrCreateProjectConversation() {
     },
   });
 }
-
 export function useDeleteMessage() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -237,14 +230,13 @@ export function useDeleteMessage() {
       if (context?.previous && context?.queryKey) {
         queryClient.setQueryData(context.queryKey, context.previous);
       }
-      useToastStore.getState().addToast('error', 'Failed to delete message on server');
+      useToastStore.getState().addToast('error', translateUi('Failed to delete message on server'));
     },
     onSettled: (_data, _err, { conversationId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
     },
   });
 }
-
 export function useEditMessage() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -266,16 +258,13 @@ export function useEditMessage() {
       const queryKey = queryKeys.messages(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<ChatMessage[]>(queryKey);
-
       queryClient.setQueryData<ChatMessage[]>(queryKey, (old) => {
         if (!old) return old;
         const msgs = [...old];
         const msgIndex = msgs.findIndex((m) => m._id === messageId);
         if (msgIndex === -1) return msgs;
-
         // Update the message text
         msgs[msgIndex] = { ...msgs[msgIndex], text: newText };
-
         // Remove subsequent assistant messages (they'll be regenerated)
         // Messages are newest-first, so assistant messages after the edited one
         // are at lower indices
@@ -287,17 +276,14 @@ export function useEditMessage() {
             break;
           }
         }
-
         // Delete those assistant messages from server too (fire-and-forget)
         for (const id of assistantIdsToRemove) {
           apiClient
             .delete(`/chat/conversations/${conversationId}/messages/${id}`)
             .catch((err) => logger.warn('Failed to delete old assistant message:', err));
         }
-
         return msgs.filter((m) => !assistantIdsToRemove.includes(m._id));
       });
-
       return { previous, queryKey };
     },
     onError: (_err, _vars, context) => {
@@ -310,7 +296,6 @@ export function useEditMessage() {
     },
   });
 }
-
 export function useRegenerateMessage() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -325,7 +310,6 @@ export function useRegenerateMessage() {
       const messages = queryClient.getQueryData<ChatMessage[]>(queryKey) ?? [];
       const assistantIndex = messages.findIndex((m) => m._id === assistantMessageId);
       if (assistantIndex === -1) return null;
-
       // Find the user message that precedes this assistant message
       // Messages are newest-first
       let userMessage: ChatMessage | null = null;
@@ -336,17 +320,14 @@ export function useRegenerateMessage() {
         }
       }
       if (!userMessage) return null;
-
       // Remove the assistant message from cache
       queryClient.setQueryData<ChatMessage[]>(queryKey, (old) =>
         (old ?? []).filter((m) => m._id !== assistantMessageId),
       );
-
       // Delete from server (fire-and-forget)
       apiClient
         .delete(`/chat/conversations/${conversationId}/messages/${assistantMessageId}`)
         .catch((err) => logger.warn('Failed to delete assistant message on server:', err));
-
       return userMessage.text;
     },
   });

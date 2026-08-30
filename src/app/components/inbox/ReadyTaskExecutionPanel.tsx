@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-
 import type {
   ExecutionProviderStatus,
   ProjectResponse,
@@ -8,7 +7,7 @@ import type {
   TaskGraphInsightNode,
   TodoResponse,
 } from '../../types/api';
-
+import { translateUi } from '../../i18n';
 const ACTIVE_AGENT_RUN_STATUSES = new Set([
   'queued',
   'starting',
@@ -16,13 +15,11 @@ const ACTIVE_AGENT_RUN_STATUSES = new Set([
   'waiting_input',
   'waiting_review',
 ]);
-
 export interface ReadyTaskExecutionRequest {
   skillId: string;
   executionProvider: string;
   model?: string | null;
 }
-
 interface ReadyTaskExecutionPanelProps {
   task: TodoResponse;
   insight: TaskGraphInsightNode;
@@ -31,10 +28,11 @@ interface ReadyTaskExecutionPanelProps {
   skills: Skill[];
   providers: ExecutionProviderStatus[];
   isStarting: boolean;
-  onStart: (request: ReadyTaskExecutionRequest) => Promise<{ run_id: string }>;
+  onStart: (request: ReadyTaskExecutionRequest) => Promise<{
+    run_id: string;
+  }>;
   onOpenRun: (runId: string) => void;
 }
-
 export default function ReadyTaskExecutionPanel({
   task,
   insight,
@@ -54,14 +52,12 @@ export default function ReadyTaskExecutionPanel({
   const [providerId, setProviderId] = useState('');
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [startedRunId, setStartedRunId] = useState<string | null>(null);
-
   useEffect(() => {
     setSkillId('');
     setProviderId('');
     setConfirmationOpen(false);
     setStartedRunId(null);
   }, [task.id]);
-
   const selectedSkillId = skillId || assignedSkill || executableSkills[0]?.id || '';
   const selectedProviderId = providerId || project?.default_execution_provider || 'builtin';
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
@@ -76,27 +72,32 @@ export default function ReadyTaskExecutionPanel({
   const hasActiveRun = Boolean(
     telemetry?.latest_run_status && ACTIVE_AGENT_RUN_STATUSES.has(telemetry.latest_run_status),
   );
-
   if (insight.is_container || hasActiveRun) return null;
-
   return (
     <>
-      <section className="cc-inbox-triage__agent-execution" aria-label="Start agent execution">
+      <section
+        className="cc-inbox-triage__agent-execution"
+        aria-label={translateUi('Start agent execution')}
+      >
         <div className="cc-inbox-triage__agent-heading">
           <div>
-            <strong>Run with agent</strong>
+            <strong>{translateUi('Run with agent')}</strong>
             <small>
               {insight.is_ready
-                ? 'Ready · one run starts only after confirmation'
-                : `Unavailable while ${insight.execution_state.replace('_', ' ')}`}
+                ? translateUi('Ready \u00B7 one run starts only after confirmation')
+                : translateUi('Unavailable while {{state}}', {
+                    state: insight.execution_state.replace('_', ' '),
+                  })}
             </small>
           </div>
-          <span data-ready={insight.is_ready}>{insight.is_ready ? 'Ready' : 'Locked'}</span>
+          <span data-ready={insight.is_ready}>
+            {insight.is_ready ? translateUi('Ready') : translateUi('Locked')}
+          </span>
         </div>
         {insight.is_ready && (
           <>
             <label>
-              Skill
+              {translateUi('\n              Skill\n              ')}
               <select
                 value={selectedSkillId}
                 disabled={isStarting}
@@ -113,7 +114,7 @@ export default function ReadyTaskExecutionPanel({
               </select>
             </label>
             <label>
-              Provider
+              {translateUi('\n              Provider\n              ')}
               <select
                 value={selectedProviderId}
                 disabled={isStarting}
@@ -129,13 +130,17 @@ export default function ReadyTaskExecutionPanel({
                     disabled={!provider.enabled || !provider.available || !provider.connected}
                   >
                     {provider.label}
-                    {!provider.connected ? ' (unavailable)' : ''}
+                    {!provider.connected ? translateUi(' (unavailable)') : ''}
                   </option>
                 ))}
               </select>
             </label>
             {selectedProviderId === 'paseo' && !paseoWorkspaceReady && (
-              <p>Configure this Project’s execution workspace before using Paseo.</p>
+              <p>
+                {translateUi(
+                  'Configure this Project\u2019s execution workspace before using Paseo.',
+                )}
+              </p>
             )}
             {!confirmationOpen ? (
               <button
@@ -144,14 +149,16 @@ export default function ReadyTaskExecutionPanel({
                 disabled={!selectedSkillId || !providerReady || isStarting}
                 onClick={() => setConfirmationOpen(true)}
               >
-                Review agent run
+                {translateUi('\n                Review agent run\n              ')}
               </button>
             ) : (
               <div className="cc-inbox-triage__agent-confirm" aria-live="polite">
-                <strong>Start one approved run?</strong>
+                <strong>{translateUi('Start one approved run?')}</strong>
                 <p>
-                  “{task.title}” moves to In Progress. The result will wait for review before
-                  completion.
+                  “{task.title}
+                  {translateUi(
+                    '\u201D moves to In Progress. The result will wait for review before\n                  completion.\n                ',
+                  )}
                 </p>
                 <div>
                   <button
@@ -175,7 +182,7 @@ export default function ReadyTaskExecutionPanel({
                       }
                     }}
                   >
-                    {isStarting ? 'Starting…' : 'Start agent run'}
+                    {isStarting ? translateUi('Starting\u2026') : translateUi('Start agent run')}
                   </button>
                   <button
                     type="button"
@@ -183,7 +190,7 @@ export default function ReadyTaskExecutionPanel({
                     disabled={isStarting}
                     onClick={() => setConfirmationOpen(false)}
                   >
-                    Cancel
+                    {translateUi('\n                    Cancel\n                  ')}
                   </button>
                 </div>
               </div>
@@ -197,7 +204,7 @@ export default function ReadyTaskExecutionPanel({
           className="cc-btn cc-btn--secondary"
           onClick={() => onOpenRun(startedRunId)}
         >
-          Open started run
+          {translateUi('\n          Open started run\n        ')}
         </button>
       )}
     </>

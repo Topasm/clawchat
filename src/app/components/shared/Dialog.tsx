@@ -1,6 +1,6 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { CloseIcon } from './Icons';
-
+import { translateUi } from '../../i18n';
 interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -8,7 +8,6 @@ interface DialogProps {
   children: React.ReactNode;
   className?: string;
 }
-
 export default function Dialog({ open, onOpenChange, title, children, className }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -18,7 +17,7 @@ export default function Dialog({ open, onOpenChange, title, children, className 
           {title && (
             <div className="cc-dialog__header">
               <RadixDialog.Title className="cc-dialog__title">{title}</RadixDialog.Title>
-              <RadixDialog.Close className="cc-dialog__close" aria-label="Close">
+              <RadixDialog.Close className="cc-dialog__close" aria-label={translateUi('Close')}>
                 <CloseIcon size={14} />
               </RadixDialog.Close>
             </div>
@@ -29,5 +28,4 @@ export default function Dialog({ open, onOpenChange, title, children, className 
     </RadixDialog.Root>
   );
 }
-
 export { RadixDialog };

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { changeAppLanguage, i18n } from '..';
+import { changeAppLanguage, i18n, translateUi } from '..';
 import { translationResources } from '../resources';
 
 function leafKeys(value: object, prefix = ''): string[] {
@@ -29,5 +29,17 @@ describe('i18n', () => {
       '설정된 OpenAI API 키가 거부되었습니다.',
     );
     expect(document.documentElement.lang).toBe('ko');
+  });
+
+  it('translates catalog UI messages and preserves interpolation', async () => {
+    await changeAppLanguage('ko');
+
+    expect(translateUi('Task created')).toBe('작업을 만들었습니다.');
+    expect(translateUi('Connected to {{name}}.', { name: '연구실' })).toBe(
+      '연구실에 연결했습니다.',
+    );
+    expect(translateUi('No results for "{{query}}"', { query: '실험' })).toBe(
+      '“실험”에 대한 결과 없음',
+    );
   });
 });

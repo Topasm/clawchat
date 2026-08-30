@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-
 import { usePlaceTodoGroups, usePreviewInboxTriage, useUndoTodoPlacement } from './queries';
 import { useToastStore } from '../stores/useToastStore';
 import type { InboxTriagePreviewResponse } from '../types/api';
 import { buildInboxTriagePlacementGroups } from '../utils/inboxTriage';
 import { inboxErrorMessage, isGraphRevisionConflict } from '../components/inbox/inboxErrors';
-
+import { translateUi } from '../i18n';
 interface InboxAiTriageOptions {
   placementRevision: number | null;
   setPlacementRevision: (revision: number) => void;
@@ -13,7 +12,6 @@ interface InboxAiTriageOptions {
   batchTaskIds: string[];
   dropFromBatchSelection: (taskIds: ReadonlySet<string>) => void;
 }
-
 export interface InboxAiTriage {
   preview: InboxTriagePreviewResponse | null;
   selectedTaskIds: string[];
@@ -24,7 +22,6 @@ export interface InboxAiTriage {
   toggleSuggestion: (taskId: string) => void;
   dismissPreview: () => void;
 }
-
 /**
  * Owns the AI placement suggestion round-trip: preview, per-suggestion selection,
  * and the grouped apply. The preview is dropped whenever the graph moves under it.
@@ -42,19 +39,16 @@ export default function useInboxAiTriage({
   const undoPlacement = useUndoTodoPlacement();
   const [triagePreview, setTriagePreview] = useState<InboxTriagePreviewResponse | null>(null);
   const [selectedTriageTaskIds, setSelectedTriageTaskIds] = useState<string[]>([]);
-
   useEffect(() => {
     if (triagePreview && placementRevision !== triagePreview.base_graph_revision) {
       setTriagePreview(null);
       setSelectedTriageTaskIds([]);
     }
   }, [placementRevision, triagePreview]);
-
   const dismissPreview = () => {
     setTriagePreview(null);
     setSelectedTriageTaskIds([]);
   };
-
   const toggleSuggestion = (taskId: string) => {
     setSelectedTriageTaskIds((current) =>
       current.includes(taskId)
@@ -62,10 +56,12 @@ export default function useInboxAiTriage({
         : [...current, taskId],
     );
   };
-
   const requestPreview = async () => {
     if (placementRevision == null || batchTaskIds.length === 0) {
-      addToast('warning', 'Select Inbox tasks after the graph revision finishes loading');
+      addToast(
+        'warning',
+        translateUi('Select Inbox tasks after the graph revision finishes loading'),
+      );
       return;
     }
     try {
@@ -76,18 +72,20 @@ export default function useInboxAiTriage({
       setTriagePreview(preview);
       setSelectedTriageTaskIds(preview.suggestions.map((suggestion) => suggestion.task_id));
       if (preview.suggestions.length === 0) {
-        addToast('info', 'AI could not confidently place the selected tasks');
+        addToast('info', translateUi('AI could not confidently place the selected tasks'));
       }
     } catch (error) {
       setTriagePreview(null);
       setSelectedTriageTaskIds([]);
-      addToast('error', inboxErrorMessage(error, 'Could not generate placement suggestions'));
+      addToast(
+        'error',
+        inboxErrorMessage(error, translateUi('Could not generate placement suggestions')),
+      );
       if (isGraphRevisionConflict(error)) {
         await refreshPlacementRevision();
       }
     }
   };
-
   const applyPreview = async () => {
     if (!triagePreview) return;
     const selected = new Set(selectedTriageTaskIds);
@@ -95,7 +93,7 @@ export default function useInboxAiTriage({
       selected.has(suggestion.task_id),
     );
     if (suggestions.length === 0) {
-      addToast('warning', 'Select at least one suggestion to apply');
+      addToast('warning', translateUi('Select at least one suggestion to apply'));
       return;
     }
     let groups;
@@ -104,7 +102,7 @@ export default function useInboxAiTriage({
     } catch (error) {
       addToast(
         'error',
-        error instanceof Error ? error.message : 'The placement preview is invalid',
+        error instanceof Error ? error.message : translateUi('The placement preview is invalid'),
       );
       return;
     }
@@ -118,25 +116,35 @@ export default function useInboxAiTriage({
       dropFromBatchSelection(appliedIds);
       setTriagePreview(null);
       setSelectedTriageTaskIds([]);
-      addToast('success', `Applied ${suggestions.length} AI placement suggestions`, {
-        duration: 6000,
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void undoPlacement
-              .mutateAsync(result.change_set_id)
-              .then((undone) => {
-                setPlacementRevision(undone.graph_revision);
-                addToast('info', 'AI placements reverted');
-              })
-              .catch((error: unknown) => {
-                addToast('error', inboxErrorMessage(error, 'Could not undo AI placements'));
-              });
+      addToast(
+        'success',
+        translateUi('Applied {{count}} AI placement suggestions', { count: suggestions.length }),
+        {
+          duration: 6000,
+          action: {
+            label: translateUi('Undo'),
+            onClick: () => {
+              void undoPlacement
+                .mutateAsync(result.change_set_id)
+                .then((undone) => {
+                  setPlacementRevision(undone.graph_revision);
+                  addToast('info', translateUi('AI placements reverted'));
+                })
+                .catch((error: unknown) => {
+                  addToast(
+                    'error',
+                    inboxErrorMessage(error, translateUi('Could not undo AI placements')),
+                  );
+                });
+            },
           },
         },
-      });
+      );
     } catch (error) {
-      addToast('error', inboxErrorMessage(error, 'Could not apply placement suggestions'));
+      addToast(
+        'error',
+        inboxErrorMessage(error, translateUi('Could not apply placement suggestions')),
+      );
       if (isGraphRevisionConflict(error)) {
         setTriagePreview(null);
         setSelectedTriageTaskIds([]);
@@ -144,7 +152,6 @@ export default function useInboxAiTriage({
       }
     }
   };
-
   return {
     preview: triagePreview,
     selectedTaskIds: selectedTriageTaskIds,

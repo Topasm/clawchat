@@ -10,7 +10,7 @@ import { hapticSuccess } from '../../utils/haptics';
 import Badge from './Badge';
 import { ArrowRightIcon, CalendarIcon, CheckCircleIcon } from './Icons';
 import type { EventResponse, TodoResponse } from '../../types/api';
-
+import { translateUi } from '../../i18n';
 interface QuickCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -18,9 +18,7 @@ interface QuickCaptureModalProps {
   defaultParentId?: string;
   parentTitle?: string;
 }
-
 type ReceiptMessage = 'Saved to Inbox' | 'Added as subtask' | 'Saved locally';
-
 export default function QuickCaptureModal({
   isOpen,
   onClose,
@@ -37,7 +35,6 @@ export default function QuickCaptureModal({
   const queryClient = useQueryClient();
   const { data: todos = [] } = useTodosQuery();
   const createTodoMutation = useCreateTodo();
-
   useEffect(() => {
     if (isOpen) {
       setText('');
@@ -49,7 +46,6 @@ export default function QuickCaptureModal({
       if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
     };
   }, [isOpen]);
-
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return;
@@ -59,10 +55,8 @@ export default function QuickCaptureModal({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
-
   const parsed = text.trim() ? parseNaturalInput(text) : null;
   const isConnected = !!useAuthStore.getState().serverUrl;
-
   // Resolve parent title for display using query data
   const resolvedParentTitle = useMemo(() => {
     if (!defaultParentId) return null;
@@ -70,7 +64,6 @@ export default function QuickCaptureModal({
     const parent = todos.find((t) => t.id === defaultParentId);
     return parent?.title ?? 'parent task';
   }, [defaultParentId, parentTitle, todos]);
-
   const showReceipt = (message: ReceiptMessage) => {
     setReceipt(message);
     if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
@@ -84,7 +77,6 @@ export default function QuickCaptureModal({
       }
     }, 1500);
   };
-
   const handleKeepCapturing = () => {
     setKeepOpen(true);
     setText('');
@@ -92,20 +84,16 @@ export default function QuickCaptureModal({
     if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
     setTimeout(() => inputRef.current?.focus(), 50);
   };
-
   const handleReviewNow = () => {
     if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
     onClose();
     navigate('/inbox');
   };
-
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!parsed || !parsed.title) return;
-
     const now = new Date().toISOString();
     const id = `local-${Date.now()}`;
-
     if (parsed.type === 'event') {
       const start = parsed.startTime || parsed.dueDate || new Date();
       // Add event optimistically to query cache
@@ -156,10 +144,8 @@ export default function QuickCaptureModal({
         showReceipt('Saved locally');
       }
     }
-
     hapticSuccess();
   };
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -196,7 +182,7 @@ export default function QuickCaptureModal({
                     className="cc-quick-capture__receipt-link"
                     onClick={handleKeepCapturing}
                   >
-                    Keep capturing
+                    {translateUi('\n                    Keep capturing\n                  ')}
                   </button>
                   {!defaultParentId && (
                     <button
@@ -204,7 +190,7 @@ export default function QuickCaptureModal({
                       className="cc-quick-capture__receipt-link"
                       onClick={handleReviewNow}
                     >
-                      Review now
+                      {translateUi('\n                      Review now\n                    ')}
                     </button>
                   )}
                 </div>
@@ -213,14 +199,18 @@ export default function QuickCaptureModal({
               <form onSubmit={handleSubmit}>
                 {defaultParentId && resolvedParentTitle && (
                   <div className="cc-quick-capture__parent-context">
-                    Adding to: <strong>{resolvedParentTitle}</strong>
+                    {translateUi('\n                    Adding to: ')}
+                    <strong>{resolvedParentTitle}</strong>
                   </div>
                 )}
                 <input
                   ref={inputRef}
                   type="text"
                   className="cc-quick-capture__input"
-                  placeholder={placeholder || 'Try "Buy groceries tomorrow" or "Meeting at 3pm"...'}
+                  placeholder={
+                    placeholder ||
+                    translateUi('Try "Buy groceries tomorrow" or "Meeting at 3pm"...')
+                  }
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   autoComplete="off"
@@ -233,7 +223,11 @@ export default function QuickCaptureModal({
                       ) : (
                         <CheckCircleIcon size={12} />
                       )}
-                      {parsed.type === 'event' ? 'Event' : parsed.type === 'note' ? 'Note' : 'Task'}
+                      {parsed.type === 'event'
+                        ? translateUi('Event')
+                        : parsed.type === 'note'
+                          ? translateUi('Note')
+                          : translateUi('Task')}
                     </span>
                     {parsed.priority && <Badge variant="priority" level={parsed.priority} />}
                     {parsed.dueDate && (
@@ -251,12 +245,16 @@ export default function QuickCaptureModal({
                       {defaultParentId ? (
                         <>
                           <ArrowRightIcon size={10} />
-                          Subtask
+                          {translateUi(
+                            '\n                          Subtask\n                        ',
+                          )}
                         </>
                       ) : (
                         <>
                           <ArrowRightIcon size={10} />
-                          Inbox
+                          {translateUi(
+                            '\n                          Inbox\n                        ',
+                          )}
                         </>
                       )}
                     </span>
@@ -264,14 +262,14 @@ export default function QuickCaptureModal({
                 )}
                 <div className="cc-quick-capture__actions">
                   <button type="button" className="cc-btn cc-btn--ghost" onClick={onClose}>
-                    Cancel
+                    {translateUi('\n                    Cancel\n                  ')}
                   </button>
                   <button
                     type="submit"
                     className="cc-btn cc-btn--primary"
                     disabled={!parsed?.title}
                   >
-                    Create
+                    {translateUi('\n                    Create\n                  ')}
                   </button>
                 </div>
               </form>

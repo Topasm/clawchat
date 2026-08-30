@@ -12,12 +12,11 @@ import {
   resetWorkspaceConnections,
   retryLocalWorkspace,
 } from '../services/workspaceSessionCoordinator';
-
+import { translateUi } from '../i18n';
 function displayStatus(state: string | undefined) {
-  if (!state) return 'Unknown';
-  return state.charAt(0).toUpperCase() + state.slice(1);
+  if (!state) return translateUi('Unknown');
+  return translateUi(state.charAt(0).toUpperCase() + state.slice(1));
 }
-
 export default function DiagnosticsPage() {
   const navigate = useNavigate();
   const { colors } = useTheme();
@@ -28,24 +27,21 @@ export default function DiagnosticsPage() {
   const initialize = useWorkspaceRuntimeStore((state) => state.initialize);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
   useEffect(() => {
     void initialize();
   }, [initialize]);
-
   const retry = async () => {
     setBusy(true);
     setError('');
     try {
       await retryLocalWorkspace();
-      addToast('success', 'The local workspace is ready.');
+      addToast('success', translateUi('The local workspace is ready.'));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
     }
   };
-
   const openFolder = async (kind: 'log' | 'data') => {
     setError('');
     try {
@@ -55,47 +51,54 @@ export default function DiagnosticsPage() {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
   };
-
   const resetConnections = async () => {
     await resetWorkspaceConnections();
-    addToast('success', 'Saved remote connections were reset. Local workspace data was kept.');
+    addToast(
+      'success',
+      translateUi('Saved remote connections were reset. Local workspace data was kept.'),
+    );
   };
-
   return (
     <div className="cc-public-shell" style={themeCssVars(colors)}>
       <header className="cc-public-shell__header">
         <div>
-          <div className="cc-public-shell__eyebrow">ClawChat</div>
-          <h1>Diagnostics & Recovery</h1>
-          <p>This page remains available even when no workspace server can be reached.</p>
+          <div className="cc-public-shell__eyebrow">{translateUi('ClawChat')}</div>
+          <h1>{translateUi('Diagnostics & Recovery')}</h1>
+          <p>
+            {translateUi(
+              'This page remains available even when no workspace server can be reached.',
+            )}
+          </p>
         </div>
         <button
           type="button"
           className="cc-btn cc-btn--secondary"
           onClick={() => navigate('/connections')}
         >
-          Connections
+          {translateUi('\n          Connections\n        ')}
         </button>
       </header>
 
       <main className="cc-public-shell__content cc-settings-page">
-        <SettingsSection title="Local server status">
+        <SettingsSection title={translateUi('Local server status')}>
           <dl className="cc-diagnostics-grid">
             <div>
-              <dt>Status</dt>
+              <dt>{translateUi('Status')}</dt>
               <dd>{displayStatus(status?.state)}</dd>
             </div>
             <div>
-              <dt>Port</dt>
-              <dd>{status?.port || config?.port || 'Automatic'}</dd>
+              <dt>{translateUi('Port')}</dt>
+              <dd>{status?.port || config?.port || translateUi('Automatic')}</dd>
             </div>
             <div>
-              <dt>Process</dt>
-              <dd>{status?.pid ?? 'Not running'}</dd>
+              <dt>{translateUi('Process')}</dt>
+              <dd>{status?.pid ?? translateUi('Not running')}</dd>
             </div>
             <div>
-              <dt>Local server policy</dt>
-              <dd>{config?.localServerEnabled ? 'Enabled' : 'Disabled'}</dd>
+              <dt>{translateUi('Local server policy')}</dt>
+              <dd>
+                {config?.localServerEnabled ? translateUi('Enabled') : translateUi('Disabled')}
+              </dd>
             </div>
           </dl>
           {(error || runtimeError || status?.error) && (
@@ -110,32 +113,35 @@ export default function DiagnosticsPage() {
               disabled={busy}
               onClick={() => void retry()}
             >
-              {busy ? 'Trying…' : 'Try local server again'}
+              {busy ? translateUi('Trying\u2026') : translateUi('Try local server again')}
             </button>
             <button
               type="button"
               className="cc-btn cc-btn--secondary"
               onClick={() => void openFolder('log')}
             >
-              Open log folder
+              {translateUi('\n              Open log folder\n            ')}
             </button>
             <button
               type="button"
               className="cc-btn cc-btn--secondary"
               onClick={() => void openFolder('data')}
             >
-              Open data folder
+              {translateUi('\n              Open data folder\n            ')}
             </button>
           </div>
         </SettingsSection>
 
-        <SettingsSection title="Connection recovery">
+        <SettingsSection title={translateUi('Connection recovery')}>
           <PropertyRow className="cc-workspace-preference">
             <div>
-              <div className="cc-workspace-card__name">Reset saved connections</div>
+              <div className="cc-workspace-card__name">
+                {translateUi('Reset saved connections')}
+              </div>
               <div className="cc-workspace-card__description">
-                Sign out and remove remote workspace profiles. Tasks stored on this device are not
-                deleted.
+                {translateUi(
+                  '\n                Sign out and remove remote workspace profiles. Tasks stored on this device are not\n                deleted.\n              ',
+                )}
               </div>
             </div>
             <button
@@ -143,7 +149,7 @@ export default function DiagnosticsPage() {
               className="cc-btn cc-btn--danger cc-btn--compact"
               onClick={() => void resetConnections()}
             >
-              Reset connections
+              {translateUi('\n              Reset connections\n            ')}
             </button>
           </PropertyRow>
         </SettingsSection>

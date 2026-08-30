@@ -5,14 +5,13 @@ import { useToastStore } from '../../stores/useToastStore';
 import { DelegateResponseSchema, SkillsResponseSchema } from '../../types/schemas';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 import { queryKeys } from './queryKeys';
-
+import { translateUi } from '../../i18n';
 export interface StartReadyTaskExecutionVariables {
   todoId: string;
   skillId: string;
   executionProvider: string;
   model?: string | null;
 }
-
 export function useSkillsQuery(enabled = true) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
@@ -22,13 +21,19 @@ export function useSkillsQuery(enabled = true) {
       return SkillsResponseSchema.parse(response.data);
     },
     enabled: !!serverUrl && enabled,
-    staleTime: 5 * 60_000,
+    staleTime: 5 * 60000,
   });
 }
-
 function executionErrorMessage(error: unknown): string {
   const response = error as {
-    response?: { data?: { error?: { code?: string; message?: string } } };
+    response?: {
+      data?: {
+        error?: {
+          code?: string;
+          message?: string;
+        };
+      };
+    };
   };
   const code = response.response?.data?.error?.code;
   if (code === 'TASK_NOT_READY') return 'This task is no longer Ready. Refresh its blockers.';
@@ -36,7 +41,6 @@ function executionErrorMessage(error: unknown): string {
   if (code === 'TASK_EXECUTION_CONFLICT') return 'The task changed before execution started.';
   return response.response?.data?.error?.message ?? 'Could not start the agent run.';
 }
-
 export function useStartReadyTaskExecution() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -63,7 +67,7 @@ export function useStartReadyTaskExecution() {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects }),
         invalidateTaskDerivedQueries(queryClient),
       ]);
-      useToastStore.getState().addToast('success', 'Agent run started');
+      useToastStore.getState().addToast('success', translateUi('Agent run started'));
     },
     onError: (error) => {
       useToastStore.getState().addToast('error', executionErrorMessage(error));

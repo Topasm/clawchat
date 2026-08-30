@@ -7,10 +7,9 @@ import {
   useObsidianFlushQueue,
   useObsidianRetryDeadLetter,
 } from '../../hooks/queries/useObsidianQueries';
-import { useTranslation } from '../../i18n';
+import { useTranslation, translateUi } from '../../i18n';
 import { useToastStore } from '../../stores/useToastStore';
 import SettingsRow from './SettingsRow';
-
 /**
  * Obsidian vault status card for the Settings page.
  *
@@ -29,7 +28,6 @@ export default function ObsidianStatusCard() {
   const flushMutation = useObsidianFlushQueue();
   const retryDeadLetterMutation = useObsidianRetryDeadLetter();
   const [showErrors, setShowErrors] = useState(false);
-
   if (isLoading) {
     return (
       <div className="cc-settings-section">
@@ -42,19 +40,15 @@ export default function ObsidianStatusCard() {
       </div>
     );
   }
-
   if (!health) return null;
-
   const statusColor = health.vault_available ? 'var(--cc-success)' : 'var(--cc-danger)';
   const statusText = health.vault_available
     ? t('workspaceSettings.obsidian.connected')
     : t('workspaceSettings.obsidian.unavailable');
-
   const companionColor = health.companion_online ? 'var(--cc-success)' : 'var(--cc-warning)';
   const companionText = health.companion_online
     ? t('workspaceSettings.obsidian.online')
     : t('workspaceSettings.obsidian.offline');
-
   const syncLag = health.bidirectional_sync?.sync_lag_seconds;
   const formatLag = (seconds: number | null | undefined) => {
     if (seconds === null || seconds === undefined) return t('workspaceSettings.obsidian.never');
@@ -66,13 +60,11 @@ export default function ObsidianStatusCard() {
     }
     return t('workspaceSettings.obsidian.hoursAgo', { count: Math.round(seconds / 3600) });
   };
-
   const queueCount = health.write_queue?.pending ?? 0;
   const deadLetterCount = health.dead_letter_count ?? 0;
   const queueAge = health.queue_age_seconds;
   const scanStuck = health.scan_stuck ?? false;
   const lastCliError = health.last_cli_error;
-
   return (
     <div className="cc-settings-section">
       <div className="cc-settings-section__title">{t('workspaceSettings.obsidian.title')}</div>
@@ -104,7 +96,7 @@ export default function ObsidianStatusCard() {
             color: health.cli_available ? 'var(--cc-success)' : 'var(--cc-muted)',
           }}
         >
-          {health.cli_available ? 'OK' : '--'}
+          {health.cli_available ? translateUi('OK') : '--'}
         </span>
       </SettingsRow>
 

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-
 import type {
   ExecutionProviderStatus,
   ProjectResponse,
@@ -14,7 +13,7 @@ import InboxExecutionTelemetryPanel from './InboxExecutionTelemetryPanel';
 import ReadyTaskExecutionPanel, { type ReadyTaskExecutionRequest } from './ReadyTaskExecutionPanel';
 import type { InboxDependencyPreview } from '../../hooks/useInboxDependencyPreview';
 import { Pane } from '../shared/WorkspacePrimitives';
-
+import { translateUi } from '../../i18n';
 interface InboxInspectorProps {
   task: TodoResponse | null;
   projects: ProjectResponse[];
@@ -35,11 +34,12 @@ interface InboxInspectorProps {
   onStartExecution: (
     taskId: string,
     request: ReadyTaskExecutionRequest,
-  ) => Promise<{ run_id: string }>;
+  ) => Promise<{
+    run_id: string;
+  }>;
   onReturnToInbox: (taskId: string) => void;
   onNavigate: (path: string) => void;
 }
-
 /** The right-hand panel: everything the triage user can learn or do about one task. */
 export default function InboxInspector({
   task,
@@ -62,32 +62,43 @@ export default function InboxInspector({
   onNavigate,
 }: InboxInspectorProps) {
   return (
-    <Pane as="aside" className="cc-inbox-triage__inspector" aria-label="Selected task">
+    <Pane
+      as="aside"
+      className="cc-inbox-triage__inspector"
+      aria-label={translateUi('Selected task')}
+    >
       {task ? (
         <>
-          <span>Selected task</span>
+          <span>{translateUi('Selected task')}</span>
           <h2>{task.title}</h2>
           <dl>
             <div>
-              <dt>Project</dt>
-              <dd>{projects.find((item) => item.id === task.project_id)?.title ?? 'Inbox'}</dd>
+              <dt>{translateUi('Project')}</dt>
+              <dd>
+                {projects.find((item) => item.id === task.project_id)?.title ??
+                  translateUi('Inbox')}
+              </dd>
             </div>
             <div>
-              <dt>Status</dt>
+              <dt>{translateUi('Status')}</dt>
               <dd>{task.status.replace('_', ' ')}</dd>
             </div>
             {insight && (
               <div>
-                <dt>Execution</dt>
+                <dt>{translateUi('Execution')}</dt>
                 <dd>{insight.execution_state.replace('_', ' ')}</dd>
               </div>
             )}
           </dl>
           {summary && (
             <p className="cc-inbox-triage__impact">
-              Ready {summary.ready_count} · Blocked {summary.blocked_count} · Critical path{' '}
+              {translateUi('\n              Ready ')}
+              {summary.ready_count}
+              {translateUi(' \u00B7 Blocked ')}
+              {summary.blocked_count}
+              {translateUi(' \u00B7 Critical path')}{' '}
               {summary.critical_path_minutes == null
-                ? 'unknown'
+                ? translateUi('unknown')
                 : `${summary.critical_path_minutes}m`}
             </p>
           )}
@@ -112,7 +123,7 @@ export default function InboxInspector({
             />
           )}
           <div className="cc-inbox-triage__dependency-picker">
-            <label htmlFor="inbox-prerequisite-select">Must wait for</label>
+            <label htmlFor="inbox-prerequisite-select">{translateUi('Must wait for')}</label>
             <select
               id="inbox-prerequisite-select"
               value=""
@@ -124,14 +135,16 @@ export default function InboxInspector({
                 }
               }}
             >
-              <option value="">Choose a prerequisite…</option>
+              <option value="">{translateUi('Choose a prerequisite\u2026')}</option>
               {dependencyCandidates.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.title}
                 </option>
               ))}
             </select>
-            <small>Desktop: drag ↝ from the dependent task onto its prerequisite.</small>
+            <small>
+              {translateUi('Desktop: drag \u219D from the dependent task onto its prerequisite.')}
+            </small>
           </div>
           {dependency.preview && (
             <InboxDependencyPreviewPanel
@@ -147,7 +160,7 @@ export default function InboxInspector({
             className="cc-btn cc-btn--secondary"
             onClick={() => onNavigate(`/tasks/${task.id}`)}
           >
-            Open details
+            {translateUi('\n            Open details\n          ')}
           </button>
           {task.project_id && (
             <button
@@ -156,18 +169,18 @@ export default function InboxInspector({
               disabled={isPlacing}
               onClick={() => onReturnToInbox(task.id)}
             >
-              Return to Inbox
+              {translateUi('\n              Return to Inbox\n            ')}
             </button>
           )}
           {mobileTree && (
             <details className="cc-inbox-triage__mobile-tree">
-              <summary>Move to project tree</summary>
+              <summary>{translateUi('Move to project tree')}</summary>
               {mobileTree}
             </details>
           )}
         </>
       ) : (
-        <p>Select or drag an Inbox card to organize it.</p>
+        <p>{translateUi('Select or drag an Inbox card to organize it.')}</p>
       )}
     </Pane>
   );

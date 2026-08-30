@@ -15,7 +15,7 @@ import {
 import ChatPanelMessages from './ChatPanelMessages';
 import ChatInput from './ChatInput';
 import { CloseIcon, ExternalLinkIcon, MinusIcon, SendIcon } from '../shared/Icons';
-
+import { translateUi } from '../../i18n';
 interface ChatPanelProps {
   isOpen: boolean;
   conversationId: string | null;
@@ -24,7 +24,6 @@ interface ChatPanelProps {
   /** "bottom" (default, mobile) renders with motion height animation; "side" renders as a full-height side panel */
   variant?: 'bottom' | 'side';
 }
-
 export default function ChatPanel({
   isOpen,
   conversationId,
@@ -46,23 +45,19 @@ export default function ChatPanel({
   const deleteMessageMutation = useDeleteMessage();
   const regenerateMutation = useRegenerateMessage();
   const { data: queryMessages = [] } = useMessagesQuery(conversationId);
-
   // Merge query messages with streaming messages
   const messages: ChatMessage[] = useMemo(() => {
     const queryIds = new Set(queryMessages.map((m) => m._id));
     const onlyStreaming = streamingMessages.filter((m) => !queryIds.has(m._id));
     return [...onlyStreaming, ...queryMessages];
   }, [queryMessages, streamingMessages]);
-
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
-
   useEffect(() => {
     setCurrentConversationId(conversationId);
     if (conversationId) clearStreamingMessages();
     return () => setCurrentConversationId(null);
   }, [conversationId, setCurrentConversationId, clearStreamingMessages]);
-
   // Clear streaming messages when streaming ends and refetch
   useEffect(() => {
     if (!isStreaming && streamingMessages.length > 0 && conversationId) {
@@ -74,7 +69,6 @@ export default function ChatPanel({
       return () => clearTimeout(timer);
     }
   }, [isStreaming, streamingMessages.length, conversationId, queryClient, clearStreamingMessages]);
-
   const handleStartEdit = useCallback(
     (messageId: string) => {
       const msg = messages.find((m) => m._id === messageId);
@@ -85,12 +79,10 @@ export default function ChatPanel({
     },
     [messages],
   );
-
   const handleCancelEdit = useCallback(() => {
     setEditingMessageId(null);
     setEditingText('');
   }, []);
-
   const handleSend = useCallback(
     async (text: string) => {
       // If in edit mode, call editMessage instead
@@ -104,7 +96,6 @@ export default function ChatPanel({
         setEditingText('');
         return;
       }
-
       let cid = conversationId;
       if (!cid) {
         // Create conversation on the server first
@@ -113,14 +104,12 @@ export default function ChatPanel({
         onSetConversationId(cid);
         setCurrentConversationId(cid);
       }
-
       addStreamingMessage({
         _id: crypto.randomUUID(),
         text,
         createdAt: new Date(),
         user: { _id: 'user', name: 'You' },
       });
-
       try {
         await sendMessageStreaming(cid, text);
       } catch {
@@ -138,7 +127,6 @@ export default function ChatPanel({
       setCurrentConversationId,
     ],
   );
-
   const handlePopOut = () => {
     if (conversationId) {
       navigate(`/chats/${conversationId}`);
@@ -146,17 +134,16 @@ export default function ChatPanel({
       navigate('/chats');
     }
   };
-
   const openContent = (
     <>
       <div className="cc-chat-panel__header">
-        <span className="cc-chat-panel__header-title">Quick Chat</span>
+        <span className="cc-chat-panel__header-title">{translateUi('Quick Chat')}</span>
         <button
           type="button"
           className="cc-chat-panel__header-btn"
           onClick={handlePopOut}
-          title="Open full view"
-          aria-label="Open full chat view"
+          title={translateUi('Open full view')}
+          aria-label={translateUi('Open full chat view')}
         >
           <ExternalLinkIcon size={14} />
         </button>
@@ -164,8 +151,12 @@ export default function ChatPanel({
           type="button"
           className="cc-chat-panel__header-btn"
           onClick={onToggle}
-          title={variant === 'side' ? 'Close' : 'Minimize'}
-          aria-label={variant === 'side' ? 'Close quick chat' : 'Minimize quick chat'}
+          title={variant === 'side' ? translateUi('Close') : translateUi('Minimize')}
+          aria-label={
+            variant === 'side'
+              ? translateUi('Close quick chat')
+              : translateUi('Minimize quick chat')
+          }
         >
           {variant === 'side' ? <CloseIcon size={14} /> : <MinusIcon size={14} />}
         </button>
@@ -202,7 +193,6 @@ export default function ChatPanel({
       />
     </>
   );
-
   const closedContent = (
     <div className="cc-chat-input" onClick={onToggle} style={{ cursor: 'pointer' }}>
       <div
@@ -214,19 +204,18 @@ export default function ChatPanel({
           color: 'var(--cc-text-tertiary)',
         }}
       >
-        Ask ClawChat anything...
+        {translateUi('\n        Ask ClawChat anything...\n      ')}
       </div>
       <button
         type="button"
         className="cc-chat-input__btn cc-chat-input__btn--send"
         disabled
-        aria-label="Send message"
+        aria-label={translateUi('Send message')}
       >
         <SendIcon size={16} />
       </button>
     </div>
   );
-
   // Side variant: full-height panel, no motion animation
   if (variant === 'side') {
     return (
@@ -235,7 +224,6 @@ export default function ChatPanel({
       </div>
     );
   }
-
   // Bottom variant (default): motion-animated height
   return (
     <motion.div

@@ -1,3 +1,4 @@
+import { translateUi } from '../../i18n';
 interface InboxBatchBarProps {
   selectedCount: number;
   totalCount: number;
@@ -7,7 +8,6 @@ interface InboxBatchBarProps {
   onSelectAll: () => void;
   onClear: () => void;
 }
-
 /** The multi-select toolbar above the captured tasks. */
 export default function InboxBatchBar({
   selectedCount,
@@ -21,7 +21,9 @@ export default function InboxBatchBar({
   return (
     <div className="cc-inbox-triage__batch-bar" aria-live="polite">
       <span>
-        {selectedCount ? `${selectedCount} selected` : 'Select tasks to move them together'}
+        {selectedCount
+          ? translateUi('{{count}} selected', { count: selectedCount })
+          : translateUi('Select tasks to move them together')}
       </span>
       <div>
         <button
@@ -30,7 +32,7 @@ export default function InboxBatchBar({
           disabled={suggestDisabled}
           onClick={onSuggest}
         >
-          {isSuggesting ? 'Suggesting…' : 'AI suggest'}
+          {isSuggesting ? translateUi('Suggesting\u2026') : translateUi('AI suggest')}
         </button>
         <button
           type="button"
@@ -38,11 +40,11 @@ export default function InboxBatchBar({
           disabled={selectedCount === totalCount}
           onClick={onSelectAll}
         >
-          Select all
+          {translateUi('\n          Select all\n        ')}
         </button>
         {selectedCount > 0 && (
           <button type="button" className="cc-btn cc-btn--ghost" onClick={onClear}>
-            Clear
+            {translateUi('\n            Clear\n          ')}
           </button>
         )}
       </div>

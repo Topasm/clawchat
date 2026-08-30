@@ -7,21 +7,21 @@ import {
   useTodosQuery,
 } from '../../hooks/queries';
 import { useToastStore } from '../../stores/useToastStore';
-
+import { translateUi } from '../../i18n';
 interface RelationshipsSectionProps {
   taskId: string;
 }
-
 interface ApiErrorResponse {
   response?: {
     status?: number;
     data?: {
       detail?: unknown;
-      error?: { message?: unknown };
+      error?: {
+        message?: unknown;
+      };
     };
   };
 }
-
 function formatValidationDetail(detail: unknown): string | null {
   if (typeof detail === 'string' && detail.trim()) return detail;
   if (!Array.isArray(detail)) return null;
@@ -31,7 +31,6 @@ function formatValidationDetail(detail: unknown): string | null {
   });
   return messages.length > 0 ? messages.join('; ') : null;
 }
-
 export function getRelationshipMutationErrorMessage(error: unknown, fallback: string): string {
   const response = (error as ApiErrorResponse | null)?.response;
   if (response?.status !== 400 && response?.status !== 409 && response?.status !== 422) {
@@ -41,7 +40,6 @@ export function getRelationshipMutationErrorMessage(error: unknown, fallback: st
   if (typeof customMessage === 'string' && customMessage.trim()) return customMessage;
   return formatValidationDetail(response.data?.detail) ?? fallback;
 }
-
 export default function RelationshipsSection({ taskId }: RelationshipsSectionProps) {
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
@@ -49,11 +47,9 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
   const createRelationship = useCreateTaskRelationship();
   const deleteRelationship = useDeleteTaskRelationship();
   const addToast = useToastStore((state) => state.addToast);
-
   const [showForm, setShowForm] = useState(false);
   const [selectedTodoId, setSelectedTodoId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
   const dependencies = useMemo(
     () =>
       relationships.filter(
@@ -67,7 +63,6 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
     [dependencies],
   );
   const todoTitleById = useMemo(() => new Map(todos.map((todo) => [todo.id, todo.title])), [todos]);
-
   const handleAdd = async () => {
     if (!selectedTodoId || dependencyIds.has(selectedTodoId)) return;
     setErrorMessage(null);
@@ -85,7 +80,6 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
       addToast('error', message);
     }
   };
-
   const handleRemove = async (relationshipId: string) => {
     setErrorMessage(null);
     try {
@@ -96,17 +90,15 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
       addToast('error', message);
     }
   };
-
   const otherTodos = todos.filter((todo) => todo.id !== taskId && !dependencyIds.has(todo.id));
   const isMutating = createRelationship.isPending || deleteRelationship.isPending;
-
   return (
     <div className="cc-detail__section">
-      <div className="cc-detail__section-title">Depends on</div>
-      {isLoading && <div style={{ fontSize: 12 }}>Loading dependencies…</div>}
+      <div className="cc-detail__section-title">{translateUi('Depends on')}</div>
+      {isLoading && <div style={{ fontSize: 12 }}>{translateUi('Loading dependencies\u2026')}</div>}
       {isError && (
         <div role="alert" style={{ fontSize: 12, color: 'var(--cc-error)' }}>
-          Failed to load dependencies
+          {translateUi('\n          Failed to load dependencies\n        ')}
         </div>
       )}
       {dependencies.map((relationship) => (
@@ -129,7 +121,7 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
             onClick={() => void handleRemove(relationship.id)}
             disabled={isMutating}
           >
-            Remove
+            {translateUi('\n            Remove\n          ')}
           </button>
         </div>
       ))}
@@ -148,7 +140,7 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
             onChange={(event) => setSelectedTodoId(event.target.value)}
             disabled={isMutating}
           >
-            <option value="">Select task...</option>
+            <option value="">{translateUi('Select task...')}</option>
             {otherTodos.map((todo) => (
               <option key={todo.id} value={todo.id}>
                 {todo.title}
@@ -161,7 +153,7 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
             onClick={() => void handleAdd()}
             disabled={!selectedTodoId || isMutating}
           >
-            Add
+            {translateUi('\n            Add\n          ')}
           </button>
           <button
             type="button"
@@ -172,7 +164,7 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
             }}
             disabled={isMutating}
           >
-            Cancel
+            {translateUi('\n            Cancel\n          ')}
           </button>
         </div>
       ) : (
@@ -186,7 +178,7 @@ export default function RelationshipsSection({ taskId }: RelationshipsSectionPro
           }}
           disabled={isLoading || isError}
         >
-          + Add dependency
+          {translateUi('\n          + Add dependency\n        ')}
         </button>
       )}
     </div>

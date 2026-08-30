@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-
 import { useCreateTaskDependency, usePreviewTaskDependency } from './queries';
 import { useToastStore } from '../stores/useToastStore';
 import type { TaskDependencyPreviewResponse, TodoResponse } from '../types/api';
 import { dependencyErrorMessage, isGraphRevisionConflict } from '../components/inbox/inboxErrors';
-
+import { translateUi } from '../i18n';
 interface InboxDependencyPreviewOptions {
   todoById: ReadonlyMap<string, TodoResponse>;
   selectedTaskId: string | null;
@@ -13,7 +12,6 @@ interface InboxDependencyPreviewOptions {
   setPlacementRevision: (revision: number) => void;
   refreshPlacementRevision: () => Promise<void>;
 }
-
 export interface InboxDependencyPreview {
   preview: TaskDependencyPreviewResponse | null;
   isPreviewing: boolean;
@@ -22,7 +20,6 @@ export interface InboxDependencyPreview {
   confirmPreview: () => Promise<void>;
   dismissPreview: () => void;
 }
-
 /**
  * Owns the two-step "must wait for" flow. The preview belongs to the selected task,
  * so it is dropped as soon as the selection moves elsewhere.
@@ -41,22 +38,19 @@ export default function useInboxDependencyPreview({
   const [dependencyPreview, setDependencyPreview] = useState<TaskDependencyPreviewResponse | null>(
     null,
   );
-
   useEffect(() => {
     if (dependencyPreview && dependencyPreview.dependent_task_id !== selectedTaskId) {
       setDependencyPreview(null);
     }
   }, [dependencyPreview, selectedTaskId]);
-
   const recoverFromConflict = async (error: unknown) => {
     if (isGraphRevisionConflict(error)) {
       await refreshPlacementRevision();
     }
   };
-
   const requestPreview = async (dependentTaskId: string, prerequisiteTaskId: string) => {
     if (placementRevision == null) {
-      addToast('warning', 'The current graph revision is still loading');
+      addToast('warning', translateUi('The current graph revision is still loading'));
       return;
     }
     selectTask(dependentTaskId);
@@ -73,7 +67,6 @@ export default function useInboxDependencyPreview({
       await recoverFromConflict(error);
     }
   };
-
   const confirmPreview = async () => {
     if (!dependencyPreview) return;
     try {
@@ -86,14 +79,19 @@ export default function useInboxDependencyPreview({
       const prerequisite = todoById.get(result.prerequisite_task_id)?.title ?? 'prerequisite';
       setPlacementRevision(result.graph_revision);
       setDependencyPreview(null);
-      addToast('success', `“${dependent}” now waits for “${prerequisite}”`);
+      addToast(
+        'success',
+        translateUi('“{{dependent}}” now waits for “{{prerequisite}}”', {
+          dependent,
+          prerequisite,
+        }),
+      );
     } catch (error) {
       setDependencyPreview(null);
       addToast('error', dependencyErrorMessage(error, todoById));
       await recoverFromConflict(error);
     }
   };
-
   return {
     preview: dependencyPreview,
     isPreviewing: previewDependency.isPending,

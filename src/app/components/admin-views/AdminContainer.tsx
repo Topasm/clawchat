@@ -7,15 +7,16 @@ import ActivityTab from './ActivityTab';
 import SessionsTab from './SessionsTab';
 import ConfigTab from './ConfigTab';
 import DataTab from './DataTab';
-
+import { translateUi } from '../../i18n';
 export default function AdminContainer() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
-
   return (
     <div style={{ maxWidth: 700 }}>
       <div className="cc-page-header">
-        <div className="cc-page-header__title">Admin Dashboard</div>
-        <div className="cc-page-header__subtitle">Server management and monitoring</div>
+        <div className="cc-page-header__title">{translateUi('Admin Dashboard')}</div>
+        <div className="cc-page-header__subtitle">
+          {translateUi('Server management and monitoring')}
+        </div>
       </div>
 
       <AdminTabBar activeTab={activeTab} onTabChange={setActiveTab} />

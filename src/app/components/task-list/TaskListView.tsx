@@ -1,12 +1,11 @@
 import type { TodoResponse } from '../../types/api';
 import { formatDueDate } from '../../utils/formatters';
-
+import { translateUi } from '../../i18n';
 interface TaskListViewProps {
   todos: TodoResponse[];
   onOpenTask: (taskId: string) => void;
   onToggleTask: (taskId: string) => void;
 }
-
 function getTaskDepth(todo: TodoResponse, todoById: Map<string, TodoResponse>) {
   let depth = 0;
   let parentId = todo.parent_id;
@@ -18,22 +17,23 @@ function getTaskDepth(todo: TodoResponse, todoById: Map<string, TodoResponse>) {
   }
   return Math.min(depth, 4);
 }
-
 export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskListViewProps) {
   const todoById = new Map(todos.map((todo) => [todo.id, todo]));
-
   if (todos.length === 0) {
-    return <div className="cc-task-list__empty">No tasks match the current filters.</div>;
+    return (
+      <div className="cc-task-list__empty">
+        {translateUi('No tasks match the current filters.')}
+      </div>
+    );
   }
-
   return (
-    <div className="cc-task-list" role="table" aria-label="Task list">
+    <div className="cc-task-list" role="table" aria-label={translateUi('Task list')}>
       <div className="cc-task-list__header" role="row">
-        <span role="columnheader">Task</span>
-        <span role="columnheader">Status</span>
-        <span role="columnheader">Priority</span>
-        <span role="columnheader">Project / tag</span>
-        <span role="columnheader">Due</span>
+        <span role="columnheader">{translateUi('Task')}</span>
+        <span role="columnheader">{translateUi('Status')}</span>
+        <span role="columnheader">{translateUi('Priority')}</span>
+        <span role="columnheader">{translateUi('Project / tag')}</span>
+        <span role="columnheader">{translateUi('Due')}</span>
       </div>
       {todos.map((todo) => {
         const status = todo.status;
@@ -66,7 +66,10 @@ export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskLi
                 checked={status === 'completed'}
                 onChange={() => onToggleTask(todo.id)}
                 onClick={(event) => event.stopPropagation()}
-                aria-label={`Mark ${todo.title} ${status === 'completed' ? 'incomplete' : 'complete'}`}
+                aria-label={translateUi(
+                  status === 'completed' ? 'Mark {{title}} incomplete' : 'Mark {{title}} complete',
+                  { title: todo.title },
+                )}
               />
               {depth > 0 && <i className="cc-task-list__branch" aria-hidden="true" />}
               <strong>{todo.title}</strong>

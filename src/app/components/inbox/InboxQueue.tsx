@@ -17,7 +17,7 @@ import {
 import type { InboxAiTriage } from '../../hooks/useInboxAiTriage';
 import type { InboxSections } from '../../hooks/useInboxSections';
 import type { InboxSelection } from '../../hooks/useInboxSelection';
-
+import { translateUi } from '../../i18n';
 interface InboxQueueProps {
   sections: InboxSections;
   selection: InboxSelection;
@@ -36,7 +36,6 @@ interface InboxQueueProps {
   onOrganize: (taskId: string) => void;
   onRetry: (taskId: string) => void;
 }
-
 /** The triage queue: every Inbox pipeline stage plus the drop target that unplaces a task. */
 export default function InboxQueue({
   sections,
@@ -59,7 +58,6 @@ export default function InboxQueue({
   const { processing, questioning, planReady, errors, needsOrganising, childCountByParent } =
     sections;
   const cardsDraggable = !isPlacing && !isBatchPlacing && !triage.isApplying;
-
   return (
     <Pane as="main" className="cc-inbox-triage__queue">
       <div
@@ -86,11 +84,16 @@ export default function InboxQueue({
           }
         }}
       >
-        Inbox · drop here to unplace
+        {translateUi('\n        Inbox \u00B7 drop here to unplace\n      ')}
       </div>
       {/* Planning now (classifying/planning) */}
       {processing.length > 0 && (
-        <SectionHeader title="Planning now" count={processing.length} variant="default" defaultOpen>
+        <SectionHeader
+          title={translateUi('Planning now')}
+          count={processing.length}
+          variant="default"
+          defaultOpen
+        >
           {processing.map((task) => (
             <div key={task.id} className="cc-inbox-card cc-inbox-card--planning">
               <div className="cc-inbox-card__spinner" />
@@ -108,7 +111,7 @@ export default function InboxQueue({
       {/* Answer questions (questioning) */}
       {questioning.length > 0 && (
         <SectionHeader
-          title="Answer questions"
+          title={translateUi('Answer questions')}
           count={questioning.length}
           variant="accent"
           defaultOpen
@@ -122,7 +125,7 @@ export default function InboxQueue({
       {/* Review suggestion (plan_ready) */}
       {planReady.length > 0 && (
         <SectionHeader
-          title="Review suggestion"
+          title={translateUi('Review suggestion')}
           count={planReady.length}
           variant="accent"
           defaultOpen
@@ -141,7 +144,7 @@ export default function InboxQueue({
                   style={{ fontSize: 12 }}
                   onClick={() => onOpenTask(task.id)}
                 >
-                  Review
+                  {translateUi('\n                  Review\n                ')}
                 </button>
               </div>
             </div>
@@ -152,7 +155,7 @@ export default function InboxQueue({
       {/* Needs organizing (captured) */}
       {needsOrganising.length > 0 && (
         <SectionHeader
-          title="Needs organizing"
+          title={translateUi('Needs organizing')}
           count={needsOrganising.length}
           variant="accent"
           defaultOpen
@@ -205,7 +208,12 @@ export default function InboxQueue({
 
       {/* Failed (error) */}
       {errors.length > 0 && (
-        <SectionHeader title="Failed" count={errors.length} variant="warning" defaultOpen={false}>
+        <SectionHeader
+          title={translateUi('Failed')}
+          count={errors.length}
+          variant="warning"
+          defaultOpen={false}
+        >
           {errors.map((task) => (
             <div key={task.id} className="cc-inbox-card cc-inbox-card--error">
               <TaskCard
@@ -220,7 +228,7 @@ export default function InboxQueue({
                   style={{ fontSize: 12 }}
                   onClick={() => onRetry(task.id)}
                 >
-                  Retry
+                  {translateUi('\n                  Retry\n                ')}
                 </button>
               </div>
             </div>
@@ -233,8 +241,8 @@ export default function InboxQueue({
           icon={<InboxTrayIcon size={20} />}
           message={
             isMobile
-              ? 'Inbox is clear. Add something when it comes up.'
-              : 'Inbox is clear. Capture a task or note when something comes up.'
+              ? translateUi('Inbox is clear. Add something when it comes up.')
+              : translateUi('Inbox is clear. Capture a task or note when something comes up.')
           }
         />
       )}

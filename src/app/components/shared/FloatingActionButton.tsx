@@ -8,61 +8,61 @@ import { queryKeys } from '../../hooks/queries/queryKeys';
 import { hapticMedium } from '../../utils/haptics';
 import type { ConversationResponse } from '../../types/api';
 import { CalendarIcon, ChatBubbleIcon, CheckCircleIcon, PlusIcon } from './Icons';
-
+import { translateUi } from '../../i18n';
 interface FabAction {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
 }
-
 function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>): FabAction[] {
   if (pathname === '/today') {
     return [
       {
-        label: 'New Task',
+        label: translateUi('New Task'),
         icon: <CheckCircleIcon size={16} />,
         onClick: () =>
           useQuickCaptureStore
             .getState()
-            .open({ placeholder: 'New task: e.g. "Buy groceries tomorrow"' }),
+            .open({ placeholder: translateUi('New task: e.g. "Buy groceries tomorrow"') }),
       },
       {
-        label: 'New Event',
+        label: translateUi('New Event'),
         icon: <CalendarIcon size={16} />,
         onClick: () =>
-          useQuickCaptureStore.getState().open({ placeholder: 'New event: e.g. "Meeting at 3pm"' }),
+          useQuickCaptureStore
+            .getState()
+            .open({ placeholder: translateUi('New event: e.g. "Meeting at 3pm"') }),
       },
     ];
   }
-
   if (pathname === '/inbox') {
     return [
       {
-        label: 'New Task',
+        label: translateUi('New Task'),
         icon: <CheckCircleIcon size={16} />,
         onClick: () => useQuickCaptureStore.getState().open(),
       },
     ];
   }
-
   if (pathname === '/tasks') {
     return [
       {
-        label: 'New Task',
+        label: translateUi('New Task'),
         icon: <CheckCircleIcon size={16} />,
         onClick: () => useQuickCaptureStore.getState().open(),
       },
     ];
   }
-
   if (pathname === '/chats') {
     return [
       {
-        label: 'New Chat',
+        label: translateUi('New Chat'),
         icon: <ChatBubbleIcon size={16} />,
         onClick: async () => {
           try {
-            const res = await apiClient.post('/chat/conversations', { title: 'New Conversation' });
+            const res = await apiClient.post('/chat/conversations', {
+              title: translateUi('New Conversation'),
+            });
             const convo = res.data as ConversationResponse;
             queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) => [
               convo,
@@ -76,40 +76,34 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
       },
     ];
   }
-
   if (pathname === '/calendar') {
     return [
       {
-        label: 'New Event',
+        label: translateUi('New Event'),
         icon: <CalendarIcon size={16} />,
         onClick: () =>
-          useQuickCaptureStore.getState().open({ placeholder: 'New event: e.g. "Meeting at 3pm"' }),
+          useQuickCaptureStore
+            .getState()
+            .open({ placeholder: translateUi('New event: e.g. "Meeting at 3pm"') }),
       },
     ];
   }
-
   return [];
 }
-
 // Hide FAB on detail pages, settings, admin, search
 const HIDDEN_PATTERNS = [/^\/(tasks|chats|events)\/[^/]+/, /^\/(settings|admin|search)/];
-
 export default function FloatingActionButton() {
   const [expanded, setExpanded] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-
   const hidden = HIDDEN_PATTERNS.some((p) => p.test(location.pathname));
   const actions = getActions(location.pathname, navigate);
-
   if (hidden || actions.length === 0) return null;
-
   const handleAction = (action: FabAction) => {
     hapticMedium();
     setExpanded(false);
     action.onClick();
   };
-
   return (
     <>
       <AnimatePresence>
@@ -150,7 +144,7 @@ export default function FloatingActionButton() {
           type="button"
           className={`cc-fab__button${expanded ? ' cc-fab__button--open' : ''}`}
           onClick={() => setExpanded((v) => !v)}
-          aria-label={expanded ? 'Close actions' : 'Quick actions'}
+          aria-label={expanded ? translateUi('Close actions') : translateUi('Quick actions')}
         >
           <PlusIcon size={24} />
         </button>

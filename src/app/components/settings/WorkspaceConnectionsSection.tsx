@@ -20,15 +20,14 @@ import {
   removeRemoteWorkspace,
   updateLocalServerPolicyForSession,
 } from '../../services/workspaceSessionCoordinator';
-
+import { translateUi } from '../../i18n';
 function statusLabel(status: ServerStatus | null): string {
-  if (!status) return 'Preparing';
-  if (status.state === 'running') return 'Ready';
-  if (status.state === 'starting') return 'Preparing';
-  if (status.state === 'stopped') return 'Stopped';
-  return status.error || 'Needs attention';
+  if (!status) return translateUi('Preparing');
+  if (status.state === 'running') return translateUi('Ready');
+  if (status.state === 'starting') return translateUi('Preparing');
+  if (status.state === 'stopped') return translateUi('Stopped');
+  return status.error || translateUi('Needs attention');
 }
-
 export default function WorkspaceConnectionsSection() {
   const navigate = useNavigate();
   const serverUrl = useAuthStore((state) => state.serverUrl);
@@ -51,28 +50,24 @@ export default function WorkspaceConnectionsSection() {
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState<'local' | 'remote' | null>(null);
   const [error, setError] = useState('');
-
   const remoteProfiles = useMemo(
     () => profiles.filter((profile) => profile.kind === 'remote'),
     [profiles],
   );
-
   useEffect(() => {
     void initializeRuntime();
   }, [initializeRuntime]);
-
   useEffect(() => {
     if (!runtimeConfig) return;
     setLocalPort(String(runtimeConfig.port));
     reconcileWorkspaceFromAuth(serverUrl);
   }, [runtimeConfig, serverUrl]);
-
   const openLocalWorkspace = useCallback(async () => {
     setBusy('local');
     setError('');
     try {
       await activateLocalWorkspace();
-      addToast('success', 'Using the private workspace on this device.');
+      addToast('success', translateUi('Using the private workspace on this device.'));
       navigate('/today');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -80,7 +75,6 @@ export default function WorkspaceConnectionsSection() {
       setBusy(null);
     }
   }, [addToast, navigate]);
-
   const connectRemote = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
@@ -94,7 +88,7 @@ export default function WorkspaceConnectionsSection() {
           selectedProfileId,
         });
         setPin('');
-        addToast('success', `Connected to ${profile.name}.`);
+        addToast('success', translateUi('Connected to {{name}}.', { name: profile.name }));
         navigate('/today');
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
@@ -104,7 +98,6 @@ export default function WorkspaceConnectionsSection() {
     },
     [addToast, name, navigate, pin, remoteUrl, selectedProfileId],
   );
-
   const chooseRemote = async (profile: WorkspaceProfile) => {
     setName(profile.name);
     setRemoteUrl(profile.serverUrl ?? '');
@@ -115,39 +108,38 @@ export default function WorkspaceConnectionsSection() {
     try {
       const activation = await activateSavedRemoteWorkspace(profile);
       if (activation.kind === 'needs-pin') {
-        setError('Enter the PIN for this workspace to connect.');
+        setError(translateUi('Enter the PIN for this workspace to connect.'));
         return;
       }
-      addToast('success', `Connected to ${profile.name}.`);
+      addToast('success', translateUi('Connected to {{name}}.', { name: profile.name }));
       navigate('/today');
     } catch (cause) {
       setError(
         cause instanceof Error
-          ? `${cause.message} Enter the PIN to reconnect.`
-          : 'Enter the PIN for this workspace to reconnect.',
+          ? translateUi('{{message}} Enter the PIN to reconnect.', { message: cause.message })
+          : translateUi('Enter the PIN for this workspace to reconnect.'),
       );
     } finally {
       setBusy(null);
     }
   };
-
   const deleteRemote = async (profile: WorkspaceProfile) => {
     await removeRemoteWorkspace(profile);
   };
-
   const handleAutoStartToggle = async (enabled: boolean) => {
     setError('');
     try {
       await updateLocalServerPolicy({ autoStartHost: enabled });
       addToast(
         'success',
-        enabled ? 'ClawChat will open at system login.' : 'Launch at system login disabled.',
+        translateUi(
+          enabled ? 'ClawChat will open at system login.' : 'Launch at system login disabled.',
+        ),
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
   };
-
   const saveLocalSecurity = async (nextLanAccess = lanAccess) => {
     setSavingLocalSecurity(true);
     setError('');
@@ -159,9 +151,11 @@ export default function WorkspaceConnectionsSection() {
       setLocalPin('');
       addToast(
         'success',
-        nextLanAccess
-          ? 'LAN access enabled with the updated PIN.'
-          : 'Local workspace security updated.',
+        translateUi(
+          nextLanAccess
+            ? 'LAN access enabled with the updated PIN.'
+            : 'Local workspace security updated.',
+        ),
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -169,7 +163,6 @@ export default function WorkspaceConnectionsSection() {
       setSavingLocalSecurity(false);
     }
   };
-
   const updateLocalLifecycle = async (updates: {
     localServerEnabled?: boolean;
     keepRunningInTray?: boolean;
@@ -178,16 +171,15 @@ export default function WorkspaceConnectionsSection() {
     try {
       const result = await updateLocalServerPolicyForSession(updates);
       if (result.leftActiveLocalWorkspace) navigate('/connections');
-      addToast('success', 'Local server policy updated.');
+      addToast('success', translateUi('Local server policy updated.'));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
   };
-
   const savePort = async () => {
     const port = Number(localPort);
     if (!Number.isInteger(port) || port < 0 || port > 65535) {
-      setError('Port must be Automatic (0) or a number between 1 and 65535.');
+      setError(translateUi('Port must be Automatic (0) or a number between 1 and 65535.'));
       return;
     }
     setError('');
@@ -196,32 +188,36 @@ export default function WorkspaceConnectionsSection() {
       await refreshRuntime();
       addToast(
         'success',
-        port === 0 ? 'Automatic port selection enabled.' : `Local port set to ${port}.`,
+        port === 0
+          ? translateUi('Automatic port selection enabled.')
+          : translateUi('Local port set to {{port}}.', { port }),
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
   };
-
   const autoStartHost = runtimeConfig?.autoStartHost ?? false;
   const lanAccess = runtimeConfig?.lanAccess ?? false;
-
   return (
-    <SettingsSection title="Workspaces & Connections">
+    <SettingsSection title={translateUi('Workspaces & Connections')}>
       <ListRow className="cc-workspace-card">
         <div className="cc-workspace-card__body">
           <div className="cc-workspace-card__heading">
-            <span className="cc-workspace-card__name">This device</span>
+            <span className="cc-workspace-card__name">{translateUi('This device')}</span>
             {activeWorkspaceId === LOCAL_WORKSPACE_ID && (
-              <span className="cc-workspace-badge">Current</span>
+              <span className="cc-workspace-badge">{translateUi('Current')}</span>
             )}
           </div>
           <div className="cc-workspace-card__description">
-            Private local tasks and calendar. No account, server address, or PIN required.
+            {translateUi(
+              '\n            Private local tasks and calendar. No account, server address, or PIN required.\n          ',
+            )}
           </div>
           <div className="cc-workspace-card__meta">
             {statusLabel(localStatus)}
-            {localStatus?.port ? ` · Local port ${localStatus.port}` : ''}
+            {localStatus?.port
+              ? translateUi(' · Local port {{port}}', { port: localStatus.port })
+              : ''}
           </div>
         </div>
         {activeWorkspaceId !== LOCAL_WORKSPACE_ID && (
@@ -231,7 +227,7 @@ export default function WorkspaceConnectionsSection() {
             disabled={busy !== null}
             onClick={() => void openLocalWorkspace()}
           >
-            {busy === 'local' ? 'Opening…' : 'Use'}
+            {busy === 'local' ? translateUi('Opening\u2026') : translateUi('Use')}
           </button>
         )}
       </ListRow>
@@ -242,12 +238,14 @@ export default function WorkspaceConnectionsSection() {
             <div className="cc-workspace-card__heading">
               <span className="cc-workspace-card__name">{profile.name}</span>
               {activeWorkspaceId === profile.id && (
-                <span className="cc-workspace-badge">Current</span>
+                <span className="cc-workspace-badge">{translateUi('Current')}</span>
               )}
             </div>
             <div className="cc-workspace-card__description">{profile.serverUrl}</div>
             <div className="cc-workspace-card__meta">
-              Remote workspace · PIN required to connect
+              {translateUi(
+                '\n              Remote workspace \u00B7 PIN required to connect\n            ',
+              )}
             </div>
           </div>
           <div className="cc-settings-inline-actions">
@@ -257,7 +255,7 @@ export default function WorkspaceConnectionsSection() {
                 className="cc-btn cc-btn--secondary cc-btn--compact"
                 onClick={() => void chooseRemote(profile)}
               >
-                Use
+                {translateUi('\n                Use\n              ')}
               </button>
             )}
             {activeWorkspaceId !== profile.id && (
@@ -266,7 +264,7 @@ export default function WorkspaceConnectionsSection() {
                 className="cc-btn cc-btn--danger cc-btn--compact"
                 onClick={() => void deleteRemote(profile)}
               >
-                Remove
+                {translateUi('\n                Remove\n              ')}
               </button>
             )}
           </div>
@@ -274,19 +272,21 @@ export default function WorkspaceConnectionsSection() {
       ))}
 
       <form className="cc-workspace-connect" onSubmit={(event) => void connectRemote(event)}>
-        <div className="cc-workspace-connect__title">Add or connect to a remote workspace</div>
+        <div className="cc-workspace-connect__title">
+          {translateUi('Add or connect to a remote workspace')}
+        </div>
         <div className="cc-workspace-connect__grid">
           <label>
-            <span>Name</span>
+            <span>{translateUi('Name')}</span>
             <input
               className="cc-settings-input"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Home server"
+              placeholder={translateUi('Home server')}
             />
           </label>
           <label>
-            <span>Server URL</span>
+            <span>{translateUi('Server URL')}</span>
             <input
               className="cc-settings-input"
               type="url"
@@ -296,31 +296,33 @@ export default function WorkspaceConnectionsSection() {
                 setRemoteUrl(event.target.value);
                 setSelectedProfileId(null);
               }}
-              placeholder="https://clawchat.example.com"
+              placeholder={translateUi('https://clawchat.example.com')}
             />
           </label>
           <label>
-            <span>PIN</span>
+            <span>{translateUi('PIN')}</span>
             <input
               className="cc-settings-input"
               type="password"
               required
               value={pin}
               onChange={(event) => setPin(event.target.value)}
-              placeholder="Not saved"
+              placeholder={translateUi('Not saved')}
               autoComplete="current-password"
             />
           </label>
         </div>
         {error && <div className="cc-workspace-connect__message">{error}</div>}
         <div className="cc-workspace-connect__actions">
-          <span>Connection names and URLs are saved locally. PINs are never saved.</span>
+          <span>
+            {translateUi('Connection names and URLs are saved locally. PINs are never saved.')}
+          </span>
           <button
             type="submit"
             className="cc-btn cc-btn--secondary cc-btn--compact"
             disabled={busy !== null}
           >
-            {busy === 'remote' ? 'Connecting…' : 'Connect'}
+            {busy === 'remote' ? translateUi('Connecting\u2026') : translateUi('Connect')}
           </button>
         </div>
       </form>
@@ -329,50 +331,56 @@ export default function WorkspaceConnectionsSection() {
         <>
           <PropertyRow className="cc-workspace-preference">
             <div>
-              <div className="cc-workspace-card__name">Local server</div>
+              <div className="cc-workspace-card__name">{translateUi('Local server')}</div>
               <div className="cc-workspace-card__description">
-                Make this device's private workspace available independently of the workspace shown
-                in this app.
+                {translateUi(
+                  "\n                Make this device's private workspace available independently of the workspace shown\n                in this app.\n              ",
+                )}
               </div>
             </div>
             <Toggle
               checked={runtimeConfig.localServerEnabled}
-              label="Local server"
+              label={translateUi('Local server')}
               onChange={(enabled) => void updateLocalLifecycle({ localServerEnabled: enabled })}
             />
           </PropertyRow>
           <PropertyRow className="cc-workspace-preference">
             <div>
-              <div className="cc-workspace-card__name">Keep available in tray</div>
+              <div className="cc-workspace-card__name">{translateUi('Keep available in tray')}</div>
               <div className="cc-workspace-card__description">
-                Keep the local server running when the ClawChat window is closed.
+                {translateUi(
+                  '\n                Keep the local server running when the ClawChat window is closed.\n              ',
+                )}
               </div>
             </div>
             <Toggle
               checked={runtimeConfig.keepRunningInTray}
               disabled={!runtimeConfig.localServerEnabled}
-              label="Keep available in tray"
+              label={translateUi('Keep available in tray')}
               onChange={(enabled) => void updateLocalLifecycle({ keepRunningInTray: enabled })}
             />
           </PropertyRow>
           <PropertyRow className="cc-workspace-preference">
             <div>
-              <div className="cc-workspace-card__name">Allow local network access</div>
+              <div className="cc-workspace-card__name">
+                {translateUi('Allow local network access')}
+              </div>
               <div className="cc-workspace-card__description">
-                Off keeps the bundled server on this device only. Turn it on to pair phones or other
-                computers on the same trusted network.
+                {translateUi(
+                  '\n                Off keeps the bundled server on this device only. Turn it on to pair phones or other\n                computers on the same trusted network.\n              ',
+                )}
               </div>
             </div>
             <Toggle
               checked={lanAccess}
               disabled={savingLocalSecurity || !runtimeConfig.localServerEnabled}
-              label="Allow local network access"
+              label={translateUi('Allow local network access')}
               onChange={(enabled) => void saveLocalSecurity(enabled)}
             />
           </PropertyRow>
           <PropertyRow className="cc-workspace-preference">
             <label>
-              <span className="cc-workspace-card__name">Local network PIN</span>
+              <span className="cc-workspace-card__name">{translateUi('Local network PIN')}</span>
               <input
                 className="cc-settings-input"
                 type="password"
@@ -382,7 +390,9 @@ export default function WorkspaceConnectionsSection() {
                 maxLength={32}
                 value={localPin}
                 placeholder={
-                  runtimeConfig.defaultPinInUse ? 'Replace the default PIN' : 'Enter a new PIN'
+                  runtimeConfig.defaultPinInUse
+                    ? translateUi('Replace the default PIN')
+                    : translateUi('Enter a new PIN')
                 }
                 onChange={(event) => setLocalPin(event.target.value)}
                 autoComplete="new-password"
@@ -397,14 +407,16 @@ export default function WorkspaceConnectionsSection() {
               }
               onClick={() => void saveLocalSecurity()}
             >
-              {savingLocalSecurity ? 'Saving…' : 'Save PIN'}
+              {savingLocalSecurity ? translateUi('Saving\u2026') : translateUi('Save PIN')}
             </button>
           </PropertyRow>
           <PropertyRow className="cc-workspace-preference">
             <label>
-              <span className="cc-workspace-card__name">Local server port</span>
+              <span className="cc-workspace-card__name">{translateUi('Local server port')}</span>
               <span className="cc-workspace-card__description">
-                Use 0 for automatic selection, or choose a fixed port.
+                {translateUi(
+                  '\n                Use 0 for automatic selection, or choose a fixed port.\n              ',
+                )}
               </span>
               <input
                 className="cc-settings-input"
@@ -422,14 +434,16 @@ export default function WorkspaceConnectionsSection() {
               disabled={!runtimeConfig.localServerEnabled}
               onClick={() => void savePort()}
             >
-              Save port
+              {translateUi('\n              Save port\n            ')}
             </button>
           </PropertyRow>
           <PropertyRow className="cc-workspace-preference">
             <div>
-              <div className="cc-workspace-card__name">Open at system login</div>
+              <div className="cc-workspace-card__name">{translateUi('Open at system login')}</div>
               <div className="cc-workspace-card__description">
-                Launch ClawChat and make the local workspace available after signing in.
+                {translateUi(
+                  '\n                Launch ClawChat and make the local workspace available after signing in.\n              ',
+                )}
               </div>
             </div>
             <Toggle

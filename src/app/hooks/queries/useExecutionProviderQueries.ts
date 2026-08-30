@@ -5,7 +5,7 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { useToastStore } from '../../stores/useToastStore';
 import { ExecutionProviderStatusSchema } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
-
+import { translateUi } from '../../i18n';
 export function useExecutionProvidersQuery(enabled = true) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({
@@ -15,10 +15,9 @@ export function useExecutionProvidersQuery(enabled = true) {
       return z.array(ExecutionProviderStatusSchema).parse(response.data);
     },
     enabled: !!serverUrl && enabled,
-    staleTime: 30_000,
+    staleTime: 30000,
   });
 }
-
 export function useTestPaseoConnection() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -36,9 +35,10 @@ export function useTestPaseoConnection() {
         .getState()
         .addToast(
           status.connected ? 'success' : 'warning',
-          status.connected ? 'Paseo connected' : 'Paseo unavailable',
+          translateUi(status.connected ? 'Paseo connected' : 'Paseo unavailable'),
         );
     },
-    onError: () => useToastStore.getState().addToast('error', 'Paseo connection test failed'),
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Paseo connection test failed')),
   });
 }

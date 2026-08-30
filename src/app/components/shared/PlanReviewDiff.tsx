@@ -3,7 +3,7 @@ import type { PlanProposalResponse } from '../../types/api';
 import { getPlanProposalMutationError, isStalePlanProposalError } from '../../hooks/queries';
 import { toggleProposalSelection } from '../task-graph/taskGraphProposal';
 import Badge from './Badge';
-
+import { translateUi } from '../../i18n';
 interface PlanReviewDiffProps {
   plan: PlanProposalResponse;
   onApply: (selectedIndices: number[]) => void | Promise<void>;
@@ -15,7 +15,6 @@ interface PlanReviewDiffProps {
   isRegenerating?: boolean;
   compact?: boolean;
 }
-
 export default function PlanReviewDiff({
   plan,
   onApply,
@@ -39,7 +38,6 @@ export default function PlanReviewDiff({
     selection.proposalId === plan.proposal_id
       ? selection.indices
       : new Set(subtasks.map((_, index) => index));
-
   const toggleIndex = (index: number) => {
     setSelection((current) => ({
       proposalId: plan.proposal_id,
@@ -52,7 +50,6 @@ export default function PlanReviewDiff({
       ),
     }));
   };
-
   const stale = Boolean(
     plan.status === 'stale' || (applyError && isStalePlanProposalError(applyError)),
   );
@@ -61,41 +58,44 @@ export default function PlanReviewDiff({
   const invalidProposal = plan.validation.errors.length > 0;
   const canApply =
     plan.status === 'draft' && !legacyProposal && !invalidProposal && !stale && selected.size > 0;
-
   const handleApply = () => {
     const indices = [...selected].sort((left, right) => left - right);
     void Promise.resolve(onApply(indices)).catch(() => undefined);
   };
-
   return (
     <div className={`cc-plan-review${compact ? ' cc-plan-review--compact' : ''}`}>
       {plan.summary && <p className="cc-plan-review__summary">{plan.summary}</p>}
 
-      <div className="cc-plan-review__stats" aria-label="Authoritative proposal diff">
+      <div
+        className="cc-plan-review__stats"
+        aria-label={translateUi('Authoritative proposal diff')}
+      >
         <span className="cc-plan-review__stat">
-          {plan.diff.add_task_count} task{plan.diff.add_task_count === 1 ? '' : 's'} to add
+          {translateUi('{{count}} tasks to add', { count: plan.diff.add_task_count })}
         </span>
         <span className="cc-plan-review__stat">
-          {plan.diff.add_relationship_count} dependenc
-          {plan.diff.add_relationship_count === 1 ? 'y' : 'ies'} to add
+          {translateUi('{{count}} dependencies to add', {
+            count: plan.diff.add_relationship_count,
+          })}
         </span>
         {plan.diff.root_update_fields.length > 0 && (
           <span className="cc-plan-review__stat">
-            Root updates: {plan.diff.root_update_fields.join(', ')}
+            {translateUi('\n            Root updates: ')}
+            {plan.diff.root_update_fields.join(', ')}
           </span>
         )}
       </div>
 
       {(plan.validation.errors.length > 0 || plan.validation.warnings.length > 0) && (
-        <div className="cc-plan-review__validation" aria-label="Proposal validation">
+        <div className="cc-plan-review__validation" aria-label={translateUi('Proposal validation')}>
           {plan.validation.errors.map((issue, index) => (
             <div key={`error-${issue.code}-${index}`} role="alert">
-              <strong>Cannot apply:</strong> {issue.message}
+              <strong>{translateUi('Cannot apply:')}</strong> {issue.message}
             </div>
           ))}
           {plan.validation.warnings.map((issue, index) => (
             <div key={`warning-${issue.code}-${index}`}>
-              <strong>Review:</strong> {issue.message}
+              <strong>{translateUi('Review:')}</strong> {issue.message}
             </div>
           ))}
         </div>
@@ -103,14 +103,18 @@ export default function PlanReviewDiff({
 
       {legacyProposal && (
         <div className="cc-plan-review__conflict" role="alert">
-          <span>This older proposal cannot be applied safely. Generate a revision-aware plan.</span>
+          <span>
+            {translateUi(
+              'This older proposal cannot be applied safely. Generate a revision-aware plan.',
+            )}
+          </span>
           <button
             type="button"
             className="cc-btn cc-btn--ghost"
             onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
             disabled={isRegenerating}
           >
-            {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+            {isRegenerating ? translateUi('Regenerating\u2026') : translateUi('Regenerate')}
           </button>
         </div>
       )}
@@ -118,14 +122,17 @@ export default function PlanReviewDiff({
       {!legacyProposal && stale && (
         <div className="cc-plan-review__conflict" role="alert">
           <span>
-            <strong>The task graph changed after this proposal was created.</strong>
+            <strong>
+              {translateUi('The task graph changed after this proposal was created.')}
+            </strong>
             {!normalizedApplyError?.staleDetails && (
-              <> Regenerate it from the current graph before applying.</>
+              <>{translateUi(' Regenerate it from the current graph before applying.')}</>
             )}
             {normalizedApplyError?.staleDetails && (
               <>
                 {' '}
-                Revision {normalizedApplyError.staleDetails.base_revision ?? 'unknown'} →{' '}
+                {translateUi('\n                Revision ')}
+                {normalizedApplyError.staleDetails.base_revision ?? 'unknown'} →{' '}
                 {normalizedApplyError.staleDetails.current_revision}.
               </>
             )}
@@ -136,7 +143,7 @@ export default function PlanReviewDiff({
             onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
             disabled={isRegenerating}
           >
-            {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+            {isRegenerating ? translateUi('Regenerating\u2026') : translateUi('Regenerate')}
           </button>
         </div>
       )}
@@ -158,7 +165,8 @@ export default function PlanReviewDiff({
                   {subtask.due_date && <Badge variant="due" dueDate={subtask.due_date} />}
                   {(subtask.depends_on_indices?.length ?? 0) > 0 && (
                     <span>
-                      {subtask.depends_on_indices!.length} prerequisite
+                      {subtask.depends_on_indices!.length}
+                      {translateUi(' prerequisite\n                      ')}
                       {subtask.depends_on_indices!.length === 1 ? '' : 's'}
                     </span>
                   )}
@@ -177,7 +185,12 @@ export default function PlanReviewDiff({
           onClick={handleApply}
           disabled={!canApply || isApplying || isDismissing || isRegenerating}
         >
-          {isApplying ? 'Applying…' : `Apply (${selected.size}/${subtasks.length})`}
+          {isApplying
+            ? translateUi('Applying\u2026')
+            : translateUi('Apply ({{selected}}/{{total}})', {
+                selected: selected.size,
+                total: subtasks.length,
+              })}
         </button>
         <button
           type="button"
@@ -186,7 +199,7 @@ export default function PlanReviewDiff({
           onClick={() => void Promise.resolve(onDismiss()).catch(() => undefined)}
           disabled={isApplying || isDismissing || isRegenerating}
         >
-          {isDismissing ? 'Dismissing…' : 'Dismiss'}
+          {isDismissing ? translateUi('Dismissing\u2026') : translateUi('Dismiss')}
         </button>
       </div>
     </div>

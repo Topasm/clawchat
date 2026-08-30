@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useTranslation } from '../i18n';
+import { useTranslation, translateUi } from '../i18n';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelSize } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
@@ -32,7 +32,6 @@ import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { HealthResponse } from '../types/api';
 import type { ColorPalette } from '../config/theme';
-
 // --- SVG icon components ---
 import {
   SunIcon,
@@ -49,7 +48,6 @@ import {
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
 import { StatusDot } from './shared/WorkspacePrimitives';
-
 // Keep the injected theme tokens declared in this runtime root. The design
 // token audit reads this bridge to distinguish runtime variables from typos.
 function cssVars(colors: ColorPalette, fontSize: number): React.CSSProperties {
@@ -87,32 +85,27 @@ function cssVars(colors: ColorPalette, fontSize: number): React.CSSProperties {
     '--cc-font-size': `${fontSize}px`,
   } as React.CSSProperties;
 }
-
 const CONNECTION_LABEL_KEYS: Record<ConnectionStatus, string> = {
   connected: 'connection.connected',
   disconnected: 'connection.disconnected',
   reconnecting: 'connection.reconnecting',
 };
-
 const primaryNavItems = [
   { to: '/today', labelKey: 'nav.today', Icon: SunIcon },
   { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
   { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
-
 const secondaryNavItems = [
   { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
   { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
   { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
   { to: '/calendar', labelKey: 'nav.calendar', Icon: NavCalendarIcon },
 ];
-
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings', labelKey: 'nav.settings', Icon: GearIcon },
   { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },
 ];
-
 export default function Layout() {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
@@ -132,7 +125,6 @@ export default function Layout() {
   const { data: capabilities } = useCapabilitiesQuery();
   const { data: todos = [] } = useTodosQuery();
   const { data: pendingReviews = [] } = useReviewsQuery();
-
   // Conditionally filter nav items based on server capabilities
   const filteredPrimaryNavItems = useMemo(() => {
     if (!capabilities) return primaryNavItems;
@@ -141,7 +133,6 @@ export default function Layout() {
       return true;
     });
   }, [capabilities]);
-
   const filteredSecondaryNavItems = useMemo(() => {
     return secondaryNavItems.filter((item) => {
       if (!capabilities) return true;
@@ -150,12 +141,10 @@ export default function Layout() {
       return true;
     });
   }, [capabilities]);
-
   const filteredUtilityNavItems = useMemo(
     () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings')),
     [isMac],
   );
-
   // Widget deep-link navigation
   useEffect(() => {
     const handler = ((e: CustomEvent<string>) => {
@@ -164,7 +153,6 @@ export default function Layout() {
     window.addEventListener('navigate', handler);
     return () => window.removeEventListener('navigate', handler);
   }, [navigate]);
-
   // Web: keyboard shortcut 'Q' opens quick capture (when no input is focused)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -179,18 +167,14 @@ export default function Layout() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [quickCapture]);
-
   // Central data sync: fetches all data from server on mount (no-op in demo mode)
   const { refresh } = useDataSync();
-
   // Offline queue: monitor network status and flush on reconnect
   const { isFlushing, pendingCount } = useNetworkStatus(refresh);
-
   // Health check polling
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const setHealthOK = useAuthStore((s) => s.setHealthOK);
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
-
   useEffect(() => {
     if (!serverUrl) {
       setHealthData(null);
@@ -213,23 +197,20 @@ export default function Layout() {
       }
     };
     fetchHealth();
-    const interval = setInterval(fetchHealth, 60_000);
+    const interval = setInterval(fetchHealth, 60000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
   }, [serverUrl, setHealthOK]);
-
   // WebSocket connection for real-time updates
   useWebSocket();
-
   // Wire global keyboard shortcuts
   useGlobalShortcuts({
     onToggleChat: chatPanel.toggle,
     onShowHelp: () => setShowShortcuts(true),
   });
   useNavigationShortcuts();
-
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
   const activeWorkspaceName = useWorkspaceStore(
     (state) =>
@@ -239,13 +220,11 @@ export default function Layout() {
   const connectionLabel = isFlushing
     ? t('connection.syncing')
     : t(CONNECTION_LABEL_KEYS[connectionStatus]);
-
   // Badge counts
   const inboxCount = useMemo(
     () => todos.filter((todo) => !todo.due_date && todo.status === 'pending').length,
     [todos],
   );
-
   // Tasks that are due now or already late — what "needs attention today" means.
   const dueCount = useMemo(() => {
     const endOfToday = new Date();
@@ -256,12 +235,10 @@ export default function Layout() {
       return !Number.isNaN(due.getTime()) && due <= endOfToday;
     }).length;
   }, [todos]);
-
   const openTaskCount = useMemo(
     () => todos.filter((todo) => todo.status === 'pending' || todo.status === 'in_progress').length,
     [todos],
   );
-
   const navBadgeCounts = useMemo<Record<string, number>>(
     () => ({
       '/today': dueCount,
@@ -271,16 +248,13 @@ export default function Layout() {
     }),
     [dueCount, inboxCount, openTaskCount, pendingReviews.length],
   );
-
   // The OS icon badge stands for "needs you now", so it counts unfiled work
   // plus anything due or overdue -- not the whole open backlog.
   useEffect(() => {
     void setAppBadge(inboxCount + dueCount);
   }, [inboxCount, dueCount]);
-
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
-
   const activeMobileTabIndex = useMemo(
     () =>
       mobileTabs.findIndex(
@@ -288,13 +262,11 @@ export default function Layout() {
       ),
     [location.pathname],
   );
-
   const canSwipeTabs = isMobile && !onChatPage && activeMobileTabIndex >= 0;
   const isDetailPage =
     isMobile &&
     (/^\/(tasks|chats|events|projects)\/[^/]+/.test(location.pathname) ||
       location.pathname === '/settings/system-prompt');
-
   const sidebar = (
     <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
       <div className="cc-sidebar__header">
@@ -315,7 +287,9 @@ export default function Layout() {
         type="button"
         className={`cc-connection-status cc-connection-status--${connectionStatus}`}
         title={`${activeWorkspaceName} · ${connectionLabel}${healthData ? ` · AI: ${healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}` : ''}`}
-        aria-label={`Switch workspace. Current: ${activeWorkspaceName}`}
+        aria-label={translateUi('Switch workspace. Current: {{name}}', {
+          name: activeWorkspaceName,
+        })}
         onClick={() => navigate('/connections')}
       >
         <StatusDot className="cc-connection-status__dot" />
@@ -331,7 +305,9 @@ export default function Layout() {
           )}
           {healthData && (
             <span className="cc-connection-status__ai">
-              {' · '}AI: {healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}
+              {' · '}
+              {translateUi('AI: ')}
+              {healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}
             </span>
           )}
         </span>
@@ -383,7 +359,6 @@ export default function Layout() {
       ))}
     </nav>
   );
-
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!canSwipeTabs && !isDetailPage) return;
     const target = e.target as HTMLElement;
@@ -399,7 +374,6 @@ export default function Layout() {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   };
-
   const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
     if (
       (!canSwipeTabs && !isDetailPage) ||
@@ -413,32 +387,26 @@ export default function Layout() {
     touchStartX.current = null;
     touchStartY.current = null;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
-
     // Edge swipe back on detail pages
     if (isDetailPage && savedStartX <= 20 && dx > 50) {
       navigate(-1);
       return;
     }
-
     if (!canSwipeTabs) return;
-
     if (dx < 0 && activeMobileTabIndex < mobileTabs.length - 1) {
       navigate(mobileTabs[activeMobileTabIndex + 1].to);
     } else if (dx > 0 && activeMobileTabIndex > 0) {
       navigate(mobileTabs[activeMobileTabIndex - 1].to);
     }
   };
-
   const handleRefresh = useCallback(() => {
     refresh();
   }, [refresh]);
-
   // Persisted panel sizes
   const sidebarSize = useSettingsStore((s) => s.sidebarSize);
   const chatPanelSize = useSettingsStore((s) => s.chatPanelSize);
   const setSidebarSize = useSettingsStore((s) => s.setSidebarSize);
   const setChatPanelSize = useSettingsStore((s) => s.setChatPanelSize);
-
   const handleSidebarResize = useCallback(
     (size: PanelSize) => {
       setSidebarSize(size.asPercentage);
@@ -446,16 +414,13 @@ export default function Layout() {
     },
     [setSidebarSize],
   );
-
   const handleChatPanelResize = useCallback(
     (size: PanelSize) => {
       setChatPanelSize(size.asPercentage);
     },
     [setChatPanelSize],
   );
-
   const showChatPanel = !onChatPage && chatPanel.isOpen;
-
   const mobileMainContent = (
     <>
       <div className="cc-content" ref={contentRef}>
@@ -474,7 +439,6 @@ export default function Layout() {
       )}
     </>
   );
-
   return (
     <div
       className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}`}

@@ -19,7 +19,7 @@ import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
 import { ListRow } from '../components/shared/WorkspacePrimitives';
-
+import { translateUi } from '../i18n';
 export default function ChatListPage() {
   const navigate = useNavigate();
   const { data: conversations = [], isLoading: convsLoading } = useConversationsQuery();
@@ -29,18 +29,14 @@ export default function ChatListPage() {
   const createProjectMutation = useCreateProject();
   const deleteConversationMutation = useDeleteConversation();
   const { isMobile } = usePlatform();
-
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [quickChatsOpen, setQuickChatsOpen] = useState(false);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [projectTitle, setProjectTitle] = useState('');
   const [projectGoal, setProjectGoal] = useState('');
-
   const loading = convsLoading || projsLoading;
-
   // Quick chats = conversations without a project_todo_id
   const quickChats = conversations.filter((c) => !c.project_id && !c.project_todo_id);
-
   // Compute per-project metadata
   const projectMeta = useMemo(() => {
     const accumulators = new Map<
@@ -60,14 +56,12 @@ export default function ChatListPage() {
         childCount: 0,
       });
     }
-
     for (const todo of todos) {
       if (!todo.project_id) continue;
       const project = projects.find((candidate) => candidate.id === todo.project_id);
       if (!project || todo.id === project.root_task_id) continue;
       const accumulator = accumulators.get(todo.project_id);
       if (!accumulator) continue;
-
       accumulator.childCount += 1;
       if (!isTerminalTaskStatus(todo.status)) {
         accumulator.openCount += 1;
@@ -80,9 +74,14 @@ export default function ChatListPage() {
         }
       }
     }
-
-    const meta: Record<string, { nextDue: string | null; openCount: number; totalCount: number }> =
-      {};
+    const meta: Record<
+      string,
+      {
+        nextDue: string | null;
+        openCount: number;
+        totalCount: number;
+      }
+    > = {};
     for (const project of projects) {
       const accumulator = accumulators.get(project.id)!;
       meta[project.id] = {
@@ -93,7 +92,6 @@ export default function ChatListPage() {
     }
     return meta;
   }, [projects, todos]);
-
   const handleNewChat = async () => {
     try {
       const convo = await createConversationMutation.mutateAsync({});
@@ -102,11 +100,9 @@ export default function ChatListPage() {
       // Stay on list page
     }
   };
-
   const handleProjectClick = (projectId: string) => {
     navigate(`/projects/${projectId}`);
   };
-
   const handleCreateProject = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!projectTitle.trim()) return;
@@ -119,24 +115,24 @@ export default function ChatListPage() {
     setCreateProjectOpen(false);
     navigate(`/projects/${project.id}`);
   };
-
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
     deleteConversationMutation.mutate(deleteTarget);
     setDeleteTarget(null);
   };
-
   return (
     <div>
       <div className="cc-projects-header">
         <div className="cc-page-header cc-page-header--flush">
-          <div className="cc-page-header__title">Projects</div>
-          {!isMobile && <div className="cc-page-header__subtitle">Your project workspaces</div>}
+          <div className="cc-page-header__title">{translateUi('Projects')}</div>
+          {!isMobile && (
+            <div className="cc-page-header__subtitle">{translateUi('Your project workspaces')}</div>
+          )}
         </div>
         <div className="cc-projects-header__actions">
           {!isMobile && (
             <button type="button" className="cc-btn" onClick={handleNewChat}>
-              + Quick Chat
+              {translateUi('\n              + Quick Chat\n            ')}
             </button>
           )}
           <button
@@ -144,7 +140,7 @@ export default function ChatListPage() {
             className="cc-btn cc-btn--primary"
             onClick={() => setCreateProjectOpen(true)}
           >
-            + Project
+            {translateUi('\n            + Project\n          ')}
           </button>
         </div>
       </div>
@@ -158,7 +154,6 @@ export default function ChatListPage() {
             const meta = projectMeta[project.id];
             const completedCount = project.completed_task_count ?? 0;
             const totalCount = meta?.totalCount ?? 0;
-
             return (
               <ListRow
                 as="button"
@@ -184,7 +179,8 @@ export default function ChatListPage() {
                   {totalCount > 0 && (
                     <span className="cc-project-card__tasks">
                       <CheckIcon size={14} />
-                      {meta?.openCount ?? 0}/{totalCount} tasks
+                      {meta?.openCount ?? 0}/{totalCount}
+                      {translateUi(' tasks\n                    ')}
                     </span>
                   )}
                   {meta?.nextDue && <Badge variant="due" dueDate={meta.nextDue} />}
@@ -215,8 +211,10 @@ export default function ChatListPage() {
           icon={<ChatBubbleIcon size={20} />}
           message={
             isMobile
-              ? 'No projects yet.'
-              : 'No projects or conversations yet. Create a project to start a workspace.'
+              ? translateUi('No projects yet.')
+              : translateUi(
+                  'No projects or conversations yet. Create a project to start a workspace.',
+                )
           }
         />
       ) : quickChats.length > 0 ? (
@@ -231,7 +229,8 @@ export default function ChatListPage() {
               size={12}
               className={`cc-quick-chats__chevron${quickChatsOpen ? ' cc-quick-chats__chevron--open' : ''}`}
             />
-            Quick conversations ({quickChats.length})
+            {translateUi('\n            Quick conversations (')}
+            {quickChats.length})
           </button>
           {quickChatsOpen && (
             <div className="cc-quick-chats__list">
@@ -253,43 +252,51 @@ export default function ChatListPage() {
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        title="Delete Conversation"
-        description="Are you sure you want to delete this conversation? This action cannot be undone."
-        confirmLabel="Delete"
+        title={translateUi('Delete Conversation')}
+        description={translateUi(
+          'Are you sure you want to delete this conversation? This action cannot be undone.',
+        )}
+        confirmLabel={translateUi('Delete')}
         danger
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
       />
-      <Dialog open={createProjectOpen} onOpenChange={setCreateProjectOpen} title="New Project">
+      <Dialog
+        open={createProjectOpen}
+        onOpenChange={setCreateProjectOpen}
+        title={translateUi('New Project')}
+      >
         <form className="cc-project-form" onSubmit={handleCreateProject}>
           <label className="cc-project-form__field">
-            <span>Title</span>
+            <span>{translateUi('Title')}</span>
             <input
               autoFocus
               value={projectTitle}
               onChange={(event) => setProjectTitle(event.target.value)}
-              placeholder="What are you working toward?"
+              placeholder={translateUi('What are you working toward?')}
             />
           </label>
           <label className="cc-project-form__field">
-            <span>Goal</span>
+            <span>{translateUi('Goal')}</span>
             <textarea
               value={projectGoal}
               onChange={(event) => setProjectGoal(event.target.value)}
-              placeholder="Describe the outcome that defines success"
+              placeholder={translateUi('Describe the outcome that defines success')}
               rows={3}
             />
           </label>
           <div className="cc-project-form__actions">
             <button type="button" className="cc-btn" onClick={() => setCreateProjectOpen(false)}>
-              Cancel
+              {translateUi('\n              Cancel\n            ')}
             </button>
             <button
               type="submit"
               className="cc-btn cc-btn--primary"
               disabled={!projectTitle.trim() || createProjectMutation.isPending}
             >
-              {createProjectMutation.isPending ? 'Creating…' : 'Create project'}
+              {createProjectMutation.isPending
+                ? translateUi('Creating\u2026')
+                : translateUi('Create project')}
             </button>
           </div>
         </form>

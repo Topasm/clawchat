@@ -9,14 +9,13 @@ import SettingsSection from '../components/shared/SettingsSection';
 import { StatusDot } from '../components/shared/WorkspacePrimitives';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
 import usePlatform from '../hooks/usePlatform';
-import { useTranslation } from '../i18n';
+import { useTranslation, translateUi } from '../i18n';
 import { platformApi } from '../platform';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { openObsidianVault } from '../utils/openObsidian';
-
 interface AIProviderState {
   active_provider: string;
   openclaw_connected: boolean;
@@ -27,15 +26,12 @@ interface AIProviderState {
   codex_api_key_persistent: boolean;
   codex_model: string;
 }
-
 const AI_PROVIDER_LABELS: Record<string, string> = {
   openclaw: 'OpenClaw',
   claude_code: 'Claude Code',
   codex: 'Codex API',
 };
-
 type Translate = (key: string, options?: Record<string, string | number>) => string;
-
 const AI_ERROR_TRANSLATIONS: Record<string, string> = {
   invalid_provider: 'workspaceSettings.ai.errors.invalidProvider',
   claude_not_initialized: 'workspaceSettings.ai.errors.claudeNotInitialized',
@@ -48,7 +44,6 @@ const AI_ERROR_TRANSLATIONS: Record<string, string> = {
   codex_model_unavailable: 'workspaceSettings.ai.errors.codexModelUnavailable',
   codex_key_persist_failed: 'workspaceSettings.ai.errors.codexKeyPersistFailed',
 };
-
 function providerStatusLabel(status: string, t: Translate): string {
   switch (status) {
     case 'available':
@@ -67,7 +62,6 @@ function providerStatusLabel(status: string, t: Translate): string {
       return status;
   }
 }
-
 function codexStatusLabel(provider: AIProviderState, t: Translate): string {
   switch (provider.codex_api_status) {
     case 'available':
@@ -82,13 +76,16 @@ function codexStatusLabel(provider: AIProviderState, t: Translate): string {
       return t('workspaceSettings.ai.status', { status: provider.codex_api_status });
   }
 }
-
 function apiErrorMessage(error: unknown, t: Translate, fallbackKey: string): string {
   const response = (
     error as {
       response?: {
         data?: {
-          error?: { details?: { reason?: string } };
+          error?: {
+            details?: {
+              reason?: string;
+            };
+          };
         };
       };
     }
@@ -97,7 +94,6 @@ function apiErrorMessage(error: unknown, t: Translate, fallbackKey: string): str
   const translationKey = reason ? AI_ERROR_TRANSLATIONS[reason] : undefined;
   return t(translationKey ?? fallbackKey);
 }
-
 /** Settings backed by the currently connected workspace server. */
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -116,14 +112,12 @@ export default function SettingsPage() {
   const [codexChecking, setCodexChecking] = useState(false);
   const [codexConfiguring, setCodexConfiguring] = useState(false);
   const [codexApiKey, setCodexApiKey] = useState('');
-
   useEffect(() => {
     apiClient
       .get('/admin/ai/provider')
       .then((response) => setAiProvider(response.data))
       .catch(() => {});
   }, []);
-
   const handleSwitchProvider = useCallback(
     async (provider: string) => {
       setAiProviderSwitching(true);
@@ -148,7 +142,6 @@ export default function SettingsPage() {
     },
     [addToast, t],
   );
-
   const handleRecheckClaudeCode = useCallback(async () => {
     setClaudeCodeChecking(true);
     try {
@@ -178,7 +171,6 @@ export default function SettingsPage() {
       setClaudeCodeChecking(false);
     }
   }, [addToast, t]);
-
   const handleRecheckCodex = useCallback(async () => {
     setCodexChecking(true);
     try {
@@ -209,7 +201,6 @@ export default function SettingsPage() {
       setCodexChecking(false);
     }
   }, [addToast, t]);
-
   const handleConfigureCodex = useCallback(async () => {
     if (!codexApiKey.trim()) {
       addToast('error', t('workspaceSettings.ai.enterApiKey'));
@@ -234,7 +225,6 @@ export default function SettingsPage() {
       setCodexConfiguring(false);
     }
   }, [addToast, codexApiKey, t]);
-
   useEffect(() => {
     if (isDesktop) {
       platformApi.server
@@ -242,13 +232,11 @@ export default function SettingsPage() {
         .then((config) => setObsidianVaultPath(config.obsidianVaultPath ?? ''));
       return;
     }
-
     apiClient
       .get('/obsidian/status')
       .then((response) => setObsidianVaultPath(response.data?.vaultPath ?? ''))
       .catch(() => {});
   }, [isDesktop]);
-
   return (
     <div className="cc-settings-page">
       <div className="cc-page-header">
@@ -309,9 +297,9 @@ export default function SettingsPage() {
               <SegmentedControl
                 ariaLabel={t('workspaceSettings.ai.providerAria')}
                 options={[
-                  { label: 'OpenClaw', value: 'openclaw' },
-                  { label: 'Claude Code', value: 'claude_code' },
-                  { label: 'Codex', value: 'codex' },
+                  { label: translateUi('OpenClaw'), value: 'openclaw' },
+                  { label: translateUi('Claude Code'), value: 'claude_code' },
+                  { label: translateUi('Codex'), value: 'codex' },
                 ]}
                 value={aiProvider.active_provider}
                 onChange={(provider) => !aiProviderSwitching && void handleSwitchProvider(provider)}

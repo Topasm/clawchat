@@ -22,7 +22,7 @@ import { GearIcon } from '../shared/NavIcons';
 import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import type { BriefingData } from '../../hooks/useTodayBriefing';
-
+import { translateUi } from '../../i18n';
 interface TodayViewProps {
   greeting: string;
   todayDate: string;
@@ -31,13 +31,17 @@ interface TodayViewProps {
   todayEvents: EventResponse[];
   inboxCount: number;
   isLoading: boolean;
-  progress: { completed: number; total: number; percentage: number; allDone: boolean };
+  progress: {
+    completed: number;
+    total: number;
+    percentage: number;
+    allDone: boolean;
+  };
   streakCount: number;
   briefingData: BriefingData | null;
   briefingLoading: boolean;
   needsReviewItems: TodoResponse[];
 }
-
 export default function TodayView({
   greeting,
   todayDate,
@@ -56,7 +60,6 @@ export default function TodayView({
   const toggleMutation = useToggleTodoComplete();
   const updateTodoMutation = useUpdateTodo();
   const { isMobile } = usePlatform();
-
   const toggleTodoComplete = useCallback(
     (id: string) => {
       // Find the task status from the props to determine the toggle direction
@@ -66,18 +69,16 @@ export default function TodayView({
     [todayTasks, overdueTasks, toggleMutation],
   );
   const [briefingOpen, setBriefingOpen] = useState(false);
-
   const totalTasks = todayTasks.length + overdueTasks.length;
   const hasAnything = totalTasks > 0 || todayEvents.length > 0 || needsReviewItems.length > 0;
   const visibleOverdueTasks = isMobile ? overdueTasks.slice(0, 3) : overdueTasks;
   const visibleTodayTasks = isMobile ? todayTasks.slice(0, 4) : todayTasks;
-
   return (
     <div>
       {/* Header */}
       <div className="cc-page-header cc-today-header">
         <div>
-          <div className="cc-page-header__title">{greeting || 'Hello'}</div>
+          <div className="cc-page-header__title">{greeting || translateUi('Hello')}</div>
           <div className="cc-page-header__subtitle">
             {todayDate ? formatDate(todayDate) : ''}
             {!isMobile &&
@@ -90,7 +91,7 @@ export default function TodayView({
             type="button"
             className="cc-btn cc-btn--ghost cc-btn--icon-touch"
             onClick={() => navigate('/settings')}
-            aria-label="Open settings"
+            aria-label={translateUi('Open settings')}
           >
             <GearIcon />
           </button>
@@ -103,14 +104,21 @@ export default function TodayView({
           <div className="cc-today-progress__header">
             <span className="cc-today-progress__label">
               {progress.allDone
-                ? '\u2705 All done!'
+                ? translateUi('\u2705 All done!')
                 : isMobile
-                  ? `${progress.completed}/${progress.total} done today`
-                  : `Today\u2019s Progress: ${progress.completed}/${progress.total} tasks`}
+                  ? translateUi('{{completed}}/{{total}} done today', {
+                      completed: progress.completed,
+                      total: progress.total,
+                    })
+                  : translateUi("Today's Progress: {{completed}}/{{total}} tasks", {
+                      completed: progress.completed,
+                      total: progress.total,
+                    })}
             </span>
             {!isMobile && streakCount > 0 && (
               <span className="cc-today-progress__streak">
-                <FlameIcon size={14} /> {streakCount} day streak
+                <FlameIcon size={14} /> {streakCount}
+                {translateUi(' day streak\n              ')}
               </span>
             )}
           </div>
@@ -125,7 +133,7 @@ export default function TodayView({
 
       {progress.total === 0 && !isLoading && hasAnything && !isMobile && (
         <div className="cc-today-progress">
-          <span className="cc-today-progress__label">No tasks for today</span>
+          <span className="cc-today-progress__label">{translateUi('No tasks for today')}</span>
         </div>
       )}
 
@@ -137,14 +145,21 @@ export default function TodayView({
         <EmptyState
           icon={<SparkleIcon size={20} />}
           message={
-            isMobile ? 'Nothing urgent right now.' : 'All clear! Nothing scheduled for today.'
+            isMobile
+              ? translateUi('Nothing urgent right now.')
+              : translateUi('All clear! Nothing scheduled for today.')
           }
         />
       )}
 
       {/* Section 1: Overdue tasks (red accent, urgent feel) */}
       {overdueTasks.length > 0 && (
-        <SectionHeader title="Overdue" count={overdueTasks.length} variant="warning" defaultOpen>
+        <SectionHeader
+          title={translateUi('Overdue')}
+          count={overdueTasks.length}
+          variant="warning"
+          defaultOpen
+        >
           {visibleOverdueTasks.map((task) => (
             <TaskCard
               key={task.id}
@@ -155,7 +170,7 @@ export default function TodayView({
           ))}
           {isMobile && overdueTasks.length > visibleOverdueTasks.length && (
             <button type="button" className="cc-link-btn" onClick={() => navigate('/tasks')}>
-              See all overdue
+              {translateUi('\n              See all overdue\n            ')}
             </button>
           )}
         </SectionHeader>
@@ -163,7 +178,7 @@ export default function TodayView({
 
       {/* Section 2: Today's tasks */}
       {todayTasks.length > 0 && (
-        <SectionHeader title="Today's Tasks" count={todayTasks.length} defaultOpen>
+        <SectionHeader title={translateUi("Today's Tasks")} count={todayTasks.length} defaultOpen>
           {visibleTodayTasks.map((task) => (
             <TaskCard
               key={task.id}
@@ -174,7 +189,7 @@ export default function TodayView({
           ))}
           {isMobile && todayTasks.length > visibleTodayTasks.length && (
             <button type="button" className="cc-link-btn" onClick={() => navigate('/tasks')}>
-              See all tasks
+              {translateUi('\n              See all tasks\n            ')}
             </button>
           )}
         </SectionHeader>
@@ -185,7 +200,7 @@ export default function TodayView({
         <div className="cc-needs-review">
           <div className="cc-needs-review__header">
             <InboxTrayIcon size={16} />
-            <span className="cc-needs-review__title">Needs review</span>
+            <span className="cc-needs-review__title">{translateUi('Needs review')}</span>
             <span className="cc-section__count">{needsReviewItems.length}</span>
           </div>
           <div className="cc-needs-review__list">
@@ -198,7 +213,9 @@ export default function TodayView({
                 <div className="cc-needs-review__item-body">
                   <span className="cc-needs-review__item-title">{item.title}</span>
                   <Badge variant="status">
-                    {item.inbox_state === 'plan_ready' ? 'Review plan' : 'Review suggestion'}
+                    {item.inbox_state === 'plan_ready'
+                      ? translateUi('Review plan')
+                      : translateUi('Review suggestion')}
                   </Badge>
                 </div>
                 <button
@@ -209,13 +226,13 @@ export default function TodayView({
                     navigate(`/tasks/${item.id}`);
                   }}
                 >
-                  Review
+                  {translateUi('\n                  Review\n                ')}
                 </button>
               </div>
             ))}
           </div>
           <button type="button" className="cc-link-btn" onClick={() => navigate('/inbox')}>
-            View all in Inbox &rarr;
+            {translateUi('\n            View all in Inbox &rarr;\n          ')}
           </button>
         </div>
       )}
@@ -225,14 +242,17 @@ export default function TodayView({
         <div className="cc-inbox-banner" onClick={() => navigate('/inbox')}>
           <InboxTrayIcon size={16} />
           <span className="cc-inbox-banner__text">
-            {inboxCount} item{inboxCount !== 1 ? 's' : ''} in your inbox
+            {inboxCount}
+            {translateUi(' item')}
+            {inboxCount !== 1 ? 's' : ''}
+            {translateUi(' in your inbox\n          ')}
           </span>
         </div>
       )}
 
       {/* Events section (moved below task sections) */}
       {todayEvents.length > 0 && !isMobile && (
-        <SectionHeader title="Events" count={todayEvents.length} variant="accent">
+        <SectionHeader title={translateUi('Events')} count={todayEvents.length} variant="accent">
           {todayEvents.map((event) => (
             <EventCard
               key={event.id}
@@ -257,7 +277,7 @@ export default function TodayView({
               className={`cc-section__chevron${briefingOpen ? ' cc-section__chevron--open' : ''}`}
             />
             <ClipboardIcon size={16} />
-            <span className="cc-briefing-collapsible__title">Daily Briefing</span>
+            <span className="cc-briefing-collapsible__title">{translateUi('Daily Briefing')}</span>
             {briefingData.load_assessment && (
               <span
                 className={`cc-briefing-pill cc-briefing-collapsible__assessment cc-briefing-pill--${briefingData.load_assessment === 'heavy' ? 'warning' : briefingData.load_assessment === 'moderate' ? 'task' : 'event'}`}
@@ -270,7 +290,7 @@ export default function TodayView({
                 {briefingData.stats.events +
                   briefingData.stats.tasks_due +
                   briefingData.stats.overdue}{' '}
-                items
+                {translateUi('\n                items\n              ')}
               </span>
             )}
           </button>
@@ -280,28 +300,33 @@ export default function TodayView({
                 <div className="cc-briefing-card__stats">
                   {briefingData.stats.events > 0 && (
                     <span className="cc-briefing-pill cc-briefing-pill--event">
-                      <CalendarIcon size={13} /> {briefingData.stats.events} event
+                      <CalendarIcon size={13} /> {briefingData.stats.events}
+                      {translateUi(' event\n                      ')}
                       {briefingData.stats.events !== 1 ? 's' : ''}
                     </span>
                   )}
                   {briefingData.stats.tasks_due > 0 && (
                     <span className="cc-briefing-pill cc-briefing-pill--task">
-                      <CheckCircleIcon size={13} /> {briefingData.stats.tasks_due} due
+                      <CheckCircleIcon size={13} /> {briefingData.stats.tasks_due}
+                      {translateUi(' due\n                    ')}
                     </span>
                   )}
                   {briefingData.stats.overdue > 0 && (
                     <span className="cc-briefing-pill cc-briefing-pill--warning">
-                      <FlameIcon size={13} /> {briefingData.stats.overdue} overdue
+                      <FlameIcon size={13} /> {briefingData.stats.overdue}
+                      {translateUi(' overdue\n                    ')}
                     </span>
                   )}
                   {briefingData.stats.in_progress > 0 && (
                     <span className="cc-briefing-pill cc-briefing-pill--progress">
-                      <SpinArrowsIcon size={13} /> {briefingData.stats.in_progress} in progress
+                      <SpinArrowsIcon size={13} /> {briefingData.stats.in_progress}
+                      {translateUi(' in progress\n                    ')}
                     </span>
                   )}
                   {briefingData.stats.inbox > 0 && (
                     <span className="cc-briefing-pill cc-briefing-pill--inbox">
-                      <InboxTrayIcon size={13} /> {briefingData.stats.inbox} inbox
+                      <InboxTrayIcon size={13} /> {briefingData.stats.inbox}
+                      {translateUi(' inbox\n                    ')}
                     </span>
                   )}
                 </div>
@@ -329,7 +354,9 @@ export default function TodayView({
                             });
                           }}
                         >
-                          Move to tomorrow
+                          {translateUi(
+                            '\n                          Move to tomorrow\n                        ',
+                          )}
                         </button>
                       )}
                       {s.action === 'start_with' && (
@@ -338,7 +365,9 @@ export default function TodayView({
                           className="cc-btn cc-btn--compact cc-btn--ghost"
                           onClick={() => navigate(`/tasks/${s.todo_id}`)}
                         >
-                          Start
+                          {translateUi(
+                            '\n                          Start\n                        ',
+                          )}
                         </button>
                       )}
                       {s.action === 'reschedule' && (
@@ -347,7 +376,9 @@ export default function TodayView({
                           className="cc-btn cc-btn--compact cc-btn--ghost"
                           onClick={() => navigate(`/tasks/${s.todo_id}`)}
                         >
-                          Reschedule
+                          {translateUi(
+                            '\n                          Reschedule\n                        ',
+                          )}
                         </button>
                       )}
                     </div>

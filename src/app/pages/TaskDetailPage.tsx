@@ -27,9 +27,8 @@ import AttachmentList from '../components/shared/AttachmentList';
 import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 import { getTaskStatusLabel, isTerminalTaskStatus } from '../utils/taskStatus';
-
+import { translateUi } from '../i18n';
 const PRIORITIES: Array<TodoResponse['priority']> = ['low', 'medium', 'high', 'urgent'];
-
 const SKILL_OPTIONS = [
   { id: 'plan', label: 'Plan' },
   { id: 'research', label: 'Research' },
@@ -40,11 +39,9 @@ const SKILL_OPTIONS = [
   { id: 'obsidian_sync', label: 'Sync' },
   { id: 'prioritize', label: 'Prioritize' },
 ] as const;
-
 const SKILL_LABELS: Record<string, string> = Object.fromEntries(
   SKILL_OPTIONS.map(({ id, label }) => [id, label]),
 );
-
 function getDueCountdown(dueDate: string): {
   label: string;
   variant: 'overdue' | 'today' | 'upcoming';
@@ -54,25 +51,30 @@ function getDueCountdown(dueDate: string): {
   const due = new Date(dueDate);
   due.setHours(0, 0, 0, 0);
   const diffDays = Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
   if (diffDays < 0) {
     const absDays = Math.abs(diffDays);
-    return { label: `Overdue by ${absDays} day${absDays !== 1 ? 's' : ''}`, variant: 'overdue' };
+    return {
+      label: translateUi('Overdue by {{count}} days', { count: absDays }),
+      variant: 'overdue',
+    };
   }
-  if (diffDays === 0) return { label: 'Due today', variant: 'today' };
-  if (diffDays === 1) return { label: 'Due tomorrow', variant: 'upcoming' };
-  return { label: `Due in ${diffDays} days`, variant: 'upcoming' };
+  if (diffDays === 0) return { label: translateUi('Due today'), variant: 'today' };
+  if (diffDays === 1) return { label: translateUi('Due tomorrow'), variant: 'upcoming' };
+  return {
+    label: translateUi('Due in {{count}} days', { count: diffDays }),
+    variant: 'upcoming',
+  };
 }
-
 export default function TaskDetailPage() {
-  const { taskId } = useParams<{ taskId: string }>();
+  const { taskId } = useParams<{
+    taskId: string;
+  }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: todos = [] } = useTodosQuery();
   const updateTodoMutation = useUpdateTodo();
   const deleteTodoMutation = useDeleteTodo();
   const toggleCompleteMutation = useToggleTodoComplete();
-
   const task = todos.find((t) => t.id === taskId);
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
   const generatePlanMutation = useGeneratePlanProposal();
@@ -82,26 +84,22 @@ export default function TaskDetailPage() {
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
   const incompleteChildren = childTasks.filter((t) => !isTerminalTaskStatus(t.status));
   const nextSubtask = incompleteChildren[0] ?? null;
-
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const plan = latestPlanQuery.data ?? null;
-
   useEffect(() => {
     if (task) {
       setTitle(task.title);
       setDescription(task.description ?? '');
     }
   }, [task]);
-
   const serverUpdateTodo = useCallback(
     (id: string, data: TodoUpdate) => {
       updateTodoMutation.mutate({ id, data });
     },
     [updateTodoMutation],
   );
-
   const localUpdateTodo = useCallback(
     (id: string, updates: TodoUpdate) => {
       // Optimistic local update in the query cache
@@ -111,32 +109,26 @@ export default function TaskDetailPage() {
     },
     [queryClient],
   );
-
   const persistField = useDebouncedPersist<TodoUpdate>(taskId, serverUpdateTodo, localUpdateTodo);
-
   const handleTitleChange = (val: string) => {
     setTitle(val);
     persistField({ title: val });
   };
-
   const handleDescriptionChange = (val: string) => {
     setDescription(val);
     persistField({ description: val });
   };
-
   const cyclePriority = () => {
     if (!task) return;
     const idx = PRIORITIES.indexOf(task.priority);
     const next = PRIORITIES[(idx + 1) % PRIORITIES.length];
     persistField({ priority: next });
   };
-
   const handleDelete = async () => {
     if (!taskId) return;
     deleteTodoMutation.mutate(taskId);
     navigate('/tasks');
   };
-
   const handleToggle = useCallback(
     (id: string) => {
       const todo = todos.find((t) => t.id === id);
@@ -144,7 +136,6 @@ export default function TaskDetailPage() {
     },
     [todos, toggleCompleteMutation],
   );
-
   const handleApplyPlan = async (selectedIndices: number[]) => {
     if (!taskId || !plan || plan.base_graph_revision === null) return;
     await applyPlanMutation.mutateAsync({
@@ -155,45 +146,39 @@ export default function TaskDetailPage() {
       subtasks: plan.subtasks,
     });
   };
-
   const handleDismissPlan = async () => {
     if (!taskId || !plan) return;
     await dismissPlanMutation.mutateAsync({ todoId: taskId, proposalId: plan.proposal_id });
-    useToastStore.getState().addToast('info', 'Plan dismissed');
+    useToastStore.getState().addToast('info', translateUi('Plan dismissed'));
   };
-
   const handleRegeneratePlan = async () => {
     if (!taskId) return;
     await generatePlanMutation.mutateAsync({ todoId: taskId });
     applyPlanMutation.reset();
   };
-
   if (!task) {
     return (
       <div className="cc-detail">
-        <div className="cc-page-header__subtitle">Task not found</div>
+        <div className="cc-page-header__subtitle">{translateUi('Task not found')}</div>
         <button
           type="button"
           className="cc-btn cc-btn--secondary cc-mt-16"
           onClick={() => navigate('/tasks')}
         >
-          Back to tasks
+          {translateUi('\n          Back to tasks\n        ')}
         </button>
       </div>
     );
   }
-
   const isProject = task.source === 'obsidian_project';
   const hasPlan = plan && (plan.status === 'draft' || plan.status === 'stale');
   const isPlanned = childTasks.length > 0;
   const dueInfo =
     task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
-
   // Blocker info from child tasks
   const blockedByRelationships = todos.filter(
     (t) => t.parent_id === taskId && !isTerminalTaskStatus(t.status),
   );
-
   return (
     <div className="cc-detail cc-exec-panel">
       {/* Top: Status + Quick Actions */}
@@ -204,7 +189,7 @@ export default function TaskDetailPage() {
             className="cc-detail__title-input"
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder="Task title"
+            placeholder={translateUi('Task title')}
           />
         </div>
         <div className="cc-exec-panel__badges">
@@ -222,7 +207,7 @@ export default function TaskDetailPage() {
 
       {/* Section 1: Next Step */}
       <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">Next step</div>
+        <div className="cc-exec-panel__section-title">{translateUi('Next step')}</div>
         {hasPlan ? (
           <PlanReviewDiff
             plan={plan}
@@ -244,7 +229,8 @@ export default function TaskDetailPage() {
             />
             {incompleteChildren.length > 1 && (
               <span className="cc-exec-panel__remaining">
-                +{incompleteChildren.length - 1} more sub-task
+                +{incompleteChildren.length - 1}
+                {translateUi(' more sub-task\n                ')}
                 {incompleteChildren.length - 1 !== 1 ? 's' : ''}
               </span>
             )}
@@ -253,10 +239,14 @@ export default function TaskDetailPage() {
           <div className="cc-exec-panel__next-step-empty">
             {isTerminalTaskStatus(task.status) ? (
               <span className="cc-exec-panel__done-label">
-                {task.status === 'completed' ? 'Task completed' : 'Task cancelled'}
+                {task.status === 'completed'
+                  ? translateUi('Task completed')
+                  : translateUi('Task cancelled')}
               </span>
             ) : (
-              <span className="cc-exec-panel__do-this">This task is your next step</span>
+              <span className="cc-exec-panel__do-this">
+                {translateUi('This task is your next step')}
+              </span>
             )}
           </div>
         )}
@@ -268,19 +258,21 @@ export default function TaskDetailPage() {
         task.is_recurring ||
         blockedByRelationships.length > 0) && (
         <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-title">Due / Estimate / Blockers</div>
+          <div className="cc-exec-panel__section-title">
+            {translateUi('Due / Estimate / Blockers')}
+          </div>
           <div className="cc-exec-panel__info-grid">
             {dueInfo && (
               <div
                 className={`cc-exec-panel__info-item cc-exec-panel__info-item--${dueInfo.variant}`}
               >
-                <span className="cc-exec-panel__info-label">Due</span>
+                <span className="cc-exec-panel__info-label">{translateUi('Due')}</span>
                 <span className="cc-exec-panel__info-value">{dueInfo.label}</span>
               </div>
             )}
             {task.estimated_minutes && (
               <div className="cc-exec-panel__info-item">
-                <span className="cc-exec-panel__info-label">Estimate</span>
+                <span className="cc-exec-panel__info-label">{translateUi('Estimate')}</span>
                 <span className="cc-exec-panel__info-value">{task.estimated_minutes}m</span>
               </div>
             )}
@@ -290,7 +282,7 @@ export default function TaskDetailPage() {
 
       {/* Section 2b: Recurrence */}
       <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">Repeat</div>
+        <div className="cc-exec-panel__section-title">{translateUi('Repeat')}</div>
         <RecurrenceSelector
           value={task.recurrence_rule ?? undefined}
           onChange={(rule) => persistField({ recurrence_rule: rule ?? null })}
@@ -300,20 +292,20 @@ export default function TaskDetailPage() {
       {/* Section 3: Project context */}
       {(isProject || task.parent_id || task.assignee) && (
         <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-title">Project context</div>
+          <div className="cc-exec-panel__section-title">{translateUi('Project context')}</div>
           <div className="cc-exec-panel__context">
             {isProject && (
               <div className="cc-exec-panel__context-row">
-                <span className="cc-exec-panel__context-label">Source</span>
+                <span className="cc-exec-panel__context-label">{translateUi('Source')}</span>
                 <span className="cc-exec-panel__context-badge cc-exec-panel__context-badge--synced">
                   <CheckIcon size={12} />
-                  Obsidian project
+                  {translateUi('\n                  Obsidian project\n                ')}
                 </span>
               </div>
             )}
             {parentTask && (
               <div className="cc-exec-panel__context-row">
-                <span className="cc-exec-panel__context-label">Parent</span>
+                <span className="cc-exec-panel__context-label">{translateUi('Parent')}</span>
                 <span
                   className="cc-exec-panel__context-link"
                   onClick={() => navigate(`/tasks/${parentTask.id}`)}
@@ -328,7 +320,7 @@ export default function TaskDetailPage() {
 
       {/* Section 4: Plan / Research / Execute (action bar) */}
       <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">Actions</div>
+        <div className="cc-exec-panel__section-title">{translateUi('Actions')}</div>
         <div className="cc-exec-panel__action-bar">
           {!isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
             <button
@@ -338,13 +330,13 @@ export default function TaskDetailPage() {
               onClick={async () => {
                 try {
                   await apiClient.post(`/todos/${taskId}/organize`);
-                  useToastStore.getState().addToast('info', 'Planning...');
+                  useToastStore.getState().addToast('info', translateUi('Planning...'));
                 } catch {
-                  useToastStore.getState().addToast('error', 'Failed');
+                  useToastStore.getState().addToast('error', translateUi('Failed'));
                 }
               }}
             >
-              Plan this task
+              {translateUi('\n              Plan this task\n            ')}
             </button>
           )}
           {isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
@@ -355,19 +347,19 @@ export default function TaskDetailPage() {
               onClick={async () => {
                 try {
                   await apiClient.post(`/todos/${taskId}/organize`);
-                  useToastStore.getState().addToast('info', 'Re-planning...');
+                  useToastStore.getState().addToast('info', translateUi('Re-planning...'));
                 } catch {
-                  useToastStore.getState().addToast('error', 'Failed');
+                  useToastStore.getState().addToast('error', translateUi('Failed'));
                 }
               }}
             >
-              Re-plan
+              {translateUi('\n              Re-plan\n            ')}
             </button>
           )}
 
           {/* Skill delegate buttons */}
           <div className="cc-exec-panel__delegate">
-            <span className="cc-exec-panel__delegate-label">Skills:</span>
+            <span className="cc-exec-panel__delegate-label">{translateUi('Skills:')}</span>
             {SKILL_OPTIONS.map(({ id, label }) => {
               const isActive = task.enabled_skills?.includes(id) || task.assignee === id;
               return (
@@ -388,7 +380,7 @@ export default function TaskDetailPage() {
                     }
                   }}
                 >
-                  {label}
+                  {translateUi(label)}
                 </button>
               );
             })}
@@ -400,19 +392,19 @@ export default function TaskDetailPage() {
             <div className="cc-exec-panel__agent-status">
               <span className="cc-exec-panel__agent-badge">
                 {task.enabled_skills?.length
-                  ? task.enabled_skills.map((s) => SKILL_LABELS[s] || s).join(' → ')
+                  ? task.enabled_skills.map((s) => translateUi(SKILL_LABELS[s] || s)).join(' → ')
                   : task.assignee === 'openclaw'
-                    ? 'OpenClaw AI'
+                    ? translateUi('OpenClaw AI')
                     : task.assignee}
               </span>
               <span className="cc-exec-panel__agent-state">
                 {task.inbox_state === 'planning'
-                  ? 'Planning in progress'
+                  ? translateUi('Planning in progress')
                   : task.inbox_state === 'classifying'
-                    ? 'Classifying...'
+                    ? translateUi('Classifying...')
                     : task.inbox_state === 'plan_ready'
-                      ? 'Plan ready for review'
-                      : 'Assigned · start from Inbox when Ready'}
+                      ? translateUi('Plan ready for review')
+                      : translateUi('Assigned \u00B7 start from Inbox when Ready')}
               </span>
             </div>
           )}
@@ -430,7 +422,7 @@ export default function TaskDetailPage() {
             size={16}
             className={`cc-section__chevron${detailsOpen ? ' cc-section__chevron--open' : ''}`}
           />
-          Details
+          {translateUi('\n          Details\n          ')}
           {(task.tags?.length || childTasks.length > 0) && (
             <span className="cc-exec-panel__details-hint">
               {[
@@ -452,13 +444,13 @@ export default function TaskDetailPage() {
             className="cc-detail__textarea"
             value={description}
             onChange={(e) => handleDescriptionChange(e.target.value)}
-            placeholder="Add a description..."
+            placeholder={translateUi('Add a description...')}
           />
 
           {/* Tags */}
           {task.tags && task.tags.length > 0 && (
             <div className="cc-detail__field" style={{ borderBottom: 'none' }}>
-              <span className="cc-detail__field-label">Tags</span>
+              <span className="cc-detail__field-label">{translateUi('Tags')}</span>
               <div
                 className="cc-detail__field-value"
                 style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}
@@ -475,7 +467,8 @@ export default function TaskDetailPage() {
           {/* Sub-tasks list */}
           <div className="cc-detail__section">
             <div className="cc-detail__section-title">
-              Sub-tasks{childTasks.length > 0 ? ` (${childTasks.length})` : ''}
+              {translateUi('\n              Sub-tasks')}
+              {childTasks.length > 0 ? ` (${childTasks.length})` : ''}
             </div>
             {childTasks.map((child) => (
               <TaskCard
@@ -492,7 +485,7 @@ export default function TaskDetailPage() {
               style={{ fontSize: 12, marginTop: 4 }}
               onClick={() => useQuickCaptureStore.getState().open({ defaultParentId: taskId })}
             >
-              + Add sub-task
+              {translateUi('\n              + Add sub-task\n            ')}
             </button>
           </div>
 
@@ -502,7 +495,7 @@ export default function TaskDetailPage() {
           {/* Attachments */}
           {taskId && (
             <div className="cc-detail__section">
-              <div className="cc-detail__section-title">Attachments</div>
+              <div className="cc-detail__section-title">{translateUi('Attachments')}</div>
               <FileDropZone todoId={taskId} />
               <AttachmentList ownerId={taskId} ownerType="todo" />
             </div>
@@ -516,7 +509,7 @@ export default function TaskDetailPage() {
         className="cc-btn cc-btn--danger cc-detail__delete-btn"
         onClick={handleDelete}
       >
-        Delete Task
+        {translateUi('\n        Delete Task\n      ')}
       </button>
     </div>
   );

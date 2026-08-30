@@ -1,6 +1,8 @@
+import { getAppLanguage, translateUi } from '../i18n';
+
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString(getAppLanguage() === 'ko' ? 'ko-KR' : 'en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -9,7 +11,7 @@ export function formatDate(dateString: string): string {
 
 export function formatTime(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleTimeString('en-US', {
+  return date.toLocaleTimeString(getAppLanguage() === 'ko' ? 'ko-KR' : 'en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -17,7 +19,10 @@ export function formatTime(dateString: string): string {
 }
 
 export function formatDateTime(dateString: string): string {
-  return `${formatDate(dateString)} at ${formatTime(dateString)}`;
+  return translateUi('{{date}} at {{time}}', {
+    date: formatDate(dateString),
+    time: formatTime(dateString),
+  });
 }
 
 export function formatRelativeTime(dateString: string): string {
@@ -29,11 +34,17 @@ export function formatRelativeTime(dateString: string): string {
   const diffHours = Math.floor(diffMinutes / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffSeconds < 60) return 'just now';
-  if (diffMinutes < 60) return diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
-  if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-  if (diffDays === 1) return 'yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffSeconds < 60) return translateUi('just now');
+  if (diffMinutes < 60)
+    return translateUi(diffMinutes === 1 ? '1 minute ago' : '{{count}} minutes ago', {
+      count: diffMinutes,
+    });
+  if (diffHours < 24)
+    return translateUi(diffHours === 1 ? '1 hour ago' : '{{count}} hours ago', {
+      count: diffHours,
+    });
+  if (diffDays === 1) return translateUi('yesterday');
+  if (diffDays < 7) return translateUi('{{count}} days ago', { count: diffDays });
   return formatDate(dateString);
 }
 
@@ -76,22 +87,27 @@ export function isOverdue(dateString: string): boolean {
 
 export function formatDueDate(dateString: string): string {
   if (!dateString) return '';
-  if (isToday(dateString)) return 'Today';
-  if (isTomorrow(dateString)) return 'Tomorrow';
-  if (isOverdue(dateString)) return 'Overdue';
+  if (isToday(dateString)) return translateUi('Today');
+  if (isTomorrow(dateString)) return translateUi('Tomorrow');
+  if (isOverdue(dateString)) return translateUi('Overdue');
   return formatDate(dateString);
 }
 
 export function getGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return translateUi('Good morning');
+  if (hour < 17) return translateUi('Good afternoon');
+  return translateUi('Good evening');
 }
 
 export function formatShortDateTime(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function formatBytes(bytes: number): string {
@@ -118,10 +134,10 @@ export function formatDateTimeShort(iso: string): string {
 export function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return translateUi('just now');
+  if (m < 60) return translateUi('{{count}}m ago', { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return translateUi('{{count}}h ago', { count: h });
   const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return translateUi('{{count}}d ago', { count: d });
 }

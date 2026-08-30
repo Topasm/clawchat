@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-
 import { queryKeys } from '../../hooks/queries';
 import apiClient from '../../services/apiClient';
 import { useToastStore } from '../../stores/useToastStore';
 import type { TodoResponse } from '../../types/api';
-
+import { translateUi } from '../../i18n';
 /** Collects the planner's clarification answers for one captured task. */
 export default function QuestionnaireCard({ task }: { task: TodoResponse }) {
   const questions = task.clarification_questions ?? [];
@@ -13,37 +12,33 @@ export default function QuestionnaireCard({ task }: { task: TodoResponse }) {
   const [submitting, setSubmitting] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
   const queryClient = useQueryClient();
-
   const handleAnswerChange = (index: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [String(index)]: value }));
   };
-
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
       await apiClient.post(`/todos/${task.id}/answer-questions`, { answers });
-      addToast('info', 'Planning with your answers...');
+      addToast('info', translateUi('Planning with your answers...'));
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
     } catch {
-      addToast('error', 'Failed to submit answers');
+      addToast('error', translateUi('Failed to submit answers'));
     } finally {
       setSubmitting(false);
     }
   };
-
   const handleSkip = async () => {
     setSubmitting(true);
     try {
       await apiClient.post(`/todos/${task.id}/skip-questions`);
-      addToast('info', 'Skipping questions, planning...');
+      addToast('info', translateUi('Skipping questions, planning...'));
       queryClient.invalidateQueries({ queryKey: queryKeys.todos });
     } catch {
-      addToast('error', 'Failed to skip questions');
+      addToast('error', translateUi('Failed to skip questions'));
     } finally {
       setSubmitting(false);
     }
   };
-
   return (
     <div className="cc-inbox-card cc-inbox-card--questioning">
       <div className="cc-inbox-card__questioning-header">{task.title}</div>
@@ -54,7 +49,7 @@ export default function QuestionnaireCard({ task }: { task: TodoResponse }) {
             <input
               className="cc-inbox-card__question-input"
               type="text"
-              placeholder="Your answer..."
+              placeholder={translateUi('Your answer...')}
               value={answers[String(index)] ?? ''}
               onChange={(e) => handleAnswerChange(index, e.target.value)}
               disabled={submitting}
@@ -69,7 +64,7 @@ export default function QuestionnaireCard({ task }: { task: TodoResponse }) {
           onClick={handleSubmit}
           disabled={submitting}
         >
-          Submit Answers
+          {translateUi('\n          Submit Answers\n        ')}
         </button>
         <button
           className="cc-btn cc-btn--secondary"
@@ -77,7 +72,7 @@ export default function QuestionnaireCard({ task }: { task: TodoResponse }) {
           onClick={handleSkip}
           disabled={submitting}
         >
-          Skip
+          {translateUi('\n          Skip\n        ')}
         </button>
       </div>
     </div>

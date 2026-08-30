@@ -16,9 +16,11 @@ import StreamingIndicator from '../components/chat-panel/StreamingIndicator';
 import ChatInput from '../components/chat-panel/ChatInput';
 import { getProjectIcon } from '../utils/projectIcons';
 import { ChevronLeftIcon } from '../components/shared/Icons';
-
+import { translateUi } from '../i18n';
 export default function ChatPage() {
-  const { conversationId } = useParams<{ conversationId: string }>();
+  const { conversationId } = useParams<{
+    conversationId: string;
+  }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: queryMessages = [] } = useMessagesQuery(conversationId ?? null);
@@ -31,17 +33,14 @@ export default function ChatPage() {
   const clearStreamingMessages = useChatStore((s) => s.clearStreamingMessages);
   const deleteMessageMutation = useDeleteMessage();
   const regenerateMutation = useRegenerateMessage();
-
   const { data: conversations = [] } = useConversationsQuery();
   const { data: projects = [] } = useProjectsQuery();
-
   const convo = conversations.find((c) => c.id === conversationId);
   const projectTodo = projects.find(
     (project) =>
       project.id === convo?.project_id || project.root_task_id === convo?.project_todo_id,
   );
   const scrollRef = useRef<HTMLDivElement>(null);
-
   // Merge query messages with streaming messages
   // Streaming messages are newest-first, query messages are newest-first
   const messages: ChatMessage[] = useMemo(() => {
@@ -50,15 +49,12 @@ export default function ChatPage() {
     const onlyStreaming = streamingMessages.filter((m) => !queryIds.has(m._id));
     return [...onlyStreaming, ...queryMessages];
   }, [queryMessages, streamingMessages]);
-
   useEffect(() => {
     if (!conversationId) return;
     setCurrentConversationId(conversationId);
     clearStreamingMessages();
-
     return () => setCurrentConversationId(null);
   }, [conversationId, setCurrentConversationId, clearStreamingMessages]);
-
   // Clear streaming messages when streaming ends and refetch
   useEffect(() => {
     if (!isStreaming && streamingMessages.length > 0 && conversationId) {
@@ -71,7 +67,6 @@ export default function ChatPage() {
       return () => clearTimeout(timer);
     }
   }, [isStreaming, streamingMessages.length, conversationId, queryClient, clearStreamingMessages]);
-
   const handleSend = useCallback(
     async (text: string) => {
       if (!conversationId) return;
@@ -89,7 +84,6 @@ export default function ChatPage() {
     },
     [conversationId, addStreamingMessage, sendMessageStreaming],
   );
-
   const handleRegenerate = useCallback(
     async (assistantMessageId: string) => {
       if (!conversationId) return;
@@ -104,16 +98,13 @@ export default function ChatPage() {
     },
     [conversationId, regenerateMutation, sendMessageStreaming],
   );
-
   // Store has newest-first; Virtuoso needs oldest-first
   const chronological = useMemo(() => [...messages].reverse(), [messages]);
-
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [chronological, isStreaming]);
-
   return (
     <div className="cc-chat-page">
       <div className="cc-chat-page__header">
@@ -121,14 +112,14 @@ export default function ChatPage() {
           type="button"
           className="cc-chat-page__back"
           onClick={() => navigate('/chats')}
-          aria-label="Back to chats"
+          aria-label={translateUi('Back to chats')}
         >
           <ChevronLeftIcon size={16} />
         </button>
         {projectTodo && (
           <span style={{ fontSize: 18, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>
         )}
-        <span className="cc-chat-page__title">{convo?.title || 'Chat'}</span>
+        <span className="cc-chat-page__title">{convo?.title || translateUi('Chat')}</span>
       </div>
 
       {projectTodo && (
@@ -147,7 +138,8 @@ export default function ChatPage() {
           <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{projectTodo.title}</span>
           {projectTodo.task_count > 0 && (
             <span style={{ color: 'var(--cc-text-tertiary)', marginLeft: 'auto' }}>
-              {projectTodo.completed_task_count}/{projectTodo.task_count} tasks done
+              {projectTodo.completed_task_count}/{projectTodo.task_count}
+              {translateUi(' tasks done\n            ')}
             </span>
           )}
         </div>
@@ -174,7 +166,7 @@ export default function ChatPage() {
         onSend={handleSend}
         isStreaming={isStreaming}
         onStop={stopGeneration}
-        placeholder="Type a message..."
+        placeholder={translateUi('Type a message...')}
       />
     </div>
   );

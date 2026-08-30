@@ -16,9 +16,8 @@ import {
 } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
-
+import { translateUi } from '../../i18n';
 // --- Queries ---
-
 export function useAdminOverviewQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
@@ -28,10 +27,9 @@ export function useAdminOverviewQuery() {
       return AdminOverviewResponseSchema.parse(res.data);
     },
     enabled: !!serverUrl,
-    refetchInterval: 30_000,
+    refetchInterval: 30000,
   });
 }
-
 export function useAdminAIQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
@@ -43,7 +41,6 @@ export function useAdminAIQuery() {
     enabled: !!serverUrl,
   });
 }
-
 export function useAdminActivityQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
@@ -55,7 +52,6 @@ export function useAdminActivityQuery() {
     enabled: !!serverUrl,
   });
 }
-
 export function useAdminSessionsQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
@@ -65,10 +61,9 @@ export function useAdminSessionsQuery() {
       return SessionsResponseSchema.parse(res.data);
     },
     enabled: !!serverUrl,
-    refetchInterval: 10_000,
+    refetchInterval: 10000,
   });
 }
-
 export function useAdminConfigQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
@@ -80,7 +75,6 @@ export function useAdminConfigQuery() {
     enabled: !!serverUrl,
   });
 }
-
 export function useAdminDataQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
@@ -92,9 +86,7 @@ export function useAdminDataQuery() {
     enabled: !!serverUrl,
   });
 }
-
 // --- Mutations ---
-
 export function useTestAIConnection() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -107,14 +99,21 @@ export function useTestAIConnection() {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview });
       const toast = useToastStore.getState();
       if (data.connected) {
-        toast.addToast('success', `AI connected (${data.latency_ms}ms)`);
+        toast.addToast(
+          'success',
+          translateUi('AI connected ({{latency}}ms)', { latency: data.latency_ms ?? 0 }),
+        );
       } else {
-        toast.addToast('error', `AI connection failed: ${data.error}`);
+        toast.addToast(
+          'error',
+          translateUi('AI connection failed: {{error}}', {
+            error: data.error ?? translateUi('Unknown error'),
+          }),
+        );
       }
     },
   });
 }
-
 export function useReindexFTS() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -123,12 +122,11 @@ export function useReindexFTS() {
       return ReindexResponseSchema.parse(res.data);
     },
     onSuccess: () => {
-      useToastStore.getState().addToast('success', 'FTS reindex completed');
+      useToastStore.getState().addToast('success', translateUi('FTS reindex completed'));
       queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview });
     },
   });
 }
-
 export function useBackupDatabase() {
   return useMutation({
     mutationFn: async () => {
@@ -136,11 +134,15 @@ export function useBackupDatabase() {
       return BackupResponseSchema.parse(res.data);
     },
     onSuccess: (data) => {
-      useToastStore.getState().addToast('success', `Backup created: ${data.filename}`);
+      useToastStore
+        .getState()
+        .addToast(
+          'success',
+          translateUi('Backup created: {{filename}}', { filename: data.filename }),
+        );
     },
   });
 }
-
 export function usePurgeData() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -149,7 +151,13 @@ export function usePurgeData() {
       return PurgeResponseSchema.parse(res.data);
     },
     onSuccess: (data) => {
-      useToastStore.getState().addToast('success', `Purged ${data.deleted_count} ${data.target}`);
+      useToastStore.getState().addToast(
+        'success',
+        translateUi('Purged {{count}} {{target}}', {
+          count: data.deleted_count,
+          target: data.target,
+        }),
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminData });
       queryClient.invalidateQueries({ queryKey: queryKeys.adminActivity });
@@ -160,7 +168,6 @@ export function usePurgeData() {
     },
   });
 }
-
 export function useDisconnectSession() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -170,7 +177,7 @@ export function useDisconnectSession() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.adminSessions });
-      useToastStore.getState().addToast('success', 'Session disconnected');
+      useToastStore.getState().addToast('success', translateUi('Session disconnected'));
     },
   });
 }

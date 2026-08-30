@@ -1,5 +1,5 @@
 import type { InboxTriagePreviewResponse, ProjectResponse, TodoResponse } from '../../types/api';
-
+import { translateUi } from '../../i18n';
 interface InboxTriagePreviewPanelProps {
   preview: InboxTriagePreviewResponse;
   projects: ProjectResponse[];
@@ -10,7 +10,6 @@ interface InboxTriagePreviewPanelProps {
   onDismiss: () => void;
   onApply: () => void;
 }
-
 /** The reviewable AI placement plan: proposed Workstreams, per-task suggestions, apply. */
 export default function InboxTriagePreviewPanel({
   preview,
@@ -26,17 +25,23 @@ export default function InboxTriagePreviewPanel({
     <div className="cc-inbox-triage__ai-preview" aria-live="polite">
       <div className="cc-inbox-triage__ai-preview-header">
         <div>
-          <strong>AI placement preview</strong>
+          <strong>{translateUi('AI placement preview')}</strong>
           <span>
-            {preview.suggestions.length} suggested
+            {preview.suggestions.length}
+            {translateUi(' suggested\n            ')}
             {preview.proposed_workstreams.length > 0
-              ? ` · ${preview.proposed_workstreams.length} new Workstream${preview.proposed_workstreams.length === 1 ? '' : 's'}`
+              ? translateUi(
+                  preview.proposed_workstreams.length === 1
+                    ? ' · 1 new Workstream'
+                    : ' · {{count}} new Workstreams',
+                  { count: preview.proposed_workstreams.length },
+                )
               : ''}
             {preview.model_provider ? ` · ${preview.model_provider}` : ''}
           </span>
         </div>
         <button type="button" className="cc-btn cc-btn--ghost" onClick={onDismiss}>
-          Dismiss
+          {translateUi('\n          Dismiss\n        ')}
         </button>
       </div>
       {preview.proposed_workstreams.map((workstream) => {
@@ -51,14 +56,17 @@ export default function InboxTriagePreviewPanel({
           <div
             key={workstream.key}
             className="cc-inbox-triage__ai-workstream"
-            aria-label={`Proposed Workstream ${workstream.title}`}
+            aria-label={translateUi('Proposed Workstream {{title}}', {
+              title: workstream.title,
+            })}
           >
-            <span>AI proposed Workstream</span>
+            <span>{translateUi('AI proposed Workstream')}</span>
             <strong>{workstream.title}</strong>
             <small>
               {project?.title ?? workstream.project_id}
-              {parent ? ` / ${parent.title}` : ' / Project root'} ·{' '}
-              {Math.round(workstream.confidence * 100)}% · {selectedCount} selected task
+              {parent ? ` / ${parent.title}` : translateUi(' / Project root')} ·{' '}
+              {Math.round(workstream.confidence * 100)}% · {selectedCount}
+              {translateUi(' selected task\n              ')}
               {selectedCount === 1 ? '' : 's'}
             </small>
             <small>{workstream.reason}</small>
@@ -85,10 +93,10 @@ export default function InboxTriagePreviewPanel({
               <small>
                 → {project?.title ?? suggestion.project_id}
                 {proposed
-                  ? ` / ${proposed.title} (new)`
+                  ? translateUi(' / {{title}} (new)', { title: proposed.title })
                   : parent
                     ? ` / ${parent.title}`
-                    : ' / Project root'}{' '}
+                    : translateUi(' / Project root')}{' '}
                 · {Math.round(suggestion.confidence * 100)}%
               </small>
               <small>{suggestion.reason}</small>
@@ -98,7 +106,9 @@ export default function InboxTriagePreviewPanel({
       })}
       {preview.unassigned_task_ids.length > 0 && (
         <p>
-          No confident location: {preview.unassigned_task_ids.length} task
+          {translateUi('\n          No confident location: ')}
+          {preview.unassigned_task_ids.length}
+          {translateUi(' task\n          ')}
           {preview.unassigned_task_ids.length === 1 ? '' : 's'}
         </p>
       )}
@@ -108,7 +118,9 @@ export default function InboxTriagePreviewPanel({
         disabled={selectedTaskIds.length === 0 || isApplying}
         onClick={onApply}
       >
-        {isApplying ? 'Applying…' : `Apply selected (${selectedTaskIds.length})`}
+        {isApplying
+          ? translateUi('Applying\u2026')
+          : translateUi('Apply selected ({{count}})', { count: selectedTaskIds.length })}
       </button>
     </div>
   );

@@ -5,7 +5,7 @@ import {
   INBOX_TASK_BATCH_DRAG_TYPE,
   INBOX_TASK_DRAG_TYPE,
 } from './inboxDragTransfer';
-
+import { translateUi } from '../../i18n';
 interface InboxCapturedCardProps {
   task: TodoResponse;
   isSelected: boolean;
@@ -20,7 +20,6 @@ interface InboxCapturedCardProps {
   onDelete: (taskId: string) => void;
   onOrganize: (taskId: string) => void;
 }
-
 /**
  * One captured task in the triage queue. It is the drag source for both a placement
  * (single or batch) and a dependency connection.
@@ -66,18 +65,20 @@ export default function InboxCapturedCard({
           <input
             type="checkbox"
             checked={isBatchSelected}
-            aria-label={`Select ${task.title} for batch placement`}
+            aria-label={translateUi('Select {{title}} for batch placement', { title: task.title })}
             onClick={(event) => event.stopPropagation()}
             onChange={() => onToggleBatch(task.id)}
           />
-          Batch
+          {translateUi('\n          Batch\n        ')}
         </label>
         <button
           className="cc-inbox-dependency-handle"
           type="button"
           draggable={dependencyDraggable}
-          aria-label={`Drag ${task.title} to a task that must finish first`}
-          title="Connect a prerequisite"
+          aria-label={translateUi('Drag {{title}} to a task that must finish first', {
+            title: task.title,
+          })}
+          title={translateUi('Connect a prerequisite')}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
           onDragStart={(event) => {
@@ -87,22 +88,23 @@ export default function InboxCapturedCard({
             onSelect(task.id);
           }}
         >
-          <span aria-hidden="true">↝</span> Prerequisite
+          <span aria-hidden="true">↝</span>
+          {translateUi(' Prerequisite\n        ')}
         </button>
         <button
           className="cc-btn cc-btn--ghost"
           type="button"
-          aria-label={`Select ${task.title} for placement`}
+          aria-label={translateUi('Select {{title}} for placement', { title: task.title })}
           onClick={() => onSelect(task.id)}
         >
-          Select
+          {translateUi('\n          Select\n        ')}
         </button>
         <button
           className="cc-btn cc-btn--secondary"
           style={{ fontSize: 12 }}
           onClick={() => onOrganize(task.id)}
         >
-          Organize
+          {translateUi('\n          Organize\n        ')}
         </button>
       </div>
     </div>

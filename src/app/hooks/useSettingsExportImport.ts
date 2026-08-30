@@ -5,7 +5,7 @@ import { queryKeys } from './queries/queryKeys';
 import apiClient from '../services/apiClient';
 import type { TodoResponse, EventResponse, ConversationResponse } from '../types/api';
 import { invalidateTaskDerivedQueries } from './queries/invalidateTaskDerivedQueries';
-
+import { translateUi } from '../i18n';
 interface BackupData {
   version: number;
   exportedAt: string;
@@ -15,7 +15,6 @@ interface BackupData {
     conversations: unknown[];
   };
 }
-
 function isValidBackup(obj: unknown): obj is BackupData {
   if (typeof obj !== 'object' || obj === null) return false;
   const record = obj as Record<string, unknown>;
@@ -26,22 +25,18 @@ function isValidBackup(obj: unknown): obj is BackupData {
     Array.isArray(data.todos) && Array.isArray(data.events) && Array.isArray(data.conversations)
   );
 }
-
 export default function useSettingsExportImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const handleExport = () => {
     const todos = queryClient.getQueryData<TodoResponse[]>(queryKeys.todos) ?? [];
     const events = queryClient.getQueryData<EventResponse[]>(queryKeys.events) ?? [];
     const conversations =
       queryClient.getQueryData<ConversationResponse[]>(queryKeys.conversations) ?? [];
-
     const backup: BackupData = {
       version: 1,
       exportedAt: new Date().toISOString(),
       data: { todos, events, conversations },
     };
-
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -52,34 +47,31 @@ export default function useSettingsExportImport() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-
-    useToastStore.getState().addToast('success', 'Data exported successfully');
+    useToastStore.getState().addToast('success', translateUi('Data exported successfully'));
   };
-
   const handleImport = async (file: File) => {
     let backup: BackupData;
-
     try {
       const text = await file.text();
       const parsed: unknown = JSON.parse(text);
       if (!isValidBackup(parsed)) {
-        useToastStore.getState().addToast('error', 'Invalid backup file format');
+        useToastStore.getState().addToast('error', translateUi('Invalid backup file format'));
         return;
       }
       backup = parsed;
     } catch {
-      useToastStore.getState().addToast('error', 'Could not parse JSON file');
+      useToastStore.getState().addToast('error', translateUi('Could not parse JSON file'));
       return;
     }
-
     const { todos, events, conversations } = backup.data;
     const confirmed = window.confirm(
-      `Import ${todos.length} todos, ${events.length} events, and ${conversations.length} conversations?\n\nThis will add them as new items.`,
+      translateUi(
+        'Import {{todos}} todos, {{events}} events, and {{conversations}} conversations? This will add them as new items.',
+        { todos: todos.length, events: events.length, conversations: conversations.length },
+      ),
     );
     if (!confirmed) return;
-
     let errors = 0;
-
     for (const todo of todos) {
       try {
         const { title, description, priority, due_date, tags } = todo as Record<string, unknown>;
@@ -94,7 +86,6 @@ export default function useSettingsExportImport() {
         errors++;
       }
     }
-
     for (const event of events) {
       try {
         const {
@@ -121,7 +112,6 @@ export default function useSettingsExportImport() {
         errors++;
       }
     }
-
     for (const convo of conversations) {
       try {
         const { title } = convo as Record<string, unknown>;
@@ -132,26 +122,27 @@ export default function useSettingsExportImport() {
         errors++;
       }
     }
-
     // Invalidate all queries to pick up imported data
     queryClient.invalidateQueries({ queryKey: queryKeys.todos });
     queryClient.invalidateQueries({ queryKey: queryKeys.events });
     queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
     queryClient.invalidateQueries({ queryKey: queryKeys.today });
     void invalidateTaskDerivedQueries(queryClient);
-
     if (errors > 0) {
-      useToastStore.getState().addToast('warning', `Import done with ${errors} failed item(s)`);
+      useToastStore
+        .getState()
+        .addToast(
+          'warning',
+          translateUi('Import done with {{count}} failed items', { count: errors }),
+        );
     } else {
-      useToastStore.getState().addToast('success', 'All data imported successfully');
+      useToastStore.getState().addToast('success', translateUi('All data imported successfully'));
     }
   };
-
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleImport(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
-
   return { fileInputRef, handleExport, onFileSelected };
 }

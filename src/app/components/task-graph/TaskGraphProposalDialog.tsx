@@ -19,18 +19,16 @@ import {
   proposalIndexFromNodeId,
   toggleProposalSelection,
 } from './taskGraphProposal';
-
+import { translateUi } from '../../i18n';
 interface TaskGraphProposalDialogProps {
   targets: TodoResponse[];
   initialTargetId?: string;
   onOpenChange: (open: boolean) => void;
 }
-
 const MODE_OPTIONS = [
   { label: 'Structure', value: 'structure' },
   { label: 'Execution', value: 'execution' },
 ];
-
 export default function TaskGraphProposalDialog({
   targets,
   initialTargetId,
@@ -48,7 +46,6 @@ export default function TaskGraphProposalDialog({
   const [draftSubtasks, setDraftSubtasks] = useState<PlanSubtask[]>([]);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [mode, setMode] = useState<TaskGraphMode>('execution');
-
   const target = targets.find((candidate) => candidate.id === targetId) ?? targets[0];
   const preview = useMemo(() => {
     if (!target || !plan) return { nodes: [], edges: [] };
@@ -81,7 +78,6 @@ export default function TaskGraphProposalDialog({
       }),
     };
   }, [draftSubtasks, mode, plan, selected, target]);
-
   const handleGenerate = async () => {
     if (!targetId) return;
     try {
@@ -95,11 +91,9 @@ export default function TaskGraphProposalDialog({
       // The mutation owns error feedback; keep the current proposal available.
     }
   };
-
   const toggleSelection = (index: number) => {
     setSelected((current) => toggleProposalSelection(draftSubtasks, current, index));
   };
-
   const updateSubtask = (index: number, updates: Partial<PlanSubtask>) => {
     setDraftSubtasks((current) =>
       current.map((subtask, candidateIndex) =>
@@ -107,7 +101,6 @@ export default function TaskGraphProposalDialog({
       ),
     );
   };
-
   const handleApply = async () => {
     if (!targetId || !plan || plan.base_graph_revision === null || selected.size === 0) return;
     try {
@@ -123,7 +116,6 @@ export default function TaskGraphProposalDialog({
       // A stale proposal must remain open so the user can inspect and regenerate it.
     }
   };
-
   const hasInvalidTitle = draftSubtasks.some(
     (subtask, index) => selected.has(index) && !subtask.title.trim(),
   );
@@ -134,17 +126,16 @@ export default function TaskGraphProposalDialog({
   const hasServerValidationErrors = (plan?.validation.errors.length ?? 0) > 0;
   const isLegacyProposal = plan?.base_graph_revision === null;
   const canApplyProposal = plan?.status === 'draft';
-
   return (
     <Dialog
       open
       onOpenChange={onOpenChange}
-      title="AI task graph proposal"
+      title={translateUi('AI task graph proposal')}
       className="cc-task-proposal"
     >
       <div className="cc-task-proposal__setup">
         <label>
-          <span>Goal or project</span>
+          <span>{translateUi('Goal or project')}</span>
           <select
             value={targetId}
             onChange={(event) => setTargetId(event.target.value)}
@@ -159,12 +150,15 @@ export default function TaskGraphProposalDialog({
         </label>
         <label className="cc-task-proposal__guidance">
           <span>
-            Guidance for AI <small>optional</small>
+            {translateUi('\n            Guidance for AI ')}
+            <small>{translateUi('optional')}</small>
           </span>
           <textarea
             value={instructions}
             onChange={(event) => setInstructions(event.target.value)}
-            placeholder="Example: Break this into 6 concrete tasks and keep research before implementation."
+            placeholder={translateUi(
+              'Example: Break this into 6 concrete tasks and keep research before implementation.',
+            )}
             maxLength={2000}
             disabled={generatePlan.isPending}
           />
@@ -175,42 +169,58 @@ export default function TaskGraphProposalDialog({
           onClick={() => void handleGenerate()}
           disabled={!targetId || generatePlan.isPending || applyPlan.isPending}
         >
-          {generatePlan.isPending ? 'AI is planning…' : plan ? 'Regenerate' : 'Generate proposal'}
+          {generatePlan.isPending
+            ? translateUi('AI is planning\u2026')
+            : plan
+              ? translateUi('Regenerate')
+              : translateUi('Generate proposal')}
         </button>
       </div>
 
       {generatePlan.isPending && (
         <div className="cc-task-proposal__loading" role="status">
           <span className="cc-task-proposal__spinner" />
-          Reading the goal, existing tasks, and schedule context…
+          {translateUi(
+            '\n          Reading the goal, existing tasks, and schedule context\u2026\n        ',
+          )}
         </div>
       )}
 
       {plan && !generatePlan.isPending && (
         <>
-          <div className="cc-task-proposal__diff" aria-label="Authoritative proposal diff">
+          <div
+            className="cc-task-proposal__diff"
+            aria-label={translateUi('Authoritative proposal diff')}
+          >
             <span>
-              {plan.diff.add_task_count} task{plan.diff.add_task_count === 1 ? '' : 's'} to add
+              {translateUi('{{count}} tasks to add', { count: plan.diff.add_task_count })}
             </span>
             <span>
-              {plan.diff.add_relationship_count} dependenc
-              {plan.diff.add_relationship_count === 1 ? 'y' : 'ies'} to add
+              {translateUi('{{count}} dependencies to add', {
+                count: plan.diff.add_relationship_count,
+              })}
             </span>
             {plan.diff.root_update_fields.length > 0 && (
-              <span>Root updates: {plan.diff.root_update_fields.join(', ')}</span>
+              <span>
+                {translateUi('Root updates: ')}
+                {plan.diff.root_update_fields.join(', ')}
+              </span>
             )}
           </div>
 
           {(plan.validation.errors.length > 0 || plan.validation.warnings.length > 0) && (
-            <div className="cc-task-proposal__validation" aria-label="Proposal validation">
+            <div
+              className="cc-task-proposal__validation"
+              aria-label={translateUi('Proposal validation')}
+            >
               {plan.validation.errors.map((issue, index) => (
                 <div key={`error-${issue.code}-${index}`} role="alert">
-                  <strong>Cannot apply:</strong> {issue.message}
+                  <strong>{translateUi('Cannot apply:')}</strong> {issue.message}
                 </div>
               ))}
               {plan.validation.warnings.map((issue, index) => (
                 <div key={`warning-${issue.code}-${index}`}>
-                  <strong>Review:</strong> {issue.message}
+                  <strong>{translateUi('Review:')}</strong> {issue.message}
                 </div>
               ))}
             </div>
@@ -218,13 +228,15 @@ export default function TaskGraphProposalDialog({
 
           {isLegacyProposal && (
             <div className="cc-task-proposal__conflict" role="alert">
-              This older proposal has no graph revision and cannot be applied safely.
+              {translateUi(
+                '\n              This older proposal has no graph revision and cannot be applied safely.\n              ',
+              )}
               <button
                 type="button"
                 className="cc-btn cc-btn--ghost"
                 onClick={() => void handleGenerate()}
               >
-                Regenerate
+                {translateUi('\n                Regenerate\n              ')}
               </button>
             </div>
           )}
@@ -232,14 +244,20 @@ export default function TaskGraphProposalDialog({
           {!isLegacyProposal && isStale && (
             <div className="cc-task-proposal__conflict" role="alert">
               <div>
-                <strong>The task graph changed after this proposal was created.</strong>
+                <strong>
+                  {translateUi('The task graph changed after this proposal was created.')}
+                </strong>
                 {!applyError?.staleDetails && (
-                  <span>Regenerate it from the current graph before applying.</span>
+                  <span>
+                    {translateUi('Regenerate it from the current graph before applying.')}
+                  </span>
                 )}
                 {applyError?.staleDetails && (
                   <span>
-                    Proposal revision {applyError.staleDetails.base_revision ?? 'unknown'} · current
-                    revision {applyError.staleDetails.current_revision}
+                    {translateUi('\n                    Proposal revision ')}
+                    {applyError.staleDetails.base_revision ?? 'unknown'}
+                    {translateUi(' \u00B7 current\n                    revision ')}
+                    {applyError.staleDetails.current_revision}
                   </span>
                 )}
               </div>
@@ -248,22 +266,27 @@ export default function TaskGraphProposalDialog({
                 className="cc-btn cc-btn--ghost"
                 onClick={() => void handleGenerate()}
               >
-                Regenerate
+                {translateUi('\n                Regenerate\n              ')}
               </button>
             </div>
           )}
 
           <div className="cc-task-proposal__heading">
             <div>
-              <strong>{plan.summary || 'Proposed task structure'}</strong>
+              <strong>{plan.summary || translateUi('Proposed task structure')}</strong>
               <span>
-                {selected.size}/{draftSubtasks.length} tasks selected · dependencies stay valid
-                automatically
+                {selected.size}/{draftSubtasks.length}
+                {translateUi(
+                  ' tasks selected \u00B7 dependencies stay valid\n                automatically\n              ',
+                )}
               </span>
             </div>
             <SegmentedControl
-              ariaLabel="Proposal graph mode"
-              options={MODE_OPTIONS}
+              ariaLabel={translateUi('Proposal graph mode')}
+              options={MODE_OPTIONS.map((option) => ({
+                ...option,
+                label: translateUi(option.label),
+              }))}
               value={mode}
               onChange={(value) => setMode(value as TaskGraphMode)}
             />
@@ -283,7 +306,7 @@ export default function TaskGraphProposalDialog({
                   }}
                 />
               </div>
-              <div className="cc-task-proposal__list" aria-label="Proposed tasks">
+              <div className="cc-task-proposal__list" aria-label={translateUi('Proposed tasks')}>
                 {draftSubtasks.map((subtask, index) => (
                   <div
                     key={index}
@@ -293,14 +316,16 @@ export default function TaskGraphProposalDialog({
                       type="checkbox"
                       checked={selected.has(index)}
                       onChange={() => toggleSelection(index)}
-                      aria-label={`Include ${subtask.title}`}
+                      aria-label={translateUi('Include {{title}}', { title: subtask.title })}
                     />
                     <div>
                       <input
                         className="cc-task-proposal__title-input"
                         value={subtask.title}
                         onChange={(event) => updateSubtask(index, { title: event.target.value })}
-                        aria-label={`Title for proposed task ${index + 1}`}
+                        aria-label={translateUi('Title for proposed task {{number}}', {
+                          number: index + 1,
+                        })}
                       />
                       <div className="cc-task-proposal__item-meta">
                         <select
@@ -310,19 +335,22 @@ export default function TaskGraphProposalDialog({
                               priority: event.target.value as PlanSubtask['priority'],
                             })
                           }
-                          aria-label={`Priority for ${subtask.title}`}
+                          aria-label={translateUi('Priority for {{title}}', {
+                            title: subtask.title,
+                          })}
                         >
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                          <option value="urgent">Urgent</option>
+                          <option value="low">{translateUi('Low')}</option>
+                          <option value="medium">{translateUi('Medium')}</option>
+                          <option value="high">{translateUi('High')}</option>
+                          <option value="urgent">{translateUi('Urgent')}</option>
                         </select>
                         {subtask.estimated_minutes ? (
                           <span>{subtask.estimated_minutes}m</span>
                         ) : null}
                         {(subtask.depends_on_indices?.length ?? 0) > 0 && (
                           <span>
-                            {subtask.depends_on_indices!.length} prerequisite
+                            {subtask.depends_on_indices!.length}
+                            {translateUi(' prerequisite\n                            ')}
                             {subtask.depends_on_indices!.length === 1 ? '' : 's'}
                           </span>
                         )}
@@ -334,7 +362,9 @@ export default function TaskGraphProposalDialog({
             </div>
           ) : (
             <div className="cc-task-proposal__empty">
-              AI did not return any actionable tasks. Add more guidance and regenerate.
+              {translateUi(
+                '\n              AI did not return any actionable tasks. Add more guidance and regenerate.\n            ',
+              )}
             </div>
           )}
 
@@ -344,7 +374,7 @@ export default function TaskGraphProposalDialog({
               className="cc-btn cc-btn--ghost"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {translateUi('\n              Cancel\n            ')}
             </button>
             <button
               type="button"
@@ -360,7 +390,9 @@ export default function TaskGraphProposalDialog({
                 applyPlan.isPending
               }
             >
-              {applyPlan.isPending ? 'Creating tasks…' : `Approve and create ${selected.size}`}
+              {applyPlan.isPending
+                ? translateUi('Creating tasks\u2026')
+                : translateUi('Approve and create {{count}}', { count: selected.size })}
             </button>
           </div>
         </>

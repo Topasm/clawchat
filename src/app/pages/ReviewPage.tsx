@@ -6,30 +6,34 @@ import { CheckCircleIcon, ClipboardIcon } from '../components/shared/Icons';
 import { useDecideReview, useReviewsQuery } from '../hooks/queries';
 import type { AgentRunReviewOutcome, ReviewItemResponse, ReviewStatus } from '../types/api';
 import { AgentRunApprovalImpactSchema } from '../types/schemas';
-
-const FILTERS: Array<{ value: ReviewStatus; label: string }> = [
+import { translateUi } from '../i18n';
+const FILTERS: Array<{
+  value: ReviewStatus;
+  label: string;
+}> = [
   { value: 'pending', label: 'Needs review' },
   { value: 'changes_requested', label: 'Changes requested' },
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
 ];
-
 function subjectLabel(item: ReviewItemResponse) {
-  return item.subject_type.replaceAll('_', ' ');
+  const labels: Record<string, string> = {
+    plan_proposal: translateUi('Plan proposal'),
+    artifact_revision: translateUi('Artifact revision'),
+    agent_run: translateUi('Agent run'),
+  };
+  return labels[item.subject_type] ?? item.subject_type.replaceAll('_', ' ');
 }
-
 function approvalImpact(item: ReviewItemResponse) {
   if (item.subject_type !== 'agent_run') return null;
   const parsed = AgentRunApprovalImpactSchema.safeParse(item.metadata.approval_impact);
   return parsed.success ? parsed.data : null;
 }
-
 interface ApprovedAgentRunHandoff {
   reviewId: string;
   taskTitle: string | null;
   outcome: AgentRunReviewOutcome;
 }
-
 export default function ReviewPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -43,7 +47,6 @@ export default function ReviewPage() {
     approvedAgentRun && (filter === 'pending' || filter === 'changes_requested')
       ? items.filter((item) => item.id !== approvedAgentRun.reviewId)
       : items;
-
   const decideItem = (
     item: ReviewItemResponse,
     decision: 'approved' | 'changes_requested' | 'rejected',
@@ -67,13 +70,16 @@ export default function ReviewPage() {
       },
     );
   };
-
   return (
     <div className="cc-review-page">
       <header className="cc-page-header cc-review-page__header">
         <div>
-          <h1>Review</h1>
-          <p>One place to approve plans and project outputs before they change your work.</p>
+          <h1>{translateUi('Review')}</h1>
+          <p>
+            {translateUi(
+              'One place to approve plans and project outputs before they change your work.',
+            )}
+          </p>
         </div>
         {projectId && (
           <button
@@ -81,7 +87,7 @@ export default function ReviewPage() {
             type="button"
             onClick={() => navigate(`/projects/${projectId}`)}
           >
-            Back to project
+            {translateUi('\n            Back to project\n          ')}
           </button>
         )}
       </header>
@@ -95,7 +101,7 @@ export default function ReviewPage() {
         />
       )}
 
-      <div className="cc-review-filters" aria-label="Review status filters">
+      <div className="cc-review-filters" aria-label={translateUi('Review status filters')}>
         {FILTERS.map((option) => (
           <button
             key={option.value}
@@ -107,18 +113,20 @@ export default function ReviewPage() {
               setSearchParams(next);
             }}
           >
-            {option.label}
+            {translateUi(option.label)}
           </button>
         ))}
       </div>
 
       {isLoading ? (
-        <div className="cc-project-workspace__loading">Loading reviews…</div>
+        <div className="cc-project-workspace__loading">{translateUi('Loading reviews\u2026')}</div>
       ) : visibleItems.length === 0 ? (
         <EmptyState
           icon={filter === 'pending' ? <CheckCircleIcon size={28} /> : <ClipboardIcon size={28} />}
           message={
-            filter === 'pending' ? 'Nothing needs your review.' : 'No reviews match this filter.'
+            filter === 'pending'
+              ? translateUi('Nothing needs your review.')
+              : translateUi('No reviews match this filter.')
           }
         />
       ) : (
@@ -129,7 +137,8 @@ export default function ReviewPage() {
               <article className="cc-review-card" key={item.id}>
                 <div className="cc-review-card__topline">
                   <span className={`cc-review-card__risk cc-review-card__risk--${item.risk_level}`}>
-                    {item.risk_level} risk
+                    {item.risk_level}
+                    {translateUi(' risk\n                  ')}
                   </span>
                   <span>{subjectLabel(item)}</span>
                   {item.project_title && <span>{item.project_title}</span>}
@@ -148,7 +157,7 @@ export default function ReviewPage() {
                     type="button"
                     onClick={() => navigate(item.subject_href!)}
                   >
-                    Open full context
+                    {translateUi('\n                    Open full context\n                  ')}
                   </button>
                 )}
                 {(item.status === 'pending' || item.status === 'changes_requested') && impact && (
@@ -167,8 +176,10 @@ export default function ReviewPage() {
                       onChange={(event) =>
                         setNotes((current) => ({ ...current, [item.id]: event.target.value }))
                       }
-                      placeholder="Optional review note"
-                      aria-label={`Review note for ${item.subject_title || item.summary}`}
+                      placeholder={translateUi('Optional review note')}
+                      aria-label={translateUi('Review note for {{title}}', {
+                        title: item.subject_title || item.summary,
+                      })}
                     />
                     <div className="cc-review-card__actions">
                       <button
@@ -177,7 +188,7 @@ export default function ReviewPage() {
                         disabled={decide.isPending}
                         onClick={() => decideItem(item, 'approved')}
                       >
-                        Approve
+                        {translateUi('\n                        Approve\n                      ')}
                       </button>
                       {item.status === 'pending' && (
                         <button
@@ -186,7 +197,9 @@ export default function ReviewPage() {
                           disabled={decide.isPending}
                           onClick={() => decideItem(item, 'changes_requested')}
                         >
-                          Request changes
+                          {translateUi(
+                            '\n                          Request changes\n                        ',
+                          )}
                         </button>
                       )}
                       <button
@@ -195,13 +208,16 @@ export default function ReviewPage() {
                         disabled={decide.isPending}
                         onClick={() => decideItem(item, 'rejected')}
                       >
-                        Reject
+                        {translateUi('\n                        Reject\n                      ')}
                       </button>
                     </div>
                   </div>
                 )}
                 {item.review_note && item.status !== 'pending' && (
-                  <p className="cc-review-card__note">Review note: {item.review_note}</p>
+                  <p className="cc-review-card__note">
+                    {translateUi('Review note: ')}
+                    {item.review_note}
+                  </p>
                 )}
               </article>
             );

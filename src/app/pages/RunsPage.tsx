@@ -11,16 +11,17 @@ import {
   useResumeAgentRun,
 } from '../hooks/queries';
 import type { AgentRunResponse } from '../types/api';
-
+import { translateUi } from '../i18n';
 type RunFilter = 'all' | 'active' | 'review' | 'failed';
-
-const FILTERS: Array<{ value: RunFilter; label: string }> = [
+const FILTERS: Array<{
+  value: RunFilter;
+  label: string;
+}> = [
   { value: 'all', label: 'All runs' },
   { value: 'active', label: 'Active' },
   { value: 'review', label: 'Waiting review' },
   { value: 'failed', label: 'Failed' },
 ];
-
 function matchesFilter(run: AgentRunResponse, filter: RunFilter) {
   if (filter === 'all') return true;
   if (filter === 'active')
@@ -32,7 +33,6 @@ function matchesFilter(run: AgentRunResponse, filter: RunFilter) {
     (run.status === 'completed' && !run.is_adopted)
   );
 }
-
 export default function RunsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -42,13 +42,16 @@ export default function RunsPage() {
   const [filter, setFilter] = useState<RunFilter>('all');
   const [expandedRun, setExpandedRun] = useState<string | null>(selectedRunId);
   const filtered = useMemo(() => runs.filter((run) => matchesFilter(run, filter)), [filter, runs]);
-
   return (
     <div className="cc-runs-page">
       <header className="cc-page-header cc-runs-page__header">
         <div>
-          <h1>Runs</h1>
-          <p>Inspect every execution attempt, provider, heartbeat, result, and failure.</p>
+          <h1>{translateUi('Runs')}</h1>
+          <p>
+            {translateUi(
+              'Inspect every execution attempt, provider, heartbeat, result, and failure.',
+            )}
+          </p>
         </div>
         {projectId && (
           <button
@@ -56,11 +59,11 @@ export default function RunsPage() {
             className="cc-btn"
             onClick={() => navigate(`/projects/${projectId}`)}
           >
-            Back to project
+            {translateUi('\n            Back to project\n          ')}
           </button>
         )}
       </header>
-      <div className="cc-review-filters" aria-label="Run filters">
+      <div className="cc-review-filters" aria-label={translateUi('Run filters')}>
         {FILTERS.map((option) => (
           <button
             key={option.value}
@@ -68,14 +71,17 @@ export default function RunsPage() {
             className={`cc-review-filter${filter === option.value ? ' cc-review-filter--active' : ''}`}
             onClick={() => setFilter(option.value)}
           >
-            {option.label}
+            {translateUi(option.label)}
           </button>
         ))}
       </div>
       {isLoading ? (
-        <div className="cc-project-workspace__loading">Loading runs…</div>
+        <div className="cc-project-workspace__loading">{translateUi('Loading runs\u2026')}</div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={<SpinArrowsIcon size={28} />} message="No agent runs match this view." />
+        <EmptyState
+          icon={<SpinArrowsIcon size={28} />}
+          message={translateUi('No agent runs match this view.')}
+        />
       ) : (
         <div className="cc-run-list">
           {filtered.map((run) => (
@@ -94,7 +100,6 @@ export default function RunsPage() {
     </div>
   );
 }
-
 function RunCard({
   run,
   expanded,
@@ -120,7 +125,6 @@ function RunCard({
   const canReturnToReady = Boolean(
     unsuccessful && run.todo_id && run.todo_status === 'in_progress',
   );
-
   return (
     <article className={`cc-run-card cc-run-card--${run.status}`}>
       <div className="cc-run-card__header">
@@ -130,26 +134,36 @@ function RunCard({
           </span>
           <h2>{run.todo_title || run.instruction_snapshot}</h2>
           <p>
-            {run.project_title || 'Unscoped'} · attempt {run.attempt} · {run.provider}
+            {run.project_title || translateUi('Unscoped')}
+            {translateUi(' \u00B7 attempt ')}
+            {run.attempt} · {run.provider}
             {run.model ? ` / ${run.model}` : ''}
           </p>
           {run.provider === 'paseo' && (run.host_id || run.workspace_id || run.external_run_id) && (
             <p className="cc-run-card__external">
-              {run.host_id || 'Paseo'}
-              {run.workspace_id ? ` · workspace ${run.workspace_id}` : ''}
-              {run.external_run_id ? ` · agent ${run.external_run_id}` : ''}
+              {run.host_id || translateUi('Paseo')}
+              {run.workspace_id ? translateUi(' · workspace {{id}}', { id: run.workspace_id }) : ''}
+              {run.external_run_id
+                ? translateUi(' · agent {{id}}', { id: run.external_run_id })
+                : ''}
             </p>
           )}
         </div>
-        {run.is_adopted && <span className="cc-run-card__adopted">Adopted</span>}
+        {run.is_adopted && <span className="cc-run-card__adopted">{translateUi('Adopted')}</span>}
       </div>
-      <div className="cc-run-progress" aria-label={`${run.progress}% complete`}>
+      <div
+        className="cc-run-progress"
+        aria-label={translateUi('{{progress}}% complete', { progress: run.progress })}
+      >
         <span style={{ width: `${run.progress}%` }} />
       </div>
       <div className="cc-run-card__status-line">
-        <span>{run.progress_message || 'No progress message'}</span>
+        <span>{run.progress_message || translateUi('No progress message')}</span>
         {run.heartbeat_at && (
-          <span>Heartbeat {new Date(run.heartbeat_at).toLocaleTimeString()}</span>
+          <span>
+            {translateUi('Heartbeat ')}
+            {new Date(run.heartbeat_at).toLocaleTimeString()}
+          </span>
         )}
       </div>
       {run.error && <p className="cc-run-card__error">{run.error}</p>}
@@ -159,12 +173,12 @@ function RunCard({
           rows={2}
           value={followUp}
           onChange={(event) => setFollowUp(event.target.value)}
-          placeholder="Add follow-up instructions before retrying"
+          placeholder={translateUi('Add follow-up instructions before retrying')}
         />
       )}
       <div className="cc-run-card__actions">
         <button type="button" className="cc-btn" onClick={onToggle}>
-          {expanded ? 'Hide log' : 'Event log'}
+          {expanded ? translateUi('Hide log') : translateUi('Event log')}
         </button>
         {active && run.status !== 'waiting_input' && (
           <button
@@ -173,7 +187,7 @@ function RunCard({
             disabled={cancel.isPending}
             onClick={() => cancel.mutate(run.id)}
           >
-            Cancel
+            {translateUi('\n            Cancel\n          ')}
           </button>
         )}
         {run.status === 'waiting_input' && (
@@ -183,7 +197,7 @@ function RunCard({
             disabled={resume.isPending || !followUp.trim()}
             onClick={() => resume.mutate({ runId: run.id, followUp })}
           >
-            Resume with follow-up
+            {translateUi('\n            Resume with follow-up\n          ')}
           </button>
         )}
         {canRetry && (
@@ -193,7 +207,7 @@ function RunCard({
             disabled={retry.isPending}
             onClick={() => retry.mutate({ runId: run.id })}
           >
-            Retry
+            {translateUi('\n            Retry\n          ')}
           </button>
         )}
         {canReturnToReady && (
@@ -203,12 +217,12 @@ function RunCard({
             disabled={returnToReady.isPending}
             onClick={() => returnToReady.mutate(run.id)}
           >
-            Return task to queue
+            {translateUi('\n            Return task to queue\n          ')}
           </button>
         )}
         {run.status === 'waiting_review' && (
           <button type="button" className="cc-btn cc-btn--primary" onClick={onReview}>
-            Review result
+            {translateUi('\n            Review result\n          ')}
           </button>
         )}
       </div>
@@ -216,10 +230,10 @@ function RunCard({
     </article>
   );
 }
-
 function RunEventLog({ runId }: { runId: string }) {
   const { data: events = [], isLoading } = useAgentRunEventsQuery(runId);
-  if (isLoading) return <div className="cc-run-events">Loading event log…</div>;
+  if (isLoading)
+    return <div className="cc-run-events">{translateUi('Loading event log\u2026')}</div>;
   return (
     <ol className="cc-run-events">
       {events.map((event) => (

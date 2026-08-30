@@ -1,9 +1,20 @@
 import type { EventResponse } from '../types/api';
+import { translateUi } from '../i18n';
 
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 export const WEEK_START_HOUR = 7;
@@ -84,7 +95,7 @@ export function indexEventsByDate(events: EventResponse[]): Map<string, EventRes
 
 /** Compact time display for pills. */
 export function pillTime(ev: EventResponse): string {
-  if (ev.is_all_day) return 'All day';
+  if (ev.is_all_day) return translateUi('All day');
   const d = new Date(ev.start_time);
   const h = d.getHours();
   const m = d.getMinutes();

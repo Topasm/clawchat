@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { koreanUiTranslations } from './literalResources';
 import { translationResources, type AppLanguage } from './resources';
 
 const LANGUAGE_STORAGE_KEY = 'clawchat-language';
@@ -47,6 +48,36 @@ function translate(key: string, options: TranslationOptions = {}): string {
   });
 }
 
+const UI_ENTITIES: Record<string, string> = {
+  '&apos;': "'",
+  '&mdash;': '—',
+  '&middot;': '·',
+  '&rarr;': '→',
+  '&times;': '×',
+};
+
+export function canonicalUiMessage(source: string): string {
+  return source
+    .replace(/&(apos|mdash|middot|rarr|times);/g, (entity) => UI_ENTITIES[entity] ?? entity)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Translate a canonical English UI message while preserving interpolation. */
+export function translateUi(source: string, options: TranslationOptions = {}): string {
+  const canonical = canonicalUiMessage(source);
+  const template =
+    currentLanguage === 'ko' ? (koreanUiTranslations[canonical] ?? canonical) : canonical;
+  const translated = template.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (placeholder, name: string) => {
+    const value = options[name];
+    return value === undefined ? placeholder : String(value);
+  });
+
+  const leadingSpace = /^\s/.test(source) ? ' ' : '';
+  const trailingSpace = /\s$/.test(source) ? ' ' : '';
+  return `${leadingSpace}${translated}${trailingSpace}`;
+}
+
 function setLanguage(language: AppLanguage) {
   if (currentLanguage === language) return;
   currentLanguage = language;
@@ -59,6 +90,7 @@ applyDocumentLanguage(currentLanguage);
 /** Small application-owned i18n surface; avoids shipping a framework for two locales. */
 export const i18n = {
   t: translate,
+  tr: translateUi,
   get language() {
     return currentLanguage;
   },
@@ -92,5 +124,5 @@ export function useTranslation() {
     () => currentLanguage,
     () => currentLanguage,
   );
-  return { t: translate, i18n };
+  return { t: translate, tr: translateUi, i18n };
 }

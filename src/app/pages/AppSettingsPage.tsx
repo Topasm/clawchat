@@ -8,7 +8,7 @@ import ToastContainer from '../components/shared/ToastContainer';
 import { useTheme } from '../config/ThemeContext';
 import { themeCssVars } from '../config/themeCssVars';
 import usePlatform from '../hooks/usePlatform';
-import { changeAppLanguage, getAppLanguage, useTranslation } from '../i18n';
+import { changeAppLanguage, getAppLanguage, useTranslation, translateUi } from '../i18n';
 import { platformApi } from '../platform';
 import {
   checkForAppUpdate,
@@ -19,7 +19,6 @@ import {
 } from '../services/updateLifecycle';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useUpdateStore } from '../stores/useUpdateStore';
-
 export default function AppSettingsPage() {
   const navigate = useNavigate();
   const { colors, mode, setMode } = useTheme();
@@ -29,14 +28,17 @@ export default function AppSettingsPage() {
   const updateStatus = useUpdateStore((state) => state.status);
   const updateInfo = useUpdateStore((state) => state.info);
   const automaticChecksEnabled = useUpdateStore((state) => state.automaticChecksEnabled);
-
   return (
     <div className="cc-public-shell" style={themeCssVars(colors, settings.fontSize)}>
       <header className="cc-public-shell__header">
         <div>
-          <div className="cc-public-shell__eyebrow">ClawChat</div>
-          <h1>Application Settings</h1>
-          <p>These preferences remain available without a workspace server connection.</p>
+          <div className="cc-public-shell__eyebrow">{translateUi('ClawChat')}</div>
+          <h1>{translateUi('Application Settings')}</h1>
+          <p>
+            {translateUi(
+              'These preferences remain available without a workspace server connection.',
+            )}
+          </p>
         </div>
         <div className="cc-settings-inline-actions">
           <button
@@ -44,17 +46,17 @@ export default function AppSettingsPage() {
             className="cc-btn cc-btn--secondary"
             onClick={() => navigate('/connections')}
           >
-            Connections
+            {translateUi('\n            Connections\n          ')}
           </button>
           <button
             type="button"
             className="cc-btn cc-btn--secondary"
             onClick={() => navigate('/diagnostics')}
           >
-            Diagnostics
+            {translateUi('\n            Diagnostics\n          ')}
           </button>
           <button type="button" className="cc-btn cc-btn--secondary" onClick={() => navigate(-1)}>
-            Done
+            {translateUi('\n            Done\n          ')}
           </button>
         </div>
       </header>
@@ -95,8 +97,8 @@ export default function AppSettingsPage() {
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Display">
-          <SettingsRow label="Font size">
+        <SettingsSection title={translateUi('Display')}>
+          <SettingsRow label={translateUi('Font size')}>
             <Slider
               value={settings.fontSize}
               min={12}
@@ -106,66 +108,72 @@ export default function AppSettingsPage() {
             />
           </SettingsRow>
           {!isMobile && (
-            <SettingsRow label="Compact mode">
+            <SettingsRow label={translateUi('Compact mode')}>
               <Toggle checked={settings.compactMode} onChange={settings.setCompactMode} />
             </SettingsRow>
           )}
         </SettingsSection>
 
-        <SettingsSection title="Notifications">
-          <SettingsRow label="Notifications enabled">
+        <SettingsSection title={translateUi('Notifications')}>
+          <SettingsRow label={translateUi('Notifications enabled')}>
             <Toggle
               checked={settings.notificationsEnabled}
               onChange={settings.setNotificationsEnabled}
             />
           </SettingsRow>
-          <SettingsRow label="Reminder sound">
+          <SettingsRow label={translateUi('Reminder sound')}>
             <Toggle checked={settings.reminderSound} onChange={settings.setReminderSound} />
           </SettingsRow>
         </SettingsSection>
 
-        <SettingsSection title="Privacy & Storage">
-          <SettingsRow label="Save history">
+        <SettingsSection title={translateUi('Privacy & Storage')}>
+          <SettingsRow label={translateUi('Save history')}>
             <Toggle checked={settings.saveHistory} onChange={settings.setSaveHistory} />
           </SettingsRow>
-          <SettingsRow label="Analytics">
+          <SettingsRow label={translateUi('Analytics')}>
             <Toggle checked={settings.analyticsEnabled} onChange={settings.setAnalyticsEnabled} />
           </SettingsRow>
-          <SettingsRow label="Reset application preferences">
+          <SettingsRow label={translateUi('Reset application preferences')}>
             <button
               type="button"
               className="cc-btn cc-btn--danger cc-btn--compact"
               onClick={settings.resetApplicationPreferences}
             >
-              Reset
+              {translateUi('\n              Reset\n            ')}
             </button>
           </SettingsRow>
         </SettingsSection>
 
         {isDesktop && (
-          <SettingsSection title="Updates">
+          <SettingsSection title={translateUi('Updates')}>
             <SettingsRow
-              label="Automatic update checks"
-              sublabel="Check for signed releases periodically. Installation always requires confirmation."
+              label={translateUi('Automatic update checks')}
+              sublabel={translateUi(
+                'Check for signed releases periodically. Installation always requires confirmation.',
+              )}
             >
               <Toggle checked={automaticChecksEnabled} onChange={setAutomaticUpdateChecks} />
             </SettingsRow>
             <SettingsRow
-              label="Software update"
+              label={translateUi('Software update')}
               sublabel={
                 updateStatus === 'available'
-                  ? `Version ${updateInfo?.version ?? ''} is available`
+                  ? translateUi('Version {{version}} is available', {
+                      version: updateInfo?.version ?? '',
+                    })
                   : updateStatus === 'downloading'
-                    ? 'Downloading update…'
+                    ? translateUi('Downloading update\u2026')
                     : updateStatus === 'ready'
-                      ? 'Ready to install and restart'
+                      ? translateUi('Ready to install and restart')
                       : updateStatus === 'restarting'
-                        ? 'Installing update…'
+                        ? translateUi('Installing update\u2026')
                         : updateStatus === 'up-to-date'
-                          ? 'ClawChat is up to date'
+                          ? translateUi('ClawChat is up to date')
                           : updateStatus === 'error'
-                            ? 'The last update operation failed'
-                            : `Current version ${platformApi.runtime.appVersion}`
+                            ? translateUi('The last update operation failed')
+                            : translateUi('Current version {{version}}', {
+                                version: platformApi.runtime.appVersion,
+                              })
               }
             >
               <button
@@ -183,20 +191,24 @@ export default function AppSettingsPage() {
                   else void checkForAppUpdate(true);
                 }}
               >
-                {updateStatus === 'checking' && 'Checking…'}
-                {updateStatus === 'downloading' && 'Downloading…'}
-                {updateStatus === 'restarting' && 'Restarting…'}
-                {updateStatus === 'available' && 'Download'}
-                {updateStatus === 'ready' && 'Restart'}
-                {updateStatus === 'error' && 'Retry'}
-                {(updateStatus === 'idle' || updateStatus === 'up-to-date') && 'Check Now'}
+                {updateStatus === 'checking' && translateUi('Checking\u2026')}
+                {updateStatus === 'downloading' && translateUi('Downloading\u2026')}
+                {updateStatus === 'restarting' && translateUi('Restarting\u2026')}
+                {updateStatus === 'available' && translateUi('Download')}
+                {updateStatus === 'ready' && translateUi('Restart')}
+                {updateStatus === 'error' && translateUi('Retry')}
+                {(updateStatus === 'idle' || updateStatus === 'up-to-date') &&
+                  translateUi('Check Now')}
               </button>
             </SettingsRow>
           </SettingsSection>
         )}
 
-        <SettingsSection title="About">
-          <SettingsRow label="ClawChat" sublabel="Application version">
+        <SettingsSection title={translateUi('About')}>
+          <SettingsRow
+            label={translateUi('ClawChat')}
+            sublabel={translateUi('Application version')}
+          >
             <span className="cc-settings-status cc-settings-status--muted">
               v{platformApi.runtime.appVersion}
             </span>
