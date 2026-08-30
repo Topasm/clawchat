@@ -1,7 +1,12 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation, translateUi } from '../i18n';
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
+import {
+  Group as PanelGroup,
+  Panel,
+  Separator as PanelResizeHandle,
+  usePanelRef,
+} from 'react-resizable-panels';
 import type { PanelSize } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
@@ -110,6 +115,9 @@ const utilityNavItems = [
   { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
   { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },
 ];
+const SIDEBAR_RAIL_WIDTH = 48;
+const SIDEBAR_EXPANDED_MIN_WIDTH = 160;
+const DEFAULT_SIDEBAR_SIZE = 18;
 export default function Layout() {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
@@ -124,6 +132,7 @@ export default function Layout() {
   const { isDesktop, isMobile, isMac } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarPanelRef = usePanelRef();
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -279,23 +288,32 @@ export default function Layout() {
     isMobile &&
     (/^\/(tasks|chats|events|projects)\/[^/]+/.test(location.pathname) ||
       location.pathname === '/settings/system-prompt');
+  const handleSidebarToggle = useCallback(() => {
+    const panel = sidebarPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) panel.expand();
+    else panel.collapse();
+  }, [sidebarPanelRef]);
   const sidebar = (
     <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
       <div className="cc-sidebar__header">
         <span className="cc-sidebar__title">{t('common.appName')}</span>
         <span className="cc-sidebar__header-actions">
+          {!sidebarCollapsed && (
+            <button
+              className="cc-sidebar-toggle"
+              onClick={() => setSimpleMode(true)}
+              title={translateUi('Switch to simple mode')}
+              aria-label={translateUi('Switch to simple mode')}
+            >
+              <CollapseIcon size={16} className="cc-nav-icon" />
+            </button>
+          )}
           <button
             className="cc-sidebar-toggle"
-            onClick={() => setSimpleMode(true)}
-            title={translateUi('Switch to simple mode')}
-            aria-label={translateUi('Switch to simple mode')}
-          >
-            <CollapseIcon size={16} className="cc-nav-icon" />
-          </button>
-          <button
-            className="cc-sidebar-toggle"
-            onClick={() => setSidebarCollapsed((c) => !c)}
+            onClick={handleSidebarToggle}
             aria-label={t(sidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
+            aria-expanded={!sidebarCollapsed}
           >
             {sidebarCollapsed ? (
               <ChevronRightIcon size={16} className="cc-nav-icon" />
@@ -440,8 +458,9 @@ export default function Layout() {
   const setChatPanelSize = useSettingsStore((s) => s.setChatPanelSize);
   const handleSidebarResize = useCallback(
     (size: PanelSize) => {
-      setSidebarSize(size.asPercentage);
-      setSidebarCollapsed(size.asPercentage <= 4);
+      const collapsed = size.inPixels <= SIDEBAR_RAIL_WIDTH + 1;
+      setSidebarCollapsed(collapsed);
+      if (!collapsed) setSidebarSize(size.asPercentage);
     },
     [setSidebarSize],
   );
@@ -512,11 +531,12 @@ export default function Layout() {
         <PanelGroup orientation="horizontal" id="cc-layout">
           <Panel
             id="sidebar"
-            defaultSize={`${sidebarSize}%`}
-            minSize="48px"
+            panelRef={sidebarPanelRef}
+            defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
+            minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
             maxSize="250px"
             collapsible
-            collapsedSize="48px"
+            collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
             onResize={handleSidebarResize}
           >
             {sidebar}
