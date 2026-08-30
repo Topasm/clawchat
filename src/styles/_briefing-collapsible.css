@@ -1,9 +1,10 @@
 /* --- Briefing Collapsible (Today page) -------------------- */
 .cc-briefing-collapsible {
   margin-top: 16px;
-  background: var(--cc-surface);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-lg);
+  background: transparent;
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
   overflow: hidden;
 }
 

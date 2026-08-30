@@ -36,15 +36,22 @@
 .cc-admin-stats {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  gap: 0;
   margin-bottom: 16px;
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
 }
 
 .cc-admin-stat {
   padding: 12px;
-  border-radius: var(--cc-radius-md);
-  background: var(--cc-surface);
-  border: 1px solid var(--cc-border);
+  border: 0;
+  border-right: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
+}
+
+.cc-admin-stat:last-child {
+  border-right: 0;
 }
 
 .cc-admin-stat__label {

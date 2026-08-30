@@ -20,14 +20,20 @@
 }
 .cc-run-list {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
 }
 .cc-run-card {
-  padding: 15px;
-  border: 1px solid var(--cc-border);
-  border-left: 3px solid var(--cc-text-tertiary);
-  border-radius: var(--cc-radius-lg);
-  background: var(--cc-surface);
+  padding: 14px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-left: 2px solid var(--cc-text-tertiary);
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
+}
+.cc-run-card:last-child {
+  border-bottom: 0;
 }
 .cc-run-card--running,
 .cc-run-card--starting,
@@ -106,7 +112,7 @@
 .cc-run-card__error {
   margin: 10px 0 0;
   padding: 10px;
-  border-radius: var(--cc-radius-sm);
+  border-radius: var(--cc-radius-row);
   background: var(--cc-surface-secondary);
   color: var(--cc-text-secondary);
   font-family: inherit;
@@ -153,16 +159,22 @@
 .cc-project-metrics {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0;
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
 }
 .cc-project-metric {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
-  background: var(--cc-surface);
+  padding: 12px 10px;
+  border: 0;
+  border-right: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
+}
+.cc-project-metric:last-child {
+  border-right: 0;
 }
 .cc-project-metric span {
   color: var(--cc-text-tertiary);
@@ -176,9 +188,10 @@
 }
 
 .cc-project-workspace__section {
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-lg);
-  background: var(--cc-surface);
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
   overflow: hidden;
 }
 .cc-project-workspace__section-header {

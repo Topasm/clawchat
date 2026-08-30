@@ -2,8 +2,8 @@
 .cc-search__input {
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid var(--cc-border);
-  border-radius: var(--cc-radius-lg);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-control);
   font-size: 15px;
   color: var(--cc-text);
   background: var(--cc-surface);
@@ -19,14 +19,16 @@
 
 .cc-search__filters {
   display: flex;
-  gap: 6px;
+  gap: 0;
   margin-bottom: 16px;
+  border-bottom: 1px solid var(--cc-border);
 }
 
 .cc-search__filter-btn {
   padding: 6px 14px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-pill);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--cc-radius-panel);
   background: transparent;
   font-size: 12px;
   font-weight: 500;
@@ -41,9 +43,9 @@
 }
 
 .cc-search__filter-btn--active {
-  background: var(--cc-primary);
-  border-color: var(--cc-primary);
-  color: #fff;
+  background: transparent;
+  border-bottom-color: var(--cc-primary);
+  color: var(--cc-primary);
 }
 
 .cc-search__results {

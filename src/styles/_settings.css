@@ -1,6 +1,6 @@
 /* --- Settings Controls ------------------------------------ */
 .cc-settings-page {
-  max-width: 560px;
+  max-width: 680px;
 }
 
 .cc-settings-inline-actions {
@@ -116,19 +116,21 @@
 
 .cc-segmented {
   display: flex;
-  background: var(--cc-surface-secondary);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-control);
-  padding: 2px;
-  gap: 2px;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
 }
 
 .cc-segmented__option {
   flex: 1;
   padding: 8px 14px;
   border: none;
+  border-bottom: 2px solid transparent;
   background: transparent;
-  border-radius: var(--cc-radius-row);
+  border-radius: var(--cc-radius-panel);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -144,7 +146,8 @@
 }
 
 .cc-segmented__option--active {
-  background: var(--cc-surface);
+  border-bottom-color: var(--cc-primary);
+  background: transparent;
   color: var(--cc-primary);
 }
 
@@ -154,7 +157,8 @@
 }
 
 .cc-settings-section {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  border-top: 1px solid var(--cc-border-subtle);
 }
 
 .cc-settings-section__title {
@@ -163,17 +167,18 @@
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--cc-text-tertiary);
-  padding: 0 0 8px 2px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--cc-border-subtle);
 }
 
 .cc-settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 11px 4px;
   border-bottom: 1px solid var(--cc-border-subtle);
   border-radius: var(--cc-radius-row);
-  min-height: 44px;
+  min-height: var(--cc-row-height);
   transition: background 0.1s ease;
 }
 

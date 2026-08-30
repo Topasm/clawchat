@@ -1,10 +1,11 @@
 /* --- Needs Review Section (Today page) -------------------- */
 .cc-needs-review {
   margin-top: 12px;
-  padding: 12px 14px;
-  background: color-mix(in srgb, var(--cc-inbox-yellow, #f59e0b) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cc-inbox-yellow, #f59e0b) 20%, transparent);
-  border-radius: var(--cc-radius-lg);
+  padding: 10px 2px;
+  background: transparent;
+  border-top: 1px solid color-mix(in srgb, var(--cc-inbox-yellow, #f59e0b) 24%, var(--cc-border));
+  border-bottom: 1px solid color-mix(in srgb, var(--cc-inbox-yellow, #f59e0b) 24%, var(--cc-border));
+  border-radius: var(--cc-radius-panel);
 }
 
 .cc-needs-review__header {
@@ -34,8 +35,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--cc-radius-sm);
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-row);
   cursor: pointer;
   transition: background 0.15s ease;
 }

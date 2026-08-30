@@ -1,17 +1,27 @@
 /* --- Structural design tokens ----------------------------- */
 :root {
-  --cc-radius-xs: 4px;
-  --cc-radius-sm: 6px;
-  --cc-radius-md: 8px;
-  --cc-radius-lg: 10px;
+  --cc-radius-xs: 2px;
+  --cc-radius-sm: 3px;
+  --cc-radius-md: 4px;
+  --cc-radius-lg: 6px;
   --cc-radius-pill: 9999px;
-  --cc-radius-row: 4px;
-  --cc-radius-control: 6px;
+  --cc-radius-row: 2px;
+  --cc-radius-control: 4px;
   --cc-radius-panel: 0px;
-  --cc-radius-overlay: 10px;
+  --cc-radius-overlay: 8px;
+  --cc-space-1: 4px;
+  --cc-space-2: 8px;
+  --cc-space-3: 12px;
+  --cc-space-4: 16px;
+  --cc-space-5: 24px;
+  --cc-space-6: 32px;
   --cc-control-height: 36px;
   --cc-touch-target: 44px;
+  --cc-row-height: 44px;
   --cc-border-subtle: color-mix(in srgb, var(--cc-border) 72%, transparent);
+  --cc-border-strong: color-mix(in srgb, var(--cc-border) 78%, var(--cc-text-tertiary));
+  --cc-hover-surface: color-mix(in srgb, var(--cc-text) 4%, var(--cc-surface));
+  --cc-selected-surface: color-mix(in srgb, var(--cc-primary) 9%, var(--cc-surface));
   --cc-shadow-content: none;
   --cc-shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.16);
   --cc-shadow-drag: 0 8px 20px rgba(0, 0, 0, 0.14);

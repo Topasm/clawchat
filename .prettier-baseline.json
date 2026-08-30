@@ -27,7 +27,6 @@
     "src/app/utils/projectIcons.ts": "614ded62b2fb3e25de2c665b9bab4bcc33554b55d708de2026d0ee4460bc0326",
     "src/styles/_chat.css": "ad41a58127ac9b2dc9b76a09077c94ea9d5d26ffe280485daca75971b2aa6d3b",
     "src/styles/_dialog.css": "b5db20949b1d530d71bdb769528e17d335193b823d5a7763237fe0d93a2717a5",
-    "src/styles/_kanban-filter.css": "43b6ceec0988b630edeca368c1e630c9159016c1b423a44d5767c3de86558c4f",
     "src/styles/_pull-refresh.css": "d1a8badb6e3407be0440a08e224c9d75d2676b1eafb25b1a55aebacf7ca0774c",
     "src/styles/_reset.css": "6612b3b31054641b289cbc480d5195c31c2c7e5cce02d88a38c0d9af215cdb98",
     "src/styles/_toast.css": "40e58c181371d97057fc4217300249d6915d10b7159e528133120b9b99547822"

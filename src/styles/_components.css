@@ -6,10 +6,11 @@
 
 /* --- Card ------------------------------------------------- */
 .cc-card {
-  background: var(--cc-surface);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
-  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-row);
+  padding: 10px 12px;
   cursor: pointer;
   transition:
     background var(--cc-transition-fast),
@@ -17,8 +18,15 @@
 }
 
 .cc-card:hover {
-  background: var(--cc-surface-secondary);
-  border-color: color-mix(in srgb, var(--cc-primary) 24%, var(--cc-border));
+  background: var(--cc-hover-surface);
+  border-color: var(--cc-border-subtle);
+}
+
+/* Kanban cards remain bounded because their drag affordance needs a surface. */
+.cc-kanban__card > .cc-card {
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
 }
 
 .cc-card--task {
@@ -50,6 +58,39 @@
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 6px;
+}
+
+.cc-card__source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  gap: 2px;
+  padding: 1px 5px;
+  border-radius: var(--cc-radius-xs);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.cc-card__title .cc-card__source {
+  margin-left: 6px;
+}
+
+.cc-card__source[data-tone='obsidian'] {
+  background: color-mix(in srgb, #7c3aed 14%, var(--cc-surface));
+  color: #7c3aed;
+}
+
+.cc-card__source[data-tone='agent'] {
+  background: color-mix(in srgb, var(--cc-primary) 12%, var(--cc-surface));
+  color: var(--cc-primary);
+}
+
+.cc-card__source[data-tone='recurring'] {
+  color: var(--cc-primary);
 }
 
 .cc-card--event {
@@ -160,7 +201,7 @@
   width: 20px;
   height: 20px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: var(--cc-radius-xs);
   border: 1.5px solid var(--cc-border);
   background: transparent;
   color: inherit;
@@ -206,8 +247,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border-radius: var(--cc-radius-sm);
+  padding: 9px 2px;
+  border-radius: var(--cc-radius-panel);
   cursor: pointer;
   user-select: none;
   transition: background 0.15s ease;
@@ -248,27 +289,27 @@
 }
 
 .cc-section__header--warning {
-  background: color-mix(in srgb, var(--cc-warning) 5%, transparent);
-  border-color: color-mix(in srgb, var(--cc-warning) 20%, transparent);
+  background: transparent;
+  border-color: transparent;
 }
 .cc-section__header--warning:hover {
-  background: color-mix(in srgb, var(--cc-warning) 10%, transparent);
+  background: var(--cc-hover-surface);
 }
 
 .cc-section__header--accent {
-  background: color-mix(in srgb, var(--cc-primary) 5%, transparent);
-  border-color: color-mix(in srgb, var(--cc-primary) 20%, transparent);
+  background: transparent;
+  border-color: transparent;
 }
 .cc-section__header--accent:hover {
-  background: color-mix(in srgb, var(--cc-primary) 10%, transparent);
+  background: var(--cc-hover-surface);
 }
 
 .cc-section__header--success {
-  background: color-mix(in srgb, var(--cc-success) 5%, transparent);
-  border-color: color-mix(in srgb, var(--cc-success) 20%, transparent);
+  background: transparent;
+  border-color: transparent;
 }
 .cc-section__header--success:hover {
-  background: color-mix(in srgb, var(--cc-success) 10%, transparent);
+  background: var(--cc-hover-surface);
 }
 
 .cc-section__chevron {
@@ -312,7 +353,8 @@
 }
 
 .cc-section__body {
-  padding: 6px 0 12px;
+  padding: 0 0 14px;
+  border-top: 1px solid var(--cc-border-subtle);
 }
 
 /* --- Empty State ------------------------------------------ */
@@ -333,7 +375,7 @@
   width: 48px;
   height: 48px;
   border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
+  border-radius: var(--cc-radius-row);
   background: var(--cc-surface-secondary);
   color: var(--cc-text-tertiary);
   margin-bottom: 4px;
@@ -351,7 +393,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: var(--cc-radius-md);
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-row);
   cursor: pointer;
   transition: background 0.15s ease;
   background: transparent;
@@ -418,7 +461,7 @@
   padding: 10px 20px;
   min-height: var(--cc-control-height);
   border: 1px solid transparent;
-  border-radius: var(--cc-radius-sm);
+  border-radius: var(--cc-radius-control);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -494,7 +537,7 @@
 .cc-context-menu {
   background: var(--cc-surface);
   border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
+  border-radius: var(--cc-radius-overlay);
   box-shadow: var(--cc-shadow-overlay);
   padding: 4px;
   min-width: 140px;

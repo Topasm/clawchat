@@ -24,9 +24,10 @@
 
 .cc-task-list {
   overflow: hidden;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
-  background: var(--cc-surface);
+  border-top: 1px solid var(--cc-border);
+  border-bottom: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
 }
 
 .cc-task-list__header,
@@ -42,7 +43,7 @@
 .cc-task-list__header {
   min-height: 38px;
   border-bottom: 1px solid var(--cc-border);
-  background: var(--cc-surface-secondary);
+  background: color-mix(in srgb, var(--cc-surface-secondary) 72%, var(--cc-background));
   color: var(--cc-text-tertiary);
   font-size: 10px;
   font-weight: 700;
@@ -72,7 +73,7 @@
   border-bottom: 0;
 }
 .cc-task-list__row:hover {
-  background: color-mix(in srgb, var(--cc-primary) 5%, transparent);
+  background: var(--cc-hover-surface);
 }
 .cc-task-list__row:focus-visible {
   outline: 2px solid var(--cc-primary);
@@ -155,8 +156,9 @@
   display: grid;
   min-height: 240px;
   place-items: center;
-  border: 1px dashed var(--cc-border);
-  border-radius: var(--cc-radius-md);
+  border-top: 1px solid var(--cc-border);
+  border-bottom: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-panel);
   color: var(--cc-text-secondary);
   font-size: 13px;
 }

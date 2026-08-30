@@ -20,34 +20,42 @@
 }
 .cc-review-filters {
   display: flex;
-  gap: 6px;
+  gap: 0;
   overflow-x: auto;
+  border-bottom: 1px solid var(--cc-border);
 }
 .cc-review-filter {
-  padding: 7px 11px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-pill);
-  background: var(--cc-surface);
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
   color: var(--cc-text-secondary);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 .cc-review-filter--active {
-  border-color: var(--cc-primary);
-  background: color-mix(in srgb, var(--cc-primary) 10%, var(--cc-surface));
+  border-bottom-color: var(--cc-primary);
+  background: transparent;
   color: var(--cc-primary);
   font-weight: 600;
 }
 .cc-review-list {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
 }
 .cc-review-card {
-  padding: 16px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-lg);
-  background: var(--cc-surface);
+  padding: 14px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
+  background: transparent;
+}
+.cc-review-card:last-child {
+  border-bottom: 0;
 }
 .cc-review-card__topline {
   display: flex;
@@ -94,7 +102,7 @@
   max-height: 180px;
   overflow: auto;
   padding: 10px;
-  border-radius: var(--cc-radius-sm);
+  border-radius: var(--cc-radius-row);
   background: var(--cc-surface-secondary);
   color: var(--cc-text-secondary);
   font-family: inherit;
@@ -134,7 +142,7 @@
   margin-top: 12px;
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--cc-primary) 35%, var(--cc-border));
-  border-radius: var(--cc-radius-md);
+  border-radius: var(--cc-radius-row);
   background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
 }
 .cc-agent-review-handoff--applied {

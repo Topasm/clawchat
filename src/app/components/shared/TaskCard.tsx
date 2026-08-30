@@ -104,22 +104,7 @@ export default function TaskCard({
           <div className={`cc-card__title${isCompleted ? ' cc-card__title--completed' : ''}`}>
             {task.title}
             {task.source === 'obsidian' && (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginLeft: 6,
-                  padding: '1px 5px',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  lineHeight: '16px',
-                  borderRadius: 4,
-                  backgroundColor: '#7C3AED',
-                  color: '#fff',
-                  verticalAlign: 'middle',
-                }}
-              >
+              <span className="cc-card__source" data-tone="obsidian">
                 {translateUi('\n                OB\n              ')}
               </span>
             )}
@@ -127,20 +112,11 @@ export default function TaskCard({
           <div className="cc-card__meta">
             {task.is_recurring && (
               <span
+                className="cc-card__source"
+                data-tone="recurring"
                 title={translateUi('Recurring')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '1px 5px',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  lineHeight: '16px',
-                  borderRadius: 4,
-                  backgroundColor: 'var(--cc-color-info, #3B82F6)',
-                  color: '#fff',
-                }}
               >
-                <RepeatIcon size={10} style={{ marginRight: 2 }} />
+                <RepeatIcon size={10} />
               </span>
             )}
             {task.priority && task.priority !== 'medium' && (
@@ -154,38 +130,13 @@ export default function TaskCard({
             ))}
             {task.enabled_skills?.length ? (
               task.enabled_skills.map((s) => (
-                <span
-                  key={s}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '1px 5px',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    lineHeight: '16px',
-                    borderRadius: 4,
-                    backgroundColor: '#6366F1',
-                    color: '#fff',
-                  }}
-                >
+                <span key={s} className="cc-card__source" data-tone="agent">
                   {SKILL_BADGE_LABELS[s] || s}
                 </span>
               ))
             ) : task.assignee &&
               ['openclaw', 'planner', 'researcher', 'executor'].includes(task.assignee) ? (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '1px 5px',
-                  fontSize: 10,
-                  fontWeight: 700,
-                  lineHeight: '16px',
-                  borderRadius: 4,
-                  backgroundColor: '#6366F1',
-                  color: '#fff',
-                }}
-              >
+              <span className="cc-card__source" data-tone="agent">
                 {task.assignee === 'openclaw'
                   ? translateUi('AI')
                   : task.assignee === 'planner'

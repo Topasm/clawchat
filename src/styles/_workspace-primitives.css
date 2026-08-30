@@ -2,11 +2,14 @@
    elevation is reserved for overlays and active drag affordances. */
 .cc-pane {
   min-width: 0;
+  background: transparent;
   border-radius: var(--cc-radius-panel);
   box-shadow: var(--cc-shadow-content);
 }
 
 .cc-pane-section {
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
   border-radius: var(--cc-radius-panel);
   box-shadow: var(--cc-shadow-content);
 }
@@ -21,6 +24,8 @@
 
 .cc-list-row,
 .cc-property-row {
+  min-height: var(--cc-row-height);
+  border-bottom: 1px solid var(--cc-border-subtle);
   border-radius: var(--cc-radius-row);
   box-shadow: var(--cc-shadow-content);
   transition: background var(--cc-transition-fast);
@@ -28,7 +33,7 @@
 
 .cc-list-row:hover,
 .cc-property-row:hover {
-  background: var(--cc-surface-secondary);
+  background: var(--cc-hover-surface);
 }
 
 .cc-status-dot {
