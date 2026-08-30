@@ -8,7 +8,7 @@ describe('webPlatformApi', () => {
 
     expect(webPlatformApi.runtime.kind).toBe('web');
     expect(webPlatformApi.runtime.isDesktop).toBe(false);
-    expect(webPlatformApi.runtime.appVersion).toBe('0.1.0');
+    expect(webPlatformApi.runtime.appVersion).toBe(__APP_VERSION__);
     expect(unsubscribe).toBeTypeOf('function');
     expect(listener).not.toHaveBeenCalled();
   });

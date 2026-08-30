@@ -12,7 +12,7 @@ describe('tauriPlatformApi', () => {
     expect(tauriPlatformApi.runtime).toMatchObject({
       kind: 'tauri',
       isDesktop: true,
-      appVersion: '0.1.0',
+      appVersion: __APP_VERSION__,
     });
   });
 
@@ -64,7 +64,9 @@ describe('tauriPlatformApi', () => {
       return command === TAURI_COMMANDS.secureStorageGet ? 'encrypted-value' : null;
     });
 
-    await expect(tauriPlatformApi.secureStorage!.get('auth-storage')).resolves.toBe('encrypted-value');
+    await expect(tauriPlatformApi.secureStorage!.get('auth-storage')).resolves.toBe(
+      'encrypted-value',
+    );
     await tauriPlatformApi.secureStorage!.set('auth-storage', 'next');
     await tauriPlatformApi.secureStorage!.remove('auth-storage');
 
