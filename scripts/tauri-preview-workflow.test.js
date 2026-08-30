@@ -67,6 +67,7 @@ test('preview and release workflows launch the packaged macOS app', () => {
   assert.match(smokeScript, /main window restore requested by macOS Dock reopen/);
   assert.match(smokeScript, /main window hidden after macOS close request/);
   assert.match(smokeScript, /first menu item whose name starts with "Settings"/);
+  assert.match(smokeScript, /menu bar item "ClawChat"/);
   assert.match(smokeScript, /attribute "AXMenuItemCmdChar"/);
   assert.match(smokeScript, /click settingsItem/);
   assert.match(smokeScript, /main window restore requested by macOS Settings menu/);

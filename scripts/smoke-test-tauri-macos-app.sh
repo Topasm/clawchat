@@ -147,7 +147,7 @@ on run arguments
   tell application "System Events"
     tell process processName
       set frontmost to true
-      tell menu 1 of menu bar item 1 of menu bar 1
+      tell menu 1 of menu bar item "ClawChat" of menu bar 1
         set settingsItem to first menu item whose name starts with "Settings"
         set commandCharacter to value of attribute "AXMenuItemCmdChar" of settingsItem
         if commandCharacter is not "," then
