@@ -8,6 +8,11 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { MANIFEST_NAME, validateServerBundle } = require('./server-bundle-manifest');
 
+// Keep the package smoke aligned with the desktop supervisor. A freshly
+// extracted Windows onedir bundle can spend extra time in filesystem scanning
+// before FastAPI finishes its lifespan startup.
+const SERVER_READY_TIMEOUT_MS = 60_000;
+
 const args = process.argv.slice(2);
 const runServer = args.includes('--run-server');
 const positionalArgs = args.filter((argument) => argument !== '--run-server');
@@ -203,7 +208,8 @@ async function smokeServer(executablePath) {
   };
 
   const waitUntilReady = async () => {
-    for (let attempt = 0; attempt < 120; attempt += 1) {
+    const deadline = Date.now() + SERVER_READY_TIMEOUT_MS;
+    while (Date.now() < deadline) {
       if (await healthCheck(port)) return;
       if (spawnError) break;
       if (child.exitCode !== null || child.signalCode !== null) break;

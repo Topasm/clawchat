@@ -97,6 +97,7 @@ test('packaged server failures are exposed as GitHub annotations', () => {
   assert.match(verifier, /device token failed after restart/);
   assert.match(verifier, /device WebSocket failed after restart/);
   assert.match(verifier, /JWT_SECRET_FILE/);
+  assert.match(verifier, /const SERVER_READY_TIMEOUT_MS = 60_000/);
   assert.match(verifier, /process\.env\.GITHUB_ACTIONS === 'true'/);
   assert.match(verifier, /::error title=Tauri package verification failed/);
 });
