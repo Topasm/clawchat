@@ -3,7 +3,9 @@
 set -euo pipefail
 
 package_root="${1:?Usage: smoke-test-tauri-macos-app.sh <mounted-package-directory>}"
-smoke_seconds="${CLAWCHAT_APP_SMOKE_SECONDS:-10}"
+# The native supervisor allows a full 60 seconds for first-run database
+# creation. Leave the outer app smoke enough time to observe its final log.
+smoke_seconds="${CLAWCHAT_APP_SMOKE_SECONDS:-75}"
 app_path="$(find "$package_root" -maxdepth 1 -name '*.app' -type d -print -quit)"
 
 if [[ -z "$app_path" ]]; then
@@ -21,6 +23,7 @@ app_icon="$app_path/Contents/Resources/$icon_file"
 log_directory="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 app_log="$log_directory/clawchat-app-startup.log"
 startup_log="${HOME}/Library/Application Support/${bundle_identifier}/startup.log"
+startup_log_offset=0
 icon_temp_root="$(mktemp -d)"
 launch_waiter_pid=''
 
@@ -58,6 +61,10 @@ for required_icon in icon_16x16.png icon_128x128@2x.png icon_512x512@2x.png; do
   fi
 done
 
+if [[ -f "$startup_log" ]]; then
+  startup_log_offset="$(wc -c < "$startup_log" | tr -d ' ')"
+fi
+
 RUST_BACKTRACE=1 /usr/bin/open -n -W "$app_path" >"$app_log" 2>&1 &
 launch_waiter_pid=$!
 
@@ -87,15 +94,32 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
     fi
     exit 1
   fi
+  if [[ -f "$startup_log" ]] && tail -c "+$((startup_log_offset + 1))" "$startup_log" \
+      | grep -Fq '[clawchat] local server ready on port'; then
+    if tail -c "+$((startup_log_offset + 1))" "$startup_log" \
+        | grep -Fq 'system tray is unavailable'; then
+      echo "Packaged macOS tray icon failed to initialize." >&2
+      tail -c "+$((startup_log_offset + 1))" "$startup_log" >&2
+      exit 1
+    fi
+    stop_app
+    wait "$launch_waiter_pid" 2>/dev/null || true
+    launch_waiter_pid=''
+    echo "ClawChat opened its bundled local workspace; macOS startup smoke test passed."
+    exit 0
+  fi
 done
 
-if [[ -f "$startup_log" ]] && grep -Fq 'system tray is unavailable' "$startup_log"; then
+if [[ -f "$startup_log" ]] && tail -c "+$((startup_log_offset + 1))" "$startup_log" \
+    | grep -Fq 'system tray is unavailable'; then
   echo "Packaged macOS tray icon failed to initialize." >&2
   cat "$startup_log" >&2
   exit 1
 fi
 
-stop_app
-wait "$launch_waiter_pid" 2>/dev/null || true
-launch_waiter_pid=''
-echo "ClawChat remained running for ${smoke_seconds}s; macOS startup smoke test passed."
+echo "ClawChat did not open its local workspace within ${smoke_seconds}s." >&2
+cat "$app_log" >&2
+if [[ -f "$startup_log" ]]; then
+  tail -c "+$((startup_log_offset + 1))" "$startup_log" >&2
+fi
+exit 1

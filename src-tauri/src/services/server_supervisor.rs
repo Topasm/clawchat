@@ -3,9 +3,9 @@ use std::{
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::{Child, Command, ExitStatus, Stdio},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -13,7 +13,15 @@ use crate::{
     startup_log,
 };
 
-const MAX_HEALTH_RETRIES: usize = 30;
+const STARTUP_HEALTH_TIMEOUT: Duration = Duration::from_secs(60);
+const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(250);
+const SERVER_LOG_DIAGNOSTIC_BYTES: usize = 4_000;
+
+enum HealthWaitOutcome {
+    Ready,
+    Exited(ExitStatus),
+    TimedOut,
+}
 
 pub struct ServerSupervisor {
     paths: NativePaths,
@@ -120,21 +128,51 @@ impl ServerSupervisor {
                 if let Err(error) = write_pid(&self.paths.pid_path, pid) {
                     startup_log::report(&format!("[clawchat] {error}"));
                 }
-                if wait_for_health(port) {
-                    self.status = ServerStatus {
-                        state: ServerState::Running,
-                        port,
-                        pid: Some(pid),
-                        error: None,
-                    };
-                } else {
-                    self.stop_child();
-                    self.status = ServerStatus {
-                        state: ServerState::Error,
-                        port,
-                        pid: None,
-                        error: Some("server failed health check after startup".to_owned()),
-                    };
+                let started_at = Instant::now();
+                let outcome = self
+                    .child
+                    .as_mut()
+                    .map(|child| wait_for_health(port, child))
+                    .unwrap_or(HealthWaitOutcome::TimedOut);
+                match outcome {
+                    HealthWaitOutcome::Ready => {
+                        startup_log::report(&format!(
+                            "[clawchat] local server ready on port {port} after {:.1}s",
+                            started_at.elapsed().as_secs_f32()
+                        ));
+                        self.status = ServerStatus {
+                            state: ServerState::Running,
+                            port,
+                            pid: Some(pid),
+                            error: None,
+                        };
+                    }
+                    HealthWaitOutcome::Exited(exit) => {
+                        // `try_wait` already reaped the child. Drop the handle
+                        // without signalling a PID that the OS may later reuse.
+                        self.child = None;
+                        let _ = fs::remove_file(&self.paths.pid_path);
+                        self.status = ServerStatus {
+                            state: ServerState::Error,
+                            port,
+                            pid: None,
+                            error: Some(self.startup_error(format!(
+                                "server exited with {exit} before becoming ready"
+                            ))),
+                        };
+                    }
+                    HealthWaitOutcome::TimedOut => {
+                        self.stop_child();
+                        self.status = ServerStatus {
+                            state: ServerState::Error,
+                            port,
+                            pid: None,
+                            error: Some(self.startup_error(format!(
+                                "server did not become ready within {} seconds",
+                                STARTUP_HEALTH_TIMEOUT.as_secs()
+                            ))),
+                        };
+                    }
                 }
             }
             Err(error) => {
@@ -147,6 +185,17 @@ impl ServerSupervisor {
             }
         }
         self.status.clone()
+    }
+
+    fn startup_error(&self, summary: String) -> String {
+        let log_path = self.paths.app_data_dir.join("server.log");
+        match read_log_tail(&log_path, SERVER_LOG_DIAGNOSTIC_BYTES) {
+            Some(diagnostic) => format!("{summary}. Last server output: {diagnostic}"),
+            None => format!(
+                "{summary}. No server output was recorded; see {}",
+                log_path.display()
+            ),
+        }
     }
 
     pub fn stop(&mut self) -> ServerStatus {
@@ -223,8 +272,13 @@ impl ServerSupervisor {
 
         let log_path = self.paths.app_data_dir.join("server.log");
         match OpenOptions::new().create(true).append(true).open(&log_path) {
-            Ok(stdout) => match stdout.try_clone() {
+            Ok(mut stdout) => match stdout.try_clone() {
                 Ok(stderr) => {
+                    let _ = writeln!(
+                        stdout,
+                        "\n[clawchat] --- starting bundled server on port {} ---",
+                        config.port
+                    );
                     command
                         .stdout(Stdio::from(stdout))
                         .stderr(Stdio::from(stderr));
@@ -372,21 +426,29 @@ fn choose_start_port(requested: u16) -> Result<u16, String> {
         .map_err(|error| format!("failed to inspect a free local server port: {error}"))
 }
 
-fn wait_for_health(port: u16) -> bool {
-    for attempt in 1..=MAX_HEALTH_RETRIES {
+fn wait_for_health(port: u16, child: &mut Child) -> HealthWaitOutcome {
+    let deadline = Instant::now() + STARTUP_HEALTH_TIMEOUT;
+    loop {
         if health_check(port) {
-            return true;
+            return HealthWaitOutcome::Ready;
         }
-        let delay = if attempt <= 5 {
-            150
-        } else if attempt <= 10 {
-            300
-        } else {
-            500
-        };
-        thread::sleep(Duration::from_millis(delay));
+        if let Ok(Some(exit)) = child.try_wait() {
+            return HealthWaitOutcome::Exited(exit);
+        }
+        if Instant::now() >= deadline {
+            return HealthWaitOutcome::TimedOut;
+        }
+        thread::sleep(HEALTH_POLL_INTERVAL);
     }
-    false
+}
+
+fn read_log_tail(path: &Path, maximum_bytes: usize) -> Option<String> {
+    let bytes = fs::read(path).ok()?;
+    let start = bytes.len().saturating_sub(maximum_bytes);
+    let diagnostic = String::from_utf8_lossy(&bytes[start..])
+        .trim()
+        .replace(['\r', '\n'], " ");
+    (!diagnostic.is_empty()).then_some(diagnostic)
 }
 
 fn read_pid(path: &Path) -> Option<u32> {
@@ -497,6 +559,18 @@ mod tests {
 
         assert_ne!(selected, 0);
         TcpListener::bind(("127.0.0.1", selected)).expect("selected port is free");
+    }
+
+    #[test]
+    fn startup_diagnostic_uses_only_the_tail_and_flattens_lines() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let log = root.path().join("server.log");
+        fs::write(&log, "discard this\nimportant line\nlast line").expect("server log");
+
+        assert_eq!(
+            read_log_tail(&log, 24),
+            Some("important line last line".to_owned())
+        );
     }
 
     #[test]
