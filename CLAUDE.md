@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ClawChat is a privacy-first, self-hosted AI project execution workspace that unifies tasks, graphs, calendar, documents, agents, and chat. Clients are web, Tauri desktop, and native Android. All clients use one FastAPI server and one SQLite database.
+ClawChat is a privacy-first, self-hosted agentic todo app that turns captured work into structured plans, runs approved ready tasks with AI agents, and routes results through human review. It unifies tasks, graphs, calendar, documents, agents, and chat across web, Tauri desktop, and native Android clients backed by one FastAPI server and one SQLite database.
 
 ## Setup & Development
 

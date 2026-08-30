@@ -2,7 +2,7 @@
 
 ## Overview
 
-**ClawChat** is a privacy-first, self-hosted AI project execution workspace. It unifies tasks, dependency graphs, calendar, documents, agents, and AI-powered conversation across web, Tauri desktop, and native Android clients backed by a user-owned server.
+**ClawChat** is a privacy-first, self-hosted agentic todo app. It turns captured work into structured plans, runs approved ready tasks with AI agents, and routes results through human review. Tasks, dependency graphs, calendar, documents, agents, and AI-powered conversation stay connected across web, Tauri desktop, and native Android clients backed by a user-owned server.
 
 Unlike existing productivity tools that scatter user data across multiple third-party cloud services, ClawChat keeps primary application data on the user's own infrastructure. The AI assistant serves as a central interface — users interact through natural language conversation, and the system intelligently routes requests to the appropriate internal modules.
 

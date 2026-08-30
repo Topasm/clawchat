@@ -2,7 +2,7 @@
   "id": "/",
   "name": "ClawChat",
   "short_name": "ClawChat",
-  "description": "A personal AI project execution workspace",
+  "description": "A privacy-first, self-hosted agentic todo app",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

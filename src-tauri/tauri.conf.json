@@ -40,8 +40,8 @@
     "active": true,
     "targets": "all",
     "category": "Productivity",
-    "shortDescription": "Cross-platform AI secretary",
-    "longDescription": "ClawChat is a self-hosted AI secretary for chat, tasks, calendar, and notes.",
+    "shortDescription": "Privacy-first agentic todo app",
+    "longDescription": "ClawChat is a self-hosted agentic todo app that plans work, runs approved tasks with AI agents, and keeps results under human review.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

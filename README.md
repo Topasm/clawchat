@@ -1,10 +1,26 @@
 # ClawChat
 
-Privacy-first, self-hosted AI project execution workspace for tasks, dependency
-graphs, calendar, documents, agents, and chat.
+**A privacy-first, self-hosted agentic todo app.**
 
-ClawChat ships a shared web/Tauri client and a native Android app. They connect to
-one FastAPI server and one SQLite database.
+ClawChat goes beyond storing todos: it helps turn captured work into structured
+plans, finds the next ready task, runs approved work with AI agents, and routes the
+result back to you for review. Tasks, projects, dependency graphs, calendar,
+documents, and chat stay connected in one workspace.
+
+You keep control of the workflow and the data. ClawChat runs on your own FastAPI
+server and SQLite database, with shared web and Tauri clients plus a native Android
+app.
+
+## What makes it agentic?
+
+- **Plan** — Turn goals and inbox captures into projects, workstreams, subtasks, and
+  dependency-aware execution plans.
+- **Act** — Run a ready task with Claude Code, the Codex Responses API, OpenClaw, or
+  another configured AI backend.
+- **Review** — Inspect agent runs and artifacts, approve the result, and see which
+  downstream tasks become ready next.
+- **Stay in control** — Preview consequential changes, require explicit approval,
+  and keep the entire workspace on infrastructure you own.
 
 ## Quick Start (local)
 

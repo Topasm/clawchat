@@ -2,7 +2,7 @@
   "name": "clawchat",
   "version": "1.4.2",
   "private": true,
-  "description": "ClawChat — Cross-platform AI secretary (Web, Desktop, Android)",
+  "description": "ClawChat — Privacy-first, self-hosted agentic todo app",
   "license": "MIT",
   "engines": {
     "node": ">=22.13.0",
