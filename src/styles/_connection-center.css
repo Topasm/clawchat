@@ -1,6 +1,10 @@
 .cc-public-shell {
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   padding: 40px 28px 64px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   color: var(--cc-text);
   background: var(--cc-background);
 }
