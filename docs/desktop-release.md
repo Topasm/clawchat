@@ -73,8 +73,8 @@ replace the bundle in place.
 
 ## Cutting a release
 
-1. Bump the version. It must match in all nine declarations; the check tells you
-   if it does not:
+1. Bump the version. It must match in all ten declarations, including the
+   `server/uv.lock` project package entry; the check tells you if it does not:
 
    ```bash
    npm run check:release-version

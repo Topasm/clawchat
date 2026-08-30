@@ -43,7 +43,9 @@ function cargoLockPackage(contents, packageName, location) {
     .split(/\r?\n(?=\[\[package\]\]\s*(?:\r?\n|$))/)
     .filter((entry) => /^name\s*=\s*"([^"]+)"\s*$/m.exec(entry)?.[1] === packageName);
   if (packages.length !== 1) {
-    throw new Error(`expected exactly one ${packageName} package at ${location}, found ${packages.length}`);
+    throw new Error(
+      `expected exactly one ${packageName} package at ${location}, found ${packages.length}`,
+    );
   }
   return packages[0];
 }
@@ -101,6 +103,7 @@ function collectReleaseVersions(projectRoot = path.resolve(__dirname, '..')) {
   const cargoLockPath = 'src-tauri/Cargo.lock';
   const serverVersionPath = 'server/app_version.py';
   const serverProjectPath = 'server/pyproject.toml';
+  const serverLockPath = 'server/uv.lock';
   const androidBuildPath = 'android/app/build.gradle.kts';
   const cargoTomlPackage = tomlSection(
     readText(projectRoot, cargoTomlPath),
@@ -111,6 +114,11 @@ function collectReleaseVersions(projectRoot = path.resolve(__dirname, '..')) {
     readText(projectRoot, cargoLockPath),
     'clawchat-tauri',
     cargoLockPath,
+  );
+  const serverLockEntry = cargoLockPackage(
+    readText(projectRoot, serverLockPath),
+    'clawchat-server',
+    serverLockPath,
   );
 
   return [
@@ -156,6 +164,14 @@ function collectReleaseVersions(projectRoot = path.resolve(__dirname, '..')) {
         tomlSection(readText(projectRoot, serverProjectPath), 'project', serverProjectPath),
         /^version\s*=\s*"([^"]+)"\s*$/gm,
         'server/pyproject.toml [project] version',
+      ),
+    },
+    {
+      location: 'server/uv.lock clawchat-server version',
+      version: singleCapturedVersion(
+        serverLockEntry,
+        /^version\s*=\s*"([^"]+)"\s*$/gm,
+        'server/uv.lock clawchat-server version',
       ),
     },
     {

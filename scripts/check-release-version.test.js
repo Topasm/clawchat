@@ -20,6 +20,7 @@ function fixture(overrides = {}) {
     cargoLock: VERSION,
     serverVersion: VERSION,
     serverProjectVersion: VERSION,
+    serverLockVersion: VERSION,
     androidVersion: VERSION,
     ...overrides,
   };
@@ -52,6 +53,10 @@ function fixture(overrides = {}) {
     `[project]\nname = "clawchat-server"\nversion = "${versions.serverProjectVersion}"\n`,
   );
   write(
+    'server/uv.lock',
+    `version = 1\n\n[[package]]\nname = "clawchat-server"\nversion = "${versions.serverLockVersion}"\nsource = { virtual = "." }\n`,
+  );
+  write(
     'android/app/build.gradle.kts',
     `android {\n  defaultConfig {\n    versionName = "${versions.androidVersion}"\n  }\n}\n`,
   );
@@ -62,10 +67,7 @@ function fixture(overrides = {}) {
   );
   write('src/app/platform/tauriPlatformApi.ts', 'appVersion: __APP_VERSION__,\n');
   write('src/app/platform/webPlatformApi.ts', 'appVersion: __APP_VERSION__,\n');
-  write(
-    'src/app/pages/AppSettingsPage.tsx',
-    '<span>v{platformApi.runtime.appVersion}</span>\n',
-  );
+  write('src/app/pages/AppSettingsPage.tsx', '<span>v{platformApi.runtime.appVersion}</span>\n');
 
   return { root, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };
 }
@@ -76,7 +78,7 @@ test('accepts synchronized package, lockfile, Cargo, Tauri, and renderer version
     const result = checkReleaseVersion(project.root);
     assert.equal(result.version, VERSION);
     assert.equal(result.tag, `clawchat-v${VERSION}`);
-    assert.equal(result.declarations.length, 9);
+    assert.equal(result.declarations.length, 10);
   } finally {
     project.cleanup();
   }
@@ -90,6 +92,7 @@ test('rejects every duplicated release version when it drifts', async (t) => {
     ['cargoLock', 'src-tauri/Cargo.lock clawchat-tauri version'],
     ['serverVersion', 'server/app_version.py APP_VERSION'],
     ['serverProjectVersion', 'server/pyproject.toml [project] version'],
+    ['serverLockVersion', 'server/uv.lock clawchat-server version'],
     ['androidVersion', 'android/app/build.gradle.kts versionName'],
   ]) {
     await t.test(location, () => {
