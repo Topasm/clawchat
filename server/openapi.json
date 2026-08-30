@@ -88,6 +88,22 @@
             ],
             "title": "Claude Code Version"
           },
+          "codex_api_configured": {
+            "title": "Codex Api Configured",
+            "type": "boolean"
+          },
+          "codex_api_key_persistent": {
+            "title": "Codex Api Key Persistent",
+            "type": "boolean"
+          },
+          "codex_api_status": {
+            "title": "Codex Api Status",
+            "type": "string"
+          },
+          "codex_model": {
+            "title": "Codex Model",
+            "type": "string"
+          },
           "openclaw_connected": {
             "title": "Openclaw Connected",
             "type": "boolean"
@@ -96,7 +112,11 @@
         "required": [
           "active_provider",
           "openclaw_connected",
-          "claude_code_status"
+          "claude_code_status",
+          "codex_api_status",
+          "codex_api_configured",
+          "codex_api_key_persistent",
+          "codex_model"
         ],
         "title": "AIProviderResponse",
         "type": "object"
@@ -1660,6 +1680,49 @@
           "active"
         ],
         "title": "ClaudeCodeStatusResponse",
+        "type": "object"
+      },
+      "CodexAPIConfigRequest": {
+        "properties": {
+          "api_key": {
+            "format": "password",
+            "title": "Api Key",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "api_key"
+        ],
+        "title": "CodexAPIConfigRequest",
+        "type": "object"
+      },
+      "CodexAPIStatusResponse": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "configured",
+          "model",
+          "active"
+        ],
+        "title": "CodexAPIStatusResponse",
         "type": "object"
       },
       "ConversationDetailResponse": {
@@ -7922,7 +7985,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "0.1.4"
+    "version": "1.4.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -8027,6 +8090,80 @@
           }
         ],
         "summary": "Recheck Claude Code",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/ai/codex": {
+      "put": {
+        "description": "Validate, securely persist when possible, and activate a Codex API key.",
+        "operationId": "configure_codex_api_api_admin_ai_codex_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodexAPIConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Configure Codex Api",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/ai/codex/check": {
+      "post": {
+        "description": "Re-check OpenAI credentials and access to the configured Codex model.",
+        "operationId": "recheck_codex_api_api_admin_ai_codex_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexAPIStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Recheck Codex Api",
         "tags": [
           "admin"
         ]

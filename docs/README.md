@@ -86,7 +86,7 @@ ClawChat is a privacy-first, self-hosted AI project execution workspace that uni
 | Styling            | CSS with custom properties                   | BEM naming (`.cc-` prefix), theme-aware via CSS variables                  |
 | Backend            | Python FastAPI                               | Async API server with AI orchestration                                     |
 | Database           | SQLite                                       | Single-file, zero-config persistent storage                                |
-| AI Layer           | Ollama / OpenAI-compatible API / Claude Code | Local-first LLM with optional external backends                            |
+| AI Layer           | Ollama / OpenAI-compatible / Claude Code / Codex API | Local-first LLM with optional external backends                      |
 | Deployment         | Docker Compose                               | One-command server setup                                                   |
 
 ## Quick Start
@@ -116,4 +116,4 @@ npm run generate:api
 - **Node.js** >= 22 and npm >= 10 (Node 24 LTS recommended)
 - **Python** >= 3.11 and **uv** 0.10.2 (for the server)
 - **Docker & Docker Compose** (for server deployment)
-- An AI backend for AI features: **Ollama**, an **OpenAI-compatible endpoint**, or **Claude Code**
+- An AI backend for AI features: **Ollama**, an **OpenAI-compatible endpoint**, **Claude Code**, or the **Codex API**

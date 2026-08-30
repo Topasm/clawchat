@@ -1,6 +1,7 @@
 import logging
 import os
 import secrets
+import tempfile
 from pathlib import Path
 
 from pydantic import field_validator, model_validator
@@ -17,7 +18,7 @@ def _read_secret(path: Path) -> str:
     with os.fdopen(descriptor, encoding="utf-8") as secret_file:
         secret = secret_file.read().strip()
     if len(secret) < 32:
-        raise ValueError(f"JWT secret file {path} is empty or too short")
+        raise ValueError(f"Secret file {path} is empty or too short")
     return secret
 
 
@@ -42,6 +43,45 @@ def _load_or_create_secret(path_value: str) -> str:
     if os.name == "posix":
         os.chmod(path, 0o600)
     return secret
+
+
+def _read_codex_api_key(path_value: str) -> str:
+    path = Path(path_value).expanduser()
+    try:
+        api_key = _read_secret(path)
+    except FileNotFoundError:
+        return ""
+    except ValueError as error:
+        logger.warning("Ignoring invalid Codex API key file %s: %s", path, error)
+        return ""
+    return api_key
+
+
+def save_codex_api_key(path_value: str, api_key: str) -> None:
+    """Atomically persist a Codex credential in an owner-only file."""
+    path = Path(path_value).expanduser()
+    value = api_key.strip()
+    if len(value) < 32:
+        raise ValueError("Codex API key is empty or too short")
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        dir=path.parent,
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        if os.name == "posix":
+            os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as secret_file:
+            secret_file.write(value)
+            secret_file.flush()
+            os.fsync(secret_file.fileno())
+        os.replace(temporary_path, path)
+        if os.name == "posix":
+            os.chmod(path, 0o600)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 class Settings(BaseSettings):
@@ -77,11 +117,20 @@ class Settings(BaseSettings):
     # a wildcard lets any website in the browser call this server's API).
     cors_allow_origins: str = ""
 
-    # AI Provider — "ollama", "openai", or "claude_code"
+    # AI Provider — OpenClaw/OpenAI-compatible, Claude Code CLI, or Codex API
     ai_provider: str = "ollama"
     ai_base_url: str = "http://localhost:11434"
     ai_api_key: str = ""
     ai_model: str = "llama3.2"
+
+    # OpenAI Codex via the Responses API. CODEX_API_KEY takes precedence;
+    # OPENAI_API_KEY is accepted as the conventional fallback. The desktop
+    # shell supplies CODEX_API_KEY_FILE inside its protected app-data folder.
+    codex_api_base_url: str = "https://api.openai.com/v1"
+    codex_api_key: str = ""
+    codex_api_key_file: str = ""
+    codex_model: str = "gpt-5.3-codex"
+    codex_reasoning_effort: str = "medium"
 
     # Optional Paseo execution daemon. The CLI owns daemon authentication and
     # supports local, TCP, unix-socket, and E2EE offer URL targets.
@@ -149,6 +198,27 @@ class Settings(BaseSettings):
             if normalized in {"debug", "development", "dev"}:
                 return True
         return value
+
+    @field_validator("codex_reasoning_effort", mode="before")
+    @classmethod
+    def normalize_codex_reasoning_effort(cls, value):
+        normalized = str(value).strip().lower()
+        if normalized not in {"low", "medium", "high", "xhigh"}:
+            raise ValueError("must be one of: low, medium, high, xhigh")
+        return normalized
+
+    @model_validator(mode="after")
+    def resolve_codex_api_key(self):
+        if self.codex_api_key:
+            self.codex_api_key = self.codex_api_key.strip()
+            return self
+
+        conventional_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if conventional_key:
+            self.codex_api_key = conventional_key
+        elif self.codex_api_key_file:
+            self.codex_api_key = _read_codex_api_key(self.codex_api_key_file)
+        return self
 
     @model_validator(mode="after")
     def resolve_jwt_secret(self):

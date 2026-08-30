@@ -21,6 +21,40 @@ interface AIProviderState {
   openclaw_connected: boolean;
   claude_code_status: string;
   claude_code_version: string | null;
+  codex_api_status: string;
+  codex_api_configured: boolean;
+  codex_api_key_persistent: boolean;
+  codex_model: string;
+}
+
+const AI_PROVIDER_LABELS: Record<string, string> = {
+  openclaw: 'OpenClaw',
+  claude_code: 'Claude Code',
+  codex: 'Codex API',
+};
+
+function codexStatusLabel(provider: AIProviderState): string {
+  switch (provider.codex_api_status) {
+    case 'available':
+      return `Ready — ${provider.codex_model}`;
+    case 'not_configured':
+      return 'Not configured — add an OpenAI API key';
+    case 'authentication_failed':
+      return 'The configured API key was rejected';
+    case 'unavailable':
+      return `Unavailable — check network and access to ${provider.codex_model}`;
+    default:
+      return `Status: ${provider.codex_api_status}`;
+  }
+}
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  const response = (
+    error as {
+      response?: { data?: { detail?: string; error?: { message?: string } } };
+    }
+  )?.response;
+  return response?.data?.detail ?? response?.data?.error?.message ?? fallback;
 }
 
 /** Settings backed by the currently connected workspace server. */
@@ -37,6 +71,9 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
   const [aiProviderSwitching, setAiProviderSwitching] = useState(false);
   const [claudeCodeChecking, setClaudeCodeChecking] = useState(false);
+  const [codexChecking, setCodexChecking] = useState(false);
+  const [codexConfiguring, setCodexConfiguring] = useState(false);
+  const [codexApiKey, setCodexApiKey] = useState('');
 
   useEffect(() => {
     apiClient
@@ -49,17 +86,15 @@ export default function SettingsPage() {
     async (provider: string) => {
       setAiProviderSwitching(true);
       try {
-        const response = await apiClient.post('/admin/ai/provider', { provider });
-        setAiProvider(response.data);
-        addToast(
-          'success',
-          `Switched to ${provider === 'claude_code' ? 'Claude Code' : 'OpenClaw'}`,
+        const response = await apiClient.post(
+          '/admin/ai/provider',
+          { provider },
+          { queueOfflineMutation: false },
         );
+        setAiProvider(response.data);
+        addToast('success', `Switched to ${AI_PROVIDER_LABELS[provider] ?? provider}`);
       } catch (error: unknown) {
-        const message =
-          (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-          'Failed to switch provider';
-        addToast('error', message);
+        addToast('error', apiErrorMessage(error, 'Failed to switch provider'));
       } finally {
         setAiProviderSwitching(false);
       }
@@ -70,7 +105,9 @@ export default function SettingsPage() {
   const handleRecheckClaudeCode = useCallback(async () => {
     setClaudeCodeChecking(true);
     try {
-      const response = await apiClient.post('/admin/ai/claude-code/check');
+      const response = await apiClient.post('/admin/ai/claude-code/check', undefined, {
+        queueOfflineMutation: false,
+      });
       setAiProvider((previous) =>
         previous
           ? {
@@ -90,6 +127,52 @@ export default function SettingsPage() {
       setClaudeCodeChecking(false);
     }
   }, [addToast]);
+
+  const handleRecheckCodex = useCallback(async () => {
+    setCodexChecking(true);
+    try {
+      const response = await apiClient.post('/admin/ai/codex/check', undefined, {
+        queueOfflineMutation: false,
+      });
+      setAiProvider((previous) =>
+        previous
+          ? {
+              ...previous,
+              codex_api_status: response.data.status,
+              codex_api_configured: response.data.configured,
+              codex_model: response.data.model,
+            }
+          : previous,
+      );
+      addToast('success', `Codex API: ${response.data.status}`);
+    } catch {
+      addToast('error', 'Failed to check Codex API status');
+    } finally {
+      setCodexChecking(false);
+    }
+  }, [addToast]);
+
+  const handleConfigureCodex = useCallback(async () => {
+    if (!codexApiKey.trim()) {
+      addToast('error', 'Enter an OpenAI API key');
+      return;
+    }
+    setCodexConfiguring(true);
+    try {
+      const response = await apiClient.put(
+        '/admin/ai/codex',
+        { api_key: codexApiKey.trim() },
+        { queueOfflineMutation: false },
+      );
+      setAiProvider(response.data);
+      setCodexApiKey('');
+      addToast('success', `Codex API is ready with ${response.data.codex_model}`);
+    } catch (error: unknown) {
+      addToast('error', apiErrorMessage(error, 'Failed to configure Codex API'));
+    } finally {
+      setCodexConfiguring(false);
+    }
+  }, [addToast, codexApiKey]);
 
   useEffect(() => {
     if (isDesktop) {
@@ -154,7 +237,9 @@ export default function SettingsPage() {
               sublabel={
                 aiProvider.active_provider === 'claude_code'
                   ? 'Using Claude Code CLI'
-                  : 'Using OpenClaw gateway'
+                  : aiProvider.active_provider === 'codex'
+                    ? `Using Codex API — ${aiProvider.codex_model}`
+                    : 'Using OpenClaw gateway'
               }
             >
               <SegmentedControl
@@ -162,10 +247,60 @@ export default function SettingsPage() {
                 options={[
                   { label: 'OpenClaw', value: 'openclaw' },
                   { label: 'Claude Code', value: 'claude_code' },
+                  { label: 'Codex', value: 'codex' },
                 ]}
                 value={aiProvider.active_provider}
                 onChange={(provider) => !aiProviderSwitching && void handleSwitchProvider(provider)}
               />
+            </SettingsRow>
+            <SettingsRow label="Codex API" sublabel={codexStatusLabel(aiProvider)}>
+              <div className="cc-settings-inline-actions">
+                <StatusDot
+                  className="cc-settings-status-dot"
+                  tone={aiProvider.codex_api_status === 'available' ? 'success' : 'neutral'}
+                />
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--secondary cc-btn--compact"
+                  onClick={() => void handleRecheckCodex()}
+                  disabled={codexChecking || !aiProvider.codex_api_configured}
+                >
+                  {codexChecking ? 'Checking...' : 'Recheck'}
+                </button>
+              </div>
+            </SettingsRow>
+            <SettingsRow
+              label="OpenAI API key"
+              sublabel={
+                aiProvider.codex_api_configured
+                  ? aiProvider.codex_api_key_persistent
+                    ? 'Stored for this workspace; enter a new key only to replace it'
+                    : 'Configured by the environment or for the current server session'
+                  : aiProvider.codex_api_key_persistent
+                    ? 'Validated before it is stored in the local app data folder'
+                    : 'Validated for this server session; use CODEX_API_KEY to persist it'
+              }
+            >
+              <div className="cc-settings-inline-actions">
+                <input
+                  className="cc-settings-input cc-settings-api-key-input"
+                  type="password"
+                  value={codexApiKey}
+                  onChange={(event) => setCodexApiKey(event.target.value)}
+                  placeholder={aiProvider.codex_api_configured ? 'Configured' : 'sk-...'}
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="OpenAI API key"
+                />
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--secondary cc-btn--compact"
+                  onClick={() => void handleConfigureCodex()}
+                  disabled={codexConfiguring || !codexApiKey.trim()}
+                >
+                  {codexConfiguring ? 'Validating...' : 'Save & Use'}
+                </button>
+              </div>
             </SettingsRow>
             <SettingsRow
               label="Claude Code CLI"

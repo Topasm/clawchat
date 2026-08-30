@@ -213,6 +213,10 @@
   max-width: 100%;
 }
 
+.cc-settings-api-key-input {
+  width: 170px;
+}
+
 .cc-settings-hint {
   font-size: 12px;
   color: var(--cc-text-secondary);

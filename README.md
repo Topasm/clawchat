@@ -16,8 +16,8 @@ make dev            # start frontend on :5173 and backend on :8000
 
 Requires **Node.js >= 22** (Node 24 LTS recommended), **Python >= 3.11**, and
 **uv 0.10.2**. AI features also require a configured backend such as Ollama, an
-OpenAI-compatible endpoint, or Claude Code. Backend installs are reproduced from
-the committed `server/uv.lock`.
+OpenAI-compatible endpoint, Claude Code, or the OpenAI Codex Responses API.
+Backend installs are reproduced from the committed `server/uv.lock`.
 
 ## Docker
 

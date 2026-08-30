@@ -73,7 +73,7 @@ server/
 │   │                            # leaf-first: vault < tasks < ai < review <
 │   │                            # calendar < planning < notifications < agents < chat
 │   ├── ai/                      # Provider clients: ai_service (Ollama + OpenAI-compatible),
-│   │                            # claude_code_provider
+│   │                            # claude_code_provider, codex_api_provider (Responses API)
 │   ├── vault/                   # Obsidian CLI wrapper + write queue, vault context/export,
 │   │                            # file indexing, watcher, durable post-commit outbox
 │   ├── tasks/                   # Todo CRUD, relationships (DAG checks), placement,
@@ -263,10 +263,17 @@ JWT_EXPIRY_HOURS=24
 PIN=123456
 
 # AI Provider
-AI_PROVIDER=ollama                          # "ollama", "openai", or "claude_code"
+AI_PROVIDER=ollama                          # "ollama", "openai", "claude_code", or "codex"
 AI_BASE_URL=http://localhost:11434          # Ollama default
-AI_API_KEY=                                 # Required for OpenAI/Claude
+AI_API_KEY=                                 # Optional gateway bearer token
 AI_MODEL=llama3.2                           # Model name
+
+# Codex via OpenAI Responses API (optional)
+CODEX_API_BASE_URL=https://api.openai.com/v1
+CODEX_API_KEY=                              # OPENAI_API_KEY also works
+CODEX_API_KEY_FILE=                         # Optional protected secret file
+CODEX_MODEL=gpt-5.3-codex
+CODEX_REASONING_EFFORT=medium
 
 # File Uploads
 UPLOAD_DIR=data/uploads                     # Directory for uploaded files

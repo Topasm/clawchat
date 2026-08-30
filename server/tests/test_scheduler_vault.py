@@ -1,6 +1,7 @@
 """Test that vault scan loop respects OBSIDIAN_WATCH_ENABLED setting."""
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,7 +16,20 @@ def _make_scheduler(**overrides):
         session_factory=overrides.get("session_factory", MagicMock()),
         ai_service=overrides.get("ai_service", MagicMock()),
         ws_manager=overrides.get("ws_manager", MagicMock()),
+        app_state=overrides.get("app_state"),
     )
+
+
+def test_scheduler_resolves_the_runtime_ai_provider():
+    openclaw = object()
+    codex = object()
+    state = SimpleNamespace(active_ai=codex)
+
+    scheduler = _make_scheduler(ai_service=openclaw, app_state=state)
+
+    assert scheduler.active_ai is codex
+    del state.active_ai
+    assert scheduler.active_ai is openclaw
 
 
 class TestVaultScanGating:

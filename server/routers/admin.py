@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app_version import APP_VERSION
 from auth.dependencies import get_current_user
-from config import settings
+from config import save_codex_api_key, settings
 from database import get_db
 from exceptions import ValidationError
 from schemas.admin import (
@@ -31,16 +31,60 @@ from schemas.admin import (
     ReindexResponse,
     BackupResponse,
     ClaudeCodeStatusResponse,
+    CodexAPIConfigRequest,
+    CodexAPIStatusResponse,
     AIProviderResponse,
     SwitchProviderRequest,
 )
 from services import admin_service
+from services.ai.codex_api_provider import CodexAPIStatus
 from ws.manager import ws_manager
 from ws.notifications import notify_module_data_changed
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _active_provider_summary(request: Request) -> tuple[str, str, str, bool]:
+    state = request.app.state
+    active_provider = getattr(state, "active_ai_provider", "openclaw")
+    if active_provider == "claude_code":
+        return (
+            active_provider,
+            "claude (via CLI)",
+            "local CLI",
+            getattr(state, "claude_code_status", "") == "available",
+        )
+    if active_provider == "codex":
+        codex = getattr(state, "codex_api", None)
+        return (
+            active_provider,
+            getattr(codex, "model", settings.codex_model),
+            getattr(codex, "base_url", settings.codex_api_base_url),
+            getattr(state, "codex_api_status", "") == "available",
+        )
+    return (
+        "openclaw",
+        settings.ai_model,
+        settings.ai_base_url,
+        getattr(state, "ai_connected", False),
+    )
+
+
+def _provider_response(request: Request) -> AIProviderResponse:
+    state = request.app.state
+    codex = getattr(state, "codex_api", None)
+    return AIProviderResponse(
+        active_provider=getattr(state, "active_ai_provider", "openclaw"),
+        openclaw_connected=getattr(state, "ai_connected", False),
+        claude_code_status=getattr(state, "claude_code_status", "unknown"),
+        claude_code_version=getattr(state, "claude_code_version", None),
+        codex_api_status=getattr(state, "codex_api_status", "not_configured"),
+        codex_api_configured=bool(codex and codex.is_configured),
+        codex_api_key_persistent=bool(settings.codex_api_key_file),
+        codex_model=getattr(codex, "model", settings.codex_model),
+    )
 
 
 # --- Overview ---
@@ -57,16 +101,17 @@ async def get_overview(
 
     scheduler = getattr(request.app.state, "scheduler", None)
 
-    active_provider = getattr(request.app.state, "active_ai_provider", "openclaw")
-    ai_model = "claude (via CLI)" if active_provider == "claude_code" else settings.ai_model
+    active_provider, ai_model, ai_base_url, ai_connected = _active_provider_summary(
+        request
+    )
 
     server = ServerOverview(
         uptime_seconds=admin_service.get_uptime_seconds(),
         version=APP_VERSION,
         ai_backend=active_provider,
         ai_model=ai_model,
-        ai_base_url=settings.ai_base_url if active_provider == "openclaw" else "local CLI",
-        ai_connected=getattr(request.app.state, "ai_connected", False) if active_provider == "openclaw" else getattr(request.app.state, "claude_code_status", "") == "available",
+        ai_base_url=ai_base_url,
+        ai_connected=ai_connected,
         active_ws_connections=len(ws_manager.active_connections),
         scheduler_enabled=settings.enable_scheduler,
         scheduler_running=scheduler is not None,
@@ -87,12 +132,18 @@ async def get_ai_config(
     request: Request,
     _user: str = Depends(get_current_user),
 ):
-    ai_service = request.app.state.ai_service
+    active_provider, model, base_url, _ = _active_provider_summary(request)
+    ai_service = getattr(request.app.state, "active_ai", None) or getattr(
+        request.app.state, "ai_service"
+    )
     connected = await ai_service.health_check()
-    request.app.state.ai_connected = connected
+    if active_provider == "openclaw":
+        request.app.state.ai_connected = connected
+    elif active_provider == "codex":
+        request.app.state.codex_api_status = "available" if connected else "unavailable"
 
     models: list[str] = []
-    if connected:
+    if connected and active_provider == "openclaw":
         try:
             resp = await ai_service.client.get(
                 f"{ai_service.base_url}/v1/models", timeout=5.0
@@ -102,11 +153,13 @@ async def get_ai_config(
                 models = [m["id"] for m in data.get("data", [])]
         except Exception:
             pass
+    elif connected:
+        models = [model]
 
     return AIConfigResponse(
-        backend="openclaw",
-        model=settings.ai_model,
-        base_url=settings.ai_base_url,
+        backend=active_provider,
+        model=model,
+        base_url=base_url,
         connected=connected,
         available_models=models,
     )
@@ -117,12 +170,20 @@ async def test_ai_connection(
     request: Request,
     _user: str = Depends(get_current_user),
 ):
-    ai_service = request.app.state.ai_service
+    active_provider = getattr(request.app.state, "active_ai_provider", "openclaw")
+    ai_service = getattr(request.app.state, "active_ai", None) or getattr(
+        request.app.state, "ai_service"
+    )
     start = time.time()
     try:
         connected = await ai_service.health_check()
         latency = (time.time() - start) * 1000
-        request.app.state.ai_connected = connected
+        if active_provider == "openclaw":
+            request.app.state.ai_connected = connected
+        elif active_provider == "codex":
+            request.app.state.codex_api_status = (
+                "available" if connected else "unavailable"
+            )
         return AITestResponse(
             connected=connected,
             latency_ms=round(latency, 1) if connected else None,
@@ -187,14 +248,27 @@ async def get_server_config(
     _user: str = Depends(get_current_user),
 ):
     db_display = settings.database_url.split("///")[-1] if "///" in settings.database_url else "***"
+    configured_provider = settings.ai_provider
+    if configured_provider in {"codex", "codex_api"}:
+        ai_backend = "codex"
+        ai_base_url = settings.codex_api_base_url
+        ai_model = settings.codex_model
+    elif configured_provider == "claude_code":
+        ai_backend = "claude_code"
+        ai_base_url = "local CLI"
+        ai_model = "claude (via CLI)"
+    else:
+        ai_backend = "openclaw"
+        ai_base_url = settings.ai_base_url
+        ai_model = settings.ai_model
     return ServerConfigResponse(
         host=settings.host,
         port=settings.port,
         database_url=db_display,
         jwt_expiry_hours=settings.jwt_expiry_hours,
-        ai_backend="openclaw",
-        ai_base_url=settings.ai_base_url,
-        ai_model=settings.ai_model,
+        ai_backend=ai_backend,
+        ai_base_url=ai_base_url,
+        ai_model=ai_model,
         upload_dir=settings.upload_dir,
         max_upload_size_mb=settings.max_upload_size_mb,
         allowed_extensions=settings.allowed_extensions,
@@ -265,12 +339,7 @@ async def get_ai_provider(
     _user: str = Depends(get_current_user),
 ):
     """Get current AI provider status and which one is active."""
-    return AIProviderResponse(
-        active_provider=getattr(request.app.state, "active_ai_provider", "openclaw"),
-        openclaw_connected=getattr(request.app.state, "ai_connected", False),
-        claude_code_status=getattr(request.app.state, "claude_code_status", "unknown"),
-        claude_code_version=getattr(request.app.state, "claude_code_version", None),
-    )
+    return _provider_response(request)
 
 
 @router.post("/ai/provider", response_model=AIProviderResponse)
@@ -280,8 +349,11 @@ async def switch_ai_provider(
     _user: str = Depends(get_current_user),
 ):
     """Switch between AI providers at runtime."""
-    if body.provider not in ("openclaw", "claude_code"):
-        raise ValidationError(f"Invalid provider: {body.provider}. Use 'openclaw' or 'claude_code'.")
+    if body.provider not in ("openclaw", "claude_code", "codex"):
+        raise ValidationError(
+            f"Invalid provider: {body.provider}. "
+            "Use 'openclaw', 'claude_code', or 'codex'."
+        )
 
     if body.provider == "claude_code":
         claude_code = getattr(request.app.state, "claude_code", None)
@@ -300,16 +372,99 @@ async def switch_ai_provider(
         request.app.state.active_ai = claude_code
         request.app.state.active_ai_provider = "claude_code"
         logger.info("Switched active AI provider to Claude Code")
+    elif body.provider == "codex":
+        codex_api = getattr(request.app.state, "codex_api", None)
+        if not codex_api:
+            raise ValidationError("Codex API provider not initialized.")
+        status = await codex_api.check_availability()
+        request.app.state.codex_api_status = status.value
+        if status != CodexAPIStatus.AVAILABLE:
+            if status == CodexAPIStatus.NOT_CONFIGURED:
+                message = "Configure an OpenAI API key before using Codex."
+            elif status == CodexAPIStatus.AUTHENTICATION_FAILED:
+                message = "The configured OpenAI API key was rejected."
+            else:
+                message = "The Codex API or configured model is unavailable."
+            raise ValidationError(message)
+        request.app.state.active_ai = codex_api
+        request.app.state.active_ai_provider = "codex"
+        logger.info("Switched active AI provider to Codex API (%s)", codex_api.model)
     else:
         request.app.state.active_ai = request.app.state.ai_service
         request.app.state.active_ai_provider = "openclaw"
         logger.info("Switched active AI provider to OpenClaw")
 
-    return AIProviderResponse(
-        active_provider=request.app.state.active_ai_provider,
-        openclaw_connected=getattr(request.app.state, "ai_connected", False),
-        claude_code_status=getattr(request.app.state, "claude_code_status", "unknown"),
-        claude_code_version=getattr(request.app.state, "claude_code_version", None),
+    return _provider_response(request)
+
+
+@router.put("/ai/codex", response_model=AIProviderResponse)
+async def configure_codex_api(
+    body: CodexAPIConfigRequest,
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Validate, securely persist when possible, and activate a Codex API key."""
+    codex_api = getattr(request.app.state, "codex_api", None)
+    if not codex_api:
+        raise ValidationError("Codex API provider not initialized.")
+
+    api_key = body.api_key.get_secret_value().strip()
+    if len(api_key) < 32:
+        raise ValidationError("OpenAI API key is empty or too short.")
+
+    previous_key = codex_api.api_key
+    previous_status = getattr(
+        request.app.state, "codex_api_status", CodexAPIStatus.NOT_CONFIGURED.value
+    )
+    codex_api.set_api_key(api_key)
+    status = await codex_api.check_availability()
+    if status != CodexAPIStatus.AVAILABLE:
+        codex_api.set_api_key(previous_key)
+        request.app.state.codex_api_status = previous_status
+        if status == CodexAPIStatus.AUTHENTICATION_FAILED:
+            raise ValidationError("OpenAI rejected this API key.")
+        raise ValidationError(
+            "Could not access the configured Codex model. Check the network and model access."
+        )
+
+    if settings.codex_api_key_file:
+        try:
+            save_codex_api_key(settings.codex_api_key_file, api_key)
+        except (OSError, ValueError):
+            codex_api.set_api_key(previous_key)
+            request.app.state.codex_api_status = previous_status
+            logger.exception("Could not persist the Codex API key")
+            raise ValidationError("Could not securely save the OpenAI API key.")
+
+    settings.codex_api_key = api_key
+    request.app.state.codex_api_status = CodexAPIStatus.AVAILABLE.value
+    request.app.state.active_ai = codex_api
+    request.app.state.active_ai_provider = "codex"
+    logger.info(
+        "Configured and activated Codex API (%s, persistent=%s)",
+        codex_api.model,
+        bool(settings.codex_api_key_file),
+    )
+    return _provider_response(request)
+
+
+@router.post("/ai/codex/check", response_model=CodexAPIStatusResponse)
+async def recheck_codex_api(
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Re-check OpenAI credentials and access to the configured Codex model."""
+    codex_api = getattr(request.app.state, "codex_api", None)
+    if not codex_api:
+        raise ValidationError("Codex API provider not initialized.")
+    status = await codex_api.check_availability()
+    request.app.state.codex_api_status = status.value
+    return CodexAPIStatusResponse(
+        status=status.value,
+        configured=codex_api.is_configured,
+        model=codex_api.model,
+        active=getattr(request.app.state, "active_ai_provider", "openclaw")
+        == "codex",
     )
 
 

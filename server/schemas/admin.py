@@ -1,6 +1,6 @@
 """Admin dashboard schemas."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 
 # --- Server Overview ---
@@ -160,7 +160,7 @@ class BackupResponse(BaseModel):
     size_bytes: int
 
 
-# --- Claude Code / AI Provider ---
+# --- AI Providers ---
 
 
 class ClaudeCodeStatusResponse(BaseModel):
@@ -169,12 +169,28 @@ class ClaudeCodeStatusResponse(BaseModel):
     active: bool  # True if Claude Code is the current active provider
 
 
+class CodexAPIStatusResponse(BaseModel):
+    status: str  # available, not_configured, authentication_failed, unavailable
+    configured: bool
+    model: str
+    active: bool
+
+
+class CodexAPIConfigRequest(BaseModel):
+    # SecretStr keeps validation errors and debug representations redacted.
+    api_key: SecretStr
+
+
 class AIProviderResponse(BaseModel):
-    active_provider: str  # "openclaw" or "claude_code"
+    active_provider: str  # "openclaw", "claude_code", or "codex"
     openclaw_connected: bool
     claude_code_status: str
     claude_code_version: str | None = None
+    codex_api_status: str
+    codex_api_configured: bool
+    codex_api_key_persistent: bool
+    codex_model: str
 
 
 class SwitchProviderRequest(BaseModel):
-    provider: str  # "openclaw" or "claude_code"
+    provider: str  # "openclaw", "claude_code", or "codex"

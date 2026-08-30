@@ -35,6 +35,7 @@ from services.ai.claude_code_provider import (
     ClaudeCodeProvider,
     ClaudeCodeStatus,
 )
+from services.ai.codex_api_provider import CodexAPIProvider, CodexAPIStatus
 from services.chat.orchestrator import Orchestrator
 from services.scheduler import Scheduler
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,6 +92,12 @@ async def lifespan(app: FastAPI):
         return await ai_service.health_check()
 
     claude_code = ClaudeCodeProvider()
+    codex_api = CodexAPIProvider(
+        api_key=settings.codex_api_key,
+        model=settings.codex_model,
+        base_url=settings.codex_api_base_url,
+        reasoning_effort=settings.codex_reasoning_effort,
+    )
 
     async def _check_claude_code():
         # check_availability() already runs the CLI probe through asyncio.to_thread
@@ -98,6 +105,13 @@ async def lifespan(app: FastAPI):
         # event loop for up to 10s during startup.
         status, version = await claude_code.check_availability()
         return status, version
+
+    async def _check_codex_api() -> tuple[CodexAPIStatus, str]:
+        # Keep the credential snapshot private, but return it so a startup
+        # result cannot overwrite a key the user configured while the other
+        # optional provider probes were still running.
+        credential_snapshot = codex_api.api_key
+        return await codex_api.check_availability(), credential_snapshot
 
     async def _init_vault():
         if settings.obsidian_vault_path:
@@ -133,22 +147,47 @@ async def lifespan(app: FastAPI):
     app.state.claude_code = claude_code
     app.state.claude_code_status = "checking"
     app.state.claude_code_version = None
+    app.state.codex_api = codex_api
+    app.state.codex_api_status = (
+        "checking" if codex_api.is_configured else CodexAPIStatus.NOT_CONFIGURED.value
+    )
     app.state.active_ai = ai_service
     app.state.active_ai_provider = "openclaw"
 
     async def _probe_optional_ai() -> None:
         try:
-            ai_connected, (claude_code_status, claude_code_version) = await asyncio.gather(
-                _check_ai(), _check_claude_code()
+            (
+                ai_connected,
+                (claude_code_status, claude_code_version),
+                (codex_api_status, codex_credential_snapshot),
+            ) = await asyncio.gather(
+                _check_ai(),
+                _check_claude_code(),
+                _check_codex_api(),
             )
             app.state.ai_connected = ai_connected
             app.state.claude_code_status = claude_code_status.value
             app.state.claude_code_version = claude_code_version
+            codex_probe_is_current = (
+                codex_api.api_key == codex_credential_snapshot
+            )
+            if codex_probe_is_current:
+                app.state.codex_api_status = codex_api_status.value
             logger.info(
                 "Claude Code status: %s, version: %s",
                 claude_code_status.value,
                 claude_code_version,
             )
+            if codex_probe_is_current:
+                logger.info(
+                    "Codex API status: %s, model: %s",
+                    codex_api_status.value,
+                    codex_api.model,
+                )
+            else:
+                logger.info(
+                    "Discarded stale Codex API startup probe after configuration changed"
+                )
             if (
                 settings.ai_provider == "claude_code"
                 and claude_code_status == ClaudeCodeStatus.AVAILABLE
@@ -160,6 +199,22 @@ async def lifespan(app: FastAPI):
                 logger.warning(
                     "ai_provider=claude_code but CLI is %s — falling back to OpenClaw",
                     claude_code_status.value,
+                )
+            elif (
+                settings.ai_provider in {"codex", "codex_api"}
+                and codex_probe_is_current
+                and codex_api_status == CodexAPIStatus.AVAILABLE
+            ):
+                app.state.active_ai = codex_api
+                app.state.active_ai_provider = "codex"
+                logger.info("Active AI provider: Codex API (%s)", codex_api.model)
+            elif (
+                settings.ai_provider in {"codex", "codex_api"}
+                and codex_probe_is_current
+            ):
+                logger.warning(
+                    "ai_provider=codex but the API is %s — falling back to OpenClaw",
+                    codex_api_status.value,
                 )
         except asyncio.CancelledError:
             raise
@@ -196,6 +251,7 @@ async def lifespan(app: FastAPI):
             ai_service=ai_service,
             ws_manager=ws_manager,
             push_service=push_service,
+            app_state=app.state,
         )
         scheduler.start()
         app.state.scheduler = scheduler
@@ -257,6 +313,7 @@ async def lifespan(app: FastAPI):
             await app.state.ai_probe_task
 
     await ai_service.close()
+    await codex_api.close()
 
 
 app = FastAPI(title="ClawChat Server", version=APP_VERSION, lifespan=lifespan)
@@ -337,13 +394,16 @@ async def health(db: AsyncSession = Depends(get_db)):
     ai_connected = getattr(app.state, "ai_connected", False)
     active_provider = getattr(app.state, "active_ai_provider", "openclaw")
     claude_code_status = getattr(app.state, "claude_code_status", "unknown")
-    # If Claude Code is the active provider, consider AI connected when CLI is available
-    effective_connected = (
-        ai_connected if active_provider == "openclaw"
-        else claude_code_status == "available"
-    )
-    # Show the actual model name based on active provider
-    ai_model = "claude (via CLI)" if active_provider == "claude_code" else settings.ai_model
+    codex_api_status = getattr(app.state, "codex_api_status", "unknown")
+    if active_provider == "claude_code":
+        effective_connected = claude_code_status == "available"
+        ai_model = "claude (via CLI)"
+    elif active_provider == "codex":
+        effective_connected = codex_api_status == "available"
+        ai_model = settings.codex_model
+    else:
+        effective_connected = ai_connected
+        ai_model = settings.ai_model
     return {
         # The desktop shell uses this marker before reusing a process that is
         # already listening on its configured port. A generic HTTP 200 is not
@@ -359,4 +419,6 @@ async def health(db: AsyncSession = Depends(get_db)):
         "ai_connected": effective_connected,
         "claude_code_status": claude_code_status,
         "claude_code_version": getattr(app.state, "claude_code_version", None),
+        "codex_api_status": codex_api_status,
+        "codex_model": settings.codex_model,
     }

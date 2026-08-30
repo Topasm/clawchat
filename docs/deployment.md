@@ -74,6 +74,22 @@ docker compose exec ollama ollama pull llama3.2
 
 Set `AI_PROVIDER=ollama` and `AI_BASE_URL=http://ollama:11434` in `.env`.
 
+### Codex API
+
+Codex uses OpenAI's Responses API rather than the OpenAI-compatible gateway
+configured by `AI_BASE_URL`. To select it at startup:
+
+```bash
+AI_PROVIDER=codex
+CODEX_API_KEY=your-openai-api-key
+CODEX_MODEL=gpt-5.3-codex
+```
+
+`OPENAI_API_KEY` can be used instead of `CODEX_API_KEY`. In the desktop app,
+you can also enter the key under **Workspace Settings → AI → OpenAI API key**;
+ClawChat validates the credential before saving it to the protected app-data
+credential file.
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -85,10 +101,15 @@ Set `AI_PROVIDER=ollama` and `AI_BASE_URL=http://ollama:11434` in `.env`.
 | `JWT_SECRET` | *(required)* | Secret key for JWT token signing |
 | `JWT_EXPIRY_HOURS` | `24` | JWT token expiration time |
 | `PIN` | *(required)* | User PIN for authentication |
-| `AI_PROVIDER` | `ollama` | AI provider: `ollama` or `openai` |
+| `AI_PROVIDER` | `ollama` | AI provider: `ollama`, `openai`, `claude_code`, or `codex` |
 | `AI_BASE_URL` | `http://localhost:11434` | AI provider API base URL |
-| `AI_API_KEY` | *(empty)* | API key (required for OpenAI/Claude) |
+| `AI_API_KEY` | *(empty)* | Optional bearer token for the OpenAI-compatible gateway |
 | `AI_MODEL` | `llama3.2` | Model name to use |
+| `CODEX_API_BASE_URL` | `https://api.openai.com/v1` | OpenAI Responses API base URL |
+| `CODEX_API_KEY` | *(empty)* | OpenAI API key for Codex; falls back to `OPENAI_API_KEY` |
+| `CODEX_API_KEY_FILE` | *(empty)* | Optional owner-only file used to persist the Codex API key |
+| `CODEX_MODEL` | `gpt-5.3-codex` | Codex model used for chat, planning, and tool calls |
+| `CODEX_REASONING_EFFORT` | `medium` | Codex reasoning effort: `low`, `medium`, `high`, or `xhigh` |
 | `PASEO_ENABLED` | `false` | Enable the optional Paseo execution adapter |
 | `PASEO_CLI_COMMAND` | `paseo` | Official Paseo CLI command available to the server process |
 | `PASEO_HOST` | *(empty)* | Optional daemon target; supports host:port or an E2EE offer URL |

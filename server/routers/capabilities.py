@@ -23,12 +23,19 @@ async def get_capabilities(
     active_provider = getattr(request.app.state, "active_ai_provider", None)
     ai_connected = getattr(request.app.state, "ai_connected", False)
 
-    # For claude_code provider, check CLI status instead
+    # Provider-specific readiness is tracked independently so a failed optional
+    # backend does not mark the core local workspace unhealthy.
     if active_provider == "claude_code":
         ai_available = (
             getattr(request.app.state, "claude_code_status", "") == "available"
         )
         ai_model = "claude (via CLI)"
+    elif active_provider == "codex":
+        ai_available = (
+            getattr(request.app.state, "codex_api_status", "") == "available"
+        )
+        codex_api = getattr(request.app.state, "codex_api", None)
+        ai_model = getattr(codex_api, "model", settings.codex_model)
     else:
         ai_available = ai_connected
         ai_model = settings.ai_model

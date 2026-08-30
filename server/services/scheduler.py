@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, time, timedelta, timezone
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -67,12 +68,20 @@ class Scheduler:
         ai_service: AIService,
         ws_manager: ConnectionManager,
         push_service=None,
+        app_state: Any | None = None,
     ):
         self.session_factory = session_factory
         self.ai_service = ai_service
+        self.app_state = app_state
         self.ws_manager = ws_manager
         self.push_service = push_service
         self._tasks: list[asyncio.Task] = []
+
+    @property
+    def active_ai(self):
+        if self.app_state is not None:
+            return getattr(self.app_state, "active_ai", self.ai_service)
+        return self.ai_service
 
     def start(self) -> None:
         self._tasks = [
@@ -157,7 +166,7 @@ class Scheduler:
                 try:
                     async with self.session_factory() as db:
                         content = await briefing_service.generate_briefing(
-                            db, self.ai_service
+                            db, self.active_ai
                         )
                         await self.ws_manager.send_json(DEFAULT_USER_ID, {
                             "type": "daily_briefing",
@@ -228,7 +237,7 @@ class Scheduler:
                 try:
                     async with self.session_factory() as db:
                         review = await weekly_review_service.generate_weekly_review(
-                            db, self.ai_service
+                            db, self.active_ai
                         )
                         await self.ws_manager.send_json(DEFAULT_USER_ID, {
                             "type": "weekly_review",
@@ -259,7 +268,7 @@ class Scheduler:
                             candidates = await nudge_service.find_nudge_candidates(db)
                             if candidates:
                                 nudge = await nudge_service.generate_nudge(
-                                    candidates, self.ai_service
+                                    candidates, self.active_ai
                                 )
                                 if nudge:
                                     await self.ws_manager.send_json(DEFAULT_USER_ID, {
