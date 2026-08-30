@@ -29,10 +29,16 @@ function installMatchMedia(matches: boolean) {
   };
 }
 
-async function loadHook(isDesktop: boolean) {
+async function loadHook(isDesktop: boolean, desktopOS: 'macos' | 'windows' | 'linux' = 'macos') {
   vi.resetModules();
   vi.doMock('../../platform', () => ({
-    platformApi: { runtime: { kind: isDesktop ? 'tauri' : 'web', isDesktop } },
+    platformApi: {
+      runtime: {
+        kind: isDesktop ? 'tauri' : 'web',
+        os: isDesktop ? desktopOS : 'web',
+        isDesktop,
+      },
+    },
   }));
   return (await import('../usePlatform')).default;
 }
@@ -96,6 +102,19 @@ describe('usePlatform', () => {
     const { result } = renderHook(() => usePlatform());
     expect(result.current.isMobile).toBe(false);
     expect(result.current.isDesktop).toBe(true);
+  });
+
+  it.each([
+    ['macos', 'isMac'],
+    ['windows', 'isWindows'],
+    ['linux', 'isLinux'],
+  ] as const)('reports the real %s desktop target', async (desktopOS, flag) => {
+    installMatchMedia(false);
+    const usePlatform = await loadHook(true, desktopOS);
+
+    const { result } = renderHook(() => usePlatform());
+    expect(result.current.desktopOS).toBe(desktopOS);
+    expect(result.current[flag]).toBe(true);
   });
 
   it('falls back to the desktop shell where matchMedia is unavailable', async () => {

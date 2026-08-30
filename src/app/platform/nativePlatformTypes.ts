@@ -1,8 +1,11 @@
 export type AppMode = 'client' | 'host';
 
 export type NativeRuntimeKind = 'web' | 'tauri';
+export type DesktopOS = 'macos' | 'windows' | 'linux';
+export type NativeOS = DesktopOS | 'web';
 
-export type NativeEventChannel = 'open-quick-capture' | 'notification:action' | 'navigate';
+export type NativeEventChannel =
+  'open-quick-capture' | 'open-settings' | 'notification:action' | 'navigate';
 
 export interface UpdateInfo {
   version: string;
@@ -107,7 +110,7 @@ export interface NativeSystemApi {
 export interface NativePlatformApi {
   runtime: {
     kind: NativeRuntimeKind;
-    os: string;
+    os: NativeOS;
     appVersion: string;
     isDesktop: boolean;
   };

@@ -6,7 +6,7 @@ interface SettingsRowProps {
 
 export default function SettingsRow({ label, sublabel, children }: SettingsRowProps) {
   return (
-    <div className="cc-settings-row">
+    <div className="cc-settings-row cc-property-row">
       <div>
         <div className="cc-settings-row__label">{label}</div>
         {sublabel && <div className="cc-settings-row__sublabel">{sublabel}</div>}

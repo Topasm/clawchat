@@ -49,7 +49,7 @@ pub fn run() {
     let application = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(
             |app, _arguments, _cwd| {
-                native::show_main_window(app);
+                native::restore_main_window(app, "second instance");
             },
         ))
         .plugin(tauri_plugin_dialog::init())
@@ -58,6 +58,22 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                #[cfg(target_os = "macos")]
+                if window.label() == "main" {
+                    api.prevent_close();
+                    match window.hide() {
+                        Ok(()) => startup_log::report(
+                            "[clawchat] main window hidden after macOS close request",
+                        ),
+                        Err(error) => startup_log::report(&format!(
+                            "[clawchat] failed to hide main window after macOS close request: {error}"
+                        )),
+                    }
+                    return;
+                }
+
+                #[cfg(not(target_os = "macos"))]
+                {
                 let keep_running = window
                     .try_state::<AppState>()
                     .and_then(|state| state.config().ok())
@@ -68,6 +84,7 @@ pub fn run() {
                     let _ = window.hide();
                 } else {
                     window.app_handle().exit(0);
+                }
                 }
             }
         })
@@ -155,6 +172,13 @@ pub fn run() {
                     ));
                 }
             }
+        }
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen { .. } => {
+            native::restore_main_window(app_handle, "macOS Dock reopen");
+        }
+        tauri::RunEvent::ExitRequested { .. } => {
+            startup_log::report("[clawchat] application quit requested");
         }
         tauri::RunEvent::Exit => {
             if let Some(state) = app_handle.try_state::<AppState>() {

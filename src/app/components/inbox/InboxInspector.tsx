@@ -61,7 +61,7 @@ export default function InboxInspector({
   onNavigate,
 }: InboxInspectorProps) {
   return (
-    <aside className="cc-inbox-triage__inspector" aria-label="Selected task">
+    <aside className="cc-inbox-triage__inspector cc-pane" aria-label="Selected task">
       {task ? (
         <>
           <span>Selected task</span>

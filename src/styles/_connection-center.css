@@ -51,8 +51,10 @@
   gap: 1px;
   overflow: hidden;
   margin: 0;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
+  border: 0;
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
   background: var(--cc-border);
 }
 
@@ -77,7 +79,7 @@
 .cc-diagnostics-error {
   margin-top: 12px;
   padding: 12px;
-  border-radius: var(--cc-radius-sm);
+  border-radius: var(--cc-radius-row);
   color: var(--cc-error);
   background: color-mix(in srgb, var(--cc-error) 10%, transparent);
   font-size: 12px;

@@ -343,7 +343,7 @@ export default function WorkspaceConnectionsSection() {
 
   return (
     <SettingsSection title="Workspaces & Connections">
-      <div className="cc-workspace-card">
+      <div className="cc-workspace-card cc-list-row">
         <div className="cc-workspace-card__body">
           <div className="cc-workspace-card__heading">
             <span className="cc-workspace-card__name">This device</span>
@@ -372,7 +372,7 @@ export default function WorkspaceConnectionsSection() {
       </div>
 
       {remoteProfiles.map((profile) => (
-        <div className="cc-workspace-card" key={profile.id}>
+        <div className="cc-workspace-card cc-list-row" key={profile.id}>
           <div className="cc-workspace-card__body">
             <div className="cc-workspace-card__heading">
               <span className="cc-workspace-card__name">{profile.name}</span>
@@ -462,7 +462,7 @@ export default function WorkspaceConnectionsSection() {
 
       {runtimeConfig && (
         <>
-          <div className="cc-workspace-preference">
+          <div className="cc-workspace-preference cc-property-row">
             <div>
               <div className="cc-workspace-card__name">Local server</div>
               <div className="cc-workspace-card__description">
@@ -476,7 +476,7 @@ export default function WorkspaceConnectionsSection() {
               onChange={(enabled) => void updateLocalLifecycle({ localServerEnabled: enabled })}
             />
           </div>
-          <div className="cc-workspace-preference">
+          <div className="cc-workspace-preference cc-property-row">
             <div>
               <div className="cc-workspace-card__name">Keep available in tray</div>
               <div className="cc-workspace-card__description">
@@ -490,7 +490,7 @@ export default function WorkspaceConnectionsSection() {
               onChange={(enabled) => void updateLocalLifecycle({ keepRunningInTray: enabled })}
             />
           </div>
-          <div className="cc-workspace-preference">
+          <div className="cc-workspace-preference cc-property-row">
             <div>
               <div className="cc-workspace-card__name">Allow local network access</div>
               <div className="cc-workspace-card__description">
@@ -505,7 +505,7 @@ export default function WorkspaceConnectionsSection() {
               onChange={(enabled) => void saveLocalSecurity(enabled)}
             />
           </div>
-          <div className="cc-workspace-preference">
+          <div className="cc-workspace-preference cc-property-row">
             <label>
               <span className="cc-workspace-card__name">Local network PIN</span>
               <input
@@ -535,7 +535,7 @@ export default function WorkspaceConnectionsSection() {
               {savingLocalSecurity ? 'Saving…' : 'Save PIN'}
             </button>
           </div>
-          <div className="cc-workspace-preference">
+          <div className="cc-workspace-preference cc-property-row">
             <label>
               <span className="cc-workspace-card__name">Local server port</span>
               <span className="cc-workspace-card__description">
@@ -560,7 +560,7 @@ export default function WorkspaceConnectionsSection() {
               Save port
             </button>
           </div>
-          <div className="cc-workspace-preference">
+          <div className="cc-workspace-preference cc-property-row">
             <div>
               <div className="cc-workspace-card__name">Open at system login</div>
               <div className="cc-workspace-card__description">

@@ -53,7 +53,7 @@ export default function InboxTriageTree({
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
 
   return (
-    <section className="cc-inbox-tree" aria-label="Project work tree">
+    <section className="cc-inbox-tree cc-pane" aria-label="Project work tree">
       <header className="cc-inbox-tree__header">
         <div>
           <strong>Project / Work Tree</strong>
@@ -195,7 +195,7 @@ function TreeNode({
   return (
     <div className="cc-inbox-tree__branch">
       <div
-        className="cc-inbox-tree__insert"
+        className="cc-inbox-tree__insert cc-insertion-target"
         style={{ marginLeft: depth * 18 }}
         onDragOver={(event) => {
           if (!disabled && acceptsPlacementDrag(event)) event.preventDefault();

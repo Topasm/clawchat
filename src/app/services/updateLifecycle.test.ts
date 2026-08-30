@@ -6,32 +6,41 @@ const updaterMock = vi.hoisted(() => ({
   installUpdate: vi.fn<() => Promise<void>>(),
   availableListener: null as ((info: { version: string; releaseNotes?: string }) => void) | null,
   notAvailableListener: null as (() => void) | null,
-  progressListener: null as ((progress: { downloadedBytes: number; totalBytes?: number; percent?: number }) => void) | null,
+  progressListener: null as
+    ((progress: { downloadedBytes: number; totalBytes?: number; percent?: number }) => void) | null,
   downloadedListener: null as (() => void) | null,
 }));
 
 vi.mock('../platform', () => ({
   platformApi: {
-    runtime: { kind: 'tauri', os: 'desktop', appVersion: '0.1.0', isDesktop: true },
+    runtime: { kind: 'tauri', os: 'macos', appVersion: '0.1.0', isDesktop: true },
     updater: {
       checkForUpdates: updaterMock.checkForUpdates,
       downloadUpdate: updaterMock.downloadUpdate,
       installUpdate: updaterMock.installUpdate,
       onUpdateAvailable: (callback: typeof updaterMock.availableListener) => {
         updaterMock.availableListener = callback;
-        return () => { updaterMock.availableListener = null; };
+        return () => {
+          updaterMock.availableListener = null;
+        };
       },
       onUpdateNotAvailable: (callback: typeof updaterMock.notAvailableListener) => {
         updaterMock.notAvailableListener = callback;
-        return () => { updaterMock.notAvailableListener = null; };
+        return () => {
+          updaterMock.notAvailableListener = null;
+        };
       },
       onDownloadProgress: (callback: typeof updaterMock.progressListener) => {
         updaterMock.progressListener = callback;
-        return () => { updaterMock.progressListener = null; };
+        return () => {
+          updaterMock.progressListener = null;
+        };
       },
       onUpdateDownloaded: (callback: typeof updaterMock.downloadedListener) => {
         updaterMock.downloadedListener = callback;
-        return () => { updaterMock.downloadedListener = null; };
+        return () => {
+          updaterMock.downloadedListener = null;
+        };
       },
     },
   },
@@ -68,9 +77,11 @@ describe('updateLifecycle', () => {
 
   it('upgrades an in-flight automatic check when the user checks manually', async () => {
     let resolveCheck: (value: null) => void = () => {};
-    updaterMock.checkForUpdates.mockReturnValue(new Promise((resolve) => {
-      resolveCheck = resolve;
-    }));
+    updaterMock.checkForUpdates.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCheck = resolve;
+      }),
+    );
 
     const automaticRequest = checkForAppUpdate(false);
     const manualRequest = checkForAppUpdate(true);

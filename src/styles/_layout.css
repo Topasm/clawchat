@@ -165,6 +165,13 @@
   opacity: 0.85;
 }
 
+.cc-nav-item--utility {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
 .cc-nav-item--active {
   color: var(--cc-primary);
   background: color-mix(in srgb, var(--cc-primary) 10%, var(--cc-surface));
@@ -230,6 +237,11 @@
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--cc-disabled);
+}
+
+.cc-connection-status__ai {
+  color: var(--cc-text-tertiary);
+  font-weight: 400;
 }
 
 .cc-connection-status--connected .cc-connection-status__dot {

@@ -6,7 +6,7 @@
   },
   "src/app/components/Layout.tsx": {
     "@typescript-eslint/no-unused-vars": {
-      "count": 2
+      "count": 1
     }
   },
   "src/app/components/chat-panel/ChatPanelMessages.tsx": {

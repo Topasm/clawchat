@@ -61,6 +61,12 @@ test('preview and release workflows launch the packaged macOS app', () => {
   assert.match(smokeScript, /port_blocker_pid/);
   assert.match(smokeScript, /reused the occupied default port/);
   assert.match(smokeScript, /::error title=macOS app startup smoke failed/);
+  assert.match(smokeScript, /AXMinimized/);
+  assert.match(smokeScript, /perform action "AXClose"/);
+  assert.match(smokeScript, /main window restore requested by macOS Dock reopen/);
+  assert.match(smokeScript, /main window hidden after macOS close request/);
+  assert.match(smokeScript, /keystroke "," using command down/);
+  assert.match(smokeScript, /main window restore requested by macOS Settings menu/);
 });
 
 test('preview and release workflows launch and terminate the packaged Linux app', () => {

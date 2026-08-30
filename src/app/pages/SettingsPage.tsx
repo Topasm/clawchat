@@ -210,7 +210,7 @@ export default function SettingsPage() {
             >
               <div className="cc-settings-inline-actions">
                 <span
-                  className={`cc-settings-status-dot cc-settings-status-dot--${
+                  className={`cc-status-dot cc-settings-status-dot cc-settings-status-dot--${
                     aiProvider.claude_code_status === 'available' ? 'success' : 'muted'
                   }`}
                   aria-hidden="true"

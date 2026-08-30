@@ -31,7 +31,6 @@ import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { HealthResponse } from '../types/api';
-import { platformApi } from '../platform';
 import type { ColorPalette } from '../config/theme';
 
 // --- SVG icon components ---
@@ -101,17 +100,17 @@ const primaryNavItems = [
 ];
 
 const secondaryNavItems = [
-  { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
-  { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
   { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
-  { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
+  { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
+  { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
   { to: '/calendar', labelKey: 'nav.calendar', Icon: NavCalendarIcon },
+];
+
+const utilityNavItems = [
+  { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings', labelKey: 'nav.settings', Icon: GearIcon },
   { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },
 ];
-
-// Flat list for backward compatibility (used in swipe navigation, etc.)
-const navItems = [...primaryNavItems, ...secondaryNavItems];
 
 export default function Layout() {
   const { t } = useTranslation();
@@ -122,7 +121,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const chatPanel = useChatPanel();
   const commandPalette = useCommandPalette();
-  const { isMobile } = usePlatform();
+  const { isMobile, isMac } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -143,13 +142,18 @@ export default function Layout() {
   }, [capabilities]);
 
   const filteredSecondaryNavItems = useMemo(() => {
-    if (!capabilities) return secondaryNavItems;
     return secondaryNavItems.filter((item) => {
+      if (!capabilities) return true;
       // Hide obsidian-related items when obsidian is not configured
       // (Currently no dedicated obsidian nav item, but future-proof)
       return true;
     });
   }, [capabilities]);
+
+  const filteredUtilityNavItems = useMemo(
+    () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings')),
+    [isMac],
+  );
 
   // Widget deep-link navigation
   useEffect(() => {
@@ -159,14 +163,6 @@ export default function Layout() {
     window.addEventListener('navigate', handler);
     return () => window.removeEventListener('navigate', handler);
   }, [navigate]);
-
-  // Desktop: global shortcut opens quick capture (Cmd/Ctrl+Shift+Space)
-  useEffect(() => {
-    if (!platformApi.runtime.isDesktop) return;
-    return platformApi.events.on('open-quick-capture', () => {
-      quickCapture.open();
-    });
-  }, [quickCapture]);
 
   // Web: keyboard shortcut 'Q' opens quick capture (when no input is focused)
   useEffect(() => {
@@ -317,11 +313,11 @@ export default function Layout() {
       <button
         type="button"
         className={`cc-connection-status cc-connection-status--${connectionStatus}`}
-        title={`${activeWorkspaceName} · ${connectionLabel}`}
+        title={`${activeWorkspaceName} · ${connectionLabel}${healthData ? ` · AI: ${healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}` : ''}`}
         aria-label={`Switch workspace. Current: ${activeWorkspaceName}`}
         onClick={() => navigate('/connections')}
       >
-        <span className="cc-connection-status__dot" />
+        <span className="cc-status-dot cc-connection-status__dot" />
         <span className="cc-sidebar__label">
           {activeWorkspaceName} · {connectionLabel}
           {pendingCount > 0 && (
@@ -332,18 +328,13 @@ export default function Layout() {
               {pendingCount}
             </span>
           )}
+          {healthData && (
+            <span className="cc-connection-status__ai">
+              {' · '}AI: {healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}
+            </span>
+          )}
         </span>
       </button>
-      {healthData && (
-        <div
-          className={`cc-health-status cc-health-status--${healthData.ai_connected ? 'ok' : 'degraded'}`}
-        >
-          <span className="cc-health-status__dot" />
-          <span className="cc-sidebar__label">
-            AI: {healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}
-          </span>
-        </div>
-      )}
       {filteredPrimaryNavItems.map((item) => (
         <NavLink
           key={item.to}
@@ -376,6 +367,19 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />
+      {filteredUtilityNavItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) =>
+            `cc-nav-item cc-nav-item--utility${isActive ? ' cc-nav-item--active' : ''}`
+          }
+          title={sidebarCollapsed ? t(item.labelKey) : undefined}
+        >
+          <item.Icon />
+          <span className="cc-sidebar__label">{t(item.labelKey)}</span>
+        </NavLink>
+      ))}
     </nav>
   );
 

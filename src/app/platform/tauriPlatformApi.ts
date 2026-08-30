@@ -27,6 +27,7 @@ function subscribe<T>(eventName: string, callback: (payload: T) => void): () => 
 
 const eventNames: Record<NativeEventChannel, string> = {
   'open-quick-capture': TAURI_EVENTS.quickCapture,
+  'open-settings': TAURI_EVENTS.openSettings,
   'notification:action': TAURI_EVENTS.notificationAction,
   navigate: TAURI_EVENTS.navigate,
 };
@@ -34,7 +35,7 @@ const eventNames: Record<NativeEventChannel, string> = {
 export const tauriPlatformApi: NativePlatformApi = {
   runtime: {
     kind: 'tauri',
-    os: 'desktop',
+    os: __TAURI_DESKTOP_OS__,
     appVersion: __APP_VERSION__,
     isDesktop: true,
   },

@@ -9,6 +9,7 @@
 @import './_variables.css';
 @import './_layout.css';
 @import './_components.css';
+@import './_workspace-primitives.css';
 @import './_chat.css';
 @import './_settings.css';
 @import './_page-header.css';

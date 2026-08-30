@@ -1,0 +1,54 @@
+/* Flat workspace primitives. Content surfaces use dividers and state tints;
+   elevation is reserved for overlays and active drag affordances. */
+.cc-pane {
+  min-width: 0;
+  border-radius: var(--cc-radius-panel);
+  box-shadow: var(--cc-shadow-content);
+}
+
+.cc-pane-section {
+  border-radius: var(--cc-radius-panel);
+  box-shadow: var(--cc-shadow-content);
+}
+
+.cc-section-header {
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cc-list-row,
+.cc-property-row {
+  border-radius: var(--cc-radius-row);
+  box-shadow: var(--cc-shadow-content);
+  transition: background var(--cc-transition-fast);
+}
+
+.cc-list-row:hover,
+.cc-property-row:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: var(--cc-radius-pill);
+}
+
+.cc-insertion-target {
+  min-height: 2px;
+  border-radius: var(--cc-radius-panel);
+  transition:
+    background var(--cc-transition-fast),
+    box-shadow var(--cc-transition-fast);
+}
+
+.cc-insertion-target:hover,
+.cc-insertion-target:focus-visible {
+  background: var(--cc-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cc-primary) 16%, transparent);
+}

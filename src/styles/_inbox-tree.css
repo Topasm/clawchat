@@ -31,19 +31,21 @@
 
 .cc-inbox-tree__projects {
   display: grid;
-  gap: 10px;
-  padding: 10px;
+  gap: 0;
+  padding: 0;
 }
 
 .cc-inbox-tree__project {
   overflow: hidden;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
+  border: 0;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
 }
 
 .cc-inbox-tree__project-target {
   padding: 10px;
-  background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
+  border-bottom: 1px solid var(--cc-border-subtle);
+  background: transparent;
 }
 
 .cc-inbox-tree__project-target:has(button:hover),
@@ -100,11 +102,29 @@
 }
 
 .cc-inbox-tree__insert {
+  position: relative;
   height: 10px;
-  border-radius: var(--cc-radius-pill);
+  border-radius: var(--cc-radius-panel);
 }
 
-.cc-inbox-tree__insert:hover {
+.cc-inbox-tree__insert::after {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  content: '';
+}
+
+.cc-inbox-tree__insert:hover,
+.cc-inbox-tree__insert:focus-visible {
+  background: transparent;
+  box-shadow: none;
+}
+
+.cc-inbox-tree__insert:hover::after,
+.cc-inbox-tree__insert:focus-visible::after {
   background: var(--cc-primary);
 }
 
@@ -118,12 +138,14 @@
 }
 
 .cc-inbox-tree__node:hover {
-  border-color: color-mix(in srgb, var(--cc-primary) 42%, var(--cc-border));
+  border-color: transparent;
   background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
 }
 
 .cc-inbox-tree__node--selected {
-  border-color: var(--cc-primary);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--cc-primary) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--cc-primary);
 }
 
 .cc-inbox-tree__node > button:first-child {

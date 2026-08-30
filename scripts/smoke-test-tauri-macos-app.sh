@@ -29,6 +29,132 @@ icon_temp_root="$(mktemp -d)"
 launch_waiter_pid=''
 port_blocker_pid=''
 
+fresh_startup_log() {
+  if [[ -f "$startup_log" ]]; then
+    tail -c "+$((startup_log_offset + 1))" "$startup_log"
+  fi
+}
+
+window_state() {
+  /usr/bin/osascript - "$executable_name" <<'APPLESCRIPT'
+on run arguments
+  set processName to item 1 of arguments
+  tell application "System Events"
+    if not (exists process processName) then return "missing-process"
+    tell process processName
+      if (count of windows) is 0 then return "no-window"
+      set minimizedState to value of attribute "AXMinimized" of window 1
+      return ((visible as text) & "," & (minimizedState as text))
+    end tell
+  end tell
+end run
+APPLESCRIPT
+}
+
+wait_for_window_state() {
+  local expected_state="$1"
+  for _ in {1..20}; do
+    if [[ "$(window_state 2>/dev/null || true)" == "$expected_state" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Expected macOS window state '$expected_state', got '$(window_state 2>/dev/null || true)'." >&2
+  return 1
+}
+
+log_count() {
+  local message="$1"
+  local count
+  count="$(fresh_startup_log | grep -Fc "$message" || true)"
+  echo "${count:-0}"
+}
+
+wait_for_new_log_entry() {
+  local message="$1"
+  local previous_count="$2"
+  for _ in {1..20}; do
+    if (( $(log_count "$message") > previous_count )); then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Timed out waiting for startup log entry: $message" >&2
+  fresh_startup_log >&2
+  return 1
+}
+
+minimize_main_window() {
+  /usr/bin/osascript - "$executable_name" <<'APPLESCRIPT'
+on run arguments
+  set processName to item 1 of arguments
+  tell application "System Events"
+    tell process processName
+      set frontmost to true
+      set value of attribute "AXMinimized" of window 1 to true
+    end tell
+  end tell
+end run
+APPLESCRIPT
+}
+
+close_main_window() {
+  /usr/bin/osascript - "$executable_name" <<'APPLESCRIPT'
+on run arguments
+  set processName to item 1 of arguments
+  tell application "System Events"
+    tell process processName
+      set frontmost to true
+      perform action "AXClose" of window 1
+    end tell
+  end tell
+end run
+APPLESCRIPT
+}
+
+activate_packaged_app() {
+  /usr/bin/osascript -e 'tell application "Finder" to activate' >/dev/null
+  /usr/bin/open "$app_path"
+}
+
+run_macos_lifecycle_smoke() {
+  local reopen_count
+  local close_count
+  local settings_count
+
+  wait_for_window_state 'true,false'
+
+  minimize_main_window
+  wait_for_window_state 'true,true'
+  reopen_count="$(log_count '[clawchat] main window restore requested by macOS Dock reopen')"
+  activate_packaged_app
+  wait_for_new_log_entry '[clawchat] main window restore requested by macOS Dock reopen' "$reopen_count"
+  wait_for_window_state 'true,false'
+
+  close_count="$(log_count '[clawchat] main window hidden after macOS close request')"
+  close_main_window
+  wait_for_new_log_entry '[clawchat] main window hidden after macOS close request' "$close_count"
+  reopen_count="$(log_count '[clawchat] main window restore requested by macOS Dock reopen')"
+  activate_packaged_app
+  wait_for_new_log_entry '[clawchat] main window restore requested by macOS Dock reopen' "$reopen_count"
+  wait_for_window_state 'true,false'
+
+  settings_count="$(log_count '[clawchat] main window restore requested by macOS Settings menu')"
+  /usr/bin/osascript - "$executable_name" <<'APPLESCRIPT'
+on run arguments
+  set processName to item 1 of arguments
+  tell application "System Events"
+    tell process processName
+      set frontmost to true
+      keystroke "," using command down
+    end tell
+  end tell
+end run
+APPLESCRIPT
+  wait_for_new_log_entry '[clawchat] main window restore requested by macOS Settings menu' "$settings_count"
+  wait_for_window_state 'true,false'
+}
+
 stop_app() {
   /usr/bin/osascript -e "tell application id \"$bundle_identifier\" to quit" >/dev/null 2>&1 || true
   for _ in 1 2 3 4 5; do
@@ -127,10 +253,11 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
       tail -c "+$((startup_log_offset + 1))" "$startup_log" >&2
       exit 1
     fi
+    run_macos_lifecycle_smoke
     stop_app
     wait "$launch_waiter_pid" 2>/dev/null || true
     launch_waiter_pid=''
-    echo "ClawChat opened its bundled local workspace; macOS startup smoke test passed."
+    echo "ClawChat opened its local workspace and passed macOS reopen and Settings smoke tests."
     exit 0
   fi
 done

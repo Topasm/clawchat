@@ -1,4 +1,5 @@
 import { platformApi } from '../platform';
+import type { DesktopOS } from '../platform';
 
 export type Platform = 'web' | 'tauri';
 
@@ -6,6 +7,12 @@ export const IS_TAURI = platformApi.runtime.kind === 'tauri';
 
 export const IS_DESKTOP = platformApi.runtime.isDesktop;
 export const IS_WEB = !IS_DESKTOP;
+export const DESKTOP_OS: DesktopOS | null = IS_DESKTOP
+  ? (platformApi.runtime.os as DesktopOS)
+  : null;
+export const IS_MAC = DESKTOP_OS === 'macos';
+export const IS_WINDOWS = DESKTOP_OS === 'windows';
+export const IS_LINUX = DESKTOP_OS === 'linux';
 
 /**
  * The compact mobile shell (bottom navigation, swipe tabs, mobile status bar)

@@ -6,6 +6,18 @@ import packageJson from './package.json';
 const tauriPlatform = process.env.TAURI_ENV_PLATFORM;
 const isTauriDebug = process.env.TAURI_ENV_DEBUG === 'true';
 const packageVersion = packageJson.version;
+const tauriDesktopOs =
+  tauriPlatform === 'darwin' || tauriPlatform === 'macos'
+    ? 'macos'
+    : tauriPlatform === 'windows'
+      ? 'windows'
+      : tauriPlatform === 'linux'
+        ? 'linux'
+        : process.platform === 'win32'
+          ? 'windows'
+          : process.platform === 'darwin'
+            ? 'macos'
+            : 'linux';
 
 const browserTarget = tauriPlatform
   ? tauriPlatform === 'windows'
@@ -17,6 +29,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(packageVersion),
+    __TAURI_DESKTOP_OS__: JSON.stringify(tauriDesktopOs),
   },
   build: {
     target: browserTarget,
@@ -42,7 +55,13 @@ export default defineConfig({
             return 'vendor-react';
           }
           // Code editor — heaviest dep, only needed by the system-prompt route
-          if (vendor('@uiw/react-codemirror', '@codemirror/lang-markdown', '@codemirror/theme-one-dark')) {
+          if (
+            vendor(
+              '@uiw/react-codemirror',
+              '@codemirror/lang-markdown',
+              '@codemirror/theme-one-dark',
+            )
+          ) {
             return 'vendor-editor';
           }
           if (vendor('@hello-pangea/dnd')) return 'vendor-dnd';

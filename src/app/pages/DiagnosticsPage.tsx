@@ -140,7 +140,7 @@ export default function DiagnosticsPage() {
         </SettingsSection>
 
         <SettingsSection title="Connection recovery">
-          <div className="cc-workspace-preference">
+          <div className="cc-workspace-preference cc-property-row">
             <div>
               <div className="cc-workspace-card__name">Reset saved connections</div>
               <div className="cc-workspace-card__description">

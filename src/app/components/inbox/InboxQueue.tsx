@@ -60,7 +60,7 @@ export default function InboxQueue({
   const cardsDraggable = !isPlacing && !isBatchPlacing && !triage.isApplying;
 
   return (
-    <main className="cc-inbox-triage__queue">
+    <main className="cc-inbox-triage__queue cc-pane">
       <div
         className="cc-inbox-triage__inbox-target"
         onDragOver={(event) => {

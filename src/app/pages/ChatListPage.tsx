@@ -162,7 +162,7 @@ export default function ChatListPage() {
               <button
                 key={project.id}
                 type="button"
-                className="cc-project-card"
+                className="cc-project-card cc-list-row"
                 onClick={() => handleProjectClick(project.id)}
               >
                 <div className="cc-project-card__header">

@@ -15,10 +15,12 @@ export const platformApi = selectPlatformApi();
 
 export type {
   AppMode,
+  DesktopOS,
   LocalServerTransitionResult,
   LocalSession,
   NativeEventChannel,
   NativePlatformApi,
+  NativeOS,
   NativeRuntimeKind,
   NativeSecureStorageApi,
   NativeServerApi,

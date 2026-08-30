@@ -5,8 +5,14 @@
   --cc-radius-md: 8px;
   --cc-radius-lg: 10px;
   --cc-radius-pill: 9999px;
+  --cc-radius-row: 4px;
+  --cc-radius-control: 6px;
+  --cc-radius-panel: 0px;
+  --cc-radius-overlay: 10px;
   --cc-control-height: 36px;
   --cc-touch-target: 44px;
+  --cc-border-subtle: color-mix(in srgb, var(--cc-border) 72%, transparent);
+  --cc-shadow-content: none;
   --cc-shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.16);
   --cc-shadow-drag: 0 8px 20px rgba(0, 0, 0, 0.14);
   --cc-transition-fast: 120ms ease;

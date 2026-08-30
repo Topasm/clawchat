@@ -87,3 +87,35 @@ fn unix_termination_signals_exit_through_the_tauri_lifecycle() {
     assert!(LIB_SOURCE.contains("tauri::RunEvent::Exit =>"));
     assert!(LIB_SOURCE.contains("state.stop_server(app_handle)"));
 }
+
+#[test]
+fn every_native_restore_path_reports_window_failures() {
+    assert!(NATIVE_SOURCE
+        .contains("pub fn show_main_window(app: &tauri::AppHandle) -> Result<(), String>"));
+    assert!(NATIVE_SOURCE.contains("failed to unminimize"));
+    assert!(NATIVE_SOURCE.contains("failed to show"));
+    assert!(NATIVE_SOURCE.contains("failed to focus"));
+    assert!(NATIVE_SOURCE.contains("pub fn restore_main_window"));
+    assert!(LIB_SOURCE.contains("restore_main_window(app, \"second instance\")"));
+    assert!(NATIVE_SOURCE.contains("restore_main_window(tray.app_handle(), \"tray icon\")"));
+}
+
+#[test]
+fn macos_reopen_and_close_share_the_observable_restore_lifecycle() {
+    assert!(LIB_SOURCE.contains("tauri::RunEvent::Reopen { .. }"));
+    assert!(LIB_SOURCE.contains("restore_main_window(app_handle, \"macOS Dock reopen\")"));
+    assert!(LIB_SOURCE.contains("main window hidden after macOS close request"));
+    assert!(LIB_SOURCE.contains("application quit requested"));
+}
+
+#[test]
+fn macos_menu_and_tray_expose_recovery_safe_application_commands() {
+    assert!(NATIVE_SOURCE.contains("fn setup_app_menu"));
+    assert!(NATIVE_SOURCE.contains("\"Settings…\""));
+    assert!(NATIVE_SOURCE.contains("Some(\"CmdOrCtrl+Comma\")"));
+    assert!(NATIVE_SOURCE.contains("\"Quick Capture\""));
+    assert!(NATIVE_SOURCE.contains("\"Connections & Diagnostics…\""));
+    assert!(NATIVE_SOURCE.contains("app.emit(\"open-settings\", ())"));
+    assert!(NATIVE_SOURCE.contains("navigate_main_window(app, \"/diagnostics\""));
+    assert!(NATIVE_SOURCE.contains("\"settings\" => open_settings(app, \"tray Settings\")"));
+}

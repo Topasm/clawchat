@@ -1,13 +1,18 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import {
+  DESKTOP_OS,
   detectPlatform,
   IS_DESKTOP,
+  IS_LINUX,
+  IS_MAC,
   IS_TAURI,
   IS_WEB,
+  IS_WINDOWS,
   isMobileViewport,
   subscribeToMobileViewport,
   type Platform,
 } from '../types/platform';
+import type { DesktopOS } from '../platform';
 
 interface PlatformInfo {
   platform: Platform;
@@ -15,6 +20,10 @@ interface PlatformInfo {
   isDesktop: boolean;
   isWeb: boolean;
   isTauri: boolean;
+  desktopOS: DesktopOS | null;
+  isMac: boolean;
+  isWindows: boolean;
+  isLinux: boolean;
 }
 
 export default function usePlatform(): PlatformInfo {
@@ -29,6 +38,10 @@ export default function usePlatform(): PlatformInfo {
       isDesktop: IS_DESKTOP,
       isWeb: IS_WEB,
       isTauri: IS_TAURI,
+      desktopOS: DESKTOP_OS,
+      isMac: IS_MAC,
+      isWindows: IS_WINDOWS,
+      isLinux: IS_LINUX,
     }),
     [isMobile],
   );

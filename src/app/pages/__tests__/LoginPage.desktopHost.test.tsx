@@ -23,7 +23,7 @@ const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 // this single mock puts the whole page in Tauri mode.
 vi.mock('../../platform', () => ({
   platformApi: {
-    runtime: { kind: 'tauri', os: 'desktop', appVersion: '0.0.0-test', isDesktop: true },
+    runtime: { kind: 'tauri', os: 'macos', appVersion: '0.0.0-test', isDesktop: true },
     events: { on: () => () => {} },
     notifications: { show: vi.fn(), setBadgeCount: vi.fn() },
     updater: {

@@ -20,7 +20,7 @@
 
 .cc-inbox-triage__inspector dl {
   display: grid;
-  gap: 8px;
+  gap: 0;
   margin: 0 0 14px;
 }
 
@@ -28,6 +28,8 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--cc-border-subtle);
 }
 
 .cc-inbox-triage__inspector dt {
@@ -43,7 +45,7 @@
 
 .cc-inbox-triage__impact {
   padding: 9px;
-  border-radius: var(--cc-radius-sm);
+  border-radius: var(--cc-radius-row);
   background: color-mix(in srgb, var(--cc-primary) 7%, var(--cc-surface));
   color: var(--cc-text-secondary);
   font-size: 11px;
@@ -251,6 +253,11 @@
   .cc-inbox-triage__inspector {
     position: static;
     grid-column: 1 / -1;
+    border-top: 1px solid var(--cc-border-subtle);
+  }
+
+  .cc-inbox-tree {
+    border-right: 0;
   }
 }
 

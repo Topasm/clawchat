@@ -25,6 +25,7 @@ export const TAURI_EVENTS = {
   serverStatusChange: 'server-status-change',
   workspaceRuntimeChange: 'workspace-runtime-change',
   quickCapture: 'open-quick-capture',
+  openSettings: 'open-settings',
   notificationAction: 'notification:action',
   navigate: 'navigate',
   updateAvailable: 'update-available',
