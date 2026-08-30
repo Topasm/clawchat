@@ -5,6 +5,7 @@ const test = require('node:test');
 
 const workflowPath = path.resolve(__dirname, '..', '.github', 'workflows', 'build-tauri.yml');
 const smokeScriptPath = path.resolve(__dirname, 'smoke-test-tauri-macos-app.sh');
+const linuxSmokeScriptPath = path.resolve(__dirname, 'smoke-test-tauri-linux-app.sh');
 
 function readNormalized(filePath) {
   return fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
@@ -59,9 +60,30 @@ test('preview and release workflows launch the packaged macOS app', () => {
   assert.match(smokeScript, /::error title=macOS app startup smoke failed/);
 });
 
+test('preview and release workflows launch and terminate the packaged Linux app', () => {
+  const previewWorkflow = readNormalized(workflowPath);
+  const releaseWorkflow = readNormalized(
+    path.resolve(__dirname, '..', '.github', 'workflows', 'release-tauri.yml'),
+  );
+  const smokeScript = readNormalized(linuxSmokeScriptPath);
+
+  for (const workflow of [previewWorkflow, releaseWorkflow]) {
+    assert.match(workflow, /name: Smoke-test packaged Linux app startup and shutdown/);
+    assert.match(workflow, /bash scripts\/smoke-test-tauri-linux-app\.sh "\$appimage"/);
+    assert.match(workflow, /xdg-utils xvfb/);
+  }
+  assert.match(smokeScript, /\[clawchat\] local server ready on port/);
+  assert.match(smokeScript, /kill -TERM "\$app_pid"/);
+  assert.match(smokeScript, /survived desktop SIGTERM/);
+});
+
 test('packaged server failures are exposed as GitHub annotations', () => {
   const verifier = readNormalized(path.resolve(__dirname, 'verify-tauri-package.js'));
 
+  assert.match(verifier, /payload\.service === 'clawchat'/);
+  assert.match(verifier, /device token failed after restart/);
+  assert.match(verifier, /device WebSocket failed after restart/);
+  assert.match(verifier, /JWT_SECRET_FILE/);
   assert.match(verifier, /process\.env\.GITHUB_ACTIONS === 'true'/);
   assert.match(verifier, /::error title=Tauri package verification failed/);
 });

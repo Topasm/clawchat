@@ -148,7 +148,7 @@ docker volume ls | grep clawchat
 
 For the mobile app to reach the server on a local network:
 
-> **Note:** The Tauri desktop app binds its embedded server to `127.0.0.1` by default. Enable host mode through the desktop settings when mobile clients need LAN access, or use Docker/manual `uvicorn --host 0.0.0.0`. For remote access, use Cloudflare Tunnel or Tailscale rather than exposing the port directly.
+> **Note:** The Tauri desktop app binds its embedded server to `127.0.0.1` by default. Enable **Allow local network access** in workspace settings and replace the default PIN when mobile clients need LAN access, or use Docker/manual `uvicorn --host 0.0.0.0`. For remote access, use Cloudflare Tunnel or Tailscale rather than exposing the port directly.
 
 1. **Find the server's local IP**: Run `ip addr` (Linux) or `ipconfig` (Windows) on the host machine
 2. **Configure the firewall**: Allow inbound TCP on port 8000

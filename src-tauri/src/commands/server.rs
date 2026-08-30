@@ -146,5 +146,10 @@ mod tests {
             ..ServerConfigPatch::default()
         }
         .requires_server_restart());
+        assert!(ServerConfigPatch {
+            lan_access: Some(true),
+            ..ServerConfigPatch::default()
+        }
+        .requires_server_restart());
     }
 }

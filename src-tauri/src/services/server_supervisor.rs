@@ -75,6 +75,15 @@ impl ServerSupervisor {
 
     pub fn start(&mut self, config: &ServerConfig) -> ServerStatus {
         let requested_port = config.port;
+        if let Err(error) = config.validate() {
+            self.status = ServerStatus {
+                state: ServerState::Error,
+                port: requested_port,
+                pid: None,
+                error: Some(error),
+            };
+            return self.status.clone();
+        }
         if self.child.is_some() {
             let current = self.status();
             if matches!(current.state, ServerState::Running) && health_check(current.port) {
@@ -243,16 +252,20 @@ impl ServerSupervisor {
                 self.paths.server_data_dir.display()
             )
         })?;
-        let (program, arguments, working_directory) = self.server_command(config.port)?;
+        let (program, arguments, working_directory) = self.server_command(config)?;
         let database = self.paths.server_data_dir.join("clawchat.db");
         let uploads = self.paths.server_data_dir.join("uploads");
         let mut command = Command::new(&program);
         command
             .args(arguments)
             .current_dir(working_directory)
-            .env("HOST", "0.0.0.0")
+            .env("HOST", config.bind_host())
             .env("PORT", config.port.to_string())
             .env("PIN", &config.pin)
+            .env(
+                "JWT_SECRET_FILE",
+                self.paths.app_data_dir.join("server-jwt-secret"),
+            )
             .env(
                 "DATABASE_URL",
                 format!("sqlite+aiosqlite:///{}", database.display()),
@@ -300,7 +313,10 @@ impl ServerSupervisor {
         })
     }
 
-    fn server_command(&self, port: u16) -> Result<(PathBuf, Vec<String>, PathBuf), String> {
+    fn server_command(
+        &self,
+        config: &ServerConfig,
+    ) -> Result<(PathBuf, Vec<String>, PathBuf), String> {
         let executable_name = if cfg!(windows) {
             "clawchat-server.exe"
         } else {
@@ -327,9 +343,9 @@ impl ServerSupervisor {
             "uvicorn".to_owned(),
             "main:app".to_owned(),
             "--host".to_owned(),
-            "0.0.0.0".to_owned(),
+            config.bind_host().to_owned(),
             "--port".to_owned(),
-            port.to_string(),
+            config.port.to_string(),
         ];
         if std::env::var_os("VITE_DEV_SERVER_URL").is_some() {
             arguments.push("--reload".to_owned());
@@ -590,7 +606,8 @@ mod tests {
         fs::write(&executable, "placeholder").expect("binary");
 
         let supervisor = ServerSupervisor::new(native_paths, 8000);
-        let (program, arguments, _) = supervisor.server_command(8000).expect("command");
+        let config = ServerConfig::default();
+        let (program, arguments, _) = supervisor.server_command(&config).expect("command");
         assert_eq!(program, executable);
         assert!(arguments.is_empty());
     }

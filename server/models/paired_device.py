@@ -13,7 +13,9 @@ class PairedDevice(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String, nullable=False)  # e.g. "iPhone 15", "iPad"
     device_type: Mapped[str] = mapped_column(String, nullable=False)  # "ios", "android", "web"
-    device_token: Mapped[str] = mapped_column(String, unique=True, nullable=False)  # JWT for this device
+    # The historical column name is retained for migration compatibility, but
+    # new and migrated rows contain only a SHA-256 digest, never the bearer JWT.
+    device_token: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     paired_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

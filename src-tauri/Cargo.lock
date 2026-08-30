@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "clawchat-tauri"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "atomicwrites",
  "dirs 6.0.0",
@@ -4621,6 +4621,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",

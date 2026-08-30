@@ -53,6 +53,11 @@ def hash_refresh_token_id(token_id: str) -> str:
     return hashlib.sha256(token_id.encode("utf-8")).hexdigest()
 
 
+def hash_device_token(token: str) -> str:
+    """Return the non-reversible database representation of a device token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def create_websocket_ticket(
     subject: str,
     principal_type: str,

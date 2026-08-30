@@ -73,7 +73,12 @@ beforeEach(() => {
   localStorage.clear();
   mocks.appMode = 'host';
   mocks.getStatus.mockResolvedValue({ state: 'running', port: 8000 });
-  mocks.getConfig.mockResolvedValue({ autoStartHost: false, port: 8000, pin: '123456' });
+  mocks.getConfig.mockResolvedValue({
+    autoStartHost: false,
+    lanAccess: false,
+    port: 8000,
+    pin: '123456',
+  });
   mocks.updateConfig.mockResolvedValue({});
   mocks.setAppMode.mockResolvedValue(undefined);
   mocks.nativeSetAppMode.mockResolvedValue(undefined);
@@ -89,13 +94,28 @@ beforeEach(() => {
 });
 
 describe('WorkspaceConnectionsSection', () => {
-  it('presents the Mac workspace as the no-setup default', async () => {
+  it('presents this device as the no-setup default', async () => {
     renderSection();
 
-    expect(screen.getByText('This Mac')).toBeInTheDocument();
+    expect(screen.getByText('This device')).toBeInTheDocument();
     expect(screen.getByText('Current')).toBeInTheDocument();
     expect(screen.getByText(/No account, server address, or PIN required/)).toBeInTheDocument();
     expect(await screen.findByText(/Local port 8000/)).toBeInTheDocument();
+  });
+
+  it('updates the PIN while explicitly enabling trusted LAN access', async () => {
+    renderSection();
+
+    const pinInput = await screen.findByLabelText('Local network PIN');
+    fireEvent.change(pinInput, { target: { value: '938274' } });
+    fireEvent.click(screen.getByRole('switch', { name: 'Allow local network access' }));
+
+    await waitFor(() =>
+      expect(mocks.updateConfig).toHaveBeenCalledWith({
+        pin: '938274',
+        lanAccess: true,
+      }),
+    );
   });
 
   it('authenticates before switching away from local and never persists the PIN', async () => {

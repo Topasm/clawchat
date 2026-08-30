@@ -177,9 +177,12 @@ impl AppState {
     pub fn update_config(&self, patch: ServerConfigPatch) -> Result<(ServerConfig, bool), String> {
         let restart = patch.requires_server_restart();
         let mut config = self.lock_config()?;
-        patch.apply(&mut config);
-        self.config_store.save(&config)?;
-        Ok((config.clone(), restart))
+        let mut updated = config.clone();
+        patch.apply(&mut updated);
+        updated.validate()?;
+        self.config_store.save(&updated)?;
+        *config = updated.clone();
+        Ok((updated, restart))
     }
 
     pub fn set_app_mode(&self, mode: AppMode) -> Result<ServerConfig, String> {

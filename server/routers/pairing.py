@@ -10,6 +10,7 @@ from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth.jwt import hash_device_token
 from app_version import APP_VERSION
 from auth.dependencies import get_current_user
 from config import settings
@@ -156,7 +157,7 @@ async def claim_pairing_session(
         id=device_id,
         name=req.device_name,
         device_type=req.device_type,
-        device_token=device_token,
+        device_token=hash_device_token(device_token),
         public_key=req.device_public_key,
     )
     db.add(device)

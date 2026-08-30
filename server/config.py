@@ -1,22 +1,60 @@
 import logging
+import os
 import secrets
+from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_JWT_SECRET = "change-this-to-a-random-secret-key"
+
+
+def _read_secret(path: Path) -> str:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    with os.fdopen(descriptor, encoding="utf-8") as secret_file:
+        secret = secret_file.read().strip()
+    if len(secret) < 32:
+        raise ValueError(f"JWT secret file {path} is empty or too short")
+    return secret
+
+
+def _load_or_create_secret(path_value: str) -> str:
+    path = Path(path_value).expanduser()
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        secret = _read_secret(path)
+    except FileNotFoundError:
+        secret = secrets.token_urlsafe(32)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(path, flags, 0o600)
+        except FileExistsError:
+            # Another process won the first-start race. Its completed value is
+            # the shared secret both processes must use.
+            return _read_secret(path)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as secret_file:
+            secret_file.write(secret)
+            secret_file.flush()
+            os.fsync(secret_file.fileno())
+    if os.name == "posix":
+        os.chmod(path, 0o600)
+    return secret
+
 
 class Settings(BaseSettings):
     # Server
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8000
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/clawchat.db"
 
     # Authentication
-    jwt_secret: str = "change-this-to-a-random-secret-key"
+    jwt_secret: str = _DEFAULT_JWT_SECRET
+    jwt_secret_file: str = ""
     jwt_expiry_hours: int = 24
     pin: str = "123456"
 
@@ -112,18 +150,19 @@ class Settings(BaseSettings):
                 return True
         return value
 
-    @field_validator("jwt_secret", mode="before")
-    @classmethod
-    def autogenerate_jwt_secret(cls, value):
-        if value == "change-this-to-a-random-secret-key":
-            generated = secrets.token_urlsafe(32)
+    @model_validator(mode="after")
+    def resolve_jwt_secret(self):
+        if self.jwt_secret == _DEFAULT_JWT_SECRET:
+            if self.jwt_secret_file:
+                self.jwt_secret = _load_or_create_secret(self.jwt_secret_file)
+                return self
+            self.jwt_secret = secrets.token_urlsafe(32)
             logger.warning(
                 "JWT_SECRET is using the default placeholder. "
                 "Auto-generating a random secret for this session. "
-                "Set JWT_SECRET in your .env file for stable sessions."
+                "Set JWT_SECRET or JWT_SECRET_FILE for stable sessions."
             )
-            return generated
-        return value
+        return self
 
     def resolved_cors_origins(self) -> list[str]:
         """Return the CORS allowlist, defaulting to local development hosts.

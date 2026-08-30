@@ -235,7 +235,8 @@ export default function Layout() {
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
   const activeWorkspaceName = useWorkspaceStore(
     (state) =>
-      state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name ?? 'This Mac',
+      state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name ??
+      'This device',
   );
   const connectionLabel = isFlushing
     ? t('connection.syncing')

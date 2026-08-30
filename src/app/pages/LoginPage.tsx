@@ -66,7 +66,7 @@ const HOST_PHASE_HEADINGS: Record<HostSessionPhase, string> = {
 
 const HOST_PHASE_DETAILS: Record<HostSessionPhase, string> = {
   idle: '',
-  checking: 'Checking the private workspace stored on this Mac.',
+  checking: 'Checking the private workspace stored on this device.',
   starting:
     'ClawChat is preparing local storage for your tasks and calendar. This usually takes a few seconds.',
   connecting: 'No account or PIN is needed. Taking you straight to your workspace.',
@@ -372,7 +372,7 @@ export default function LoginPage() {
                     marginBottom: 10,
                   }}
                 >
-                  Your tasks and calendar stay on this Mac. ClawChat could not prepare that local
+                  Your tasks and calendar stay on this device. ClawChat could not prepare that local
                   workspace yet.
                 </div>
                 <div
@@ -470,7 +470,7 @@ export default function LoginPage() {
                 marginBottom: 14,
               }}
             >
-              Keep tasks and calendar on this Mac. No server address, pairing, account, or PIN is
+              Keep tasks and calendar on this device. No server address, pairing, account, or PIN is
               required.
             </div>
             <button

@@ -345,6 +345,12 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the app_open_camera_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-app-open-camera-settings",
+          "markdownDescription": "Enables the app_open_camera_settings command without any pre-configured scope."
+        },
+        {
           "description": "Enables the app_set_badge_count command without any pre-configured scope.",
           "type": "string",
           "const": "allow-app-set-badge-count",
@@ -439,6 +445,12 @@
           "type": "string",
           "const": "allow-updater-install",
           "markdownDescription": "Enables the updater_install command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the app_open_camera_settings command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-app-open-camera-settings",
+          "markdownDescription": "Denies the app_open_camera_settings command without any pre-configured scope."
         },
         {
           "description": "Denies the app_set_badge_count command without any pre-configured scope.",

@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+const DEFAULT_PIN: &str = "123456";
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppMode {
@@ -23,6 +25,7 @@ pub struct ServerConfig {
     pub obsidian_vault_path: String,
     pub host_server_url: String,
     pub auto_start_host: bool,
+    pub lan_access: bool,
 }
 
 impl Default for ServerConfig {
@@ -30,11 +33,34 @@ impl Default for ServerConfig {
         Self {
             app_mode: AppMode::Host,
             port: 8000,
-            pin: "123456".to_owned(),
+            pin: DEFAULT_PIN.to_owned(),
             obsidian_vault_path: String::new(),
             host_server_url: String::new(),
             auto_start_host: false,
+            lan_access: false,
         }
+    }
+}
+
+impl ServerConfig {
+    pub fn bind_host(&self) -> &'static str {
+        if self.lan_access {
+            "0.0.0.0"
+        } else {
+            "127.0.0.1"
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.pin.bytes().all(|byte| byte.is_ascii_digit())
+            || !(6..=32).contains(&self.pin.len())
+        {
+            return Err("PIN must contain between 6 and 32 digits".to_owned());
+        }
+        if self.lan_access && self.pin == DEFAULT_PIN {
+            return Err("Change the default PIN before enabling LAN access".to_owned());
+        }
+        Ok(())
     }
 }
 
@@ -47,6 +73,7 @@ pub struct ServerConfigPatch {
     pub obsidian_vault_path: Option<String>,
     pub host_server_url: Option<String>,
     pub auto_start_host: Option<bool>,
+    pub lan_access: Option<bool>,
 }
 
 impl ServerConfigPatch {
@@ -55,7 +82,10 @@ impl ServerConfigPatch {
     }
 
     pub fn requires_server_restart(&self) -> bool {
-        self.port.is_some() || self.pin.is_some() || self.obsidian_vault_path.is_some()
+        self.port.is_some()
+            || self.pin.is_some()
+            || self.obsidian_vault_path.is_some()
+            || self.lan_access.is_some()
     }
 
     pub fn apply(self, config: &mut ServerConfig) {
@@ -76,6 +106,9 @@ impl ServerConfigPatch {
         }
         if let Some(value) = self.auto_start_host {
             config.auto_start_host = value;
+        }
+        if let Some(value) = self.lan_access {
+            config.lan_access = value;
         }
     }
 }
@@ -206,6 +239,37 @@ mod tests {
         assert_eq!(
             status(ServerState::Stopped, None).startup_failure(),
             Some("server stopped without starting".to_owned())
+        );
+    }
+
+    #[test]
+    fn local_workspace_binds_only_to_loopback_by_default() {
+        let config = ServerConfig::default();
+
+        assert_eq!(config.bind_host(), "127.0.0.1");
+        assert!(!config.lan_access);
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn lan_access_requires_a_non_default_numeric_pin() {
+        let mut config = ServerConfig {
+            lan_access: true,
+            ..ServerConfig::default()
+        };
+
+        assert_eq!(config.bind_host(), "0.0.0.0");
+        assert_eq!(
+            config.validate(),
+            Err("Change the default PIN before enabling LAN access".to_owned())
+        );
+
+        config.pin = "938274".to_owned();
+        assert!(config.validate().is_ok());
+        config.pin = "not-a-pin".to_owned();
+        assert_eq!(
+            config.validate(),
+            Err("PIN must contain between 6 and 32 digits".to_owned())
         );
     }
 }

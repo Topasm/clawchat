@@ -1,9 +1,11 @@
 interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  label?: string;
 }
 
-export default function Toggle({ checked, onChange }: ToggleProps) {
+export default function Toggle({ checked, onChange, disabled = false, label }: ToggleProps) {
   return (
     <button
       type="button"
@@ -11,6 +13,8 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
       onClick={() => onChange(!checked)}
       role="switch"
       aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
     >
       <div className="cc-toggle__knob" />
     </button>

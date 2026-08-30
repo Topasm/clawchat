@@ -7,7 +7,7 @@ beforeEach(() => {
 });
 
 describe('workspace connections', () => {
-  it('always starts with the local Mac workspace', () => {
+  it('always starts with the local device workspace', () => {
     const state = useWorkspaceStore.getState();
 
     expect(state.activeWorkspaceId).toBe(LOCAL_WORKSPACE_ID);

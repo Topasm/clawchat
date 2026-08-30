@@ -8,6 +8,42 @@ mod state;
 use state::{AppState, PendingUpdateState};
 use tauri::Manager;
 
+#[cfg(unix)]
+fn install_termination_signal_handler<R: tauri::Runtime>(app_handle: tauri::AppHandle<R>) {
+    tauri::async_runtime::spawn(async move {
+        use tokio::signal::unix::{signal, SignalKind};
+
+        let mut terminate = match signal(SignalKind::terminate()) {
+            Ok(signal) => signal,
+            Err(error) => {
+                startup_log::report(&format!(
+                    "[clawchat] failed to install SIGTERM handler: {error}"
+                ));
+                return;
+            }
+        };
+        let mut interrupt = match signal(SignalKind::interrupt()) {
+            Ok(signal) => signal,
+            Err(error) => {
+                startup_log::report(&format!(
+                    "[clawchat] failed to install SIGINT handler: {error}"
+                ));
+                return;
+            }
+        };
+
+        tokio::select! {
+            _ = terminate.recv() => {}
+            _ = interrupt.recv() => {}
+        }
+        startup_log::report("[clawchat] termination signal received; stopping local server");
+        app_handle.exit(0);
+    });
+}
+
+#[cfg(not(unix))]
+fn install_termination_signal_handler<R: tauri::Runtime>(_app_handle: tauri::AppHandle<R>) {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let application = tauri::Builder::default()
@@ -49,6 +85,7 @@ pub fn run() {
             let should_start_host = state.should_start_host();
             app.manage(state);
             app.manage(PendingUpdateState::default());
+            install_termination_signal_handler(app.handle().clone());
             if should_start_host {
                 let app_handle = app.handle().clone();
                 tauri::async_runtime::spawn_blocking(move || {

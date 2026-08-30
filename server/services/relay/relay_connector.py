@@ -179,7 +179,11 @@ class RelayHostConnector:
         try:
             token_payload = decode_token_any(payload.get("token", ""))
             async with async_session_factory() as db:
-                principal = await validate_principal(token_payload, db)
+                principal = await validate_principal(
+                    token_payload,
+                    db,
+                    payload.get("token", ""),
+                )
             await self._drop_subscription(client_id)
             transport = RelayTransport(self, client_id)
             self.transports[client_id] = (principal.subject, transport)

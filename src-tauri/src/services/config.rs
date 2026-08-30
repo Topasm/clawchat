@@ -47,7 +47,10 @@ impl ConfigStore {
             .map_err(|error| format!("failed to serialize server config: {error}"))?;
         AtomicFile::new(&self.path, AllowOverwrite)
             .write(|file| std::io::Write::write_all(file, &payload))
-            .map_err(|error| format!("failed to atomically save {}: {error}", self.path.display()))
+            .map_err(|error| {
+                format!("failed to atomically save {}: {error}", self.path.display())
+            })?;
+        restrict_config_permissions(&self.path)
     }
 
     /// Preserve an unreadable config for diagnostics and replace it with a
@@ -73,6 +76,19 @@ impl ConfigStore {
     pub fn path(&self) -> &std::path::Path {
         &self.path
     }
+}
+
+#[cfg(unix)]
+fn restrict_config_permissions(path: &std::path::Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .map_err(|error| format!("failed to protect {}: {error}", path.display()))
+}
+
+#[cfg(not(unix))]
+fn restrict_config_permissions(_path: &std::path::Path) -> Result<(), String> {
+    Ok(())
 }
 
 #[cfg(test)]
@@ -108,6 +124,24 @@ mod tests {
         // Running our own server must not also enrol the app in OS autostart:
         // that stays an explicit opt-in.
         assert!(!config.auto_start_host);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn persisted_pin_configuration_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().expect("temp dir");
+        let store = ConfigStore::new(dir.path().join("server-config.json"));
+
+        store.save(&ServerConfig::default()).expect("save config");
+
+        let mode = fs::metadata(store.path())
+            .expect("config metadata")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600);
     }
 
     #[test]

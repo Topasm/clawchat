@@ -39,7 +39,13 @@ async def websocket_endpoint(
             }
         else:
             principal_payload = payload
-        principal = await validate_principal(principal_payload, db)
+        # Only a legacy raw device token can be compared with the credential
+        # hash stored for the paired device. A ws_ticket is a separate,
+        # short-lived signed credential; when it represents a device, checking
+        # that the device is still active is sufficient because issuance
+        # already authenticated the original device token.
+        presented_token = credential if payload["type"] == "device" else None
+        principal = await validate_principal(principal_payload, db, presented_token)
         user_id = principal.subject
     except UnauthorizedError:
         await websocket.close(code=4001, reason="Invalid or expired token")

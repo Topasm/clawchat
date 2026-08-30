@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import secrets
 
+from auth.jwt import hash_device_token
 from database import get_db
 from exceptions import UnauthorizedError
 from fastapi import Depends
@@ -20,7 +22,11 @@ class AuthPrincipal:
     session_id: str | None = None
 
 
-async def validate_principal(payload: dict, db: AsyncSession) -> AuthPrincipal:
+async def validate_principal(
+    payload: dict,
+    db: AsyncSession,
+    presented_token: str | None = None,
+) -> AuthPrincipal:
     """Validate token claims that require server-side state."""
     token_type = payload.get("type")
     subject = payload["sub"]
@@ -37,6 +43,11 @@ async def validate_principal(payload: dict, db: AsyncSession) -> AuthPrincipal:
         device = result.scalar_one_or_none()
         if not device or not device.is_active:
             raise UnauthorizedError("Device has been revoked")
+        if presented_token is not None and not secrets.compare_digest(
+            device.device_token,
+            hash_device_token(presented_token),
+        ):
+            raise UnauthorizedError("Device token has been replaced")
         device.last_seen = datetime.now(timezone.utc)
         await db.commit()
 
@@ -72,7 +83,7 @@ async def get_current_principal(
     if credentials is None:
         raise UnauthorizedError("Missing authorization header")
     payload = decode_token_any(credentials.credentials)
-    return await validate_principal(payload, db)
+    return await validate_principal(payload, db, credentials.credentials)
 
 
 async def get_current_user(

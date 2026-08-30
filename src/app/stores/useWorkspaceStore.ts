@@ -23,7 +23,7 @@ interface WorkspaceState {
 const LOCAL_WORKSPACE: WorkspaceProfile = {
   id: LOCAL_WORKSPACE_ID,
   kind: 'local',
-  name: 'This Mac',
+  name: 'This device',
   serverUrl: null,
   lastConnectedAt: null,
 };

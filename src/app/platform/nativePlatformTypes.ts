@@ -39,6 +39,7 @@ export interface ServerConfig {
   obsidianVaultPath: string;
   hostServerUrl: string;
   autoStartHost: boolean;
+  lanAccess: boolean;
 }
 
 export interface NetworkInfo {

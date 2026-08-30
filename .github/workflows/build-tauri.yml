@@ -44,7 +44,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils xvfb
 
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
@@ -90,6 +90,14 @@ jobs:
 
       - name: Check Tauri artifact size budget
         run: npm run check:tauri-artifact-budget -- src-tauri/target/release/bundle "${{ matrix.budget_platform }}"
+
+      - name: Smoke-test packaged Linux app startup and shutdown
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          appimage="$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' -type f -print -quit)"
+          test -n "$appimage"
+          bash scripts/smoke-test-tauri-linux-app.sh "$appimage"
 
       - name: Verify packaged Linux server resource
         if: runner.os == 'Linux'

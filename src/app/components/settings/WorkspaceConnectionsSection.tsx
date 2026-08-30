@@ -35,6 +35,9 @@ export default function WorkspaceConnectionsSection() {
   const addToast = useToastStore((state) => state.addToast);
   const [localStatus, setLocalStatus] = useState<ServerStatus | null>(null);
   const [autoStartHost, setAutoStartHost] = useState(false);
+  const [lanAccess, setLanAccess] = useState(false);
+  const [localPin, setLocalPin] = useState('');
+  const [savingLocalSecurity, setSavingLocalSecurity] = useState(false);
   const [name, setName] = useState('');
   const [remoteUrl, setRemoteUrl] = useState('');
   const [pin, setPin] = useState('');
@@ -48,7 +51,11 @@ export default function WorkspaceConnectionsSection() {
 
   useEffect(() => {
     void platformApi.server.getStatus().then(setLocalStatus);
-    void platformApi.server.getConfig().then((config) => setAutoStartHost(config.autoStartHost));
+    void platformApi.server.getConfig().then((config) => {
+      setAutoStartHost(config.autoStartHost);
+      setLanAccess(config.lanAccess);
+      setLocalPin(config.pin);
+    });
     return platformApi.server.onStatusChange(setLocalStatus);
   }, []);
 
@@ -93,7 +100,7 @@ export default function WorkspaceConnectionsSection() {
         );
       }
       setActiveWorkspace(LOCAL_WORKSPACE_ID);
-      addToast('success', 'Using the private workspace on this Mac.');
+      addToast('success', 'Using the private workspace on this device.');
       navigate('/today');
     } catch (cause) {
       try {
@@ -156,10 +163,32 @@ export default function WorkspaceConnectionsSection() {
       setAutoStartHost(enabled);
       addToast(
         'success',
-        enabled ? 'ClawChat will open at Mac login.' : 'Launch at Mac login disabled.',
+        enabled ? 'ClawChat will open at system login.' : 'Launch at system login disabled.',
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
+  const saveLocalSecurity = async (nextLanAccess = lanAccess) => {
+    setSavingLocalSecurity(true);
+    setError('');
+    try {
+      await platformApi.server.updateConfig({
+        pin: localPin,
+        lanAccess: nextLanAccess,
+      });
+      setLanAccess(nextLanAccess);
+      addToast(
+        'success',
+        nextLanAccess
+          ? 'LAN access enabled with the updated PIN.'
+          : 'Local workspace security updated.',
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSavingLocalSecurity(false);
     }
   };
 
@@ -168,7 +197,7 @@ export default function WorkspaceConnectionsSection() {
       <div className="cc-workspace-card">
         <div className="cc-workspace-card__body">
           <div className="cc-workspace-card__heading">
-            <span className="cc-workspace-card__name">This Mac</span>
+            <span className="cc-workspace-card__name">This device</span>
             {appMode === 'host' && <span className="cc-workspace-badge">Current</span>}
           </div>
           <div className="cc-workspace-card__description">
@@ -278,15 +307,56 @@ export default function WorkspaceConnectionsSection() {
       </form>
 
       {appMode === 'host' && (
-        <div className="cc-workspace-preference">
-          <div>
-            <div className="cc-workspace-card__name">Open at Mac login</div>
-            <div className="cc-workspace-card__description">
-              Launch ClawChat and make the local workspace available after signing in to macOS.
+        <>
+          <div className="cc-workspace-preference">
+            <div>
+              <div className="cc-workspace-card__name">Allow local network access</div>
+              <div className="cc-workspace-card__description">
+                Off keeps the bundled server on this device only. Turn it on to pair phones or other
+                computers on the same trusted network.
+              </div>
             </div>
+            <Toggle
+              checked={lanAccess}
+              disabled={savingLocalSecurity}
+              label="Allow local network access"
+              onChange={(enabled) => void saveLocalSecurity(enabled)}
+            />
           </div>
-          <Toggle checked={autoStartHost} onChange={handleAutoStartToggle} />
-        </div>
+          <div className="cc-workspace-preference">
+            <label>
+              <span className="cc-workspace-card__name">Local network PIN</span>
+              <input
+                className="cc-settings-input"
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]{6,32}"
+                minLength={6}
+                maxLength={32}
+                value={localPin}
+                onChange={(event) => setLocalPin(event.target.value)}
+                autoComplete="new-password"
+              />
+            </label>
+            <button
+              type="button"
+              className="cc-btn cc-btn--secondary cc-btn--compact"
+              disabled={savingLocalSecurity || localPin.length < 6}
+              onClick={() => void saveLocalSecurity()}
+            >
+              {savingLocalSecurity ? 'Saving…' : 'Save PIN'}
+            </button>
+          </div>
+          <div className="cc-workspace-preference">
+            <div>
+              <div className="cc-workspace-card__name">Open at system login</div>
+              <div className="cc-workspace-card__description">
+                Launch ClawChat and make the local workspace available after signing in.
+              </div>
+            </div>
+            <Toggle checked={autoStartHost} onChange={handleAutoStartToggle} />
+          </div>
+        </>
       )}
     </SettingsSection>
   );

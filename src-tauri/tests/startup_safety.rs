@@ -78,3 +78,12 @@ fn disabled_preview_updater_is_a_noop() {
     assert!(APP_COMMAND_SOURCE
         .contains("Err(tauri_plugin_updater::Error::EmptyEndpoints) => return Ok(None)"));
 }
+
+#[test]
+fn unix_termination_signals_exit_through_the_tauri_lifecycle() {
+    assert!(LIB_SOURCE.contains("signal(SignalKind::terminate())"));
+    assert!(LIB_SOURCE.contains("signal(SignalKind::interrupt())"));
+    assert!(LIB_SOURCE.contains("app_handle.exit(0)"));
+    assert!(LIB_SOURCE.contains("tauri::RunEvent::Exit =>"));
+    assert!(LIB_SOURCE.contains("state.stop_server(app_handle)"));
+}
