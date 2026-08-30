@@ -16,7 +16,7 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
     let connections = MenuItem::with_id(
         app,
         AppMenuCommand::Connections.id(),
-        "Connections & Diagnostics…",
+        "Connections…",
         true,
         None::<&str>,
     )?;

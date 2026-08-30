@@ -49,6 +49,7 @@ import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
 import { StatusDot } from './shared/WorkspacePrimitives';
 import { platformApi } from '../platform';
+import { settingsNavigationState } from '../services/settingsNavigation';
 
 const SimpleMode = lazy(() => import('./SimpleMode'));
 // Keep the injected theme tokens declared in this runtime root. The design
@@ -106,7 +107,7 @@ const secondaryNavItems = [
 ];
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
-  { to: '/settings', labelKey: 'nav.settings', Icon: GearIcon },
+  { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
   { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },
 ];
 export default function Layout() {
@@ -153,7 +154,7 @@ export default function Layout() {
     });
   }, [capabilities]);
   const filteredUtilityNavItems = useMemo(
-    () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings')),
+    () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings/app')),
     [isMac],
   );
   // Widget deep-link navigation
@@ -311,7 +312,11 @@ export default function Layout() {
         aria-label={translateUi('Switch workspace. Current: {{name}}', {
           name: activeWorkspaceName,
         })}
-        onClick={() => navigate('/connections')}
+        onClick={() =>
+          navigate('/connections', {
+            state: settingsNavigationState(location.pathname, location.search, location.state),
+          })
+        }
       >
         <StatusDot className="cc-connection-status__dot" />
         <span className="cc-sidebar__label">
@@ -369,6 +374,11 @@ export default function Layout() {
         <NavLink
           key={item.to}
           to={item.to}
+          state={
+            item.to === '/settings/app'
+              ? settingsNavigationState(location.pathname, location.search, location.state)
+              : undefined
+          }
           className={({ isActive }) =>
             `cc-nav-item cc-nav-item--utility${isActive ? ' cc-nav-item--active' : ''}`
           }

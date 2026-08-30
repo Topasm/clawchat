@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { changeAppLanguage } from '../../i18n';
+import { ThemeProvider } from '../../config/ThemeProvider';
 import { useToastStore } from '../../stores/useToastStore';
 import SettingsPage from '../SettingsPage';
 
@@ -61,10 +62,19 @@ describe('SettingsPage Codex provider', () => {
   });
 
   afterEach(async () => {
-    await changeAppLanguage('en');
+    await act(async () => {
+      await changeAppLanguage('en');
+    });
   });
 
   it('configures and activates Codex without echoing an existing key', async () => {
+    apiMocks.get.mockImplementation((path: string) => {
+      if (path === '/admin/ai/provider') {
+        return Promise.resolve({ data: { ...providerState, active_provider: 'codex' } });
+      }
+      if (path === '/obsidian/status') return Promise.resolve({ data: { vaultPath: '' } });
+      return Promise.reject(new Error(`Unexpected GET ${path}`));
+    });
     apiMocks.put.mockResolvedValue({
       data: {
         ...providerState,
@@ -76,7 +86,9 @@ describe('SettingsPage Codex provider', () => {
 
     render(
       <MemoryRouter>
-        <SettingsPage />
+        <ThemeProvider>
+          <SettingsPage />
+        </ThemeProvider>
       </MemoryRouter>,
     );
 
@@ -106,12 +118,13 @@ describe('SettingsPage Codex provider', () => {
 
     render(
       <MemoryRouter>
-        <SettingsPage />
+        <ThemeProvider>
+          <SettingsPage />
+        </ThemeProvider>
       </MemoryRouter>,
     );
 
     const codexCli = await screen.findByRole('button', { name: 'Codex CLI' });
-    expect(screen.getByText('Installed and signed in — codex-cli 0.test')).toBeInTheDocument();
     fireEvent.click(codexCli);
 
     await waitFor(() =>
@@ -121,11 +134,21 @@ describe('SettingsPage Codex provider', () => {
         { queueOfflineMutation: false },
       ),
     );
+    expect(
+      await screen.findByText('Installed and signed in — codex-cli 0.test'),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Using Codex CLI — default model')).toBeInTheDocument();
   });
 
   it('renders Codex settings and stable provider errors in Korean', async () => {
     await changeAppLanguage('ko');
+    apiMocks.get.mockImplementation((path: string) => {
+      if (path === '/admin/ai/provider') {
+        return Promise.resolve({ data: { ...providerState, active_provider: 'codex' } });
+      }
+      if (path === '/obsidian/status') return Promise.resolve({ data: { vaultPath: '' } });
+      return Promise.reject(new Error(`Unexpected GET ${path}`));
+    });
     apiMocks.put.mockRejectedValue({
       response: {
         data: {
@@ -139,11 +162,14 @@ describe('SettingsPage Codex provider', () => {
 
     render(
       <MemoryRouter>
-        <SettingsPage />
+        <ThemeProvider>
+          <SettingsPage />
+        </ThemeProvider>
       </MemoryRouter>,
     );
 
     expect(await screen.findByText('워크스페이스 설정')).toBeInTheDocument();
+    await screen.findByRole('button', { name: 'Codex' });
     expect(screen.getByText('설정되지 않음 — OpenAI API 키를 추가하세요')).toBeInTheDocument();
 
     const input = screen.getByLabelText('OpenAI API 키');

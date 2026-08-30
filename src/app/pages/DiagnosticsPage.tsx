@@ -1,25 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import SettingsShell from '../components/settings/SettingsShell';
 import SettingsSection from '../components/shared/SettingsSection';
 import { PropertyRow } from '../components/shared/WorkspacePrimitives';
-import ToastContainer from '../components/shared/ToastContainer';
 import { platformApi } from '../platform';
 import { useToastStore } from '../stores/useToastStore';
 import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
-import { useTheme } from '../config/ThemeContext';
-import { themeCssVars } from '../config/themeCssVars';
 import {
   resetWorkspaceConnections,
   retryLocalWorkspace,
 } from '../services/workspaceSessionCoordinator';
-import { translateUi } from '../i18n';
+import { translateUi, useTranslation } from '../i18n';
 function displayStatus(state: string | undefined) {
   if (!state) return translateUi('Unknown');
   return translateUi(state.charAt(0).toUpperCase() + state.slice(1));
 }
 export default function DiagnosticsPage() {
-  const navigate = useNavigate();
-  const { colors } = useTheme();
+  const { t } = useTranslation();
   const addToast = useToastStore((state) => state.addToast);
   const config = useWorkspaceRuntimeStore((state) => state.config);
   const status = useWorkspaceRuntimeStore((state) => state.localServerStatus);
@@ -59,27 +55,12 @@ export default function DiagnosticsPage() {
     );
   };
   return (
-    <div className="cc-public-shell" style={themeCssVars(colors)}>
-      <header className="cc-public-shell__header">
-        <div>
-          <div className="cc-public-shell__eyebrow">{translateUi('ClawChat')}</div>
-          <h1>{translateUi('Diagnostics & Recovery')}</h1>
-          <p>
-            {translateUi(
-              'This page remains available even when no workspace server can be reached.',
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="cc-btn cc-btn--secondary"
-          onClick={() => navigate('/connections')}
-        >
-          {translateUi('\n          Connections\n        ')}
-        </button>
-      </header>
-
-      <main className="cc-public-shell__content cc-settings-page">
+    <SettingsShell
+      activePane="diagnostics"
+      title={translateUi('Diagnostics & Recovery')}
+      description={t('settingsShell.diagnosticsDescription')}
+    >
+      <div className="cc-settings-page">
         <SettingsSection title={translateUi('Local server status')}>
           <dl className="cc-diagnostics-grid">
             <div>
@@ -153,8 +134,7 @@ export default function DiagnosticsPage() {
             </button>
           </PropertyRow>
         </SettingsSection>
-      </main>
-      <ToastContainer />
-    </div>
+      </div>
+    </SettingsShell>
   );
 }

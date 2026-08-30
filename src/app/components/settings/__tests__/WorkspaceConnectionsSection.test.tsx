@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
   issueLocalSession: vi.fn(),
   getAppMode: vi.fn(),
-  navigate: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
   verifyHealth: vi.fn(),
@@ -74,11 +73,6 @@ vi.mock('../../../platform', () => ({
     secureStorage: null,
   },
 }));
-
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return { ...actual, useNavigate: () => mocks.navigate };
-});
 
 const { useAuthStore } = await import('../../../stores/useAuthStore');
 const { useHostSessionStore } = await import('../../../stores/useHostSessionStore');
@@ -206,7 +200,6 @@ describe('WorkspaceConnectionsSection', () => {
       expect.objectContaining({ name: 'Home', serverUrl: 'https://home.example' }),
     );
     expect(localStorage.getItem('workspace-connections')).not.toContain('654321');
-    expect(mocks.navigate).toHaveBeenCalledWith('/today');
   });
 
   it('keeps local mode running when remote authentication fails', async () => {
@@ -251,7 +244,6 @@ describe('WorkspaceConnectionsSection', () => {
     expect(useAuthStore.getState().serverUrl).toBe('http://localhost:8000');
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
     expect(useWorkspaceStore.getState().profiles).toHaveLength(1);
-    expect(mocks.navigate).not.toHaveBeenCalledWith('/today');
   });
 
   it('restores the prior workspace if secure session persistence fails', async () => {
@@ -292,7 +284,21 @@ describe('WorkspaceConnectionsSection', () => {
     expect(mocks.login).not.toHaveBeenCalled();
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe(remote.id);
     expect(useAuthStore.getState().token).toBe('saved-token');
-    expect(mocks.navigate).toHaveBeenCalledWith('/today');
+  });
+
+  it('moves focus to the PIN field when a saved remote workspace needs authentication', async () => {
+    useWorkspaceStore
+      .getState()
+      .upsertRemote('Lab', 'https://lab.example', { hostId: 'claw_test', apiVersion: '1' });
+    useWorkspaceStore.getState().setActiveWorkspace('local');
+    renderSection();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use' }));
+
+    expect(
+      await screen.findByText('Enter the PIN for this workspace to connect.'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByPlaceholderText('Not saved')).toHaveFocus());
   });
 
   it('keeps remote credentials until the local workspace is ready', async () => {
@@ -309,7 +315,6 @@ describe('WorkspaceConnectionsSection', () => {
     expect(mocks.issueLocalSession).toHaveBeenCalledTimes(1);
     expect(mocks.logout).not.toHaveBeenCalled();
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
-    expect(mocks.navigate).toHaveBeenCalledWith('/today');
   });
 
   it('returns to the remote workspace if local startup fails', async () => {

@@ -229,6 +229,17 @@
   padding: 8px 12px 2px;
 }
 
+.cc-settings-inline-notice {
+  padding: 10px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  color: var(--cc-warning);
+  font-size: 12px;
+}
+
 /* Local and remote workspace connections */
 .cc-workspace-card,
 .cc-workspace-preference {
@@ -381,5 +392,27 @@
 
   .cc-settings-input {
     width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .cc-settings-shell .cc-settings-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cc-settings-shell .cc-settings-row__control {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .cc-settings-shell .cc-settings-inline-actions {
+    flex-wrap: wrap;
+  }
+
+  .cc-settings-shell .cc-segmented {
+    max-width: 100%;
+    overflow-x: auto;
   }
 }

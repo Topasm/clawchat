@@ -69,16 +69,16 @@ describe('NativeCommandBridge', () => {
     expect(screen.getByLabelText('current route')).toHaveTextContent('/settings/app');
   });
 
-  it('opens workspace Settings for an authenticated, ready session', () => {
+  it('opens the same Settings entry point for an authenticated, ready session', () => {
     mocks.token = 'session-token';
     mocks.hostPhase = 'connected';
     renderBridge();
 
     act(() => mocks.listeners.get('open-settings')?.());
-    expect(screen.getByLabelText('current route')).toHaveTextContent('/settings/workspace');
+    expect(screen.getByLabelText('current route')).toHaveTextContent('/settings/app');
 
     act(() => fireEvent.keyDown(window, { key: ',', metaKey: true }));
-    expect(screen.getByLabelText('current route')).toHaveTextContent('/settings/workspace');
+    expect(screen.getByLabelText('current route')).toHaveTextContent('/settings/app');
   });
 
   it('opens recovery settings when the active server is unhealthy', () => {

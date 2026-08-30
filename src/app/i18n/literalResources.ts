@@ -948,6 +948,9 @@ Object.assign(koreanUiTranslations, {
   task: '작업',
   Task: '작업',
   Todo: '할 일',
+  'This device server': '이 기기의 서버',
+  'Local server stopped. Choose another workspace to continue.':
+    '로컬 서버가 중지되었습니다. 계속하려면 다른 워크스페이스를 선택하세요.',
   'This and future events': '이번 일정과 이후 일정',
   'This occurrence only': '이번 일정만',
   'Upload directory': '업로드 디렉터리',

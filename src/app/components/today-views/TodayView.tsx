@@ -23,6 +23,7 @@ import { TodayPageSkeleton, BriefingSkeleton } from '../shared/PageSkeletons';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import type { BriefingData } from '../../hooks/useTodayBriefing';
 import { translateUi } from '../../i18n';
+import { settingsNavigationState } from '../../services/settingsNavigation';
 interface TodayViewProps {
   greeting: string;
   todayDate: string;
@@ -90,7 +91,11 @@ export default function TodayView({
           <button
             type="button"
             className="cc-btn cc-btn--ghost cc-btn--icon-touch"
-            onClick={() => navigate('/settings')}
+            onClick={() =>
+              navigate('/settings/app', {
+                state: settingsNavigationState('/today'),
+              })
+            }
             aria-label={translateUi('Open settings')}
           >
             <GearIcon />

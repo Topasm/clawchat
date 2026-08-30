@@ -17,7 +17,6 @@
     "src/app/hooks/useKanbanKeyboardNav.ts": "34e48b1a8e742c8627ec0134f9023419893189ed609c74841c936a61b0c945c5",
     "src/app/hooks/useTodayBriefing.ts": "98d4e04f2d8eab8f50d0a3af7aa8482e9c7ea7aa6ae472e3efc92172886d892a",
     "src/app/hooks/useVoiceInput.ts": "c9e3d6c708afc949c973490165faf145b025fe6c40c65add4d2981739a4e6333",
-    "src/app/keyboard/hooks.ts": "6ad8ea2d7c807cb16e840761571fa26119604d7701314204a6f293e9301ea142",
     "src/app/platform/__tests__/tauriCommandParity.test.ts": "99655878478ce862863ffc1c6fcb5c6f2f536a2f7d3a88a810278dc2a974d090",
     "src/app/services/updateLifecycle.ts": "7a9bf140a4a0f827f01e22509d4979460256c84942d7a16c42ea35dc2d0c5d79",
     "src/app/stores/useToastStore.ts": "63b1b3aafd36a9163f398e504998d0b5358c1583ee9b423b9bf45a6a6380606f",

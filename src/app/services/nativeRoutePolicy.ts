@@ -14,8 +14,6 @@ export function isWorkspaceSessionReady(context: WorkspaceRouteContext): boolean
   );
 }
 
-export function resolveNativeSettingsRoute(
-  context: WorkspaceRouteContext,
-): '/settings/workspace' | '/settings/app' {
-  return isWorkspaceSessionReady(context) ? '/settings/workspace' : '/settings/app';
+export function resolveNativeSettingsRoute(_context: WorkspaceRouteContext): '/settings/app' {
+  return '/settings/app';
 }

@@ -7,6 +7,7 @@ import ErrorBoundary from './app/components/shared/ErrorBoundary';
 import { markStartupPhaseAfterPaint } from './app/services/startupPerformance';
 import { hideStartupShell } from './app/services/startupSurface';
 import { IS_DESKTOP } from './app/types/platform';
+import { isWorkspaceSessionReady } from './app/services/nativeRoutePolicy';
 
 // ── Lazy-loaded pages ────────────────────────────────────────────────
 const Layout = lazy(() => import('./app/components/Layout'));
@@ -70,6 +71,7 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
 export default function AppRouter() {
   const location = useLocation();
   const token = useAuthStore((s) => s.token);
+  const healthOK = useAuthStore((s) => s.healthOK);
   const isLoading = useAuthStore((s) => s.isLoading);
   const hostPhase = useHostSessionStore((s) => s.phase);
 
@@ -79,19 +81,49 @@ export default function AppRouter() {
   // Application, connection, and recovery controls belong to the native shell,
   // not to a workspace session. Keep them mountable while auth is rehydrating
   // and while the bundled server is blocked.
+  const workspaceReady = isWorkspaceSessionReady({ token, healthOK, hostPhase });
   if (
-    location.pathname === '/settings/app' ||
+    location.pathname === '/settings' ||
+    location.pathname.startsWith('/settings/') ||
     location.pathname === '/connections' ||
     location.pathname === '/diagnostics'
   ) {
     return (
       <Routes>
         <Route
+          path="/settings"
+          element={<Navigate to="/settings/app" replace state={location.state} />}
+        />
+        <Route
           path="/settings/app"
           element={
             <LazyRoute>
               <AppSettingsPage />
             </LazyRoute>
+          }
+        />
+        <Route
+          path="/settings/workspace"
+          element={
+            workspaceReady ? (
+              <LazyRoute>
+                <SettingsPage />
+              </LazyRoute>
+            ) : (
+              <Navigate to="/settings/app" replace state={location.state} />
+            )
+          }
+        />
+        <Route
+          path="/settings/system-prompt"
+          element={
+            workspaceReady ? (
+              <LazyRoute>
+                <SystemPromptPage />
+              </LazyRoute>
+            ) : (
+              <Navigate to="/settings/app" replace state={location.state} />
+            )
           }
         />
         <Route
@@ -110,6 +142,7 @@ export default function AppRouter() {
             </LazyRoute>
           }
         />
+        <Route path="/settings/*" element={<Navigate to="/settings/app" replace />} />
       </Routes>
     );
   }
@@ -298,27 +331,6 @@ export default function AppRouter() {
             <ErrorBoundary name="EventDetailPage">
               <LazyRoute>
                 <EventDetailPage />
-              </LazyRoute>
-            </ErrorBoundary>
-          }
-        />
-        <Route path="/settings" element={<Navigate to="/settings/workspace" replace />} />
-        <Route
-          path="/settings/workspace"
-          element={
-            <ErrorBoundary name="SettingsPage">
-              <LazyRoute>
-                <SettingsPage />
-              </LazyRoute>
-            </ErrorBoundary>
-          }
-        />
-        <Route
-          path="/settings/system-prompt"
-          element={
-            <ErrorBoundary name="SystemPromptPage">
-              <LazyRoute>
-                <SystemPromptPage />
               </LazyRoute>
             </ErrorBoundary>
           }

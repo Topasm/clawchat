@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
+import SettingsShell from '../components/settings/SettingsShell';
 import CalendarSubscriptionCard from '../components/shared/CalendarSubscriptionCard';
 import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
@@ -12,6 +13,7 @@ import usePlatform from '../hooks/usePlatform';
 import { useTranslation, translateUi } from '../i18n';
 import { platformApi } from '../platform';
 import apiClient from '../services/apiClient';
+import { settingsNavigationState } from '../services/settingsNavigation';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
@@ -104,6 +106,7 @@ function apiErrorMessage(error: unknown, t: Translate, fallbackKey: string): str
 export default function SettingsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isDesktop } = usePlatform();
   const token = useAuthStore((state) => state.token);
   const serverUrl = useAuthStore((state) => state.serverUrl);
@@ -113,18 +116,25 @@ export default function SettingsPage() {
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
+  const [aiProviderLoadFailed, setAiProviderLoadFailed] = useState(false);
   const [aiProviderSwitching, setAiProviderSwitching] = useState(false);
   const [claudeCodeChecking, setClaudeCodeChecking] = useState(false);
   const [codexCliChecking, setCodexCliChecking] = useState(false);
   const [codexChecking, setCodexChecking] = useState(false);
   const [codexConfiguring, setCodexConfiguring] = useState(false);
   const [codexApiKey, setCodexApiKey] = useState('');
-  useEffect(() => {
-    apiClient
-      .get('/admin/ai/provider')
-      .then((response) => setAiProvider(response.data))
-      .catch(() => {});
+  const loadAiProvider = useCallback(async () => {
+    setAiProviderLoadFailed(false);
+    try {
+      const response = await apiClient.get('/admin/ai/provider');
+      setAiProvider(response.data);
+    } catch {
+      setAiProviderLoadFailed(true);
+    }
   }, []);
+  useEffect(() => {
+    void loadAiProvider();
+  }, [loadAiProvider]);
   const handleSwitchProvider = useCallback(
     async (provider: string) => {
       setAiProviderSwitching(true);
@@ -275,348 +285,352 @@ export default function SettingsPage() {
       .catch(() => {});
   }, [isDesktop]);
   return (
-    <div className="cc-settings-page">
-      <div className="cc-page-header">
-        <div className="cc-page-header__title">{t('workspaceSettings.title')}</div>
-      </div>
-
-      <SettingsSection title={t('workspaceSettings.sections.application')}>
-        <SettingsRow
-          label={t('workspaceSettings.application.settings')}
-          sublabel={t('workspaceSettings.application.settingsHint')}
-        >
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary cc-btn--compact"
-            onClick={() => navigate('/settings/app')}
-          >
-            {t('workspaceSettings.actions.open')}
-          </button>
-        </SettingsRow>
-        {isDesktop && (
-          <SettingsRow
-            label={t('workspaceSettings.application.connections')}
-            sublabel={t('workspaceSettings.application.connectionsHint')}
-          >
+    <SettingsShell
+      activePane="workspace"
+      title={t('workspaceSettings.title')}
+      description={t('settingsShell.workspaceDescription')}
+    >
+      <div className="cc-settings-page">
+        <SettingsSection title={t('workspaceSettings.sections.ai')}>
+          <SettingsRow label={t('workspaceSettings.ai.systemPrompt')}>
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
-              onClick={() => navigate('/connections')}
+              onClick={() =>
+                navigate('/settings/system-prompt', {
+                  state: settingsNavigationState(
+                    location.pathname,
+                    location.search,
+                    location.state,
+                  ),
+                })
+              }
             >
-              {t('workspaceSettings.actions.manage')}
+              {t('workspaceSettings.actions.edit')}
             </button>
           </SettingsRow>
-        )}
-      </SettingsSection>
-
-      <SettingsSection title={t('workspaceSettings.sections.ai')}>
-        <SettingsRow label={t('workspaceSettings.ai.systemPrompt')}>
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary cc-btn--compact"
-            onClick={() => navigate('/settings/system-prompt')}
-          >
-            {t('workspaceSettings.actions.edit')}
-          </button>
-        </SettingsRow>
-        {aiProvider && (
-          <>
-            <SettingsRow
-              label={t('workspaceSettings.ai.provider')}
-              sublabel={
-                aiProvider.active_provider === 'claude_code'
-                  ? t('workspaceSettings.ai.usingClaudeCode')
-                  : aiProvider.active_provider === 'codex_cli'
-                    ? t('workspaceSettings.ai.usingCodexCli', {
-                        model: aiProvider.codex_cli_model || t('workspaceSettings.ai.defaultModel'),
-                      })
-                    : aiProvider.active_provider === 'codex'
-                      ? t('workspaceSettings.ai.usingCodex', { model: aiProvider.codex_model })
-                      : t('workspaceSettings.ai.usingOpenClaw')
-              }
-            >
-              <SegmentedControl
-                ariaLabel={t('workspaceSettings.ai.providerAria')}
-                options={[
-                  { label: translateUi('OpenClaw'), value: 'openclaw' },
-                  { label: translateUi('Claude Code'), value: 'claude_code' },
-                  { label: t('workspaceSettings.ai.codexCli'), value: 'codex_cli' },
-                  { label: translateUi('Codex'), value: 'codex' },
-                ]}
-                value={aiProvider.active_provider}
-                onChange={(provider) => !aiProviderSwitching && void handleSwitchProvider(provider)}
-              />
-            </SettingsRow>
-            <SettingsRow
-              label={t('workspaceSettings.ai.codexApi')}
-              sublabel={codexStatusLabel(aiProvider, t)}
-            >
-              <div className="cc-settings-inline-actions">
-                <StatusDot
-                  className="cc-settings-status-dot"
-                  tone={aiProvider.codex_api_status === 'available' ? 'success' : 'neutral'}
-                />
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--secondary cc-btn--compact"
-                  onClick={() => void handleRecheckCodex()}
-                  disabled={codexChecking || !aiProvider.codex_api_configured}
-                >
-                  {codexChecking
-                    ? t('workspaceSettings.actions.checking')
-                    : t('workspaceSettings.actions.recheck')}
-                </button>
-              </div>
-            </SettingsRow>
-            <SettingsRow
-              label={t('workspaceSettings.ai.openaiApiKey')}
-              sublabel={
-                aiProvider.codex_api_configured
-                  ? aiProvider.codex_api_key_persistent
-                    ? t('workspaceSettings.ai.keyStored')
-                    : t('workspaceSettings.ai.keyEnvironment')
-                  : aiProvider.codex_api_key_persistent
-                    ? t('workspaceSettings.ai.keyWillPersist')
-                    : t('workspaceSettings.ai.keySessionOnly')
-              }
-            >
-              <div className="cc-settings-inline-actions">
-                <input
-                  className="cc-settings-input cc-settings-api-key-input"
-                  type="password"
-                  value={codexApiKey}
-                  onChange={(event) => setCodexApiKey(event.target.value)}
-                  placeholder={
-                    aiProvider.codex_api_configured
-                      ? t('workspaceSettings.ai.configuredPlaceholder')
-                      : 'sk-...'
-                  }
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label={t('workspaceSettings.ai.apiKeyAria')}
-                />
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--secondary cc-btn--compact"
-                  onClick={() => void handleConfigureCodex()}
-                  disabled={codexConfiguring || !codexApiKey.trim()}
-                >
-                  {codexConfiguring
-                    ? t('workspaceSettings.actions.validating')
-                    : t('workspaceSettings.actions.saveUse')}
-                </button>
-              </div>
-            </SettingsRow>
-            <SettingsRow
-              label={t('workspaceSettings.ai.codexCli')}
-              sublabel={
-                aiProvider.codex_cli_status === 'available'
-                  ? t('workspaceSettings.ai.codexCliReady', {
-                      version: aiProvider.codex_cli_version
-                        ? ` — ${aiProvider.codex_cli_version}`
-                        : '',
-                    })
-                  : aiProvider.codex_cli_status === 'not_installed'
-                    ? t('workspaceSettings.ai.codexCliNotInstalled')
-                    : aiProvider.codex_cli_status === 'not_authenticated'
-                      ? t('workspaceSettings.ai.codexCliNotAuthenticated')
-                      : t('workspaceSettings.ai.status', {
-                          status: aiProvider.codex_cli_status,
-                        })
-              }
-            >
-              <div className="cc-settings-inline-actions">
-                <StatusDot
-                  className="cc-settings-status-dot"
-                  tone={aiProvider.codex_cli_status === 'available' ? 'success' : 'neutral'}
-                />
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--secondary cc-btn--compact"
-                  onClick={() => void handleRecheckCodexCli()}
-                  disabled={codexCliChecking}
-                >
-                  {codexCliChecking
-                    ? t('workspaceSettings.actions.checking')
-                    : t('workspaceSettings.actions.recheck')}
-                </button>
-              </div>
-            </SettingsRow>
-            <SettingsRow
-              label={t('workspaceSettings.ai.claudeCodeCli')}
-              sublabel={
-                aiProvider.claude_code_status === 'available'
-                  ? t('workspaceSettings.ai.claudeInstalled', {
-                      version: aiProvider.claude_code_version
-                        ? ` — ${aiProvider.claude_code_version}`
-                        : '',
-                    })
-                  : aiProvider.claude_code_status === 'not_installed'
-                    ? t('workspaceSettings.ai.claudeNotInstalled')
-                    : aiProvider.claude_code_status === 'not_authenticated'
-                      ? t('workspaceSettings.ai.claudeNotAuthenticated')
-                      : t('workspaceSettings.ai.status', {
-                          status: aiProvider.claude_code_status,
-                        })
-              }
-            >
-              <div className="cc-settings-inline-actions">
-                <StatusDot
-                  className="cc-settings-status-dot"
-                  tone={aiProvider.claude_code_status === 'available' ? 'success' : 'neutral'}
-                />
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--secondary cc-btn--compact"
-                  onClick={() => void handleRecheckClaudeCode()}
-                  disabled={claudeCodeChecking}
-                >
-                  {claudeCodeChecking
-                    ? t('workspaceSettings.actions.checking')
-                    : t('workspaceSettings.actions.recheck')}
-                </button>
-              </div>
-            </SettingsRow>
-          </>
-        )}
-      </SettingsSection>
-
-      <SettingsSection title={t('workspaceSettings.sections.workspace')}>
-        <SettingsRow
-          label={t('workspaceSettings.workspace.calendarView')}
-          sublabel={t('workspaceSettings.workspace.calendarViewHint')}
-        >
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary cc-btn--compact"
-            onClick={() => navigate('/calendar')}
-          >
-            {t('workspaceSettings.actions.open')}
-          </button>
-        </SettingsRow>
-      </SettingsSection>
-
-      <SettingsSection title={t('workspaceSettings.sections.importExport')}>
-        <SettingsRow
-          label={t('workspaceSettings.importExport.exportAll')}
-          sublabel={t('workspaceSettings.importExport.exportHint')}
-        >
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary cc-btn--compact"
-            onClick={handleExport}
-          >
-            {t('workspaceSettings.actions.export')}
-          </button>
-        </SettingsRow>
-        <SettingsRow
-          label={t('workspaceSettings.importExport.importData')}
-          sublabel={t('workspaceSettings.importExport.importHint')}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={onFileSelected}
-            className="cc-hidden"
-          />
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary cc-btn--compact"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {t('workspaceSettings.actions.import')}
-          </button>
-        </SettingsRow>
-      </SettingsSection>
-
-      <CalendarSubscriptionCard />
-      <ObsidianStatusCard />
-
-      {isDesktop && isHost && (
-        <SettingsSection title={t('workspaceSettings.sections.obsidianDesktop')}>
-          <SettingsRow
-            label={t('workspaceSettings.obsidianDesktop.vaultPath')}
-            sublabel={obsidianVaultPath || t('workspaceSettings.obsidianDesktop.notConfigured')}
-          >
-            <div className="cc-settings-inline-actions">
+          {aiProviderLoadFailed && (
+            <div className="cc-settings-inline-notice" role="alert">
+              <span>{t('settingsShell.providerLoadError')}</span>
               <button
                 type="button"
                 className="cc-btn cc-btn--secondary cc-btn--compact"
-                onClick={async () => {
-                  const folder = await platformApi.server.selectFolder();
-                  if (!folder) return;
-                  setObsidianVaultPath(folder);
-                  await platformApi.server.updateConfig({ obsidianVaultPath: folder });
-                  addToast('success', t('workspaceSettings.obsidianDesktop.vaultSaved'));
-                }}
+                onClick={() => void loadAiProvider()}
               >
-                {t('workspaceSettings.actions.browse')}
+                {t('workspaceSettings.actions.retry')}
               </button>
-              {obsidianVaultPath && (
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--danger cc-btn--compact"
-                  onClick={async () => {
-                    setObsidianVaultPath('');
-                    await platformApi.server.updateConfig({ obsidianVaultPath: '' });
-                    addToast('success', t('workspaceSettings.obsidianDesktop.vaultCleared'));
-                  }}
-                >
-                  {t('workspaceSettings.actions.clear')}
-                </button>
-              )}
             </div>
-          </SettingsRow>
+          )}
+          {aiProvider && (
+            <>
+              <SettingsRow
+                label={t('workspaceSettings.ai.provider')}
+                sublabel={
+                  aiProvider.active_provider === 'claude_code'
+                    ? t('workspaceSettings.ai.usingClaudeCode')
+                    : aiProvider.active_provider === 'codex_cli'
+                      ? t('workspaceSettings.ai.usingCodexCli', {
+                          model:
+                            aiProvider.codex_cli_model || t('workspaceSettings.ai.defaultModel'),
+                        })
+                      : aiProvider.active_provider === 'codex'
+                        ? t('workspaceSettings.ai.usingCodex', { model: aiProvider.codex_model })
+                        : t('workspaceSettings.ai.usingOpenClaw')
+                }
+              >
+                <SegmentedControl
+                  ariaLabel={t('workspaceSettings.ai.providerAria')}
+                  options={[
+                    { label: translateUi('OpenClaw'), value: 'openclaw' },
+                    { label: translateUi('Claude Code'), value: 'claude_code' },
+                    { label: t('workspaceSettings.ai.codexCli'), value: 'codex_cli' },
+                    { label: translateUi('Codex'), value: 'codex' },
+                  ]}
+                  value={aiProvider.active_provider}
+                  onChange={(provider) =>
+                    !aiProviderSwitching && void handleSwitchProvider(provider)
+                  }
+                />
+              </SettingsRow>
+              {aiProvider.active_provider === 'codex' && (
+                <>
+                  <SettingsRow
+                    label={t('workspaceSettings.ai.codexApi')}
+                    sublabel={codexStatusLabel(aiProvider, t)}
+                  >
+                    <div className="cc-settings-inline-actions">
+                      <StatusDot
+                        className="cc-settings-status-dot"
+                        tone={aiProvider.codex_api_status === 'available' ? 'success' : 'neutral'}
+                      />
+                      <button
+                        type="button"
+                        className="cc-btn cc-btn--secondary cc-btn--compact"
+                        onClick={() => void handleRecheckCodex()}
+                        disabled={codexChecking || !aiProvider.codex_api_configured}
+                      >
+                        {codexChecking
+                          ? t('workspaceSettings.actions.checking')
+                          : t('workspaceSettings.actions.recheck')}
+                      </button>
+                    </div>
+                  </SettingsRow>
+                  <SettingsRow
+                    label={t('workspaceSettings.ai.openaiApiKey')}
+                    sublabel={
+                      aiProvider.codex_api_configured
+                        ? aiProvider.codex_api_key_persistent
+                          ? t('workspaceSettings.ai.keyStored')
+                          : t('workspaceSettings.ai.keyEnvironment')
+                        : aiProvider.codex_api_key_persistent
+                          ? t('workspaceSettings.ai.keyWillPersist')
+                          : t('workspaceSettings.ai.keySessionOnly')
+                    }
+                  >
+                    <div className="cc-settings-inline-actions">
+                      <input
+                        className="cc-settings-input cc-settings-api-key-input"
+                        type="password"
+                        value={codexApiKey}
+                        onChange={(event) => setCodexApiKey(event.target.value)}
+                        placeholder={
+                          aiProvider.codex_api_configured
+                            ? t('workspaceSettings.ai.configuredPlaceholder')
+                            : 'sk-...'
+                        }
+                        autoComplete="off"
+                        spellCheck={false}
+                        aria-label={t('workspaceSettings.ai.apiKeyAria')}
+                      />
+                      <button
+                        type="button"
+                        className="cc-btn cc-btn--secondary cc-btn--compact"
+                        onClick={() => void handleConfigureCodex()}
+                        disabled={codexConfiguring || !codexApiKey.trim()}
+                      >
+                        {codexConfiguring
+                          ? t('workspaceSettings.actions.validating')
+                          : t('workspaceSettings.actions.saveUse')}
+                      </button>
+                    </div>
+                  </SettingsRow>
+                </>
+              )}
+              {aiProvider.active_provider === 'codex_cli' && (
+                <SettingsRow
+                  label={t('workspaceSettings.ai.codexCli')}
+                  sublabel={
+                    aiProvider.codex_cli_status === 'available'
+                      ? t('workspaceSettings.ai.codexCliReady', {
+                          version: aiProvider.codex_cli_version
+                            ? ` — ${aiProvider.codex_cli_version}`
+                            : '',
+                        })
+                      : aiProvider.codex_cli_status === 'not_installed'
+                        ? t('workspaceSettings.ai.codexCliNotInstalled')
+                        : aiProvider.codex_cli_status === 'not_authenticated'
+                          ? t('workspaceSettings.ai.codexCliNotAuthenticated')
+                          : t('workspaceSettings.ai.status', {
+                              status: aiProvider.codex_cli_status,
+                            })
+                  }
+                >
+                  <div className="cc-settings-inline-actions">
+                    <StatusDot
+                      className="cc-settings-status-dot"
+                      tone={aiProvider.codex_cli_status === 'available' ? 'success' : 'neutral'}
+                    />
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--secondary cc-btn--compact"
+                      onClick={() => void handleRecheckCodexCli()}
+                      disabled={codexCliChecking}
+                    >
+                      {codexCliChecking
+                        ? t('workspaceSettings.actions.checking')
+                        : t('workspaceSettings.actions.recheck')}
+                    </button>
+                  </div>
+                </SettingsRow>
+              )}
+              {aiProvider.active_provider === 'claude_code' && (
+                <SettingsRow
+                  label={t('workspaceSettings.ai.claudeCodeCli')}
+                  sublabel={
+                    aiProvider.claude_code_status === 'available'
+                      ? t('workspaceSettings.ai.claudeInstalled', {
+                          version: aiProvider.claude_code_version
+                            ? ` — ${aiProvider.claude_code_version}`
+                            : '',
+                        })
+                      : aiProvider.claude_code_status === 'not_installed'
+                        ? t('workspaceSettings.ai.claudeNotInstalled')
+                        : aiProvider.claude_code_status === 'not_authenticated'
+                          ? t('workspaceSettings.ai.claudeNotAuthenticated')
+                          : t('workspaceSettings.ai.status', {
+                              status: aiProvider.claude_code_status,
+                            })
+                  }
+                >
+                  <div className="cc-settings-inline-actions">
+                    <StatusDot
+                      className="cc-settings-status-dot"
+                      tone={aiProvider.claude_code_status === 'available' ? 'success' : 'neutral'}
+                    />
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--secondary cc-btn--compact"
+                      onClick={() => void handleRecheckClaudeCode()}
+                      disabled={claudeCodeChecking}
+                    >
+                      {claudeCodeChecking
+                        ? t('workspaceSettings.actions.checking')
+                        : t('workspaceSettings.actions.recheck')}
+                    </button>
+                  </div>
+                </SettingsRow>
+              )}
+            </>
+          )}
+        </SettingsSection>
+
+        <SettingsSection title={t('workspaceSettings.sections.workspace')}>
           <SettingsRow
-            label={t('workspaceSettings.obsidianDesktop.openInObsidian')}
-            sublabel={t('workspaceSettings.obsidianDesktop.openHint')}
+            label={t('workspaceSettings.workspace.calendarView')}
+            sublabel={t('workspaceSettings.workspace.calendarViewHint')}
           >
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
-              disabled={!obsidianVaultPath}
-              onClick={() => openObsidianVault(obsidianVaultPath)}
+              onClick={() => navigate('/calendar')}
             >
               {t('workspaceSettings.actions.open')}
             </button>
           </SettingsRow>
         </SettingsSection>
-      )}
 
-      {!isDesktop && (
-        <SettingsSection title={t('workspaceSettings.sections.serverConnection')}>
+        <SettingsSection title={t('workspaceSettings.sections.importExport')}>
           <SettingsRow
-            label={t('workspaceSettings.serverConnection.server')}
-            sublabel={serverUrl ?? t('workspaceSettings.serverConnection.unknown')}
-          >
-            <span className="cc-settings-status cc-settings-status--success">
-              {t('connection.connected')}
-            </span>
-          </SettingsRow>
-          <SettingsRow
-            label={t('workspaceSettings.serverConnection.logout')}
-            sublabel={t('workspaceSettings.serverConnection.logoutHint')}
+            label={t('workspaceSettings.importExport.exportAll')}
+            sublabel={t('workspaceSettings.importExport.exportHint')}
           >
             <button
               type="button"
-              className="cc-btn cc-btn--danger"
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
+              className="cc-btn cc-btn--secondary cc-btn--compact"
+              onClick={handleExport}
             >
-              {t('workspaceSettings.actions.logout')}
+              {t('workspaceSettings.actions.export')}
+            </button>
+          </SettingsRow>
+          <SettingsRow
+            label={t('workspaceSettings.importExport.importData')}
+            sublabel={t('workspaceSettings.importExport.importHint')}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={onFileSelected}
+              className="cc-hidden"
+            />
+            <button
+              type="button"
+              className="cc-btn cc-btn--secondary cc-btn--compact"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {t('workspaceSettings.actions.import')}
             </button>
           </SettingsRow>
         </SettingsSection>
-      )}
 
-      {isDesktop && isHost && token && (
-        <SettingsSection title={t('workspaceSettings.sections.connectMobile')}>
-          <PairingCodeDisplay />
-        </SettingsSection>
-      )}
-    </div>
+        <CalendarSubscriptionCard />
+        <ObsidianStatusCard />
+
+        {isDesktop && isHost && (
+          <SettingsSection title={t('workspaceSettings.sections.obsidianDesktop')}>
+            <SettingsRow
+              label={t('workspaceSettings.obsidianDesktop.vaultPath')}
+              sublabel={obsidianVaultPath || t('workspaceSettings.obsidianDesktop.notConfigured')}
+            >
+              <div className="cc-settings-inline-actions">
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--secondary cc-btn--compact"
+                  onClick={async () => {
+                    const folder = await platformApi.server.selectFolder();
+                    if (!folder) return;
+                    setObsidianVaultPath(folder);
+                    await platformApi.server.updateConfig({ obsidianVaultPath: folder });
+                    addToast('success', t('workspaceSettings.obsidianDesktop.vaultSaved'));
+                  }}
+                >
+                  {t('workspaceSettings.actions.browse')}
+                </button>
+                {obsidianVaultPath && (
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn--danger cc-btn--compact"
+                    onClick={async () => {
+                      setObsidianVaultPath('');
+                      await platformApi.server.updateConfig({ obsidianVaultPath: '' });
+                      addToast('success', t('workspaceSettings.obsidianDesktop.vaultCleared'));
+                    }}
+                  >
+                    {t('workspaceSettings.actions.clear')}
+                  </button>
+                )}
+              </div>
+            </SettingsRow>
+            <SettingsRow
+              label={t('workspaceSettings.obsidianDesktop.openInObsidian')}
+              sublabel={t('workspaceSettings.obsidianDesktop.openHint')}
+            >
+              <button
+                type="button"
+                className="cc-btn cc-btn--secondary cc-btn--compact"
+                disabled={!obsidianVaultPath}
+                onClick={() => openObsidianVault(obsidianVaultPath)}
+              >
+                {t('workspaceSettings.actions.open')}
+              </button>
+            </SettingsRow>
+          </SettingsSection>
+        )}
+
+        {!isDesktop && (
+          <SettingsSection title={t('workspaceSettings.sections.serverConnection')}>
+            <SettingsRow
+              label={t('workspaceSettings.serverConnection.server')}
+              sublabel={serverUrl ?? t('workspaceSettings.serverConnection.unknown')}
+            >
+              <span className="cc-settings-status cc-settings-status--success">
+                {t('connection.connected')}
+              </span>
+            </SettingsRow>
+            <SettingsRow
+              label={t('workspaceSettings.serverConnection.logout')}
+              sublabel={t('workspaceSettings.serverConnection.logoutHint')}
+            >
+              <button
+                type="button"
+                className="cc-btn cc-btn--danger"
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+              >
+                {t('workspaceSettings.actions.logout')}
+              </button>
+            </SettingsRow>
+          </SettingsSection>
+        )}
+
+        {isDesktop && isHost && token && (
+          <SettingsSection title={t('workspaceSettings.sections.connectMobile')}>
+            <PairingCodeDisplay />
+          </SettingsSection>
+        )}
+      </div>
+    </SettingsShell>
   );
 }
