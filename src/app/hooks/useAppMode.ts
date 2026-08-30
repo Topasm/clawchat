@@ -28,10 +28,13 @@ export function useAppMode(): UseAppModeResult {
     void initialize();
   }, [initialize]);
 
-  const setAppMode = useCallback(async (mode: AppMode) => {
-    if (!IS_DESKTOP) return;
-    await setCompatibilityMode(mode);
-  }, [setCompatibilityMode]);
+  const setAppMode = useCallback(
+    async (mode: AppMode) => {
+      if (!IS_DESKTOP) return;
+      await setCompatibilityMode(mode);
+    },
+    [setCompatibilityMode],
+  );
 
   return {
     appMode,

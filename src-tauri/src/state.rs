@@ -256,7 +256,9 @@ impl AppState {
         let Ok(mut config) = self.lock_config() else {
             return;
         };
-        if config.port == status.port {
+        // Port zero is an enduring "automatic" policy. Keep it in config
+        // while exposing the selected runtime port through ServerStatus.
+        if config.port == 0 || config.port == status.port {
             return;
         }
         config.port = status.port;

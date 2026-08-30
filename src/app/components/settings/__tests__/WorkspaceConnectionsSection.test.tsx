@@ -15,10 +15,23 @@ const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   logout: vi.fn(),
   verifyHealth: vi.fn(),
+  loadSession: vi.fn(),
+  saveSession: vi.fn(),
+  removeSession: vi.fn(),
+  apiGet: vi.fn(),
 }));
 
 vi.mock('../../../services/workspaceHealth', () => ({
   verifyClawChatHealth: mocks.verifyHealth,
+}));
+vi.mock('../../../services/workspaceCredentials', () => ({
+  workspaceCredentialRef: (id: string) => `workspace-session-${id}`,
+  loadWorkspaceSession: mocks.loadSession,
+  saveWorkspaceSession: mocks.saveSession,
+  removeWorkspaceSession: mocks.removeSession,
+}));
+vi.mock('../../../services/apiClient', () => ({
+  default: { get: mocks.apiGet },
 }));
 
 vi.mock('../../../hooks/useAppMode', () => ({
@@ -132,6 +145,10 @@ beforeEach(() => {
     hostId: 'claw_test',
     hostPublicKey: 'public-key',
   });
+  mocks.loadSession.mockResolvedValue(null);
+  mocks.saveSession.mockResolvedValue(undefined);
+  mocks.removeSession.mockResolvedValue(undefined);
+  mocks.apiGet.mockResolvedValue({ data: {} });
   useHostSessionStore.getState().reset();
   useWorkspaceRuntimeStore.getState().reset();
   useWorkspaceStore.getState().reset();
@@ -207,6 +224,30 @@ describe('WorkspaceConnectionsSection', () => {
     expect(await screen.findByText('Invalid PIN')).toBeInTheDocument();
     expect(mocks.nativeSetAppMode).not.toHaveBeenCalled();
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
+  });
+
+  it('quick-switches with a saved secure session without asking for the PIN again', async () => {
+    const remote = useWorkspaceStore
+      .getState()
+      .upsertRemote('Lab', 'https://lab.example', { hostId: 'claw_test', apiVersion: '1' });
+    useWorkspaceStore.getState().setActiveWorkspace('local');
+    mocks.loadSession.mockResolvedValueOnce({
+      token: 'saved-token',
+      refreshToken: 'saved-refresh',
+      serverUrl: 'https://lab.example',
+      hostId: 'claw_test',
+      hostPublicKey: 'public-key',
+      relayUrl: null,
+    });
+    renderSection();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use' }));
+
+    await waitFor(() => expect(mocks.apiGet).toHaveBeenCalledWith('/capabilities'));
+    expect(mocks.login).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe(remote.id);
+    expect(useAuthStore.getState().token).toBe('saved-token');
+    expect(mocks.navigate).toHaveBeenCalledWith('/today');
   });
 
   it('keeps remote credentials until the local workspace is ready', async () => {

@@ -2,7 +2,6 @@ import { useState, useEffect, type FormEvent, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
-import { platformApi } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
 import { relayClient } from '../services/relayClient';
 

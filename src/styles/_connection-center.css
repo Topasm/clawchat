@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 40px 28px 64px;
   color: var(--cc-text);
-  background: var(--cc-bg);
+  background: var(--cc-background);
 }
 
 .cc-public-shell__header,

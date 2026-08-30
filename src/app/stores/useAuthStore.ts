@@ -15,7 +15,10 @@ interface AuthState {
   isLoading: boolean;
   connectionStatus: ConnectionStatus;
   healthOK: boolean;
-  login: (serverUrl: string, pin: string) => Promise<{
+  login: (
+    serverUrl: string,
+    pin: string,
+  ) => Promise<{
     hostId: string | null;
     hostPublicKey: string | null;
     apiVersion: string | null;

@@ -6,14 +6,15 @@ import SegmentedControl from '../components/shared/SegmentedControl';
 import ToastContainer from '../components/shared/ToastContainer';
 import { useTheme } from '../config/ThemeContext';
 import { changeAppLanguage, getAppLanguage, useTranslation } from '../i18n';
+import { themeCssVars } from '../config/themeCssVars';
 
 export default function ConnectionCenterPage() {
   const navigate = useNavigate();
-  const { mode, setMode } = useTheme();
+  const { colors, mode, setMode } = useTheme();
   const { t } = useTranslation();
 
   return (
-    <div className="cc-public-shell">
+    <div className="cc-public-shell" style={themeCssVars(colors)}>
       <header className="cc-public-shell__header">
         <div>
           <div className="cc-public-shell__eyebrow">ClawChat</div>
@@ -28,11 +29,7 @@ export default function ConnectionCenterPage() {
           >
             Diagnostics
           </button>
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary"
-            onClick={() => navigate(-1)}
-          >
+          <button type="button" className="cc-btn cc-btn--secondary" onClick={() => navigate(-1)}>
             Back
           </button>
         </div>

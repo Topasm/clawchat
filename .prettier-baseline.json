@@ -43,7 +43,6 @@
     "src/app/hooks/useVoiceInput.ts": "c9e3d6c708afc949c973490165faf145b025fe6c40c65add4d2981739a4e6333",
     "src/app/keyboard/hooks.ts": "6ad8ea2d7c807cb16e840761571fa26119604d7701314204a6f293e9301ea142",
     "src/app/pages/EventDetailPage.tsx": "adfe0eff77ba2ca41a7b7bdc04bc549894eac5180d0f7a1b27533625a8be8d7c",
-    "src/app/pages/OnboardingPage.tsx": "e39908fcab1846438764c523f9e4c5d097703eb5a3c59f1f409aff0754d9a7e9",
     "src/app/pages/SearchPage.tsx": "348499f770fe264efa6b4e1d84492432a469d7bc6e857c3ce95beb4250953d4f",
     "src/app/pages/SystemPromptPage.tsx": "59879b2987cf2f42213d327d8b6a8c9e56b267369000a068e11e4d31c337e880",
     "src/app/platform/__tests__/tauriCommandParity.test.ts": "99655878478ce862863ffc1c6fcb5c6f2f536a2f7d3a88a810278dc2a974d090",
@@ -60,7 +59,6 @@
     "src/styles/_chat.css": "ad41a58127ac9b2dc9b76a09077c94ea9d5d26ffe280485daca75971b2aa6d3b",
     "src/styles/_dialog.css": "b5db20949b1d530d71bdb769528e17d335193b823d5a7763237fe0d93a2717a5",
     "src/styles/_kanban-filter.css": "43b6ceec0988b630edeca368c1e630c9159016c1b423a44d5767c3de86558c4f",
-    "src/styles/_layout.css": "89ee0224706e82c766cf65c6008e7c0817b3be88a83d7d4b6ce87383c4afcf55",
     "src/styles/_pull-refresh.css": "d1a8badb6e3407be0440a08e224c9d75d2676b1eafb25b1a55aebacf7ca0774c",
     "src/styles/_reset.css": "6612b3b31054641b289cbc480d5195c31c2c7e5cce02d88a38c0d9af215cdb98",
     "src/styles/_toast.css": "40e58c181371d97057fc4217300249d6915d10b7159e528133120b9b99547822"

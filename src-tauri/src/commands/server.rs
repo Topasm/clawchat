@@ -75,28 +75,34 @@ pub fn server_update_config<R: Runtime>(
     }
     let status = if !config.local_server_enabled {
         if local_server_update == Some(false)
-            || matches!(previous_status.state, ServerState::Running | ServerState::Starting)
+            || matches!(
+                previous_status.state,
+                ServerState::Running | ServerState::Starting
+            )
         {
             state.stop_server(&app)?
         } else {
             previous_status.clone()
         }
     } else if requires_restart
-        && matches!(previous_status.state, ServerState::Running | ServerState::Starting)
+        && matches!(
+            previous_status.state,
+            ServerState::Running | ServerState::Starting
+        )
     {
         state.restart_server(&app)?
     } else if local_server_update == Some(true)
-        || !matches!(previous_status.state, ServerState::Running | ServerState::Starting)
+        || !matches!(
+            previous_status.state,
+            ServerState::Running | ServerState::Starting
+        )
     {
         state.start_server(&app)?
     } else {
         previous_status.clone()
     };
     if local_server_update.is_some() && autostart_update.is_none() {
-        set_autostart(
-            &app,
-            config.local_server_enabled && config.auto_start_host,
-        );
+        set_autostart(&app, config.local_server_enabled && config.auto_start_host);
     }
     let result = transition_result(config, previous_status, status, requires_restart);
     let _ = app.emit("workspace-runtime-change", &result);
@@ -174,10 +180,7 @@ pub fn server_set_app_mode<R: Runtime>(
         // not an instruction to disconnect phones using this local server.
         _ => previous_status.clone(),
     };
-    set_autostart(
-        &app,
-        config.local_server_enabled && config.auto_start_host,
-    );
+    set_autostart(&app, config.local_server_enabled && config.auto_start_host);
     let result = transition_result(config, previous_status, status, false);
     let _ = app.emit("workspace-runtime-change", &result);
     Ok(result)

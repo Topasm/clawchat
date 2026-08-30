@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager, suppress
 
 from app_version import APP_VERSION
 from config import settings
-from database import async_session_factory, init_db
+from database import async_session_factory, get_db, init_db
 from exceptions import AppError, app_error_handler
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
 from routers import agent_run as agent_run_router
@@ -37,6 +37,7 @@ from services.ai.claude_code_provider import (
 )
 from services.chat.orchestrator import Orchestrator
 from services.scheduler import Scheduler
+from sqlalchemy.ext.asyncio import AsyncSession
 from utils.access_log import install_access_log_redaction
 from ws.handler import websocket_endpoint
 from ws.manager import ws_manager
@@ -321,7 +322,18 @@ app.websocket("/ws")(websocket_endpoint)
 
 
 @app.get("/api/health")
-async def health():
+async def health(db: AsyncSession = Depends(get_db)):
+    host_id = getattr(app.state, "host_id", None)
+    host_public_key = getattr(app.state, "host_public_key", None)
+    if not host_id:
+        from services.relay.host_identity import get_or_create_host_identity
+
+        identity = await get_or_create_host_identity(db)
+        await db.commit()
+        host_id = identity.host_id
+        host_public_key = identity.public_key
+        app.state.host_id = host_id
+        app.state.host_public_key = host_public_key
     ai_connected = getattr(app.state, "ai_connected", False)
     active_provider = getattr(app.state, "active_ai_provider", "openclaw")
     claude_code_status = getattr(app.state, "claude_code_status", "unknown")
@@ -338,8 +350,8 @@ async def health():
         # enough: port 8000 is commonly occupied by unrelated developer tools.
         "service": "clawchat",
         "api_version": "1",
-        "host_id": getattr(app.state, "host_id", None),
-        "host_public_key": getattr(app.state, "host_public_key", None),
+        "host_id": host_id,
+        "host_public_key": host_public_key,
         "status": "ok" if effective_connected else "degraded",
         "version": APP_VERSION,
         "ai_provider": active_provider,

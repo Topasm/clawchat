@@ -83,20 +83,23 @@ export default function OnboardingPage() {
   }, []);
 
   // Check server health via HTTP
-  const checkServerHealth = useCallback(async (url?: string) => {
-    const targetUrl = (url ?? manualServerUrl).replace(/\/+$/, '');
-    if (!targetUrl) {
-      setServerStatus('offline');
-      return;
-    }
-    setServerStatus('checking');
-    try {
-      await verifyClawChatHealth(targetUrl);
-      setServerStatus('online');
-    } catch {
-      setServerStatus('offline');
-    }
-  }, [manualServerUrl]);
+  const checkServerHealth = useCallback(
+    async (url?: string) => {
+      const targetUrl = (url ?? manualServerUrl).replace(/\/+$/, '');
+      if (!targetUrl) {
+        setServerStatus('offline');
+        return;
+      }
+      setServerStatus('checking');
+      try {
+        await verifyClawChatHealth(targetUrl);
+        setServerStatus('online');
+      } catch {
+        setServerStatus('offline');
+      }
+    },
+    [manualServerUrl],
+  );
 
   // Auto-check server when entering the server step
   useEffect(() => {
@@ -123,7 +126,13 @@ export default function OnboardingPage() {
 
   // Auto-retry the embedded server check while it is starting.
   useEffect(() => {
-    if (currentStep !== 'server' || !IS_DESKTOP || chosenRole !== 'host' || serverStatus !== 'checking') return;
+    if (
+      currentStep !== 'server' ||
+      !IS_DESKTOP ||
+      chosenRole !== 'host' ||
+      serverStatus !== 'checking'
+    )
+      return;
     const interval = setInterval(checkEmbeddedServer, 2000);
     return () => clearInterval(interval);
   }, [currentStep, chosenRole, serverStatus, checkEmbeddedServer]);
@@ -149,7 +158,10 @@ export default function OnboardingPage() {
       const data = await response.json();
       if (data.claude_code === 'authenticated' || data.claudeCode === 'authenticated') {
         setClaudeStatus('ready');
-      } else if (data.claude_code === 'not_authenticated' || data.claudeCode === 'not_authenticated') {
+      } else if (
+        data.claude_code === 'not_authenticated' ||
+        data.claudeCode === 'not_authenticated'
+      ) {
         setClaudeStatus('not-authenticated');
       } else if (data.claude_code === 'not_installed' || data.claudeCode === 'not_installed') {
         setClaudeStatus('not-installed');
@@ -184,7 +196,9 @@ export default function OnboardingPage() {
   const enterApp = () => {
     try {
       localStorage.setItem('cc-onboarding-complete', 'true');
-    } catch { /* localStorage may be unavailable */ }
+    } catch {
+      /* localStorage may be unavailable */
+    }
     navigate('/login', { replace: true });
   };
 
@@ -349,9 +363,9 @@ export default function OnboardingPage() {
     <div className="cc-onboarding__card">
       <h2 className="cc-onboarding__card-title">Welcome to ClawChat</h2>
       <p className="cc-onboarding__card-description">
-        ClawChat is your personal productivity hub with AI-powered chat, tasks,
-        calendar, and notes &mdash; all in one place. This wizard will help you
-        get everything set up in a few quick steps.
+        ClawChat is your personal productivity hub with AI-powered chat, tasks, calendar, and notes
+        &mdash; all in one place. This wizard will help you get everything set up in a few quick
+        steps.
       </p>
       <div className="cc-onboarding__actions">
         <span />
@@ -368,8 +382,8 @@ export default function OnboardingPage() {
     <div className="cc-onboarding__card">
       <h2 className="cc-onboarding__card-title">Choose where to start</h2>
       <p className="cc-onboarding__card-description">
-        You can use the private workspace on this computer or connect to an
-        existing ClawChat. This can be changed at any time.
+        You can use the private workspace on this computer or connect to an existing ClawChat. This
+        can be changed at any time.
       </p>
 
       <div className="cc-onboarding__role-grid">
@@ -381,8 +395,8 @@ export default function OnboardingPage() {
           <div className="cc-onboarding__role-content">
             <div className="cc-onboarding__role-title">Start on this computer</div>
             <p className="cc-onboarding__role-description">
-              Start with the private workspace on this computer. Other devices
-              can connect to its local server later.
+              Start with the private workspace on this computer. Other devices can connect to its
+              local server later.
             </p>
           </div>
         </div>
@@ -395,8 +409,8 @@ export default function OnboardingPage() {
           <div className="cc-onboarding__role-content">
             <div className="cc-onboarding__role-title">Connect to an existing ClawChat</div>
             <p className="cc-onboarding__role-description">
-              View a ClawChat workspace running on another device. This
-              computer can still keep its own local server available.
+              View a ClawChat workspace running on another device. This computer can still keep its
+              own local server available.
             </p>
           </div>
         </div>
@@ -501,9 +515,8 @@ export default function OnboardingPage() {
     <div className="cc-onboarding__card">
       <h2 className="cc-onboarding__card-title">Claude Code</h2>
       <p className="cc-onboarding__card-description">
-        ClawChat can use Claude Code for AI-powered features like smart task
-        suggestions, natural language chat, and more. This is optional &mdash;
-        all non-AI features work without it.
+        ClawChat can use Claude Code for AI-powered features like smart task suggestions, natural
+        language chat, and more. This is optional &mdash; all non-AI features work without it.
       </p>
 
       <div className="cc-onboarding__status-row">
@@ -520,7 +533,14 @@ export default function OnboardingPage() {
       </div>
 
       {claudeStatus === 'not-installed' && (
-        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--cc-text-secondary)', lineHeight: 1.6 }}>
+        <div
+          style={{
+            marginTop: 12,
+            fontSize: 13,
+            color: 'var(--cc-text-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
           Install Claude Code from{' '}
           <a
             href="https://docs.anthropic.com/en/docs/claude-code"
@@ -535,13 +555,22 @@ export default function OnboardingPage() {
       )}
 
       {claudeStatus === 'not-authenticated' && (
-        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--cc-text-secondary)', lineHeight: 1.6 }}>
-          Run <code className="cc-onboarding__code">claude login</code> in your
-          terminal to authenticate, then click Retry.
+        <div
+          style={{
+            marginTop: 12,
+            fontSize: 13,
+            color: 'var(--cc-text-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
+          Run <code className="cc-onboarding__code">claude login</code> in your terminal to
+          authenticate, then click Retry.
         </div>
       )}
 
-      {(claudeStatus === 'not-installed' || claudeStatus === 'not-authenticated' || claudeStatus === 'unavailable') && (
+      {(claudeStatus === 'not-installed' ||
+        claudeStatus === 'not-authenticated' ||
+        claudeStatus === 'unavailable') && (
         <button
           className="cc-btn cc-btn--secondary"
           onClick={checkClaudeCode}
@@ -573,8 +602,8 @@ export default function OnboardingPage() {
     <div className="cc-onboarding__card">
       <h2 className="cc-onboarding__card-title">Mobile Pairing</h2>
       <p className="cc-onboarding__card-description">
-        Optionally pair a mobile device to access ClawChat on the go. You can
-        always set this up later in Settings.
+        Optionally pair a mobile device to access ClawChat on the go. You can always set this up
+        later in Settings.
       </p>
 
       {serverStatus === 'online' && token ? (
@@ -582,9 +611,20 @@ export default function OnboardingPage() {
       ) : (
         <>
           <div className="cc-onboarding__qr-placeholder">
-            <span>Log in to the server first<br />to generate a pairing code</span>
+            <span>
+              Log in to the server first
+              <br />
+              to generate a pairing code
+            </span>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--cc-text-tertiary)', textAlign: 'center', marginTop: 8 }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--cc-text-tertiary)',
+              textAlign: 'center',
+              marginTop: 8,
+            }}
+          >
             You can pair devices later from Settings after logging in.
           </div>
         </>
@@ -619,12 +659,15 @@ export default function OnboardingPage() {
       <p className="cc-onboarding__card-description" style={{ textAlign: 'center' }}>
         {IS_DESKTOP && chosenRole === 'host'
           ? 'Your ClawChat host is running. Other devices can connect to this machine.'
-          : 'ClawChat is ready to use.'
-        }{' '}
+          : 'ClawChat is ready to use.'}{' '}
         You can adjust any of these settings later from the Settings page.
       </p>
       <div className="cc-onboarding__actions" style={{ justifyContent: 'center' }}>
-        <button className="cc-btn cc-btn--primary" onClick={enterApp} style={{ padding: '12px 32px', fontSize: 15 }}>
+        <button
+          className="cc-btn cc-btn--primary"
+          onClick={enterApp}
+          style={{ padding: '12px 32px', fontSize: 15 }}
+        >
           Enter ClawChat
         </button>
       </div>
@@ -654,9 +697,7 @@ export default function OnboardingPage() {
         {renderStepper()}
         {renderCurrentStep()}
       </div>
-      {showScanner && (
-        <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />
-      )}
+      {showScanner && <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />}
     </div>
   );
 }

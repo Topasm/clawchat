@@ -320,8 +320,8 @@ mod tests {
             ..ServerConfig::default()
         };
 
-        let serialized = serde_json::to_string(&RedactedServerConfig::from(&config))
-            .expect("redacted config");
+        let serialized =
+            serde_json::to_string(&RedactedServerConfig::from(&config)).expect("redacted config");
 
         assert!(!serialized.contains("938274"));
         assert!(serialized.contains("\"pinConfigured\":true"));

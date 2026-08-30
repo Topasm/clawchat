@@ -10,11 +10,7 @@ import type {
 import { logger } from '../services/logger';
 
 export type WorkspaceBootstrapPhase =
-  | 'reading_config'
-  | 'starting_local_server'
-  | 'connecting'
-  | 'ready'
-  | 'action_required';
+  'reading_config' | 'starting_local_server' | 'connecting' | 'ready' | 'action_required';
 
 export interface WorkspaceTransition {
   kind: 'local_server_policy' | 'workspace';
@@ -92,7 +88,9 @@ export const useWorkspaceRuntimeStore = create<WorkspaceRuntimeState>((set, get)
           config: runtime.config,
           localServerStatus: runtime.status,
           bootstrapPhase: phaseFor(runtime.config, runtime.status),
-          error: runtime.applied ? null : (runtime.status.error ?? 'Local server transition failed'),
+          error: runtime.applied
+            ? null
+            : (runtime.status.error ?? 'Local server transition failed'),
         });
       });
       await get().refresh();

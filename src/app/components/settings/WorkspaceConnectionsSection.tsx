@@ -14,6 +14,12 @@ import SettingsSection from '../shared/SettingsSection';
 import Toggle from '../shared/Toggle';
 import { useWorkspaceRuntimeStore } from '../../stores/useWorkspaceRuntimeStore';
 import { verifyClawChatHealth } from '../../services/workspaceHealth';
+import apiClient from '../../services/apiClient';
+import {
+  loadWorkspaceSession,
+  removeWorkspaceSession,
+  saveWorkspaceSession,
+} from '../../services/workspaceCredentials';
 
 function statusLabel(status: ServerStatus | null): string {
   if (!status) return 'Preparing';
@@ -41,9 +47,7 @@ export default function WorkspaceConnectionsSection() {
   const updateLocalServerPolicy = useWorkspaceRuntimeStore(
     (state) => state.updateLocalServerPolicy,
   );
-  const setWorkspaceTransition = useWorkspaceRuntimeStore(
-    (state) => state.setWorkspaceTransition,
-  );
+  const setWorkspaceTransition = useWorkspaceRuntimeStore((state) => state.setWorkspaceTransition);
   const [localPin, setLocalPin] = useState('');
   const [localPort, setLocalPort] = useState('0');
   const [savingLocalSecurity, setSavingLocalSecurity] = useState(false);
@@ -152,9 +156,8 @@ export default function WorkspaceConnectionsSection() {
         from: activeWorkspaceId,
         to: remoteUrl,
       });
-      let normalizedUrl = '';
       try {
-        normalizedUrl = normalizeWorkspaceUrl(remoteUrl);
+        const normalizedUrl = normalizeWorkspaceUrl(remoteUrl);
         // Workspace selection no longer controls the local server lifecycle.
         // A phone paired to this computer stays connected while the desktop
         // UI authenticates against and displays a remote workspace.
@@ -170,6 +173,17 @@ export default function WorkspaceConnectionsSection() {
           hostPublicKey: identity.hostPublicKey ?? health.hostPublicKey,
           apiVersion: identity.apiVersion ?? health.apiVersion,
         });
+        const auth = useAuthStore.getState();
+        if (profile.credentialRef && auth.token && auth.serverUrl) {
+          await saveWorkspaceSession(profile.credentialRef, {
+            token: auth.token,
+            refreshToken: auth.refreshToken,
+            serverUrl: auth.serverUrl,
+            hostId: auth.hostId,
+            hostPublicKey: auth.hostPublicKey,
+            relayUrl: auth.relayUrl,
+          });
+        }
         setActiveWorkspace(profile.id);
         setPin('');
         addToast('success', `Connected to ${profile.name}.`);
@@ -197,12 +211,59 @@ export default function WorkspaceConnectionsSection() {
     ],
   );
 
-  const chooseRemote = (profile: WorkspaceProfile) => {
+  const chooseRemote = async (profile: WorkspaceProfile) => {
     setName(profile.name);
     setRemoteUrl(profile.serverUrl ?? '');
     setSelectedProfileId(profile.id);
     setPin('');
-    setError('Enter the PIN for this workspace to connect.');
+    setError('');
+    if (!profile.serverUrl || !profile.credentialRef) {
+      setError('Enter the PIN for this workspace to connect.');
+      return;
+    }
+    setBusy('remote');
+    const previousAuth = useAuthStore.getState();
+    try {
+      const [health, session] = await Promise.all([
+        verifyClawChatHealth(profile.serverUrl, profile.hostId),
+        loadWorkspaceSession(profile.credentialRef),
+      ]);
+      if (!session) {
+        setError('Enter the PIN for this workspace to connect.');
+        return;
+      }
+      if (session.hostId && session.hostId !== health.hostId) {
+        throw new Error('The saved session belongs to a different ClawChat host.');
+      }
+      useAuthStore.setState({ ...session, isLoading: false });
+      await apiClient.get('/capabilities');
+      useHostSessionStore.getState().deactivate();
+      setActiveWorkspace(profile.id);
+      addToast('success', `Connected to ${profile.name}.`);
+      navigate('/today');
+    } catch (cause) {
+      useAuthStore.setState({
+        token: previousAuth.token,
+        refreshToken: previousAuth.refreshToken,
+        serverUrl: previousAuth.serverUrl,
+        hostId: previousAuth.hostId,
+        hostPublicKey: previousAuth.hostPublicKey,
+        relayUrl: previousAuth.relayUrl,
+        isLoading: false,
+      });
+      setError(
+        cause instanceof Error
+          ? `${cause.message} Enter the PIN to reconnect.`
+          : 'Enter the PIN for this workspace to reconnect.',
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const deleteRemote = async (profile: WorkspaceProfile) => {
+    if (profile.credentialRef) await removeWorkspaceSession(profile.credentialRef);
+    removeRemote(profile.id);
   };
 
   const handleAutoStartToggle = async (enabled: boolean) => {
@@ -329,7 +390,7 @@ export default function WorkspaceConnectionsSection() {
               <button
                 type="button"
                 className="cc-btn cc-btn--secondary cc-btn--compact"
-                onClick={() => chooseRemote(profile)}
+                onClick={() => void chooseRemote(profile)}
               >
                 Use
               </button>
@@ -338,7 +399,7 @@ export default function WorkspaceConnectionsSection() {
               <button
                 type="button"
                 className="cc-btn cc-btn--danger cc-btn--compact"
-                onClick={() => removeRemote(profile.id)}
+                onClick={() => void deleteRemote(profile)}
               >
                 Remove
               </button>

@@ -23,6 +23,10 @@ export const TokenResponseSchema = z.object({
   refresh_token: z.string(),
   token_type: z.string(),
   expires_in: z.number().optional(),
+  host_id: z.string().nullable().optional(),
+  host_public_key: z.string().nullable().optional(),
+  api_version: z.string().optional(),
+  workspace_name: z.string().optional(),
 });
 
 export const RefreshRequestSchema = z.object({

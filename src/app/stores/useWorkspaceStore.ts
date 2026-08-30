@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { workspaceCredentialRef } from '../services/workspaceCredentials';
 
 export const LOCAL_WORKSPACE_ID = 'local';
 
@@ -11,6 +12,7 @@ export interface WorkspaceProfile {
   hostId: string | null;
   hostPublicKey: string | null;
   apiVersion: string | null;
+  credentialRef: string | null;
   endpoints: Array<{ url: string; kind: 'loopback' | 'lan' | 'tailscale' | 'relay' | 'public' }>;
   lastConnectedAt: string | null;
 }
@@ -36,6 +38,7 @@ const LOCAL_WORKSPACE: WorkspaceProfile = {
   hostId: null,
   hostPublicKey: null,
   apiVersion: null,
+  credentialRef: null,
   endpoints: [],
   lastConnectedAt: null,
 };
@@ -95,8 +98,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           { url: serverUrl, kind: endpointKind(serverUrl) },
         ].filter(
           (endpoint, index, all) =>
-            all.findIndex((candidate) => candidate.url.toLowerCase() === endpoint.url.toLowerCase()) ===
-            index,
+            all.findIndex(
+              (candidate) => candidate.url.toLowerCase() === endpoint.url.toLowerCase(),
+            ) === index,
         );
         const profile: WorkspaceProfile = {
           id: existing?.id ?? id,
@@ -106,6 +110,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           hostId: identity?.hostId ?? existing?.hostId ?? null,
           hostPublicKey: identity?.hostPublicKey ?? existing?.hostPublicKey ?? null,
           apiVersion: identity?.apiVersion ?? existing?.apiVersion ?? null,
+          credentialRef: existing?.credentialRef ?? workspaceCredentialRef(existing?.id ?? id),
           endpoints,
           lastConnectedAt: new Date().toISOString(),
         };
@@ -144,22 +149,28 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       merge: (persisted, current) => {
         const saved = persisted as Partial<WorkspaceState> | undefined;
         const remotes = Array.isArray(saved?.profiles)
-          ? saved.profiles.filter(
-              (profile): profile is WorkspaceProfile =>
-                profile?.kind === 'remote' &&
-                typeof profile.id === 'string' &&
-                typeof profile.name === 'string' &&
-                typeof profile.serverUrl === 'string',
-            ).map((profile) => ({
-              ...profile,
-              hostId: typeof profile.hostId === 'string' ? profile.hostId : null,
-              hostPublicKey:
-                typeof profile.hostPublicKey === 'string' ? profile.hostPublicKey : null,
-              apiVersion: typeof profile.apiVersion === 'string' ? profile.apiVersion : null,
-              endpoints: Array.isArray(profile.endpoints)
-                ? profile.endpoints
-                : [{ url: profile.serverUrl!, kind: endpointKind(profile.serverUrl!) }],
-            }))
+          ? saved.profiles
+              .filter(
+                (profile): profile is WorkspaceProfile =>
+                  profile?.kind === 'remote' &&
+                  typeof profile.id === 'string' &&
+                  typeof profile.name === 'string' &&
+                  typeof profile.serverUrl === 'string',
+              )
+              .map((profile) => ({
+                ...profile,
+                hostId: typeof profile.hostId === 'string' ? profile.hostId : null,
+                hostPublicKey:
+                  typeof profile.hostPublicKey === 'string' ? profile.hostPublicKey : null,
+                apiVersion: typeof profile.apiVersion === 'string' ? profile.apiVersion : null,
+                credentialRef:
+                  typeof profile.credentialRef === 'string'
+                    ? profile.credentialRef
+                    : workspaceCredentialRef(profile.id),
+                endpoints: Array.isArray(profile.endpoints)
+                  ? profile.endpoints
+                  : [{ url: profile.serverUrl!, kind: endpointKind(profile.serverUrl!) }],
+              }))
           : [];
         const profiles = [LOCAL_WORKSPACE, ...remotes];
         const activeWorkspaceId = profiles.some(

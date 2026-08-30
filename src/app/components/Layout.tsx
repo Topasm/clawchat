@@ -30,9 +30,9 @@ import { useCapabilitiesQuery, useReviewsQuery, useTodosQuery } from '../hooks/q
 import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
-import type { ColorPalette } from '../config/theme';
 import type { HealthResponse } from '../types/api';
 import { platformApi } from '../platform';
+import type { ColorPalette } from '../config/theme';
 
 // --- SVG icon components ---
 import {
@@ -50,7 +50,8 @@ import {
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
 
-// --- Theme bridge: map ColorPalette → CSS custom properties ---
+// Keep the injected theme tokens declared in this runtime root. The design
+// token audit reads this bridge to distinguish runtime variables from typos.
 function cssVars(colors: ColorPalette, fontSize: number): React.CSSProperties {
   return {
     '--cc-background': colors.background,

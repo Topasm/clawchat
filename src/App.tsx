@@ -10,6 +10,9 @@ import AppRouter from './router';
 import { initializeUpdateLifecycle } from './app/services/updateLifecycle';
 import { platformApi } from './app/platform';
 import { useWorkspaceRuntimeStore } from './app/stores/useWorkspaceRuntimeStore';
+import { useAuthStore } from './app/stores/useAuthStore';
+import { useWorkspaceStore } from './app/stores/useWorkspaceStore';
+import { saveWorkspaceSession } from './app/services/workspaceCredentials';
 
 initializeQueryCachePersistence();
 
@@ -27,6 +30,38 @@ function AppRuntimeBridge() {
       if (route) navigate(route);
     });
   }, [navigate]);
+
+  useEffect(() => {
+    const persistActiveRemoteSession = () => {
+      const auth = useAuthStore.getState();
+      const workspace = useWorkspaceStore.getState();
+      const profile = workspace.profiles.find(
+        (candidate) => candidate.kind === 'remote' && candidate.id === workspace.activeWorkspaceId,
+      );
+      if (!profile?.credentialRef || !auth.token || !auth.serverUrl) return;
+      const endpointMatches = profile.endpoints.some(
+        (endpoint) =>
+          endpoint.url.replace(/\/+$/, '').toLowerCase() ===
+          auth.serverUrl?.replace(/\/+$/, '').toLowerCase(),
+      );
+      if (!endpointMatches) return;
+      void saveWorkspaceSession(profile.credentialRef, {
+        token: auth.token,
+        refreshToken: auth.refreshToken,
+        serverUrl: auth.serverUrl,
+        hostId: auth.hostId,
+        hostPublicKey: auth.hostPublicKey,
+        relayUrl: auth.relayUrl,
+      });
+    };
+    const stopAuth = useAuthStore.subscribe(persistActiveRemoteSession);
+    const stopWorkspace = useWorkspaceStore.subscribe(persistActiveRemoteSession);
+    persistActiveRemoteSession();
+    return () => {
+      stopAuth();
+      stopWorkspace();
+    };
+  }, []);
 
   useEffect(() => {
     const openConnections = (event: KeyboardEvent) => {

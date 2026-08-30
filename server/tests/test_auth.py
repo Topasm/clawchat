@@ -14,6 +14,9 @@ async def test_login_with_correct_pin(client: AsyncClient):
     assert "refresh_token" in data
     assert data["token_type"] == "bearer"
     assert data["expires_in"] > 0
+    assert data["host_id"].startswith("claw_")
+    assert data["host_public_key"]
+    assert data["api_version"] == "1"
 
 
 @pytest.mark.asyncio

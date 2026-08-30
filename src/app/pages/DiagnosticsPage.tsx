@@ -8,6 +8,9 @@ import { useHostSessionStore } from '../stores/useHostSessionStore';
 import { useToastStore } from '../stores/useToastStore';
 import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useTheme } from '../config/ThemeContext';
+import { themeCssVars } from '../config/themeCssVars';
+import { removeWorkspaceSession } from '../services/workspaceCredentials';
 
 function displayStatus(state: string | undefined) {
   if (!state) return 'Unknown';
@@ -16,6 +19,7 @@ function displayStatus(state: string | undefined) {
 
 export default function DiagnosticsPage() {
   const navigate = useNavigate();
+  const { colors } = useTheme();
   const addToast = useToastStore((state) => state.addToast);
   const config = useWorkspaceRuntimeStore((state) => state.config);
   const status = useWorkspaceRuntimeStore((state) => state.localServerStatus);
@@ -56,7 +60,11 @@ export default function DiagnosticsPage() {
     }
   };
 
-  const resetConnections = () => {
+  const resetConnections = async () => {
+    const remoteCredentials = useWorkspaceStore
+      .getState()
+      .profiles.flatMap((profile) => (profile.credentialRef ? [profile.credentialRef] : []));
+    await Promise.all(remoteCredentials.map((credential) => removeWorkspaceSession(credential)));
     useHostSessionStore.getState().deactivate();
     useAuthStore.getState().logout();
     useWorkspaceStore.getState().reset();
@@ -64,7 +72,7 @@ export default function DiagnosticsPage() {
   };
 
   return (
-    <div className="cc-public-shell">
+    <div className="cc-public-shell" style={themeCssVars(colors)}>
       <header className="cc-public-shell__header">
         <div>
           <div className="cc-public-shell__eyebrow">ClawChat</div>
@@ -143,7 +151,7 @@ export default function DiagnosticsPage() {
             <button
               type="button"
               className="cc-btn cc-btn--danger cc-btn--compact"
-              onClick={resetConnections}
+              onClick={() => void resetConnections()}
             >
               Reset connections
             </button>

@@ -39,6 +39,26 @@ describe('workspace connections', () => {
     expect(remotes[0].name).toBe('Home');
   });
 
+  it('groups multiple endpoints under one stable host identity', () => {
+    const lan = useWorkspaceStore.getState().upsertRemote('Lab', 'http://192.168.1.20:8000', {
+      hostId: 'claw_lab',
+      apiVersion: '1',
+    });
+    const tunnel = useWorkspaceStore
+      .getState()
+      .upsertRemote('Lab', 'https://lab.example', { hostId: 'claw_lab', apiVersion: '1' });
+
+    expect(tunnel.id).toBe(lan.id);
+    expect(tunnel.credentialRef).toMatch(/^workspace-session-/);
+    expect(tunnel.endpoints).toEqual([
+      { url: 'http://192.168.1.20:8000', kind: 'lan' },
+      { url: 'https://lab.example', kind: 'public' },
+    ]);
+    expect(
+      useWorkspaceStore.getState().profiles.filter((profile) => profile.kind === 'remote'),
+    ).toHaveLength(1);
+  });
+
   it('falls back to local when the active remote connection is removed', () => {
     const remote = useWorkspaceStore.getState().upsertRemote('Work', 'http://work.local:8000');
 

@@ -7789,9 +7789,36 @@
             "title": "Access Token",
             "type": "string"
           },
+          "api_version": {
+            "default": "1",
+            "title": "Api Version",
+            "type": "string"
+          },
           "expires_in": {
             "title": "Expires In",
             "type": "integer"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
+          },
+          "host_public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Public Key"
           },
           "refresh_token": {
             "title": "Refresh Token",
@@ -7800,6 +7827,11 @@
           "token_type": {
             "default": "bearer",
             "title": "Token Type",
+            "type": "string"
+          },
+          "workspace_name": {
+            "default": "ClawChat",
+            "title": "Workspace Name",
             "type": "string"
           }
         },
@@ -7890,7 +7922,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "0.1.0"
+    "version": "0.1.4"
   },
   "openapi": "3.1.0",
   "paths": {
