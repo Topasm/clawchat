@@ -38,7 +38,7 @@ android {
         applicationId = "com.clawchat.android"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionName = "0.1.0"
+        versionName = "0.1.1"
         versionCode = androidVersionCode(versionName!!)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
