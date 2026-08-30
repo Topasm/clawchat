@@ -1,6 +1,6 @@
 [package]
 name = "clawchat-tauri"
-version = "0.1.3"
+version = "0.1.4"
 description = "Tauri desktop shell for ClawChat"
 license = "MIT"
 publish = false

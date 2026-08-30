@@ -57,6 +57,9 @@ test('preview and release workflows launch the packaged macOS app', () => {
   assert.match(smokeScript, /tell application id/);
   assert.match(smokeScript, /ClawChat exited during the macOS startup smoke test/);
   assert.match(smokeScript, /kill -0 "\$launch_waiter_pid"/);
+  assert.match(smokeScript, /python3 -m http\.server 8000 --bind 0\.0\.0\.0/);
+  assert.match(smokeScript, /port_blocker_pid/);
+  assert.match(smokeScript, /reused the occupied default port/);
   assert.match(smokeScript, /::error title=macOS app startup smoke failed/);
 });
 

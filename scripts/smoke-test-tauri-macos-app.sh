@@ -22,10 +22,12 @@ fi
 app_icon="$app_path/Contents/Resources/$icon_file"
 log_directory="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 app_log="$log_directory/clawchat-app-startup.log"
+port_blocker_log="$log_directory/clawchat-port-blocker.log"
 startup_log="${HOME}/Library/Application Support/${bundle_identifier}/startup.log"
 startup_log_offset=0
 icon_temp_root="$(mktemp -d)"
 launch_waiter_pid=''
+port_blocker_pid=''
 
 stop_app() {
   /usr/bin/osascript -e "tell application id \"$bundle_identifier\" to quit" >/dev/null 2>&1 || true
@@ -40,6 +42,10 @@ stop_app() {
 
 cleanup() {
   stop_app
+  if [[ -n "$port_blocker_pid" ]] && kill -0 "$port_blocker_pid" 2>/dev/null; then
+    kill "$port_blocker_pid" 2>/dev/null || true
+    wait "$port_blocker_pid" 2>/dev/null || true
+  fi
   if [[ -n "$launch_waiter_pid" ]] && kill -0 "$launch_waiter_pid" 2>/dev/null; then
     kill "$launch_waiter_pid" 2>/dev/null || true
     wait "$launch_waiter_pid" 2>/dev/null || true
@@ -63,6 +69,18 @@ done
 
 if [[ -f "$startup_log" ]]; then
   startup_log_offset="$(wc -c < "$startup_log" | tr -d ' ')"
+fi
+
+# Reproduce the common upgrade case where an older process or development
+# server still owns the default wildcard port. The packaged app must move its
+# local workspace to another loopback port instead of showing the login page.
+python3 -m http.server 8000 --bind 0.0.0.0 >"$port_blocker_log" 2>&1 &
+port_blocker_pid=$!
+sleep 1
+if ! kill -0 "$port_blocker_pid" 2>/dev/null; then
+  echo "Could not reserve port 8000 for the macOS collision smoke test." >&2
+  cat "$port_blocker_log" >&2
+  exit 1
 fi
 
 RUST_BACKTRACE=1 /usr/bin/open -n -W "$app_path" >"$app_log" 2>&1 &
@@ -96,6 +114,13 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
   fi
   if [[ -f "$startup_log" ]] && tail -c "+$((startup_log_offset + 1))" "$startup_log" \
       | grep -Fq '[clawchat] local server ready on port'; then
+    ready_line="$(tail -c "+$((startup_log_offset + 1))" "$startup_log" \
+      | grep -F '[clawchat] local server ready on port' | tail -1)"
+    if [[ "$ready_line" == *"port 8000 "* ]]; then
+      echo "ClawChat reused the occupied default port instead of selecting a safe fallback." >&2
+      tail -c "+$((startup_log_offset + 1))" "$startup_log" >&2
+      exit 1
+    fi
     if tail -c "+$((startup_log_offset + 1))" "$startup_log" \
         | grep -Fq 'system tray is unavailable'; then
       echo "Packaged macOS tray icon failed to initialize." >&2

@@ -16,6 +16,7 @@ use crate::{
 const STARTUP_HEALTH_TIMEOUT: Duration = Duration::from_secs(60);
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const SERVER_LOG_DIAGNOSTIC_BYTES: usize = 4_000;
+const PORT_BIND_RETRY_LIMIT: usize = 3;
 
 enum HealthWaitOutcome {
     Ready,
@@ -108,7 +109,7 @@ impl ServerSupervisor {
         // Port 8000 is a common development default. A local-first desktop
         // app should not become unusable just because another tool already
         // owns it, so select a free loopback port for this workspace.
-        let port = match choose_start_port(requested_port) {
+        let mut port = match choose_start_port(requested_port) {
             Ok(port) => port,
             Err(error) => {
                 self.status = ServerStatus {
@@ -120,77 +121,112 @@ impl ServerSupervisor {
                 return self.status.clone();
             }
         };
-        let mut effective_config = config.clone();
-        effective_config.port = port;
+        let mut failed_ports = Vec::new();
+        for bind_attempt in 0..=PORT_BIND_RETRY_LIMIT {
+            let mut effective_config = config.clone();
+            effective_config.port = port;
+            self.status = ServerStatus {
+                state: ServerState::Starting,
+                port,
+                pid: None,
+                error: None,
+            };
 
-        self.status = ServerStatus {
-            state: ServerState::Starting,
-            port,
-            pid: None,
-            error: None,
-        };
-
-        match self.spawn(&effective_config) {
-            Ok(child) => {
-                let pid = child.id();
-                self.child = Some(child);
-                if let Err(error) = write_pid(&self.paths.pid_path, pid) {
-                    startup_log::report(&format!("[clawchat] {error}"));
+            let log_path = self.paths.app_data_dir.join("server.log");
+            let log_offset = fs::metadata(&log_path)
+                .map(|metadata| metadata.len() as usize)
+                .unwrap_or(0);
+            match self.spawn(&effective_config) {
+                Ok(child) => {
+                    let pid = child.id();
+                    self.child = Some(child);
+                    if let Err(error) = write_pid(&self.paths.pid_path, pid) {
+                        startup_log::report(&format!("[clawchat] {error}"));
+                    }
+                    let started_at = Instant::now();
+                    let outcome = self
+                        .child
+                        .as_mut()
+                        .map(|child| wait_for_health(port, child))
+                        .unwrap_or(HealthWaitOutcome::TimedOut);
+                    match outcome {
+                        HealthWaitOutcome::Ready => {
+                            startup_log::report(&format!(
+                                "[clawchat] local server ready on port {port} after {:.1}s",
+                                started_at.elapsed().as_secs_f32()
+                            ));
+                            self.status = ServerStatus {
+                                state: ServerState::Running,
+                                port,
+                                pid: Some(pid),
+                                error: None,
+                            };
+                            break;
+                        }
+                        HealthWaitOutcome::Exited(exit) => {
+                            // `try_wait` already reaped the child. Drop the handle
+                            // without signalling a PID that the OS may later reuse.
+                            self.child = None;
+                            let _ = fs::remove_file(&self.paths.pid_path);
+                            let attempt_output =
+                                read_log_since(&log_path, log_offset, SERVER_LOG_DIAGNOSTIC_BYTES);
+                            if bind_attempt < PORT_BIND_RETRY_LIMIT
+                                && attempt_output.as_deref().is_some_and(is_bind_conflict)
+                            {
+                                failed_ports.push(port);
+                                match choose_retry_port(&failed_ports) {
+                                    Ok(retry_port) => {
+                                        startup_log::report(&format!(
+                                            "[clawchat] port {port} was claimed during startup; retrying on port {retry_port}"
+                                        ));
+                                        port = retry_port;
+                                        continue;
+                                    }
+                                    Err(error) => {
+                                        self.status = ServerStatus {
+                                            state: ServerState::Error,
+                                            port,
+                                            pid: None,
+                                            error: Some(error),
+                                        };
+                                        break;
+                                    }
+                                }
+                            }
+                            self.status = ServerStatus {
+                                state: ServerState::Error,
+                                port,
+                                pid: None,
+                                error: Some(self.startup_error(format!(
+                                    "server exited with {exit} before becoming ready"
+                                ))),
+                            };
+                            break;
+                        }
+                        HealthWaitOutcome::TimedOut => {
+                            self.stop_child();
+                            self.status = ServerStatus {
+                                state: ServerState::Error,
+                                port,
+                                pid: None,
+                                error: Some(self.startup_error(format!(
+                                    "server did not become ready within {} seconds",
+                                    STARTUP_HEALTH_TIMEOUT.as_secs()
+                                ))),
+                            };
+                            break;
+                        }
+                    }
                 }
-                let started_at = Instant::now();
-                let outcome = self
-                    .child
-                    .as_mut()
-                    .map(|child| wait_for_health(port, child))
-                    .unwrap_or(HealthWaitOutcome::TimedOut);
-                match outcome {
-                    HealthWaitOutcome::Ready => {
-                        startup_log::report(&format!(
-                            "[clawchat] local server ready on port {port} after {:.1}s",
-                            started_at.elapsed().as_secs_f32()
-                        ));
-                        self.status = ServerStatus {
-                            state: ServerState::Running,
-                            port,
-                            pid: Some(pid),
-                            error: None,
-                        };
-                    }
-                    HealthWaitOutcome::Exited(exit) => {
-                        // `try_wait` already reaped the child. Drop the handle
-                        // without signalling a PID that the OS may later reuse.
-                        self.child = None;
-                        let _ = fs::remove_file(&self.paths.pid_path);
-                        self.status = ServerStatus {
-                            state: ServerState::Error,
-                            port,
-                            pid: None,
-                            error: Some(self.startup_error(format!(
-                                "server exited with {exit} before becoming ready"
-                            ))),
-                        };
-                    }
-                    HealthWaitOutcome::TimedOut => {
-                        self.stop_child();
-                        self.status = ServerStatus {
-                            state: ServerState::Error,
-                            port,
-                            pid: None,
-                            error: Some(self.startup_error(format!(
-                                "server did not become ready within {} seconds",
-                                STARTUP_HEALTH_TIMEOUT.as_secs()
-                            ))),
-                        };
-                    }
+                Err(error) => {
+                    self.status = ServerStatus {
+                        state: ServerState::Error,
+                        port,
+                        pid: None,
+                        error: Some(error),
+                    };
+                    break;
                 }
-            }
-            Err(error) => {
-                self.status = ServerStatus {
-                    state: ServerState::Error,
-                    port,
-                    pid: None,
-                    error: Some(error),
-                };
             }
         }
         self.status.clone()
@@ -442,20 +478,63 @@ fn choose_start_port(requested: u16) -> Result<u16, String> {
         .map_err(|error| format!("failed to inspect a free local server port: {error}"))
 }
 
+fn choose_retry_port(failed_ports: &[u16]) -> Result<u16, String> {
+    // The listener returned by `choose_start_port` cannot be inherited by the
+    // cross-platform sidecar. A second process can therefore still win the
+    // small gap before uvicorn binds. Avoid ports that already lost that race
+    // and make a few OS-assigned selections before reporting an error.
+    for _ in 0..16 {
+        let port = choose_start_port(0)?;
+        if !failed_ports.contains(&port) {
+            return Ok(port);
+        }
+    }
+    Err("failed to find a new local server port after a startup collision".to_owned())
+}
+
 fn wait_for_health(port: u16, child: &mut Child) -> HealthWaitOutcome {
     let deadline = Instant::now() + STARTUP_HEALTH_TIMEOUT;
     loop {
-        if health_check(port) {
-            return HealthWaitOutcome::Ready;
-        }
         if let Ok(Some(exit)) = child.try_wait() {
             return HealthWaitOutcome::Exited(exit);
+        }
+        if health_check(port) {
+            // A competing ClawChat process can claim the port after the
+            // preflight probe but before this child binds. Give the child one
+            // polling interval to report that bind failure before accepting a
+            // healthy response that may belong to the competitor.
+            thread::sleep(HEALTH_POLL_INTERVAL);
+            if let Ok(Some(exit)) = child.try_wait() {
+                return HealthWaitOutcome::Exited(exit);
+            }
+            if health_check(port) {
+                return HealthWaitOutcome::Ready;
+            }
         }
         if Instant::now() >= deadline {
             return HealthWaitOutcome::TimedOut;
         }
         thread::sleep(HEALTH_POLL_INTERVAL);
     }
+}
+
+fn read_log_since(path: &Path, offset: usize, maximum_bytes: usize) -> Option<String> {
+    let bytes = fs::read(path).ok()?;
+    let attempt_start = if offset <= bytes.len() { offset } else { 0 };
+    let start = attempt_start.max(bytes.len().saturating_sub(maximum_bytes));
+    let diagnostic = String::from_utf8_lossy(&bytes[start..])
+        .trim()
+        .replace(['\r', '\n'], " ");
+    (!diagnostic.is_empty()).then_some(diagnostic)
+}
+
+fn is_bind_conflict(output: &str) -> bool {
+    let output = output.to_ascii_lowercase();
+    output.contains("address already in use")
+        || output.contains("only one usage of each socket address")
+        || output.contains("errno 48")
+        || output.contains("errno 98")
+        || output.contains("error 10048")
 }
 
 fn read_log_tail(path: &Path, maximum_bytes: usize) -> Option<String> {
@@ -587,6 +666,95 @@ mod tests {
             read_log_tail(&log, 24),
             Some("important line last line".to_owned())
         );
+    }
+
+    #[test]
+    fn bind_conflict_detection_is_scoped_to_the_current_attempt() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let log = root.path().join("server.log");
+        let old_output = "ERROR: [Errno 48] address already in use\n";
+        fs::write(&log, old_output).expect("old server log");
+        fs::write(&log, format!("{old_output}new startup failure\n")).expect("new server log");
+
+        let current = read_log_since(&log, old_output.len(), 4_000).expect("current output");
+
+        assert_eq!(current, "new startup failure");
+        assert!(!is_bind_conflict(&current));
+        assert!(is_bind_conflict(
+            "ERROR: [Errno 48] error while attempting to bind: address already in use"
+        ));
+        assert!(is_bind_conflict(
+            "Only one usage of each socket address is normally permitted (error 10048)"
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn retries_on_a_port_claimed_between_selection_and_sidecar_bind() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = tempfile::tempdir().expect("temp dir");
+        let native_paths = paths(root.path());
+        let executable = native_paths
+            .resource_dir
+            .join("server-bin")
+            .join("clawchat-server");
+        fs::create_dir_all(executable.parent().expect("binary parent")).expect("binary dir");
+        fs::write(
+            &executable,
+            r#"#!/bin/sh
+attempt_file="$PWD/start-attempts"
+if [ ! -f "$attempt_file" ]; then
+  printf 'first\n' > "$attempt_file"
+  echo 'ERROR: [Errno 48] error while attempting to bind: address already in use' >&2
+  exit 3
+fi
+printf 'second\n' >> "$attempt_file"
+exec python3 -c '
+import os
+import socket
+
+listener = socket.socket()
+listener.bind((os.environ["HOST"], int(os.environ["PORT"])))
+listener.listen()
+while True:
+    connection, _ = listener.accept()
+    connection.recv(8192)
+    body = b"{\"service\":\"clawchat\"}"
+    response = (b"HTTP/1.1 200 OK\r\nContent-Length: " + str(len(body)).encode()
+                + b"\r\nConnection: close\r\n\r\n" + body)
+    connection.sendall(response)
+    connection.close()
+'
+"#,
+        )
+        .expect("fake server");
+        let mut permissions = fs::metadata(&executable).expect("metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&executable, permissions).expect("executable permissions");
+
+        let probe = TcpListener::bind(("127.0.0.1", 0)).expect("preferred port probe");
+        let requested_port = probe.local_addr().expect("preferred address").port();
+        drop(probe);
+        let config = ServerConfig {
+            port: requested_port,
+            ..ServerConfig::default()
+        };
+        let mut supervisor = ServerSupervisor::new(native_paths, requested_port);
+
+        let status = supervisor.start(&config);
+
+        assert!(
+            matches!(status.state, ServerState::Running),
+            "startup failed: {:?}",
+            status.error
+        );
+        assert_ne!(status.port, requested_port);
+        assert_eq!(
+            fs::read_to_string(root.path().join("start-attempts")).expect("attempt log"),
+            "first\nsecond\n"
+        );
+        supervisor.stop();
     }
 
     #[test]
