@@ -105,7 +105,8 @@ on run arguments
   tell application "System Events"
     tell process processName
       set frontmost to true
-      perform action "AXClose" of window 1
+      set closeButton to value of attribute "AXCloseButton" of window 1
+      perform action "AXPress" of closeButton
     end tell
   end tell
 end run
