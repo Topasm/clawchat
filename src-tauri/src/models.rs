@@ -20,6 +20,8 @@ pub enum AppMode {
 #[serde(rename_all = "camelCase")]
 pub struct ServerConfig {
     pub app_mode: AppMode,
+    pub local_server_enabled: bool,
+    pub keep_running_in_tray: bool,
     pub port: u16,
     pub pin: String,
     pub obsidian_vault_path: String,
@@ -32,12 +34,46 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             app_mode: AppMode::Host,
+            local_server_enabled: true,
+            keep_running_in_tray: true,
             port: 8000,
             pin: DEFAULT_PIN.to_owned(),
             obsidian_vault_path: String::new(),
             host_server_url: String::new(),
             auto_start_host: false,
             lan_access: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedactedServerConfig {
+    pub app_mode: AppMode,
+    pub local_server_enabled: bool,
+    pub keep_running_in_tray: bool,
+    pub port: u16,
+    pub pin_configured: bool,
+    pub default_pin_in_use: bool,
+    pub obsidian_vault_path: String,
+    pub host_server_url: String,
+    pub auto_start_host: bool,
+    pub lan_access: bool,
+}
+
+impl From<&ServerConfig> for RedactedServerConfig {
+    fn from(config: &ServerConfig) -> Self {
+        Self {
+            app_mode: config.app_mode,
+            local_server_enabled: config.local_server_enabled,
+            keep_running_in_tray: config.keep_running_in_tray,
+            port: config.port,
+            pin_configured: !config.pin.is_empty(),
+            default_pin_in_use: config.pin == DEFAULT_PIN,
+            obsidian_vault_path: config.obsidian_vault_path.clone(),
+            host_server_url: config.host_server_url.clone(),
+            auto_start_host: config.auto_start_host,
+            lan_access: config.lan_access,
         }
     }
 }
@@ -68,6 +104,8 @@ impl ServerConfig {
 #[serde(rename_all = "camelCase")]
 pub struct ServerConfigPatch {
     pub app_mode: Option<AppMode>,
+    pub local_server_enabled: Option<bool>,
+    pub keep_running_in_tray: Option<bool>,
     pub port: Option<u16>,
     pub pin: Option<String>,
     pub obsidian_vault_path: Option<String>,
@@ -91,6 +129,12 @@ impl ServerConfigPatch {
     pub fn apply(self, config: &mut ServerConfig) {
         if let Some(value) = self.app_mode {
             config.app_mode = value;
+        }
+        if let Some(value) = self.local_server_enabled {
+            config.local_server_enabled = value;
+        }
+        if let Some(value) = self.keep_running_in_tray {
+            config.keep_running_in_tray = value;
         }
         if let Some(value) = self.port {
             config.port = value;
@@ -130,6 +174,22 @@ pub struct ServerStatus {
     pub port: u16,
     pub pid: Option<u32>,
     pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalServerTransitionResult {
+    pub config: RedactedServerConfig,
+    pub previous_status: ServerStatus,
+    pub status: ServerStatus,
+    pub applied: bool,
+    pub restart_required: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LocalSession {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
 }
 
 impl ServerStatus {
@@ -247,8 +307,25 @@ mod tests {
         let config = ServerConfig::default();
 
         assert_eq!(config.bind_host(), "127.0.0.1");
+        assert!(config.local_server_enabled);
+        assert!(config.keep_running_in_tray);
         assert!(!config.lan_access);
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn renderer_config_never_contains_the_local_pin() {
+        let config = ServerConfig {
+            pin: "938274".to_owned(),
+            ..ServerConfig::default()
+        };
+
+        let serialized = serde_json::to_string(&RedactedServerConfig::from(&config))
+            .expect("redacted config");
+
+        assert!(!serialized.contains("938274"));
+        assert!(serialized.contains("\"pinConfigured\":true"));
+        assert!(serialized.contains("\"defaultPinInUse\":false"));
     }
 
     #[test]

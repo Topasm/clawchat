@@ -4,11 +4,12 @@ import type { ServerStatus } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
 import { logger } from '../services/logger';
 import { useAuthStore } from './useAuthStore';
+import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from './useWorkspaceStore';
 
 /**
  * The desktop handshake that has to succeed before a host-mode install is
- * usable at all: read the app mode, wait for the bundled server, then sign in
- * with the locally stored PIN.
+ * usable at all: check whether the local workspace is active, wait for the
+ * bundled server, then ask native code for a local session.
  *
  * It lives in a store rather than inside `useAutoLogin` because two callers
  * need it — the router drives it, and the login screen renders it — and
@@ -56,7 +57,7 @@ interface HostSessionState {
   refresh: () => Promise<void>;
   /** Ask the shell to (re)start the local server, then sign in. */
   retryHostStartup: () => Promise<void>;
-  /** Sign in against the local server with the stored PIN. */
+  /** Ask native code to exchange the protected local PIN for a session. */
   signIn: () => Promise<void>;
   applyStatus: (status: ServerStatus) => Promise<void>;
   /** Test seam: forget the subscription and go back to the initial state. */
@@ -143,8 +144,7 @@ export const useHostSessionStore = create<HostSessionState>((set, get) => ({
     if (statusSubscription || startInFlight) return;
     startInFlight = true;
     try {
-      const mode = await platformApi.server.getAppMode();
-      if (mode !== 'host') {
+      if (useWorkspaceStore.getState().activeWorkspaceId !== LOCAL_WORKSPACE_ID) {
         set({ phase: 'idle', isHostMode: false });
         return;
       }
@@ -206,12 +206,10 @@ export const useHostSessionStore = create<HostSessionState>((set, get) => ({
     signInInFlight = true;
     set({ phase: 'connecting', failure: null });
     try {
-      const config = await platformApi.server.getConfig();
-      const url = `http://localhost:${config.port}`;
-      // Only drop stored credentials once we know where we are logging in and
-      // are about to replace them. Clearing up front used to destroy a working
-      // session whenever the local host happened to be unreachable.
-      await useAuthStore.getState().login(url, config.pin);
+      const status = get().status ?? (await platformApi.server.getStatus());
+      const url = `http://localhost:${status.port}`;
+      const session = await platformApi.server.issueLocalSession();
+      useAuthStore.getState().adoptSession(url, session);
       set({ phase: 'connected', failure: null });
     } catch (error) {
       const failure = classifyLoginFailure(error);
@@ -225,9 +223,7 @@ export const useHostSessionStore = create<HostSessionState>((set, get) => ({
   retryHostStartup: async () => {
     set({ phase: 'starting', failure: null });
     try {
-      // `server_set_app_mode('host')` is the only exposed command that starts
-      // the sidecar, so it doubles as the retry.
-      await platformApi.server.setAppMode('host');
+      await platformApi.server.updateConfig({ localServerEnabled: true });
       set({ isHostMode: true });
       statusSubscription ??= platformApi.server.onStatusChange((status) => {
         void get().applyStatus(status);

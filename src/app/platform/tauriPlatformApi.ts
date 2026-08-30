@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type {
   AppMode,
+  LocalServerTransitionResult,
+  LocalSession,
   NativeEventChannel,
   NativePlatformApi,
   ServerConfig,
@@ -61,14 +63,21 @@ export const tauriPlatformApi: NativePlatformApi = {
   server: {
     getStatus: () => invoke<ServerStatus>(TAURI_COMMANDS.serverGetStatus),
     getConfig: () => invoke<ServerConfig>(TAURI_COMMANDS.serverGetConfig),
+    issueLocalSession: () => invoke<LocalSession>(TAURI_COMMANDS.serverIssueLocalSession),
     getNetworkInfo: () => invoke(TAURI_COMMANDS.serverGetNetworkInfo),
-    updateConfig: (updates) => invoke<ServerConfig>(TAURI_COMMANDS.serverUpdateConfig, { updates }),
+    updateConfig: (updates) =>
+      invoke<LocalServerTransitionResult>(TAURI_COMMANDS.serverUpdateConfig, { updates }),
     selectFolder: () => invoke<string | null>(TAURI_COMMANDS.serverSelectFolder),
     openObsidianVault: () => invoke<void>(TAURI_COMMANDS.serverOpenObsidianVault),
-    setAppMode: (mode: AppMode) => invoke<ServerConfig>(TAURI_COMMANDS.serverSetAppMode, { mode }),
+    openLogFolder: () => invoke<void>(TAURI_COMMANDS.serverOpenLogFolder),
+    openDataFolder: () => invoke<void>(TAURI_COMMANDS.serverOpenDataFolder),
+    setAppMode: (mode: AppMode) =>
+      invoke<LocalServerTransitionResult>(TAURI_COMMANDS.serverSetAppMode, { mode }),
     getAppMode: () => invoke<AppMode>(TAURI_COMMANDS.serverGetAppMode),
     onStatusChange: (callback) =>
       subscribe<ServerStatus>(TAURI_EVENTS.serverStatusChange, callback),
+    onRuntimeChange: (callback) =>
+      subscribe<LocalServerTransitionResult>(TAURI_EVENTS.workspaceRuntimeChange, callback),
   },
   system: {
     openCameraSettings: () => invoke<void>(TAURI_COMMANDS.appOpenCameraSettings),

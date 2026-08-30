@@ -23,6 +23,7 @@ from schemas.auth import (
     WebSocketTicketResponse,
 )
 from services.rate_limiter import client_key, login_limiter
+from services.relay.host_identity import get_or_create_host_identity
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,12 +57,15 @@ async def login(
             expires_at=datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc),
         )
     )
+    identity = await get_or_create_host_identity(db)
     await db.commit()
     access_token, expires_in = create_access_token(session_id=session_id)
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=expires_in,
+        host_id=identity.host_id,
+        host_public_key=identity.public_key,
     )
 
 

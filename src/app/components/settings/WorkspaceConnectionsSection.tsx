@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppMode } from '../../hooks/useAppMode';
-import { platformApi, type ServerStatus } from '../../platform';
+import { type ServerStatus } from '../../platform';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useHostSessionStore } from '../../stores/useHostSessionStore';
 import { useToastStore } from '../../stores/useToastStore';
@@ -13,6 +12,8 @@ import {
 } from '../../stores/useWorkspaceStore';
 import SettingsSection from '../shared/SettingsSection';
 import Toggle from '../shared/Toggle';
+import { useWorkspaceRuntimeStore } from '../../stores/useWorkspaceRuntimeStore';
+import { verifyClawChatHealth } from '../../services/workspaceHealth';
 
 function statusLabel(status: ServerStatus | null): string {
   if (!status) return 'Preparing';
@@ -24,22 +25,31 @@ function statusLabel(status: ServerStatus | null): string {
 
 export default function WorkspaceConnectionsSection() {
   const navigate = useNavigate();
-  const { appMode, setAppMode } = useAppMode();
   const serverUrl = useAuthStore((state) => state.serverUrl);
   const login = useAuthStore((state) => state.login);
+  const logout = useAuthStore((state) => state.logout);
   const profiles = useWorkspaceStore((state) => state.profiles);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const upsertRemote = useWorkspaceStore((state) => state.upsertRemote);
   const removeRemote = useWorkspaceStore((state) => state.removeRemote);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
   const addToast = useToastStore((state) => state.addToast);
-  const [localStatus, setLocalStatus] = useState<ServerStatus | null>(null);
-  const [autoStartHost, setAutoStartHost] = useState(false);
-  const [lanAccess, setLanAccess] = useState(false);
+  const runtimeConfig = useWorkspaceRuntimeStore((state) => state.config);
+  const localStatus = useWorkspaceRuntimeStore((state) => state.localServerStatus);
+  const initializeRuntime = useWorkspaceRuntimeStore((state) => state.initialize);
+  const refreshRuntime = useWorkspaceRuntimeStore((state) => state.refresh);
+  const updateLocalServerPolicy = useWorkspaceRuntimeStore(
+    (state) => state.updateLocalServerPolicy,
+  );
+  const setWorkspaceTransition = useWorkspaceRuntimeStore(
+    (state) => state.setWorkspaceTransition,
+  );
   const [localPin, setLocalPin] = useState('');
+  const [localPort, setLocalPort] = useState('0');
   const [savingLocalSecurity, setSavingLocalSecurity] = useState(false);
   const [name, setName] = useState('');
   const [remoteUrl, setRemoteUrl] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState<'local' | 'remote' | null>(null);
   const [error, setError] = useState('');
@@ -50,22 +60,13 @@ export default function WorkspaceConnectionsSection() {
   );
 
   useEffect(() => {
-    void platformApi.server.getStatus().then(setLocalStatus);
-    void platformApi.server.getConfig().then((config) => {
-      setAutoStartHost(config.autoStartHost);
-      setLanAccess(config.lanAccess);
-      setLocalPin(config.pin);
-    });
-    return platformApi.server.onStatusChange(setLocalStatus);
-  }, []);
+    void initializeRuntime();
+  }, [initializeRuntime]);
 
   useEffect(() => {
-    if (!appMode) return;
-    if (appMode === 'host') {
-      setActiveWorkspace(LOCAL_WORKSPACE_ID);
-      return;
-    }
-    if (!serverUrl) return;
+    if (!runtimeConfig) return;
+    setLocalPort(String(runtimeConfig.port));
+    if (!serverUrl || activeWorkspaceId === LOCAL_WORKSPACE_ID) return;
     const existing = remoteProfiles.find(
       (profile) => profile.serverUrl?.toLowerCase() === serverUrl.toLowerCase(),
     );
@@ -80,18 +81,39 @@ export default function WorkspaceConnectionsSection() {
       // Keep a readable fallback for legacy stored URLs.
     }
     upsertRemote(defaultName, serverUrl);
-  }, [appMode, remoteProfiles, serverUrl, setActiveWorkspace, upsertRemote]);
+  }, [
+    activeWorkspaceId,
+    remoteProfiles,
+    runtimeConfig,
+    serverUrl,
+    setActiveWorkspace,
+    upsertRemote,
+  ]);
 
   const openLocalWorkspace = useCallback(async () => {
-    if (appMode === 'host') return;
+    if (
+      activeWorkspaceId === LOCAL_WORKSPACE_ID &&
+      useHostSessionStore.getState().phase === 'connected'
+    ) {
+      return;
+    }
     setBusy('local');
     setError('');
+    setWorkspaceTransition({
+      kind: 'workspace',
+      phase: 'activating',
+      from: activeWorkspaceId,
+      to: LOCAL_WORKSPACE_ID,
+    });
     const hostSession = useHostSessionStore.getState();
     try {
       // Keep the working remote credentials until the local handshake has
       // succeeded. A broken sidecar can then be rolled back without signing
       // the user out of the workspace they were already using.
       hostSession.reset();
+      if (!runtimeConfig?.localServerEnabled) {
+        await updateLocalServerPolicy({ localServerEnabled: true });
+      }
       await hostSession.retryHostStartup();
       if (useHostSessionStore.getState().phase !== 'connected') {
         throw new Error(
@@ -103,55 +125,82 @@ export default function WorkspaceConnectionsSection() {
       addToast('success', 'Using the private workspace on this device.');
       navigate('/today');
     } catch (cause) {
-      try {
-        await setAppMode('client');
-      } catch {
-        // Preserve the original startup error; the next retry can repair mode.
-      }
       hostSession.deactivate();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
+      setWorkspaceTransition(null);
       setBusy(null);
     }
-  }, [addToast, appMode, navigate, setActiveWorkspace, setAppMode]);
+  }, [
+    activeWorkspaceId,
+    addToast,
+    navigate,
+    runtimeConfig?.localServerEnabled,
+    setActiveWorkspace,
+    setWorkspaceTransition,
+    updateLocalServerPolicy,
+  ]);
 
   const connectRemote = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
       setBusy('remote');
       setError('');
+      setWorkspaceTransition({
+        kind: 'workspace',
+        phase: 'preflight',
+        from: activeWorkspaceId,
+        to: remoteUrl,
+      });
       let normalizedUrl = '';
       try {
         normalizedUrl = normalizeWorkspaceUrl(remoteUrl);
-        // Authenticate before stopping the local engine. A typo or wrong PIN
-        // therefore leaves the current local workspace fully usable.
-        await login(normalizedUrl, pin);
-        await platformApi.server.updateConfig({ hostServerUrl: normalizedUrl });
-        await setAppMode('client');
+        // Workspace selection no longer controls the local server lifecycle.
+        // A phone paired to this computer stays connected while the desktop
+        // UI authenticates against and displays a remote workspace.
+        const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
+        const health = await verifyClawChatHealth(normalizedUrl, selectedProfile?.hostId);
+        const identity = await login(normalizedUrl, pin);
+        if (identity.hostId && identity.hostId !== health.hostId) {
+          throw new Error('The server identity changed between health check and sign-in.');
+        }
         useHostSessionStore.getState().deactivate();
-        const profile = upsertRemote(name, normalizedUrl);
+        const profile = upsertRemote(name || identity.workspaceName || '', normalizedUrl, {
+          hostId: health.hostId,
+          hostPublicKey: identity.hostPublicKey ?? health.hostPublicKey,
+          apiVersion: identity.apiVersion ?? health.apiVersion,
+        });
         setActiveWorkspace(profile.id);
         setPin('');
         addToast('success', `Connected to ${profile.name}.`);
         navigate('/today');
       } catch (cause) {
-        // If native mode switching failed after remote authentication, restore
-        // the invisible local session instead of mixing remote credentials
-        // with a still-running local engine.
-        if (normalizedUrl && useAuthStore.getState().serverUrl === normalizedUrl) {
-          await useHostSessionStore.getState().retryHostStartup();
-        }
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
+        setWorkspaceTransition(null);
         setBusy(null);
       }
     },
-    [addToast, login, name, navigate, pin, remoteUrl, setActiveWorkspace, setAppMode, upsertRemote],
+    [
+      activeWorkspaceId,
+      addToast,
+      login,
+      name,
+      navigate,
+      pin,
+      remoteUrl,
+      profiles,
+      selectedProfileId,
+      setActiveWorkspace,
+      setWorkspaceTransition,
+      upsertRemote,
+    ],
   );
 
   const chooseRemote = (profile: WorkspaceProfile) => {
     setName(profile.name);
     setRemoteUrl(profile.serverUrl ?? '');
+    setSelectedProfileId(profile.id);
     setPin('');
     setError('Enter the PIN for this workspace to connect.');
   };
@@ -159,8 +208,7 @@ export default function WorkspaceConnectionsSection() {
   const handleAutoStartToggle = async (enabled: boolean) => {
     setError('');
     try {
-      await platformApi.server.updateConfig({ autoStartHost: enabled });
-      setAutoStartHost(enabled);
+      await updateLocalServerPolicy({ autoStartHost: enabled });
       addToast(
         'success',
         enabled ? 'ClawChat will open at system login.' : 'Launch at system login disabled.',
@@ -174,11 +222,11 @@ export default function WorkspaceConnectionsSection() {
     setSavingLocalSecurity(true);
     setError('');
     try {
-      await platformApi.server.updateConfig({
-        pin: localPin,
+      await updateLocalServerPolicy({
+        ...(localPin ? { pin: localPin } : {}),
         lanAccess: nextLanAccess,
       });
-      setLanAccess(nextLanAccess);
+      setLocalPin('');
       addToast(
         'success',
         nextLanAccess
@@ -192,13 +240,55 @@ export default function WorkspaceConnectionsSection() {
     }
   };
 
+  const updateLocalLifecycle = async (updates: {
+    localServerEnabled?: boolean;
+    keepRunningInTray?: boolean;
+  }) => {
+    setError('');
+    try {
+      await updateLocalServerPolicy(updates);
+      if (updates.localServerEnabled === false && activeWorkspaceId === LOCAL_WORKSPACE_ID) {
+        useHostSessionStore.getState().deactivate();
+        logout();
+        navigate('/connections');
+      }
+      addToast('success', 'Local server policy updated.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
+  const savePort = async () => {
+    const port = Number(localPort);
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      setError('Port must be Automatic (0) or a number between 1 and 65535.');
+      return;
+    }
+    setError('');
+    try {
+      await updateLocalServerPolicy({ port });
+      await refreshRuntime();
+      addToast(
+        'success',
+        port === 0 ? 'Automatic port selection enabled.' : `Local port set to ${port}.`,
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
+  const autoStartHost = runtimeConfig?.autoStartHost ?? false;
+  const lanAccess = runtimeConfig?.lanAccess ?? false;
+
   return (
     <SettingsSection title="Workspaces & Connections">
       <div className="cc-workspace-card">
         <div className="cc-workspace-card__body">
           <div className="cc-workspace-card__heading">
             <span className="cc-workspace-card__name">This device</span>
-            {appMode === 'host' && <span className="cc-workspace-badge">Current</span>}
+            {activeWorkspaceId === LOCAL_WORKSPACE_ID && (
+              <span className="cc-workspace-badge">Current</span>
+            )}
           </div>
           <div className="cc-workspace-card__description">
             Private local tasks and calendar. No account, server address, or PIN required.
@@ -208,7 +298,7 @@ export default function WorkspaceConnectionsSection() {
             {localStatus?.port ? ` · Local port ${localStatus.port}` : ''}
           </div>
         </div>
-        {appMode !== 'host' && (
+        {activeWorkspaceId !== LOCAL_WORKSPACE_ID && (
           <button
             type="button"
             className="cc-btn cc-btn--primary cc-btn--compact"
@@ -225,7 +315,7 @@ export default function WorkspaceConnectionsSection() {
           <div className="cc-workspace-card__body">
             <div className="cc-workspace-card__heading">
               <span className="cc-workspace-card__name">{profile.name}</span>
-              {appMode === 'client' && activeWorkspaceId === profile.id && (
+              {activeWorkspaceId === profile.id && (
                 <span className="cc-workspace-badge">Current</span>
               )}
             </div>
@@ -235,7 +325,7 @@ export default function WorkspaceConnectionsSection() {
             </div>
           </div>
           <div className="cc-settings-inline-actions">
-            {!(appMode === 'client' && activeWorkspaceId === profile.id) && (
+            {activeWorkspaceId !== profile.id && (
               <button
                 type="button"
                 className="cc-btn cc-btn--secondary cc-btn--compact"
@@ -276,7 +366,10 @@ export default function WorkspaceConnectionsSection() {
               type="url"
               required
               value={remoteUrl}
-              onChange={(event) => setRemoteUrl(event.target.value)}
+              onChange={(event) => {
+                setRemoteUrl(event.target.value);
+                setSelectedProfileId(null);
+              }}
               placeholder="https://clawchat.example.com"
             />
           </label>
@@ -306,8 +399,36 @@ export default function WorkspaceConnectionsSection() {
         </div>
       </form>
 
-      {appMode === 'host' && (
+      {runtimeConfig && (
         <>
+          <div className="cc-workspace-preference">
+            <div>
+              <div className="cc-workspace-card__name">Local server</div>
+              <div className="cc-workspace-card__description">
+                Make this device's private workspace available independently of the workspace shown
+                in this app.
+              </div>
+            </div>
+            <Toggle
+              checked={runtimeConfig.localServerEnabled}
+              label="Local server"
+              onChange={(enabled) => void updateLocalLifecycle({ localServerEnabled: enabled })}
+            />
+          </div>
+          <div className="cc-workspace-preference">
+            <div>
+              <div className="cc-workspace-card__name">Keep available in tray</div>
+              <div className="cc-workspace-card__description">
+                Keep the local server running when the ClawChat window is closed.
+              </div>
+            </div>
+            <Toggle
+              checked={runtimeConfig.keepRunningInTray}
+              disabled={!runtimeConfig.localServerEnabled}
+              label="Keep available in tray"
+              onChange={(enabled) => void updateLocalLifecycle({ keepRunningInTray: enabled })}
+            />
+          </div>
           <div className="cc-workspace-preference">
             <div>
               <div className="cc-workspace-card__name">Allow local network access</div>
@@ -318,7 +439,7 @@ export default function WorkspaceConnectionsSection() {
             </div>
             <Toggle
               checked={lanAccess}
-              disabled={savingLocalSecurity}
+              disabled={savingLocalSecurity || !runtimeConfig.localServerEnabled}
               label="Allow local network access"
               onChange={(enabled) => void saveLocalSecurity(enabled)}
             />
@@ -334,17 +455,48 @@ export default function WorkspaceConnectionsSection() {
                 minLength={6}
                 maxLength={32}
                 value={localPin}
+                placeholder={
+                  runtimeConfig.defaultPinInUse ? 'Replace the default PIN' : 'Enter a new PIN'
+                }
                 onChange={(event) => setLocalPin(event.target.value)}
                 autoComplete="new-password"
+                disabled={!runtimeConfig.localServerEnabled}
               />
             </label>
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
-              disabled={savingLocalSecurity || localPin.length < 6}
+              disabled={
+                savingLocalSecurity || !runtimeConfig.localServerEnabled || localPin.length < 6
+              }
               onClick={() => void saveLocalSecurity()}
             >
               {savingLocalSecurity ? 'Saving…' : 'Save PIN'}
+            </button>
+          </div>
+          <div className="cc-workspace-preference">
+            <label>
+              <span className="cc-workspace-card__name">Local server port</span>
+              <span className="cc-workspace-card__description">
+                Use 0 for automatic selection, or choose a fixed port.
+              </span>
+              <input
+                className="cc-settings-input"
+                type="number"
+                min="0"
+                max="65535"
+                value={localPort}
+                onChange={(event) => setLocalPort(event.target.value)}
+                disabled={!runtimeConfig.localServerEnabled}
+              />
+            </label>
+            <button
+              type="button"
+              className="cc-btn cc-btn--secondary cc-btn--compact"
+              disabled={!runtimeConfig.localServerEnabled}
+              onClick={() => void savePort()}
+            >
+              Save port
             </button>
           </div>
           <div className="cc-workspace-preference">
@@ -354,7 +506,11 @@ export default function WorkspaceConnectionsSection() {
                 Launch ClawChat and make the local workspace available after signing in.
               </div>
             </div>
-            <Toggle checked={autoStartHost} onChange={handleAutoStartToggle} />
+            <Toggle
+              checked={autoStartHost}
+              disabled={!runtimeConfig.localServerEnabled}
+              onChange={handleAutoStartToggle}
+            />
           </div>
         </>
       )}

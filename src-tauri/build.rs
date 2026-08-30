@@ -2,10 +2,13 @@ fn main() {
     const COMMANDS: &[&str] = &[
         "server_get_status",
         "server_get_config",
+        "server_issue_local_session",
         "server_get_network_info",
         "server_update_config",
         "server_select_folder",
         "server_open_obsidian_vault",
+        "server_open_log_folder",
+        "server_open_data_folder",
         "server_set_app_mode",
         "server_get_app_mode",
         "app_show_notification",

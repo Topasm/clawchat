@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './app/stores/useAuthStore';
 import { useHostSessionStore } from './app/stores/useHostSessionStore';
 import { useAutoLogin } from './app/hooks/useAutoLogin';
@@ -27,6 +27,8 @@ const SystemPromptPage = lazy(() => import('./app/pages/SystemPromptPage'));
 const SearchPage = lazy(() => import('./app/pages/SearchPage'));
 const CalendarPage = lazy(() => import('./app/pages/CalendarPage'));
 const AdminPage = lazy(() => import('./app/pages/AdminPage'));
+const ConnectionCenterPage = lazy(() => import('./app/pages/ConnectionCenterPage'));
+const DiagnosticsPage = lazy(() => import('./app/pages/DiagnosticsPage'));
 
 // ── Route-level suspense fallback ────────────────────────────────────
 function PageFallback() {
@@ -65,12 +67,39 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppRouter() {
+  const location = useLocation();
   const token = useAuthStore((s) => s.token);
   const isLoading = useAuthStore((s) => s.isLoading);
   const hostPhase = useHostSessionStore((s) => s.phase);
 
   // Auto-login when the packaged Tauri host server is available.
   useAutoLogin();
+
+  // Connection and recovery controls belong to the native application shell,
+  // not to a workspace session. Keep them mountable while auth is rehydrating
+  // and while the bundled server is blocked.
+  if (location.pathname === '/connections' || location.pathname === '/diagnostics') {
+    return (
+      <Routes>
+        <Route
+          path="/connections"
+          element={
+            <LazyRoute>
+              <ConnectionCenterPage />
+            </LazyRoute>
+          }
+        />
+        <Route
+          path="/diagnostics"
+          element={
+            <LazyRoute>
+              <DiagnosticsPage />
+            </LazyRoute>
+          }
+        />
+      </Routes>
+    );
+  }
 
   // Show nothing while rehydrating from localStorage
   if (isLoading) return null;

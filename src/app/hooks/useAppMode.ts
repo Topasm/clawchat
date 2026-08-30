@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { platformApi, type AppMode } from '../platform';
+import { useCallback, useEffect } from 'react';
+import type { AppMode } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
+import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
 
 interface UseAppModeResult {
   /** Current app mode. null outside desktop runtimes (web/mobile are always clients). */
@@ -16,31 +17,21 @@ interface UseAppModeResult {
 }
 
 export function useAppMode(): UseAppModeResult {
-  const [appMode, setAppModeState] = useState<AppMode | null>(null);
-  const [loading, setLoading] = useState(IS_DESKTOP);
+  const appMode = useWorkspaceRuntimeStore((state) => state.config?.appMode ?? null);
+  const loading = useWorkspaceRuntimeStore(
+    (state) => state.bootstrapPhase === 'reading_config' || state.transition !== null,
+  );
+  const initialize = useWorkspaceRuntimeStore((state) => state.initialize);
+  const setCompatibilityMode = useWorkspaceRuntimeStore((state) => state.setCompatibilityMode);
 
   useEffect(() => {
-    if (!IS_DESKTOP) {
-      setAppModeState(null);
-      setLoading(false);
-      return;
-    }
-    platformApi.server.getAppMode().then((mode) => {
-      setAppModeState(mode);
-      setLoading(false);
-    });
-  }, []);
+    void initialize();
+  }, [initialize]);
 
   const setAppMode = useCallback(async (mode: AppMode) => {
     if (!IS_DESKTOP) return;
-    setLoading(true);
-    try {
-      await platformApi.server.setAppMode(mode);
-      setAppModeState(mode);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await setCompatibilityMode(mode);
+  }, [setCompatibilityMode]);
 
   return {
     appMode,

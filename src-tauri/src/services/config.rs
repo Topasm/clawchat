@@ -26,12 +26,28 @@ impl ConfigStore {
             .map_err(|error| format!("invalid server config {}: {error}", self.path.display()))?;
         let was_legacy_host = value.get("appMode").is_none()
             && (value.get("port").is_some() || value.get("pin").is_some());
+        let needs_policy_migration = value.get("localServerEnabled").is_none();
+        let legacy_mode_was_host = value
+            .get("appMode")
+            .and_then(Value::as_str)
+            .map(|mode| mode == "host")
+            .unwrap_or(was_legacy_host);
         let mut config: ServerConfig = serde_json::from_value(value)
             .map_err(|error| format!("invalid server config {}: {error}", self.path.display()))?;
 
         if was_legacy_host {
             config.app_mode = crate::models::AppMode::Host;
             config.auto_start_host = true;
+        }
+        if needs_policy_migration {
+            // Before policy and workspace selection were separated, Client
+            // mode always meant that the local sidecar was disabled. Preserve
+            // that explicit choice while fresh installs keep the local-first
+            // default from `ServerConfig::default`.
+            config.local_server_enabled = legacy_mode_was_host;
+            config.keep_running_in_tray = legacy_mode_was_host;
+        }
+        if was_legacy_host || needs_policy_migration {
             self.save(&config)?;
         }
 
@@ -104,6 +120,7 @@ mod tests {
 
         let config = store.load().expect("load config");
         assert!(matches!(config.app_mode, AppMode::Host));
+        assert!(config.local_server_enabled);
         assert!(config.auto_start_host);
         assert_eq!(config.port, 8123);
 
@@ -121,6 +138,7 @@ mod tests {
         let config = store.load().expect("load config");
 
         assert!(matches!(config.app_mode, AppMode::Host));
+        assert!(config.local_server_enabled);
         // Running our own server must not also enrol the app in OS autostart:
         // that stays an explicit opt-in.
         assert!(!config.auto_start_host);
@@ -153,6 +171,11 @@ mod tests {
         let config = store.load().expect("load config");
 
         assert!(matches!(config.app_mode, AppMode::Client));
+        assert!(!config.local_server_enabled);
+        assert!(!config.keep_running_in_tray);
+
+        let persisted = fs::read_to_string(store.path()).expect("migrated config");
+        assert!(persisted.contains("\"localServerEnabled\": false"));
     }
 
     #[test]

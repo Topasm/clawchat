@@ -313,9 +313,12 @@ export default function Layout() {
           )}
         </button>
       </div>
-      <div
+      <button
+        type="button"
         className={`cc-connection-status cc-connection-status--${connectionStatus}`}
         title={`${activeWorkspaceName} · ${connectionLabel}`}
+        aria-label={`Switch workspace. Current: ${activeWorkspaceName}`}
+        onClick={() => navigate('/connections')}
       >
         <span className="cc-connection-status__dot" />
         <span className="cc-sidebar__label">
@@ -329,7 +332,7 @@ export default function Layout() {
             </span>
           )}
         </span>
-      </div>
+      </button>
       {healthData && (
         <div
           className={`cc-health-status cc-health-status--${healthData.ai_connected ? 'ok' : 'degraded'}`}

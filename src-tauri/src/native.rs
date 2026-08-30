@@ -6,7 +6,7 @@ use tauri::{
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartExt};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-use crate::{models::AppMode, startup_log, state::AppState};
+use crate::{startup_log, state::AppState};
 
 const QUICK_CAPTURE_SHORTCUT: &str = "CommandOrControl+Shift+Space";
 
@@ -88,7 +88,7 @@ fn sync_autostart(app: &AppHandle) {
     };
     let enabled = state
         .config()
-        .map(|config| matches!(config.app_mode, AppMode::Host) && config.auto_start_host)
+        .map(|config| config.local_server_enabled && config.auto_start_host)
         .unwrap_or(false);
     let manager = app.autolaunch();
     let result = if enabled {
@@ -105,11 +105,21 @@ fn sync_autostart(app: &AppHandle) {
 
 fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show ClawChat", true, None::<&str>)?;
+    let connections = MenuItem::with_id(
+        app,
+        "open-connections",
+        "Open Connections…",
+        true,
+        None::<&str>,
+    )?;
     let stop = MenuItem::with_id(app, "stop-server", "Stop Server", true, None::<&str>)?;
     let restart = MenuItem::with_id(app, "restart-server", "Restart Server", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit ClawChat", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &stop, &restart, &separator, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&show, &connections, &stop, &restart, &separator, &quit],
+    )?;
     let builder = TrayIconBuilder::with_id("main-tray")
         .icon(TRAY_ICON)
         .icon_as_template(cfg!(target_os = "macos"))
@@ -118,6 +128,10 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => show_main_window(app),
+            "open-connections" => {
+                show_main_window(app);
+                let _ = app.emit("navigate", "/connections");
+            }
             "stop-server" => {
                 let state = app.state::<AppState>();
                 if let Err(error) = state.stop_server(app) {
@@ -130,7 +144,7 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
                 let state = app.state::<AppState>();
                 if state
                     .config()
-                    .map(|config| matches!(config.app_mode, AppMode::Host))
+                    .map(|config| config.local_server_enabled)
                     .unwrap_or(false)
                 {
                     if let Err(error) = state.restart_server(app) {

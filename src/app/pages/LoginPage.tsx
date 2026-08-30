@@ -23,6 +23,8 @@ import {
   type HostSessionPhase,
 } from '../stores/useHostSessionStore';
 import type { ServerStatus } from '../platform';
+import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { verifyClawChatHealth } from '../services/workspaceHealth';
 
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'error';
 
@@ -78,6 +80,10 @@ export default function LoginPage() {
   const { colors } = useTheme();
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const profiles = useWorkspaceStore((state) => state.profiles);
+  const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
+  const upsertRemote = useWorkspaceStore((state) => state.upsertRemote);
 
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
   const [pin, setPin] = useState('');
@@ -121,21 +127,18 @@ export default function LoginPage() {
     if (next && hostStatus) setServerUrl(`http://localhost:${hostStatus.port}`);
   };
 
-  // On desktop client mode: show server URL + QR, pre-fill from stored hostServerUrl
+  // A remote workspace selection controls what the renderer connects to. It
+  // does not control whether this computer continues hosting in the tray.
   useEffect(() => {
     if (!IS_DESKTOP) return;
-    platformApi.server.getAppMode().then((mode) => {
-      if (mode === 'client') {
-        setDesktopClientMode(true);
-        setShowServerUrl(true);
-        platformApi.server.getConfig().then((cfg) => {
-          if (cfg.hostServerUrl) {
-            setServerUrl(cfg.hostServerUrl);
-          }
-        });
-      }
-    });
-  }, []);
+    const activeProfile = profiles.find((profile) => profile.id === activeWorkspaceId);
+    const isRemote = activeProfile?.kind === 'remote';
+    setDesktopClientMode(isRemote);
+    if (isRemote) {
+      setShowServerUrl(true);
+      if (activeProfile.serverUrl) setServerUrl(activeProfile.serverUrl);
+    }
+  }, [activeWorkspaceId, profiles]);
 
   /**
    * Switch the desktop app to hosting its own server and log straight in.
@@ -153,6 +156,7 @@ export default function LoginPage() {
     await retryHostStartup();
     const { phase, status, failure } = useHostSessionStore.getState();
     if (phase === 'connected') {
+      setActiveWorkspace(LOCAL_WORKSPACE_ID);
       navigate('/today');
       return;
     }
@@ -234,6 +238,11 @@ export default function LoginPage() {
             relayUrl: result.relay_url ?? parsed.relay_url ?? null,
             isLoading: false,
           });
+          upsertRemote('Remote workspace', result.api_base_url || pairUrl, {
+            hostId: result.host_id ?? parsed.host_id,
+            hostPublicKey: result.host_public_key ?? parsed.host_public_key,
+            apiVersion: '1',
+          });
           navigate('/today');
         } catch (err) {
           setError((err as Error).message);
@@ -265,7 +274,23 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(serverUrl.replace(/\/+$/, ''), pin);
+      const normalizedUrl = serverUrl.replace(/\/+$/, '');
+      const activeProfile = profiles.find((profile) => profile.id === activeWorkspaceId);
+      const health = await verifyClawChatHealth(
+        normalizedUrl,
+        activeProfile?.kind === 'remote' ? activeProfile.hostId : null,
+      );
+      const identity = await login(normalizedUrl, pin);
+      if (identity.hostId && identity.hostId !== health.hostId) {
+        throw new Error('The server identity changed between health check and sign-in.');
+      }
+      if (!IS_DESKTOP || desktopClientMode) {
+        upsertRemote(identity.workspaceName || '', normalizedUrl, {
+          hostId: health.hostId,
+          hostPublicKey: identity.hostPublicKey ?? health.hostPublicKey,
+          apiVersion: identity.apiVersion ?? health.apiVersion,
+        });
+      }
       navigate('/today');
     } catch (err) {
       setError((err as Error).message);
@@ -282,15 +307,13 @@ export default function LoginPage() {
     }
     setHealthStatus('checking');
     try {
-      const response = await fetch(`${url}/api/health`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000),
-      });
-      setHealthStatus(response.ok ? 'ok' : 'error');
+      const activeProfile = profiles.find((profile) => profile.id === activeWorkspaceId);
+      await verifyClawChatHealth(url, activeProfile?.hostId);
+      setHealthStatus('ok');
     } catch {
       setHealthStatus('error');
     }
-  }, [serverUrl]);
+  }, [activeWorkspaceId, profiles, serverUrl]);
 
   const handleServerUrlBlur = () => {
     if (serverUrl.trim()) {
@@ -344,9 +367,37 @@ export default function LoginPage() {
           boxShadow: `0 2px 12px ${colors.shadow}22`,
         }}
       >
-        <h1 style={{ margin: '0 0 24px', fontSize: 24, fontWeight: 700, color: colors.primary }}>
-          ClawChat
-        </h1>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 24,
+          }}
+        >
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: colors.primary }}>
+            ClawChat
+          </h1>
+          {IS_DESKTOP && (
+            <button
+              type="button"
+              aria-label="Open connections"
+              onClick={() => navigate('/connections')}
+              style={{
+                padding: '6px 9px',
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+                color: colors.textSecondary,
+                background: colors.background,
+                cursor: 'pointer',
+                fontSize: 12,
+              }}
+            >
+              Connections
+            </button>
+          )}
+        </div>
 
         {hostPanelActive && (
           <div
@@ -421,6 +472,40 @@ export default function LoginPage() {
                 >
                   Try opening the workspace again
                 </button>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/connections')}
+                    style={{
+                      flex: 1,
+                      padding: '9px 8px',
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: 8,
+                      color: colors.text,
+                      background: colors.surface,
+                      cursor: 'pointer',
+                      fontSize: 11,
+                    }}
+                  >
+                    Connect elsewhere
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/diagnostics')}
+                    style={{
+                      flex: 1,
+                      padding: '9px 8px',
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: 8,
+                      color: colors.text,
+                      background: colors.surface,
+                      cursor: 'pointer',
+                      fontSize: 11,
+                    }}
+                  >
+                    Diagnostics
+                  </button>
+                </div>
               </>
             ) : (
               <div style={{ fontSize: 12, lineHeight: 1.5, color: colors.textSecondary }}>

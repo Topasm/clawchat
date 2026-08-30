@@ -4,9 +4,11 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { platformApi } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
-import { useAppMode } from '../hooks/useAppMode';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import QRScanner from '../components/shared/QRScanner';
+import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
+import { verifyClawChatHealth } from '../services/workspaceHealth';
 
 type Step = 'welcome' | 'role' | 'server' | 'claude' | 'pairing' | 'ready';
 
@@ -28,7 +30,12 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
   const token = useAuthStore((s) => s.token);
   const serverUrl = useAuthStore((s) => s.serverUrl);
-  const { appMode, setAppMode } = useAppMode();
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
+  const upsertRemote = useWorkspaceStore((state) => state.upsertRemote);
+  const updateLocalServerPolicy = useWorkspaceRuntimeStore(
+    (state) => state.updateLocalServerPolicy,
+  );
 
   const [chosenRole, setChosenRole] = useState<'host' | 'client' | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
@@ -42,12 +49,13 @@ export default function OnboardingPage() {
   const steps = getSteps(IS_DESKTOP, chosenRole);
   const currentIndex = steps.indexOf(currentStep);
 
-  // Sync chosenRole from appMode if already set (e.g. migration)
+  // The onboarding choice selects the workspace to view. Hosting remains an
+  // independent policy and defaults to enabled on desktop.
   useEffect(() => {
-    if (IS_DESKTOP && appMode && chosenRole === null) {
-      setChosenRole(appMode);
+    if (IS_DESKTOP && chosenRole === null) {
+      setChosenRole(activeWorkspaceId === LOCAL_WORKSPACE_ID ? 'host' : 'client');
     }
-  }, [appMode, chosenRole]);
+  }, [activeWorkspaceId, chosenRole]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -83,11 +91,8 @@ export default function OnboardingPage() {
     }
     setServerStatus('checking');
     try {
-      const response = await fetch(`${targetUrl}/api/health`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000),
-      });
-      setServerStatus(response.ok ? 'online' : 'error');
+      await verifyClawChatHealth(targetUrl);
+      setServerStatus('online');
     } catch {
       setServerStatus('offline');
     }
@@ -185,8 +190,9 @@ export default function OnboardingPage() {
 
   const handleRoleSelect = async (role: 'host' | 'client') => {
     setChosenRole(role);
-    if (IS_DESKTOP) {
-      await setAppMode(role);
+    if (IS_DESKTOP && role === 'host') {
+      await updateLocalServerPolicy({ localServerEnabled: true });
+      setActiveWorkspace(LOCAL_WORKSPACE_ID);
     }
     // Advance to next step (server)
     const nextSteps = getSteps(IS_DESKTOP, role);
@@ -220,6 +226,12 @@ export default function OnboardingPage() {
           }
           const result = await res.json();
           const resolvedUrl = result.api_base_url || pairUrl;
+          if (parsed.host_id && result.host_id !== parsed.host_id) {
+            throw new Error('Host ID did not match the scanned QR code');
+          }
+          if (parsed.host_public_key && result.host_public_key !== parsed.host_public_key) {
+            throw new Error('Host identity did not match the scanned QR code');
+          }
           // Store device token
           useAuthStore.setState({
             token: result.device_token,
@@ -227,10 +239,11 @@ export default function OnboardingPage() {
             serverUrl: resolvedUrl,
             isLoading: false,
           });
-          // Save the host URL in the native desktop config.
-          if (IS_DESKTOP) {
-            await platformApi.server.updateConfig({ hostServerUrl: resolvedUrl });
-          }
+          upsertRemote('Remote workspace', resolvedUrl, {
+            hostId: result.host_id ?? parsed.host_id,
+            hostPublicKey: result.host_public_key ?? parsed.host_public_key,
+            apiVersion: '1',
+          });
           setServerStatus('online');
         } catch (err) {
           console.error('QR pairing failed:', err);
@@ -353,10 +366,10 @@ export default function OnboardingPage() {
 
   const renderRole = () => (
     <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">Choose Your Role</h2>
+      <h2 className="cc-onboarding__card-title">Choose where to start</h2>
       <p className="cc-onboarding__card-description">
-        Is this your main desktop, or are you connecting to a ClawChat host
-        running on another machine?
+        You can use the private workspace on this computer or connect to an
+        existing ClawChat. This can be changed at any time.
       </p>
 
       <div className="cc-onboarding__role-grid">
@@ -366,10 +379,10 @@ export default function OnboardingPage() {
         >
           <div className="cc-onboarding__role-icon">{'\uD83D\uDDA5'}</div>
           <div className="cc-onboarding__role-content">
-            <div className="cc-onboarding__role-title">Set Up as Host</div>
+            <div className="cc-onboarding__role-title">Start on this computer</div>
             <p className="cc-onboarding__role-description">
-              Run the ClawChat server on this computer. Your data stays here.
-              Other devices connect to you.
+              Start with the private workspace on this computer. Other devices
+              can connect to its local server later.
             </p>
           </div>
         </div>
@@ -380,10 +393,10 @@ export default function OnboardingPage() {
         >
           <div className="cc-onboarding__role-icon">{'\uD83D\uDD17'}</div>
           <div className="cc-onboarding__role-content">
-            <div className="cc-onboarding__role-title">Connect to a Host</div>
+            <div className="cc-onboarding__role-title">Connect to an existing ClawChat</div>
             <p className="cc-onboarding__role-description">
-              Connect to a ClawChat server running on another device. No server
-              runs on this machine.
+              View a ClawChat workspace running on another device. This
+              computer can still keep its own local server available.
             </p>
           </div>
         </div>

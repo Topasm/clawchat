@@ -30,13 +30,17 @@ export const webPlatformApi: NativePlatformApi = {
   server: {
     getStatus: () => unavailable('Native server'),
     getConfig: () => unavailable('Native server'),
+    issueLocalSession: () => unavailable('Native local session'),
     getNetworkInfo: () => unavailable('Native server'),
     updateConfig: () => unavailable('Native server'),
     selectFolder: () => unavailable('Folder picker'),
     openObsidianVault: () => unavailable('Obsidian launcher'),
+    openLogFolder: () => unavailable('Native log folder'),
+    openDataFolder: () => unavailable('Native data folder'),
     setAppMode: () => unavailable('App mode'),
     getAppMode: () => unavailable('App mode'),
     onStatusChange: () => () => {},
+    onRuntimeChange: () => () => {},
   },
   system: {
     openCameraSettings: () => unavailable('Camera settings'),

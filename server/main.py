@@ -52,6 +52,17 @@ async def lifespan(app: FastAPI):
 
     await init_db()
 
+    # Expose the same durable identity through health, pairing, and login so a
+    # saved workspace cannot silently turn into a different server at the same
+    # URL.
+    from services.relay.host_identity import get_or_create_host_identity
+
+    async with async_session_factory() as identity_db:
+        identity = await get_or_create_host_identity(identity_db)
+        await identity_db.commit()
+        app.state.host_id = identity.host_id
+        app.state.host_public_key = identity.public_key
+
     # Create AI service — relays to OpenClaw
     ai_service = AIService(
         base_url=settings.ai_base_url,
@@ -326,6 +337,9 @@ async def health():
         # already listening on its configured port. A generic HTTP 200 is not
         # enough: port 8000 is commonly occupied by unrelated developer tools.
         "service": "clawchat",
+        "api_version": "1",
+        "host_id": getattr(app.state, "host_id", None),
+        "host_public_key": getattr(app.state, "host_public_key", None),
         "status": "ok" if effective_connected else "degraded",
         "version": APP_VERSION,
         "ai_provider": active_provider,

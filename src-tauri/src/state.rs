@@ -188,6 +188,13 @@ impl AppState {
     pub fn set_app_mode(&self, mode: AppMode) -> Result<ServerConfig, String> {
         let mut config = self.lock_config()?;
         config.app_mode = mode;
+        if matches!(mode, AppMode::Host) {
+            // Compatibility for older renderers: choosing "host" still
+            // guarantees that the local server is available. Choosing a
+            // remote workspace no longer disables it; workspace selection is
+            // now independent from this lifecycle policy.
+            config.local_server_enabled = true;
+        }
         self.config_store.save(&config)?;
         Ok(config.clone())
     }
@@ -238,7 +245,7 @@ impl AppState {
 
     pub fn should_start_host(&self) -> bool {
         self.config()
-            .map(|config| matches!(config.app_mode, AppMode::Host))
+            .map(|config| config.local_server_enabled)
             .unwrap_or(false)
     }
 

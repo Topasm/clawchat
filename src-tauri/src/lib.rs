@@ -58,12 +58,12 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let is_host = window
+                let keep_running = window
                     .try_state::<AppState>()
                     .and_then(|state| state.config().ok())
-                    .map(|config| matches!(config.app_mode, models::AppMode::Host))
+                    .map(|config| config.local_server_enabled && config.keep_running_in_tray)
                     .unwrap_or(false);
-                if is_host {
+                if keep_running {
                     api.prevent_close();
                     let _ = window.hide();
                 } else {
@@ -114,10 +114,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::server::server_get_status,
             commands::server::server_get_config,
+            commands::server::server_issue_local_session,
             commands::server::server_get_network_info,
             commands::server::server_update_config,
             commands::server::server_select_folder,
             commands::server::server_open_obsidian_vault,
+            commands::server::server_open_log_folder,
+            commands::server::server_open_data_folder,
             commands::server::server_set_app_mode,
             commands::server::server_get_app_mode,
             commands::app::app_show_notification,

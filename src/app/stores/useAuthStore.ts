@@ -15,7 +15,16 @@ interface AuthState {
   isLoading: boolean;
   connectionStatus: ConnectionStatus;
   healthOK: boolean;
-  login: (serverUrl: string, pin: string) => Promise<void>;
+  login: (serverUrl: string, pin: string) => Promise<{
+    hostId: string | null;
+    hostPublicKey: string | null;
+    apiVersion: string | null;
+    workspaceName: string | null;
+  }>;
+  adoptSession: (
+    serverUrl: string,
+    session: { access_token: string; refresh_token?: string | null },
+  ) => void;
   logout: () => void;
   setToken: (token: string) => void;
   setTokens: (token: string, refreshToken: string) => void;
@@ -55,6 +64,24 @@ export const useAuthStore = create<AuthState>()(
         set({
           token: data.access_token,
           refreshToken: data.refresh_token,
+          serverUrl,
+          hostId: typeof data.host_id === 'string' ? data.host_id : null,
+          hostPublicKey: typeof data.host_public_key === 'string' ? data.host_public_key : null,
+          relayUrl: null,
+          isLoading: false,
+        });
+        return {
+          hostId: typeof data.host_id === 'string' ? data.host_id : null,
+          hostPublicKey: typeof data.host_public_key === 'string' ? data.host_public_key : null,
+          apiVersion: typeof data.api_version === 'string' ? data.api_version : null,
+          workspaceName: typeof data.workspace_name === 'string' ? data.workspace_name : null,
+        };
+      },
+
+      adoptSession: (serverUrl, session) => {
+        set({
+          token: session.access_token,
+          refreshToken: session.refresh_token ?? null,
           serverUrl,
           hostId: null,
           hostPublicKey: null,

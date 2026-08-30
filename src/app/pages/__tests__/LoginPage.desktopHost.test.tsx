@@ -9,11 +9,13 @@ const serverMocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
   getNetworkInfo: vi.fn(),
   updateConfig: vi.fn(),
+  issueLocalSession: vi.fn(),
   selectFolder: vi.fn(),
   openObsidianVault: vi.fn(),
   setAppMode: vi.fn(),
   getAppMode: vi.fn(),
   onStatusChange: vi.fn(() => () => {}),
+  onRuntimeChange: vi.fn(() => () => {}),
 }));
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
@@ -47,6 +49,7 @@ vi.mock('react-router-dom', async () => {
 const { ThemeProvider } = await import('../../config/ThemeProvider');
 const { useHostSessionStore } = await import('../../stores/useHostSessionStore');
 const { useAuthStore } = await import('../../stores/useAuthStore');
+const { useWorkspaceStore } = await import('../../stores/useWorkspaceStore');
 const LoginPage = (await import('../LoginPage')).default;
 
 function renderLoginPage() {
@@ -69,14 +72,29 @@ beforeEach(() => {
   serverMocks.getStatus.mockResolvedValue(hostStatus());
   serverMocks.getConfig.mockResolvedValue({
     appMode: 'host',
+    localServerEnabled: true,
+    keepRunningInTray: true,
     port: 8000,
-    pin: '123456',
+    pinConfigured: true,
+    defaultPinInUse: false,
     obsidianVaultPath: '',
     hostServerUrl: '',
     autoStartHost: false,
   });
+  serverMocks.updateConfig.mockResolvedValue({
+    config: {},
+    previousStatus: hostStatus(),
+    status: hostStatus(),
+    applied: true,
+    restartRequired: false,
+  });
+  serverMocks.issueLocalSession.mockResolvedValue({
+    access_token: 'local-token',
+    refresh_token: 'local-refresh',
+  });
   serverMocks.setAppMode.mockResolvedValue({ appMode: 'host', port: 8000, pin: '123456' });
   useAuthStore.setState({ token: null, isLoading: false, login: vi.fn() });
+  useWorkspaceStore.getState().reset();
   useHostSessionStore.setState({
     phase: 'checking',
     status: null,
@@ -163,7 +181,9 @@ describe('LoginPage on a desktop host', () => {
       await screen.findByRole('button', { name: /try opening the workspace again/i }),
     );
 
-    await waitFor(() => expect(serverMocks.setAppMode).toHaveBeenCalledWith('host'));
+    await waitFor(() =>
+      expect(serverMocks.updateConfig).toHaveBeenCalledWith({ localServerEnabled: true }),
+    );
   });
 
   it('keeps manual sign-in available as a collapsed fallback', async () => {
@@ -188,15 +208,7 @@ describe('LoginPage on a desktop host', () => {
 
 describe('LoginPage on a desktop client', () => {
   it('keeps the pairing and manual sign-in paths untouched', async () => {
-    serverMocks.getAppMode.mockResolvedValue('client');
-    serverMocks.getConfig.mockResolvedValue({
-      appMode: 'client',
-      port: 8000,
-      pin: '',
-      obsidianVaultPath: '',
-      hostServerUrl: 'http://192.168.1.20:8000',
-      autoStartHost: false,
-    });
+    useWorkspaceStore.getState().upsertRemote('Home', 'http://192.168.1.20:8000');
     useHostSessionStore.setState({ phase: 'idle', isHostMode: false });
     renderLoginPage();
 
@@ -210,15 +222,7 @@ describe('LoginPage on a desktop client', () => {
   });
 
   it('waits for the server to settle before reporting a failed switch to hosting', async () => {
-    serverMocks.getAppMode.mockResolvedValue('client');
-    serverMocks.getConfig.mockResolvedValue({
-      appMode: 'client',
-      port: 8000,
-      pin: '',
-      obsidianVaultPath: '',
-      hostServerUrl: '',
-      autoStartHost: false,
-    });
+    useWorkspaceStore.getState().upsertRemote('Home', 'http://192.168.1.20:8000');
     serverMocks.getStatus.mockResolvedValue(
       hostStatus({ state: 'error', error: 'packaged server binary is missing' }),
     );

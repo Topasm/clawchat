@@ -9,9 +9,16 @@ const mocks = vi.hoisted(() => ({
   updateConfig: vi.fn(),
   getStatus: vi.fn(),
   getConfig: vi.fn(),
+  issueLocalSession: vi.fn(),
+  getAppMode: vi.fn(),
   navigate: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
+  verifyHealth: vi.fn(),
+}));
+
+vi.mock('../../../services/workspaceHealth', () => ({
+  verifyClawChatHealth: mocks.verifyHealth,
 }));
 
 vi.mock('../../../hooks/useAppMode', () => ({
@@ -41,9 +48,14 @@ vi.mock('../../../platform', () => ({
     server: {
       getStatus: mocks.getStatus,
       getConfig: mocks.getConfig,
+      getAppMode: mocks.getAppMode,
+      issueLocalSession: mocks.issueLocalSession,
       updateConfig: mocks.updateConfig,
       setAppMode: mocks.nativeSetAppMode,
       onStatusChange: vi.fn(() => () => {}),
+      onRuntimeChange: vi.fn(() => () => {}),
+      openLogFolder: vi.fn(),
+      openDataFolder: vi.fn(),
     },
     system: { openCameraSettings: vi.fn() },
     secureStorage: null,
@@ -58,6 +70,7 @@ vi.mock('react-router-dom', async () => {
 const { useAuthStore } = await import('../../../stores/useAuthStore');
 const { useHostSessionStore } = await import('../../../stores/useHostSessionStore');
 const { useWorkspaceStore } = await import('../../../stores/useWorkspaceStore');
+const { useWorkspaceRuntimeStore } = await import('../../../stores/useWorkspaceRuntimeStore');
 const WorkspaceConnectionsSection = (await import('../WorkspaceConnectionsSection')).default;
 
 function renderSection() {
@@ -74,16 +87,53 @@ beforeEach(() => {
   mocks.appMode = 'host';
   mocks.getStatus.mockResolvedValue({ state: 'running', port: 8000 });
   mocks.getConfig.mockResolvedValue({
+    appMode: 'host',
+    localServerEnabled: true,
+    keepRunningInTray: true,
     autoStartHost: false,
     lanAccess: false,
     port: 8000,
-    pin: '123456',
+    pinConfigured: true,
+    defaultPinInUse: false,
+    obsidianVaultPath: '',
+    hostServerUrl: '',
   });
-  mocks.updateConfig.mockResolvedValue({});
+  mocks.updateConfig.mockImplementation(async (updates) => ({
+    config: { ...(await mocks.getConfig()), ...updates },
+    previousStatus: { state: 'running', port: 8000 },
+    status: { state: updates.localServerEnabled === false ? 'stopped' : 'running', port: 8000 },
+    applied: true,
+    restartRequired: false,
+  }));
   mocks.setAppMode.mockResolvedValue(undefined);
-  mocks.nativeSetAppMode.mockResolvedValue(undefined);
-  mocks.login.mockResolvedValue(undefined);
+  mocks.nativeSetAppMode.mockResolvedValue({
+    config: {},
+    previousStatus: { state: 'running', port: 8000 },
+    status: { state: 'running', port: 8000 },
+    applied: true,
+    restartRequired: false,
+  });
+  mocks.getAppMode.mockImplementation(async () => mocks.appMode);
+  mocks.issueLocalSession.mockResolvedValue({
+    access_token: 'local-token',
+    refresh_token: 'local-refresh',
+  });
+  mocks.login.mockResolvedValue({
+    hostId: 'claw_test',
+    hostPublicKey: 'public-key',
+    apiVersion: '1',
+    workspaceName: 'ClawChat',
+  });
+  mocks.verifyHealth.mockResolvedValue({
+    service: 'clawchat',
+    status: 'ok',
+    version: '0.1.5',
+    apiVersion: '1',
+    hostId: 'claw_test',
+    hostPublicKey: 'public-key',
+  });
   useHostSessionStore.getState().reset();
+  useWorkspaceRuntimeStore.getState().reset();
   useWorkspaceStore.getState().reset();
   useAuthStore.setState({
     token: 'local-token',
@@ -133,10 +183,8 @@ describe('WorkspaceConnectionsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
     await waitFor(() => expect(mocks.login).toHaveBeenCalledWith('https://home.example', '654321'));
-    expect(mocks.updateConfig).toHaveBeenCalledWith({
-      hostServerUrl: 'https://home.example',
-    });
-    expect(mocks.setAppMode).toHaveBeenCalledWith('client');
+    expect(mocks.updateConfig).not.toHaveBeenCalled();
+    expect(mocks.nativeSetAppMode).not.toHaveBeenCalledWith('client');
     expect(useWorkspaceStore.getState().profiles).toContainEqual(
       expect.objectContaining({ name: 'Home', serverUrl: 'https://home.example' }),
     );
@@ -157,7 +205,7 @@ describe('WorkspaceConnectionsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
     expect(await screen.findByText('Invalid PIN')).toBeInTheDocument();
-    expect(mocks.setAppMode).not.toHaveBeenCalled();
+    expect(mocks.nativeSetAppMode).not.toHaveBeenCalled();
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
   });
 
@@ -169,8 +217,10 @@ describe('WorkspaceConnectionsSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Use' }));
 
-    await waitFor(() => expect(mocks.nativeSetAppMode).toHaveBeenCalledWith('host'));
-    expect(mocks.login).toHaveBeenCalledWith('http://localhost:8000', '123456');
+    await waitFor(() =>
+      expect(mocks.updateConfig).toHaveBeenCalledWith({ localServerEnabled: true }),
+    );
+    expect(mocks.issueLocalSession).toHaveBeenCalledTimes(1);
     expect(mocks.logout).not.toHaveBeenCalled();
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
     expect(mocks.navigate).toHaveBeenCalledWith('/today');
@@ -180,13 +230,13 @@ describe('WorkspaceConnectionsSection', () => {
     mocks.appMode = 'client';
     const remote = useWorkspaceStore.getState().upsertRemote('Work', 'https://work.example');
     useAuthStore.setState({ token: 'remote-token', serverUrl: 'https://work.example' });
-    mocks.nativeSetAppMode.mockRejectedValueOnce(new Error('Local engine unavailable'));
+    mocks.updateConfig.mockRejectedValueOnce(new Error('Local engine unavailable'));
     renderSection();
 
     fireEvent.click(screen.getByRole('button', { name: 'Use' }));
 
     expect(await screen.findByText('Local engine unavailable')).toBeInTheDocument();
-    expect(mocks.setAppMode).toHaveBeenCalledWith('client');
+    expect(mocks.nativeSetAppMode).not.toHaveBeenCalledWith('client');
     expect(mocks.logout).not.toHaveBeenCalled();
     expect(useAuthStore.getState().token).toBe('remote-token');
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe(remote.id);

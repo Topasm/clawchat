@@ -6,6 +6,8 @@ const serverMocks = vi.hoisted(() => ({
   getAppMode: vi.fn(),
   getStatus: vi.fn(),
   getConfig: vi.fn(),
+  issueLocalSession: vi.fn(),
+  updateConfig: vi.fn(),
   setAppMode: vi.fn(),
   onStatusChange: vi.fn(),
 }));
@@ -16,7 +18,7 @@ const loggerMocks = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
 const authMocks = vi.hoisted(() => ({
-  state: { token: null as string | null, login: vi.fn() },
+  state: { token: null as string | null, adoptSession: vi.fn() },
 }));
 
 vi.mock('../../platform', () => ({ platformApi: { server: serverMocks } }));
@@ -27,6 +29,7 @@ vi.mock('../useAuthStore', () => ({
 }));
 
 const { useHostSessionStore, classifyLoginFailure } = await import('../useHostSessionStore');
+const { useWorkspaceStore } = await import('../useWorkspaceStore');
 
 function status(partial: Partial<ServerStatus> = {}): ServerStatus {
   return { state: 'running', port: 8000, ...partial };
@@ -38,7 +41,7 @@ const unsubscribe = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   statusListener = null;
-  authMocks.state = { token: null, login: vi.fn().mockResolvedValue(undefined) };
+  authMocks.state = { token: null, adoptSession: vi.fn() };
   serverMocks.onStatusChange.mockImplementation((callback: (next: ServerStatus) => void) => {
     statusListener = callback;
     return unsubscribe;
@@ -47,13 +50,22 @@ beforeEach(() => {
   serverMocks.getConfig.mockResolvedValue({
     appMode: 'host',
     port: 8123,
-    pin: '123456',
+    localServerEnabled: true,
+    keepRunningInTray: true,
+    pinConfigured: true,
+    defaultPinInUse: false,
     obsidianVaultPath: '',
     hostServerUrl: '',
     autoStartHost: false,
   });
   serverMocks.getStatus.mockResolvedValue(status());
+  serverMocks.updateConfig.mockResolvedValue({});
+  serverMocks.issueLocalSession.mockResolvedValue({
+    access_token: 'local-access-token',
+    refresh_token: 'local-refresh-token',
+  });
   useHostSessionStore.getState().reset();
+  useWorkspaceStore.getState().reset();
 });
 
 afterEach(() => {
@@ -65,7 +77,11 @@ describe('host session auto-login', () => {
   it('signs in against the local server once it is running', async () => {
     await useHostSessionStore.getState().start();
 
-    expect(authMocks.state.login).toHaveBeenCalledWith('http://localhost:8123', '123456');
+    expect(serverMocks.issueLocalSession).toHaveBeenCalledTimes(1);
+    expect(authMocks.state.adoptSession).toHaveBeenCalledWith('http://localhost:8000', {
+      access_token: 'local-access-token',
+      refresh_token: 'local-refresh-token',
+    });
     expect(useHostSessionStore.getState().phase).toBe('connected');
     expect(useHostSessionStore.getState().isHostMode).toBe(true);
   });
@@ -75,7 +91,7 @@ describe('host session auto-login', () => {
 
     await useHostSessionStore.getState().start();
 
-    expect(authMocks.state.login).toHaveBeenCalledWith('http://localhost:8123', '123456');
+    expect(serverMocks.issueLocalSession).toHaveBeenCalledTimes(1);
     expect(useHostSessionStore.getState().phase).toBe('connected');
   });
 
@@ -85,7 +101,7 @@ describe('host session auto-login', () => {
     await useHostSessionStore.getState().start();
 
     expect(useHostSessionStore.getState().phase).toBe('starting');
-    expect(authMocks.state.login).not.toHaveBeenCalled();
+    expect(serverMocks.issueLocalSession).not.toHaveBeenCalled();
   });
 
   it('keeps watching a stopped sidecar so a later start still signs in', async () => {
@@ -99,7 +115,7 @@ describe('host session auto-login', () => {
     expect(serverMocks.onStatusChange).toHaveBeenCalledTimes(1);
 
     statusListener?.(status({ state: 'running' }));
-    await vi.waitFor(() => expect(authMocks.state.login).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(serverMocks.issueLocalSession).toHaveBeenCalledTimes(1));
     expect(useHostSessionStore.getState().phase).toBe('connected');
   });
 
@@ -117,29 +133,29 @@ describe('host session auto-login', () => {
     expect(useHostSessionStore.getState().status?.error).toBe(
       'legacy data import failed; host startup blocked: db is corrupt',
     );
-    expect(authMocks.state.login).not.toHaveBeenCalled();
+    expect(serverMocks.issueLocalSession).not.toHaveBeenCalled();
   });
 
-  it('stays out of the way in client mode', async () => {
-    serverMocks.getAppMode.mockResolvedValue('client');
+  it('stays out of the way when a remote workspace is active', async () => {
+    useWorkspaceStore.getState().upsertRemote('Lab', 'https://lab.example');
 
     await useHostSessionStore.getState().start();
 
     expect(useHostSessionStore.getState().phase).toBe('idle');
     expect(useHostSessionStore.getState().isHostMode).toBe(false);
     expect(serverMocks.onStatusChange).not.toHaveBeenCalled();
-    expect(authMocks.state.login).not.toHaveBeenCalled();
+    expect(serverMocks.issueLocalSession).not.toHaveBeenCalled();
   });
 
   it('stays idle when there is no native server bridge', async () => {
-    serverMocks.getAppMode.mockRejectedValue(
-      new Error('App mode is unavailable in the web runtime'),
-    );
+    serverMocks.onStatusChange.mockImplementationOnce(() => {
+      throw new Error('Native server bridge unavailable');
+    });
 
     await useHostSessionStore.getState().start();
 
     expect(useHostSessionStore.getState().phase).toBe('idle');
-    expect(authMocks.state.login).not.toHaveBeenCalled();
+    expect(serverMocks.issueLocalSession).not.toHaveBeenCalled();
   });
 
   it('runs the handshake once no matter how many callers start it', async () => {
@@ -150,7 +166,7 @@ describe('host session auto-login', () => {
     await useHostSessionStore.getState().start();
 
     expect(serverMocks.onStatusChange).toHaveBeenCalledTimes(1);
-    expect(authMocks.state.login).toHaveBeenCalledTimes(1);
+    expect(serverMocks.issueLocalSession).toHaveBeenCalledTimes(1);
   });
 
   it('leaves the host state machine when a remote workspace is selected', async () => {
@@ -173,13 +189,13 @@ describe('host session auto-login', () => {
 
     statusListener?.(status({ state: 'running' }));
 
-    expect(authMocks.state.login).toHaveBeenCalledTimes(1);
+    expect(serverMocks.issueLocalSession).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('host session failure reporting', () => {
   it('tells an unreachable server apart from a refused PIN', async () => {
-    authMocks.state.login = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    serverMocks.issueLocalSession.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await useHostSessionStore.getState().start();
 
     expect(useHostSessionStore.getState().failure).toEqual({
@@ -193,10 +209,10 @@ describe('host session failure reporting', () => {
 
     useHostSessionStore.getState().reset();
     vi.clearAllMocks();
-    authMocks.state = {
-      token: null,
-      login: vi.fn().mockRejectedValue(new Error('Login failed. Check your server URL and PIN.')),
-    };
+    authMocks.state = { token: null, adoptSession: vi.fn() };
+    serverMocks.issueLocalSession.mockRejectedValueOnce(
+      new Error('Login failed. Check your server URL and PIN.'),
+    );
     await useHostSessionStore.getState().start();
 
     expect(useHostSessionStore.getState().failure?.kind).toBe('rejected');
@@ -218,18 +234,18 @@ describe('host session failure reporting', () => {
 
 describe('host startup retry', () => {
   it('asks the shell to host, then signs in', async () => {
-    serverMocks.setAppMode.mockResolvedValue({ port: 8123, pin: '123456' });
+    serverMocks.setAppMode.mockResolvedValue({});
 
     await useHostSessionStore.getState().retryHostStartup();
 
-    expect(serverMocks.setAppMode).toHaveBeenCalledWith('host');
-    expect(authMocks.state.login).toHaveBeenCalledWith('http://localhost:8123', '123456');
+    expect(serverMocks.updateConfig).toHaveBeenCalledWith({ localServerEnabled: true });
+    expect(serverMocks.issueLocalSession).toHaveBeenCalledTimes(1);
     expect(useHostSessionStore.getState().phase).toBe('connected');
   });
 
   it('waits for a booting server rather than logging in against a closed port', async () => {
     vi.useFakeTimers();
-    serverMocks.setAppMode.mockResolvedValue({ port: 8123, pin: '123456' });
+    serverMocks.setAppMode.mockResolvedValue({});
     serverMocks.getStatus
       .mockResolvedValueOnce(status({ state: 'starting' }))
       .mockResolvedValueOnce(status({ state: 'starting' }))
@@ -240,11 +256,11 @@ describe('host startup retry', () => {
     await retry;
 
     expect(serverMocks.getStatus.mock.calls.length).toBeGreaterThan(1);
-    expect(authMocks.state.login).toHaveBeenCalledTimes(1);
+    expect(serverMocks.issueLocalSession).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces a shell that refuses to switch into host mode', async () => {
-    serverMocks.setAppMode.mockRejectedValue(new Error('packaged server binary is missing'));
+    serverMocks.updateConfig.mockRejectedValue(new Error('packaged server binary is missing'));
 
     await useHostSessionStore.getState().retryHostStartup();
 

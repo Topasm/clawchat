@@ -10,6 +10,10 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
+    host_id: str | None = None
+    host_public_key: str | None = None
+    api_version: str = "1"
+    workspace_name: str = "ClawChat"
 
 
 class RefreshRequest(BaseModel):

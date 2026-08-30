@@ -1,4 +1,5 @@
 pub mod config;
+pub mod local_session;
 pub mod migration;
 pub mod paths;
 pub mod secure_storage;

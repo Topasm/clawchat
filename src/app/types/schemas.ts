@@ -726,6 +726,10 @@ export const SettingsResponseSchema = z.object({
 // -- Health -----------------------------------------------------------------
 
 export const HealthResponseSchema = z.object({
+  service: z.literal('clawchat').optional(),
+  api_version: z.string().optional(),
+  host_id: z.string().optional(),
+  host_public_key: z.string().optional(),
   status: z.enum(['ok', 'degraded']),
   version: z.string(),
   ai_backend: z.string(),

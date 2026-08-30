@@ -17,6 +17,13 @@ mod services {
         include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/services/migration.rs"));
     }
 
+    pub mod local_session {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../src/services/local_session.rs"
+        ));
+    }
+
     pub mod secure_storage {
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),

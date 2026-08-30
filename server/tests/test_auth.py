@@ -153,6 +153,9 @@ async def test_access_protected_endpoint_with_token(
     assert resp.status_code == 200
     data = resp.json()
     assert data["service"] == "clawchat"
+    assert data["api_version"] == "1"
+    assert data["host_id"].startswith("claw_")
+    assert data["host_public_key"]
     assert data["status"] in ("ok", "degraded")
     assert "ai_provider" in data
     assert "version" in data

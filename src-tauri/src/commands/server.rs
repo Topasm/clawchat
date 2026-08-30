@@ -1,10 +1,14 @@
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tauri_plugin_autostart::AutoLaunchManager;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
-    models::{AppMode, NetworkAddress, NetworkInfo, ServerConfig, ServerConfigPatch, ServerStatus},
+    models::{
+        AppMode, LocalServerTransitionResult, LocalSession, NetworkAddress, NetworkInfo,
+        RedactedServerConfig, ServerConfig, ServerConfigPatch, ServerState, ServerStatus,
+    },
+    services::local_session::issue_local_session,
     startup_log,
     state::AppState,
 };
@@ -15,8 +19,22 @@ pub fn server_get_status(state: State<'_, AppState>) -> Result<ServerStatus, Str
 }
 
 #[tauri::command]
-pub fn server_get_config(state: State<'_, AppState>) -> Result<ServerConfig, String> {
-    state.config()
+pub fn server_get_config(state: State<'_, AppState>) -> Result<RedactedServerConfig, String> {
+    state
+        .config()
+        .map(|config| RedactedServerConfig::from(&config))
+}
+
+#[tauri::command]
+pub fn server_issue_local_session(state: State<'_, AppState>) -> Result<LocalSession, String> {
+    let status = state.status()?;
+    if !matches!(status.state, ServerState::Running) {
+        return Err(status
+            .error
+            .unwrap_or_else(|| "the local workspace is not running".to_owned()));
+    }
+    let config = state.config()?;
+    issue_local_session(status.port, &config.pin)
 }
 
 #[tauri::command]
@@ -47,16 +65,42 @@ pub fn server_update_config<R: Runtime>(
     updates: ServerConfigPatch,
     app: AppHandle<R>,
     state: State<'_, AppState>,
-) -> Result<ServerConfig, String> {
+) -> Result<LocalServerTransitionResult, String> {
     let autostart_update = updates.autostart_update();
+    let local_server_update = updates.local_server_enabled;
+    let previous_status = state.status()?;
     let (config, requires_restart) = state.update_config(updates)?;
     if let Some(enabled) = autostart_update {
-        set_autostart(&app, enabled && matches!(config.app_mode, AppMode::Host));
+        set_autostart(&app, enabled && config.local_server_enabled);
     }
-    if requires_restart && matches!(config.app_mode, AppMode::Host) {
-        state.restart_server(&app)?;
+    let status = if !config.local_server_enabled {
+        if local_server_update == Some(false)
+            || matches!(previous_status.state, ServerState::Running | ServerState::Starting)
+        {
+            state.stop_server(&app)?
+        } else {
+            previous_status.clone()
+        }
+    } else if requires_restart
+        && matches!(previous_status.state, ServerState::Running | ServerState::Starting)
+    {
+        state.restart_server(&app)?
+    } else if local_server_update == Some(true)
+        || !matches!(previous_status.state, ServerState::Running | ServerState::Starting)
+    {
+        state.start_server(&app)?
+    } else {
+        previous_status.clone()
+    };
+    if local_server_update.is_some() && autostart_update.is_none() {
+        set_autostart(
+            &app,
+            config.local_server_enabled && config.auto_start_host,
+        );
     }
-    Ok(config)
+    let result = transition_result(config, previous_status, status, requires_restart);
+    let _ = app.emit("workspace-runtime-change", &result);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -89,23 +133,54 @@ pub fn server_open_obsidian_vault<R: Runtime>(
 }
 
 #[tauri::command]
+pub fn server_open_log_folder<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("failed to resolve the log folder: {error}"))?;
+    app.opener()
+        .open_path(directory, None::<&str>)
+        .map_err(|error| format!("failed to open the log folder: {error}"))
+}
+
+#[tauri::command]
+pub fn server_open_data_folder<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("failed to resolve the data folder: {error}"))?
+        .join("server-data")
+        .join("data");
+    std::fs::create_dir_all(&directory)
+        .map_err(|error| format!("failed to prepare the data folder: {error}"))?;
+    app.opener()
+        .open_path(directory, None::<&str>)
+        .map_err(|error| format!("failed to open the data folder: {error}"))
+}
+
+#[tauri::command]
 pub fn server_set_app_mode<R: Runtime>(
     mode: AppMode,
     app: AppHandle<R>,
     state: State<'_, AppState>,
-) -> Result<ServerConfig, String> {
+) -> Result<LocalServerTransitionResult, String> {
+    let previous_status = state.status()?;
     let config = state.set_app_mode(mode)?;
-    match mode {
-        AppMode::Host => {
-            state.start_server(&app)?;
-            set_autostart(&app, config.auto_start_host);
+    let status = match mode {
+        AppMode::Host if !matches!(previous_status.state, ServerState::Running) => {
+            state.start_server(&app)?
         }
-        AppMode::Client => {
-            state.stop_server(&app)?;
-            set_autostart(&app, false);
-        }
-    }
-    Ok(config)
+        // Client is now a compatibility marker for the selected workspace,
+        // not an instruction to disconnect phones using this local server.
+        _ => previous_status.clone(),
+    };
+    set_autostart(
+        &app,
+        config.local_server_enabled && config.auto_start_host,
+    );
+    let result = transition_result(config, previous_status, status, false);
+    let _ = app.emit("workspace-runtime-change", &result);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -130,6 +205,26 @@ fn set_autostart<R: Runtime>(app: &AppHandle<R>, enabled: bool) {
     }
 }
 
+fn transition_result(
+    config: ServerConfig,
+    previous_status: ServerStatus,
+    status: ServerStatus,
+    restart_required: bool,
+) -> LocalServerTransitionResult {
+    let applied = if config.local_server_enabled {
+        matches!(status.state, ServerState::Running)
+    } else {
+        matches!(status.state, ServerState::Stopped)
+    };
+    LocalServerTransitionResult {
+        config: RedactedServerConfig::from(&config),
+        previous_status,
+        status,
+        applied,
+        restart_required,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +246,29 @@ mod tests {
             ..ServerConfigPatch::default()
         }
         .requires_server_restart());
+    }
+
+    #[test]
+    fn transition_reports_a_saved_but_failed_server_start() {
+        let result = transition_result(
+            ServerConfig::default(),
+            ServerStatus {
+                state: ServerState::Stopped,
+                port: 8000,
+                pid: None,
+                error: None,
+            },
+            ServerStatus {
+                state: ServerState::Error,
+                port: 8000,
+                pid: None,
+                error: Some("bind failed".to_owned()),
+            },
+            true,
+        );
+
+        assert!(!result.applied);
+        assert!(result.restart_required);
+        assert_eq!(result.status.error.as_deref(), Some("bind failed"));
     }
 }

@@ -34,12 +34,35 @@ export interface ServerStatus {
 
 export interface ServerConfig {
   appMode: AppMode;
+  localServerEnabled: boolean;
+  keepRunningInTray: boolean;
   port: number;
-  pin: string;
+  pinConfigured: boolean;
+  defaultPinInUse: boolean;
   obsidianVaultPath: string;
   hostServerUrl: string;
   autoStartHost: boolean;
   lanAccess: boolean;
+}
+
+export type ServerConfigUpdate = Partial<
+  Omit<ServerConfig, 'pinConfigured' | 'defaultPinInUse'>
+> & {
+  /** One-way update. The current PIN is never returned to the renderer. */
+  pin?: string;
+};
+
+export interface LocalServerTransitionResult {
+  config: ServerConfig;
+  previousStatus: ServerStatus;
+  status: ServerStatus;
+  applied: boolean;
+  restartRequired: boolean;
+}
+
+export interface LocalSession {
+  access_token: string;
+  refresh_token?: string | null;
 }
 
 export interface NetworkInfo {
@@ -53,13 +76,17 @@ export interface NetworkInfo {
 export interface NativeServerApi {
   getStatus: () => Promise<ServerStatus>;
   getConfig: () => Promise<ServerConfig>;
+  issueLocalSession: () => Promise<LocalSession>;
   getNetworkInfo: () => Promise<NetworkInfo>;
-  updateConfig: (updates: Partial<ServerConfig>) => Promise<ServerConfig>;
+  updateConfig: (updates: ServerConfigUpdate) => Promise<LocalServerTransitionResult>;
   selectFolder: () => Promise<string | null>;
   openObsidianVault: () => Promise<void>;
-  setAppMode: (mode: AppMode) => Promise<ServerConfig>;
+  openLogFolder: () => Promise<void>;
+  openDataFolder: () => Promise<void>;
+  setAppMode: (mode: AppMode) => Promise<LocalServerTransitionResult>;
   getAppMode: () => Promise<AppMode>;
   onStatusChange: (callback: (status: ServerStatus) => void) => () => void;
+  onRuntimeChange: (callback: (runtime: LocalServerTransitionResult) => void) => () => void;
 }
 
 export interface NativeSecureStorageApi {

@@ -15,6 +15,8 @@ export const platformApi = selectPlatformApi();
 
 export type {
   AppMode,
+  LocalServerTransitionResult,
+  LocalSession,
   NativeEventChannel,
   NativePlatformApi,
   NativeRuntimeKind,
@@ -23,6 +25,7 @@ export type {
   NativeUpdaterApi,
   NetworkInfo,
   ServerConfig,
+  ServerConfigUpdate,
   ServerStatus,
   UpdateDownloadProgress,
   UpdateInfo,
