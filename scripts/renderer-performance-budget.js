@@ -3,6 +3,8 @@ const METRIC_LABELS = Object.freeze({
   'allRendererFiles.rawBytes': 'All renderer files raw',
   'initialJavaScript.gzipBytes': 'Initial HTML JavaScript gzip',
   'initialJavaScript.rawBytes': 'Initial HTML JavaScript raw',
+  'localizationAssets.rawBytes': 'Compressed localization assets raw',
+  'rendererCoreFiles.rawBytes': 'Renderer core files raw',
 });
 
 function metricValue(report, metric) {

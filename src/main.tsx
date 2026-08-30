@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import './app/i18n';
+import { prepareAppLanguage } from './app/i18n';
 import { markStartupPhase, markStartupPhaseAfterPaint } from './app/services/startupPerformance';
 import { useAuthStore } from './app/stores/useAuthStore';
 import './styles/index.css';
@@ -34,11 +34,17 @@ const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Application root element is missing.');
 }
+const applicationRoot = rootElement;
 
-createRoot(rootElement).render(
-  <StrictMode>
-    <StartupShellGuard>
-      <App />
-    </StartupShellGuard>
-  </StrictMode>,
-);
+async function renderApplication() {
+  await prepareAppLanguage();
+  createRoot(applicationRoot).render(
+    <StrictMode>
+      <StartupShellGuard>
+        <App />
+      </StartupShellGuard>
+    </StrictMode>,
+  );
+}
+
+void renderApplication();

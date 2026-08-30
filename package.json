@@ -26,6 +26,7 @@
     "check:runtime-boundary": "node scripts/check-runtime-boundary.js",
     "check:design-tokens": "node scripts/check-design-tokens.js",
     "check:ui-i18n": "node scripts/check-ui-localization.mjs",
+    "check:i18n-catalog": "node scripts/generate-korean-catalog.js --check",
     "check:icon-design": "node scripts/check-icon-design.js",
     "check:release-version": "node scripts/check-release-version.js",
     "check:api-contract": "node scripts/generate-api-contracts.js --check",
@@ -37,7 +38,7 @@
     "format:check": "node scripts/check-prettier-baseline.mjs",
     "format:baseline": "node scripts/check-prettier-baseline.mjs --write-baseline",
     "format:check:all": "prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:ui-i18n && npm run check:design-tokens && npm run check:icon-design && npm run check:licenses && npm run check:runtime-boundary && npm run check:api-contract && npm run check:schema-drift && npm run format:rust:check",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:ui-i18n && npm run check:i18n-catalog && npm run check:design-tokens && npm run check:icon-design && npm run check:licenses && npm run check:runtime-boundary && npm run check:api-contract && npm run check:schema-drift && npm run format:rust:check",
     "pre-commit": "npm run check && npm test",
     "measure:renderer": "node scripts/measure-renderer-bundle.js dist",
     "check:renderer-budget": "node scripts/check-renderer-performance-budget.js dist",
@@ -64,7 +65,8 @@
     "install:android": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "generate:openapi": "uv run --project server --locked python scripts/export-openapi.py",
     "generate:contracts": "node scripts/generate-api-contracts.js",
-    "generate:api": "npm run generate:openapi && npm run generate:contracts"
+    "generate:api": "npm run generate:openapi && npm run generate:contracts",
+    "generate:i18n-catalog": "node scripts/generate-korean-catalog.js"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",
@@ -77,6 +79,7 @@
     "@xyflow/react": "^12.11.5",
     "axios": "^1.20.0",
     "cmdk": "^1.1.1",
+    "fflate": "^0.8.3",
     "framer-motion": "^11.18.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",

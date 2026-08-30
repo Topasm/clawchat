@@ -13,6 +13,8 @@ function report(overrides = {}) {
     initialJavaScript: { rawBytes: 100_000, gzipBytes: 30_000 },
     allJavaScript: { rawBytes: 500_000 },
     allRendererFiles: { rawBytes: 750_000 },
+    rendererCoreFiles: { rawBytes: 725_000 },
+    localizationAssets: { rawBytes: 25_000 },
     ...overrides,
   };
 }
@@ -67,6 +69,7 @@ test('rejects empty, unknown, or malformed thresholds', () => {
 
 test('metricValue requires a non-negative safe integer', () => {
   assert.equal(metricValue(report(), 'allRendererFiles.rawBytes'), 750_000);
+  assert.equal(metricValue(report(), 'rendererCoreFiles.rawBytes'), 725_000);
   assert.throws(
     () => metricValue({ initialJavaScript: { rawBytes: Number.NaN } }, 'initialJavaScript.rawBytes'),
     /missing integer metric/,

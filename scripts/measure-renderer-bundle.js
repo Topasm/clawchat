@@ -60,6 +60,10 @@ function isJavaScript(filePath) {
   return ['.js', '.mjs', '.cjs'].includes(path.extname(filePath));
 }
 
+function isLocalizationAsset(filePath) {
+  return /\.catalog\.json(?:-[^/\\]+)?\.gz$/.test(filePath);
+}
+
 function measureFile(filePath) {
   const contents = fs.readFileSync(filePath);
   return {
@@ -102,6 +106,8 @@ try {
     .map(measureFile);
   const allFiles = listFiles(buildDirectory).sort();
   const allJavaScript = allFiles.filter(isJavaScript).map(measureFile);
+  const localizationFiles = allFiles.filter(isLocalizationAsset);
+  const rendererCoreFiles = allFiles.filter((filePath) => !isLocalizationAsset(filePath));
   const result = {
     schemaVersion: 1,
     buildDirectory,
@@ -119,6 +125,20 @@ try {
     allRendererFiles: {
       fileCount: allFiles.length,
       rawBytes: allFiles.reduce((total, filePath) => total + fs.statSync(filePath).size, 0),
+    },
+    rendererCoreFiles: {
+      fileCount: rendererCoreFiles.length,
+      rawBytes: rendererCoreFiles.reduce(
+        (total, filePath) => total + fs.statSync(filePath).size,
+        0,
+      ),
+    },
+    localizationAssets: {
+      fileCount: localizationFiles.length,
+      rawBytes: localizationFiles.reduce(
+        (total, filePath) => total + fs.statSync(filePath).size,
+        0,
+      ),
     },
   };
 
@@ -139,6 +159,14 @@ try {
     console.log(
       `All renderer files: ${formatBytes(result.allRendererFiles.rawBytes)} ` +
         `(${result.allRendererFiles.fileCount} files)`,
+    );
+    console.log(
+      `Renderer core files: ${formatBytes(result.rendererCoreFiles.rawBytes)} ` +
+        `(${result.rendererCoreFiles.fileCount} files)`,
+    );
+    console.log(
+      `Localization assets: ${formatBytes(result.localizationAssets.rawBytes)} ` +
+        `(${result.localizationAssets.fileCount} files)`,
     );
     console.log('Initial files:');
     for (const file of initialFiles) {

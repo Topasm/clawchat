@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
-import { koreanUiTranslations } from './literalResources';
-import { translationResources, type AppLanguage } from './resources';
+
+export type AppLanguage = 'en' | 'ko';
 
 const LANGUAGE_STORAGE_KEY = 'clawchat-language';
 const languageListeners = new Set<() => void>();
@@ -18,13 +18,44 @@ function detectLanguage(): AppLanguage {
 }
 
 let currentLanguage = detectLanguage();
+let englishStructuredTranslations: Record<string, unknown> = {};
+let koreanStructuredTranslations: Record<string, unknown> = {};
+let koreanUiTranslations: Record<string, string> = {};
+let englishCatalogPromise: Promise<void> | null = null;
+let koreanCatalogPromise: Promise<void> | null = null;
+
+async function loadEnglishCatalog(): Promise<void> {
+  if (englishCatalogPromise) return englishCatalogPromise;
+
+  englishCatalogPromise = import('./localeCatalog').then(async (catalogModule) => {
+    englishStructuredTranslations = await catalogModule.loadEnglishCatalog();
+  });
+  return englishCatalogPromise;
+}
+
+async function loadKoreanCatalog(): Promise<void> {
+  if (koreanCatalogPromise) return koreanCatalogPromise;
+
+  koreanCatalogPromise = import('./localeCatalog').then(async (catalogModule) => {
+    const catalog = await catalogModule.loadKoreanCatalog();
+    koreanStructuredTranslations = catalog.structured;
+    koreanUiTranslations = catalog.literal;
+  });
+  return koreanCatalogPromise;
+}
+
+async function prepareLanguage(language: AppLanguage): Promise<void> {
+  await loadEnglishCatalog();
+  if (language === 'ko') await loadKoreanCatalog();
+}
 
 function applyDocumentLanguage(language: AppLanguage) {
   document.documentElement.lang = language;
 }
 
 function resourceValue(language: AppLanguage, key: string): string | null {
-  let value: unknown = translationResources[language].translation;
+  let value: unknown =
+    language === 'ko' ? koreanStructuredTranslations : englishStructuredTranslations;
   for (const segment of key.split('.')) {
     if (!value || typeof value !== 'object' || !(segment in value)) return null;
     value = (value as Record<string, unknown>)[segment];
@@ -87,6 +118,11 @@ function setLanguage(language: AppLanguage) {
 
 applyDocumentLanguage(currentLanguage);
 
+/** Load locale resources required before the first application render. */
+export async function prepareAppLanguage(): Promise<void> {
+  await prepareLanguage(currentLanguage);
+}
+
 /** Small application-owned i18n surface; avoids shipping a framework for two locales. */
 export const i18n = {
   t: translate,
@@ -98,11 +134,13 @@ export const i18n = {
     return currentLanguage;
   },
   async changeLanguage(language: AppLanguage) {
+    await prepareLanguage(language);
     setLanguage(language);
   },
 };
 
 export async function changeAppLanguage(language: AppLanguage): Promise<void> {
+  await prepareLanguage(language);
   try {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
   } catch {
