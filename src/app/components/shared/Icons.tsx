@@ -410,6 +410,24 @@ export function ExternalLinkIcon({ size = ICON_SIZE.feature, className, label, s
   );
 }
 
+export function ExpandIcon({ size = ICON_SIZE.feature, className, label, style }: IconProps) {
+  return (
+    <IconBase size={size} className={className} label={label} style={style}>
+      <path d="M7 3H3v4M11 3h4v4M7 15H3v-4M11 15h4v-4" />
+      <path d="M3 7l4-4M15 7l-4-4M3 11l4 4M15 11l-4 4" />
+    </IconBase>
+  );
+}
+
+export function CollapseIcon({ size = ICON_SIZE.feature, className, label, style }: IconProps) {
+  return (
+    <IconBase size={size} className={className} label={label} style={style}>
+      <path d="M2.5 6.5h4v-4M15.5 6.5h-4v-4M2.5 11.5h4v4M15.5 11.5h-4v4" />
+      <path d="M6.5 6.5l-4-4M11.5 6.5l4-4M6.5 11.5l-4 4M11.5 11.5l4 4" />
+    </IconBase>
+  );
+}
+
 export function RepeatIcon({ size = ICON_SIZE.feature, className, label, style }: IconProps) {
   return (
     <IconBase size={size} className={className} label={label} style={style}>

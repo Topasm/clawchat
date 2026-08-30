@@ -45,5 +45,8 @@ export const webPlatformApi: NativePlatformApi = {
   system: {
     openCameraSettings: () => unavailable('Camera settings'),
   },
+  appWindow: {
+    setWorkspaceViewMode: async () => {},
+  },
   secureStorage: null,
 };

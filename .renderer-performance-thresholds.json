@@ -12,12 +12,12 @@
       "maxBytes": 106000
     },
     "allJavaScript.rawBytes": {
-      "baselineBytes": 1990300,
-      "maxBytes": 2051000
+      "baselineBytes": 2054967,
+      "maxBytes": 2117000
     },
     "rendererCoreFiles.rawBytes": {
-      "baselineBytes": 2169770,
-      "maxBytes": 2235000
+      "baselineBytes": 2244527,
+      "maxBytes": 2312000
     },
     "localizationAssets.rawBytes": {
       "baselineBytes": 23863,

@@ -64,9 +64,19 @@
   white-space: nowrap;
 }
 
+.cc-sidebar__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .cc-sidebar--collapsed .cc-sidebar__title {
   width: 0;
   opacity: 0;
+}
+
+.cc-sidebar--collapsed .cc-sidebar__header-actions {
+  flex-direction: column;
 }
 
 .cc-sidebar-toggle {

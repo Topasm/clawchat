@@ -108,8 +108,25 @@ export default function AppSettingsPage() {
             />
           </SettingsRow>
           {!isMobile && (
-            <SettingsRow label={translateUi('Compact mode')}>
+            <SettingsRow
+              label={translateUi('Compact mode')}
+              sublabel={translateUi('Reduce spacing in expanded mode')}
+            >
               <Toggle checked={settings.compactMode} onChange={settings.setCompactMode} />
+            </SettingsRow>
+          )}
+          {isDesktop && (
+            <SettingsRow
+              label={translateUi('Simple mode')}
+              sublabel={translateUi('Show a compact todo list and quick add in a small window')}
+            >
+              <Toggle
+                checked={settings.simpleMode}
+                onChange={(enabled) => {
+                  settings.setSimpleMode(enabled);
+                  if (enabled) navigate('/tasks');
+                }}
+              />
             </SettingsRow>
           )}
         </SettingsSection>

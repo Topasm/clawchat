@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation, translateUi } from '../i18n';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
@@ -24,7 +24,7 @@ import QuickCaptureModal from './shared/QuickCaptureModal';
 import OfflineIndicator from './shared/OfflineIndicator';
 import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
-import { ChevronLeftIcon, ChevronRightIcon } from './shared/Icons';
+import { ChevronLeftIcon, ChevronRightIcon, CollapseIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useCapabilitiesQuery, useReviewsQuery, useTodosQuery } from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
@@ -48,6 +48,9 @@ import {
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
 import { StatusDot } from './shared/WorkspacePrimitives';
+import { platformApi } from '../platform';
+
+const SimpleMode = lazy(() => import('./SimpleMode'));
 // Keep the injected theme tokens declared in this runtime root. The design
 // token audit reads this bridge to distinguish runtime variables from typos.
 function cssVars(colors: ColorPalette, fontSize: number): React.CSSProperties {
@@ -111,11 +114,13 @@ export default function Layout() {
   const { colors, isDark } = useTheme();
   const fontSize = useSettingsStore((state) => state.fontSize);
   const compactMode = useSettingsStore((state) => state.compactMode);
+  const simpleMode = useSettingsStore((state) => state.simpleMode);
+  const setSimpleMode = useSettingsStore((state) => state.setSimpleMode);
   const location = useLocation();
   const navigate = useNavigate();
   const chatPanel = useChatPanel();
   const commandPalette = useCommandPalette();
-  const { isMobile, isMac } = usePlatform();
+  const { isDesktop, isMobile, isMac } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -125,6 +130,12 @@ export default function Layout() {
   const { data: capabilities } = useCapabilitiesQuery();
   const { data: todos = [] } = useTodosQuery();
   const { data: pendingReviews = [] } = useReviewsQuery();
+  useEffect(() => {
+    if (!isDesktop) return;
+    void platformApi.appWindow
+      .setWorkspaceViewMode(simpleMode ? 'simple' : 'expanded')
+      .catch((error) => console.warn('Failed to resize the workspace window:', error));
+  }, [isDesktop, simpleMode]);
   // Conditionally filter nav items based on server capabilities
   const filteredPrimaryNavItems = useMemo(() => {
     if (!capabilities) return primaryNavItems;
@@ -271,17 +282,27 @@ export default function Layout() {
     <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
       <div className="cc-sidebar__header">
         <span className="cc-sidebar__title">{t('common.appName')}</span>
-        <button
-          className="cc-sidebar-toggle"
-          onClick={() => setSidebarCollapsed((c) => !c)}
-          aria-label={t(sidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRightIcon size={16} className="cc-nav-icon" />
-          ) : (
-            <ChevronLeftIcon size={16} className="cc-nav-icon" />
-          )}
-        </button>
+        <span className="cc-sidebar__header-actions">
+          <button
+            className="cc-sidebar-toggle"
+            onClick={() => setSimpleMode(true)}
+            title={translateUi('Switch to simple mode')}
+            aria-label={translateUi('Switch to simple mode')}
+          >
+            <CollapseIcon size={16} className="cc-nav-icon" />
+          </button>
+          <button
+            className="cc-sidebar-toggle"
+            onClick={() => setSidebarCollapsed((c) => !c)}
+            aria-label={t(sidebarCollapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRightIcon size={16} className="cc-nav-icon" />
+            ) : (
+              <ChevronLeftIcon size={16} className="cc-nav-icon" />
+            )}
+          </button>
+        </span>
       </div>
       <button
         type="button"
@@ -441,7 +462,7 @@ export default function Layout() {
   );
   return (
     <div
-      className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}`}
+      className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}${isDesktop && simpleMode ? ' cc-root--simple' : ''}`}
       style={cssVars(colors, fontSize)}
     >
       <UpdateNotification />
@@ -456,7 +477,11 @@ export default function Layout() {
         defaultParentId={quickCapture.defaultParentId}
       />
 
-      {isMobile ? (
+      {isDesktop && simpleMode ? (
+        <Suspense fallback={null}>
+          <SimpleMode />
+        </Suspense>
+      ) : isMobile ? (
         <>
           {connectionStatus !== 'connected' && (
             <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>

@@ -26,6 +26,7 @@ interface SettingsState {
   // Appearance
   theme: string;
   compactMode: boolean;
+  simpleMode: boolean;
   sidebarSize: number;
   chatPanelSize: number;
 
@@ -56,6 +57,7 @@ interface SettingsState {
   setStreamResponses: (v: boolean) => void;
   setTheme: (v: string) => void;
   setCompactMode: (v: boolean) => void;
+  setSimpleMode: (v: boolean) => void;
   setSidebarSize: (v: number) => void;
   setChatPanelSize: (v: number) => void;
   setNotificationsEnabled: (v: boolean) => void;
@@ -84,6 +86,7 @@ const APPLICATION_DEFAULT_SETTINGS = {
 
   theme: 'system',
   compactMode: false,
+  simpleMode: false,
   sidebarSize: 18,
   chatPanelSize: 30,
 
@@ -171,6 +174,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       setTheme: (theme) => set({ theme }),
       setCompactMode: (compactMode) => set({ compactMode }),
+      setSimpleMode: (simpleMode) => set({ simpleMode }),
       setSidebarSize: (sidebarSize) => set({ sidebarSize }),
       setChatPanelSize: (chatPanelSize) => set({ chatPanelSize }),
 

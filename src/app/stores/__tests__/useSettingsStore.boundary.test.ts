@@ -20,20 +20,27 @@ describe('settings persistence boundary', () => {
   it('keeps application preferences local without contacting a workspace server', async () => {
     useSettingsStore.getState().setFontSize(19);
     useSettingsStore.getState().setNotificationsEnabled(false);
+    useSettingsStore.getState().setSimpleMode(true);
 
     await vi.advanceTimersByTimeAsync(600);
 
     expect(useSettingsStore.getState().fontSize).toBe(19);
     expect(useSettingsStore.getState().notificationsEnabled).toBe(false);
+    expect(useSettingsStore.getState().simpleMode).toBe(true);
     expect(api.put).not.toHaveBeenCalled();
   });
 
   it('resets application preferences without changing active workspace settings', () => {
-    useSettingsStore.setState({ fontSize: 21, systemPrompt: 'Workspace prompt' });
+    useSettingsStore.setState({
+      fontSize: 21,
+      simpleMode: true,
+      systemPrompt: 'Workspace prompt',
+    });
 
     useSettingsStore.getState().resetApplicationPreferences();
 
     expect(useSettingsStore.getState().fontSize).toBe(DEFAULT_SETTINGS.fontSize);
+    expect(useSettingsStore.getState().simpleMode).toBe(false);
     expect(useSettingsStore.getState().systemPrompt).toBe('Workspace prompt');
   });
 

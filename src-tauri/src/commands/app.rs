@@ -1,12 +1,12 @@
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     time::Duration,
 };
 
-use tauri::{AppHandle, Emitter, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, Runtime, State};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Notify;
@@ -22,6 +22,11 @@ use crate::{
 
 const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(30);
 const UPDATE_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+const SIMPLE_WINDOW_SIZE: (f64, f64) = (420.0, 640.0);
+const SIMPLE_WINDOW_MIN_SIZE: (f64, f64) = (360.0, 480.0);
+const EXPANDED_WINDOW_SIZE: (f64, f64) = (1280.0, 820.0);
+const EXPANDED_WINDOW_MIN_SIZE: (f64, f64) = (800.0, 600.0);
+static PREVIOUS_EXPANDED_WINDOW_SIZE: Mutex<Option<(f64, f64)>> = Mutex::new(None);
 
 enum DownloadOutcome {
     Completed(tauri_plugin_updater::Result<Vec<u8>>),
@@ -81,6 +86,78 @@ pub fn app_set_badge_count<R: Runtime>(app: AppHandle<R>, count: u32) -> Result<
     window
         .set_badge_count((count > 0).then_some(i64::from(count)))
         .map_err(|error| format!("failed to set application badge: {error}"))
+}
+
+#[tauri::command]
+pub fn app_set_workspace_view_mode<R: Runtime>(
+    app: AppHandle<R>,
+    mode: String,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window is not available".to_owned())?;
+    let scale_factor = window
+        .scale_factor()
+        .map_err(|error| format!("failed to read window scale factor: {error}"))?;
+    let current_size = window
+        .inner_size()
+        .map_err(|error| format!("failed to read window size: {error}"))?
+        .to_logical::<f64>(scale_factor);
+
+    match mode.as_str() {
+        "simple" => {
+            if current_size.width >= EXPANDED_WINDOW_MIN_SIZE.0
+                && current_size.height >= EXPANDED_WINDOW_MIN_SIZE.1
+            {
+                *PREVIOUS_EXPANDED_WINDOW_SIZE
+                    .lock()
+                    .map_err(|_| "workspace window size state is unavailable".to_owned())? =
+                    Some((current_size.width, current_size.height));
+            }
+            window
+                .unmaximize()
+                .map_err(|error| format!("failed to unmaximize workspace window: {error}"))?;
+            window
+                .set_min_size(Some(LogicalSize::new(
+                    SIMPLE_WINDOW_MIN_SIZE.0,
+                    SIMPLE_WINDOW_MIN_SIZE.1,
+                )))
+                .map_err(|error| format!("failed to set simple window minimum size: {error}"))?;
+            window
+                .set_size(LogicalSize::new(SIMPLE_WINDOW_SIZE.0, SIMPLE_WINDOW_SIZE.1))
+                .map_err(|error| format!("failed to resize simple workspace window: {error}"))
+        }
+        "expanded" => {
+            window
+                .set_min_size(Some(LogicalSize::new(
+                    EXPANDED_WINDOW_MIN_SIZE.0,
+                    EXPANDED_WINDOW_MIN_SIZE.1,
+                )))
+                .map_err(|error| format!("failed to set expanded window minimum size: {error}"))?;
+            let previous_size = PREVIOUS_EXPANDED_WINDOW_SIZE
+                .lock()
+                .map_err(|_| "workspace window size state is unavailable".to_owned())?
+                .take();
+            if let Some((width, height)) = previous_size {
+                window
+                    .set_size(LogicalSize::new(width, height))
+                    .map_err(|error| format!("failed to restore workspace window size: {error}"))?;
+            } else if current_size.width < EXPANDED_WINDOW_MIN_SIZE.0
+                || current_size.height < EXPANDED_WINDOW_MIN_SIZE.1
+            {
+                window
+                    .set_size(LogicalSize::new(
+                        EXPANDED_WINDOW_SIZE.0,
+                        EXPANDED_WINDOW_SIZE.1,
+                    ))
+                    .map_err(|error| {
+                        format!("failed to resize expanded workspace window: {error}")
+                    })?;
+            }
+            Ok(())
+        }
+        _ => Err(format!("unsupported workspace view mode: {mode}")),
+    }
 }
 
 #[tauri::command]

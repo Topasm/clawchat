@@ -11,6 +11,7 @@ import type {
   ServerStatus,
   UpdateDownloadProgress,
   UpdateInfo,
+  WorkspaceViewMode,
 } from './nativePlatformTypes';
 import { TAURI_COMMANDS, TAURI_EVENTS } from './tauriCommands';
 
@@ -38,6 +39,10 @@ function subscribeNativeEvent<Channel extends NativeEventChannel>(
   callback: (payload: NativeEventPayloadMap[Channel]) => void,
 ): () => void {
   return subscribe<NativeEventPayloadMap[Channel]>(eventNames[channel], callback);
+}
+
+async function setWorkspaceViewMode(mode: WorkspaceViewMode): Promise<void> {
+  await invoke<void>(TAURI_COMMANDS.appSetWorkspaceViewMode, { mode });
 }
 
 export const tauriPlatformApi: NativePlatformApi = {
@@ -86,6 +91,9 @@ export const tauriPlatformApi: NativePlatformApi = {
   },
   system: {
     openCameraSettings: () => invoke<void>(TAURI_COMMANDS.appOpenCameraSettings),
+  },
+  appWindow: {
+    setWorkspaceViewMode,
   },
   secureStorage: {
     get: (key) => invoke<string | null>(TAURI_COMMANDS.secureStorageGet, { key }),

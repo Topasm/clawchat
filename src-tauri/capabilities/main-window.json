@@ -21,6 +21,7 @@
     "allow-app-show-notification",
     "allow-app-set-badge-count",
     "allow-app-open-camera-settings",
+    "allow-app-set-workspace-view-mode",
     "allow-secure-storage-get",
     "allow-secure-storage-set",
     "allow-secure-storage-remove",

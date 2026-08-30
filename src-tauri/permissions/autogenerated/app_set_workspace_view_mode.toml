@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-set-workspace-view-mode"
+description = "Enables the app_set_workspace_view_mode command without any pre-configured scope."
+commands.allow = ["app_set_workspace_view_mode"]
+
+[[permission]]
+identifier = "deny-app-set-workspace-view-mode"
+description = "Denies the app_set_workspace_view_mode command without any pre-configured scope."
+commands.deny = ["app_set_workspace_view_mode"]

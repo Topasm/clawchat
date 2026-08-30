@@ -3,6 +3,7 @@ export type AppMode = 'client' | 'host';
 export type NativeRuntimeKind = 'web' | 'tauri';
 export type DesktopOS = 'macos' | 'windows' | 'linux';
 export type NativeOS = DesktopOS | 'web';
+export type WorkspaceViewMode = 'simple' | 'expanded';
 
 export interface NativeNotificationAction {
   action?: string;
@@ -119,6 +120,10 @@ export interface NativeSystemApi {
   openCameraSettings: () => Promise<void>;
 }
 
+export interface NativeAppWindowApi {
+  setWorkspaceViewMode: (mode: WorkspaceViewMode) => Promise<void>;
+}
+
 export interface NativePlatformApi {
   runtime: {
     kind: NativeRuntimeKind;
@@ -143,5 +148,6 @@ export interface NativePlatformApi {
   updater: NativeUpdaterApi;
   server: NativeServerApi;
   system: NativeSystemApi;
+  appWindow: NativeAppWindowApi;
   secureStorage: NativeSecureStorageApi | null;
 }
