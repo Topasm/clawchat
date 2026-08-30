@@ -85,9 +85,9 @@ function requirePackageVersionWiring(projectRoot, version) {
     );
   }
   requireSourceInvariant(
-    readText(projectRoot, 'src/app/pages/SettingsPage.tsx'),
+    readText(projectRoot, 'src/app/pages/AppSettingsPage.tsx'),
     /v\{platformApi\.runtime\.appVersion\}/,
-    'src/app/pages/SettingsPage.tsx displayed version',
+    'src/app/pages/AppSettingsPage.tsx displayed version',
   );
 
   return { location: 'renderer and Tauri package.json version wiring', version };

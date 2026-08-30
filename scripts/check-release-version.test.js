@@ -63,7 +63,7 @@ function fixture(overrides = {}) {
   write('src/app/platform/tauriPlatformApi.ts', 'appVersion: __APP_VERSION__,\n');
   write('src/app/platform/webPlatformApi.ts', 'appVersion: __APP_VERSION__,\n');
   write(
-    'src/app/pages/SettingsPage.tsx',
+    'src/app/pages/AppSettingsPage.tsx',
     '<span>v{platformApi.runtime.appVersion}</span>\n',
   );
 
