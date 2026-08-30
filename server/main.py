@@ -78,13 +78,14 @@ async def lifespan(app: FastAPI):
     async def _check_ai() -> bool:
         return await ai_service.health_check()
 
+    claude_code = ClaudeCodeProvider()
+
     async def _check_claude_code():
         # check_availability() already runs the CLI probe through asyncio.to_thread
         # and resolves _cli_path itself; calling subprocess.run here would stall the
         # event loop for up to 10s during startup.
-        cc = ClaudeCodeProvider()
-        status, version = await cc.check_availability()
-        return cc, status, version
+        status, version = await claude_code.check_availability()
+        return status, version
 
     async def _init_vault():
         if settings.obsidian_vault_path:
@@ -113,33 +114,56 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("Could not resume pending Vault sync jobs")
 
-    ai_connected, (claude_code, claude_code_status, claude_code_version), _ = (
-        await asyncio.gather(_check_ai(), _check_claude_code(), _init_vault())
+    # Task and calendar storage are the core desktop product. Optional AI
+    # probes can each wait on unavailable local tools for several seconds, so
+    # they must not delay the health endpoint that unlocks the local workspace.
+    app.state.ai_connected = False
+    app.state.claude_code = claude_code
+    app.state.claude_code_status = "checking"
+    app.state.claude_code_version = None
+    app.state.active_ai = ai_service
+    app.state.active_ai_provider = "openclaw"
+
+    async def _probe_optional_ai() -> None:
+        try:
+            ai_connected, (claude_code_status, claude_code_version) = await asyncio.gather(
+                _check_ai(), _check_claude_code()
+            )
+            app.state.ai_connected = ai_connected
+            app.state.claude_code_status = claude_code_status.value
+            app.state.claude_code_version = claude_code_version
+            logger.info(
+                "Claude Code status: %s, version: %s",
+                claude_code_status.value,
+                claude_code_version,
+            )
+            if (
+                settings.ai_provider == "claude_code"
+                and claude_code_status == ClaudeCodeStatus.AVAILABLE
+            ):
+                app.state.active_ai = claude_code
+                app.state.active_ai_provider = "claude_code"
+                logger.info("Active AI provider: Claude Code CLI")
+            elif settings.ai_provider == "claude_code":
+                logger.warning(
+                    "ai_provider=claude_code but CLI is %s — falling back to OpenClaw",
+                    claude_code_status.value,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Optional providers must never make the local task/calendar
+            # workspace noisy or unusable during startup.
+            logger.exception("Optional AI provider probe failed; continuing in local mode")
+
+    app.state.ai_probe_task = asyncio.create_task(
+        _probe_optional_ai(),
+        name="optional-ai-probe",
     )
 
-    app.state.ai_connected = ai_connected
-    app.state.claude_code = claude_code
-    app.state.claude_code_status = claude_code_status.value
-    app.state.claude_code_version = claude_code_version
-    logger.info(f"Claude Code status: {claude_code_status.value}, version: {claude_code_version}")
-
-    # Determine the active AI provider — Claude Code takes priority when
-    # configured AND available; otherwise fall back to OpenClaw/OpenAI.
-    if (
-        settings.ai_provider == "claude_code"
-        and claude_code_status == ClaudeCodeStatus.AVAILABLE
-    ):
-        app.state.active_ai = claude_code
-        app.state.active_ai_provider = "claude_code"
-        logger.info("Active AI provider: Claude Code CLI")
-    else:
-        app.state.active_ai = ai_service
-        app.state.active_ai_provider = "openclaw"
-        if settings.ai_provider == "claude_code":
-            logger.warning(
-                "ai_provider=claude_code but CLI is %s — falling back to OpenClaw",
-                claude_code_status.value,
-            )
+    # Vault recovery remains part of durable-data startup, but it does not
+    # contact an AI provider or require a remote server.
+    await _init_vault()
 
     # Initialize push notification service (no-op if not configured)
     from services.notifications.push_service import PushService
@@ -214,6 +238,11 @@ async def lifespan(app: FastAPI):
         app.state.relay_task.cancel()
         with suppress(asyncio.CancelledError):
             await app.state.relay_task
+
+    if not app.state.ai_probe_task.done():
+        app.state.ai_probe_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await app.state.ai_probe_task
 
     await ai_service.close()
 
@@ -293,6 +322,10 @@ async def health():
     # Show the actual model name based on active provider
     ai_model = "claude (via CLI)" if active_provider == "claude_code" else settings.ai_model
     return {
+        # The desktop shell uses this marker before reusing a process that is
+        # already listening on its configured port. A generic HTTP 200 is not
+        # enough: port 8000 is commonly occupied by unrelated developer tools.
+        "service": "clawchat",
         "status": "ok" if effective_connected else "degraded",
         "version": APP_VERSION,
         "ai_provider": active_provider,

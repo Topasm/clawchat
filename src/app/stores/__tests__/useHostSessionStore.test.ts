@@ -70,6 +70,15 @@ describe('host session auto-login', () => {
     expect(useHostSessionStore.getState().isHostMode).toBe(true);
   });
 
+  it('replaces a token restored from an earlier local-server process', async () => {
+    authMocks.state.token = 'stale-session-token';
+
+    await useHostSessionStore.getState().start();
+
+    expect(authMocks.state.login).toHaveBeenCalledWith('http://localhost:8123', '123456');
+    expect(useHostSessionStore.getState().phase).toBe('connected');
+  });
+
   it('reports a booting sidecar instead of signing in early', async () => {
     serverMocks.getStatus.mockResolvedValue(status({ state: 'starting' }));
 
@@ -142,6 +151,20 @@ describe('host session auto-login', () => {
 
     expect(serverMocks.onStatusChange).toHaveBeenCalledTimes(1);
     expect(authMocks.state.login).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the host state machine when a remote workspace is selected', async () => {
+    await useHostSessionStore.getState().start();
+
+    useHostSessionStore.getState().deactivate();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(useHostSessionStore.getState()).toMatchObject({
+      phase: 'idle',
+      status: null,
+      failure: null,
+      isHostMode: false,
+    });
   });
 
   it('does not sign in twice when a status event lands mid-login', async () => {

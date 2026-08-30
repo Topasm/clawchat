@@ -1,7 +1,7 @@
 use std::{
     fs::{self, OpenOptions},
     io::{Read, Write},
-    net::{SocketAddr, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     thread,
@@ -66,27 +66,45 @@ impl ServerSupervisor {
     }
 
     pub fn start(&mut self, config: &ServerConfig) -> ServerStatus {
-        let port = config.port;
+        let requested_port = config.port;
         if self.child.is_some() {
             let current = self.status();
-            if matches!(current.state, ServerState::Running) && health_check(port) {
+            if matches!(current.state, ServerState::Running) && health_check(current.port) {
                 return current;
             }
             self.stop();
         }
 
-        if health_check(port) {
+        if health_check(requested_port) {
             let pid = read_pid(&self.paths.pid_path);
             self.reused_pid = pid;
             self.status = ServerStatus {
                 state: ServerState::Running,
-                port,
+                port: requested_port,
                 pid,
                 error: None,
             };
             return self.status.clone();
         }
         let _ = fs::remove_file(&self.paths.pid_path);
+
+        // Port 8000 is a common development default. A local-first desktop
+        // app should not become unusable just because another tool already
+        // owns it, so select a free loopback port for this workspace.
+        let port = match choose_start_port(requested_port) {
+            Ok(port) => port,
+            Err(error) => {
+                self.status = ServerStatus {
+                    state: ServerState::Error,
+                    port: requested_port,
+                    pid: None,
+                    error: Some(error),
+                };
+                return self.status.clone();
+            }
+        };
+        let mut effective_config = config.clone();
+        effective_config.port = port;
 
         self.status = ServerStatus {
             state: ServerState::Starting,
@@ -95,7 +113,7 @@ impl ServerSupervisor {
             error: None,
         };
 
-        match self.spawn(config) {
+        match self.spawn(&effective_config) {
             Ok(child) => {
                 let pid = child.id();
                 self.child = Some(child);
@@ -316,12 +334,42 @@ fn health_check(port: u16) -> bool {
     if stream.write_all(request.as_bytes()).is_err() {
         return false;
     }
-    let mut response = [0_u8; 64];
-    let Ok(read) = stream.read(&mut response) else {
+    let mut response = Vec::with_capacity(1024);
+    let Ok(_) = stream.take(8192).read_to_end(&mut response) else {
         return false;
     };
-    String::from_utf8_lossy(&response[..read]).starts_with("HTTP/1.1 200")
-        || String::from_utf8_lossy(&response[..read]).starts_with("HTTP/1.0 200")
+    let response = String::from_utf8_lossy(&response);
+    let Some((headers, body)) = response.split_once("\r\n\r\n") else {
+        return false;
+    };
+    let successful = headers.starts_with("HTTP/1.1 200") || headers.starts_with("HTTP/1.0 200");
+    if !successful {
+        return false;
+    }
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|payload| {
+            payload
+                .get("service")
+                .and_then(|value| value.as_str())
+                .map(str::to_owned)
+        })
+        .is_some_and(|service| service == "clawchat")
+}
+
+fn choose_start_port(requested: u16) -> Result<u16, String> {
+    // Port zero asks the OS to choose, but uvicorn does not report that choice
+    // back to the shell. Resolve it here so status and auto-login use the same
+    // concrete port.
+    if requested != 0 && TcpListener::bind(("0.0.0.0", requested)).is_ok() {
+        return Ok(requested);
+    }
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|error| format!("failed to find a free local server port: {error}"))?;
+    listener
+        .local_addr()
+        .map(|address| address.port())
+        .map_err(|error| format!("failed to inspect a free local server port: {error}"))
 }
 
 fn wait_for_health(port: u16) -> bool {
@@ -403,13 +451,52 @@ mod tests {
             let (mut stream, _) = listener.accept().expect("connection");
             let mut request = [0_u8; 256];
             let _ = stream.read(&mut request);
-            stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
-                .expect("response");
+            let body = r#"{"service":"clawchat","status":"degraded"}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).expect("response");
         });
 
         assert!(health_check(port));
         server.join().expect("server thread");
+    }
+
+    #[test]
+    fn rejects_an_unrelated_service_on_the_configured_port() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("listener");
+        let port = listener.local_addr().expect("address").port();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("connection");
+            let mut request = [0_u8; 256];
+            let _ = stream.read(&mut request);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")
+                .expect("response");
+        });
+
+        assert!(!health_check(port));
+        server.join().expect("server thread");
+    }
+
+    #[test]
+    fn selects_another_port_when_the_preferred_port_is_busy() {
+        let occupied = TcpListener::bind(("0.0.0.0", 0)).expect("occupied listener");
+        let requested = occupied.local_addr().expect("address").port();
+
+        let selected = choose_start_port(requested).expect("fallback port");
+
+        assert_ne!(selected, requested);
+        TcpListener::bind(("127.0.0.1", selected)).expect("selected port is free");
+    }
+
+    #[test]
+    fn resolves_port_zero_before_starting_the_server() {
+        let selected = choose_start_port(0).expect("concrete port");
+
+        assert_ne!(selected, 0);
+        TcpListener::bind(("127.0.0.1", selected)).expect("selected port is free");
     }
 
     #[test]

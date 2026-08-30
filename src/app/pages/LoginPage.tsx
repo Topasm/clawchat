@@ -58,18 +58,18 @@ export function describeHostBlock(
 const HOST_PHASE_HEADINGS: Record<HostSessionPhase, string> = {
   idle: 'Sign in',
   checking: 'Preparing ClawChat',
-  starting: 'Starting the local server',
-  connecting: 'Connecting',
-  connected: 'Connected',
-  blocked: 'ClawChat could not start its local server',
+  starting: 'Preparing your local workspace',
+  connecting: 'Opening your workspace',
+  connected: 'Workspace ready',
+  blocked: 'ClawChat could not open its local workspace',
 };
 
 const HOST_PHASE_DETAILS: Record<HostSessionPhase, string> = {
   idle: '',
-  checking: 'Checking whether this computer runs its own ClawChat server.',
+  checking: 'Checking the private workspace stored on this Mac.',
   starting:
-    'ClawChat is bringing up its own server on this computer. This usually takes a few seconds.',
-  connecting: 'The local server is up. Signing in with the PIN stored on this computer.',
+    'ClawChat is preparing local storage for your tasks and calendar. This usually takes a few seconds.',
+  connecting: 'No account or PIN is needed. Taking you straight to your workspace.',
   connected: 'Taking you to your workspace.',
   blocked: '',
 };
@@ -372,8 +372,8 @@ export default function LoginPage() {
                     marginBottom: 10,
                   }}
                 >
-                  ClawChat runs its own server on this computer, and that server is not answering —
-                  so there is nothing to sign in to yet.
+                  Your tasks and calendar stay on this Mac. ClawChat could not prepare that local
+                  workspace yet.
                 </div>
                 <div
                   data-testid="host-startup-reason"
@@ -419,7 +419,7 @@ export default function LoginPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Try starting the server again
+                  Try opening the workspace again
                 </button>
               </>
             ) : (
@@ -470,8 +470,8 @@ export default function LoginPage() {
                 marginBottom: 14,
               }}
             >
-              Run ClawChat's own server here. No pairing, no network access — everything stays on
-              this machine.
+              Keep tasks and calendar on this Mac. No server address, pairing, account, or PIN is
+              required.
             </div>
             <button
               type="button"
@@ -490,7 +490,7 @@ export default function LoginPage() {
                 opacity: switchingToHost ? 0.7 : 1,
               }}
             >
-              {switchingToHost ? 'Starting local server…' : 'Start local server'}
+              {switchingToHost ? 'Preparing local workspace…' : 'Use local workspace'}
             </button>
           </div>
         )}

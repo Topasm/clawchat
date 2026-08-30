@@ -21,7 +21,6 @@ pub struct AppState {
     config: Mutex<ServerConfig>,
     config_store: ConfigStore,
     supervisor: Mutex<ServerSupervisor>,
-    migration_error: Option<String>,
 }
 
 pub struct PendingUpdateState {
@@ -134,19 +133,40 @@ impl AppState {
     pub fn initialize<R: Runtime>(app: &AppHandle<R>) -> Result<Self, String> {
         let paths = resolve_native_paths(app)?;
         let candidates = electron_user_data_candidates(&paths.app_data_dir);
-        let migration_error = import_electron_data(&paths, &candidates).err();
+        if let Err(error) = import_electron_data(&paths, &candidates) {
+            // Legacy Electron data is optional input. Keep the source intact
+            // and continue with a clean local workspace instead of blocking
+            // every TODO and calendar screen behind a migration failure.
+            startup_log::report(&format!(
+                "[clawchat] legacy data import was skipped; starting local workspace: {error}"
+            ));
+        }
         let config_store = ConfigStore::new(paths.config_path.clone());
-        let (config, config_error) = match config_store.load() {
-            Ok(config) => (config, None),
-            Err(error) => (ServerConfig::default(), Some(error)),
+        let config = match config_store.load() {
+            Ok(config) => config,
+            Err(error) => {
+                startup_log::report(&format!(
+                    "[clawchat] invalid server config was reset to local defaults: {error}"
+                ));
+                match config_store.recover_default() {
+                    Ok(config) => config,
+                    Err(recovery_error) => {
+                        // The in-memory default is enough to start this launch.
+                        // Keep the recovery error visible without turning an
+                        // optional settings file into an application lockout.
+                        startup_log::report(&format!(
+                            "[clawchat] could not persist recovered config: {recovery_error}"
+                        ));
+                        ServerConfig::default()
+                    }
+                }
+            }
         };
-        let migration_error = migration_error.or(config_error);
         let supervisor = ServerSupervisor::new(paths, config.port);
         Ok(Self {
             config: Mutex::new(config),
             config_store,
             supervisor: Mutex::new(supervisor),
-            migration_error,
         })
     }
 
@@ -175,27 +195,17 @@ impl AppState {
 
     pub fn start_server<R: Runtime>(&self, app: &AppHandle<R>) -> Result<ServerStatus, String> {
         let config = self.config()?;
-        let status = if let Some(error) = &self.migration_error {
-            ServerStatus {
-                state: ServerState::Error,
+        emit_status(
+            app,
+            &ServerStatus {
+                state: ServerState::Starting,
                 port: config.port,
                 pid: None,
-                error: Some(format!(
-                    "legacy data import failed; host startup blocked: {error}"
-                )),
-            }
-        } else {
-            emit_status(
-                app,
-                &ServerStatus {
-                    state: ServerState::Starting,
-                    port: config.port,
-                    pid: None,
-                    error: None,
-                },
-            );
-            self.lock_supervisor()?.start(&config)
-        };
+                error: None,
+            },
+        );
+        let status = self.lock_supervisor()?.start(&config);
+        self.remember_runtime_port(&status);
         emit_status(app, &status);
         Ok(status)
     }
@@ -208,27 +218,17 @@ impl AppState {
 
     pub fn restart_server<R: Runtime>(&self, app: &AppHandle<R>) -> Result<ServerStatus, String> {
         let config = self.config()?;
-        let status = if let Some(error) = &self.migration_error {
-            ServerStatus {
-                state: ServerState::Error,
+        emit_status(
+            app,
+            &ServerStatus {
+                state: ServerState::Starting,
                 port: config.port,
                 pid: None,
-                error: Some(format!(
-                    "legacy data import failed; host startup blocked: {error}"
-                )),
-            }
-        } else {
-            emit_status(
-                app,
-                &ServerStatus {
-                    state: ServerState::Starting,
-                    port: config.port,
-                    pid: None,
-                    error: None,
-                },
-            );
-            self.lock_supervisor()?.restart(&config)
-        };
+                error: None,
+            },
+        );
+        let status = self.lock_supervisor()?.restart(&config);
+        self.remember_runtime_port(&status);
         emit_status(app, &status);
         Ok(status)
     }
@@ -237,6 +237,25 @@ impl AppState {
         self.config()
             .map(|config| matches!(config.app_mode, AppMode::Host))
             .unwrap_or(false)
+    }
+
+    fn remember_runtime_port(&self, status: &ServerStatus) {
+        if !matches!(status.state, ServerState::Running) {
+            return;
+        }
+        let Ok(mut config) = self.lock_config() else {
+            return;
+        };
+        if config.port == status.port {
+            return;
+        }
+        config.port = status.port;
+        if let Err(error) = self.config_store.save(&config) {
+            startup_log::report(&format!(
+                "[clawchat] local server moved to port {}, but the config could not be updated: {error}",
+                status.port
+            ));
+        }
     }
 
     fn lock_config(&self) -> Result<MutexGuard<'_, ServerConfig>, String> {

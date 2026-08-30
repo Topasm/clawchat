@@ -7,6 +7,7 @@ import { useHostSessionStore } from '../../stores/useHostSessionStore';
 
 const start = vi.fn().mockResolvedValue(undefined);
 const stop = vi.fn();
+const signIn = vi.fn().mockResolvedValue(undefined);
 
 function Harness() {
   useAutoLogin();
@@ -15,7 +16,7 @@ function Harness() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useHostSessionStore.setState({ start, stop });
+  useHostSessionStore.setState({ start, stop, signIn, phase: 'checking' });
   useAuthStore.setState({ token: null, isLoading: false });
 });
 
@@ -36,16 +37,23 @@ describe('useAutoLogin', () => {
     expect(start).not.toHaveBeenCalled();
   });
 
-  it('does not start a handshake for an already signed-in user', () => {
+  it('revalidates a restored local session before the workspace mounts', () => {
     useAuthStore.setState({ token: 'session-token' });
     render(<Harness />);
 
-    expect(start).not.toHaveBeenCalled();
+    expect(start).toHaveBeenCalledTimes(1);
   });
 
   it('drops the status watch when nothing is listening any more', () => {
     render(<Harness />).unmount();
 
     expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('silently reopens a connected local workspace if its token is cleared', () => {
+    useHostSessionStore.setState({ phase: 'connected' });
+    render(<Harness />);
+
+    expect(signIn).toHaveBeenCalledTimes(1);
   });
 });

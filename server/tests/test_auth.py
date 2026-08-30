@@ -152,6 +152,7 @@ async def test_access_protected_endpoint_with_token(
     resp = await client.get("/api/health")
     assert resp.status_code == 200
     data = resp.json()
+    assert data["service"] == "clawchat"
     assert data["status"] in ("ok", "degraded")
     assert "ai_provider" in data
     assert "version" in data

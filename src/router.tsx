@@ -1,10 +1,12 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './app/stores/useAuthStore';
+import { useHostSessionStore } from './app/stores/useHostSessionStore';
 import { useAutoLogin } from './app/hooks/useAutoLogin';
 import ErrorBoundary from './app/components/shared/ErrorBoundary';
 import { markStartupPhaseAfterPaint } from './app/services/startupPerformance';
 import { hideStartupShell } from './app/services/startupSurface';
+import { IS_DESKTOP } from './app/types/platform';
 
 // ── Lazy-loaded pages ────────────────────────────────────────────────
 const Layout = lazy(() => import('./app/components/Layout'));
@@ -65,12 +67,25 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
 export default function AppRouter() {
   const token = useAuthStore((s) => s.token);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const hostPhase = useHostSessionStore((s) => s.phase);
 
   // Auto-login when the packaged Tauri host server is available.
   useAutoLogin();
 
   // Show nothing while rehydrating from localStorage
   if (isLoading) return null;
+
+  // Do not mount the workspace with credentials restored from a previous
+  // local-server process.  Re-authenticate the invisible local session first,
+  // otherwise every eager TODO/calendar query fails once before the refresh
+  // interceptor eventually sends the user back through login.
+  if (IS_DESKTOP && hostPhase !== 'idle' && hostPhase !== 'connected') {
+    return (
+      <LazyRoute>
+        <LoginPage />
+      </LazyRoute>
+    );
+  }
 
   const isAuthenticated = !!token;
 

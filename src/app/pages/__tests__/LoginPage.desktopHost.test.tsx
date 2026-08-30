@@ -90,7 +90,7 @@ describe('LoginPage on a desktop host', () => {
     useHostSessionStore.setState({ phase: 'starting', status: hostStatus({ state: 'starting' }) });
     renderLoginPage();
 
-    expect(await screen.findByText('Starting the local server')).toBeInTheDocument();
+    expect(await screen.findByText('Preparing your local workspace')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Enter your PIN')).not.toBeInTheDocument();
   });
 
@@ -98,7 +98,7 @@ describe('LoginPage on a desktop host', () => {
     useHostSessionStore.setState({ phase: 'connecting', status: hostStatus() });
     renderLoginPage();
 
-    expect(await screen.findByText('Connecting')).toBeInTheDocument();
+    expect(await screen.findByText('Opening your workspace')).toBeInTheDocument();
   });
 
   it('shows the reason a blocked sidecar reported, verbatim', async () => {
@@ -159,7 +159,9 @@ describe('LoginPage on a desktop host', () => {
     });
     renderLoginPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: /try starting the server again/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /try opening the workspace again/i }),
+    );
 
     await waitFor(() => expect(serverMocks.setAppMode).toHaveBeenCalledWith('host'));
   });
@@ -198,7 +200,7 @@ describe('LoginPage on a desktop client', () => {
     useHostSessionStore.setState({ phase: 'idle', isHostMode: false });
     renderLoginPage();
 
-    expect(await screen.findByRole('button', { name: /start local server/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /use local workspace/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /scan qr code/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter your PIN')).toBeInTheDocument();
     expect(screen.queryByTestId('host-startup-panel')).not.toBeInTheDocument();
@@ -223,7 +225,7 @@ describe('LoginPage on a desktop client', () => {
     useHostSessionStore.setState({ phase: 'idle', isHostMode: false });
     renderLoginPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: /start local server/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /use local workspace/i }));
 
     // The old handler logged in the instant the mode flipped, so a sidecar that
     // never came up surfaced as a generic credential error.

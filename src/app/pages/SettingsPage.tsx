@@ -7,7 +7,6 @@ import { useUpdateStore } from '../stores/useUpdateStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
-import { useAppMode } from '../hooks/useAppMode';
 import apiClient from '../services/apiClient';
 import { openObsidianVault } from '../utils/openObsidian';
 import SettingsSection from '../components/shared/SettingsSection';
@@ -18,7 +17,9 @@ import Toggle from '../components/shared/Toggle';
 import Slider from '../components/shared/Slider';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
-import { platformApi, type ServerStatus } from '../platform';
+import WorkspaceConnectionsSection from '../components/settings/WorkspaceConnectionsSection';
+import { platformApi } from '../platform';
+import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import {
   checkForAppUpdate,
   downloadAppUpdate,
@@ -50,58 +51,10 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
   const [aiProviderSwitching, setAiProviderSwitching] = useState(false);
   const [claudeCodeChecking, setClaudeCodeChecking] = useState(false);
-  const { appMode, setAppMode: switchAppMode, isHost } = useAppMode();
-  const [hostServerStatus, setHostServerStatus] = useState<ServerStatus | null>(null);
-  const [autoStartHost, setAutoStartHost] = useState(false);
+  const isHost = useWorkspaceStore((state) => state.activeWorkspaceId === LOCAL_WORKSPACE_ID);
   const updateStatus = useUpdateStore((state) => state.status);
   const updateInfo = useUpdateStore((state) => state.info);
   const automaticChecksEnabled = useUpdateStore((state) => state.automaticChecksEnabled);
-
-  // Load host-mode specific state
-  useEffect(() => {
-    if (!isDesktop) return;
-    platformApi.server.getStatus().then(setHostServerStatus);
-    platformApi.server.getConfig().then((cfg) => {
-      setAutoStartHost(cfg.autoStartHost);
-    });
-    const unsub = platformApi.server.onStatusChange(setHostServerStatus);
-    return unsub;
-  }, [isDesktop]);
-
-  const handleModeSwitch = useCallback(
-    async (newMode: string) => {
-      if (newMode !== 'client' && newMode !== 'host') return;
-      if (newMode === appMode) return;
-
-      if (appMode === 'host' && newMode === 'client') {
-        const confirmed = window.confirm(
-          'Switching to client mode will stop the local server. Connected devices will be disconnected. Continue?',
-        );
-        if (!confirmed) return;
-      }
-
-      await switchAppMode(newMode);
-      addToast(
-        'success',
-        newMode === 'host' ? 'Host mode enabled. Server starting...' : 'Switched to client mode.',
-      );
-
-      if (newMode === 'client') {
-        logout();
-        navigate('/login');
-      }
-    },
-    [appMode, switchAppMode, addToast, logout, navigate],
-  );
-
-  const handleAutoStartToggle = useCallback(
-    async (enabled: boolean) => {
-      await platformApi.server.updateConfig({ autoStartHost: enabled });
-      setAutoStartHost(enabled);
-      addToast('success', enabled ? 'Server will start on login.' : 'Auto-start disabled.');
-    },
-    [addToast],
-  );
 
   // Fetch AI provider status on mount
   useEffect(() => {
@@ -176,66 +129,7 @@ export default function SettingsPage() {
         <div className="cc-page-header__title">{t('settings.title')}</div>
       </div>
 
-      {isDesktop && appMode && (
-        <SettingsSection title="Server Mode">
-          <SettingsRow
-            label="App mode"
-            sublabel={
-              isHost
-                ? 'Running as host — server is active on this machine'
-                : 'Running as client — connected to a remote host'
-            }
-          >
-            <SegmentedControl
-              ariaLabel="Application mode"
-              options={[
-                { label: 'Client', value: 'client' },
-                { label: 'Host', value: 'host' },
-              ]}
-              value={appMode}
-              onChange={handleModeSwitch}
-            />
-          </SettingsRow>
-
-          {isHost && hostServerStatus && (
-            <SettingsRow label="Server status" sublabel={`Port ${hostServerStatus.port}`}>
-              <span
-                className={`cc-settings-status cc-settings-status--${
-                  hostServerStatus.state === 'running'
-                    ? 'success'
-                    : hostServerStatus.state === 'error'
-                      ? 'error'
-                      : 'muted'
-                }`}
-              >
-                {hostServerStatus.state === 'running' && 'Host Running'}
-                {hostServerStatus.state === 'starting' && 'Starting...'}
-                {hostServerStatus.state === 'stopped' && 'Stopped'}
-                {hostServerStatus.state === 'error' && (hostServerStatus.error || 'Error')}
-              </span>
-            </SettingsRow>
-          )}
-
-          {isHost && (
-            <SettingsRow
-              label="Start on login"
-              sublabel="Automatically start server when you log in to your computer"
-            >
-              <Toggle checked={autoStartHost} onChange={handleAutoStartToggle} />
-            </SettingsRow>
-          )}
-
-          {!isHost && (
-            <SettingsRow label="Host server" sublabel={serverUrl || 'Not configured'}>
-              <span
-                className={`cc-settings-status cc-settings-status--${token ? 'success' : 'subtle'}`}
-              >
-                {token ? 'Connected' : 'Not connected'}
-              </span>
-            </SettingsRow>
-          )}
-        </SettingsSection>
-      )}
+      {isDesktop && <WorkspaceConnectionsSection />}
 
       <SettingsSection title={t('settings.essentials')}>
         <SettingsRow label={t('settings.theme')}>
@@ -496,24 +390,6 @@ export default function SettingsPage() {
       {isDesktop && isHost && token && (
         <SettingsSection title="Connect Mobile Device">
           <PairingCodeDisplay />
-        </SettingsSection>
-      )}
-      {isDesktop && token && (
-        <SettingsSection title="Account">
-          <SettingsRow label="Server" sublabel={serverUrl ?? 'localhost:8000'}>
-            <span className="cc-settings-status cc-settings-status--success">Connected</span>
-          </SettingsRow>
-          <SettingsRow label="Logout">
-            <button
-              className="cc-btn cc-btn--danger cc-btn--compact"
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-            >
-              Logout
-            </button>
-          </SettingsRow>
         </SettingsSection>
       )}
       {isDesktop && (

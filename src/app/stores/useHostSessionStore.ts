@@ -50,6 +50,8 @@ interface HostSessionState {
   start: () => Promise<void>;
   /** Drop the status subscription. */
   stop: () => void;
+  /** Leave the local-host state machine after selecting a remote workspace. */
+  deactivate: () => void;
   /** Re-read the current server status and act on it. */
   refresh: () => Promise<void>;
   /** Ask the shell to (re)start the local server, then sign in. */
@@ -125,6 +127,14 @@ export const useHostSessionStore = create<HostSessionState>((set, get) => ({
     statusSubscription = null;
   },
 
+  deactivate: () => {
+    statusSubscription?.();
+    statusSubscription = null;
+    startInFlight = false;
+    signInInFlight = false;
+    set({ phase: 'idle', status: null, failure: null, isHostMode: false });
+  },
+
   start: async () => {
     if (!IS_DESKTOP) {
       set({ phase: 'idle', isHostMode: false });
@@ -172,8 +182,11 @@ export const useHostSessionStore = create<HostSessionState>((set, get) => ({
   // can await the sign-in it kicks off instead of racing it.
   applyStatus: async (status) => {
     set({ status });
-    if (useAuthStore.getState().token) {
-      set({ phase: 'connected' });
+    // Once this launch has completed its own handshake, repeated native
+    // status notifications do not need to create more refresh sessions.
+    // Before that point, a persisted token is not trusted: the local server
+    // process may have restarted with a different signing key.
+    if (get().phase === 'connected' && useAuthStore.getState().token) {
       return;
     }
     switch (status.state) {
@@ -189,7 +202,7 @@ export const useHostSessionStore = create<HostSessionState>((set, get) => ({
   },
 
   signIn: async () => {
-    if (useAuthStore.getState().token || signInInFlight) return;
+    if (signInInFlight) return;
     signInInFlight = true;
     set({ phase: 'connecting', failure: null });
     try {

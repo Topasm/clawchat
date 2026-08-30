@@ -50,6 +50,25 @@ impl ConfigStore {
             .map_err(|error| format!("failed to atomically save {}: {error}", self.path.display()))
     }
 
+    /// Preserve an unreadable config for diagnostics and replace it with a
+    /// host-mode default.  A malformed preference file must not make the
+    /// user's local tasks and calendar inaccessible.
+    pub fn recover_default(&self) -> Result<ServerConfig, String> {
+        if self.path.exists() {
+            let backup = self.path.with_extension("invalid.json");
+            fs::copy(&self.path, &backup).map_err(|error| {
+                format!(
+                    "failed to preserve invalid config {} as {}: {error}",
+                    self.path.display(),
+                    backup.display()
+                )
+            })?;
+        }
+        let config = ServerConfig::default();
+        self.save(&config)?;
+        Ok(config)
+    }
+
     #[cfg(test)]
     pub fn path(&self) -> &std::path::Path {
         &self.path
@@ -100,5 +119,23 @@ mod tests {
         let config = store.load().expect("load config");
 
         assert!(matches!(config.app_mode, AppMode::Client));
+    }
+
+    #[test]
+    fn malformed_config_is_preserved_and_replaced_with_local_defaults() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let store = ConfigStore::new(dir.path().join("server-config.json"));
+        fs::write(store.path(), "{not-json").expect("invalid config");
+
+        assert!(store.load().is_err());
+        let recovered = store.recover_default().expect("recover config");
+
+        assert!(matches!(recovered.app_mode, AppMode::Host));
+        assert_eq!(
+            fs::read_to_string(dir.path().join("server-config.invalid.json"))
+                .expect("preserved config"),
+            "{not-json"
+        );
+        assert!(store.load().is_ok());
     }
 }

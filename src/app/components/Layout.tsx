@@ -15,6 +15,7 @@ import useWebSocket from '../hooks/useWebSocket';
 import useNetworkStatus from '../hooks/useNetworkStatus';
 import { useAuthStore } from '../stores/useAuthStore';
 import type { ConnectionStatus } from '../stores/useAuthStore';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import AnimatedOutlet from './AnimatedOutlet';
 import ToastContainer from './shared/ToastContainer';
 import CommandPalette from './shared/CommandPalette';
@@ -232,6 +233,13 @@ export default function Layout() {
   useNavigationShortcuts();
 
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
+  const activeWorkspaceName = useWorkspaceStore(
+    (state) =>
+      state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name ?? 'This Mac',
+  );
+  const connectionLabel = isFlushing
+    ? t('connection.syncing')
+    : t(CONNECTION_LABEL_KEYS[connectionStatus]);
 
   // Badge counts
   const inboxCount = useMemo(
@@ -304,10 +312,13 @@ export default function Layout() {
           )}
         </button>
       </div>
-      <div className={`cc-connection-status cc-connection-status--${connectionStatus}`}>
+      <div
+        className={`cc-connection-status cc-connection-status--${connectionStatus}`}
+        title={`${activeWorkspaceName} · ${connectionLabel}`}
+      >
         <span className="cc-connection-status__dot" />
         <span className="cc-sidebar__label">
-          {isFlushing ? t('connection.syncing') : t(CONNECTION_LABEL_KEYS[connectionStatus])}
+          {activeWorkspaceName} · {connectionLabel}
           {pendingCount > 0 && (
             <span
               className="cc-offline-badge"
