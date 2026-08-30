@@ -10,12 +10,14 @@ pub(super) enum NativeCommand {
     QuickCapture,
     Settings,
     Connections,
+    #[cfg(target_os = "macos")]
     Diagnostics,
     StopServer,
     RestartServer,
     Quit,
 }
 
+#[cfg(target_os = "macos")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum AppMenuCommand {
     Settings,
@@ -25,6 +27,7 @@ pub(super) enum AppMenuCommand {
     Diagnostics,
 }
 
+#[cfg(target_os = "macos")]
 impl AppMenuCommand {
     pub const fn id(self) -> &'static str {
         match self {
@@ -148,6 +151,7 @@ pub(super) fn dispatch(app: &AppHandle, command: NativeCommand, source: &str) {
             }
         }
         NativeCommand::Connections => navigate(app, "/connections", source),
+        #[cfg(target_os = "macos")]
         NativeCommand::Diagnostics => navigate(app, "/diagnostics", source),
         NativeCommand::StopServer => {
             let state = app.state::<AppState>();

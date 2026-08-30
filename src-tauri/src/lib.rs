@@ -69,7 +69,6 @@ pub fn run() {
                             "[clawchat] failed to hide main window after macOS close request: {error}"
                         )),
                     }
-                    return;
                 }
 
                 #[cfg(not(target_os = "macos"))]
