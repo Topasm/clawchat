@@ -4,8 +4,20 @@ export type NativeRuntimeKind = 'web' | 'tauri';
 export type DesktopOS = 'macos' | 'windows' | 'linux';
 export type NativeOS = DesktopOS | 'web';
 
-export type NativeEventChannel =
-  'open-quick-capture' | 'open-settings' | 'notification:action' | 'navigate';
+export interface NativeNotificationAction {
+  action?: string;
+  itemType?: string;
+  itemId?: string;
+}
+
+export interface NativeEventPayloadMap {
+  'open-quick-capture': void;
+  'open-settings': void;
+  'notification:action': NativeNotificationAction;
+  navigate: string;
+}
+
+export type NativeEventChannel = keyof NativeEventPayloadMap;
 
 export interface UpdateInfo {
   version: string;
@@ -115,7 +127,10 @@ export interface NativePlatformApi {
     isDesktop: boolean;
   };
   events: {
-    on: (channel: NativeEventChannel, callback: (...args: unknown[]) => void) => () => void;
+    on: <Channel extends NativeEventChannel>(
+      channel: Channel,
+      callback: (payload: NativeEventPayloadMap[Channel]) => void,
+    ) => () => void;
   };
   notifications: {
     show: (

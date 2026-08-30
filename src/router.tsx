@@ -29,6 +29,7 @@ const CalendarPage = lazy(() => import('./app/pages/CalendarPage'));
 const AdminPage = lazy(() => import('./app/pages/AdminPage'));
 const ConnectionCenterPage = lazy(() => import('./app/pages/ConnectionCenterPage'));
 const DiagnosticsPage = lazy(() => import('./app/pages/DiagnosticsPage'));
+const AppSettingsPage = lazy(() => import('./app/pages/AppSettingsPage'));
 
 // ── Route-level suspense fallback ────────────────────────────────────
 function PageFallback() {
@@ -75,12 +76,24 @@ export default function AppRouter() {
   // Auto-login when the packaged Tauri host server is available.
   useAutoLogin();
 
-  // Connection and recovery controls belong to the native application shell,
+  // Application, connection, and recovery controls belong to the native shell,
   // not to a workspace session. Keep them mountable while auth is rehydrating
   // and while the bundled server is blocked.
-  if (location.pathname === '/connections' || location.pathname === '/diagnostics') {
+  if (
+    location.pathname === '/settings/app' ||
+    location.pathname === '/connections' ||
+    location.pathname === '/diagnostics'
+  ) {
     return (
       <Routes>
+        <Route
+          path="/settings/app"
+          element={
+            <LazyRoute>
+              <AppSettingsPage />
+            </LazyRoute>
+          }
+        />
         <Route
           path="/connections"
           element={
@@ -289,8 +302,9 @@ export default function AppRouter() {
             </ErrorBoundary>
           }
         />
+        <Route path="/settings" element={<Navigate to="/settings/workspace" replace />} />
         <Route
-          path="/settings"
+          path="/settings/workspace"
           element={
             <ErrorBoundary name="SettingsPage">
               <LazyRoute>

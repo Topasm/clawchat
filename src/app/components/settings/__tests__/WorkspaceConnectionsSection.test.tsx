@@ -226,6 +226,51 @@ describe('WorkspaceConnectionsSection', () => {
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
   });
 
+  it('rolls back auth and workspace state when a remote identity changes during sign-in', async () => {
+    mocks.login.mockImplementationOnce(async () => {
+      useAuthStore.setState({ token: 'untrusted-token', serverUrl: 'https://work.example' });
+      return {
+        hostId: 'different-host',
+        hostPublicKey: 'different-key',
+        apiVersion: '1',
+        workspaceName: 'Changed host',
+      };
+    });
+    renderSection();
+
+    fireEvent.change(screen.getByPlaceholderText('https://clawchat.example.com'), {
+      target: { value: 'https://work.example' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Not saved'), {
+      target: { value: '654321' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    expect(await screen.findByText(/server identity changed/)).toBeInTheDocument();
+    expect(useAuthStore.getState().token).toBe('local-token');
+    expect(useAuthStore.getState().serverUrl).toBe('http://localhost:8000');
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
+    expect(useWorkspaceStore.getState().profiles).toHaveLength(1);
+    expect(mocks.navigate).not.toHaveBeenCalledWith('/today');
+  });
+
+  it('restores the prior workspace if secure session persistence fails', async () => {
+    mocks.saveSession.mockRejectedValueOnce(new Error('Credential vault unavailable'));
+    renderSection();
+
+    fireEvent.change(screen.getByPlaceholderText('https://clawchat.example.com'), {
+      target: { value: 'https://work.example' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Not saved'), {
+      target: { value: '654321' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    expect(await screen.findByText('Credential vault unavailable')).toBeInTheDocument();
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local');
+    expect(useWorkspaceStore.getState().profiles).toHaveLength(1);
+  });
+
   it('quick-switches with a saved secure session without asking for the PIN again', async () => {
     const remote = useWorkspaceStore
       .getState()

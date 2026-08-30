@@ -48,6 +48,7 @@ import {
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import UpdateNotification from './shared/UpdateNotification';
+import { StatusDot } from './shared/WorkspacePrimitives';
 
 // Keep the injected theme tokens declared in this runtime root. The design
 // token audit reads this bridge to distinguish runtime variables from typos.
@@ -317,7 +318,7 @@ export default function Layout() {
         aria-label={`Switch workspace. Current: ${activeWorkspaceName}`}
         onClick={() => navigate('/connections')}
       >
-        <span className="cc-status-dot cc-connection-status__dot" />
+        <StatusDot className="cc-connection-status__dot" />
         <span className="cc-sidebar__label">
           {activeWorkspaceName} · {connectionLabel}
           {pendingCount > 0 && (

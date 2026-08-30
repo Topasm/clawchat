@@ -18,6 +18,7 @@ import Dialog from '../components/shared/Dialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
+import { ListRow } from '../components/shared/WorkspacePrimitives';
 
 export default function ChatListPage() {
   const navigate = useNavigate();
@@ -159,10 +160,11 @@ export default function ChatListPage() {
             const totalCount = meta?.totalCount ?? 0;
 
             return (
-              <button
+              <ListRow
+                as="button"
                 key={project.id}
                 type="button"
-                className="cc-project-card cc-list-row"
+                className="cc-project-card"
                 onClick={() => handleProjectClick(project.id)}
               >
                 <div className="cc-project-card__header">
@@ -201,7 +203,7 @@ export default function ChatListPage() {
                 )}
 
                 <ChevronRightIcon className="cc-project-card__chevron" size={16} />
-              </button>
+              </ListRow>
             );
           })}
         </div>

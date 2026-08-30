@@ -22,11 +22,15 @@ vi.mock('./app/pages/ConnectionCenterPage', () => ({
 vi.mock('./app/pages/DiagnosticsPage', () => ({
   default: () => <div>Public diagnostics</div>,
 }));
+vi.mock('./app/pages/AppSettingsPage', () => ({
+  default: () => <div>Public application settings</div>,
+}));
 
 const AppRouter = (await import('./router')).default;
 
 describe('public shell routes', () => {
   it.each([
+    ['/settings/app', 'Public application settings'],
     ['/connections', 'Public connection center'],
     ['/diagnostics', 'Public diagnostics'],
   ])('keeps %s available during auth rehydration and a blocked host', async (path, label) => {

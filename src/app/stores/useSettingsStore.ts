@@ -66,7 +66,7 @@ interface SettingsState {
   setStreak: (v: StreakData) => void;
 
   // Actions
-  resetToDefaults: () => void;
+  resetApplicationPreferences: () => void;
   exportSettings: () => string;
   importSettings: (json: string) => { success: boolean; count?: number; error?: string };
 
@@ -75,18 +75,12 @@ interface SettingsState {
   saveSettings: () => Promise<void>;
 }
 
-const DEFAULT_SETTINGS = {
+const APPLICATION_DEFAULT_SETTINGS = {
   fontSize: 16,
   messageBubbleStyle: 'modern',
   sendOnEnter: true, // desktop convention: true (mobile was false)
   showTimestamps: true,
   showAvatars: true,
-
-  llmModel: 'openclaw-default',
-  temperature: 0.7,
-  systemPrompt: 'You are a helpful assistant.',
-  maxTokens: 2048,
-  streamResponses: true,
 
   theme: 'system',
   compactMode: false,
@@ -104,13 +98,37 @@ const DEFAULT_SETTINGS = {
   streak: { lastCompletedDate: '', currentStreak: 0 },
 } as const;
 
+const WORKSPACE_DEFAULT_SETTINGS = {
+  llmModel: 'openclaw-default',
+  temperature: 0.7,
+  systemPrompt: 'You are a helpful assistant.',
+  maxTokens: 2048,
+  streamResponses: true,
+} as const;
+
+const DEFAULT_SETTINGS = {
+  ...APPLICATION_DEFAULT_SETTINGS,
+  ...WORKSPACE_DEFAULT_SETTINGS,
+} as const;
+
 type DefaultKeys = keyof typeof DEFAULT_SETTINGS;
+type WorkspaceSettingKey =
+  'llmModel' | 'temperature' | 'systemPrompt' | 'maxTokens' | 'streamResponses';
+
+const WORKSPACE_SETTING_KEYS: readonly WorkspaceSettingKey[] = [
+  'llmModel',
+  'temperature',
+  'systemPrompt',
+  'maxTokens',
+  'streamResponses',
+];
 
 let _syncTimer: ReturnType<typeof setTimeout> | null = null;
 
-function scheduleSave() {
+function scheduleWorkspaceSave() {
   if (_syncTimer) clearTimeout(_syncTimer);
   _syncTimer = setTimeout(() => {
+    _syncTimer = null;
     useSettingsStore.getState().saveSettings();
   }, 500);
 }
@@ -120,35 +138,51 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       ...DEFAULT_SETTINGS,
 
-      setFontSize: (fontSize) => { set({ fontSize }); scheduleSave(); },
-      setMessageBubbleStyle: (messageBubbleStyle) => { set({ messageBubbleStyle }); scheduleSave(); },
-      setSendOnEnter: (sendOnEnter) => { set({ sendOnEnter }); scheduleSave(); },
-      setShowTimestamps: (showTimestamps) => { set({ showTimestamps }); scheduleSave(); },
-      setShowAvatars: (showAvatars) => { set({ showAvatars }); scheduleSave(); },
+      // Application preferences are persisted locally by Zustand. They must
+      // remain writable while no workspace server is available.
+      setFontSize: (fontSize) => set({ fontSize }),
+      setMessageBubbleStyle: (messageBubbleStyle) => set({ messageBubbleStyle }),
+      setSendOnEnter: (sendOnEnter) => set({ sendOnEnter }),
+      setShowTimestamps: (showTimestamps) => set({ showTimestamps }),
+      setShowAvatars: (showAvatars) => set({ showAvatars }),
 
-      setLlmModel: (llmModel) => { set({ llmModel }); scheduleSave(); },
-      setTemperature: (temperature) => { set({ temperature }); scheduleSave(); },
-      setSystemPrompt: (systemPrompt) => { set({ systemPrompt }); scheduleSave(); },
-      setMaxTokens: (maxTokens) => { set({ maxTokens }); scheduleSave(); },
-      setStreamResponses: (streamResponses) => { set({ streamResponses }); scheduleSave(); },
+      // These values belong to the active workspace and are synchronized with
+      // its server after the local state has been updated.
+      setLlmModel: (llmModel) => {
+        set({ llmModel });
+        scheduleWorkspaceSave();
+      },
+      setTemperature: (temperature) => {
+        set({ temperature });
+        scheduleWorkspaceSave();
+      },
+      setSystemPrompt: (systemPrompt) => {
+        set({ systemPrompt });
+        scheduleWorkspaceSave();
+      },
+      setMaxTokens: (maxTokens) => {
+        set({ maxTokens });
+        scheduleWorkspaceSave();
+      },
+      setStreamResponses: (streamResponses) => {
+        set({ streamResponses });
+        scheduleWorkspaceSave();
+      },
 
-      setTheme: (theme) => { set({ theme }); scheduleSave(); },
-      setCompactMode: (compactMode) => { set({ compactMode }); scheduleSave(); },
-      setSidebarSize: (sidebarSize) => { set({ sidebarSize }); scheduleSave(); },
-      setChatPanelSize: (chatPanelSize) => { set({ chatPanelSize }); scheduleSave(); },
+      setTheme: (theme) => set({ theme }),
+      setCompactMode: (compactMode) => set({ compactMode }),
+      setSidebarSize: (sidebarSize) => set({ sidebarSize }),
+      setChatPanelSize: (chatPanelSize) => set({ chatPanelSize }),
 
-      setNotificationsEnabled: (notificationsEnabled) => { set({ notificationsEnabled }); scheduleSave(); },
-      setReminderSound: (reminderSound) => { set({ reminderSound }); scheduleSave(); },
+      setNotificationsEnabled: (notificationsEnabled) => set({ notificationsEnabled }),
+      setReminderSound: (reminderSound) => set({ reminderSound }),
 
-      setSaveHistory: (saveHistory) => { set({ saveHistory }); scheduleSave(); },
-      setAnalyticsEnabled: (analyticsEnabled) => { set({ analyticsEnabled }); scheduleSave(); },
+      setSaveHistory: (saveHistory) => set({ saveHistory }),
+      setAnalyticsEnabled: (analyticsEnabled) => set({ analyticsEnabled }),
       setBiometricEnabled: (biometricEnabled) => set({ biometricEnabled }),
       setStreak: (streak) => set({ streak }),
 
-      resetToDefaults: () => {
-        if (_syncTimer) clearTimeout(_syncTimer);
-        set({ ...DEFAULT_SETTINGS });
-      },
+      resetApplicationPreferences: () => set({ ...APPLICATION_DEFAULT_SETTINGS }),
 
       exportSettings: () => {
         const state = get();
@@ -180,8 +214,11 @@ export const useSettingsStore = create<SettingsState>()(
           const response = await apiClient.get('/settings');
           const serverSettings: SettingsPayload = response.data?.settings ?? response.data;
           const merge: Record<string, unknown> = {};
-          for (const key of Object.keys(DEFAULT_SETTINGS) as DefaultKeys[]) {
-            if (key in serverSettings && (serverSettings as Record<string, unknown>)[key] !== undefined) {
+          for (const key of WORKSPACE_SETTING_KEYS) {
+            if (
+              key in serverSettings &&
+              (serverSettings as Record<string, unknown>)[key] !== undefined
+            ) {
               merge[key] = (serverSettings as Record<string, unknown>)[key];
             }
           }
@@ -197,24 +234,11 @@ export const useSettingsStore = create<SettingsState>()(
         try {
           const state = get();
           const payload: SettingsPayload = {
-            fontSize: state.fontSize,
-            messageBubbleStyle: state.messageBubbleStyle,
-            sendOnEnter: state.sendOnEnter,
-            showTimestamps: state.showTimestamps,
-            showAvatars: state.showAvatars,
             llmModel: state.llmModel,
             temperature: state.temperature,
             systemPrompt: state.systemPrompt,
             maxTokens: state.maxTokens,
             streamResponses: state.streamResponses,
-            theme: state.theme,
-            compactMode: state.compactMode,
-            sidebarSize: state.sidebarSize,
-            chatPanelSize: state.chatPanelSize,
-            notificationsEnabled: state.notificationsEnabled,
-            reminderSound: state.reminderSound,
-            saveHistory: state.saveHistory,
-            analyticsEnabled: state.analyticsEnabled,
           };
           await apiClient.put('/settings', payload);
         } catch (err) {
@@ -229,4 +253,9 @@ export const useSettingsStore = create<SettingsState>()(
   ),
 );
 
-export { DEFAULT_SETTINGS };
+export {
+  APPLICATION_DEFAULT_SETTINGS,
+  DEFAULT_SETTINGS,
+  WORKSPACE_DEFAULT_SETTINGS,
+  WORKSPACE_SETTING_KEYS,
+};

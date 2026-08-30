@@ -37,6 +37,19 @@
   height: 8px;
   flex: 0 0 auto;
   border-radius: var(--cc-radius-pill);
+  background: var(--cc-text-tertiary);
+}
+
+.cc-status-dot[data-tone='success'] {
+  background: var(--cc-success);
+}
+
+.cc-status-dot[data-tone='warning'] {
+  background: var(--cc-warning);
+}
+
+.cc-status-dot[data-tone='danger'] {
+  background: var(--cc-error);
 }
 
 .cc-insertion-target {

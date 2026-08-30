@@ -13,6 +13,7 @@ import InboxDependencyPreviewPanel from './InboxDependencyPreviewPanel';
 import InboxExecutionTelemetryPanel from './InboxExecutionTelemetryPanel';
 import ReadyTaskExecutionPanel, { type ReadyTaskExecutionRequest } from './ReadyTaskExecutionPanel';
 import type { InboxDependencyPreview } from '../../hooks/useInboxDependencyPreview';
+import { Pane } from '../shared/WorkspacePrimitives';
 
 interface InboxInspectorProps {
   task: TodoResponse | null;
@@ -61,7 +62,7 @@ export default function InboxInspector({
   onNavigate,
 }: InboxInspectorProps) {
   return (
-    <aside className="cc-inbox-triage__inspector cc-pane" aria-label="Selected task">
+    <Pane as="aside" className="cc-inbox-triage__inspector" aria-label="Selected task">
       {task ? (
         <>
           <span>Selected task</span>
@@ -168,6 +169,6 @@ export default function InboxInspector({
       ) : (
         <p>Select or drag an Inbox card to organize it.</p>
       )}
-    </aside>
+    </Pane>
   );
 }

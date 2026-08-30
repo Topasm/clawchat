@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SettingsSection from '../components/shared/SettingsSection';
+import { PropertyRow } from '../components/shared/WorkspacePrimitives';
 import ToastContainer from '../components/shared/ToastContainer';
 import { platformApi } from '../platform';
-import { useAuthStore } from '../stores/useAuthStore';
-import { useHostSessionStore } from '../stores/useHostSessionStore';
 import { useToastStore } from '../stores/useToastStore';
 import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
-import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useTheme } from '../config/ThemeContext';
 import { themeCssVars } from '../config/themeCssVars';
-import { removeWorkspaceSession } from '../services/workspaceCredentials';
+import {
+  resetWorkspaceConnections,
+  retryLocalWorkspace,
+} from '../services/workspaceSessionCoordinator';
 
 function displayStatus(state: string | undefined) {
   if (!state) return 'Unknown';
@@ -25,8 +26,6 @@ export default function DiagnosticsPage() {
   const status = useWorkspaceRuntimeStore((state) => state.localServerStatus);
   const runtimeError = useWorkspaceRuntimeStore((state) => state.error);
   const initialize = useWorkspaceRuntimeStore((state) => state.initialize);
-  const refresh = useWorkspaceRuntimeStore((state) => state.refresh);
-  const updatePolicy = useWorkspaceRuntimeStore((state) => state.updateLocalServerPolicy);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,10 +37,7 @@ export default function DiagnosticsPage() {
     setBusy(true);
     setError('');
     try {
-      await updatePolicy({ localServerEnabled: true });
-      useHostSessionStore.getState().reset();
-      await useHostSessionStore.getState().retryHostStartup();
-      await refresh();
+      await retryLocalWorkspace();
       addToast('success', 'The local workspace is ready.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -61,13 +57,7 @@ export default function DiagnosticsPage() {
   };
 
   const resetConnections = async () => {
-    const remoteCredentials = useWorkspaceStore
-      .getState()
-      .profiles.flatMap((profile) => (profile.credentialRef ? [profile.credentialRef] : []));
-    await Promise.all(remoteCredentials.map((credential) => removeWorkspaceSession(credential)));
-    useHostSessionStore.getState().deactivate();
-    useAuthStore.getState().logout();
-    useWorkspaceStore.getState().reset();
+    await resetWorkspaceConnections();
     addToast('success', 'Saved remote connections were reset. Local workspace data was kept.');
   };
 
@@ -140,7 +130,7 @@ export default function DiagnosticsPage() {
         </SettingsSection>
 
         <SettingsSection title="Connection recovery">
-          <div className="cc-workspace-preference cc-property-row">
+          <PropertyRow className="cc-workspace-preference">
             <div>
               <div className="cc-workspace-card__name">Reset saved connections</div>
               <div className="cc-workspace-card__description">
@@ -155,7 +145,7 @@ export default function DiagnosticsPage() {
             >
               Reset connections
             </button>
-          </div>
+          </PropertyRow>
         </SettingsSection>
       </main>
       <ToastContainer />

@@ -5,6 +5,7 @@ import type {
   LocalServerTransitionResult,
   LocalSession,
   NativeEventChannel,
+  NativeEventPayloadMap,
   NativePlatformApi,
   ServerConfig,
   ServerStatus,
@@ -32,6 +33,13 @@ const eventNames: Record<NativeEventChannel, string> = {
   navigate: TAURI_EVENTS.navigate,
 };
 
+function subscribeNativeEvent<Channel extends NativeEventChannel>(
+  channel: Channel,
+  callback: (payload: NativeEventPayloadMap[Channel]) => void,
+): () => void {
+  return subscribe<NativeEventPayloadMap[Channel]>(eventNames[channel], callback);
+}
+
 export const tauriPlatformApi: NativePlatformApi = {
   runtime: {
     kind: 'tauri',
@@ -40,11 +48,7 @@ export const tauriPlatformApi: NativePlatformApi = {
     isDesktop: true,
   },
   events: {
-    on: (channel, callback) =>
-      subscribe<unknown>(eventNames[channel], (payload) => {
-        if (Array.isArray(payload)) callback(...payload);
-        else callback(payload);
-      }),
+    on: subscribeNativeEvent,
   },
   notifications: {
     show: (title, body, options) =>

@@ -218,29 +218,21 @@ export default function useWebSocket(): void {
 
     // Desktop: handle "Mark Done" action from a native notification
     let unsubNotifAction: (() => void) | undefined;
-    let unsubNotifNav: (() => void) | undefined;
     if (IS_DESKTOP) {
-      unsubNotifAction = platformApi.events.on(
-        'notification:action',
-        async (...args: unknown[]) => {
-          const d = args[0] as { action?: string; itemType?: string; itemId?: string };
-          if (d.action === 'mark_done' && d.itemId) {
-            try {
-              if (d.itemType === 'todo') {
-                await apiClient.patch(`/todos/${d.itemId}`, { status: 'completed' });
-                queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-                queryClient.invalidateQueries({ queryKey: queryKeys.today });
-                void invalidateTaskDerivedQueries(queryClient);
-              }
-            } catch {
-              // Best-effort
+      unsubNotifAction = platformApi.events.on('notification:action', async (action) => {
+        const d = action;
+        if (d.action === 'mark_done' && d.itemId) {
+          try {
+            if (d.itemType === 'todo') {
+              await apiClient.patch(`/todos/${d.itemId}`, { status: 'completed' });
+              queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+              queryClient.invalidateQueries({ queryKey: queryKeys.today });
+              void invalidateTaskDerivedQueries(queryClient);
             }
+          } catch {
+            // Best-effort
           }
-        },
-      );
-      unsubNotifNav = platformApi.events.on('navigate', (...args: unknown[]) => {
-        const route = args[0] as string;
-        if (route) window.dispatchEvent(new CustomEvent('navigate', { detail: route }));
+        }
       });
     }
 
@@ -303,7 +295,6 @@ export default function useWebSocket(): void {
 
     return () => {
       unsubNotifAction?.();
-      unsubNotifNav?.();
       unsubStatus();
       wsClient.off('tick', handleLivenessNoop);
       wsClient.off('heartbeat', handleLivenessNoop);

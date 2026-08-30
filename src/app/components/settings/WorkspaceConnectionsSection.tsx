@@ -2,24 +2,24 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { useNavigate } from 'react-router-dom';
 import { type ServerStatus } from '../../platform';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { useHostSessionStore } from '../../stores/useHostSessionStore';
 import { useToastStore } from '../../stores/useToastStore';
 import {
   LOCAL_WORKSPACE_ID,
-  normalizeWorkspaceUrl,
   useWorkspaceStore,
   type WorkspaceProfile,
 } from '../../stores/useWorkspaceStore';
 import SettingsSection from '../shared/SettingsSection';
 import Toggle from '../shared/Toggle';
+import { ListRow, PropertyRow } from '../shared/WorkspacePrimitives';
 import { useWorkspaceRuntimeStore } from '../../stores/useWorkspaceRuntimeStore';
-import { verifyClawChatHealth } from '../../services/workspaceHealth';
-import apiClient from '../../services/apiClient';
 import {
-  loadWorkspaceSession,
-  removeWorkspaceSession,
-  saveWorkspaceSession,
-} from '../../services/workspaceCredentials';
+  activateLocalWorkspace,
+  activateSavedRemoteWorkspace,
+  connectRemoteWorkspace,
+  reconcileWorkspaceFromAuth,
+  removeRemoteWorkspace,
+  updateLocalServerPolicyForSession,
+} from '../../services/workspaceSessionCoordinator';
 
 function statusLabel(status: ServerStatus | null): string {
   if (!status) return 'Preparing';
@@ -32,13 +32,8 @@ function statusLabel(status: ServerStatus | null): string {
 export default function WorkspaceConnectionsSection() {
   const navigate = useNavigate();
   const serverUrl = useAuthStore((state) => state.serverUrl);
-  const login = useAuthStore((state) => state.login);
-  const logout = useAuthStore((state) => state.logout);
   const profiles = useWorkspaceStore((state) => state.profiles);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const upsertRemote = useWorkspaceStore((state) => state.upsertRemote);
-  const removeRemote = useWorkspaceStore((state) => state.removeRemote);
-  const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
   const addToast = useToastStore((state) => state.addToast);
   const runtimeConfig = useWorkspaceRuntimeStore((state) => state.config);
   const localStatus = useWorkspaceRuntimeStore((state) => state.localServerStatus);
@@ -47,7 +42,6 @@ export default function WorkspaceConnectionsSection() {
   const updateLocalServerPolicy = useWorkspaceRuntimeStore(
     (state) => state.updateLocalServerPolicy,
   );
-  const setWorkspaceTransition = useWorkspaceRuntimeStore((state) => state.setWorkspaceTransition);
   const [localPin, setLocalPin] = useState('');
   const [localPort, setLocalPort] = useState('0');
   const [savingLocalSecurity, setSavingLocalSecurity] = useState(false);
@@ -70,145 +64,45 @@ export default function WorkspaceConnectionsSection() {
   useEffect(() => {
     if (!runtimeConfig) return;
     setLocalPort(String(runtimeConfig.port));
-    if (!serverUrl || activeWorkspaceId === LOCAL_WORKSPACE_ID) return;
-    const existing = remoteProfiles.find(
-      (profile) => profile.serverUrl?.toLowerCase() === serverUrl.toLowerCase(),
-    );
-    if (existing) {
-      setActiveWorkspace(existing.id);
-      return;
-    }
-    let defaultName = 'Remote workspace';
-    try {
-      defaultName = new URL(serverUrl).hostname;
-    } catch {
-      // Keep a readable fallback for legacy stored URLs.
-    }
-    upsertRemote(defaultName, serverUrl);
-  }, [
-    activeWorkspaceId,
-    remoteProfiles,
-    runtimeConfig,
-    serverUrl,
-    setActiveWorkspace,
-    upsertRemote,
-  ]);
+    reconcileWorkspaceFromAuth(serverUrl);
+  }, [runtimeConfig, serverUrl]);
 
   const openLocalWorkspace = useCallback(async () => {
-    if (
-      activeWorkspaceId === LOCAL_WORKSPACE_ID &&
-      useHostSessionStore.getState().phase === 'connected'
-    ) {
-      return;
-    }
     setBusy('local');
     setError('');
-    setWorkspaceTransition({
-      kind: 'workspace',
-      phase: 'activating',
-      from: activeWorkspaceId,
-      to: LOCAL_WORKSPACE_ID,
-    });
-    const hostSession = useHostSessionStore.getState();
     try {
-      // Keep the working remote credentials until the local handshake has
-      // succeeded. A broken sidecar can then be rolled back without signing
-      // the user out of the workspace they were already using.
-      hostSession.reset();
-      if (!runtimeConfig?.localServerEnabled) {
-        await updateLocalServerPolicy({ localServerEnabled: true });
-      }
-      await hostSession.retryHostStartup();
-      if (useHostSessionStore.getState().phase !== 'connected') {
-        throw new Error(
-          useHostSessionStore.getState().failure?.message ||
-            'The local workspace could not be opened.',
-        );
-      }
-      setActiveWorkspace(LOCAL_WORKSPACE_ID);
+      await activateLocalWorkspace();
       addToast('success', 'Using the private workspace on this device.');
       navigate('/today');
     } catch (cause) {
-      hostSession.deactivate();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setWorkspaceTransition(null);
       setBusy(null);
     }
-  }, [
-    activeWorkspaceId,
-    addToast,
-    navigate,
-    runtimeConfig?.localServerEnabled,
-    setActiveWorkspace,
-    setWorkspaceTransition,
-    updateLocalServerPolicy,
-  ]);
+  }, [addToast, navigate]);
 
   const connectRemote = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
       setBusy('remote');
       setError('');
-      setWorkspaceTransition({
-        kind: 'workspace',
-        phase: 'preflight',
-        from: activeWorkspaceId,
-        to: remoteUrl,
-      });
       try {
-        const normalizedUrl = normalizeWorkspaceUrl(remoteUrl);
-        // Workspace selection no longer controls the local server lifecycle.
-        // A phone paired to this computer stays connected while the desktop
-        // UI authenticates against and displays a remote workspace.
-        const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
-        const health = await verifyClawChatHealth(normalizedUrl, selectedProfile?.hostId);
-        const identity = await login(normalizedUrl, pin);
-        if (identity.hostId && identity.hostId !== health.hostId) {
-          throw new Error('The server identity changed between health check and sign-in.');
-        }
-        useHostSessionStore.getState().deactivate();
-        const profile = upsertRemote(name || identity.workspaceName || '', normalizedUrl, {
-          hostId: health.hostId,
-          hostPublicKey: identity.hostPublicKey ?? health.hostPublicKey,
-          apiVersion: identity.apiVersion ?? health.apiVersion,
+        const profile = await connectRemoteWorkspace({
+          name,
+          remoteUrl,
+          pin,
+          selectedProfileId,
         });
-        const auth = useAuthStore.getState();
-        if (profile.credentialRef && auth.token && auth.serverUrl) {
-          await saveWorkspaceSession(profile.credentialRef, {
-            token: auth.token,
-            refreshToken: auth.refreshToken,
-            serverUrl: auth.serverUrl,
-            hostId: auth.hostId,
-            hostPublicKey: auth.hostPublicKey,
-            relayUrl: auth.relayUrl,
-          });
-        }
-        setActiveWorkspace(profile.id);
         setPin('');
         addToast('success', `Connected to ${profile.name}.`);
         navigate('/today');
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
-        setWorkspaceTransition(null);
         setBusy(null);
       }
     },
-    [
-      activeWorkspaceId,
-      addToast,
-      login,
-      name,
-      navigate,
-      pin,
-      remoteUrl,
-      profiles,
-      selectedProfileId,
-      setActiveWorkspace,
-      setWorkspaceTransition,
-      upsertRemote,
-    ],
+    [addToast, name, navigate, pin, remoteUrl, selectedProfileId],
   );
 
   const chooseRemote = async (profile: WorkspaceProfile) => {
@@ -217,40 +111,16 @@ export default function WorkspaceConnectionsSection() {
     setSelectedProfileId(profile.id);
     setPin('');
     setError('');
-    if (!profile.serverUrl || !profile.credentialRef) {
-      setError('Enter the PIN for this workspace to connect.');
-      return;
-    }
     setBusy('remote');
-    const previousAuth = useAuthStore.getState();
     try {
-      const [health, session] = await Promise.all([
-        verifyClawChatHealth(profile.serverUrl, profile.hostId),
-        loadWorkspaceSession(profile.credentialRef),
-      ]);
-      if (!session) {
+      const activation = await activateSavedRemoteWorkspace(profile);
+      if (activation.kind === 'needs-pin') {
         setError('Enter the PIN for this workspace to connect.');
         return;
       }
-      if (session.hostId && session.hostId !== health.hostId) {
-        throw new Error('The saved session belongs to a different ClawChat host.');
-      }
-      useAuthStore.setState({ ...session, isLoading: false });
-      await apiClient.get('/capabilities');
-      useHostSessionStore.getState().deactivate();
-      setActiveWorkspace(profile.id);
       addToast('success', `Connected to ${profile.name}.`);
       navigate('/today');
     } catch (cause) {
-      useAuthStore.setState({
-        token: previousAuth.token,
-        refreshToken: previousAuth.refreshToken,
-        serverUrl: previousAuth.serverUrl,
-        hostId: previousAuth.hostId,
-        hostPublicKey: previousAuth.hostPublicKey,
-        relayUrl: previousAuth.relayUrl,
-        isLoading: false,
-      });
       setError(
         cause instanceof Error
           ? `${cause.message} Enter the PIN to reconnect.`
@@ -262,8 +132,7 @@ export default function WorkspaceConnectionsSection() {
   };
 
   const deleteRemote = async (profile: WorkspaceProfile) => {
-    if (profile.credentialRef) await removeWorkspaceSession(profile.credentialRef);
-    removeRemote(profile.id);
+    await removeRemoteWorkspace(profile);
   };
 
   const handleAutoStartToggle = async (enabled: boolean) => {
@@ -307,12 +176,8 @@ export default function WorkspaceConnectionsSection() {
   }) => {
     setError('');
     try {
-      await updateLocalServerPolicy(updates);
-      if (updates.localServerEnabled === false && activeWorkspaceId === LOCAL_WORKSPACE_ID) {
-        useHostSessionStore.getState().deactivate();
-        logout();
-        navigate('/connections');
-      }
+      const result = await updateLocalServerPolicyForSession(updates);
+      if (result.leftActiveLocalWorkspace) navigate('/connections');
       addToast('success', 'Local server policy updated.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -343,7 +208,7 @@ export default function WorkspaceConnectionsSection() {
 
   return (
     <SettingsSection title="Workspaces & Connections">
-      <div className="cc-workspace-card cc-list-row">
+      <ListRow className="cc-workspace-card">
         <div className="cc-workspace-card__body">
           <div className="cc-workspace-card__heading">
             <span className="cc-workspace-card__name">This device</span>
@@ -369,10 +234,10 @@ export default function WorkspaceConnectionsSection() {
             {busy === 'local' ? 'Opening…' : 'Use'}
           </button>
         )}
-      </div>
+      </ListRow>
 
       {remoteProfiles.map((profile) => (
-        <div className="cc-workspace-card cc-list-row" key={profile.id}>
+        <ListRow className="cc-workspace-card" key={profile.id}>
           <div className="cc-workspace-card__body">
             <div className="cc-workspace-card__heading">
               <span className="cc-workspace-card__name">{profile.name}</span>
@@ -405,7 +270,7 @@ export default function WorkspaceConnectionsSection() {
               </button>
             )}
           </div>
-        </div>
+        </ListRow>
       ))}
 
       <form className="cc-workspace-connect" onSubmit={(event) => void connectRemote(event)}>
@@ -462,7 +327,7 @@ export default function WorkspaceConnectionsSection() {
 
       {runtimeConfig && (
         <>
-          <div className="cc-workspace-preference cc-property-row">
+          <PropertyRow className="cc-workspace-preference">
             <div>
               <div className="cc-workspace-card__name">Local server</div>
               <div className="cc-workspace-card__description">
@@ -475,8 +340,8 @@ export default function WorkspaceConnectionsSection() {
               label="Local server"
               onChange={(enabled) => void updateLocalLifecycle({ localServerEnabled: enabled })}
             />
-          </div>
-          <div className="cc-workspace-preference cc-property-row">
+          </PropertyRow>
+          <PropertyRow className="cc-workspace-preference">
             <div>
               <div className="cc-workspace-card__name">Keep available in tray</div>
               <div className="cc-workspace-card__description">
@@ -489,8 +354,8 @@ export default function WorkspaceConnectionsSection() {
               label="Keep available in tray"
               onChange={(enabled) => void updateLocalLifecycle({ keepRunningInTray: enabled })}
             />
-          </div>
-          <div className="cc-workspace-preference cc-property-row">
+          </PropertyRow>
+          <PropertyRow className="cc-workspace-preference">
             <div>
               <div className="cc-workspace-card__name">Allow local network access</div>
               <div className="cc-workspace-card__description">
@@ -504,8 +369,8 @@ export default function WorkspaceConnectionsSection() {
               label="Allow local network access"
               onChange={(enabled) => void saveLocalSecurity(enabled)}
             />
-          </div>
-          <div className="cc-workspace-preference cc-property-row">
+          </PropertyRow>
+          <PropertyRow className="cc-workspace-preference">
             <label>
               <span className="cc-workspace-card__name">Local network PIN</span>
               <input
@@ -534,8 +399,8 @@ export default function WorkspaceConnectionsSection() {
             >
               {savingLocalSecurity ? 'Saving…' : 'Save PIN'}
             </button>
-          </div>
-          <div className="cc-workspace-preference cc-property-row">
+          </PropertyRow>
+          <PropertyRow className="cc-workspace-preference">
             <label>
               <span className="cc-workspace-card__name">Local server port</span>
               <span className="cc-workspace-card__description">
@@ -559,8 +424,8 @@ export default function WorkspaceConnectionsSection() {
             >
               Save port
             </button>
-          </div>
-          <div className="cc-workspace-preference cc-property-row">
+          </PropertyRow>
+          <PropertyRow className="cc-workspace-preference">
             <div>
               <div className="cc-workspace-card__name">Open at system login</div>
               <div className="cc-workspace-card__description">
@@ -572,7 +437,7 @@ export default function WorkspaceConnectionsSection() {
               disabled={!runtimeConfig.localServerEnabled}
               onChange={handleAutoStartToggle}
             />
-          </div>
+          </PropertyRow>
         </>
       )}
     </SettingsSection>

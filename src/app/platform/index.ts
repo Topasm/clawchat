@@ -19,6 +19,8 @@ export type {
   LocalServerTransitionResult,
   LocalSession,
   NativeEventChannel,
+  NativeEventPayloadMap,
+  NativeNotificationAction,
   NativePlatformApi,
   NativeOS,
   NativeRuntimeKind,

@@ -2,6 +2,7 @@ import EmptyState from '../shared/EmptyState';
 import SectionHeader from '../shared/SectionHeader';
 import TaskCard from '../shared/TaskCard';
 import { InboxTrayIcon } from '../shared/Icons';
+import { Pane } from '../shared/WorkspacePrimitives';
 import type { ProjectResponse } from '../../types/api';
 import InboxBatchBar from './InboxBatchBar';
 import InboxCapturedCard from './InboxCapturedCard';
@@ -60,7 +61,7 @@ export default function InboxQueue({
   const cardsDraggable = !isPlacing && !isBatchPlacing && !triage.isApplying;
 
   return (
-    <main className="cc-inbox-triage__queue cc-pane">
+    <Pane as="main" className="cc-inbox-triage__queue">
       <div
         className="cc-inbox-triage__inbox-target"
         onDragOver={(event) => {
@@ -237,6 +238,6 @@ export default function InboxQueue({
           }
         />
       )}
-    </main>
+    </Pane>
   );
 }

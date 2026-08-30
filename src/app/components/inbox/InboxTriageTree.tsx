@@ -4,6 +4,7 @@ import type {
   TodoResponse,
 } from '../../types/api';
 import { getTaskExecutionBadges } from '../../utils/taskExecutionTelemetry';
+import { InsertionTarget, Pane } from '../shared/WorkspacePrimitives';
 import {
   acceptsPlacementDrag,
   draggedDependencyTaskId,
@@ -53,7 +54,7 @@ export default function InboxTriageTree({
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
 
   return (
-    <section className="cc-inbox-tree cc-pane" aria-label="Project work tree">
+    <Pane as="section" className="cc-inbox-tree" aria-label="Project work tree">
       <header className="cc-inbox-tree__header">
         <div>
           <strong>Project / Work Tree</strong>
@@ -154,7 +155,7 @@ export default function InboxTriageTree({
           <div className="cc-inbox-tree__empty">Create a project before placing Inbox tasks.</div>
         )}
       </div>
-    </section>
+    </Pane>
   );
 }
 
@@ -194,8 +195,8 @@ function TreeNode({
   const executionBadges = getTaskExecutionBadges(telemetryByTaskId.get(task.id));
   return (
     <div className="cc-inbox-tree__branch">
-      <div
-        className="cc-inbox-tree__insert cc-insertion-target"
+      <InsertionTarget
+        className="cc-inbox-tree__insert"
         style={{ marginLeft: depth * 18 }}
         onDragOver={(event) => {
           if (!disabled && acceptsPlacementDrag(event)) event.preventDefault();
