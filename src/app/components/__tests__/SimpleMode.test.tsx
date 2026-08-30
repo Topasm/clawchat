@@ -78,6 +78,14 @@ beforeEach(() => {
 });
 
 describe('SimpleMode', () => {
+  it('keeps the connected task surface focused on the list instead of technical chrome', () => {
+    renderSimpleMode();
+
+    expect(screen.getByRole('heading', { name: 'Tasks' })).toBeInTheDocument();
+    expect(screen.queryByText('Connected')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to expanded mode' })).toBeInTheDocument();
+  });
+
   it('shows only open tasks and creates a task from the inline input', () => {
     renderSimpleMode();
 

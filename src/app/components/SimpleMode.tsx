@@ -7,7 +7,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import type { TodoResponse } from '../types/api';
 import { formatDueDate } from '../utils/formatters';
-import { ExpandIcon, PlusIcon } from './shared/Icons';
+import { CalendarIcon, CheckIcon, ExpandIcon, PlusIcon } from './shared/Icons';
 import '../../styles/_simple-mode.css';
 
 type SimpleTaskFilter = 'open' | 'completed';
@@ -112,8 +112,8 @@ export default function SimpleMode() {
   return (
     <main className="cc-simple-mode">
       <header className="cc-simple-mode__header">
-        <div>
-          <h1>{translateUi('ClawChat')}</h1>
+        <div className="cc-simple-mode__title">
+          <h1>{translateUi('Tasks')}</h1>
           <p>{translateUi('{{count}} open tasks', { count: openCount })}</p>
         </div>
         <button
@@ -128,6 +128,7 @@ export default function SimpleMode() {
       </header>
 
       <form className="cc-simple-mode__capture" onSubmit={handleSubmit}>
+        <PlusIcon size={16} className="cc-simple-mode__capture-icon" />
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -140,7 +141,7 @@ export default function SimpleMode() {
           disabled={!title.trim() || createTodo.isPending}
           aria-label={translateUi('Add task')}
         >
-          <PlusIcon size={16} />
+          {translateUi('Add')}
         </button>
       </form>
 
@@ -184,6 +185,7 @@ export default function SimpleMode() {
               className={`cc-simple-mode__task${todo.status === 'completed' ? ' cc-simple-mode__task--completed' : ''}`}
             >
               <input
+                className="cc-simple-mode__task-input"
                 type="checkbox"
                 checked={todo.status === 'completed'}
                 onChange={() => handleToggle(todo)}
@@ -194,26 +196,29 @@ export default function SimpleMode() {
                   { title: todo.title },
                 )}
               />
+              <span className="cc-simple-mode__check" aria-hidden="true">
+                <CheckIcon size={12} />
+              </span>
               <span className="cc-simple-mode__task-copy">
                 <strong>{todo.title}</strong>
-                {todo.due_date && <small>{formatDueDate(todo.due_date)}</small>}
+                {todo.due_date && (
+                  <small>
+                    <CalendarIcon size={12} />
+                    {formatDueDate(todo.due_date)}
+                  </small>
+                )}
               </span>
             </label>
           ))
         )}
       </div>
 
-      <footer className="cc-simple-mode__footer">
-        <span className={`cc-simple-mode__status cc-simple-mode__status--${connectionStatus}`} />
-        <span>
-          {connectionStatus === 'connected'
-            ? translateUi('Connected')
-            : translateUi('Working offline')}
-        </span>
-        <button type="button" onClick={expand}>
-          {translateUi('Open full app')}
-        </button>
-      </footer>
+      {connectionStatus !== 'connected' && (
+        <footer className="cc-simple-mode__footer" aria-live="polite">
+          <span className={`cc-simple-mode__status cc-simple-mode__status--${connectionStatus}`} />
+          <span>{translateUi('Working offline')}</span>
+        </footer>
+      )}
     </main>
   );
 }

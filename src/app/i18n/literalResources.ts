@@ -722,7 +722,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Task relationship graph': '작업 관계 그래프',
   'Task title': '작업 제목',
   tasks: '작업',
-  Tasks: '작업',
+  Tasks: '할 일',
   'Tasks (': '작업(',
   'tasks completed': '완료된 작업',
   'tasks done': '완료된 작업',
