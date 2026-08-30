@@ -1,6 +1,6 @@
 use tauri::{
     menu::{MenuBuilder, MenuItem, SubmenuBuilder},
-    AppHandle, Manager,
+    AppHandle,
 };
 
 use super::command::{dispatch, AppMenuCommand};

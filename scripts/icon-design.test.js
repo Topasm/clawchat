@@ -156,8 +156,11 @@ test('keeps web, mobile, and tray branding synchronized with platform-safe asset
     path.join(repositoryRoot, 'src-tauri', 'src', 'native', 'tray.rs'),
     'utf8',
   );
-  assert.match(nativeTraySource, /include_image!\("\.\.\/icons\/tray-template-macos\.png"\)/);
-  assert.match(nativeTraySource, /include_image!\("\.\.\/icons\/tray-color\.png"\)/);
+  assert.match(
+    nativeTraySource,
+    /include_image!\("\.\.\/\.\.\/icons\/tray-template-macos\.png"\)/,
+  );
+  assert.match(nativeTraySource, /include_image!\("\.\.\/\.\.\/icons\/tray-color\.png"\)/);
   assert.match(nativeTraySource, /\.icon_as_template\(cfg!\(target_os = "macos"\)\)/);
   assert.doesNotMatch(nativeTraySource, /default_window_icon/);
 

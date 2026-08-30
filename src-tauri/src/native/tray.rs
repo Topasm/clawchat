@@ -8,10 +8,10 @@ use super::command::{dispatch, NativeCommand, TrayMenuCommand};
 
 #[cfg(target_os = "macos")]
 const TRAY_ICON: tauri::image::Image<'static> =
-    tauri::include_image!("../icons/tray-template-macos.png");
+    tauri::include_image!("../../icons/tray-template-macos.png");
 
 #[cfg(not(target_os = "macos"))]
-const TRAY_ICON: tauri::image::Image<'static> = tauri::include_image!("../icons/tray-color.png");
+const TRAY_ICON: tauri::image::Image<'static> = tauri::include_image!("../../icons/tray-color.png");
 
 pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
     let show = menu_item(app, TrayMenuCommand::ShowMain, "Show ClawChat")?;

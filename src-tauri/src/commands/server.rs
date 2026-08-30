@@ -145,7 +145,7 @@ pub fn server_open_log_folder<R: Runtime>(app: AppHandle<R>) -> Result<(), Strin
         .app_data_dir()
         .map_err(|error| format!("failed to resolve the log folder: {error}"))?;
     app.opener()
-        .open_path(directory, None::<&str>)
+        .open_path(directory.to_string_lossy().into_owned(), None::<&str>)
         .map_err(|error| format!("failed to open the log folder: {error}"))
 }
 
@@ -160,7 +160,7 @@ pub fn server_open_data_folder<R: Runtime>(app: AppHandle<R>) -> Result<(), Stri
     std::fs::create_dir_all(&directory)
         .map_err(|error| format!("failed to prepare the data folder: {error}"))?;
     app.opener()
-        .open_path(directory, None::<&str>)
+        .open_path(directory.to_string_lossy().into_owned(), None::<&str>)
         .map_err(|error| format!("failed to open the data folder: {error}"))
 }
 
