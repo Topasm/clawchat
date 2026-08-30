@@ -263,7 +263,7 @@ JWT_EXPIRY_HOURS=24
 PIN=123456
 
 # AI Provider
-AI_PROVIDER=ollama                          # "ollama", "openai", "claude_code", or "codex"
+AI_PROVIDER=ollama                          # "ollama", "openai", "claude_code", "codex_cli", or "codex"
 AI_BASE_URL=http://localhost:11434          # Ollama default
 AI_API_KEY=                                 # Optional gateway bearer token
 AI_MODEL=llama3.2                           # Model name
@@ -274,6 +274,9 @@ CODEX_API_KEY=                              # OPENAI_API_KEY also works
 CODEX_API_KEY_FILE=                         # Optional protected secret file
 CODEX_MODEL=gpt-5.3-codex
 CODEX_REASONING_EFFORT=medium
+
+# Local Codex CLI (optional; uses the existing `codex login`)
+CODEX_CLI_MODEL=                            # Empty uses ~/.codex/config.toml
 
 # File Uploads
 UPLOAD_DIR=data/uploads                     # Directory for uploaded files

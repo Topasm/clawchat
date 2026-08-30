@@ -31,6 +31,7 @@ from schemas.admin import (
     ReindexResponse,
     BackupResponse,
     ClaudeCodeStatusResponse,
+    CodexCLIStatusResponse,
     CodexAPIConfigRequest,
     CodexAPIStatusResponse,
     AIProviderResponse,
@@ -38,6 +39,7 @@ from schemas.admin import (
 )
 from services import admin_service
 from services.ai.codex_api_provider import CodexAPIStatus
+from services.ai.codex_cli_provider import CodexCLIStatus
 from ws.manager import ws_manager
 from ws.notifications import notify_module_data_changed
 
@@ -64,6 +66,14 @@ def _active_provider_summary(request: Request) -> tuple[str, str, str, bool]:
             getattr(codex, "base_url", settings.codex_api_base_url),
             getattr(state, "codex_api_status", "") == "available",
         )
+    if active_provider == "codex_cli":
+        codex_cli = getattr(state, "codex_cli", None)
+        return (
+            active_provider,
+            getattr(codex_cli, "model", "") or "Codex CLI default",
+            "local CLI",
+            getattr(state, "codex_cli_status", "") == "available",
+        )
     return (
         "openclaw",
         settings.ai_model,
@@ -80,6 +90,9 @@ def _provider_response(request: Request) -> AIProviderResponse:
         openclaw_connected=getattr(state, "ai_connected", False),
         claude_code_status=getattr(state, "claude_code_status", "unknown"),
         claude_code_version=getattr(state, "claude_code_version", None),
+        codex_cli_status=getattr(state, "codex_cli_status", "unknown"),
+        codex_cli_version=getattr(state, "codex_cli_version", None),
+        codex_cli_model=getattr(getattr(state, "codex_cli", None), "model", ""),
         codex_api_status=getattr(state, "codex_api_status", "not_configured"),
         codex_api_configured=bool(codex and codex.is_configured),
         codex_api_key_persistent=bool(settings.codex_api_key_file),
@@ -141,6 +154,8 @@ async def get_ai_config(
         request.app.state.ai_connected = connected
     elif active_provider == "codex":
         request.app.state.codex_api_status = "available" if connected else "unavailable"
+    elif active_provider == "codex_cli":
+        request.app.state.codex_cli_status = "available" if connected else "error"
 
     models: list[str] = []
     if connected and active_provider == "openclaw":
@@ -184,6 +199,8 @@ async def test_ai_connection(
             request.app.state.codex_api_status = (
                 "available" if connected else "unavailable"
             )
+        elif active_provider == "codex_cli":
+            request.app.state.codex_cli_status = "available" if connected else "error"
         return AITestResponse(
             connected=connected,
             latency_ms=round(latency, 1) if connected else None,
@@ -257,6 +274,10 @@ async def get_server_config(
         ai_backend = "claude_code"
         ai_base_url = "local CLI"
         ai_model = "claude (via CLI)"
+    elif configured_provider == "codex_cli":
+        ai_backend = "codex_cli"
+        ai_base_url = "local CLI"
+        ai_model = settings.codex_cli_model or "Codex CLI default"
     else:
         ai_backend = "openclaw"
         ai_base_url = settings.ai_base_url
@@ -349,10 +370,10 @@ async def switch_ai_provider(
     _user: str = Depends(get_current_user),
 ):
     """Switch between AI providers at runtime."""
-    if body.provider not in ("openclaw", "claude_code", "codex"):
+    if body.provider not in ("openclaw", "claude_code", "codex_cli", "codex"):
         raise ValidationError(
             f"Invalid provider: {body.provider}. "
-            "Use 'openclaw', 'claude_code', or 'codex'.",
+            "Use 'openclaw', 'claude_code', 'codex_cli', or 'codex'.",
             details={"reason": "invalid_provider"},
         )
 
@@ -380,6 +401,27 @@ async def switch_ai_provider(
         request.app.state.active_ai = claude_code
         request.app.state.active_ai_provider = "claude_code"
         logger.info("Switched active AI provider to Claude Code")
+    elif body.provider == "codex_cli":
+        codex_cli = getattr(request.app.state, "codex_cli", None)
+        if not codex_cli:
+            raise ValidationError(
+                "Codex CLI provider not initialized.",
+                details={"reason": "codex_cli_not_initialized"},
+            )
+        status, version = await codex_cli.check_availability()
+        request.app.state.codex_cli_status = status.value
+        request.app.state.codex_cli_version = version
+        if status != CodexCLIStatus.AVAILABLE:
+            raise ValidationError(
+                "Codex CLI is unavailable. Install it and run `codex login`.",
+                details={
+                    "reason": "codex_cli_unavailable",
+                    "provider_status": status.value,
+                },
+            )
+        request.app.state.active_ai = codex_cli
+        request.app.state.active_ai_provider = "codex_cli"
+        logger.info("Switched active AI provider to Codex CLI")
     elif body.provider == "codex":
         codex_api = getattr(request.app.state, "codex_api", None)
         if not codex_api:
@@ -508,6 +550,46 @@ async def get_claude_code_status(
         status=getattr(request.app.state, "claude_code_status", "unknown"),
         version=getattr(request.app.state, "claude_code_version", None),
         active=getattr(request.app.state, "active_ai_provider", "openclaw") == "claude_code",
+    )
+
+
+@router.get("/ai/codex-cli", response_model=CodexCLIStatusResponse)
+async def get_codex_cli_status(
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Get local Codex CLI install and login status."""
+    codex_cli = getattr(request.app.state, "codex_cli", None)
+    return CodexCLIStatusResponse(
+        status=getattr(request.app.state, "codex_cli_status", "unknown"),
+        version=getattr(request.app.state, "codex_cli_version", None),
+        model=getattr(codex_cli, "model", ""),
+        active=getattr(request.app.state, "active_ai_provider", "openclaw")
+        == "codex_cli",
+    )
+
+
+@router.post("/ai/codex-cli/check", response_model=CodexCLIStatusResponse)
+async def recheck_codex_cli(
+    request: Request,
+    _user: str = Depends(get_current_user),
+):
+    """Re-check the local Codex CLI and saved login."""
+    codex_cli = getattr(request.app.state, "codex_cli", None)
+    if not codex_cli:
+        from services.ai.codex_cli_provider import CodexCLIProvider
+
+        codex_cli = CodexCLIProvider(model=settings.codex_cli_model)
+        request.app.state.codex_cli = codex_cli
+    status, version = await codex_cli.check_availability()
+    request.app.state.codex_cli_status = status.value
+    request.app.state.codex_cli_version = version
+    return CodexCLIStatusResponse(
+        status=status.value,
+        version=version,
+        model=codex_cli.model,
+        active=getattr(request.app.state, "active_ai_provider", "openclaw")
+        == "codex_cli",
     )
 
 

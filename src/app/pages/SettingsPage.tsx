@@ -21,6 +21,9 @@ interface AIProviderState {
   openclaw_connected: boolean;
   claude_code_status: string;
   claude_code_version: string | null;
+  codex_cli_status: string;
+  codex_cli_version: string | null;
+  codex_cli_model: string;
   codex_api_status: string;
   codex_api_configured: boolean;
   codex_api_key_persistent: boolean;
@@ -29,6 +32,7 @@ interface AIProviderState {
 const AI_PROVIDER_LABELS: Record<string, string> = {
   openclaw: 'OpenClaw',
   claude_code: 'Claude Code',
+  codex_cli: 'Codex CLI',
   codex: 'Codex API',
 };
 type Translate = (key: string, options?: Record<string, string | number>) => string;
@@ -36,6 +40,8 @@ const AI_ERROR_TRANSLATIONS: Record<string, string> = {
   invalid_provider: 'workspaceSettings.ai.errors.invalidProvider',
   claude_not_initialized: 'workspaceSettings.ai.errors.claudeNotInitialized',
   claude_unavailable: 'workspaceSettings.ai.errors.claudeUnavailable',
+  codex_cli_not_initialized: 'workspaceSettings.ai.errors.codexCliNotInitialized',
+  codex_cli_unavailable: 'workspaceSettings.ai.errors.codexCliUnavailable',
   codex_not_initialized: 'workspaceSettings.ai.errors.codexNotInitialized',
   codex_not_configured: 'workspaceSettings.ai.errors.codexNotConfigured',
   codex_authentication_failed: 'workspaceSettings.ai.errors.codexAuthenticationFailed',
@@ -109,6 +115,7 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
   const [aiProviderSwitching, setAiProviderSwitching] = useState(false);
   const [claudeCodeChecking, setClaudeCodeChecking] = useState(false);
+  const [codexCliChecking, setCodexCliChecking] = useState(false);
   const [codexChecking, setCodexChecking] = useState(false);
   const [codexConfiguring, setCodexConfiguring] = useState(false);
   const [codexApiKey, setCodexApiKey] = useState('');
@@ -201,6 +208,36 @@ export default function SettingsPage() {
       setCodexChecking(false);
     }
   }, [addToast, t]);
+  const handleRecheckCodexCli = useCallback(async () => {
+    setCodexCliChecking(true);
+    try {
+      const response = await apiClient.post('/admin/ai/codex-cli/check', undefined, {
+        queueOfflineMutation: false,
+      });
+      setAiProvider((previous) =>
+        previous
+          ? {
+              ...previous,
+              codex_cli_status: response.data.status,
+              codex_cli_version: response.data.version,
+              codex_cli_model: response.data.model,
+            }
+          : previous,
+      );
+      addToast(
+        'success',
+        t('workspaceSettings.ai.providerCheckResult', {
+          provider: 'Codex CLI',
+          status: providerStatusLabel(response.data.status, t),
+          version: response.data.version ? ` (${response.data.version})` : '',
+        }),
+      );
+    } catch {
+      addToast('error', t('workspaceSettings.ai.failedCodexCliCheck'));
+    } finally {
+      setCodexCliChecking(false);
+    }
+  }, [addToast, t]);
   const handleConfigureCodex = useCallback(async () => {
     if (!codexApiKey.trim()) {
       addToast('error', t('workspaceSettings.ai.enterApiKey'));
@@ -289,9 +326,13 @@ export default function SettingsPage() {
               sublabel={
                 aiProvider.active_provider === 'claude_code'
                   ? t('workspaceSettings.ai.usingClaudeCode')
-                  : aiProvider.active_provider === 'codex'
-                    ? t('workspaceSettings.ai.usingCodex', { model: aiProvider.codex_model })
-                    : t('workspaceSettings.ai.usingOpenClaw')
+                  : aiProvider.active_provider === 'codex_cli'
+                    ? t('workspaceSettings.ai.usingCodexCli', {
+                        model: aiProvider.codex_cli_model || t('workspaceSettings.ai.defaultModel'),
+                      })
+                    : aiProvider.active_provider === 'codex'
+                      ? t('workspaceSettings.ai.usingCodex', { model: aiProvider.codex_model })
+                      : t('workspaceSettings.ai.usingOpenClaw')
               }
             >
               <SegmentedControl
@@ -299,6 +340,7 @@ export default function SettingsPage() {
                 options={[
                   { label: translateUi('OpenClaw'), value: 'openclaw' },
                   { label: translateUi('Claude Code'), value: 'claude_code' },
+                  { label: t('workspaceSettings.ai.codexCli'), value: 'codex_cli' },
                   { label: translateUi('Codex'), value: 'codex' },
                 ]}
                 value={aiProvider.active_provider}
@@ -362,6 +404,41 @@ export default function SettingsPage() {
                   {codexConfiguring
                     ? t('workspaceSettings.actions.validating')
                     : t('workspaceSettings.actions.saveUse')}
+                </button>
+              </div>
+            </SettingsRow>
+            <SettingsRow
+              label={t('workspaceSettings.ai.codexCli')}
+              sublabel={
+                aiProvider.codex_cli_status === 'available'
+                  ? t('workspaceSettings.ai.codexCliReady', {
+                      version: aiProvider.codex_cli_version
+                        ? ` — ${aiProvider.codex_cli_version}`
+                        : '',
+                    })
+                  : aiProvider.codex_cli_status === 'not_installed'
+                    ? t('workspaceSettings.ai.codexCliNotInstalled')
+                    : aiProvider.codex_cli_status === 'not_authenticated'
+                      ? t('workspaceSettings.ai.codexCliNotAuthenticated')
+                      : t('workspaceSettings.ai.status', {
+                          status: aiProvider.codex_cli_status,
+                        })
+              }
+            >
+              <div className="cc-settings-inline-actions">
+                <StatusDot
+                  className="cc-settings-status-dot"
+                  tone={aiProvider.codex_cli_status === 'available' ? 'success' : 'neutral'}
+                />
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--secondary cc-btn--compact"
+                  onClick={() => void handleRecheckCodexCli()}
+                  disabled={codexCliChecking}
+                >
+                  {codexCliChecking
+                    ? t('workspaceSettings.actions.checking')
+                    : t('workspaceSettings.actions.recheck')}
                 </button>
               </div>
             </SettingsRow>

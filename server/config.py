@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     # a wildcard lets any website in the browser call this server's API).
     cors_allow_origins: str = ""
 
-    # AI Provider — OpenClaw/OpenAI-compatible, Claude Code CLI, or Codex API
+    # AI Provider — OpenClaw/OpenAI-compatible, local CLIs, or Codex API
     ai_provider: str = "ollama"
     ai_base_url: str = "http://localhost:11434"
     ai_api_key: str = ""
@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     codex_api_key_file: str = ""
     codex_model: str = "gpt-5.3-codex"
     codex_reasoning_effort: str = "medium"
+
+    # Local Codex CLI. Empty uses the model selected in ~/.codex/config.toml.
+    codex_cli_model: str = ""
 
     # Optional Paseo execution daemon. The CLI owns daemon authentication and
     # supports local, TCP, unix-socket, and E2EE offer URL targets.

@@ -169,6 +169,13 @@ class ClaudeCodeStatusResponse(BaseModel):
     active: bool  # True if Claude Code is the current active provider
 
 
+class CodexCLIStatusResponse(BaseModel):
+    status: str  # available, not_installed, not_authenticated, busy, error
+    version: str | None = None
+    model: str
+    active: bool
+
+
 class CodexAPIStatusResponse(BaseModel):
     status: str  # available, not_configured, authentication_failed, unavailable
     configured: bool
@@ -182,10 +189,13 @@ class CodexAPIConfigRequest(BaseModel):
 
 
 class AIProviderResponse(BaseModel):
-    active_provider: str  # "openclaw", "claude_code", or "codex"
+    active_provider: str  # openclaw, claude_code, codex_cli, or codex
     openclaw_connected: bool
     claude_code_status: str
     claude_code_version: str | None = None
+    codex_cli_status: str
+    codex_cli_version: str | None = None
+    codex_cli_model: str
     codex_api_status: str
     codex_api_configured: bool
     codex_api_key_persistent: bool
@@ -193,4 +203,4 @@ class AIProviderResponse(BaseModel):
 
 
 class SwitchProviderRequest(BaseModel):
-    provider: str  # "openclaw", "claude_code", or "codex"
+    provider: str  # openclaw, claude_code, codex_cli, or codex

@@ -204,7 +204,7 @@ export default function ChatPanel({
           color: 'var(--cc-text-tertiary)',
         }}
       >
-        {translateUi('\n        Ask ClawChat anything...\n      ')}
+        {translateUi('Ask ClawChat anything...')}
       </div>
       <button
         type="button"
@@ -227,8 +227,8 @@ export default function ChatPanel({
   // Bottom variant (default): motion-animated height
   return (
     <motion.div
-      className="cc-chat-panel"
-      animate={{ height: isOpen ? 360 : 52 }}
+      className={`cc-chat-panel${isOpen ? '' : ' cc-chat-panel--collapsed'}`}
+      animate={{ height: isOpen ? 360 : 58 }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
     >
       {isOpen ? openContent : closedContent}

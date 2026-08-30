@@ -36,6 +36,12 @@ async def get_capabilities(
         )
         codex_api = getattr(request.app.state, "codex_api", None)
         ai_model = getattr(codex_api, "model", settings.codex_model)
+    elif active_provider == "codex_cli":
+        ai_available = (
+            getattr(request.app.state, "codex_cli_status", "") == "available"
+        )
+        codex_cli = getattr(request.app.state, "codex_cli", None)
+        ai_model = getattr(codex_cli, "model", "") or "Codex CLI default"
     else:
         ai_available = ai_connected
         ai_model = settings.ai_model

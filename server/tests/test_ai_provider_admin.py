@@ -6,6 +6,7 @@ import pytest
 from config import settings
 from main import app
 from services.ai.codex_api_provider import CodexAPIStatus
+from services.ai.codex_cli_provider import CodexCLIStatus
 
 
 class StubAI:
@@ -40,6 +41,16 @@ class StubCodex:
         return self.status
 
 
+class StubCodexCLI:
+    model = ""
+
+    async def check_availability(self):
+        return CodexCLIStatus.AVAILABLE, "codex-cli 0.test"
+
+    async def health_check(self) -> bool:
+        return True
+
+
 def _restore_state(key: str, previous) -> None:
     if previous is None:
         try:
@@ -61,6 +72,9 @@ def ai_provider_state():
         "claude_code_version",
         "codex_api",
         "codex_api_status",
+        "codex_cli",
+        "codex_cli_status",
+        "codex_cli_version",
     )
     previous = {key: getattr(app.state, key, None) for key in keys}
     openclaw = StubAI()
@@ -73,6 +87,9 @@ def ai_provider_state():
     app.state.claude_code_version = None
     app.state.codex_api = codex
     app.state.codex_api_status = "available"
+    app.state.codex_cli = StubCodexCLI()
+    app.state.codex_cli_status = "available"
+    app.state.codex_cli_version = "codex-cli 0.test"
     try:
         yield codex
     finally:
@@ -93,6 +110,30 @@ async def test_provider_status_exposes_codex_metadata_without_credential(
     assert payload["codex_model"] == "gpt-5.3-codex"
     assert ai_provider_state.api_key not in response.text
     assert "api_key" not in payload
+    assert payload["codex_cli_status"] == "available"
+    assert payload["codex_cli_version"] == "codex-cli 0.test"
+
+
+async def test_codex_cli_can_be_selected_as_the_active_provider(
+    client, auth_headers, ai_provider_state
+):
+    response = await client.post(
+        "/api/admin/ai/provider",
+        headers=auth_headers,
+        json={"provider": "codex_cli"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["active_provider"] == "codex_cli"
+    assert app.state.active_ai is app.state.codex_cli
+
+    capabilities = await client.get("/api/capabilities", headers=auth_headers)
+    assert capabilities.status_code == 200
+    assert capabilities.json()["ai"] == {
+        "provider": "codex_cli",
+        "model": "Codex CLI default",
+        "available": True,
+    }
 
 
 async def test_codex_can_be_selected_as_the_active_provider(

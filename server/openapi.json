@@ -100,6 +100,25 @@
             "title": "Codex Api Status",
             "type": "string"
           },
+          "codex_cli_model": {
+            "title": "Codex Cli Model",
+            "type": "string"
+          },
+          "codex_cli_status": {
+            "title": "Codex Cli Status",
+            "type": "string"
+          },
+          "codex_cli_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codex Cli Version"
+          },
           "codex_model": {
             "title": "Codex Model",
             "type": "string"
@@ -113,6 +132,8 @@
           "active_provider",
           "openclaw_connected",
           "claude_code_status",
+          "codex_cli_status",
+          "codex_cli_model",
           "codex_api_status",
           "codex_api_configured",
           "codex_api_key_persistent",
@@ -1723,6 +1744,40 @@
           "active"
         ],
         "title": "CodexAPIStatusResponse",
+        "type": "object"
+      },
+      "CodexCLIStatusResponse": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "status",
+          "model",
+          "active"
+        ],
+        "title": "CodexCLIStatusResponse",
         "type": "object"
       },
       "ConversationDetailResponse": {
@@ -7985,7 +8040,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "1.4.1"
+    "version": "1.4.3"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -8137,6 +8192,60 @@
           }
         ],
         "summary": "Configure Codex Api",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/ai/codex-cli": {
+      "get": {
+        "description": "Get local Codex CLI install and login status.",
+        "operationId": "get_codex_cli_status_api_admin_ai_codex_cli_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexCLIStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Codex Cli Status",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/ai/codex-cli/check": {
+      "post": {
+        "description": "Re-check the local Codex CLI and saved login.",
+        "operationId": "recheck_codex_cli_api_admin_ai_codex_cli_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodexCLIStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Recheck Codex Cli",
         "tags": [
           "admin"
         ]

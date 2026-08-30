@@ -37,6 +37,9 @@ const providerState = {
   openclaw_connected: true,
   claude_code_status: 'not_installed',
   claude_code_version: null,
+  codex_cli_status: 'available',
+  codex_cli_version: 'codex-cli 0.test',
+  codex_cli_model: '',
   codex_api_status: 'not_configured',
   codex_api_configured: false,
   codex_api_key_persistent: true,
@@ -94,6 +97,31 @@ describe('SettingsPage Codex provider', () => {
     await waitFor(() => expect(input).toHaveValue(''));
     expect(screen.getByText('Using Codex API — gpt-5.3-codex')).toBeInTheDocument();
     expect(screen.getByText('Ready — gpt-5.3-codex')).toBeInTheDocument();
+  });
+
+  it('shows and activates the local Codex CLI provider', async () => {
+    apiMocks.post.mockResolvedValue({
+      data: { ...providerState, active_provider: 'codex_cli' },
+    });
+
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    const codexCli = await screen.findByRole('button', { name: 'Codex CLI' });
+    expect(screen.getByText('Installed and signed in — codex-cli 0.test')).toBeInTheDocument();
+    fireEvent.click(codexCli);
+
+    await waitFor(() =>
+      expect(apiMocks.post).toHaveBeenCalledWith(
+        '/admin/ai/provider',
+        { provider: 'codex_cli' },
+        { queueOfflineMutation: false },
+      ),
+    );
+    expect(await screen.findByText('Using Codex CLI — default model')).toBeInTheDocument();
   });
 
   it('renders Codex settings and stable provider errors in Korean', async () => {
