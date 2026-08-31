@@ -10,12 +10,16 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -129,6 +133,34 @@ class CalendarViewModelTest {
         val next = month.plusMonths(1)
         assertEquals(next, viewModel.uiState.value.visibleMonth)
         coVerify { eventRepository.listEvents(next.atDay(1), next.atEndOfMonth()) }
+    }
+
+    @Test
+    fun `a late old month response cannot replace the visible month`() = runTest {
+        val oldResponse = CompletableDeferred<ApiResult<List<Event>>>()
+        val next = month.plusMonths(1)
+        val nextEvent = event("next", next.atDay(2))
+        coEvery { eventRepository.listEvents(firstDay, month.atEndOfMonth()) } coAnswers {
+            // Model an adapter that cannot cancel an already-dispatched call.
+            withContext(NonCancellable) { oldResponse.await() }
+        }
+        coEvery { eventRepository.listEvents(next.atDay(1), next.atEndOfMonth()) } returns
+            ApiResult.Success(listOf(nextEvent))
+
+        val viewModel = viewModel()
+        runCurrent()
+        viewModel.onAction(CalendarAction.ShowNextMonth)
+        runCurrent()
+
+        assertEquals(next, viewModel.uiState.value.visibleMonth)
+        assertEquals(listOf("next"), viewModel.uiState.value.eventsByDate[next.atDay(2)]?.map { it.id })
+
+        oldResponse.complete(ApiResult.Success(listOf(event("old", firstDay))))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(next, viewModel.uiState.value.visibleMonth)
+        assertEquals(listOf("next"), viewModel.uiState.value.eventsByDate[next.atDay(2)]?.map { it.id })
+        assertTrue(firstDay !in viewModel.uiState.value.eventsByDate)
     }
 
     @Test

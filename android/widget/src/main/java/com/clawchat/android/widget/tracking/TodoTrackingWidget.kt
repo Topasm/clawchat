@@ -38,7 +38,6 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.WidgetSize
 import com.clawchat.android.widget.common.WidgetState
@@ -57,29 +56,28 @@ class TodoTrackingWidget : GlanceAppWidget() {
             context.applicationContext,
             WidgetEntryPoint::class.java,
         )
-        val token = entryPoint.sessionStore().token.first()
-
-        val state: WidgetState<TodoWidgetUiModel> = if (token == null) {
-            WidgetState.NotLoggedIn
-        } else {
-            when (val result = entryPoint.todayRepository().getToday()) {
-                is ApiResult.Success -> WidgetState.Success(TodoWidgetUiModel.from(result.data))
-                is ApiResult.Error -> WidgetState.Error(result.message)
-                is ApiResult.Loading -> WidgetState.Loading
-            }
-        }
+        val sessionStore = entryPoint.sessionStore()
+        val snapshot = loadTodoWidgetSnapshot(
+            runtimeState = { sessionStore.runtimeState.first() },
+            loadToday = { entryPoint.todayRepository().getToday() },
+        )
 
         val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
 
         provideContent {
             GlanceTheme {
-                TodoTrackingContent(state = state, mainActivity = mainActivity)
+                TodoTrackingContent(
+                    state = snapshot.state,
+                    mainActivity = mainActivity,
+                    workspaceKey = snapshot.workspaceKey,
+                )
             }
         }
     }
 
     companion object {
         val TODO_ID_KEY = ActionParameters.Key<String>("todoId")
+        val WORKSPACE_KEY = ActionParameters.Key<String>("workspaceKey")
     }
 }
 
@@ -87,6 +85,7 @@ class TodoTrackingWidget : GlanceAppWidget() {
 private fun TodoTrackingContent(
     state: WidgetState<TodoWidgetUiModel>,
     mainActivity: ComponentName,
+    workspaceKey: String?,
 ) {
     val context = LocalContext.current
     val size = LocalSize.current
@@ -162,10 +161,16 @@ private fun TodoTrackingContent(
                         context.getString(R.string.widget_empty),
                         GlanceModifier.defaultWeight(),
                     )
+                } else if (workspaceKey == null) {
+                    CenterMessage(
+                        context.getString(R.string.widget_login_required),
+                        GlanceModifier.defaultWeight(),
+                    )
                 } else {
                     TodoList(
                         model = state.data,
                         mainActivity = mainActivity,
+                        workspaceKey = workspaceKey,
                         compact = isCompactHeight,
                         modifier = GlanceModifier.defaultWeight(),
                     )
@@ -183,6 +188,7 @@ private fun TodoTrackingContent(
 private fun TodoList(
     model: TodoWidgetUiModel,
     mainActivity: ComponentName,
+    workspaceKey: String,
     compact: Boolean,
     modifier: GlanceModifier,
 ) {
@@ -207,11 +213,11 @@ private fun TodoList(
             }
         }
         items(model.overdue, itemId = { it.id.hashCode().toLong() }) { todo ->
-            TodoRow(todo = todo, mainActivity = mainActivity)
+            TodoRow(todo = todo, mainActivity = mainActivity, workspaceKey = workspaceKey)
         }
 
         items(model.today, itemId = { it.id.hashCode().toLong() }) { todo ->
-            TodoRow(todo = todo, mainActivity = mainActivity)
+            TodoRow(todo = todo, mainActivity = mainActivity, workspaceKey = workspaceKey)
         }
         item { Spacer(GlanceModifier.height(2.dp)) }
     }
@@ -221,6 +227,7 @@ private fun TodoList(
 private fun TodoRow(
     todo: TodoWidgetItem,
     mainActivity: ComponentName,
+    workspaceKey: String,
 ) {
     val context = LocalContext.current
     Row(
@@ -234,7 +241,10 @@ private fun TodoRow(
                 .size(42.dp)
                 .clickable(
                     actionRunCallback<CompleteTodoAction>(
-                        actionParametersOf(TodoTrackingWidget.TODO_ID_KEY to todo.id)
+                        actionParametersOf(
+                            TodoTrackingWidget.TODO_ID_KEY to todo.id,
+                            TodoTrackingWidget.WORKSPACE_KEY to workspaceKey,
+                        ),
                     )
                 ),
             contentAlignment = Alignment.Center,

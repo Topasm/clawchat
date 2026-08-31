@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_title">Chat</string>
+    <string name="chat_new_chat">New chat</string>
+    <string name="chat_new_conversation_default_title">New conversation</string>
+    <string name="chat_loading_conversations">Loading conversations…</string>
+    <string name="chat_no_conversations">No conversations yet</string>
+    <string name="chat_no_conversations_description">Start a chat and let the assistant organize work across tasks and time.</string>
+    <string name="chat_start_chatting">Start chatting</string>
+    <string name="chat_conversation">Conversation</string>
+    <string name="chat_assistant_responding">Assistant is responding…</string>
+    <string name="chat_conversation_subtitle">Ask about tasks, notes, or your day</string>
+    <string name="chat_back">Back</string>
+    <string name="chat_speak_now">Speak now…</string>
+    <string name="chat_loading_messages">Loading messages…</string>
+    <string name="chat_start_conversation">Start the conversation</string>
+    <string name="chat_start_conversation_description">Try asking what is due today, add a task in natural language, or request a summary of pending work.</string>
+    <string name="chat_input_placeholder">Ask ClawChat anything…</string>
+    <string name="chat_voice_input">Voice input</string>
+    <string name="chat_stop">Stop</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_streaming">Streaming</string>
+    <string name="chat_you">You</string>
+    <string name="chat_assistant">Assistant</string>
+    <string name="chat_just_now">Just now</string>
+    <plurals name="chat_minutes_ago">
+        <item quantity="one">%1$d minute ago</item>
+        <item quantity="other">%1$d minutes ago</item>
+    </plurals>
+    <plurals name="chat_hours_ago">
+        <item quantity="one">%1$d hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <plurals name="chat_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+</resources>

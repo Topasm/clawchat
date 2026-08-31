@@ -14,8 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
+import com.clawchat.android.core.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,7 +52,7 @@ fun TaskCreateSheet(
         ) {
             // Header
             Text(
-                "New Task",
+                stringResource(R.string.task_create_title),
                 style = MaterialTheme.typography.titleLarge,
             )
 
@@ -57,8 +60,8 @@ fun TaskCreateSheet(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Title") },
-                placeholder = { Text("What needs to be done?") },
+                label = { Text(stringResource(R.string.task_title_label)) },
+                placeholder = { Text(stringResource(R.string.task_title_hint)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
@@ -70,8 +73,8 @@ fun TaskCreateSheet(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Notes") },
-                placeholder = { Text("Add details...") },
+                label = { Text(stringResource(R.string.task_notes_label)) },
+                placeholder = { Text(stringResource(R.string.task_notes_hint)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 80.dp),
@@ -82,20 +85,20 @@ fun TaskCreateSheet(
 
             // Priority selector
             Text(
-                "Priority",
+                stringResource(R.string.task_priority_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                PriorityOption("low", priority == "low", MaterialTheme.colorScheme.outline) {
+                PriorityOption(R.string.task_priority_low, priority == "low", MaterialTheme.colorScheme.outline) {
                     priority = "low"
                 }
-                PriorityOption("medium", priority == "medium", MaterialTheme.colorScheme.tertiary) {
+                PriorityOption(R.string.task_priority_medium, priority == "medium", MaterialTheme.colorScheme.tertiary) {
                     priority = "medium"
                 }
-                PriorityOption("high", priority == "high", MaterialTheme.colorScheme.error) {
+                PriorityOption(R.string.task_priority_high, priority == "high", MaterialTheme.colorScheme.error) {
                     priority = "high"
                 }
             }
@@ -123,7 +126,7 @@ fun TaskCreateSheet(
                             ) {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = "Clear date",
+                                    contentDescription = stringResource(R.string.task_clear_due_date),
                                     modifier = Modifier.size(14.dp),
                                 )
                             }
@@ -131,7 +134,7 @@ fun TaskCreateSheet(
                     )
                 } else {
                     TextButton(onClick = { showDatePicker = true }) {
-                        Text("Add due date")
+                        Text(stringResource(R.string.task_add_due_date))
                     }
                 }
             }
@@ -143,7 +146,7 @@ fun TaskCreateSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
                 Spacer(Modifier.width(8.dp))
                 Button(
@@ -160,7 +163,7 @@ fun TaskCreateSheet(
                     },
                     enabled = title.trim().isNotBlank(),
                 ) {
-                    Text("Create")
+                    Text(stringResource(R.string.task_create_action))
                 }
             }
         }
@@ -179,10 +182,12 @@ fun TaskCreateSheet(
                         dueDate = localDate.toString()
                     }
                     showDatePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.common_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             },
         ) {
             DatePicker(state = datePickerState)
@@ -192,7 +197,7 @@ fun TaskCreateSheet(
 
 @Composable
 private fun PriorityOption(
-    label: String,
+    @StringRes labelRes: Int,
     isSelected: Boolean,
     color: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
@@ -202,7 +207,7 @@ private fun PriorityOption(
         onClick = onClick,
         label = {
             Text(
-                label.replaceFirstChar { it.uppercase() },
+                stringResource(labelRes),
                 style = MaterialTheme.typography.labelMedium,
             )
         },

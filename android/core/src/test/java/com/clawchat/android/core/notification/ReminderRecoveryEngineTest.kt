@@ -278,7 +278,10 @@ class ReminderRecoveryEngineTest {
     @Test
     fun `exact WebSocket occurrence suppresses worker after todo becomes overdue`() = runTest {
         val due = now.plusSeconds(10 * 60)
-        val exactKey = reminderDeliveryKey("todo", "due", due.epochSecond)
+        val exactKey = workspaceReminderClaimKey(
+            sessionA.workspaceKey,
+            reminderDeliveryKey("todo", "due", due.epochSecond),
+        )
         val claims = FakeClaims().apply {
             claim(exactKey, now.toEpochMilli(), EXACT_REMINDER_WINDOW_MILLIS)
         }
@@ -290,6 +293,29 @@ class ReminderRecoveryEngineTest {
 
         assertTrue(harness.delivered.isEmpty())
         assertEquals(setOf(exactKey), claims.keys)
+    }
+
+    @Test
+    fun `same reminder identity can be delivered in two workspaces`() = runTest {
+        val due = now.plusSeconds(10 * 60)
+        val source = FakeSource(remoteTodos = ApiResult.Success(listOf(todo("shared-id", due))))
+        val claims = FakeClaims()
+        val first = harness(
+            source = source,
+            session = { ReminderSession("token-a", "host:a", "server:a") },
+            claims = claims,
+        )
+        val second = harness(
+            source = source,
+            session = { ReminderSession("token-b", "host:b", "server:b") },
+            claims = claims,
+        )
+
+        first.engine.recover()
+        second.engine.recover()
+
+        assertEquals(listOf("shared-id"), first.delivered.map { it.itemId })
+        assertEquals(listOf("shared-id"), second.delivered.map { it.itemId })
     }
 
     @Test

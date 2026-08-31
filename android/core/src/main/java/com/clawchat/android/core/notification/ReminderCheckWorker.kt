@@ -4,8 +4,10 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.clawchat.android.core.R
 import com.clawchat.android.core.data.ActiveSession
 import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
@@ -50,7 +52,16 @@ class ReminderCheckWorker(
             val sessionStore = dependencies.sessionStore()
             val ledger = ReminderDeliveryLedger(applicationContext)
             val engine = ReminderRecoveryEngine(
-                session = { sessionStore.activeSession.first()?.toReminderSession() },
+                session = {
+                    val runtimeState = sessionStore.runtimeState.first()
+                    when (runtimeState.mode) {
+                        WorkspaceMode.LOCAL -> LOCAL_REMINDER_SESSION
+                        WorkspaceMode.SERVER -> runtimeState.activeSession?.toReminderSession(
+                            runtimeState.workspaceKey,
+                        )
+                        WorkspaceMode.UNCONFIGURED -> null
+                    }
+                },
                 clearSession = sessionStore::clearSession,
                 source = RepositoryReminderRecoverySource(
                     dependencies.todoRepository(),
@@ -62,7 +73,8 @@ class ReminderCheckWorker(
                         reminderType = reminder.reminderType,
                         itemId = reminder.itemId,
                         title = reminder.title,
-                        message = reminder.message,
+                        message = reminder.localizedMessage(applicationContext),
+                        workspaceKey = reminder.workspaceKey,
                         // The recovery engine has already atomically claimed
                         // both the exact reminder and the cross-channel key.
                         deduplicate = false,
@@ -93,6 +105,7 @@ class ReminderCheckWorker(
 
     private companion object {
         const val TAG = "ReminderCheckWorker"
+        val LOCAL_REMINDER_SESSION = ReminderSession(token = "", scope = "local")
     }
 }
 
@@ -116,6 +129,7 @@ internal enum class ReminderRecoveryResult {
 internal data class ReminderSession(
     val token: String,
     val scope: String,
+    val workspaceKey: String = scope,
 )
 
 internal data class RecoveredReminder(
@@ -123,9 +137,11 @@ internal data class RecoveredReminder(
     val itemId: String,
     val title: String,
     val message: String,
+    val distanceMinutes: Long = 0,
     val scheduledAt: Instant,
     val exactClaimKey: String,
     val isOverdue: Boolean,
+    val workspaceKey: String,
 )
 
 internal interface ReminderRecoverySource {
@@ -246,8 +262,11 @@ internal class ReminderRecoveryEngine(
         }
 
         val candidates = (
-            todos.mapNotNull { it.toRecoveredReminder(now, todoHorizon) } +
-                events.mapNotNull { it.toRecoveredReminder(now, eventHorizon) }
+            todos.mapNotNull {
+                it.toRecoveredReminder(now, todoHorizon, initialSession.workspaceKey)
+            } + events.mapNotNull {
+                it.toRecoveredReminder(now, eventHorizon, initialSession.workspaceKey)
+            }
             )
             .distinctBy(RecoveredReminder::exactClaimKey)
             .sortedWith(
@@ -291,11 +310,18 @@ internal class ReminderRecoveryEngine(
     }
 
     private suspend fun deliver(candidate: RecoveredReminder, claimedAt: Long): Boolean {
-        if (!claims.claim(candidate.exactClaimKey, claimedAt, EXACT_REMINDER_WINDOW_MILLIS)) {
+        val exactClaimKey = workspaceReminderClaimKey(
+            candidate.workspaceKey,
+            candidate.exactClaimKey,
+        )
+        if (!claims.claim(exactClaimKey, claimedAt, EXACT_REMINDER_WINDOW_MILLIS)) {
             return false
         }
 
-        val recentKey = recentReminderKey(candidate.reminderType, candidate.itemId)
+        val recentKey = workspaceReminderClaimKey(
+            candidate.workspaceKey,
+            recentReminderKey(candidate.reminderType, candidate.itemId),
+        )
         if (!claims.claim(recentKey, claimedAt, RECENT_REMINDER_WINDOW_MILLIS)) {
             // A recent WebSocket delivery owns the coarse claim. Retaining the
             // exact claim records that this scheduled occurrence was covered.
@@ -306,14 +332,14 @@ internal class ReminderRecoveryEngine(
             if (!notifier(candidate)) {
                 // Permission/channel failures must not consume the reminder;
                 // it can be recovered after the user enables notifications.
-                claims.release(candidate.exactClaimKey, claimedAt)
+                claims.release(exactClaimKey, claimedAt)
                 claims.release(recentKey, claimedAt)
                 false
             } else {
                 true
             }
         } catch (error: Exception) {
-            claims.release(candidate.exactClaimKey, claimedAt)
+            claims.release(exactClaimKey, claimedAt)
             claims.release(recentKey, claimedAt)
             throw error
         }
@@ -328,7 +354,11 @@ internal class ReminderRecoveryEngine(
     }
 }
 
-private fun Todo.toRecoveredReminder(now: Instant, horizon: Instant): RecoveredReminder? {
+private fun Todo.toRecoveredReminder(
+    now: Instant,
+    horizon: Instant,
+    workspaceKey: String,
+): RecoveredReminder? {
     if (status != TaskStatus.PENDING && status != TaskStatus.IN_PROGRESS) return null
     val due = dueDate?.toReminderInstant() ?: return null
     if (due > horizon) return null
@@ -345,13 +375,19 @@ private fun Todo.toRecoveredReminder(now: Instant, horizon: Instant): RecoveredR
         } else {
             "'$title' is due in $minutesUntil minute(s)."
         },
+        distanceMinutes = minutesUntil,
         scheduledAt = due,
         exactClaimKey = reminderDeliveryKey(type, id, due.epochSecond),
         isOverdue = overdue,
+        workspaceKey = workspaceKey,
     )
 }
 
-private fun Event.toRecoveredReminder(now: Instant, horizon: Instant): RecoveredReminder? {
+private fun Event.toRecoveredReminder(
+    now: Instant,
+    horizon: Instant,
+    workspaceKey: String,
+): RecoveredReminder? {
     val leadMinutes = reminderMinutes ?: return null
     if (leadMinutes !in 0..MAX_SUPPORTED_EVENT_REMINDER_MINUTES) return null
     val start = startTime.toReminderInstant() ?: return null
@@ -372,19 +408,49 @@ private fun Event.toRecoveredReminder(now: Instant, horizon: Instant): Recovered
         } else {
             "'$title' starts in $distanceMinutes minute(s)."
         },
+        distanceMinutes = distanceMinutes,
         scheduledAt = start,
         exactClaimKey = reminderDeliveryKey("event", occurrenceKey, start.epochSecond),
         isOverdue = started,
+        workspaceKey = workspaceKey,
     )
 }
 
-internal fun ActiveSession.toReminderSession(): ReminderSession? {
+private fun RecoveredReminder.localizedMessage(context: Context): String {
+    val quantity = distanceMinutes.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
+    return when (reminderType) {
+        "todo_overdue" -> context.getString(R.string.notification_todo_overdue, title)
+        "todo" -> context.resources.getQuantityString(
+            R.plurals.notification_todo_due_in_minutes,
+            quantity,
+            title,
+            distanceMinutes,
+        )
+        "event" -> context.resources.getQuantityString(
+            if (isOverdue) {
+                R.plurals.notification_event_started_minutes_ago
+            } else {
+                R.plurals.notification_event_starts_in_minutes
+            },
+            quantity,
+            title,
+            distanceMinutes,
+        )
+        else -> message
+    }
+}
+
+internal fun ActiveSession.toReminderSession(workspaceKey: String? = null): ReminderSession? {
     val stableScope = if (authMode == "paired" && !hostId.isNullOrBlank()) {
         "host:${hostId.trim()}"
     } else {
         apiBaseUrl.toNormalizedReminderBaseUrl()?.let { "url:$it" }
     } ?: return null
-    return ReminderSession(token = token, scope = stableScope)
+    return ReminderSession(
+        token = token,
+        scope = stableScope,
+        workspaceKey = workspaceKey ?: stableScope,
+    )
 }
 
 internal fun String?.toNormalizedReminderBaseUrl(): String? {

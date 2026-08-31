@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -51,6 +52,8 @@ class CalendarViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
+    private var loadGeneration = 0L
 
     init {
         load()
@@ -88,24 +91,30 @@ class CalendarViewModel @Inject constructor(
     }
 
     private fun load(month: YearMonth = _uiState.value.visibleMonth) {
-        viewModelScope.launch {
+        val generation = ++loadGeneration
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val from = month.atDay(1)
             val to = month.atEndOfMonth()
             when (val result = eventRepository.listEvents(from, to)) {
-                is ApiResult.Success -> _uiState.update {
-                    it.copy(
-                        eventsByDate = groupByDate(result.data),
-                        isLoading = false,
-                        isOffline = false,
-                        error = null,
-                    )
+                is ApiResult.Success -> {
+                    if (!isCurrentLoad(generation, month)) return@launch
+                    _uiState.update {
+                        it.copy(
+                            eventsByDate = groupByDate(result.data),
+                            isLoading = false,
+                            isOffline = false,
+                            error = null,
+                        )
+                    }
                 }
 
                 is ApiResult.Error -> {
                     // Same trade as Today: a cached month beats an empty one,
                     // minus the repeats the server expands, which are not cached.
                     val cached = eventRepository.cachedEvents(from, to)
+                    if (!isCurrentLoad(generation, month)) return@launch
                     _uiState.update {
                         if (cached.isEmpty()) {
                             it.copy(isLoading = false, isOffline = false, error = result.message)
@@ -124,6 +133,9 @@ class CalendarViewModel @Inject constructor(
             }
         }
     }
+
+    private fun isCurrentLoad(generation: Long, month: YearMonth): Boolean =
+        generation == loadGeneration && _uiState.value.visibleMonth == month
 
     private suspend fun deleteEvent(event: Event): ApiResult<Unit> {
         val occurrenceDate = event.occurrenceDate

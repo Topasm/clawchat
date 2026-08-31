@@ -1,5 +1,6 @@
 package com.clawchat.android.feature.calendar
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.EventCreate
@@ -44,10 +48,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-private val DATE_LABEL = DateTimeFormatter.ofPattern("EEE, d MMM yyyy")
-private val TIME_LABEL = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
  * Creates or edits one event. Editing a repeat edits the whole series, which
@@ -63,6 +63,13 @@ fun EventEditorSheet(
     onUpdate: (String, EventUpdate) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
+    val locale = LocalLocale.current.platformLocale
+    val is24Hour = DateFormat.is24HourFormat(context)
+    val dateFormatter = remember(locale) { localizedDateFormatter(locale, "yMMMdE") }
+    val timeFormatter = remember(locale, is24Hour) {
+        localizedTimeFormatter(locale, is24Hour)
+    }
 
     var title by remember { mutableStateOf(event?.title.orEmpty()) }
     var description by remember { mutableStateOf(event?.description.orEmpty()) }
@@ -92,14 +99,16 @@ fun EventEditorSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                if (event == null) "New event" else "Edit event",
+                stringResource(
+                    if (event == null) R.string.calendar_new_event else R.string.calendar_edit_event,
+                ),
                 style = MaterialTheme.typography.titleLarge,
             )
 
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Title") },
+                label = { Text(stringResource(R.string.calendar_title)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
@@ -107,7 +116,7 @@ fun EventEditorSheet(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Notes") },
+                label = { Text(stringResource(R.string.calendar_notes)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 72.dp),
@@ -117,7 +126,7 @@ fun EventEditorSheet(
             OutlinedTextField(
                 value = location,
                 onValueChange = { location = it },
-                label = { Text("Location") },
+                label = { Text(stringResource(R.string.calendar_location)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
@@ -127,7 +136,7 @@ fun EventEditorSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("All day", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.calendar_all_day), style = MaterialTheme.typography.bodyLarge)
                 Switch(checked = isAllDay, onCheckedChange = { isAllDay = it })
             }
 
@@ -137,16 +146,21 @@ fun EventEditorSheet(
             ) {
                 AssistChip(
                     onClick = { showDatePicker = true },
-                    label = { Text(date.format(DATE_LABEL)) },
+                    label = { Text(date.format(dateFormatter)) },
                 )
                 if (!isAllDay) {
                     AssistChip(
                         onClick = { editingTime = TimeField.Start },
-                        label = { Text(startTime.format(TIME_LABEL)) },
+                        label = { Text(startTime.format(timeFormatter)) },
                     )
                     AssistChip(
                         onClick = { editingTime = TimeField.End },
-                        label = { Text(endTime?.format(TIME_LABEL) ?: "End") },
+                        label = {
+                            Text(
+                                endTime?.format(timeFormatter)
+                                    ?: stringResource(R.string.calendar_end),
+                            )
+                        },
                     )
                 }
             }
@@ -161,7 +175,9 @@ fun EventEditorSheet(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.calendar_cancel))
+                }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
@@ -202,7 +218,11 @@ fun EventEditorSheet(
                     enabled = title.trim().isNotBlank(),
                     colors = ButtonDefaults.buttonColors(),
                 ) {
-                    Text(if (event == null) "Create" else "Save")
+                    Text(
+                        stringResource(
+                            if (event == null) R.string.calendar_create else R.string.calendar_save,
+                        ),
+                    )
                 }
             }
         }
@@ -225,10 +245,12 @@ fun EventEditorSheet(
                             .toLocalDate()
                     }
                     showDatePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.calendar_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.calendar_cancel))
+                }
             },
         ) {
             DatePicker(state = pickerState)
@@ -243,7 +265,7 @@ fun EventEditorSheet(
         val pickerState = rememberTimePickerState(
             initialHour = initial.hour,
             initialMinute = initial.minute,
-            is24Hour = true,
+            is24Hour = is24Hour,
         )
         AlertDialog(
             onDismissRequest = { editingTime = null },
@@ -255,10 +277,12 @@ fun EventEditorSheet(
                         TimeField.End -> endTime = picked
                     }
                     editingTime = null
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.calendar_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { editingTime = null }) { Text("Cancel") }
+                TextButton(onClick = { editingTime = null }) {
+                    Text(stringResource(R.string.calendar_cancel))
+                }
             },
             text = { TimePicker(state = pickerState) },
         )

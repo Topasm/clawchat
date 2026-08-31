@@ -7,7 +7,9 @@ import org.junit.Test
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.YearMonth
+import java.time.ZoneId
 import java.util.Locale
 
 class CalendarMonthTest {
@@ -50,12 +52,35 @@ class CalendarMonthTest {
     @Test
     fun `timestamps parse with an offset, without one, and as a bare date`() {
         val expected = LocalDateTime.of(2026, 8, 29, 9, 0)
+        val offsetValue = "2026-08-29T09:00:00+00:00"
+        val expectedOffsetTime = OffsetDateTime.parse(offsetValue)
+            .atZoneSameInstant(ZoneId.systemDefault())
+            .toLocalDateTime()
 
         assertEquals(expected, parseEventDateTime("2026-08-29T09:00:00"))
-        assertEquals(expected, parseEventDateTime("2026-08-29T09:00:00+00:00"))
+        assertEquals(expectedOffsetTime, parseEventDateTime(offsetValue))
         assertEquals(
             LocalDate.of(2026, 8, 29).atStartOfDay(),
             parseEventDateTime("2026-08-29"),
+        )
+    }
+
+    @Test
+    fun `offset and zoned timestamps cross the date boundary in the device timezone`() {
+        val seoul = ZoneId.of("Asia/Seoul")
+        val expected = LocalDateTime.of(2026, 8, 30, 8, 30)
+
+        assertEquals(
+            expected,
+            parseEventDateTime("2026-08-29T23:30:00Z", deviceZone = seoul),
+        )
+        assertEquals(
+            expected,
+            parseEventDateTime("2026-08-29T23:30:00Z[UTC]", deviceZone = seoul),
+        )
+        assertEquals(
+            LocalDate.of(2026, 8, 30),
+            eventDate("2026-08-29T23:30:00Z", deviceZone = seoul),
         )
     }
 
@@ -69,11 +94,32 @@ class CalendarMonthTest {
 
     @Test
     fun `the time label covers all-day, open-ended, and bounded events`() {
-        assertEquals("All day", eventTimeLabel("2026-08-29T00:00:00", null, isAllDay = true))
-        assertEquals("09:00", eventTimeLabel("2026-08-29T09:00:00", null, isAllDay = false))
+        assertEquals(
+            "All day",
+            eventTimeLabel(
+                "2026-08-29T00:00:00",
+                null,
+                isAllDay = true,
+                allDayLabel = "All day",
+            ),
+        )
+        assertEquals(
+            "09:00",
+            eventTimeLabel(
+                "2026-08-29T09:00:00",
+                null,
+                isAllDay = false,
+                allDayLabel = "All day",
+            ),
+        )
         assertEquals(
             "09:00 – 10:30",
-            eventTimeLabel("2026-08-29T09:00:00", "2026-08-29T10:30:00", isAllDay = false),
+            eventTimeLabel(
+                "2026-08-29T09:00:00",
+                "2026-08-29T10:30:00",
+                isAllDay = false,
+                allDayLabel = "All day",
+            ),
         )
     }
 }

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today_title">Today</string>
+    <string name="today_cd_search">Search</string>
+    <string name="today_cd_settings">Settings</string>
+    <string name="today_cd_capture_task">Capture task</string>
+    <string name="today_offline_cached">Offline — showing the last synced day</string>
+    <string name="today_ready_when_you_are">Ready when you are</string>
+    <string name="today_greeting_morning">Good morning</string>
+    <string name="today_greeting_afternoon">Good afternoon</string>
+    <string name="today_greeting_evening">Good evening</string>
+
+    <string name="today_overdue_title">Overdue</string>
+    <string name="today_overdue_subtitle">Start with the items already slipping.</string>
+    <string name="today_focus_title">Today\'s focus</string>
+    <string name="today_focus_subtitle">The main work to close out today.</string>
+    <string name="today_empty_title">All clear for today</string>
+    <string name="today_empty_description">Ask ClawChat for a plan or capture something new when it comes up.</string>
+    <string name="today_empty_description_local">Add a task when something comes up. It will stay on this device.</string>
+    <string name="today_empty_action">Capture a task</string>
+
+    <string name="today_agent_activity_title">Agent activity</string>
+    <string name="today_agent_activity_subtitle">Review decisions or check active runs.</string>
+    <string name="today_review_queue">Review queue</string>
+    <string name="today_agent_runs">Agent runs</string>
+
+    <plurals name="today_tasks_done_summary">
+        <item quantity="one">%1$d of %2$d task done today</item>
+        <item quantity="other">%1$d of %2$d tasks done today</item>
+    </plurals>
+    <plurals name="today_events_summary">
+        <item quantity="one">%1$d event on the calendar</item>
+        <item quantity="other">%1$d events on the calendar</item>
+    </plurals>
+    <plurals name="today_inbox_summary">
+        <item quantity="one">%1$d item waiting in Inbox</item>
+        <item quantity="other">%1$d items waiting in Inbox</item>
+    </plurals>
+    <string name="today_shape_day_hint">Use chat or quick capture to shape the rest of your day.</string>
+    <string name="today_shape_day_hint_local">Quickly capture what you want to finish today.</string>
+    <plurals name="today_metric_tasks">
+        <item quantity="one">%1$d/%2$d task</item>
+        <item quantity="other">%1$d/%2$d tasks</item>
+    </plurals>
+    <plurals name="today_metric_events">
+        <item quantity="one">%1$d event</item>
+        <item quantity="other">%1$d events</item>
+    </plurals>
+    <plurals name="today_metric_inbox">
+        <item quantity="one">%1$d inbox item</item>
+        <item quantity="other">%1$d inbox items</item>
+    </plurals>
+    <string name="today_metrics_format">%1$s · %2$s · %3$s</string>
+    <string name="today_metrics_without_inbox_format">%1$s · %2$s</string>
+    <string name="today_quick_capture">Quick capture</string>
+    <string name="today_open_inbox">Open inbox</string>
+    <plurals name="today_progress_accessibility">
+        <item quantity="one">Today progress: %1$d of %2$d task complete</item>
+        <item quantity="other">Today progress: %1$d of %2$d tasks complete</item>
+    </plurals>
+
+    <string name="today_status_pending">Pending</string>
+    <string name="today_status_in_progress">In progress</string>
+    <string name="today_status_completed">Completed</string>
+    <string name="today_status_cancelled">Cancelled</string>
+    <string name="today_recurring">Recurring</string>
+    <string name="today_task_mark_complete">Mark %1$s complete</string>
+    <string name="today_task_mark_incomplete">Mark %1$s incomplete</string>
+
+    <string name="today_calendar_title">Calendar</string>
+    <string name="today_calendar_subtitle">What the rest of the day is anchored around.</string>
+    <string name="today_event_all_day">All day</string>
+    <string name="today_needs_review_title">Needs review</string>
+    <string name="today_needs_review_subtitle">Captured items waiting for your decision.</string>
+    <string name="today_inbox_state_review">Review</string>
+    <string name="today_inbox_state_organize">Organize</string>
+
+    <string name="today_briefing_title">Daily briefing</string>
+    <string name="today_briefing_fallback">AI summary for the day ahead.</string>
+    <string name="today_load_light">Light</string>
+    <string name="today_load_moderate">Moderate</string>
+    <string name="today_load_heavy">Heavy</string>
+    <plurals name="today_highlight_count">
+        <item quantity="one">%1$d highlight</item>
+        <item quantity="other">%1$d highlights</item>
+    </plurals>
+    <string name="today_suggestion_start_with">Start with</string>
+    <string name="today_suggestion_move_to_tomorrow">Move to tomorrow</string>
+    <string name="today_suggestion_reschedule">Reschedule</string>
+    <string name="today_suggestion_archive">Archive</string>
+    <string name="today_suggestion_break_down">Break down</string>
+    <string name="today_suggestion_prioritize">Prioritize</string>
+
+    <string name="today_priority_low">Low</string>
+    <string name="today_priority_medium">Medium</string>
+    <string name="today_priority_high">High</string>
+    <string name="today_priority_urgent">Urgent</string>
+    <plurals name="today_reminder_minutes_before">
+        <item quantity="one">%1$d min before</item>
+        <item quantity="other">%1$d min before</item>
+    </plurals>
+    <plurals name="today_reminder_hours_before">
+        <item quantity="one">%1$d hr before</item>
+        <item quantity="other">%1$d hr before</item>
+    </plurals>
+    <plurals name="today_reminder_days_before">
+        <item quantity="one">%1$d day before</item>
+        <item quantity="other">%1$d days before</item>
+    </plurals>
+</resources>

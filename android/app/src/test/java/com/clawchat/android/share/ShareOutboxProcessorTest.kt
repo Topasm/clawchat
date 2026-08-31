@@ -1,7 +1,9 @@
 package com.clawchat.android.share
 
 import com.clawchat.android.core.data.ActiveSession
+import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.repository.AttachmentRepository
 import com.clawchat.android.core.data.repository.ShareAttachmentUploadResult
@@ -30,19 +32,42 @@ class ShareOutboxProcessorTest {
     private val processor = ShareOutboxProcessor(store, sessionStore, repository, notifier)
 
     @Test
-    fun `logged out capture remains queued for retry`() = runTest {
+    fun `logged out capture remains queued without retry backoff`() = runTest {
         val item = item(targetScope = null)
         coEvery { store.listProcessable() } returns listOf(item)
-        every { sessionStore.activeSession } returns MutableStateFlow(null)
+        everyRuntime(session = null)
         coEvery { store.update(any()) } returns true
 
-        assertEquals(ShareOutboxRunResult.RETRY, processor.processAll())
+        assertEquals(ShareOutboxRunResult.SUCCESS, processor.processAll())
 
         coVerify {
             store.update(
                 match {
                     it.captureId == item.captureId &&
-                        it.status == ShareOutboxStatus.WAITING_FOR_CONNECTION
+                        it.status == ShareOutboxStatus.WAITING_FOR_CONNECTION &&
+                        it.lastError == "session_unavailable"
+                },
+            )
+        }
+        coVerify(exactly = 0) { repository.createSharedTodo(any(), any()) }
+        coVerify(exactly = 0) { store.discard(any()) }
+    }
+
+    @Test
+    fun `local mode keeps legacy server captures without retry backoff`() = runTest {
+        val item = item(targetScope = null)
+        coEvery { store.listProcessable() } returns listOf(item)
+        everyRuntime(session = null, mode = WorkspaceMode.LOCAL)
+        coEvery { store.update(any()) } returns true
+
+        assertEquals(ShareOutboxRunResult.SUCCESS, processor.processAll())
+
+        coVerify(exactly = 1) {
+            store.update(
+                match {
+                    it.captureId == item.captureId &&
+                        it.status == ShareOutboxStatus.WAITING_FOR_CONNECTION &&
+                        it.lastError == "local_mode"
                 },
             )
         }
@@ -54,7 +79,7 @@ class ShareOutboxProcessorTest {
     fun `pre-login capture binds workspace before idempotent todo creation`() = runTest {
         val item = item(targetScope = null)
         coEvery { store.listProcessable() } returns listOf(item)
-        every { sessionStore.activeSession } returns MutableStateFlow(session("host-a"))
+        everyRuntime(session("host-a"))
         coEvery { store.update(any()) } returns true
         coEvery { repository.createSharedTodo(any(), "host-a") } returns
             ApiResult.Success(Todo(id = "todo-1", title = "Shared"))
@@ -78,16 +103,25 @@ class ShareOutboxProcessorTest {
     fun `workspace switch blocks every network write and retains the capture`() = runTest {
         val item = item(targetScope = "host-a")
         coEvery { store.listProcessable() } returns listOf(item)
-        every { sessionStore.activeSession } returns MutableStateFlow(session("host-b"))
+        everyRuntime(session("host-b"))
         coEvery { store.update(any()) } returns true
 
-        assertEquals(ShareOutboxRunResult.RETRY, processor.processAll())
+        assertEquals(ShareOutboxRunResult.SUCCESS, processor.processAll())
 
         coVerify(exactly = 0) { repository.createSharedTodo(any(), any()) }
         coVerify(exactly = 0) {
             repository.uploadAttachment(any(), any(), any(), any(), any(), any())
         }
         coVerify(exactly = 0) { store.discard(any()) }
+        coVerify {
+            store.update(
+                match {
+                    it.captureId == item.captureId &&
+                        it.status == ShareOutboxStatus.WAITING_FOR_CONNECTION &&
+                        it.lastError == "workspace_changed"
+                },
+            )
+        }
         verify { notifier.connectionRequired(match { it.targetScope == "host-a" }) }
     }
 
@@ -110,7 +144,7 @@ class ShareOutboxProcessorTest {
             deleteOnExit()
         }
         coEvery { store.listProcessable() } returns listOf(item)
-        every { sessionStore.activeSession } returns MutableStateFlow(session("host-a"))
+        everyRuntime(session("host-a"))
         coEvery { store.update(any()) } returns true
         every { store.attachmentFile(any(), attachment) } returns file
         coEvery {
@@ -155,7 +189,10 @@ class ShareOutboxProcessorTest {
                 as ShareOutboxEnqueueResult.Enqueued
             val localSessionStore = mockk<SessionStore>()
             val localRepository = mockk<AttachmentRepository>()
-            every { localSessionStore.activeSession } returns MutableStateFlow(session("host-a"))
+            val activeSession = session("host-a")
+            every { localSessionStore.runtimeState } returns MutableStateFlow(
+                runtimeState(WorkspaceMode.SERVER, activeSession),
+            )
             coEvery {
                 localRepository.createSharedTodo(any(), "host-a")
             } throws CancellationException("unique work replaced")
@@ -187,6 +224,31 @@ class ShareOutboxProcessorTest {
         apiBaseUrl = "https://$hostId.example",
         hostId = hostId,
         authMode = "paired",
+    )
+
+    private fun everyRuntime(
+        session: ActiveSession?,
+        mode: WorkspaceMode = if (session == null) {
+            WorkspaceMode.UNCONFIGURED
+        } else {
+            WorkspaceMode.SERVER
+        },
+    ) {
+        every { sessionStore.runtimeState } returns MutableStateFlow(runtimeState(mode, session))
+    }
+
+    private fun runtimeState(
+        mode: WorkspaceMode,
+        session: ActiveSession?,
+    ) = AppRuntimeState(
+        mode = mode,
+        activeSession = session,
+        hasSavedServerSession = session != null,
+        workspaceKey = when (mode) {
+            WorkspaceMode.UNCONFIGURED -> null
+            WorkspaceMode.LOCAL -> "local"
+            WorkspaceMode.SERVER -> "server:test"
+        },
     )
 
     private fun item(

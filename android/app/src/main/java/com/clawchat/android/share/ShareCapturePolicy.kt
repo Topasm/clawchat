@@ -89,7 +89,12 @@ internal object ShareCapturePolicy {
         )
     }
 
-    fun taskTitle(subject: String?, text: String?, fileNames: List<String>): String? {
+    fun taskTitle(
+        subject: String?,
+        text: String?,
+        fileNames: List<String>,
+        multipleFilesTitle: (Int) -> String = { count -> "$count shared files" },
+    ): String? {
         val subjectTitle = normalizeText(subject)?.lineSequence()?.firstOrNull()?.trim()
         if (!subjectTitle.isNullOrEmpty()) return subjectTitle.take(MAX_TITLE_LENGTH)
 
@@ -101,7 +106,7 @@ internal object ShareCapturePolicy {
         return when (fileNames.size) {
             0 -> null
             1 -> fileNames.first().take(MAX_TITLE_LENGTH)
-            else -> "${fileNames.size} shared files"
+            else -> multipleFilesTitle(fileNames.size).take(MAX_TITLE_LENGTH)
         }
     }
 

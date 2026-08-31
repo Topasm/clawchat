@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.clawchat.android.core.data.ActiveSession
 import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.ShareTodoCreate
 import com.clawchat.android.core.data.repository.AttachmentRepository
 import com.clawchat.android.core.data.repository.ShareAttachmentUploadResult
@@ -40,7 +41,22 @@ internal class ShareOutboxProcessor @Inject constructor(
     suspend fun processAll(): ShareOutboxRunResult {
         val items = store.listProcessable()
         if (items.isEmpty()) return ShareOutboxRunResult.SUCCESS
-        val session = sessionStore.activeSession.first()
+        val runtimeState = sessionStore.runtimeState.first()
+        if (runtimeState.mode == WorkspaceMode.LOCAL) {
+            items.forEach { item ->
+                store.update(
+                    item.copy(
+                        status = ShareOutboxStatus.WAITING_FOR_CONNECTION,
+                        lastError = "local_mode",
+                        updatedAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }
+            // A remembered capture may be delivered if the user activates a
+            // server later. Local mode itself is stable, not a retry failure.
+            return ShareOutboxRunResult.SUCCESS
+        }
+        val session = runtimeState.activeSession
         if (session == null) {
             items.forEach { item ->
                 store.update(
@@ -51,7 +67,10 @@ internal class ShareOutboxProcessor @Inject constructor(
                     ),
                 )
             }
-            return ShareOutboxRunResult.RETRY
+            // The queue itself is durable. Treat an absent session as a stable
+            // waiting state so WorkManager does not burn battery in exponential
+            // retries; activating a server explicitly schedules this worker.
+            return ShareOutboxRunResult.SUCCESS
         }
 
         var needsRetry = false
@@ -99,7 +118,10 @@ internal class ShareOutboxProcessor @Inject constructor(
             )
             store.update(waiting)
             notifier.connectionRequired(waiting)
-            return ShareOutboxRunResult.RETRY
+            // This is a stable workspace choice, not a transient transport
+            // failure. The session coordinator schedules a fresh pass whenever
+            // the user activates another workspace.
+            return ShareOutboxRunResult.SUCCESS
         }
 
         var item = bound.copy(

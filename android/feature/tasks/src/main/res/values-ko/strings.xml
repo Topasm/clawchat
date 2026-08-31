@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tasks_title">작업</string>
+    <string name="tasks_cd_new_task">새 작업</string>
+    <string name="tasks_loading">작업 불러오는 중…</string>
+    <string name="tasks_empty_title">이 보기에 작업이 없습니다</string>
+    <string name="tasks_empty_description">새 작업을 만들거나 필터를 바꿔 완료한 작업을 확인하세요.</string>
+    <string name="tasks_create_task">작업 만들기</string>
+    <string name="tasks_none_yet">아직 작업이 없습니다</string>
+    <plurals name="tasks_summary_active">
+        <item quantity="other">진행할 작업 %1$d개</item>
+    </plurals>
+    <plurals name="tasks_summary_completed">
+        <item quantity="other">완료 %1$d개</item>
+    </plurals>
+    <plurals name="tasks_summary_total">
+        <item quantity="other">전체 %1$d개</item>
+    </plurals>
+    <string name="tasks_summary_format">%1$s · %2$s · %3$s</string>
+    <string name="tasks_filter_all">전체</string>
+
+    <string name="tasks_status_pending">대기 중</string>
+    <string name="tasks_status_in_progress">진행 중</string>
+    <string name="tasks_status_completed">완료</string>
+    <string name="tasks_status_cancelled">취소됨</string>
+    <string name="tasks_inbox_planning">계획 중</string>
+    <string name="tasks_inbox_review">검토</string>
+    <string name="tasks_inbox_organize">정리</string>
+    <string name="tasks_inbox_failed">실패</string>
+    <string name="tasks_priority_low">낮음</string>
+    <string name="tasks_priority_medium">보통</string>
+    <string name="tasks_priority_high">높음</string>
+    <string name="tasks_priority_urgent">긴급</string>
+    <string name="tasks_recurring">반복</string>
+
+    <string name="tasks_detail_title">작업 상세</string>
+    <string name="tasks_cd_back">뒤로</string>
+    <string name="tasks_cd_delete">작업 삭제</string>
+    <string name="tasks_mark_complete">%1$s 완료로 표시</string>
+    <string name="tasks_mark_incomplete">%1$s 미완료로 표시</string>
+    <string name="tasks_description_title">설명</string>
+    <string name="tasks_description_subtitle">메모와 참고할 세부 내용입니다.</string>
+    <string name="tasks_details_title">세부 정보</string>
+    <string name="tasks_details_subtitle">이 작업의 운영 정보입니다.</string>
+    <string name="tasks_links_title">작업 연결</string>
+    <string name="tasks_links_subtitle">공유 작업 그래프의 의존성과 관련 작업입니다.</string>
+    <string name="tasks_links_loading">작업 연결 불러오는 중…</string>
+    <string name="tasks_links_empty">아직 연결된 작업이 없습니다.</string>
+    <string name="tasks_tags_title">태그</string>
+    <string name="tasks_tags_subtitle">이 작업에 지정된 라벨입니다.</string>
+    <string name="tasks_fallback_title">작업 %1$s</string>
+    <string name="tasks_relationship_depends_on">다음 작업에 의존</string>
+    <string name="tasks_relationship_required_by">다음 작업에 필요</string>
+    <string name="tasks_relationship_duplicates">다음 작업과 중복</string>
+    <string name="tasks_relationship_duplicated_by">다음 작업이 이 작업과 중복</string>
+    <string name="tasks_relationship_related_to">관련 작업</string>
+    <string name="tasks_relationship_type_depends_on">의존성</string>
+    <string name="tasks_relationship_type_duplicate">중복</string>
+    <string name="tasks_relationship_type_related">관련</string>
+</resources>

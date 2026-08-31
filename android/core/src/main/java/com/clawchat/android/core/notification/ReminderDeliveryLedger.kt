@@ -114,6 +114,14 @@ internal fun recentReminderKey(reminderType: String, itemId: String): String =
     "recent:${reminderTypeFamily(reminderType)}:$itemId"
 
 /**
+ * Keeps reminder claims independent across local and remembered server
+ * workspaces. The length prefix prevents ambiguous keys when a workspace
+ * identity itself contains separators.
+ */
+internal fun workspaceReminderClaimKey(workspaceKey: String, claimKey: String): String =
+    "workspace:v1:${workspaceKey.length}:$workspaceKey:$claimKey"
+
+/**
  * Stable cross-channel identity. Epoch seconds intentionally match the
  * backend's precision even when a database timestamp contains microseconds.
  */

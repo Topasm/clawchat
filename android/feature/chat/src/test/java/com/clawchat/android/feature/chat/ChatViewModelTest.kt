@@ -105,7 +105,7 @@ class ChatViewModelTest {
 
         val viewModel = viewModel()
         dispatcher.scheduler.advanceUntilIdle()
-        viewModel.createConversation()
+        viewModel.createConversation("New Conversation")
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(listOf("c2", "c1"), viewModel.uiState.value.conversations.map { it.id })

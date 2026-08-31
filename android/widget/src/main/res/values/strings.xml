@@ -3,7 +3,7 @@
     <string name="widget_today_title">Today</string>
     <string name="widget_add_task">Add a task</string>
     <string name="widget_refresh">Refresh</string>
-    <string name="widget_login_required">Sign in to use this widget</string>
+    <string name="widget_login_required">Set up ClawChat to use this widget</string>
     <string name="widget_loading">Loading…</string>
     <string name="widget_load_error">Couldn’t load tasks</string>
     <string name="widget_empty">No tasks due today</string>
@@ -11,13 +11,16 @@
     <string name="widget_mark_done">Mark %1$s complete</string>
     <string name="widget_inbox">Inbox</string>
     <string name="widget_add_to_inbox">Add to inbox…</string>
+    <string name="widget_add_task_prompt">Add a task…</string>
 
     <string name="quick_add_today_title">Add to Today</string>
     <string name="quick_add_inbox_title">Add to Inbox</string>
+    <string name="quick_add_task_title">Add task</string>
     <string name="quick_add_hint">What needs to be done?</string>
     <string name="quick_add_cancel">Cancel</string>
     <string name="quick_add_add">Add</string>
     <string name="quick_add_today_success">Added to Today</string>
     <string name="quick_add_inbox_success">Added to Inbox</string>
+    <string name="quick_add_task_success">Task added</string>
     <string name="quick_add_failed">Couldn’t add task. Try again.</string>
 </resources>

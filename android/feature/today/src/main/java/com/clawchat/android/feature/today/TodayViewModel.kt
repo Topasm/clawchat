@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -56,6 +57,7 @@ class TodayViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(TodayUiState())
     val uiState: StateFlow<TodayUiState> = _uiState.asStateFlow()
+    private var refreshJob: Job? = null
 
     init {
         doRefresh()
@@ -82,19 +84,31 @@ class TodayViewModel @Inject constructor(
     fun createTask(input: TodoCreate) = onAction(TodayAction.Create(input))
 
     private fun doRefresh() {
-        viewModelScope.launch {
+        // A reconnect emits both todo and event invalidations. Cancel the
+        // superseded refresh instead of running duplicate REST/Room reads.
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true, error = null) }
             when (val todayResult = todayRepository.getToday()) {
                 is ApiResult.Success -> {
                     val today = todayResult.data
-                    // Fetch inbox preview: items with plan_ready or captured state (up to 3)
-                    val inboxPreviewItems = when (val todosResult = todoRepository.listTodos(mapOf("limit" to "200"))) {
-                        is ApiResult.Success -> todosResult.data.items
-                            .filter { todo ->
-                                todo.inboxState == "plan_ready" || todo.inboxState == "captured"
-                            }
-                            .take(3)
-                        else -> emptyList()
+                    // Avoid a second workspace query when the authoritative
+                    // Today response says there is no inbox to preview. This
+                    // is always the case for the device-only workspace.
+                    val inboxPreviewItems = if (today.inboxCount == 0) {
+                        emptyList()
+                    } else {
+                        when (
+                            val todosResult = todoRepository.listTodos(mapOf("limit" to "200"))
+                        ) {
+                            is ApiResult.Success -> todosResult.data.items
+                                .filter { todo ->
+                                    todo.inboxState == "plan_ready" ||
+                                        todo.inboxState == "captured"
+                                }
+                                .take(3)
+                            else -> emptyList()
+                        }
                     }
                     _uiState.update {
                         it.copy(

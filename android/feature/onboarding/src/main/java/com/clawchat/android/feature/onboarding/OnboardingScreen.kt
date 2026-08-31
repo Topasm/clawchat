@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,7 +32,7 @@ fun OnboardingScreen(
     onSkip: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     AnimatedContent(
         targetState = state.step,
@@ -38,12 +40,11 @@ fun OnboardingScreen(
     ) { step ->
         when (step) {
             OnboardingStep.WELCOME -> WelcomeStep(
+                isSelectingLocalMode = state.isSelectingLocalMode,
+                error = state.error,
                 onScanQr = { viewModel.goToStep(OnboardingStep.SCAN_QR) },
                 onManualConnect = { viewModel.goToStep(OnboardingStep.SERVER) },
-                onSkip = {
-                    viewModel.skipOnboarding()
-                    onSkip()
-                },
+                onUseLocal = { viewModel.useLocalMode(onSkip) },
             )
             OnboardingStep.SCAN_QR -> ScanQrStep(
                 isConnecting = state.isCheckingServer || state.isPairing,
@@ -55,16 +56,14 @@ fun OnboardingScreen(
             OnboardingStep.SERVER -> ServerStep(
                 serverUrl = state.serverUrl,
                 isChecking = state.isCheckingServer,
+                isSelectingLocalMode = state.isSelectingLocalMode,
                 serverReachable = state.serverReachable,
                 error = state.error,
                 onUrlChange = viewModel::updateServerUrl,
                 onCheck = viewModel::checkServer,
                 onNext = { viewModel.goToStep(OnboardingStep.PAIRING) },
                 onManualLogin = { viewModel.goToStep(OnboardingStep.MANUAL_LOGIN) },
-                onSkip = {
-                    viewModel.skipOnboarding()
-                    onSkip()
-                },
+                onUseLocal = { viewModel.useLocalMode(onSkip) },
             )
             OnboardingStep.PAIRING -> PairingStep(
                 code = state.pairingCode,
@@ -90,9 +89,11 @@ fun OnboardingScreen(
 
 @Composable
 private fun WelcomeStep(
+    isSelectingLocalMode: Boolean,
+    error: OnboardingError?,
     onScanQr: () -> Unit,
     onManualConnect: () -> Unit,
-    onSkip: () -> Unit,
+    onUseLocal: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -109,7 +110,7 @@ private fun WelcomeStep(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
-                    "C",
+                    stringResource(R.string.onboarding_brand_initial),
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -118,43 +119,76 @@ private fun WelcomeStep(
         }
         Spacer(Modifier.height(24.dp))
         Text(
-            "Welcome to\nClawChat",
+            stringResource(R.string.onboarding_welcome_title),
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "Open ClawChat on your desktop and go to Settings to display the QR code.",
+            stringResource(R.string.onboarding_welcome_description),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(32.dp))
         Button(
+            onClick = onUseLocal,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(6.dp),
+            enabled = !isSelectingLocalMode,
+        ) {
+            if (isSelectingLocalMode) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                stringResource(R.string.onboarding_use_on_this_device),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            stringResource(R.string.onboarding_local_mode_description),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(
             onClick = onScanQr,
             modifier = Modifier.fillMaxWidth().height(48.dp),
             shape = RoundedCornerShape(6.dp),
-        ) {
-            Text("Scan QR Code", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = onManualConnect,
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = RoundedCornerShape(6.dp),
+            enabled = !isSelectingLocalMode,
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
         ) {
-            Text("Connect manually", style = MaterialTheme.typography.titleMedium)
-        }
-        Spacer(Modifier.height(20.dp))
-        TextButton(onClick = onSkip) {
             Text(
-                "Skip for now",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
+                stringResource(R.string.onboarding_connect_with_qr),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        TextButton(
+            onClick = onManualConnect,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isSelectingLocalMode,
+        ) {
+            Text(stringResource(R.string.onboarding_connect_manually), style = MaterialTheme.typography.titleMedium)
+        }
+        if (error == OnboardingError.LOCAL_MODE_FAILED) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                onboardingErrorMessage(error),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -163,7 +197,7 @@ private fun WelcomeStep(
 @Composable
 private fun ScanQrStep(
     isConnecting: Boolean,
-    error: String?,
+    error: OnboardingError?,
     onQrScanned: (String) -> Unit,
     onCancel: () -> Unit,
     onManualEntry: () -> Unit,
@@ -197,7 +231,7 @@ private fun ScanQrStep(
                         )
                         Spacer(Modifier.height(20.dp))
                         Text(
-                            "Connecting\u2026",
+                            stringResource(R.string.onboarding_connecting),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
                         )
@@ -206,7 +240,7 @@ private fun ScanQrStep(
             }
         }
 
-        error?.let {
+        error?.let { onboardingError ->
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -216,7 +250,7 @@ private fun ScanQrStep(
                 shape = RoundedCornerShape(6.dp),
             ) {
                 Text(
-                    it,
+                    onboardingErrorMessage(onboardingError),
                     modifier = Modifier.padding(16.dp),
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     style = MaterialTheme.typography.bodyMedium,
@@ -230,13 +264,14 @@ private fun ScanQrStep(
 private fun ServerStep(
     serverUrl: String,
     isChecking: Boolean,
+    isSelectingLocalMode: Boolean,
     serverReachable: Boolean?,
-    error: String?,
+    error: OnboardingError?,
     onUrlChange: (String) -> Unit,
     onCheck: () -> Unit,
     onNext: () -> Unit,
     onManualLogin: () -> Unit,
-    onSkip: () -> Unit,
+    onUseLocal: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -245,13 +280,13 @@ private fun ServerStep(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            "Connect to Server",
+            stringResource(R.string.onboarding_connect_server_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Enter the URL of your ClawChat server.",
+            stringResource(R.string.onboarding_connect_server_description),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -260,8 +295,8 @@ private fun ServerStep(
         TextField(
             value = serverUrl,
             onValueChange = onUrlChange,
-            label = { Text("Server URL") },
-            placeholder = { Text("http://192.168.1.100:8000") },
+            label = { Text(stringResource(R.string.onboarding_server_url)) },
+            placeholder = { Text(stringResource(R.string.onboarding_server_url_example)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(6.dp),
@@ -302,7 +337,7 @@ private fun ServerStep(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "Server is reachable",
+                        stringResource(R.string.onboarding_server_reachable),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium,
@@ -311,9 +346,13 @@ private fun ServerStep(
             }
         }
 
-        error?.let {
+        error?.let { onboardingError ->
             Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(
+                onboardingErrorMessage(onboardingError),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         Spacer(Modifier.height(24.dp))
@@ -322,10 +361,16 @@ private fun ServerStep(
             onClick = { if (serverReachable == true) onNext() else onCheck() },
             modifier = Modifier.fillMaxWidth().height(48.dp),
             shape = RoundedCornerShape(6.dp),
-            enabled = serverUrl.isNotBlank() && !isChecking,
+            enabled = serverUrl.isNotBlank() && !isChecking && !isSelectingLocalMode,
         ) {
             Text(
-                if (serverReachable == true) "Next \u2014 Pair Device" else "Check Connection",
+                stringResource(
+                    if (serverReachable == true) {
+                        R.string.onboarding_next_pair_device
+                    } else {
+                        R.string.onboarding_check_connection
+                    },
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -337,19 +382,20 @@ private fun ServerStep(
             onClick = onManualLogin,
             modifier = Modifier.fillMaxWidth().height(48.dp),
             shape = RoundedCornerShape(6.dp),
-            enabled = serverReachable == true,
+            enabled = serverReachable == true && !isSelectingLocalMode,
         ) {
-            Text("Log in with PIN instead")
+            Text(stringResource(R.string.onboarding_login_with_pin_instead))
         }
 
         Spacer(Modifier.height(24.dp))
 
         TextButton(
-            onClick = onSkip,
+            onClick = onUseLocal,
             modifier = Modifier.fillMaxWidth(),
+            enabled = !isChecking && !isSelectingLocalMode,
         ) {
             Text(
-                "Set up later",
+                stringResource(R.string.onboarding_use_on_this_device_instead),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -360,7 +406,7 @@ private fun ServerStep(
 private fun PairingStep(
     code: String,
     isPairing: Boolean,
-    error: String?,
+    error: OnboardingError?,
     onCodeChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onBack: () -> Unit,
@@ -373,13 +419,13 @@ private fun PairingStep(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            "Pair with Desktop",
+            stringResource(R.string.onboarding_pair_with_desktop),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Open ClawChat on your desktop, go to Settings > Devices, and generate a pairing code.",
+            stringResource(R.string.onboarding_pair_with_desktop_description),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -388,7 +434,7 @@ private fun PairingStep(
         TextField(
             value = code,
             onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) onCodeChange(it) },
-            label = { Text("6-digit pairing code") },
+            label = { Text(stringResource(R.string.onboarding_pairing_code)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(6.dp),
@@ -402,9 +448,13 @@ private fun PairingStep(
             keyboardActions = KeyboardActions(onDone = { onSubmit() }),
         )
 
-        error?.let {
+        error?.let { onboardingError ->
             Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(
+                onboardingErrorMessage(onboardingError),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         Spacer(Modifier.height(24.dp))
@@ -423,17 +473,24 @@ private fun PairingStep(
                 )
                 Spacer(Modifier.width(10.dp))
             }
-            Text("Pair", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.onboarding_pair),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
 
         Spacer(Modifier.height(16.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onBack) {
-                Text("Back", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    stringResource(R.string.onboarding_back),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             TextButton(onClick = onManualLogin) {
-                Text("Use PIN instead")
+                Text(stringResource(R.string.onboarding_use_pin_instead))
             }
         }
     }
@@ -443,7 +500,7 @@ private fun PairingStep(
 private fun ManualLoginStep(
     pin: String,
     isLoggingIn: Boolean,
-    error: String?,
+    error: OnboardingError?,
     onPinChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onBack: () -> Unit,
@@ -455,13 +512,13 @@ private fun ManualLoginStep(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            "Log in with PIN",
+            stringResource(R.string.onboarding_login_with_pin),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Enter your server\u2019s PIN to connect directly.",
+            stringResource(R.string.onboarding_login_with_pin_description),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -470,7 +527,7 @@ private fun ManualLoginStep(
         TextField(
             value = pin,
             onValueChange = onPinChange,
-            label = { Text("PIN") },
+            label = { Text(stringResource(R.string.onboarding_pin)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(6.dp),
@@ -485,9 +542,13 @@ private fun ManualLoginStep(
             keyboardActions = KeyboardActions(onDone = { onSubmit() }),
         )
 
-        error?.let {
+        error?.let { onboardingError ->
             Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(
+                onboardingErrorMessage(onboardingError),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         Spacer(Modifier.height(24.dp))
@@ -506,12 +567,19 @@ private fun ManualLoginStep(
                 )
                 Spacer(Modifier.width(10.dp))
             }
-            Text("Log In", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.onboarding_log_in),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
 
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = onBack) {
-            Text("Back", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(R.string.onboarding_back),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -542,14 +610,14 @@ private fun ReadyStep(onComplete: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
         Text(
-            "You\u2019re all set!",
+            stringResource(R.string.onboarding_ready_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "ClawChat is ready to use.",
+            stringResource(R.string.onboarding_ready_description),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -560,7 +628,23 @@ private fun ReadyStep(onComplete: () -> Unit) {
             modifier = Modifier.fillMaxWidth().height(48.dp),
             shape = RoundedCornerShape(6.dp),
         ) {
-            Text("Enter ClawChat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.onboarding_enter_clawchat),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
+
+@Composable
+private fun onboardingErrorMessage(error: OnboardingError): String = stringResource(
+    when (error) {
+        OnboardingError.LOCAL_MODE_FAILED -> R.string.onboarding_error_local_mode_failed
+        OnboardingError.CANNOT_REACH_SERVER -> R.string.onboarding_error_cannot_reach_server
+        OnboardingError.PAIRING_FAILED -> R.string.onboarding_error_pairing_failed
+        OnboardingError.LOGIN_FAILED -> R.string.onboarding_error_login_failed
+        OnboardingError.HOST_IDENTITY_MISMATCH -> R.string.onboarding_error_host_identity_mismatch
+        OnboardingError.HOST_ID_MISMATCH -> R.string.onboarding_error_host_id_mismatch
+    },
+)

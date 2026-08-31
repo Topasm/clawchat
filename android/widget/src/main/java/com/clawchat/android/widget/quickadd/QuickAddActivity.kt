@@ -26,7 +26,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +43,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.clawchat.android.widget.R
@@ -67,8 +68,12 @@ class QuickAddActivity : ComponentActivity() {
         val sessionStore = entryPoint.sessionStore()
 
         setContent {
-            val themeMode by sessionStore.themeMode.collectAsState(initial = "light")
-            val accentColor by sessionStore.accentColor.collectAsState(initial = "system")
+            val themeMode by sessionStore.themeMode.collectAsStateWithLifecycle(initialValue = "light")
+            val accentColor by sessionStore.accentColor.collectAsStateWithLifecycle(initialValue = "system")
+            val runtimeState by sessionStore.runtimeState.collectAsStateWithLifecycle(
+                initialValue = null,
+            )
+            val isLocal = runtimeState?.mode == WorkspaceMode.LOCAL
 
             ClawChatTheme(
                 themeModeKey = themeMode,
@@ -91,16 +96,24 @@ class QuickAddActivity : ComponentActivity() {
                         target = target,
                         idempotencyKey = idempotencyKey,
                     )
-                    if (!isSubmitting && request != null) {
+                    val expectedWorkspaceKey = runtimeState?.workspaceKey
+                    if (!isSubmitting && request != null && expectedWorkspaceKey != null) {
                         isSubmitting = true
                         scope.launch {
-                            when (val result = todoRepository.createTodo(request)) {
+                            when (
+                                val result = todoRepository.createTodo(
+                                    request,
+                                    expectedWorkspaceKey,
+                                )
+                            ) {
                                 is ApiResult.Success -> {
                                     keyboardController?.hide()
                                     Toast.makeText(
                                         this@QuickAddActivity,
                                         getString(
-                                            if (target == QuickAddTarget.TODAY) {
+                                            if (isLocal && target == QuickAddTarget.INBOX) {
+                                                R.string.quick_add_task_success
+                                            } else if (target == QuickAddTarget.TODAY) {
                                                 R.string.quick_add_today_success
                                             } else {
                                                 R.string.quick_add_inbox_success
@@ -143,7 +156,9 @@ class QuickAddActivity : ComponentActivity() {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = stringResource(
-                                    if (target == QuickAddTarget.TODAY) {
+                                    if (isLocal && target == QuickAddTarget.INBOX) {
+                                        R.string.quick_add_task_title
+                                    } else if (target == QuickAddTarget.TODAY) {
                                         R.string.quick_add_today_title
                                     } else {
                                         R.string.quick_add_inbox_title
@@ -196,7 +211,9 @@ class QuickAddActivity : ComponentActivity() {
                                 Spacer(Modifier.width(8.dp))
                                 FilledTonalButton(
                                     onClick = submitTask,
-                                    enabled = text.isNotBlank() && !isSubmitting,
+                                    enabled = text.isNotBlank() &&
+                                        !isSubmitting &&
+                                        runtimeState?.workspaceKey != null,
                                     shape = RoundedCornerShape(6.dp),
                                 ) {
                                     Text(stringResource(R.string.quick_add_add))

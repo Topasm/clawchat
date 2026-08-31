@@ -1,6 +1,5 @@
 package com.clawchat.android.core.update
 
-import com.clawchat.android.core.network.ApiResult
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -32,9 +31,9 @@ class AppUpdateManagerTest {
         releaseUrl = "https://example.test/releases/android-v0.2.0",
     )
 
-    private class FakeRepository(var result: ApiResult<AvailableUpdate?>) : AppUpdateRepository {
+    private class FakeRepository(var result: UpdateCheckResult) : AppUpdateRepository {
         var calls = 0
-        override suspend fun findUpdate(): ApiResult<AvailableUpdate?> {
+        override suspend fun findUpdate(): UpdateCheckResult {
             calls++
             return result
         }
@@ -55,12 +54,22 @@ class AppUpdateManagerTest {
         }
     }
 
-    private class FakeInstaller(var permitted: Boolean = true) : ApkInstaller {
+    private class FakeInstaller(
+        var permitted: Boolean = true,
+        private val permissionFailure: RuntimeException? = null,
+        private val installFailure: RuntimeException? = null,
+    ) : ApkInstaller {
         var installed: File? = null
         var permissionRequests = 0
         override fun canInstallPackages(): Boolean = permitted
-        override fun requestInstallPermission() { permissionRequests++ }
-        override fun install(file: File) { installed = file }
+        override fun requestInstallPermission() {
+            permissionRequests++
+            permissionFailure?.let { throw it }
+        }
+        override fun install(file: File) {
+            installFailure?.let { throw it }
+            installed = file
+        }
     }
 
     private fun preferences(
@@ -101,7 +110,7 @@ class AppUpdateManagerTest {
 
     @Test
     fun `a manual check surfaces the newest release and prompts`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val manager = manager(repository)
 
         manager.checkForUpdate()
@@ -116,7 +125,7 @@ class AppUpdateManagerTest {
 
     @Test
     fun `a manual check reports being up to date`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(null))
+        val repository = FakeRepository(UpdateCheckResult.Success(null))
         val manager = manager(repository)
 
         manager.checkForUpdate()
@@ -128,24 +137,29 @@ class AppUpdateManagerTest {
 
     @Test
     fun `a manual failure is reported, an automatic one stays silent`() = runTest {
-        val repository = FakeRepository(ApiResult.Error("Network error"))
+        val repository = FakeRepository(
+            UpdateCheckResult.Failure(UpdateFailure.CheckFailed("Network error")),
+        )
 
         val manual = manager(repository)
         manual.checkForUpdate()
         advanceUntilIdle()
         assertEquals(UpdatePhase.Failed, manual.state.value.phase)
-        assertEquals("Network error", manual.state.value.error)
+        assertEquals(
+            UpdateFailure.CheckFailed("Network error"),
+            manual.state.value.failure,
+        )
 
         val automatic = manager(repository)
         automatic.checkForUpdateIfDue()
         advanceUntilIdle()
         assertEquals(UpdatePhase.Idle, automatic.state.value.phase)
-        assertNull(automatic.state.value.error)
+        assertNull(automatic.state.value.failure)
     }
 
     @Test
     fun `an automatic check is throttled and records the attempt`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val recent = preferences(lastCheckedAt = 1_000_000L - 60_000L)
         val throttled = manager(repository, preferences = recent)
 
@@ -164,7 +178,7 @@ class AppUpdateManagerTest {
 
     @Test
     fun `an automatic check honours the disabled preference`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val manager = manager(
             repository,
             preferences = preferences(autoCheck = false),
@@ -179,7 +193,7 @@ class AppUpdateManagerTest {
 
     @Test
     fun `a skipped version is still reported but never prompts automatically`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val manager = manager(
             repository,
             preferences = preferences(skipped = "0.2.0"),
@@ -194,7 +208,7 @@ class AppUpdateManagerTest {
 
     @Test
     fun `skipping the pending version persists it and closes the prompt`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val preferences = preferences()
         val manager = manager(repository, preferences = preferences)
 
@@ -209,7 +223,7 @@ class AppUpdateManagerTest {
 
     @Test
     fun `a download reports progress and ends ready to install`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val manager = manager(repository)
 
         manager.checkForUpdate()
@@ -225,10 +239,15 @@ class AppUpdateManagerTest {
 
     @Test
     fun `a failed download reports the reason and stages no file`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val manager = manager(
             repository,
-            downloader = FakeDownloader(failure = IOException("Update checksum mismatch")),
+            downloader = FakeDownloader(
+                failure = UpdateDownloadException(
+                    UpdateFailure.ChecksumMismatch,
+                    "Update checksum mismatch",
+                ),
+            ),
         )
 
         manager.checkForUpdate()
@@ -237,13 +256,32 @@ class AppUpdateManagerTest {
         advanceUntilIdle()
 
         assertEquals(UpdatePhase.Failed, manager.state.value.phase)
-        assertEquals("Update checksum mismatch", manager.state.value.error)
+        assertEquals(UpdateFailure.ChecksumMismatch, manager.state.value.failure)
         assertNull(manager.state.value.downloadedFile)
     }
 
     @Test
+    fun `an unexpected download failure keeps only a bounded single-line detail`() = runTest {
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
+        val manager = manager(
+            repository,
+            downloader = FakeDownloader(failure = IOException("disk offline\nretry later")),
+        )
+
+        manager.checkForUpdate()
+        advanceUntilIdle()
+        manager.downloadUpdate()
+        advanceUntilIdle()
+
+        assertEquals(
+            UpdateFailure.DownloadFailed("disk offline retry later"),
+            manager.state.value.failure,
+        )
+    }
+
+    @Test
     fun `installing asks for the permission first and installs once granted`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val installer = FakeInstaller(permitted = false)
         val manager = manager(repository, installer = installer)
 
@@ -265,8 +303,43 @@ class AppUpdateManagerTest {
     }
 
     @Test
+    fun `install permission and installer launch failures use typed categories`() = runTest {
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
+        val permissionInstaller = FakeInstaller(
+            permitted = false,
+            permissionFailure = IllegalStateException("settings unavailable"),
+        )
+        val permissionManager = manager(repository, installer = permissionInstaller)
+        permissionManager.checkForUpdate()
+        advanceUntilIdle()
+        permissionManager.downloadUpdate()
+        advanceUntilIdle()
+        permissionManager.installUpdate()
+
+        assertEquals(
+            UpdateFailure.InstallPermissionFailed("settings unavailable"),
+            permissionManager.state.value.failure,
+        )
+
+        val installInstaller = FakeInstaller(
+            installFailure = IllegalStateException("installer unavailable"),
+        )
+        val installManager = manager(repository, installer = installInstaller)
+        installManager.checkForUpdate()
+        advanceUntilIdle()
+        installManager.downloadUpdate()
+        advanceUntilIdle()
+        installManager.installUpdate()
+
+        assertEquals(
+            UpdateFailure.InstallLaunchFailed("installer unavailable"),
+            installManager.state.value.failure,
+        )
+    }
+
+    @Test
     fun `a build without updater wiring never reaches the network`() = runTest {
-        val repository = FakeRepository(ApiResult.Success(update))
+        val repository = FakeRepository(UpdateCheckResult.Success(update))
         val manager = manager(repository, config = config(enabled = false))
 
         manager.checkForUpdateIfDue()
@@ -278,5 +351,6 @@ class AppUpdateManagerTest {
         assertEquals(0, repository.calls)
         assertEquals(UpdatePhase.Failed, manager.state.value.phase)
         assertFalse(manager.state.value.supported)
+        assertEquals(UpdateFailure.UnsupportedBuild, manager.state.value.failure)
     }
 }

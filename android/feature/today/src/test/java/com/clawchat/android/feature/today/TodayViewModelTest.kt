@@ -141,6 +141,19 @@ class TodayViewModelTest {
     }
 
     @Test
+    fun `an empty inbox skips the secondary task query`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(
+            sampleTodayResponse.copy(inboxCount = 0),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(emptyList<Todo>(), viewModel.uiState.value.inboxPreview)
+        coVerify(exactly = 0) { todoRepository.listTodos(any()) }
+    }
+
+    @Test
     fun `toggleComplete on today todo optimistically updates`() = runTest {
         coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
         coEvery { todoRepository.listTodos(any()) } returns

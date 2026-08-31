@@ -23,7 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.clawchat.android.core.R
 
 /**
  * Shared swipe-to-dismiss background used across Today and Tasks screens.
@@ -50,6 +52,11 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
         SwipeToDismissBoxValue.StartToEnd -> Icons.Default.DateRange
         else -> null
     }
+    val iconDescription = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.EndToStart -> stringResource(R.string.task_swipe_delete)
+        SwipeToDismissBoxValue.StartToEnd -> stringResource(R.string.task_swipe_due_today)
+        else -> null
+    }
 
     Box(
         modifier = Modifier
@@ -61,7 +68,7 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
         if (icon != null) {
             Icon(
                 icon,
-                contentDescription = null,
+                contentDescription = iconDescription,
                 tint = when (dismissState.dismissDirection) {
                     SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
                     SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary

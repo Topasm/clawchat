@@ -46,6 +46,7 @@ class SearchViewModel @Inject constructor(
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var availableTypes: Set<SearchType> = SearchType.entries.toSet()
 
     fun onQueryChange(query: String) {
         _uiState.update { it.copy(query = query) }
@@ -54,6 +55,7 @@ class SearchViewModel @Inject constructor(
 
     /** Toggles one type filter; no filter means every type. */
     fun toggleType(type: SearchType) {
+        if (type !in availableTypes) return
         _uiState.update { state ->
             val next = if (type in state.activeTypes) {
                 state.activeTypes - type
@@ -63,6 +65,28 @@ class SearchViewModel @Inject constructor(
             state.copy(activeTypes = next)
         }
         scheduleSearch(immediate = true)
+    }
+
+    /** Restricts search to the capabilities of the active workspace. */
+    fun setAvailableTypes(types: Collection<SearchType>) {
+        val nextAvailableTypes = types.toSet()
+        if (nextAvailableTypes == availableTypes) return
+
+        availableTypes = nextAvailableTypes
+        searchJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                activeTypes = state.activeTypes.intersect(nextAvailableTypes),
+                hits = state.hits.filter { hit ->
+                    nextAvailableTypes.any { it.hitValue == hit.type }
+                },
+                isSearching = false,
+                error = null,
+            )
+        }
+        if (_uiState.value.query.isNotBlank()) {
+            scheduleSearch(immediate = true)
+        }
     }
 
     fun clearQuery() {
@@ -88,7 +112,10 @@ class SearchViewModel @Inject constructor(
         searchJob = viewModelScope.launch {
             if (!immediate) delay(QUERY_DEBOUNCE_MILLIS)
             _uiState.update { it.copy(isSearching = true, error = null) }
-            when (val result = searchRepository.search(state.query, state.activeTypes)) {
+            val requestedTypes = state.activeTypes.ifEmpty {
+                availableTypes.takeIf { it.size < SearchType.entries.size }.orEmpty()
+            }
+            when (val result = searchRepository.search(state.query, requestedTypes)) {
                 is ApiResult.Success -> _uiState.update {
                     it.copy(
                         hits = result.data,

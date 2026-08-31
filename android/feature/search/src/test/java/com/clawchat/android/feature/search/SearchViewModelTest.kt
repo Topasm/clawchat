@@ -111,6 +111,31 @@ class SearchViewModelTest {
     }
 
     @Test
+    fun `available types prevent local search from querying messages`() = runTest {
+        coEvery { repository.search(any(), any(), any()) } returns ApiResult.Success(emptyList())
+
+        val viewModel = viewModel()
+        viewModel.setAvailableTypes(listOf(SearchType.Tasks, SearchType.Events))
+        viewModel.onQueryChange("plan")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(emptySet<SearchType>(), viewModel.uiState.value.activeTypes)
+        coVerify(exactly = 1) {
+            repository.search(
+                "plan",
+                setOf(SearchType.Tasks, SearchType.Events),
+                any(),
+            )
+        }
+
+        viewModel.toggleType(SearchType.Messages)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(emptySet<SearchType>(), viewModel.uiState.value.activeTypes)
+        coVerify(exactly = 1) { repository.search(any(), any(), any()) }
+    }
+
+    @Test
     fun `results are grouped under their type in server rank order`() = runTest {
         coEvery { repository.search(any(), any(), any()) } returns ApiResult.Success(
             listOf(

@@ -29,11 +29,7 @@ class BaseUrlInterceptor @Inject constructor(
         val originalRequest = chain.request()
         val session = runBlocking { sessionStore.activeSession.first() }
         val expectedScope = originalRequest.tag(ExpectedSessionScope::class.java)?.value
-        val activeScope = when (session?.authMode) {
-            "paired" -> session.hostId
-            "manual" -> session.apiBaseUrl?.trimEnd('/')
-            else -> session?.hostId ?: session?.apiBaseUrl?.trimEnd('/')
-        }
+        val activeScope = session?.networkScope()
         if (expectedScope != null && expectedScope != activeScope) {
             // Durable background writes are owned by the workspace that first
             // accepted them. Fail before routing or authentication if the user
@@ -41,10 +37,7 @@ class BaseUrlInterceptor @Inject constructor(
             throw SessionScopeChangedException(expectedScope, activeScope)
         }
         val newBaseUrl = session?.apiBaseUrl?.trimEnd('/')?.toHttpUrlOrNull()
-
-        if (session == null || newBaseUrl == null) {
-            return chain.proceed(originalRequest)
-        }
+            ?: throw NoActiveServerException()
 
         val newUrl = originalRequest.url.newBuilder()
             .scheme(newBaseUrl.scheme)
@@ -57,7 +50,10 @@ class BaseUrlInterceptor @Inject constructor(
             // AuthInterceptor must use this exact token/host snapshot. Reading
             // both values independently can leak a newly selected workspace's
             // token to a request already routed to the previous workspace.
-            .tag(AuthenticatedRoute::class.java, AuthenticatedRoute(newBaseUrl, session.token))
+            .tag(
+                AuthenticatedRoute::class.java,
+                AuthenticatedRoute(newBaseUrl, session.token, activeScope),
+            )
             .build()
 
         return chain.proceed(newRequest)
@@ -67,4 +63,5 @@ class BaseUrlInterceptor @Inject constructor(
 internal data class AuthenticatedRoute(
     val baseUrl: HttpUrl,
     val token: String,
+    val workspaceScope: String?,
 )

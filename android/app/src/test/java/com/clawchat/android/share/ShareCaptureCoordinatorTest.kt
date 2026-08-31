@@ -3,7 +3,12 @@ package com.clawchat.android.share
 import android.content.Context
 import app.cash.turbine.test
 import com.clawchat.android.core.data.ActiveSession
+import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.repository.TodoRepository
+import com.clawchat.android.core.network.ApiResult
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -26,6 +31,7 @@ class ShareCaptureCoordinatorTest {
     private val sessionStore = mockk<SessionStore>()
     private val contentStager = mockk<ShareContentStager>()
     private val outboxStore = mockk<ShareOutboxStore>()
+    private val todoRepository = mockk<TodoRepository>()
 
     @Test
     fun `shared text is durably queued before login and delivery is scheduled`() = runTest {
@@ -90,6 +96,42 @@ class ShareCaptureCoordinatorTest {
     }
 
     @Test
+    fun `shared text is saved directly without queueing in local mode`() = runTest {
+        val staged = stagedShare(text = "Read https://example.com")
+        everyWorkspace(WorkspaceMode.LOCAL)
+        coEvery { contentStager.stage(any()) } returns staged
+        coEvery { todoRepository.createTodo(any(), "local") } returns ApiResult.Success(
+            Todo(id = "local-1", title = "Read https://example.com"),
+        )
+        val scheduledContexts = mutableListOf<Context>()
+        val coordinator = coordinator(StandardTestDispatcher(testScheduler)) {
+            scheduledContexts += it
+        }
+
+        coordinator.events.test {
+            coordinator.submit(payload(text = "Read https://example.com"))
+            advanceUntilIdle()
+            assertEquals(ShareCaptureEvent.SavedLocally, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        coVerify(exactly = 1) {
+            todoRepository.createTodo(
+                match { request ->
+                    request.title == "Read https://example.com" &&
+                        request.source == "share_sheet" &&
+                        request.inboxState == "none"
+                },
+                "local",
+            )
+        }
+        coVerify(exactly = 0) { outboxStore.enqueue(any(), any(), any(), any()) }
+        assertTrue(scheduledContexts.isEmpty())
+        assertFalse(staged.directory.exists())
+        coordinator.closeForTest()
+    }
+
+    @Test
     fun `full durable queue is reported and transient staging is removed`() = runTest {
         val staged = stagedShare(text = "Queued item")
         everyActiveSession(null)
@@ -125,6 +167,28 @@ class ShareCaptureCoordinatorTest {
 
     private fun everyActiveSession(session: ActiveSession?) {
         io.mockk.every { sessionStore.activeSession } returns MutableStateFlow(session)
+        everyWorkspace(
+            mode = if (session == null) WorkspaceMode.UNCONFIGURED else WorkspaceMode.SERVER,
+            session = session,
+        )
+    }
+
+    private fun everyWorkspace(
+        mode: WorkspaceMode,
+        session: ActiveSession? = null,
+    ) {
+        io.mockk.every { sessionStore.runtimeState } returns MutableStateFlow(
+            AppRuntimeState(
+                mode = mode,
+                activeSession = session,
+                hasSavedServerSession = session != null,
+                workspaceKey = when (mode) {
+                    WorkspaceMode.UNCONFIGURED -> null
+                    WorkspaceMode.LOCAL -> "local"
+                    WorkspaceMode.SERVER -> "server:test"
+                },
+            ),
+        )
     }
 
     private fun coordinator(
@@ -135,6 +199,7 @@ class ShareCaptureCoordinatorTest {
         sessionStore = sessionStore,
         contentStager = contentStager,
         outboxStore = outboxStore,
+        todoRepository = todoRepository,
         dispatcher = dispatcher,
         scheduleDelivery = schedule,
     )

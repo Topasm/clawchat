@@ -19,6 +19,13 @@ sealed interface ApiResult<out T> {
     data object Loading : ApiResult<Nothing>
 }
 
+/** Fail closed before an authenticated API can use the placeholder base URL. */
+fun <T> workspaceNotConfigured(): ApiResult<T> = ApiResult.Error(
+    message = "Choose a local workspace or connect a server first",
+    code = 409,
+    serverCode = "workspace_unconfigured",
+)
+
 /** Map the success value while preserving error/loading states. */
 inline fun <T, R> ApiResult<T>.map(transform: (T) -> R): ApiResult<R> = when (this) {
     is ApiResult.Success -> ApiResult.Success(transform(data))
@@ -46,7 +53,7 @@ suspend fun <T> apiCall(block: suspend () -> T): ApiResult<T> {
     } catch (e: java.io.IOException) {
         ApiResult.Error("Network error: ${e.message}")
     } catch (e: Exception) {
-        ApiResult.Error(e.message ?: "Unknown error")
+        ApiResult.Error("Unknown error: ${e.message.orEmpty()}".trimEnd())
     }
 }
 

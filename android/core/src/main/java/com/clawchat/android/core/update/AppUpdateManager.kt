@@ -1,7 +1,7 @@
 package com.clawchat.android.core.update
 
-import com.clawchat.android.core.network.ApiResult
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -25,7 +25,7 @@ data class UpdateState(
     val downloadedBytes: Long = 0,
     val totalBytes: Long = 0,
     val downloadedFile: File? = null,
-    val error: String? = null,
+    val failure: UpdateFailure? = null,
     val autoCheckEnabled: Boolean = true,
     /** True while the launch-time prompt for [update] should be on screen. */
     val promptVisible: Boolean = false,
@@ -113,7 +113,7 @@ class AppUpdateManager internal constructor(
     fun checkForUpdate() {
         if (!config.isValid) {
             _state.update {
-                it.copy(phase = UpdatePhase.Failed, error = UNSUPPORTED_MESSAGE)
+                it.copy(phase = UpdatePhase.Failed, failure = UpdateFailure.UnsupportedBuild)
             }
             return
         }
@@ -126,19 +126,19 @@ class AppUpdateManager internal constructor(
         // A silent launch-time check must leave the visible state untouched
         // when the network is unreachable, which is the common case offline.
         val previousPhase = _state.value.phase
-        _state.update { it.copy(phase = UpdatePhase.Checking, error = null) }
+        _state.update { it.copy(phase = UpdatePhase.Checking, failure = null) }
         val result = repository.findUpdate()
         preferences.recordCheckedAt(clock())
         when (result) {
-            is ApiResult.Success -> {
-                val update = result.data
+            is UpdateCheckResult.Success -> {
+                val update = result.update
                 if (update == null) {
                     _state.update {
                         it.copy(
                             phase = UpdatePhase.UpToDate,
                             update = null,
                             promptVisible = false,
-                            error = null,
+                            failure = null,
                         )
                     }
                     return
@@ -151,20 +151,18 @@ class AppUpdateManager internal constructor(
                         downloadedFile = null,
                         downloadedBytes = 0,
                         totalBytes = 0,
-                        error = null,
+                        failure = null,
                         promptVisible = manual || update.version != skipped,
                     )
                 }
             }
 
-            is ApiResult.Error -> _state.update {
+            is UpdateCheckResult.Failure -> _state.update {
                 it.copy(
                     phase = if (manual) UpdatePhase.Failed else previousPhase,
-                    error = if (manual) result.message else null,
+                    failure = if (manual) result.failure else null,
                 )
             }
-
-            is ApiResult.Loading -> _state.update { it.copy(phase = previousPhase) }
         }
     }
 
@@ -179,18 +177,43 @@ class AppUpdateManager internal constructor(
                     downloadedBytes = 0,
                     totalBytes = update.sizeBytes,
                     downloadedFile = null,
-                    error = null,
+                    failure = null,
                 )
             }
             try {
                 val file = downloader.download(update) { downloaded, total ->
                     _state.update { it.copy(downloadedBytes = downloaded, totalBytes = total) }
                 }
+                val needsInstallPermission = try {
+                    !installer.canInstallPackages()
+                } catch (error: Exception) {
+                    _state.update {
+                        it.copy(
+                            phase = UpdatePhase.Failed,
+                            downloadedFile = file,
+                            failure = UpdateFailure.InstallPermissionFailed(
+                                safeUpdateFailureDetail(error.message),
+                            ),
+                        )
+                    }
+                    return@launch
+                }
                 _state.update {
                     it.copy(
                         phase = UpdatePhase.ReadyToInstall,
                         downloadedFile = file,
-                        needsInstallPermission = !installer.canInstallPackages(),
+                        needsInstallPermission = needsInstallPermission,
+                        failure = null,
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: UpdateDownloadException) {
+                _state.update {
+                    it.copy(
+                        phase = UpdatePhase.Failed,
+                        downloadedFile = null,
+                        failure = error.failure,
                     )
                 }
             } catch (error: Exception) {
@@ -198,7 +221,9 @@ class AppUpdateManager internal constructor(
                     it.copy(
                         phase = UpdatePhase.Failed,
                         downloadedFile = null,
-                        error = error.message ?: "Update download failed",
+                        failure = UpdateFailure.DownloadFailed(
+                            safeUpdateFailureDetail(error.message),
+                        ),
                     )
                 }
             }
@@ -214,6 +239,7 @@ class AppUpdateManager internal constructor(
                 downloadedBytes = 0,
                 totalBytes = 0,
                 downloadedFile = null,
+                failure = null,
             )
         }
     }
@@ -224,13 +250,48 @@ class AppUpdateManager internal constructor(
      */
     fun installUpdate() {
         val file = _state.value.downloadedFile ?: return
-        if (!installer.canInstallPackages()) {
-            _state.update { it.copy(needsInstallPermission = true) }
-            installer.requestInstallPermission()
+        val canInstallPackages = try {
+            installer.canInstallPackages()
+        } catch (error: Exception) {
+            _state.update {
+                it.copy(
+                    phase = UpdatePhase.Failed,
+                    failure = UpdateFailure.InstallPermissionFailed(
+                        safeUpdateFailureDetail(error.message),
+                    ),
+                )
+            }
             return
         }
-        _state.update { it.copy(needsInstallPermission = false) }
-        installer.install(file)
+        if (!canInstallPackages) {
+            _state.update { it.copy(needsInstallPermission = true) }
+            try {
+                installer.requestInstallPermission()
+            } catch (error: Exception) {
+                _state.update {
+                    it.copy(
+                        phase = UpdatePhase.Failed,
+                        failure = UpdateFailure.InstallPermissionFailed(
+                            safeUpdateFailureDetail(error.message),
+                        ),
+                    )
+                }
+            }
+            return
+        }
+        _state.update { it.copy(needsInstallPermission = false, failure = null) }
+        try {
+            installer.install(file)
+        } catch (error: Exception) {
+            _state.update {
+                it.copy(
+                    phase = UpdatePhase.Failed,
+                    failure = UpdateFailure.InstallLaunchFailed(
+                        safeUpdateFailureDetail(error.message),
+                    ),
+                )
+            }
+        }
     }
 
     /** Hides the launch-time prompt without forgetting the pending update. */
@@ -252,7 +313,5 @@ class AppUpdateManager internal constructor(
 
     private companion object {
         const val CHECK_INTERVAL_MILLIS = 12L * 60 * 60 * 1000
-        const val UNSUPPORTED_MESSAGE =
-            "This build does not receive GitHub releases. Install a release build to auto-update."
     }
 }

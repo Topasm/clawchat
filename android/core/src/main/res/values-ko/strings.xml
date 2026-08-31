@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_cancel">취소</string>
+    <string name="common_ok">확인</string>
+    <string name="navigation_open_menu">탐색 메뉴 열기</string>
+    <string name="error_workspace_unconfigured">기기 내 작업 공간을 선택하거나 서버에 연결하세요.</string>
+    <string name="error_workspace_changed">저장하기 전에 작업 공간이 변경되었습니다.</string>
+    <string name="error_server_feature_required">이 기능을 사용하려면 작업 공간 서버에 연결해야 합니다.</string>
+    <string name="error_local_task_not_found">이 기기에 저장된 작업이 더 이상 없습니다.</string>
+    <string name="error_invalid_local_task">작업의 날짜 또는 값이 올바르지 않습니다.</string>
+    <string name="error_local_event_not_found">이 기기에 저장된 일정이 더 이상 없습니다.</string>
+    <string name="error_invalid_local_event">일정의 날짜 또는 시간이 올바르지 않습니다.</string>
+    <string name="error_realtime_closed">실시간 연결이 끊어졌습니다.</string>
+
+    <string name="task_create_title">새 작업</string>
+    <string name="task_title_label">제목</string>
+    <string name="task_title_hint">무엇을 해야 하나요?</string>
+    <string name="task_notes_label">메모</string>
+    <string name="task_notes_hint">세부 내용을 추가하세요…</string>
+    <string name="task_priority_label">우선순위</string>
+    <string name="task_priority_low">낮음</string>
+    <string name="task_priority_medium">보통</string>
+    <string name="task_priority_high">높음</string>
+    <string name="task_clear_due_date">마감일 지우기</string>
+    <string name="task_add_due_date">마감일 추가</string>
+    <string name="task_create_action">만들기</string>
+    <string name="task_swipe_delete">작업 삭제</string>
+    <string name="task_swipe_due_today">오늘 마감으로 설정</string>
+
+    <string name="reminder_none">알림 없음</string>
+    <string name="reminder_5_minutes_before">5분 전</string>
+    <string name="reminder_10_minutes_before">10분 전</string>
+    <string name="reminder_15_minutes_before">15분 전</string>
+    <string name="reminder_30_minutes_before">30분 전</string>
+    <string name="reminder_1_hour_before">1시간 전</string>
+    <string name="reminder_2_hours_before">2시간 전</string>
+    <string name="reminder_1_day_before">1일 전</string>
+    <plurals name="reminder_minutes_before">
+        <item quantity="other">%1$d분 전</item>
+    </plurals>
+
+    <string name="notification_reminders_channel">미리 알림</string>
+    <string name="notification_reminders_channel_description">일정 및 작업 미리 알림</string>
+    <string name="notification_mark_done">완료</string>
+    <string name="notification_todo_overdue">‘%1$s’ 작업의 기한이 지났습니다.</string>
+    <plurals name="notification_todo_due_in_minutes">
+        <item quantity="other">‘%1$s’ 작업이 %2$d분 후 마감됩니다.</item>
+    </plurals>
+    <plurals name="notification_event_started_minutes_ago">
+        <item quantity="other">‘%1$s’ 일정이 %2$d분 전에 시작했습니다.</item>
+    </plurals>
+    <plurals name="notification_event_starts_in_minutes">
+        <item quantity="other">‘%1$s’ 일정이 %2$d분 후 시작합니다.</item>
+    </plurals>
+
+    <string name="update_available_title">업데이트 가능</string>
+    <string name="update_available_message">ClawChat %1$s 버전을 사용할 수 있습니다. 현재 버전은 %2$s입니다.</string>
+    <string name="update_install_permission">ClawChat에서 앱을 설치하려면 Android 권한이 필요합니다. 열리는 화면에서 권한을 허용한 다음 설치를 다시 누르세요.</string>
+    <string name="update_install_action">설치</string>
+    <string name="update_downloading_action">다운로드 중…</string>
+    <string name="update_download_action">다운로드</string>
+    <string name="update_skip_action">건너뛰기</string>
+    <string name="update_later_action">나중에</string>
+    <string name="update_section_title">앱 업데이트</string>
+    <string name="update_section_subtitle">GitHub 릴리스에서 설치합니다.</string>
+    <string name="update_version_label">버전</string>
+    <string name="update_checking_action">확인 중…</string>
+    <string name="update_check_now_action">지금 확인</string>
+    <string name="update_auto_check_title">자동 확인</string>
+    <string name="update_auto_check_subtitle">새 릴리스를 하루에 최대 두 번 확인합니다.</string>
+    <string name="update_status_manual">이 빌드는 업데이트를 직접 설치해야 합니다.</string>
+    <string name="update_status_checking">업데이트 확인 중…</string>
+    <string name="update_status_downloading">%1$s 버전 다운로드 중…</string>
+    <string name="update_status_ready">ClawChat %1$s 버전을 설치할 준비가 됐습니다.</string>
+    <string name="update_status_available">ClawChat %1$s 버전을 사용할 수 있습니다.</string>
+    <string name="update_status_failed">업데이트를 확인하지 못했습니다.</string>
+    <string name="update_status_current">ClawChat이 최신 버전입니다.</string>
+    <string name="update_status_delivery">업데이트는 GitHub 릴리스를 통해 제공됩니다.</string>
+    <string name="update_error_unsupported_build">이 빌드는 GitHub 릴리스 업데이트를 지원하지 않습니다. 자동 업데이트를 사용하려면 릴리스 빌드를 설치하세요.</string>
+    <string name="update_error_check">업데이트를 확인하지 못했습니다.</string>
+    <string name="update_error_check_detail">업데이트를 확인하지 못했습니다. 세부 정보: %1$s</string>
+    <string name="update_error_check_network">릴리스 서버에 연결하지 못했습니다. 인터넷 연결을 확인한 후 다시 시도하세요.</string>
+    <string name="update_error_check_http">릴리스 서버에서 업데이트 확인 요청을 거부했습니다(HTTP %1$d).</string>
+    <string name="update_error_check_http_detail">릴리스 서버에서 업데이트 확인 요청을 거부했습니다(HTTP %1$d). 세부 정보: %2$s</string>
+    <string name="update_error_cache_unavailable">업데이트용 임시 저장 공간을 준비하지 못했습니다.</string>
+    <string name="update_error_download_http">업데이트를 다운로드하지 못했습니다(HTTP %1$d).</string>
+    <string name="update_error_checksum_http">업데이트 검증 파일을 다운로드하지 못했습니다(HTTP %1$d).</string>
+    <string name="update_error_checksum_invalid">업데이트 검증 파일이 올바르지 않습니다.</string>
+    <string name="update_error_checksum_mismatch">다운로드한 업데이트의 무결성 검증에 실패하여 파일을 삭제했습니다.</string>
+    <string name="update_error_download">업데이트를 다운로드하지 못했습니다.</string>
+    <string name="update_error_download_detail">업데이트를 다운로드하지 못했습니다. 세부 정보: %1$s</string>
+    <string name="update_error_install_permission">Android 설치 권한 화면을 열지 못했습니다.</string>
+    <string name="update_error_install_permission_detail">Android 설치 권한 화면을 열지 못했습니다. 세부 정보: %1$s</string>
+    <string name="update_error_install_launch">Android 패키지 설치 프로그램을 열지 못했습니다.</string>
+    <string name="update_error_install_launch_detail">Android 패키지 설치 프로그램을 열지 못했습니다. 세부 정보: %1$s</string>
+</resources>

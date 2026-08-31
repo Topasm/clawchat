@@ -66,9 +66,9 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun createConversation() {
+    fun createConversation(title: String) {
         viewModelScope.launch {
-            when (val result = conversationRepository.createConversation(mapOf("title" to "New Conversation"))) {
+            when (val result = conversationRepository.createConversation(mapOf("title" to title))) {
                 is ApiResult.Success -> {
                     val convo = result.data
                     _uiState.update {

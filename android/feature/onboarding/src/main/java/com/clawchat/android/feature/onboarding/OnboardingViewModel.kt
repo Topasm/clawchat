@@ -9,6 +9,7 @@ import com.clawchat.android.core.data.model.LoginRequest
 import com.clawchat.android.core.data.model.PairingClaimRequest
 import com.clawchat.android.core.di.DebugServerUrl
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +18,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 enum class OnboardingStep { WELCOME, SCAN_QR, SERVER, PAIRING, MANUAL_LOGIN, READY }
+
+enum class OnboardingError {
+    LOCAL_MODE_FAILED,
+    CANNOT_REACH_SERVER,
+    PAIRING_FAILED,
+    LOGIN_FAILED,
+    HOST_IDENTITY_MISMATCH,
+    HOST_ID_MISMATCH,
+}
 
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.WELCOME,
@@ -27,7 +37,8 @@ data class OnboardingUiState(
     val isPairing: Boolean = false,
     val pin: String = "",
     val isLoggingIn: Boolean = false,
-    val error: String? = null,
+    val isSelectingLocalMode: Boolean = false,
+    val error: OnboardingError? = null,
     val serverVersion: String? = null,
     val autoClaimAfterHealthCheck: Boolean = false,
     val expectedHostId: String? = null,
@@ -97,12 +108,12 @@ class OnboardingViewModel @Inject constructor(
                     _uiState.update { it.copy(autoClaimAfterHealthCheck = false) }
                     claimPairingCode()
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.update {
                     it.copy(
                         isCheckingServer = false,
                         serverReachable = false,
-                        error = "Cannot reach server: ${e.message}",
+                        error = OnboardingError.CANNOT_REACH_SERVER,
                     )
                 }
             }
@@ -130,10 +141,22 @@ class OnboardingViewModel @Inject constructor(
                     ),
                 )
                 if (expectedKey != null && response.hostPublicKey != expectedKey) {
-                    error("Host identity did not match the scanned QR code")
+                    _uiState.update {
+                        it.copy(
+                            isPairing = false,
+                            error = OnboardingError.HOST_IDENTITY_MISMATCH,
+                        )
+                    }
+                    return@launch
                 }
                 if (expectedId != null && response.hostId != expectedId) {
-                    error("Host ID did not match the scanned QR code")
+                    _uiState.update {
+                        it.copy(
+                            isPairing = false,
+                            error = OnboardingError.HOST_ID_MISMATCH,
+                        )
+                    }
+                    return@launch
                 }
                 sessionStore.savePairedSession(
                     deviceId = response.deviceId,
@@ -145,9 +168,9 @@ class OnboardingViewModel @Inject constructor(
                     relayUrl = response.relayUrl,
                 )
                 _uiState.update { it.copy(isPairing = false, step = OnboardingStep.READY) }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.update {
-                    it.copy(isPairing = false, error = "Pairing failed: ${e.message}")
+                    it.copy(isPairing = false, error = OnboardingError.PAIRING_FAILED)
                 }
             }
         }
@@ -172,20 +195,42 @@ class OnboardingViewModel @Inject constructor(
                     apiBaseUrl = url,
                 )
                 _uiState.update { it.copy(isLoggingIn = false, step = OnboardingStep.READY) }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.update {
-                    it.copy(isLoggingIn = false, error = "Login failed: ${e.message}")
+                    it.copy(isLoggingIn = false, error = OnboardingError.LOGIN_FAILED)
                 }
             }
         }
     }
 
-    /** Skip onboarding — set up server later. */
-    fun skipOnboarding() {
+    /**
+     * Persist the explicit local-only choice before leaving onboarding. This
+     * ordering prevents a process death from returning the user to setup after
+     * they have already entered the app.
+     */
+    fun useLocalMode(onSelected: () -> Unit = {}) {
+        if (_uiState.value.isSelectingLocalMode) return
+        _uiState.update { it.copy(isSelectingLocalMode = true, error = null) }
         viewModelScope.launch {
-            sessionStore.markOnboardingSkipped()
+            try {
+                sessionStore.selectLocalMode()
+                _uiState.update { it.copy(isSelectingLocalMode = false) }
+                onSelected()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSelectingLocalMode = false,
+                        error = OnboardingError.LOCAL_MODE_FAILED,
+                    )
+                }
+            }
         }
     }
+
+    /** Compatibility wrapper for callers compiled against the old wording. */
+    fun skipOnboarding() = useLocalMode()
 
     /** Parse a scanned QR payload and auto-fill server URL + code. */
     fun handleQrPayload(json: String) {

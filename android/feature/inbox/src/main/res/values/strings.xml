@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="inbox_title">Inbox</string>
+    <string name="inbox_loading">Loading inbox…</string>
+    <string name="inbox_planning_title">Planning now</string>
+    <string name="inbox_planning_subtitle">The assistant is actively classifying or planning these items.</string>
+    <string name="inbox_review_title">Review suggestion</string>
+    <string name="inbox_review_subtitle">AI has a recommendation ready for your confirmation.</string>
+    <string name="inbox_action_review">Review</string>
+    <string name="inbox_organize_title">Needs organizing</string>
+    <string name="inbox_organize_subtitle">Captured items that still need structure or routing.</string>
+    <string name="inbox_action_organize">Organize</string>
+    <string name="inbox_failed_title">Failed</string>
+    <string name="inbox_failed_subtitle">These items need another attempt or a manual check.</string>
+    <string name="inbox_action_retry">Retry</string>
+    <string name="inbox_empty_title">Inbox is clear</string>
+    <string name="inbox_empty_description">New captures will appear here when they need planning or review.</string>
+    <string name="inbox_nothing_waiting">Nothing waiting right now</string>
+    <plurals name="inbox_items_need_attention">
+        <item quantity="one">%1$d item needs attention</item>
+        <item quantity="other">%1$d items need attention</item>
+    </plurals>
+    <plurals name="inbox_summary_planning">
+        <item quantity="one">%1$d item being planned</item>
+        <item quantity="other">%1$d items being planned</item>
+    </plurals>
+    <plurals name="inbox_summary_review">
+        <item quantity="one">%1$d review</item>
+        <item quantity="other">%1$d reviews</item>
+    </plurals>
+    <plurals name="inbox_summary_failed">
+        <item quantity="one">%1$d failed item</item>
+        <item quantity="other">%1$d failed items</item>
+    </plurals>
+    <string name="inbox_summary_format">%1$s · %2$s · %3$s</string>
+    <string name="inbox_state_working">Working</string>
+    <string name="inbox_state_attention">Attention</string>
+    <string name="inbox_state_suggestion">Suggestion</string>
+    <string name="inbox_state_captured">Captured</string>
+</resources>

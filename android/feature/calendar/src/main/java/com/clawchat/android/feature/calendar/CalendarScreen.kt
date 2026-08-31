@@ -1,5 +1,6 @@
 package com.clawchat.android.feature.calendar
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,7 +35,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,33 +43,42 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
+import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
+import com.clawchat.android.core.ui.localizedErrorMessage
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.Locale
 
-private val MONTH_LABEL = DateTimeFormatter.ofPattern("MMMM yyyy")
-private val AGENDA_LABEL = DateTimeFormatter.ofPattern("EEEE, d MMMM")
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
-    val state by viewModel.uiState.collectAsState()
+fun CalendarScreen(
+    onOpenNavigation: () -> Unit = {},
+    viewModel: CalendarViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<EditorTarget?>(null) }
     // Read observably: the month and weekday names have to follow a locale
     // change without a restart.
     val locale = LocalLocale.current.platformLocale
+    val monthLabelFormatter = remember(locale) {
+        localizedDateFormatter(locale, "yMMMM")
+    }
+    val agendaLabelFormatter = remember(locale) {
+        localizedDateFormatter(locale, "MMMMdEEEE")
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -77,20 +86,29 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             TopAppBar(
                 title = {
                     Text(
-                        state.visibleMonth.format(MONTH_LABEL.withLocale(locale)),
+                        state.visibleMonth.format(monthLabelFormatter),
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleLarge,
                     )
                 },
+                navigationIcon = {
+                    ClawNavigationMenuButton(onClick = onOpenNavigation)
+                },
                 actions = {
                     TextButton(onClick = { viewModel.onAction(CalendarAction.ShowToday) }) {
-                        Text("Today")
+                        Text(stringResource(R.string.calendar_today))
                     }
                     IconButton(onClick = { viewModel.onAction(CalendarAction.ShowPreviousMonth) }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = stringResource(R.string.calendar_previous_month),
+                        )
                     }
                     IconButton(onClick = { viewModel.onAction(CalendarAction.ShowNextMonth) }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = stringResource(R.string.calendar_next_month),
+                        )
                     }
                 },
                 colors = ClawTopBarColors(),
@@ -104,7 +122,10 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
-                Icon(Icons.Default.Add, contentDescription = "New event")
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.calendar_new_event),
+                )
             }
         },
     ) { padding ->
@@ -118,7 +139,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             if (state.isOffline) {
                 item {
                     ClawStatusChip(
-                        text = "Offline — showing the last synced month",
+                        text = stringResource(R.string.calendar_offline_last_synced_month),
                         tone = ClawTone.Error,
                     )
                 }
@@ -126,7 +147,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
 
             state.error?.let { message ->
                 item {
-                    ClawStatusChip(text = message, tone = ClawTone.Error)
+                    ClawStatusChip(text = localizedErrorMessage(message), tone = ClawTone.Error)
                 }
             }
 
@@ -144,7 +165,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
 
             item {
                 Text(
-                    state.selectedDate.format(AGENDA_LABEL.withLocale(locale)),
+                    state.selectedDate.format(agendaLabelFormatter),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -153,9 +174,9 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             if (state.selectedEvents.isEmpty()) {
                 item {
                     ClawEmptyState(
-                        title = "Nothing scheduled",
-                        description = "Add an event for this day, or pick another date above.",
-                        actionLabel = "New event",
+                        title = stringResource(R.string.calendar_nothing_scheduled),
+                        description = stringResource(R.string.calendar_nothing_scheduled_description),
+                        actionLabel = stringResource(R.string.calendar_new_event),
                         onActionClick = { editing = EditorTarget(null) },
                     )
                 }
@@ -310,11 +331,25 @@ private fun DayCell(
 
 @Composable
 private fun EventRow(event: Event, onClick: () -> Unit, onDelete: () -> Unit) {
+    val locale = LocalLocale.current.platformLocale
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val is24Hour = DateFormat.is24HourFormat(context)
+    val timeFormatter = remember(locale, is24Hour) {
+        localizedTimeFormatter(locale, is24Hour)
+    }
+    val allDayLabel = stringResource(R.string.calendar_all_day)
+
     ClawListItemSurface(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    eventTimeLabel(event.startTime, event.endTime, event.isAllDay),
+                    eventTimeLabel(
+                        event.startTime,
+                        event.endTime,
+                        event.isAllDay,
+                        allDayLabel = allDayLabel,
+                        timeFormatter = timeFormatter,
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -332,13 +367,16 @@ private fun EventRow(event: Event, onClick: () -> Unit, onDelete: () -> Unit) {
                 }
             }
             if (event.isOccurrence) {
-                ClawStatusChip(text = "Repeats", tone = ClawTone.Default)
+                ClawStatusChip(
+                    text = stringResource(R.string.calendar_repeats),
+                    tone = ClawTone.Default,
+                )
                 Spacer(Modifier.width(8.dp))
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Delete event",
+                    contentDescription = stringResource(R.string.calendar_delete_event),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }

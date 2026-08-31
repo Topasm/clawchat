@@ -288,7 +288,9 @@ Active foundation work is tracked separately from release status:
 ### Phase 6: Mobile
 
 - [x] Native Android app with Compose feature modules, widgets, notifications, and background work
-- [x] Bottom navigation for native Android and the shared mobile layout
+- [x] Compact drawer navigation for the native Android client
+- [x] Standalone Android local workspace with Room-backed tasks, calendar, search, reminders, and widgets
+- [x] English and Korean resources across the native Android feature modules
 - [x] Complete Android release CI validation for the canonical task contract
 - [x] Mobile Review Inbox with approve, request-changes, and reject decisions
 - [x] Agent Run monitor with progress, event log, cancel, retry, and follow-up controls
@@ -370,7 +372,7 @@ Active foundation work is tracked separately from release status:
 
 ## Future Considerations
 
-- **Internationalization (i18next)** — Multi-language UI support using `i18next` + `react-i18next` with locale files
+- **Web/desktop localization and languages beyond Android English/Korean** — Multi-language UI support using `i18next` + `react-i18next` with locale files
 - **Google Calendar bidirectional sync**
 - **Voice input** (speech-to-text)
 - ~~**Web dashboard** for server admin~~ _(completed — Phase 8)_

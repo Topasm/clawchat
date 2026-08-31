@@ -60,7 +60,9 @@ class AuthInterceptor @Inject constructor(
         }
 
         response.close()
-        return chain.proceed(request.reroute(refreshedBaseUrl, refreshedToken))
+        return chain.proceed(
+            request.reroute(refreshedBaseUrl, refreshedToken, route.workspaceScope),
+        )
     }
 }
 
@@ -70,6 +72,7 @@ private fun okhttp3.HttpUrl.hasSameOrigin(other: okhttp3.HttpUrl): Boolean =
 private fun Request.reroute(
     baseUrl: okhttp3.HttpUrl,
     token: String,
+    workspaceScope: String?,
 ): Request {
     val reroutedUrl = url.newBuilder()
         .scheme(baseUrl.scheme)
@@ -79,6 +82,9 @@ private fun Request.reroute(
     return newBuilder()
         .url(reroutedUrl)
         .header("Authorization", "Bearer $token")
-        .tag(AuthenticatedRoute::class.java, AuthenticatedRoute(baseUrl, token))
+        .tag(
+            AuthenticatedRoute::class.java,
+            AuthenticatedRoute(baseUrl, token, workspaceScope),
+        )
         .build()
 }

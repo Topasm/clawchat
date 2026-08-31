@@ -34,6 +34,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.widgetBackground
 import com.clawchat.android.widget.di.WidgetEntryPoint
@@ -48,9 +49,10 @@ class InboxQuickAddWidget : GlanceAppWidget() {
             context.applicationContext,
             WidgetEntryPoint::class.java,
         )
-        val token = entryPoint.sessionStore().token.first()
+        val workspaceMode = entryPoint.sessionStore().runtimeState.first().mode
+        val isConfigured = workspaceMode != WorkspaceMode.UNCONFIGURED
 
-        val inboxCount = if (token != null) {
+        val inboxCount = if (isConfigured) {
             when (val result = entryPoint.todayRepository().getToday()) {
                 is ApiResult.Success -> result.data.inboxCount
                 else -> null
@@ -60,7 +62,8 @@ class InboxQuickAddWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 InboxQuickAddContent(
-                    isLoggedIn = token != null,
+                    isConfigured = isConfigured,
+                    isLocal = workspaceMode == WorkspaceMode.LOCAL,
                     inboxCount = inboxCount,
                 )
             }
@@ -70,7 +73,8 @@ class InboxQuickAddWidget : GlanceAppWidget() {
 
 @Composable
 private fun InboxQuickAddContent(
-    isLoggedIn: Boolean,
+    isConfigured: Boolean,
+    isLocal: Boolean,
     inboxCount: Int?,
 ) {
     val context = LocalContext.current
@@ -108,14 +112,15 @@ private fun InboxQuickAddContent(
                 )
                 .padding(horizontal = 12.dp, vertical = 10.dp)
                 .clickable(
-                    if (isLoggedIn) actionStartActivityByIntent(quickAddIntent)
+                    if (isConfigured) actionStartActivityByIntent(quickAddIntent)
                     else actionStartActivityByComponent(mainActivity)
                 ),
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(
                 text = context.getString(
-                    if (isLoggedIn) R.string.widget_add_to_inbox
+                    if (isLocal) R.string.widget_add_task_prompt
+                    else if (isConfigured) R.string.widget_add_to_inbox
                     else R.string.widget_login_required
                 ),
                 style = TextStyle(

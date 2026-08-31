@@ -90,7 +90,7 @@ class ReviewInboxViewModelTest {
         viewModel.onAction(ReviewInboxAction.Select(planReview.id))
         viewModel.onAction(ReviewInboxAction.Decide(ReviewDecision.APPROVED))
 
-        assertTrue(viewModel.uiState.value.error!!.contains("read-only"))
+        assertEquals(R.string.review_read_only_error, viewModel.uiState.value.errorResource)
         coVerify(exactly = 0) { repository.decide(any(), any(), any()) }
         coVerify(exactly = 0) { runRepository.getRun(any()) }
     }
@@ -157,7 +157,10 @@ class ReviewInboxViewModelTest {
         advanceUntilIdle()
 
         assertEquals("run-1", viewModel.uiState.value.followUpRunId)
-        assertTrue(viewModel.uiState.value.notice!!.contains("follow-up"))
+        assertEquals(
+            R.string.review_changes_requested_notice,
+            viewModel.uiState.value.noticeResource,
+        )
     }
 
     @Test

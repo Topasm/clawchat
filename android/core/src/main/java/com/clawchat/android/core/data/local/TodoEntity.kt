@@ -1,11 +1,27 @@
 package com.clawchat.android.core.data.local
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
+import androidx.room.Index
 
-@Entity(tableName = "todos")
+/** A server-owned task cached under the stable workspace that returned it. */
+@Entity(
+    tableName = "todos",
+    primaryKeys = ["workspaceKey", "id"],
+    indices = [
+        Index(
+            name = "index_todos_workspace_order",
+            value = ["workspaceKey", "sortOrder", "createdAt", "id"],
+            orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC],
+        ),
+        Index(
+            name = "index_todos_workspace_due_date",
+            value = ["workspaceKey", "dueDate", "status"],
+        ),
+    ],
+)
 data class TodoEntity(
-    @PrimaryKey val id: String,
+    val workspaceKey: String,
+    val id: String,
     val title: String,
     val description: String? = null,
     val status: String = "pending",

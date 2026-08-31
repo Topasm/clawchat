@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">ClawChat</string>
+    <string name="nav_today">Today</string>
+    <string name="nav_calendar">Calendar</string>
+    <string name="nav_inbox">Inbox</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_review">Review</string>
+    <string name="nav_runs">Agent runs</string>
+    <string name="navigation_primary_section">Workspace</string>
+    <string name="navigation_more_section">More</string>
+    <string name="navigation_local_workspace">This device</string>
+    <string name="navigation_server_workspace">Connected workspace</string>
+    <string name="navigation_setup_workspace">Choose how to use ClawChat</string>
+    <string name="server_feature_requires_workspace_title">Connect a workspace</string>
+    <string name="server_feature_requires_workspace_description">This feature runs on a ClawChat server. Your local tasks and calendar will stay on this device.</string>
+    <string name="server_feature_connect_action">Connect a workspace</string>
+    <string name="weekly_review_ready">Weekly review is ready!</string>
     <string name="widget_todo_tracking_label">Today</string>
     <string name="widget_todo_tracking_description">Add and complete today\'s tasks from your Home screen</string>
     <string name="widget_inbox_quick_add_label">Add task</string>
@@ -8,6 +26,12 @@
     <string name="share_rejected">Nothing shareable was found. ClawChat accepts images, PDF, text, Markdown, and ZIP files up to 10 MB.</string>
     <string name="share_failed">Couldn’t save the shared item. Check your connection and try again.</string>
     <string name="share_queued">Saved securely. ClawChat will add it to Inbox when connected.</string>
+    <string name="share_saved_locally">Saved to this device</string>
+    <string name="share_files_require_server">File attachments require a server connection</string>
+    <plurals name="share_multiple_files_title">
+        <item quantity="one">%1$d shared file</item>
+        <item quantity="other">%1$d shared files</item>
+    </plurals>
     <string name="share_queue_full">The share queue is full. Open ClawChat and reconnect or discard an older capture before sharing again.</string>
     <string name="share_malformed">This app sent an invalid share. Nothing was saved.</string>
     <string name="share_channel_name">Shared captures</string>

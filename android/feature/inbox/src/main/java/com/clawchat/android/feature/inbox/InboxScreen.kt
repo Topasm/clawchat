@@ -24,31 +24,36 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
+import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.icons.ClawIcons
+import com.clawchat.android.core.ui.localizedErrorMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
     viewModel: InboxViewModel = hiltViewModel(),
     onTaskClick: (String) -> Unit = {},
+    onOpenNavigation: () -> Unit = {},
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
 
     Scaffold(
@@ -57,10 +62,13 @@ fun InboxScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Inbox",
+                        text = stringResource(R.string.inbox_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
+                },
+                navigationIcon = {
+                    ClawNavigationMenuButton(onClick = onOpenNavigation)
                 },
                 colors = ClawTopBarColors(),
             )
@@ -79,7 +87,7 @@ fun InboxScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Loading inbox...",
+                        text = stringResource(R.string.inbox_loading),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -102,8 +110,8 @@ fun InboxScreen(
                     if (state.planningNow.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Planning now",
-                                subtitle = "The assistant is actively classifying or planning these items.",
+                                title = stringResource(R.string.inbox_planning_title),
+                                subtitle = stringResource(R.string.inbox_planning_subtitle),
                                 tone = ClawTone.Primary,
                                 icon = {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
@@ -121,14 +129,14 @@ fun InboxScreen(
                     if (state.reviewSuggestion.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Review suggestion",
-                                subtitle = "AI has a recommendation ready for your confirmation.",
+                                title = stringResource(R.string.inbox_review_title),
+                                subtitle = stringResource(R.string.inbox_review_subtitle),
                                 tone = ClawTone.Warning,
                                 icon = {
                                     Icon(Icons.Default.CheckCircle, contentDescription = null)
                                 },
                                 items = state.reviewSuggestion,
-                                actionLabel = "Review",
+                                actionLabel = stringResource(R.string.inbox_action_review),
                                 onAction = viewModel::organize,
                                 isError = false,
                                 showSpinner = false,
@@ -140,14 +148,14 @@ fun InboxScreen(
                     if (state.needsOrganizing.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Needs organizing",
-                                subtitle = "Captured items that still need structure or routing.",
+                                title = stringResource(R.string.inbox_organize_title),
+                                subtitle = stringResource(R.string.inbox_organize_subtitle),
                                 tone = ClawTone.Default,
                                 icon = {
                                     Icon(ClawIcons.Inbox, contentDescription = null)
                                 },
                                 items = state.needsOrganizing,
-                                actionLabel = "Organize",
+                                actionLabel = stringResource(R.string.inbox_action_organize),
                                 onAction = viewModel::organize,
                                 isError = false,
                                 showSpinner = false,
@@ -159,14 +167,14 @@ fun InboxScreen(
                     if (state.failed.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Failed",
-                                subtitle = "These items need another attempt or a manual check.",
+                                title = stringResource(R.string.inbox_failed_title),
+                                subtitle = stringResource(R.string.inbox_failed_subtitle),
                                 tone = ClawTone.Error,
                                 icon = {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                 },
                                 items = state.failed,
-                                actionLabel = "Retry",
+                                actionLabel = stringResource(R.string.inbox_action_retry),
                                 onAction = viewModel::retryOrganize,
                                 isError = true,
                                 showSpinner = false,
@@ -178,8 +186,8 @@ fun InboxScreen(
                     if (isEmpty(state)) {
                         item {
                             ClawEmptyState(
-                                title = "Inbox is clear",
-                                description = "New captures will appear here when they need planning or review.",
+                                title = stringResource(R.string.inbox_empty_title),
+                                description = stringResource(R.string.inbox_empty_description),
                                 icon = {
                                     Icon(
                                         Icons.Default.CheckCircle,
@@ -199,7 +207,7 @@ fun InboxScreen(
                         .padding(12.dp)
                         .align(Alignment.BottomCenter),
                 ) {
-                    Text(error)
+                    Text(localizedErrorMessage(error))
                 }
             }
         }
@@ -226,12 +234,36 @@ private fun InboxSummaryCard(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = if (totalItems == 0) "Nothing waiting right now" else "$totalItems item${if (totalItems == 1) "" else "s"} need attention",
+            text = if (totalItems == 0) {
+                stringResource(R.string.inbox_nothing_waiting)
+            } else {
+                pluralStringResource(R.plurals.inbox_items_need_attention, totalItems, totalItems)
+            },
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
         )
+        val planningSummary = pluralStringResource(
+            R.plurals.inbox_summary_planning,
+            planningNow,
+            planningNow,
+        )
+        val reviewSummary = pluralStringResource(
+            R.plurals.inbox_summary_review,
+            reviewSuggestion,
+            reviewSuggestion,
+        )
+        val failedSummary = pluralStringResource(
+            R.plurals.inbox_summary_failed,
+            failed,
+            failed,
+        )
         Text(
-            text = "$planningNow planning  ·  $reviewSuggestion review  ·  $failed failed",
+            text = stringResource(
+                R.string.inbox_summary_format,
+                planningSummary,
+                reviewSummary,
+                failedSummary,
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -313,15 +345,15 @@ private fun InboxItemCard(
             ) {
                 if (showSpinner) {
                     ClawStatusChip(
-                        text = "Working",
+                        text = stringResource(R.string.inbox_state_working),
                         tone = ClawTone.Primary,
                     )
                 } else {
                     ClawStatusChip(
                         text = when {
-                            isError -> "Attention"
-                            todo.inboxState == "plan_ready" -> "Suggestion"
-                            else -> "Captured"
+                            isError -> stringResource(R.string.inbox_state_attention)
+                            todo.inboxState == "plan_ready" -> stringResource(R.string.inbox_state_suggestion)
+                            else -> stringResource(R.string.inbox_state_captured)
                         },
                         tone = if (isError) ClawTone.Error else ClawTone.Warning,
                     )

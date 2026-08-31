@@ -45,7 +45,7 @@
 }
 
 .cc-bubble__delivery--failed {
-  color: var(--cc-danger);
+  color: var(--cc-error);
 }
 
 .cc-bubble__delivery button {

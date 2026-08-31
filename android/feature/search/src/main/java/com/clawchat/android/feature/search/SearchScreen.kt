@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -36,31 +34,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.SearchHit
 import com.clawchat.android.core.data.repository.SearchType
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
+import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
+import com.clawchat.android.core.ui.localizedErrorMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
-    onBack: () -> Unit = {},
+    onOpenNavigation: () -> Unit = {},
     onOpenHit: (SearchHit) -> Unit = {},
+    availableTypes: List<SearchType> = SearchType.entries,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(availableTypes) { viewModel.setAvailableTypes(availableTypes) }
+
+    val supportsMessages = SearchType.Messages in availableTypes
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -68,15 +74,13 @@ fun SearchScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Search",
+                        stringResource(R.string.search_title),
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleLarge,
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
+                    ClawNavigationMenuButton(onClick = onOpenNavigation)
                 },
                 colors = ClawTopBarColors(),
             )
@@ -95,12 +99,25 @@ fun SearchScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
-                placeholder = { Text("Tasks, events, and messages") },
+                placeholder = {
+                    Text(
+                        stringResource(
+                            if (supportsMessages) {
+                                R.string.search_placeholder
+                            } else {
+                                R.string.search_placeholder_local
+                            },
+                        ),
+                    )
+                },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (state.query.isNotEmpty()) {
                         IconButton(onClick = viewModel::clearQuery) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear query")
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.search_cd_clear_query),
+                            )
                         }
                     }
                 },
@@ -110,11 +127,11 @@ fun SearchScreen(
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                SearchType.entries.forEach { type ->
+                availableTypes.forEach { type ->
                     FilterChip(
                         selected = type in state.activeTypes,
                         onClick = { viewModel.toggleType(type) },
-                        label = { Text(type.label) },
+                        label = { Text(type.localizedLabel()) },
                     )
                 }
             }
@@ -123,18 +140,24 @@ fun SearchScreen(
                 state.isSearching && state.hits.isEmpty() -> LoadingRow()
 
                 state.error != null -> ClawStatusChip(
-                    text = state.error.orEmpty(),
+                    text = localizedErrorMessage(state.error.orEmpty()),
                     tone = ClawTone.Error,
                 )
 
                 state.hasSearched && state.hits.isEmpty() -> ClawEmptyState(
-                    title = "No matches",
-                    description = "Nothing matched \"${state.query}\". Try fewer words.",
+                    title = stringResource(R.string.search_no_matches_title),
+                    description = stringResource(R.string.search_no_matches_description, state.query),
                 )
 
                 !state.hasSearched -> ClawEmptyState(
-                    title = "Search your workspace",
-                    description = "Full-text search across tasks, events, and chat messages.",
+                    title = stringResource(R.string.search_initial_title),
+                    description = stringResource(
+                        if (supportsMessages) {
+                            R.string.search_initial_description
+                        } else {
+                            R.string.search_initial_description_local
+                        },
+                    ),
                 )
 
                 else -> ResultList(state = state, onOpenHit = onOpenHit)
@@ -164,7 +187,7 @@ private fun ResultList(state: SearchUiState, onOpenHit: (SearchHit) -> Unit) {
         state.grouped.forEach { (type, hits) ->
             item(key = "header-${type.filterValue}") {
                 ClawSectionHeader(
-                    title = type.label,
+                    title = type.localizedLabel(),
                     count = hits.size,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
@@ -174,6 +197,13 @@ private fun ResultList(state: SearchUiState, onOpenHit: (SearchHit) -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun SearchType.localizedLabel(): String = when (this) {
+    SearchType.Tasks -> stringResource(R.string.search_type_tasks)
+    SearchType.Events -> stringResource(R.string.search_type_events)
+    SearchType.Messages -> stringResource(R.string.search_type_messages)
 }
 
 @Composable

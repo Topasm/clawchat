@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nav_today">오늘</string>
+    <string name="nav_calendar">캘린더</string>
+    <string name="nav_inbox">받은 편지함</string>
+    <string name="nav_chat">채팅</string>
+    <string name="nav_tasks">작업</string>
+    <string name="nav_search">검색</string>
+    <string name="nav_settings">설정</string>
+    <string name="nav_review">리뷰</string>
+    <string name="nav_runs">에이전트 실행</string>
+    <string name="navigation_primary_section">작업 공간</string>
+    <string name="navigation_more_section">더 보기</string>
+    <string name="navigation_local_workspace">이 기기</string>
+    <string name="navigation_server_workspace">연결된 Workspace</string>
+    <string name="navigation_setup_workspace">ClawChat 사용 방법 선택</string>
+    <string name="server_feature_requires_workspace_title">Workspace 연결</string>
+    <string name="server_feature_requires_workspace_description">이 기능은 ClawChat 서버에서 실행됩니다. 로컬 작업과 일정은 이 기기에 그대로 유지됩니다.</string>
+    <string name="server_feature_connect_action">Workspace 연결</string>
+    <string name="weekly_review_ready">주간 리뷰가 준비됐습니다!</string>
     <string name="widget_todo_tracking_label">오늘</string>
     <string name="widget_todo_tracking_description">홈 화면에서 오늘 할 일을 추가하고 완료합니다</string>
     <string name="widget_inbox_quick_add_label">할 일 추가</string>
@@ -7,6 +25,11 @@
     <string name="share_rejected">공유할 수 있는 내용이 없습니다. 10MB 이하의 이미지, PDF, 텍스트, Markdown, ZIP 파일을 지원합니다.</string>
     <string name="share_failed">공유 항목을 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.</string>
     <string name="share_queued">안전하게 보관했습니다. 연결되면 ClawChat 받은 편지함에 추가합니다.</string>
+    <string name="share_saved_locally">이 기기에 저장했습니다</string>
+    <string name="share_files_require_server">파일 첨부는 서버 연결이 필요합니다</string>
+    <plurals name="share_multiple_files_title">
+        <item quantity="other">공유 파일 %1$d개</item>
+    </plurals>
     <string name="share_queue_full">공유 대기열이 가득 찼습니다. ClawChat을 열어 다시 연결하거나 이전 캡처를 폐기한 후 공유하세요.</string>
     <string name="share_malformed">공유한 앱에서 잘못된 데이터를 보냈습니다. 아무 내용도 저장하지 않았습니다.</string>
     <string name="share_channel_name">공유 캡처</string>

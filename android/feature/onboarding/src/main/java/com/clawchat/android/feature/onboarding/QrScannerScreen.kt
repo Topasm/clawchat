@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -25,7 +26,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @Composable
@@ -63,7 +66,7 @@ fun QrScannerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "Camera permission is required to scan QR codes.",
+                    stringResource(R.string.onboarding_camera_permission_required),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                 )
@@ -73,7 +76,7 @@ fun QrScannerScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                 ) {
-                    Text("Connect manually")
+                    Text(stringResource(R.string.onboarding_connect_manually))
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
@@ -81,7 +84,7 @@ fun QrScannerScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.onboarding_cancel))
                 }
             }
         }
@@ -106,7 +109,7 @@ fun QrScannerScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        "Point your camera at the QR code on your desktop",
+                        stringResource(R.string.onboarding_point_camera_at_qr),
                         color = Color.White,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
@@ -117,10 +120,13 @@ fun QrScannerScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
                         TextButton(onClick = onCancel) {
-                            Text("Cancel", color = Color.White)
+                            Text(stringResource(R.string.onboarding_cancel), color = Color.White)
                         }
                         TextButton(onClick = onManualEntry) {
-                            Text("Enter code manually", color = Color.White)
+                            Text(
+                                stringResource(R.string.onboarding_enter_code_manually),
+                                color = Color.White,
+                            )
                         }
                     }
                 }
@@ -133,52 +139,78 @@ fun QrScannerScreen(
 private fun CameraPreview(onQrDetected: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val executor = remember { Executors.newSingleThreadExecutor() }
+    val currentOnQrDetected by rememberUpdatedState(onQrDetected)
+    val resources = remember(context, lifecycleOwner) { CameraPreviewResources() }
+
+    DisposableEffect(context, lifecycleOwner, resources) {
+        resources.imageAnalysis.setAnalyzer(resources.executor) { imageProxy ->
+            processImage(imageProxy, resources.scanner) { rawValue ->
+                // ML Kit can finish after this composable has left the tree.
+                // Never route a stale scan into the next onboarding step.
+                if (!resources.isDisposed) currentOnQrDetected(rawValue)
+            }
+        }
+
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        cameraProviderFuture.addListener({
+            if (resources.isDisposed) return@addListener
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                if (resources.isDisposed) return@addListener
+                resources.cameraProvider = cameraProvider
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    resources.preview,
+                    resources.imageAnalysis,
+                )
+            } catch (error: Exception) {
+                Log.e("QrScanner", "Camera bind failed", error)
+            }
+        }, ContextCompat.getMainExecutor(context))
+
+        onDispose {
+            // The onboarding steps share one Activity lifecycle. Binding only to
+            // that owner would leave the camera running after this composable is
+            // removed, so release every resource at the composition boundary.
+            resources.isDisposed = true
+            resources.imageAnalysis.clearAnalyzer()
+            resources.cameraProvider?.unbind(resources.preview, resources.imageAnalysis)
+            resources.cameraProvider = null
+            resources.scanner.close()
+            resources.executor.shutdown()
+        }
+    }
 
     AndroidView(
         factory = { ctx ->
-            val previewView = PreviewView(ctx)
-            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-
-            cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.surfaceProvider = previewView.surfaceProvider
-                }
-
-                val barcodeScanner = BarcodeScanning.getClient()
-                val imageAnalysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                    .also { analysis ->
-                        analysis.setAnalyzer(executor) { imageProxy ->
-                            processImage(imageProxy, barcodeScanner, onQrDetected)
-                        }
-                    }
-
-                try {
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview,
-                        imageAnalysis,
-                    )
-                } catch (e: Exception) {
-                    Log.e("QrScanner", "Camera bind failed", e)
-                }
-            }, ContextCompat.getMainExecutor(ctx))
-
-            previewView
+            PreviewView(ctx).also { previewView ->
+                resources.preview.surfaceProvider = previewView.surfaceProvider
+            }
         },
         modifier = Modifier.fillMaxSize(),
     )
 }
 
+private class CameraPreviewResources {
+    val executor: ExecutorService = Executors.newSingleThreadExecutor()
+    val scanner: BarcodeScanner = BarcodeScanning.getClient()
+    val preview: Preview = Preview.Builder().build()
+    val imageAnalysis: ImageAnalysis = ImageAnalysis.Builder()
+        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+        .build()
+
+    @Volatile
+    var isDisposed: Boolean = false
+
+    @Volatile
+    var cameraProvider: ProcessCameraProvider? = null
+}
+
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun processImage(
     imageProxy: ImageProxy,
-    scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    scanner: BarcodeScanner,
     onQrDetected: (String) -> Unit,
 ) {
     val mediaImage = imageProxy.image

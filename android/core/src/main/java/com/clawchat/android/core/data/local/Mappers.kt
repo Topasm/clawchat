@@ -4,7 +4,8 @@ import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 
-fun Todo.toEntity(): TodoEntity = TodoEntity(
+fun Todo.toEntity(workspaceKey: String): TodoEntity = TodoEntity(
+    workspaceKey = workspaceKey,
     id = id,
     title = title,
     description = description,
@@ -40,7 +41,8 @@ fun TodoEntity.toModel(): Todo = Todo(
     updatedAt = updatedAt,
 )
 
-fun Event.toEntity(): EventEntity = EventEntity(
+fun Event.toEntity(workspaceKey: String): EventEntity = EventEntity(
+    workspaceKey = workspaceKey,
     id = id,
     title = title,
     description = description,

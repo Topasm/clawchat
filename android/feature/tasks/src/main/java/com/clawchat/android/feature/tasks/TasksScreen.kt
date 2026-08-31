@@ -47,8 +47,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +67,7 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
+import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
@@ -69,9 +75,14 @@ import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
+import com.clawchat.android.core.ui.localizedErrorMessage
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 @Composable
 fun TasksScreen(
+    onOpenNavigation: () -> Unit = {},
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -97,6 +108,7 @@ fun TasksScreen(
             tasks = state.tasks,
             isLoading = state.isLoading,
             statusFilter = state.statusFilter,
+            onOpenNavigation = onOpenNavigation,
             onSelect = viewModel::selectTask,
             onToggle = viewModel::toggleComplete,
             onDelete = viewModel::deleteTask,
@@ -114,6 +126,7 @@ private fun TaskListView(
     tasks: List<Todo>,
     isLoading: Boolean,
     statusFilter: TaskStatus?,
+    onOpenNavigation: () -> Unit,
     onSelect: (Todo) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -139,10 +152,13 @@ private fun TaskListView(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Tasks",
+                        text = stringResource(R.string.tasks_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
+                },
+                navigationIcon = {
+                    ClawNavigationMenuButton(onClick = onOpenNavigation)
                 },
                 colors = ClawTopBarColors(),
             )
@@ -155,7 +171,10 @@ private fun TaskListView(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
-                Icon(Icons.Default.Add, contentDescription = "New task")
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.tasks_cd_new_task),
+                )
             }
         },
     ) { padding ->
@@ -178,7 +197,7 @@ private fun TaskListView(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Loading tasks...",
+                        text = stringResource(R.string.tasks_loading),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -191,9 +210,9 @@ private fun TaskListView(
                     contentAlignment = Alignment.Center,
                 ) {
                     ClawEmptyState(
-                        title = "No tasks in this view",
-                        description = "Create something new or switch filters to revisit completed work.",
-                        actionLabel = "Create task",
+                        title = stringResource(R.string.tasks_empty_title),
+                        description = stringResource(R.string.tasks_empty_description),
+                        actionLabel = stringResource(R.string.tasks_create_task),
                         onActionClick = { showCreateSheet = true },
                     )
                 }
@@ -251,9 +270,26 @@ private fun TaskSummaryCard(
         ) {
             Text(
                 text = if (totalCount == 0) {
-                    "No tasks yet"
+                    stringResource(R.string.tasks_none_yet)
                 } else {
-                    "$activeCount active  ·  $completedCount done  ·  $totalCount total"
+                    stringResource(
+                        R.string.tasks_summary_format,
+                        pluralStringResource(
+                            R.plurals.tasks_summary_active,
+                            activeCount,
+                            activeCount,
+                        ),
+                        pluralStringResource(
+                            R.plurals.tasks_summary_completed,
+                            completedCount,
+                            completedCount,
+                        ),
+                        pluralStringResource(
+                            R.plurals.tasks_summary_total,
+                            totalCount,
+                            totalCount,
+                        ),
+                    )
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -261,7 +297,7 @@ private fun TaskSummaryCard(
             )
             Text(
                 text = when (statusFilter) {
-                    null -> "All"
+                    null -> stringResource(R.string.tasks_filter_all)
                     else -> taskStatusLabel(statusFilter)
                 },
                 style = MaterialTheme.typography.labelMedium,
@@ -275,7 +311,7 @@ private fun TaskSummaryCard(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TaskFilterChip(
-                label = "All",
+                label = stringResource(R.string.tasks_filter_all),
                 selected = statusFilter == null,
                 onClick = { onSetFilter(null) },
             )
@@ -352,6 +388,10 @@ private fun TaskRow(
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     val view = LocalView.current
+    val checkboxDescription = stringResource(
+        if (isCompleted) R.string.tasks_mark_incomplete else R.string.tasks_mark_complete,
+        task.title,
+    )
     val completionAlpha by animateFloatAsState(
         targetValue = if (isCompleted) 0.65f else 1f,
         animationSpec = tween(durationMillis = 220),
@@ -371,6 +411,9 @@ private fun TaskRow(
             ) {
                 Checkbox(
                     checked = isCompleted,
+                    modifier = Modifier.semantics {
+                        contentDescription = checkboxDescription
+                    },
                     onCheckedChange = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -421,14 +464,14 @@ private fun TaskRow(
                 PriorityChip(task.priority)
                 task.dueDate?.let {
                     ClawStatusChip(
-                        text = it,
+                        text = localizedDateLabel(it),
                         tone = ClawTone.Warning,
                     )
                 }
                 inboxStateLabel(task.inboxState)?.let { label ->
                     ClawStatusChip(
                         text = label,
-                        tone = if (label == "Failed") ClawTone.Error else ClawTone.Default,
+                        tone = if (task.inboxState == "error") ClawTone.Error else ClawTone.Default,
                     )
                 }
             }
@@ -436,20 +479,22 @@ private fun TaskRow(
     }
 }
 
+@Composable
 private fun inboxStateLabel(inboxState: String?): String? = when (inboxState) {
     null, "none" -> null
-    "classifying", "planning" -> "Planning"
-    "plan_ready" -> "Review"
-    "captured" -> "Organize"
-    "error" -> "Failed"
-    else -> inboxState.replaceFirstChar { it.uppercase() }
+    "classifying", "planning" -> stringResource(R.string.tasks_inbox_planning)
+    "plan_ready" -> stringResource(R.string.tasks_inbox_review)
+    "captured" -> stringResource(R.string.tasks_inbox_organize)
+    "error" -> stringResource(R.string.tasks_inbox_failed)
+    else -> inboxState.replace('_', ' ')
 }
 
+@Composable
 private fun taskStatusLabel(status: TaskStatus): String = when (status) {
-    TaskStatus.PENDING -> "Pending"
-    TaskStatus.IN_PROGRESS -> "In progress"
-    TaskStatus.COMPLETED -> "Completed"
-    TaskStatus.CANCELLED -> "Cancelled"
+    TaskStatus.PENDING -> stringResource(R.string.tasks_status_pending)
+    TaskStatus.IN_PROGRESS -> stringResource(R.string.tasks_status_in_progress)
+    TaskStatus.COMPLETED -> stringResource(R.string.tasks_status_completed)
+    TaskStatus.CANCELLED -> stringResource(R.string.tasks_status_cancelled)
 }
 
 private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
@@ -472,27 +517,35 @@ private fun TaskDetailView(
     onSetStatus: (TaskStatus) -> Unit,
     onDelete: () -> Unit,
 ) {
+    val isCompleted = task.status == TaskStatus.COMPLETED
+    val checkboxDescription = stringResource(
+        if (isCompleted) R.string.tasks_mark_incomplete else R.string.tasks_mark_complete,
+        task.title,
+    )
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Task detail",
+                        text = stringResource(R.string.tasks_detail_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.tasks_cd_back),
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = { onDelete(); onBack() }) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = "Delete",
+                            contentDescription = stringResource(R.string.tasks_cd_delete),
                             tint = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -520,7 +573,10 @@ private fun TaskDetailView(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
-                            checked = task.status == TaskStatus.COMPLETED,
+                            checked = isCompleted,
+                            modifier = Modifier.semantics {
+                                contentDescription = checkboxDescription
+                            },
                             onCheckedChange = { onToggle() },
                         )
                         Text(
@@ -548,8 +604,8 @@ private fun TaskDetailView(
                 item {
                     ClawSectionCard {
                         ClawSectionHeader(
-                            title = "Description",
-                            subtitle = "Notes and supporting detail.",
+                            title = stringResource(R.string.tasks_description_title),
+                            subtitle = stringResource(R.string.tasks_description_subtitle),
                         )
                         Text(
                             text = description,
@@ -562,8 +618,8 @@ private fun TaskDetailView(
             item {
                 ClawSectionCard {
                     ClawSectionHeader(
-                        title = "Details",
-                        subtitle = "Operational metadata for this task.",
+                        title = stringResource(R.string.tasks_details_title),
+                        subtitle = stringResource(R.string.tasks_details_subtitle),
                     )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -571,10 +627,13 @@ private fun TaskDetailView(
                     ) {
                         PriorityChip(task.priority)
                         task.dueDate?.let {
-                            ClawStatusChip(text = it, tone = ClawTone.Warning)
+                            ClawStatusChip(text = localizedDateLabel(it), tone = ClawTone.Warning)
                         }
                         if (task.isRecurring) {
-                            ClawStatusChip(text = "Recurring", tone = ClawTone.Success)
+                            ClawStatusChip(
+                                text = stringResource(R.string.tasks_recurring),
+                                tone = ClawTone.Success,
+                            )
                         }
                         inboxStateLabel(task.inboxState)?.let {
                             ClawStatusChip(text = it, tone = ClawTone.Default)
@@ -583,36 +642,38 @@ private fun TaskDetailView(
                 }
             }
 
-            item {
-                ClawSectionCard {
-                    ClawSectionHeader(
-                        title = "Task links",
-                        subtitle = "Dependencies and related work from the shared task graph.",
-                        count = relationships.size.takeIf { it > 0 },
-                    )
-                    when {
-                        isLoadingRelationships -> Text(
-                            text = "Loading task links…",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (task.syncStatus != "local") {
+                item {
+                    ClawSectionCard {
+                        ClawSectionHeader(
+                            title = stringResource(R.string.tasks_links_title),
+                            subtitle = stringResource(R.string.tasks_links_subtitle),
+                            count = relationships.size.takeIf { it > 0 },
                         )
-                        relationshipError != null -> Text(
-                            text = relationshipError,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        relationships.isEmpty() -> Text(
-                            text = "No task links yet.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            relationships.forEach { relationship ->
-                                TaskRelationshipRow(
-                                    relationship = relationship,
-                                    currentTaskId = task.id,
-                                    taskTitles = taskTitles,
-                                )
+                        when {
+                            isLoadingRelationships -> Text(
+                                text = stringResource(R.string.tasks_links_loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            relationshipError != null -> Text(
+                                text = localizedErrorMessage(relationshipError),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            relationships.isEmpty() -> Text(
+                                text = stringResource(R.string.tasks_links_empty),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                relationships.forEach { relationship ->
+                                    TaskRelationshipRow(
+                                        relationship = relationship,
+                                        currentTaskId = task.id,
+                                        taskTitles = taskTitles,
+                                    )
+                                }
                             }
                         }
                     }
@@ -624,8 +685,8 @@ private fun TaskDetailView(
                 item {
                     ClawSectionCard {
                         ClawSectionHeader(
-                            title = "Tags",
-                            subtitle = "Labels attached to this work item.",
+                            title = stringResource(R.string.tasks_tags_title),
+                            subtitle = stringResource(R.string.tasks_tags_subtitle),
                         )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -650,12 +711,21 @@ private fun TaskRelationshipRow(
 ) {
     val isOutgoing = relationship.sourceTaskId == currentTaskId
     val otherTaskId = if (isOutgoing) relationship.targetTaskId else relationship.sourceTaskId
-    val otherTaskTitle = taskTitles[otherTaskId] ?: "Task ${otherTaskId.take(8)}"
+    val otherTaskTitle = taskTitles[otherTaskId]
+        ?: stringResource(R.string.tasks_fallback_title, otherTaskId.take(8))
     val direction = when (relationship.type) {
-        "depends_on" -> if (isOutgoing) "Depends on" else "Required by"
-        "duplicate" -> if (isOutgoing) "Duplicates" else "Duplicated by"
-        "related" -> "Related to"
-        else -> relationship.type.replace('_', ' ').replaceFirstChar { it.uppercase() }
+        "depends_on" -> if (isOutgoing) {
+            stringResource(R.string.tasks_relationship_depends_on)
+        } else {
+            stringResource(R.string.tasks_relationship_required_by)
+        }
+        "duplicate" -> if (isOutgoing) {
+            stringResource(R.string.tasks_relationship_duplicates)
+        } else {
+            stringResource(R.string.tasks_relationship_duplicated_by)
+        }
+        "related" -> stringResource(R.string.tasks_relationship_related_to)
+        else -> relationship.type.replace('_', ' ')
     }
 
     ClawListItemSurface {
@@ -691,7 +761,7 @@ private fun TaskRelationshipRow(
                 }
             }
             ClawStatusChip(
-                text = relationship.type.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                text = relationshipTypeLabel(relationship.type),
                 tone = if (relationship.type == "depends_on") ClawTone.Warning else ClawTone.Default,
             )
         }
@@ -706,7 +776,36 @@ private fun PriorityChip(priority: String) {
         else -> ClawTone.Default
     }
     ClawStatusChip(
-        text = priority.replaceFirstChar { it.uppercase() },
+        text = priorityLabel(priority),
         tone = tone,
     )
+}
+
+@Composable
+private fun relationshipTypeLabel(type: String): String = when (type) {
+    "depends_on" -> stringResource(R.string.tasks_relationship_type_depends_on)
+    "duplicate" -> stringResource(R.string.tasks_relationship_type_duplicate)
+    "related" -> stringResource(R.string.tasks_relationship_type_related)
+    else -> type.replace('_', ' ')
+}
+
+@Composable
+private fun priorityLabel(priority: String): String = when (priority.lowercase()) {
+    "low" -> stringResource(R.string.tasks_priority_low)
+    "medium" -> stringResource(R.string.tasks_priority_medium)
+    "high" -> stringResource(R.string.tasks_priority_high)
+    "urgent" -> stringResource(R.string.tasks_priority_urgent)
+    else -> priority
+}
+
+@Composable
+private fun localizedDateLabel(rawDate: String): String {
+    val locale = LocalLocale.current.platformLocale
+    return remember(rawDate, locale) {
+        runCatching {
+            LocalDate.parse(rawDate).format(
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale),
+            )
+        }.getOrDefault(rawDate)
+    }
 }

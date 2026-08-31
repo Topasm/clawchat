@@ -17,9 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class AgentRunFilter(val label: String) {
-    ALL("All"), ACTIVE("Active"), ATTENTION("Needs attention"), RECENT("Recent"),
-}
+enum class AgentRunFilter { ALL, ACTIVE, ATTENTION, RECENT }
 
 enum class AgentRunOperation { CANCEL, RETRY, RESUME }
 
@@ -36,6 +34,8 @@ data class AgentRunsUiState(
     val pendingOperation: AgentRunOperation? = null,
     val error: String? = null,
     val notice: String? = null,
+    val errorResource: Int? = null,
+    val noticeResource: Int? = null,
 ) {
     val visibleRuns: List<AgentRun>
         get() = when (filter) {
@@ -106,13 +106,20 @@ class AgentRunsViewModel @Inject constructor(
                     followUp = action.value.take(MAX_FOLLOW_UP_LENGTH),
                     error = null,
                     notice = null,
+                    errorResource = null,
+                    noticeResource = null,
                 )
             }
             is AgentRunsAction.Cancel -> cancelRunInternal(action.runId)
             is AgentRunsAction.Retry -> retryRunInternal(action.runId)
             is AgentRunsAction.Resume -> resumeRunInternal(action.runId)
             AgentRunsAction.ClearFeedback -> _uiState.update {
-                it.copy(error = null, notice = null)
+                it.copy(
+                    error = null,
+                    notice = null,
+                    errorResource = null,
+                    noticeResource = null,
+                )
             }
         }
     }
@@ -134,7 +141,15 @@ class AgentRunsViewModel @Inject constructor(
     /** At most one list request runs; bursts collapse to the strongest next load. */
     private fun requestList(kind: ListLoad) {
         if (kind == ListLoad.USER) {
-            _uiState.update { it.copy(isRefreshing = true, error = null, notice = null) }
+            _uiState.update {
+                it.copy(
+                    isRefreshing = true,
+                    error = null,
+                    notice = null,
+                    errorResource = null,
+                    noticeResource = null,
+                )
+            }
         }
         if (_uiState.value.pendingOperation != null || listJob?.isActive == true) {
             queuedListLoad = queuedListLoad.merge(kind)
@@ -209,6 +224,8 @@ class AgentRunsViewModel @Inject constructor(
                 isDetailLoading = true,
                 error = null,
                 notice = null,
+                errorResource = null,
+                noticeResource = null,
             )
         }
         refreshSelectedDetail(showLoading = true)
@@ -290,6 +307,8 @@ class AgentRunsViewModel @Inject constructor(
                 isDetailLoading = false,
                 error = null,
                 notice = null,
+                errorResource = null,
+                noticeResource = null,
             )
         }
     }
@@ -301,7 +320,11 @@ class AgentRunsViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = repository.cancelRun(runId)) {
                 is ApiResult.Success -> finishOperation(
-                    generation, runId, AgentRunOperation.CANCEL, result.data, "Agent run cancelled",
+                    generation,
+                    runId,
+                    AgentRunOperation.CANCEL,
+                    result.data,
+                    R.string.runs_cancelled_notice,
                 )
                 is ApiResult.Error -> failOperation(generation, runId, AgentRunOperation.CANCEL, result.message)
                 ApiResult.Loading -> Unit
@@ -321,7 +344,7 @@ class AgentRunsViewModel @Inject constructor(
                     runId,
                     AgentRunOperation.RETRY,
                     result.data,
-                    "New agent attempt started",
+                    R.string.runs_retry_started_notice,
                     clearFollowUp = true,
                 )
                 is ApiResult.Error -> failOperation(generation, runId, AgentRunOperation.RETRY, result.message)
@@ -335,7 +358,12 @@ class AgentRunsViewModel @Inject constructor(
         if (run.status != AgentRunStatus.WAITING_INPUT || _uiState.value.pendingOperation != null) return
         val followUp = _uiState.value.followUp.trim()
         if (followUp.isEmpty()) {
-            _uiState.update { it.copy(error = "Add follow-up instructions before resuming") }
+            _uiState.update {
+                it.copy(
+                    error = null,
+                    errorResource = R.string.runs_follow_up_required,
+                )
+            }
             return
         }
         val generation = beginOperation(runId, AgentRunOperation.RESUME)
@@ -346,7 +374,7 @@ class AgentRunsViewModel @Inject constructor(
                     runId,
                     AgentRunOperation.RESUME,
                     result.data,
-                    "Agent run resumed",
+                    R.string.runs_resumed_notice,
                     clearFollowUp = true,
                 )
                 is ApiResult.Error -> failOperation(generation, runId, AgentRunOperation.RESUME, result.message)
@@ -369,6 +397,8 @@ class AgentRunsViewModel @Inject constructor(
                 pendingOperation = operation,
                 error = null,
                 notice = null,
+                errorResource = null,
+                noticeResource = null,
             )
         }
         return generation
@@ -379,7 +409,7 @@ class AgentRunsViewModel @Inject constructor(
         requestedRunId: String,
         operation: AgentRunOperation,
         updatedRun: AgentRun,
-        notice: String,
+        noticeResource: Int,
         clearFollowUp: Boolean = false,
     ) {
         if (!isCurrentOperation(generation, requestedRunId, operation)) return
@@ -399,7 +429,9 @@ class AgentRunsViewModel @Inject constructor(
                 pendingRunId = null,
                 pendingOperation = null,
                 error = null,
-                notice = notice,
+                notice = null,
+                errorResource = null,
+                noticeResource = noticeResource,
             )
         }
         refreshSelectedDetail(showLoading = false)
@@ -418,6 +450,8 @@ class AgentRunsViewModel @Inject constructor(
                 pendingRunId = null,
                 pendingOperation = null,
                 error = message,
+                errorResource = null,
+                noticeResource = null,
             )
         }
         drainQueuedListLoad()

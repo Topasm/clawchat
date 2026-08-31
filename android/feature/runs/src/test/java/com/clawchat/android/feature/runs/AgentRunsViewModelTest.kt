@@ -175,7 +175,7 @@ class AgentRunsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(AgentRunStatus.CANCELLED, viewModel.uiState.value.runs.single().status)
-        assertEquals("Agent run cancelled", viewModel.uiState.value.notice)
+        assertEquals(R.string.runs_cancelled_notice, viewModel.uiState.value.noticeResource)
         assertNull(viewModel.uiState.value.pendingOperation)
     }
 
@@ -190,7 +190,7 @@ class AgentRunsViewModelTest {
         advanceUntilIdle()
 
         viewModel.resumeRun("run-1")
-        assertEquals("Add follow-up instructions before resuming", viewModel.uiState.value.error)
+        assertEquals(R.string.runs_follow_up_required, viewModel.uiState.value.errorResource)
 
         viewModel.updateFollowUp("  Use the smaller API surface  ")
         viewModel.resumeRun("run-1")
@@ -223,7 +223,7 @@ class AgentRunsViewModelTest {
 
         assertEquals(listOf("run-2", "run-1"), viewModel.uiState.value.runs.map { it.id })
         assertEquals("run-2", viewModel.uiState.value.selectedRun?.id)
-        assertEquals("New agent attempt started", viewModel.uiState.value.notice)
+        assertEquals(R.string.runs_retry_started_notice, viewModel.uiState.value.noticeResource)
     }
 
     @Test

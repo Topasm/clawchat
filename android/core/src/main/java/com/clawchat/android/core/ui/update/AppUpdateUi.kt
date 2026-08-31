@@ -17,11 +17,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.clawchat.android.core.R
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawSectionHeader
+import com.clawchat.android.core.update.UpdateFailure
 import com.clawchat.android.core.update.UpdatePhase
 import com.clawchat.android.core.update.UpdateState
 import java.util.Locale
@@ -45,14 +48,18 @@ fun AppUpdatePrompt(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                "Update available",
+                stringResource(R.string.update_available_title),
                 fontWeight = FontWeight.SemiBold,
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "ClawChat ${update.version} is available. You have ${state.currentVersion}.",
+                    stringResource(
+                        R.string.update_available_message,
+                        update.version,
+                        state.currentVersion,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (update.releaseNotes.isNotBlank()) {
@@ -66,17 +73,16 @@ fun AppUpdatePrompt(
                     )
                 }
                 UpdateProgress(state)
-                state.error?.let {
+                state.failure?.let {
                     Text(
-                        it,
+                        updateFailureMessage(it),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 if (state.needsInstallPermission) {
                     Text(
-                        "Android needs permission to install apps from ClawChat. " +
-                            "Grant it on the screen that opens, then tap Install again.",
+                        stringResource(R.string.update_install_permission),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -85,19 +91,23 @@ fun AppUpdatePrompt(
         },
         confirmButton = {
             when (state.phase) {
-                UpdatePhase.ReadyToInstall -> Button(onClick = onInstall) { Text("Install") }
-                UpdatePhase.Downloading -> TextButton(onClick = {}, enabled = false) {
-                    Text("Downloading…")
+                UpdatePhase.ReadyToInstall -> Button(onClick = onInstall) {
+                    Text(stringResource(R.string.update_install_action))
                 }
-                else -> Button(onClick = onDownload) { Text("Download") }
+                UpdatePhase.Downloading -> TextButton(onClick = {}, enabled = false) {
+                    Text(stringResource(R.string.update_downloading_action))
+                }
+                else -> Button(onClick = onDownload) {
+                    Text(stringResource(R.string.update_download_action))
+                }
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (state.phase != UpdatePhase.Downloading) {
-                    TextButton(onClick = onSkip) { Text("Skip") }
+                    TextButton(onClick = onSkip) { Text(stringResource(R.string.update_skip_action)) }
                 }
-                TextButton(onClick = onDismiss) { Text("Later") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later_action)) }
             }
         },
     )
@@ -117,8 +127,8 @@ fun AppUpdateSection(
         modifier = modifier,
         header = {
             ClawSectionHeader(
-                title = "App updates",
-                subtitle = "Installed from GitHub releases.",
+                title = stringResource(R.string.update_section_title),
+                subtitle = stringResource(R.string.update_section_subtitle),
             )
         },
     ) {
@@ -129,7 +139,7 @@ fun AppUpdateSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Version",
+                    stringResource(R.string.update_version_label),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -160,11 +170,23 @@ fun AppUpdateSection(
                         state.phase != UpdatePhase.Checking &&
                         state.phase != UpdatePhase.Downloading,
                 ) {
-                    Text(if (state.phase == UpdatePhase.Checking) "Checking…" else "Check now")
+                    Text(
+                        stringResource(
+                            if (state.phase == UpdatePhase.Checking) {
+                                R.string.update_checking_action
+                            } else {
+                                R.string.update_check_now_action
+                            },
+                        ),
+                    )
                 }
                 when (state.phase) {
-                    UpdatePhase.Available -> Button(onClick = onDownload) { Text("Download") }
-                    UpdatePhase.ReadyToInstall -> Button(onClick = onInstall) { Text("Install") }
+                    UpdatePhase.Available -> Button(onClick = onDownload) {
+                        Text(stringResource(R.string.update_download_action))
+                    }
+                    UpdatePhase.ReadyToInstall -> Button(onClick = onInstall) {
+                        Text(stringResource(R.string.update_install_action))
+                    }
                     else -> Unit
                 }
             }
@@ -177,12 +199,12 @@ fun AppUpdateSection(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Check automatically",
+                        stringResource(R.string.update_auto_check_title),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
-                        "Looks for a new release at most twice a day.",
+                        stringResource(R.string.update_auto_check_subtitle),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -218,16 +240,74 @@ private fun UpdateProgress(state: UpdateState) {
     }
 }
 
+@Composable
 internal fun updateStatusLine(state: UpdateState): String = when {
-    !state.supported -> "This build installs updates manually."
-    state.phase == UpdatePhase.Checking -> "Checking for updates…"
-    state.phase == UpdatePhase.Downloading -> "Downloading ${state.update?.version.orEmpty()}…"
-    state.phase == UpdatePhase.ReadyToInstall ->
-        "ClawChat ${state.update?.version.orEmpty()} is ready to install."
-    state.phase == UpdatePhase.Available -> "ClawChat ${state.update?.version.orEmpty()} is available."
-    state.phase == UpdatePhase.Failed -> state.error ?: "Update check failed."
-    state.phase == UpdatePhase.UpToDate -> "ClawChat is up to date."
-    else -> "Updates are delivered through GitHub releases."
+    state.phase == UpdatePhase.Failed && state.failure != null ->
+        updateFailureMessage(state.failure)
+    !state.supported -> stringResource(R.string.update_status_manual)
+    state.phase == UpdatePhase.Checking -> stringResource(R.string.update_status_checking)
+    state.phase == UpdatePhase.Downloading -> stringResource(
+        R.string.update_status_downloading,
+        state.update?.version.orEmpty(),
+    )
+    state.phase == UpdatePhase.ReadyToInstall -> stringResource(
+        R.string.update_status_ready,
+        state.update?.version.orEmpty(),
+    )
+    state.phase == UpdatePhase.Available -> stringResource(
+        R.string.update_status_available,
+        state.update?.version.orEmpty(),
+    )
+    state.phase == UpdatePhase.Failed -> stringResource(R.string.update_status_failed)
+    state.phase == UpdatePhase.UpToDate -> stringResource(R.string.update_status_current)
+    else -> stringResource(R.string.update_status_delivery)
+}
+
+@Composable
+internal fun updateFailureMessage(failure: UpdateFailure): String {
+    val message = failure.messageResource()
+    return stringResource(message.resource, *message.arguments.toTypedArray())
+}
+
+internal data class UpdateFailureMessageResource(
+    val resource: Int,
+    val arguments: List<Any> = emptyList(),
+)
+
+/** Pure mapping keeps local categories testable and independent of translated text. */
+internal fun UpdateFailure.messageResource(): UpdateFailureMessageResource = when (this) {
+    UpdateFailure.UnsupportedBuild ->
+        UpdateFailureMessageResource(R.string.update_error_unsupported_build)
+    is UpdateFailure.CheckFailed -> detail?.let {
+        UpdateFailureMessageResource(R.string.update_error_check_detail, listOf(it))
+    } ?: UpdateFailureMessageResource(R.string.update_error_check)
+    UpdateFailure.CheckNetworkFailed ->
+        UpdateFailureMessageResource(R.string.update_error_check_network)
+    is UpdateFailure.CheckHttpError -> detail?.let {
+        UpdateFailureMessageResource(
+            R.string.update_error_check_http_detail,
+            listOf(statusCode, it),
+        )
+    } ?: UpdateFailureMessageResource(R.string.update_error_check_http, listOf(statusCode))
+    UpdateFailure.CacheUnavailable ->
+        UpdateFailureMessageResource(R.string.update_error_cache_unavailable)
+    is UpdateFailure.DownloadHttpError ->
+        UpdateFailureMessageResource(R.string.update_error_download_http, listOf(statusCode))
+    is UpdateFailure.ChecksumHttpError ->
+        UpdateFailureMessageResource(R.string.update_error_checksum_http, listOf(statusCode))
+    UpdateFailure.InvalidChecksumPayload ->
+        UpdateFailureMessageResource(R.string.update_error_checksum_invalid)
+    UpdateFailure.ChecksumMismatch ->
+        UpdateFailureMessageResource(R.string.update_error_checksum_mismatch)
+    is UpdateFailure.DownloadFailed -> detail?.let {
+        UpdateFailureMessageResource(R.string.update_error_download_detail, listOf(it))
+    } ?: UpdateFailureMessageResource(R.string.update_error_download)
+    is UpdateFailure.InstallPermissionFailed -> detail?.let {
+        UpdateFailureMessageResource(R.string.update_error_install_permission_detail, listOf(it))
+    } ?: UpdateFailureMessageResource(R.string.update_error_install_permission)
+    is UpdateFailure.InstallLaunchFailed -> detail?.let {
+        UpdateFailureMessageResource(R.string.update_error_install_launch_detail, listOf(it))
+    } ?: UpdateFailureMessageResource(R.string.update_error_install_launch)
 }
 
 internal fun formatBytes(bytes: Long): String = when {

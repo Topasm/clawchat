@@ -1,6 +1,7 @@
 package com.clawchat.android.core.api
 
 import com.clawchat.android.core.data.model.*
+import com.clawchat.android.core.network.ExpectedSessionScope
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -18,61 +19,100 @@ interface ClawChatApi {
     // --- Today ---
 
     @GET("api/today")
-    suspend fun getToday(): TodayResponse
+    suspend fun getToday(@Tag expectedScope: ExpectedSessionScope? = null): TodayResponse
 
     @GET("api/today/briefing")
-    suspend fun getBriefing(): BriefingResponse
+    suspend fun getBriefing(@Tag expectedScope: ExpectedSessionScope? = null): BriefingResponse
 
     // --- Todos ---
 
     @GET("api/todos")
-    suspend fun listTodos(@QueryMap params: Map<String, String> = emptyMap()): PaginatedResponse<Todo>
+    suspend fun listTodos(
+        @QueryMap params: Map<String, String> = emptyMap(),
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): PaginatedResponse<Todo>
 
     @GET("api/todos/{id}")
-    suspend fun getTodo(@Path("id") id: String): Todo
+    suspend fun getTodo(
+        @Path("id") id: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): Todo
 
     @POST("api/todos")
-    suspend fun createTodo(@Body body: TodoCreate): Todo
+    suspend fun createTodo(
+        @Body body: TodoCreate,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): Todo
 
     @PATCH("api/todos/{id}")
-    suspend fun updateTodo(@Path("id") id: String, @Body body: TodoUpdate): Todo
+    suspend fun updateTodo(
+        @Path("id") id: String,
+        @Body body: TodoUpdate,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): Todo
 
     @DELETE("api/todos/{id}")
-    suspend fun deleteTodo(@Path("id") id: String)
+    suspend fun deleteTodo(
+        @Path("id") id: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    )
 
     @POST("api/todos/{todoId}/organize")
-    suspend fun organizeTodo(@Path("todoId") todoId: String): Response<Unit>
+    suspend fun organizeTodo(
+        @Path("todoId") todoId: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): Response<Unit>
 
     // --- Task relationships ---
 
     @GET("api/task-relationships")
-    suspend fun listTaskRelationships(@Query("task_id") taskId: String): List<TaskRelationship>
+    suspend fun listTaskRelationships(
+        @Query("task_id") taskId: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): List<TaskRelationship>
 
     // --- Events ---
 
     @GET("api/events")
-    suspend fun listEvents(@QueryMap params: Map<String, String> = emptyMap()): PaginatedResponse<Event>
+    suspend fun listEvents(
+        @QueryMap params: Map<String, String> = emptyMap(),
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): PaginatedResponse<Event>
 
     @POST("api/events")
-    suspend fun createEvent(@Body body: EventCreate): Event
+    suspend fun createEvent(
+        @Body body: EventCreate,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): Event
 
     @PATCH("api/events/{id}")
-    suspend fun updateEvent(@Path("id") id: String, @Body body: EventUpdate): Event
+    suspend fun updateEvent(
+        @Path("id") id: String,
+        @Body body: EventUpdate,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): Event
 
     @DELETE("api/events/{id}")
-    suspend fun deleteEvent(@Path("id") id: String)
+    suspend fun deleteEvent(
+        @Path("id") id: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    )
 
     @DELETE("api/events/{id}/occurrences/{date}")
     suspend fun deleteEventOccurrence(
         @Path("id") id: String,
         @Path("date") date: String,
         @Query("mode") mode: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
     )
 
     // --- Search ---
 
     @GET("api/search")
-    suspend fun search(@QueryMap params: Map<String, String>): PaginatedResponse<SearchHit>
+    suspend fun search(
+        @QueryMap params: Map<String, String>,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): PaginatedResponse<SearchHit>
 
     // --- Conversations ---
 

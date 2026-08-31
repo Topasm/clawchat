@@ -1,5 +1,6 @@
 package com.clawchat.android.core.sync
 
+import com.clawchat.android.core.data.ActiveSession
 import com.clawchat.android.core.network.SyncEvent
 import com.clawchat.android.core.network.WebSocketClient
 import io.mockk.Runs
@@ -175,6 +176,58 @@ class SyncManagerTest {
         }
 
         verify(exactly = 1) { fixture.client.connect() }
+        fixture.manager.stop()
+    }
+
+    @Test
+    fun `activity recreation keeps the existing workspace connection`() = runTest {
+        val fixture = fixture()
+
+        fixture.manager.reconcile("server:host:a")
+        fixture.manager.reconcile("server:host:a")
+
+        verify(exactly = 1) { fixture.client.connect() }
+        verify(exactly = 0) { fixture.client.disconnect() }
+        fixture.manager.stop()
+    }
+
+    @Test
+    fun `workspace switch reconnects and scopes queued user actions`() = runTest {
+        val fixture = fixture()
+        val received = mutableListOf<WorkspaceSyncEvent<SyncEvent.Reminder>>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            fixture.manager.reminder.collect(received::add)
+        }
+
+        fixture.manager.reconcile("server:host:a")
+        fixture.manager.reconcile("server:host:b")
+        val reminder = SyncEvent.Reminder(
+            reminderType = "todo",
+            itemId = "todo-1",
+            title = "Due",
+            message = "Now",
+            minutesUntil = 0,
+        )
+        assertTrue(fixture.events.tryEmit(reminder))
+        advanceUntilIdle()
+
+        assertEquals(listOf(WorkspaceSyncEvent("server:host:b", reminder)), received)
+        verify(exactly = 2) { fixture.client.connect() }
+        verify(exactly = 1) { fixture.client.disconnect() }
+        fixture.manager.stop()
+    }
+
+    @Test
+    fun `credential change on the same workspace reconnects`() = runTest {
+        val fixture = fixture()
+        val first = ActiveSession("token-a", "https://a.example", "host-a", "paired")
+        val rotated = first.copy(token = "token-b")
+
+        fixture.manager.reconcile("server:host:a", first)
+        fixture.manager.reconcile("server:host:a", rotated)
+
+        verify(exactly = 2) { fixture.client.connect() }
+        verify(exactly = 1) { fixture.client.disconnect() }
         fixture.manager.stop()
     }
 }

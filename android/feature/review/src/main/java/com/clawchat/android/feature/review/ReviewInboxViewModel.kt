@@ -32,6 +32,8 @@ data class ReviewInboxUiState(
     val detailError: String? = null,
     val error: String? = null,
     val notice: String? = null,
+    val errorResource: Int? = null,
+    val noticeResource: Int? = null,
     val followUpRunId: String? = null,
 ) {
     /** A decision needs authoritative original, result, and impact data. */
@@ -101,7 +103,13 @@ class ReviewInboxViewModel @Inject constructor(
             }
             is ReviewInboxAction.Decide -> submitDecision(action.decision)
             ReviewInboxAction.DismissFeedback -> _uiState.update {
-                it.copy(error = null, notice = null, followUpRunId = null)
+                it.copy(
+                    error = null,
+                    notice = null,
+                    errorResource = null,
+                    noticeResource = null,
+                    followUpRunId = null,
+                )
             }
         }
     }
@@ -115,6 +123,7 @@ class ReviewInboxViewModel @Inject constructor(
                 isLoading = !isRefresh && it.items.isEmpty(),
                 isRefreshing = (isRefresh || silent) && it.items.isNotEmpty(),
                 error = if (silent) it.error else null,
+                errorResource = if (silent) it.errorResource else null,
             )
         }
         viewModelScope.launch {
@@ -171,6 +180,8 @@ class ReviewInboxViewModel @Inject constructor(
                 detailError = null,
                 error = null,
                 notice = null,
+                errorResource = null,
+                noticeResource = null,
             )
         }
         if (item.supportsDecision) refreshSelectedRun(showLoading = true)
@@ -240,6 +251,7 @@ class ReviewInboxViewModel @Inject constructor(
                 isDetailLoading = false,
                 detailError = null,
                 error = null,
+                errorResource = null,
             )
         }
     }
@@ -251,10 +263,11 @@ class ReviewInboxViewModel @Inject constructor(
         if (!state.canDecideSelected) {
             _uiState.update {
                 it.copy(
-                    error = if (!item.supportsDecision) {
-                        "This review is read-only on Android until its complete source is available."
+                    error = null,
+                    errorResource = if (!item.supportsDecision) {
+                        R.string.review_read_only_error
                     } else {
-                        "Load the authoritative run result and impact before deciding."
+                        R.string.review_evidence_required_error
                     },
                 )
             }
@@ -266,7 +279,15 @@ class ReviewInboxViewModel @Inject constructor(
         listGeneration++
         detailGeneration++
         val note = state.note.trim().ifEmpty { null }
-        _uiState.update { it.copy(isSubmitting = true, error = null, notice = null) }
+        _uiState.update {
+            it.copy(
+                isSubmitting = true,
+                error = null,
+                notice = null,
+                errorResource = null,
+                noticeResource = null,
+            )
+        }
         viewModelScope.launch {
             when (val result = repository.decide(item.id, decision, note)) {
                 is ApiResult.Success -> {
@@ -281,7 +302,9 @@ class ReviewInboxViewModel @Inject constructor(
                             isDetailLoading = false,
                             isSubmitting = false,
                             detailError = null,
-                            notice = decision.confirmationMessage,
+                            notice = null,
+                            errorResource = null,
+                            noticeResource = decision.confirmationMessageResource,
                             followUpRunId = if (decision == ReviewDecision.CHANGES_REQUESTED) {
                                 item.subjectId
                             } else {
@@ -293,7 +316,14 @@ class ReviewInboxViewModel @Inject constructor(
                 }
                 is ApiResult.Error -> {
                     if (!isCurrentDecision(generation, item.id)) return@launch
-                    _uiState.update { it.copy(isSubmitting = false, error = result.message) }
+                    _uiState.update {
+                        it.copy(
+                            isSubmitting = false,
+                            error = result.message,
+                            errorResource = null,
+                            noticeResource = null,
+                        )
+                    }
                     refreshAfterDecisionIfNeeded()
                 }
                 ApiResult.Loading -> Unit
@@ -313,12 +343,11 @@ class ReviewInboxViewModel @Inject constructor(
         }
     }
 
-    private val ReviewDecision.confirmationMessage: String
+    private val ReviewDecision.confirmationMessageResource: Int
         get() = when (this) {
-            ReviewDecision.APPROVED -> "Review approved"
-            ReviewDecision.CHANGES_REQUESTED ->
-                "Changes requested. Open the run to send follow-up instructions and resume it."
-            ReviewDecision.REJECTED -> "Review rejected"
+            ReviewDecision.APPROVED -> R.string.review_approved_notice
+            ReviewDecision.CHANGES_REQUESTED -> R.string.review_changes_requested_notice
+            ReviewDecision.REJECTED -> R.string.review_rejected_notice
         }
 
     private companion object {
