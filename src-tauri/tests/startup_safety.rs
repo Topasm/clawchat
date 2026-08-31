@@ -120,7 +120,8 @@ fn macos_menu_and_tray_expose_recovery_safe_application_commands() {
     assert!(NATIVE_MENU_SOURCE.contains("\"Settings…\""));
     assert!(NATIVE_MENU_SOURCE.contains("Some(\"CmdOrCtrl+Comma\")"));
     assert!(NATIVE_MENU_SOURCE.contains("\"Quick Capture\""));
-    assert!(NATIVE_MENU_SOURCE.contains("\"Connections & Diagnostics…\""));
+    assert!(NATIVE_MENU_SOURCE.contains("\"Connections…\""));
+    assert!(NATIVE_MENU_SOURCE.contains("\"Open Diagnostics\""));
     assert!(NATIVE_COMMAND_SOURCE.contains("app.emit(\"open-settings\", ())"));
     assert!(NATIVE_COMMAND_SOURCE.contains("navigate(app, \"/diagnostics\", source)"));
     assert!(NATIVE_COMMAND_SOURCE.contains("pub(super) enum AppMenuCommand"));
