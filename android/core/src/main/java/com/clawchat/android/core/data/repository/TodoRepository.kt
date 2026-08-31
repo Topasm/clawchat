@@ -18,6 +18,7 @@ import javax.inject.Singleton
 
 interface TodoRepository {
     suspend fun listTodos(params: Map<String, String> = emptyMap()): ApiResult<PaginatedResponse<Todo>>
+    suspend fun getTodo(id: String): ApiResult<Todo>
     suspend fun createTodo(body: TodoCreate): ApiResult<Todo>
     suspend fun updateTodo(id: String, body: TodoUpdate): ApiResult<Todo>
     suspend fun deleteTodo(id: String): ApiResult<Unit>
@@ -39,14 +40,37 @@ class TodoRepositoryImpl @Inject constructor(
         return result
     }
 
-    override suspend fun createTodo(body: TodoCreate): ApiResult<Todo> =
-        apiCall { api.createTodo(body) }
+    override suspend fun getTodo(id: String): ApiResult<Todo> {
+        val result = apiCall { api.getTodo(id) }
+        if (result is ApiResult.Success) {
+            todoDao.upsertAll(listOf(result.data.toEntity()))
+        }
+        return result
+    }
 
-    override suspend fun updateTodo(id: String, body: TodoUpdate): ApiResult<Todo> =
-        apiCall { api.updateTodo(id, body) }
+    override suspend fun createTodo(body: TodoCreate): ApiResult<Todo> {
+        val result = apiCall { api.createTodo(body) }
+        if (result is ApiResult.Success) {
+            todoDao.upsertAll(listOf(result.data.toEntity()))
+        }
+        return result
+    }
 
-    override suspend fun deleteTodo(id: String): ApiResult<Unit> =
-        apiCall { api.deleteTodo(id) }
+    override suspend fun updateTodo(id: String, body: TodoUpdate): ApiResult<Todo> {
+        val result = apiCall { api.updateTodo(id, body) }
+        if (result is ApiResult.Success) {
+            todoDao.upsertAll(listOf(result.data.toEntity()))
+        }
+        return result
+    }
+
+    override suspend fun deleteTodo(id: String): ApiResult<Unit> {
+        val result = apiCall { api.deleteTodo(id) }
+        if (result is ApiResult.Success) {
+            todoDao.deleteById(id)
+        }
+        return result
+    }
 
     override suspend fun organizeTodo(todoId: String): ApiResult<Unit> =
         apiCall { api.organizeTodo(todoId) }.map { }

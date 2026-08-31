@@ -15,11 +15,12 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
-import androidx.glance.action.actionStartActivity
+import androidx.glance.action.actionStartActivity as actionStartActivityByComponent
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.action.actionStartActivity as actionStartActivityByIntent
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
@@ -32,25 +33,21 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
-import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
-import com.clawchat.android.core.data.model.TaskStatus
-import com.clawchat.android.core.data.model.Todo
-import com.clawchat.android.core.data.model.TodayResponse
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.WidgetSize
 import com.clawchat.android.widget.common.WidgetState
 import com.clawchat.android.widget.common.widgetBackground
-import com.clawchat.android.widget.common.widgetItemBackground
 import com.clawchat.android.widget.di.WidgetEntryPoint
+import com.clawchat.android.widget.quickadd.QuickAddActivity
+import com.clawchat.android.widget.quickadd.QuickAddTarget
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 class TodoTrackingWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
@@ -62,11 +59,11 @@ class TodoTrackingWidget : GlanceAppWidget() {
         )
         val token = entryPoint.sessionStore().token.first()
 
-        val state: WidgetState<TodayResponse> = if (token == null) {
+        val state: WidgetState<TodoWidgetUiModel> = if (token == null) {
             WidgetState.NotLoggedIn
         } else {
             when (val result = entryPoint.todayRepository().getToday()) {
-                is ApiResult.Success -> WidgetState.Success(result.data)
+                is ApiResult.Success -> WidgetState.Success(TodoWidgetUiModel.from(result.data))
                 is ApiResult.Error -> WidgetState.Error(result.message)
                 is ApiResult.Loading -> WidgetState.Loading
             }
@@ -83,201 +80,250 @@ class TodoTrackingWidget : GlanceAppWidget() {
 
     companion object {
         val TODO_ID_KEY = ActionParameters.Key<String>("todoId")
-        val CURRENT_STATUS_KEY = ActionParameters.Key<String>("currentStatus")
     }
 }
 
 @Composable
 private fun TodoTrackingContent(
-    state: WidgetState<TodayResponse>,
+    state: WidgetState<TodoWidgetUiModel>,
     mainActivity: ComponentName,
 ) {
-    val size = LocalSize.current
     val context = LocalContext.current
+    val size = LocalSize.current
+    val isLoggedIn = state !is WidgetState.NotLoggedIn
+    val isCompactHeight = size.height <= WidgetSize.Height2
+    val quickAddIntent = QuickAddActivity.createIntent(context, QuickAddTarget.TODAY)
 
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .widgetBackground()
-            .clickable(actionStartActivity(mainActivity)),
+            .widgetBackground(),
     ) {
-        // Title bar
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(if (isCompactHeight) 40.dp else 44.dp)
+                .padding(start = 14.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
+                text = context.getString(R.string.widget_today_title),
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     color = GlanceTheme.colors.onSurface,
                     fontSize = if (size.width >= WidgetSize.Width4) 16.sp else 14.sp,
                 ),
-                modifier = GlanceModifier.defaultWeight(),
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .clickable(actionStartActivityByComponent(mainActivity)),
             )
-            if (size.width >= WidgetSize.Width4) {
+            if (isLoggedIn && isCompactHeight) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_add),
+                    contentDescription = context.getString(R.string.widget_add_task),
+                    colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+                    modifier = GlanceModifier
+                        .size(32.dp)
+                        .padding(5.dp)
+                        .clickable(actionStartActivityByIntent(quickAddIntent)),
+                )
+            }
+            if (isLoggedIn && (!isCompactHeight || size.width >= WidgetSize.Width4)) {
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_refresh),
-                    contentDescription = "Refresh",
+                    contentDescription = context.getString(R.string.widget_refresh),
                     colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant),
                     modifier = GlanceModifier
-                        .padding(4.dp)
+                        .size(32.dp)
+                        .padding(7.dp)
                         .clickable(actionRunCallback<RefreshTodosAction>()),
                 )
             }
         }
 
         when (state) {
-            is WidgetState.NotLoggedIn -> CenterMessage("Please log in to ClawChat")
-            is WidgetState.Loading -> CenterMessage("Loading...")
-            is WidgetState.Error -> CenterMessage("Could not load data")
+            is WidgetState.NotLoggedIn -> CenterMessage(
+                text = context.getString(R.string.widget_login_required),
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .clickable(actionStartActivityByComponent(mainActivity)),
+            )
+            is WidgetState.Loading -> CenterMessage(
+                context.getString(R.string.widget_loading),
+                GlanceModifier.defaultWeight(),
+            )
+            is WidgetState.Error -> CenterMessage(
+                context.getString(R.string.widget_load_error),
+                GlanceModifier.defaultWeight(),
+            )
             is WidgetState.Success -> {
-                val today = state.data
-                val allTodos = today.todayTodos + today.overdueTodos
-                if (allTodos.isEmpty()) {
-                    CenterMessage("No todos for today")
+                if (state.data.isEmpty) {
+                    CenterMessage(
+                        context.getString(R.string.widget_empty),
+                        GlanceModifier.defaultWeight(),
+                    )
                 } else {
                     TodoList(
-                        todayTodos = today.todayTodos,
-                        overdueTodos = today.overdueTodos,
+                        model = state.data,
+                        mainActivity = mainActivity,
+                        compact = isCompactHeight,
+                        modifier = GlanceModifier.defaultWeight(),
                     )
                 }
             }
+        }
+
+        if (isLoggedIn && !isCompactHeight) {
+            AddTaskAction()
         }
     }
 }
 
 @Composable
 private fun TodoList(
-    todayTodos: List<Todo>,
-    overdueTodos: List<Todo>,
+    model: TodoWidgetUiModel,
+    mainActivity: ComponentName,
+    compact: Boolean,
+    modifier: GlanceModifier,
 ) {
+    val context = LocalContext.current
     LazyColumn(
-        modifier = GlanceModifier.fillMaxSize().padding(horizontal = 8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
         horizontalAlignment = Alignment.Start,
     ) {
-        if (overdueTodos.isNotEmpty()) {
+        if (model.overdue.isNotEmpty() && !compact) {
             item {
                 Text(
-                    text = "Overdue",
+                    text = context.getString(R.string.widget_overdue),
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         color = GlanceTheme.colors.error,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                     ),
-                    modifier = GlanceModifier.padding(start = 4.dp, bottom = 4.dp),
+                    modifier = GlanceModifier.padding(start = 44.dp, top = 2.dp, bottom = 2.dp),
                 )
             }
-            items(overdueTodos, itemId = { it.id.hashCode().toLong() }) { todo ->
-                TodoRow(todo)
-            }
-            item { Spacer(GlanceModifier.height(8.dp)) }
+        }
+        items(model.overdue, itemId = { it.id.hashCode().toLong() }) { todo ->
+            TodoRow(todo = todo, mainActivity = mainActivity)
         }
 
-        if (todayTodos.isNotEmpty()) {
-            if (overdueTodos.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Today",
-                        style = TextStyle(
-                            fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.onSurfaceVariant,
-                            fontSize = 12.sp,
-                        ),
-                        modifier = GlanceModifier.padding(start = 4.dp, bottom = 4.dp),
-                    )
-                }
-            }
-            items(todayTodos, itemId = { it.id.hashCode().toLong() }) { todo ->
-                TodoRow(todo)
-            }
+        items(model.today, itemId = { it.id.hashCode().toLong() }) { todo ->
+            TodoRow(todo = todo, mainActivity = mainActivity)
         }
-
-        item { Spacer(GlanceModifier.height(4.dp)) }
+        item { Spacer(GlanceModifier.height(2.dp)) }
     }
 }
 
 @Composable
-private fun TodoRow(todo: Todo) {
-    val completed = todo.status == TaskStatus.COMPLETED
-
-    Column(modifier = GlanceModifier.padding(bottom = 4.dp)) {
-        Row(
+private fun TodoRow(
+    todo: TodoWidgetItem,
+    mainActivity: ComponentName,
+) {
+    val context = LocalContext.current
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(42.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
             modifier = GlanceModifier
-                .fillMaxWidth()
-                .widgetItemBackground(completed)
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .size(42.dp)
                 .clickable(
-                    actionRunCallback<ToggleTodoAction>(
-                        actionParametersOf(
-                            TodoTrackingWidget.TODO_ID_KEY to todo.id,
-                            TodoTrackingWidget.CURRENT_STATUS_KEY to todo.status.wireValue,
-                        )
+                    actionRunCallback<CompleteTodoAction>(
+                        actionParametersOf(TodoTrackingWidget.TODO_ID_KEY to todo.id)
                     )
                 ),
-            verticalAlignment = Alignment.CenterVertically,
+            contentAlignment = Alignment.Center,
         ) {
-            // Priority indicator
-            if (todo.priority == "high" || todo.priority == "urgent") {
-                Box(
-                    modifier = GlanceModifier
-                        .width(4.dp)
-                        .height(16.dp),
-                ) {
-                    Image(
-                        provider = ImageProvider(R.drawable.ic_widget_priority),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.error),
-                    )
-                }
-                Spacer(GlanceModifier.width(8.dp))
-            }
-
-            Text(
-                text = todo.title,
-                modifier = GlanceModifier.defaultWeight(),
-                style = TextStyle(
-                    color = if (!completed) GlanceTheme.colors.onSecondaryContainer
-                    else GlanceTheme.colors.onTertiaryContainer,
-                    textDecoration = if (completed) TextDecoration.LineThrough
-                    else TextDecoration.None,
-                ),
-                maxLines = 2,
-            )
-
-            Spacer(GlanceModifier.width(8.dp))
-
             Image(
-                provider = ImageProvider(
-                    if (completed) R.drawable.ic_widget_check_circle
-                    else R.drawable.ic_widget_circle
-                ),
-                contentDescription = taskStatusLabel(todo.status),
+                provider = ImageProvider(R.drawable.ic_widget_circle),
+                contentDescription = context.getString(R.string.widget_mark_done, todo.title),
                 colorFilter = ColorFilter.tint(
-                    if (completed) GlanceTheme.colors.primary
-                    else GlanceTheme.colors.onSurfaceVariant
+                    if (todo.isOverdue) GlanceTheme.colors.error
+                    else GlanceTheme.colors.primary
                 ),
+                modifier = GlanceModifier.size(22.dp),
             )
         }
+
+        Text(
+            text = todo.title,
+            modifier = GlanceModifier
+                .defaultWeight()
+                .clickable(actionStartActivityByComponent(mainActivity)),
+            style = TextStyle(
+                color = if (todo.isOverdue) GlanceTheme.colors.error
+                else GlanceTheme.colors.onSurface,
+                fontSize = 14.sp,
+            ),
+            maxLines = 1,
+        )
+
+        if (todo.isHighPriority) {
+            Spacer(GlanceModifier.width(4.dp))
+            Image(
+                provider = ImageProvider(R.drawable.ic_widget_priority),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(GlanceTheme.colors.error),
+                modifier = GlanceModifier.size(16.dp),
+            )
+        }
+        Spacer(GlanceModifier.width(8.dp))
     }
 }
 
-private fun taskStatusLabel(status: TaskStatus): String = when (status) {
-    TaskStatus.PENDING -> "Pending"
-    TaskStatus.IN_PROGRESS -> "In progress"
-    TaskStatus.COMPLETED -> "Completed"
-    TaskStatus.CANCELLED -> "Cancelled"
+@Composable
+private fun AddTaskAction() {
+    val context = LocalContext.current
+    val quickAddIntent = QuickAddActivity.createIntent(context, QuickAddTarget.TODAY)
+    Row(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .padding(horizontal = 12.dp)
+            .clickable(actionStartActivityByIntent(quickAddIntent)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            provider = ImageProvider(R.drawable.ic_widget_add),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+            modifier = GlanceModifier.size(22.dp),
+        )
+        Spacer(GlanceModifier.width(10.dp))
+        Text(
+            text = context.getString(R.string.widget_add_task),
+            style = TextStyle(
+                color = GlanceTheme.colors.primary,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp,
+            ),
+        )
+    }
 }
 
 @Composable
-private fun CenterMessage(text: String) {
+private fun CenterMessage(
+    text: String,
+    modifier: GlanceModifier,
+) {
     Box(
-        modifier = GlanceModifier.fillMaxSize().padding(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
-            style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant),
+            style = TextStyle(
+                color = GlanceTheme.colors.onSurfaceVariant,
+                fontSize = 13.sp,
+            ),
+            maxLines = 2,
         )
     }
 }

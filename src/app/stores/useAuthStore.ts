@@ -95,6 +95,14 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         const { serverUrl, token, refreshToken } = get();
+        // Explicit sign-out and confirmed refresh failures must also remove the
+        // per-workspace credential. Otherwise selecting the same workspace can
+        // silently restore a session the user believed they had forgotten.
+        void import('../services/activeRemoteSession')
+          .then(({ forgetActiveRemoteWorkspaceSession }) => forgetActiveRemoteWorkspaceSession())
+          .catch((error) => {
+            console.warn('Could not forget the active workspace session.', error);
+          });
         if (serverUrl && token) {
           // Revoke the server-side refresh session without delaying local
           // sign-out. keepalive lets the request survive an app/webview close.

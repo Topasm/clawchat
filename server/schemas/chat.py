@@ -44,21 +44,24 @@ class MessageResponse(BaseModel):
             raw = values.metadata_json
         elif isinstance(values, dict):
             raw = values.pop("metadata_json", None)
+        parsed = _json.loads(raw) if isinstance(raw, str) else raw
+        if hasattr(values, "__dict__"):
+            # Always convert ORM objects.  SQLAlchemy's declarative base has a
+            # class-level ``metadata`` attribute, so from_attributes otherwise
+            # mistakes that MetaData object for this response field when the
+            # message has no metadata_json value.
+            d = {
+                "id": values.id,
+                "conversation_id": values.conversation_id,
+                "role": values.role,
+                "content": values.content,
+                "message_type": values.message_type,
+                "intent": values.intent,
+                "created_at": values.created_at,
+                "metadata": parsed,
+            }
+            return d
         if raw:
-            parsed = _json.loads(raw) if isinstance(raw, str) else raw
-            if hasattr(values, "__dict__"):
-                # ORM object: convert to dict so Pydantic can set metadata
-                d = {
-                    "id": values.id,
-                    "conversation_id": values.conversation_id,
-                    "role": values.role,
-                    "content": values.content,
-                    "message_type": values.message_type,
-                    "intent": values.intent,
-                    "created_at": values.created_at,
-                    "metadata": parsed,
-                }
-                return d
             values["metadata"] = parsed
         return values
 
@@ -75,7 +78,9 @@ class SendMessageRequest(BaseModel):
 class SendMessageResponse(BaseModel):
     message_id: str
     conversation_id: str
-    status: str = "delivered"
+    # The user message is durable before the 202 is returned.  Assistant
+    # delivery is acknowledged separately by the final WebSocket event.
+    status: str = "accepted"
 
 
 class MessageEditRequest(BaseModel):

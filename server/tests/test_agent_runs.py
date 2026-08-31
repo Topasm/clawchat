@@ -127,6 +127,33 @@ async def test_new_attempt_preserves_previous_result(db_session):
 
 
 @pytest.mark.asyncio
+async def test_run_detail_exposes_full_result_but_list_stays_compact(
+    client, auth_headers, db_session
+):
+    _project, _todo, task = await create_project_task(db_session)
+    run = await agent_run_service.create_run(
+        db_session, task, provider="openclaw", model="model-a"
+    )
+    full_result = "complete-source:" + ("x" * 2_000)
+    run.result = full_result
+    run.result_summary = full_result[:500]
+    run.status = "waiting_review"
+    run.progress = 100
+    await db_session.commit()
+
+    listed = await client.get("/api/runs", headers=auth_headers)
+    assert listed.status_code == 200, listed.text
+    listed_run = next(item for item in listed.json() if item["id"] == run.id)
+    assert "result" not in listed_run
+    assert listed_run["result_summary"] == full_result[:500]
+
+    detail = await client.get(f"/api/runs/{run.id}", headers=auth_headers)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["result"] == full_result
+    assert detail.json()["result_summary"] == full_result[:500]
+
+
+@pytest.mark.asyncio
 async def test_cancel_endpoint_stops_registered_execution(
     client, auth_headers, db_session
 ):

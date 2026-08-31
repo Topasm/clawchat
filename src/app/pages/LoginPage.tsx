@@ -676,7 +676,7 @@ export default function LoginPage() {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                marginBottom: 20,
+                marginBottom: 6,
                 border: `1px solid ${colors.border}`,
                 borderRadius: 8,
                 fontSize: 14,
@@ -686,6 +686,18 @@ export default function LoginPage() {
                 outline: 'none',
               }}
             />
+            <div
+              style={{
+                color: colors.textTertiary,
+                fontSize: 11,
+                lineHeight: 1.45,
+                marginBottom: 20,
+              }}
+            >
+              {translateUi(
+                'PINs are never saved. This device securely remembers the session until you sign out.',
+              )}
+            </div>
 
             {error && (
               <div style={{ color: colors.error, fontSize: 13, marginBottom: 16 }}>{error}</div>

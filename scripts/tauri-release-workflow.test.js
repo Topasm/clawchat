@@ -9,18 +9,26 @@ function readWorkflow() {
   return fs.readFileSync(workflowPath, 'utf8').replace(/\r\n/g, '\n');
 }
 
-test('preflight gates the build matrix and one dependent job publishes the release', () => {
+test('preflight gates desktop and Android builds before one dependent job publishes the release', () => {
   const workflow = readWorkflow();
 
+  assert.match(workflow, /^name: Release ClawChat$/m);
   assert.doesNotMatch(workflow, /tauri-apps\/tauri-action/);
   assert.match(workflow, /\n  preflight:\n[\s\S]*?npm run check:release-version/);
-  assert.match(workflow, /Desktop releases must run from the current origin\/main commit/);
+  assert.match(workflow, /ClawChat releases must run from the current origin\/main commit/);
   assert.match(workflow, /Release tag already exists/);
   assert.match(workflow, /\n  release:\n[\s\S]*?needs: preflight/);
+  assert.match(workflow, /\n  release:\n[\s\S]*?environment: desktop-release/);
+  assert.match(workflow, /\n  android:\n[\s\S]*?needs: preflight/);
   assert.match(workflow, /npx tauri build/);
+  assert.match(
+    workflow,
+    /\.\/gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease/,
+  );
   assert.match(workflow, /name: Stage verified release artifacts/);
+  assert.match(workflow, /name: Upload verified Android release artifacts/);
   assert.match(workflow, /compression-level: 0/);
-  assert.match(workflow, /\n  publish:\n[\s\S]*?needs: \[preflight, release\]/);
+  assert.match(workflow, /\n  publish:\n[\s\S]*?needs: \[preflight, release, android\]/);
   assert.match(workflow, /actions\/download-artifact@[a-f\d]{40}/);
   assert.match(workflow, /npm run generate:tauri-release -- release-input release-artifacts/);
   assert.match(workflow, /sha256sum --check checksums\.txt/);
@@ -28,10 +36,17 @@ test('preflight gates the build matrix and one dependent job publishes the relea
 
   const buildIndex = workflow.indexOf('npx tauri build');
   const stageIndex = workflow.indexOf('name: Stage verified release artifacts');
+  const androidBuildIndex = workflow.indexOf('./gradlew testDebugUnitTest');
+  const androidStageIndex = workflow.indexOf('name: Upload verified Android release artifacts');
   const downloadIndex = workflow.indexOf('name: Download verified platform artifacts');
+  const inventoryIndex = workflow.indexOf('name: Verify final release inventory');
   const publishIndex = workflow.indexOf('name: Create one complete draft release');
   assert.ok(buildIndex < stageIndex);
+  assert.ok(androidBuildIndex < androidStageIndex);
   assert.ok(stageIndex < downloadIndex);
+  assert.ok(androidStageIndex < downloadIndex);
+  assert.ok(downloadIndex < inventoryIndex);
+  assert.ok(inventoryIndex < publishIndex);
   assert.ok(downloadIndex < publishIndex);
 });
 
@@ -41,10 +56,18 @@ test('final inventory requires every platform updater and all expected release f
   for (const platform of ['linux-x86_64', 'darwin-aarch64', 'windows-x86_64']) {
     assert.match(workflow, new RegExp(platform));
   }
-  // Eight artifacts plus latest.json and checksums.txt. Three signatures:
-  // one updater bundle per platform.
+  // Eight desktop artifacts, three Android artifacts, latest.json, and
+  // checksums.txt. Three signatures: one desktop updater bundle per platform.
   assert.match(workflow, /-eq 3/);
-  assert.match(workflow, /-eq 10/);
+  assert.match(workflow, /-eq 13/);
+  for (const extension of ['apk', 'aab', 'apk\\.sha256']) {
+    assert.match(
+      workflow,
+      new RegExp(
+        `release-artifacts/ClawChat-\\$\\{\\{ needs\\.preflight\\.outputs\\.version \\}\\}\\.${extension}`,
+      ),
+    );
+  }
   assert.match(workflow, /fail_on_unmatched_files: true/);
   assert.match(workflow, /draft: true/);
 });
@@ -67,13 +90,25 @@ test('platform code signing is optional but all-or-nothing per platform', () => 
   assert.match(workflow, /TAURI_UPDATER_PUBKEY is required/);
 
   // Each import step only runs once its platform resolved to "enabled".
-  assert.match(workflow, /Import Apple Developer ID certificate\n\s+if: runner\.os == 'macOS' && env\.APPLE_SIGNING_ENABLED == '1'/);
-  assert.match(workflow, /Import Windows code-signing certificate\n\s+if: runner\.os == 'Windows' && env\.WINDOWS_SIGNING_ENABLED == '1'/);
-  assert.match(workflow, /Import Linux AppImage signing key\n\s+if: runner\.os == 'Linux' && env\.LINUX_SIGNING_ENABLED == '1'/);
+  assert.match(
+    workflow,
+    /Import Apple Developer ID certificate\n\s+if: runner\.os == 'macOS' && env\.APPLE_SIGNING_ENABLED == '1'/,
+  );
+  assert.match(
+    workflow,
+    /Import Windows code-signing certificate\n\s+if: runner\.os == 'Windows' && env\.WINDOWS_SIGNING_ENABLED == '1'/,
+  );
+  assert.match(
+    workflow,
+    /Import Linux AppImage signing key\n\s+if: runner\.os == 'Linux' && env\.LINUX_SIGNING_ENABLED == '1'/,
+  );
 
   // An unsigned macOS bundle still gets an ad-hoc signature, which the
   // updater needs in order to replace the app in place.
-  assert.match(workflow, /Ad-hoc sign macOS build\n\s+if: runner\.os == 'macOS' && env\.APPLE_SIGNING_ENABLED != '1'/);
+  assert.match(
+    workflow,
+    /Ad-hoc sign macOS build\n\s+if: runner\.os == 'macOS' && env\.APPLE_SIGNING_ENABLED != '1'/,
+  );
   assert.match(workflow, /APPLE_SIGNING_IDENTITY=-/);
 
   // Gatekeeper and stapler checks only apply to a notarized Developer ID build.

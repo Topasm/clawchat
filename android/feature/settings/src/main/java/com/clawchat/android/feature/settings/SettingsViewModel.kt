@@ -8,6 +8,7 @@ import com.clawchat.android.core.data.model.PairedDevice
 import com.clawchat.android.core.data.repository.DeviceRepository
 import com.clawchat.android.core.data.repository.SettingsRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.update.AppUpdateManager
 import com.clawchat.android.core.update.UpdateState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +27,8 @@ data class SettingsUiState(
     val authMode: String = "",
     val accentColor: String = "system",
     val themeMode: String = "light",
+    val diagnostics: ConnectionDiagnostics? = null,
+    val isCheckingConnection: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -36,6 +39,7 @@ class SettingsViewModel @Inject constructor(
     private val deviceRepository: DeviceRepository,
     private val sessionStore: SessionStore,
     private val updateManager: AppUpdateManager,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -57,6 +61,8 @@ class SettingsViewModel @Inject constructor(
             val authMode = sessionStore.authMode.first() ?: ""
             val accentColor = sessionStore.accentColor.first()
             val themeMode = sessionStore.themeMode.first()
+            val hasSession = !sessionStore.token.first().isNullOrBlank()
+            val hasServer = !sessionStore.apiBaseUrl.first().isNullOrBlank()
             _uiState.update {
                 it.copy(
                     hostName = hostName,
@@ -66,17 +72,60 @@ class SettingsViewModel @Inject constructor(
                 )
             }
 
-            when (val result = settingsRepository.health()) {
-                is ApiResult.Success -> _uiState.update { it.copy(health = result.data) }
-                else -> { /* Ignore */ }
-            }
+            refreshConnectionDiagnostics()
 
-            when (val result = deviceRepository.listDevices()) {
-                is ApiResult.Success -> _uiState.update { it.copy(devices = result.data.devices) }
-                else -> { /* Ignore — might not have user-level auth */ }
+            if (hasSession && hasServer) {
+                when (val result = deviceRepository.listDevices()) {
+                    is ApiResult.Success -> _uiState.update { it.copy(devices = result.data.devices) }
+                    else -> { /* Ignore — might not have user-level auth */ }
+                }
             }
 
             _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    fun checkConnection() {
+        viewModelScope.launch { refreshConnectionDiagnostics() }
+    }
+
+    private suspend fun refreshConnectionDiagnostics() {
+        _uiState.update { it.copy(isCheckingConnection = true) }
+
+        val apiBaseUrl = sessionStore.apiBaseUrl.first()
+        val relayConfigured = !sessionStore.relayUrl.first().isNullOrBlank()
+        val authMode = sessionStore.authMode.first()
+        val hasSession = !sessionStore.token.first().isNullOrBlank()
+        var health: HealthResponse? = null
+        var latencyMillis: Long? = null
+        var httpError: String? = null
+        if (!apiBaseUrl.isNullOrBlank()) {
+            val startedAtNanos = System.nanoTime()
+            when (val healthResult = settingsRepository.health()) {
+                is ApiResult.Success -> health = healthResult.data
+                is ApiResult.Error -> httpError = healthResult.message
+                ApiResult.Loading -> Unit
+            }
+            latencyMillis = ((System.nanoTime() - startedAtNanos) / 1_000_000L).coerceAtLeast(0L)
+        }
+
+        _uiState.update {
+            it.copy(
+                health = health,
+                diagnostics = buildConnectionDiagnostics(
+                    apiBaseUrl = apiBaseUrl,
+                    relayConfigured = relayConfigured,
+                    authMode = authMode,
+                    hasSession = hasSession,
+                    health = health,
+                    latencyMillis = latencyMillis,
+                    realtimeConnected = syncManager.isConnected.value,
+                    lastRealtimeEventAtEpochMillis = syncManager.lastEventAtEpochMillis.value,
+                    realtimeError = syncManager.lastConnectionError.value,
+                    httpError = httpError,
+                ),
+                isCheckingConnection = false,
+            )
         }
     }
 

@@ -38,7 +38,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +51,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.BriefingResponse
 import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
@@ -75,10 +75,12 @@ import com.clawchat.android.core.ui.icons.ClawIcons
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     onNavigateToInbox: () -> Unit = {},
+    onNavigateToReview: () -> Unit = {},
+    onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showQuickAdd by remember { mutableStateOf(false) }
 
     val totalTasks = state.todayTodos.size + state.overdueTodos.size
@@ -167,6 +169,13 @@ fun TodayScreen(
                     )
                 }
 
+                item {
+                    AgentControlCard(
+                        onNavigateToReview = onNavigateToReview,
+                        onNavigateToRuns = onNavigateToRuns,
+                    )
+                }
+
                 state.briefing?.let { briefing ->
                     item {
                         BriefingSection(briefing = briefing)
@@ -250,6 +259,40 @@ fun TodayScreen(
 }
 
 @Composable
+private fun AgentControlCard(
+    onNavigateToReview: () -> Unit,
+    onNavigateToRuns: () -> Unit,
+) {
+    ClawSectionCard {
+        ClawSectionHeader(
+            title = "Agent activity",
+            subtitle = "Approve decisions, monitor progress, and intervene from your phone.",
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FilledTonalButton(
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToReview,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
+            ) {
+                Text("Review queue")
+            }
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                onClick = onNavigateToRuns,
+            ) {
+                Text("Agent runs")
+            }
+        }
+    }
+}
+
+@Composable
 private fun TodayHeroCard(
     greeting: String,
     completedTasks: Int,
@@ -319,7 +362,7 @@ private fun TodayHeroCard(
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateToInbox,
             ) {
-                Text("Review inbox")
+                Text("Open inbox")
             }
         }
     }

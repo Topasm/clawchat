@@ -14,6 +14,8 @@ class AppVersionTest {
         assertEquals(expected, AppVersion.parse("v0.2.1"))
         assertEquals(expected, AppVersion.parse("android-v0.2.1"))
         assertEquals(expected, AppVersion.parse(" android-v0.2.1 "))
+        assertEquals(expected, AppVersion.parse("clawchat-v0.2.1"))
+        assertEquals(expected, AppVersion.parse(" clawchat-v0.2.1 "))
     }
 
     @Test
@@ -21,7 +23,7 @@ class AppVersionTest {
         assertNull(AppVersion.parse(null))
         assertNull(AppVersion.parse(""))
         assertNull(AppVersion.parse("1.2"))
-        assertNull(AppVersion.parse("clawchat-v1.2.3"))
+        assertNull(AppVersion.parse("desktop-v1.2.3"))
         assertNull(AppVersion.parse("1.2.3.4"))
     }
 

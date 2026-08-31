@@ -2,6 +2,7 @@
 
 package com.clawchat.android.feature.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,16 +37,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.PairedDevice
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawSectionCard
@@ -66,8 +70,10 @@ fun SettingsScreen(
     onSetupServer: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val updateState by viewModel.updateState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -146,6 +152,20 @@ fun SettingsScreen(
                 }
             }
 
+            state.diagnostics?.let { diagnostics ->
+                item {
+                    ConnectionDiagnosticsCard(
+                        diagnostics = diagnostics,
+                        isChecking = state.isCheckingConnection,
+                        onCheck = viewModel::checkConnection,
+                        onCopy = {
+                            clipboard.setText(AnnotatedString(diagnostics.toSafeReport()))
+                            Toast.makeText(context, "Diagnostics copied", Toast.LENGTH_SHORT).show()
+                        },
+                    )
+                }
+            }
+
             if (state.devices.isNotEmpty()) {
                 item {
                     ClawSectionCard {
@@ -196,6 +216,99 @@ fun SettingsScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Log Out", fontWeight = FontWeight.Medium)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionDiagnosticsCard(
+    diagnostics: ConnectionDiagnostics,
+    isChecking: Boolean,
+    onCheck: () -> Unit,
+    onCopy: () -> Unit,
+) {
+    val isConfigured = diagnostics.serverOrigin != "Not configured"
+    ClawSectionCard {
+        ClawSectionHeader(
+            title = "Connection diagnostics",
+            subtitle = "A credential-safe snapshot for troubleshooting this device.",
+        )
+        ClawListItemSurface {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                !isConfigured -> MaterialTheme.colorScheme.onSurfaceVariant
+                                diagnostics.httpReachable -> MaterialTheme.colorScheme.secondary
+                                else -> MaterialTheme.colorScheme.error
+                            },
+                        ),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        when {
+                            !isConfigured -> "No server configured"
+                            diagnostics.httpReachable -> "Server reachable"
+                            else -> "Server unavailable"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        when {
+                            !isConfigured -> "Connect a server to run diagnostics"
+                            diagnostics.latencyMillis != null ->
+                                "HTTP check completed in ${diagnostics.latencyMillis}ms"
+                            else -> "HTTP check did not complete"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            InfoRow("Server", diagnostics.serverOrigin)
+            InfoRow("Transport", diagnostics.connectionMode)
+            InfoRow("Authentication", diagnostics.authMode)
+            diagnostics.serverVersion?.let { InfoRow("Server version", it) }
+            InfoRow(
+                "Realtime",
+                if (diagnostics.realtimeConnected) "Connected" else "Disconnected",
+                if (diagnostics.realtimeConnected) {
+                    MaterialTheme.colorScheme.secondary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            diagnostics.lastRealtimeEventAtEpochMillis?.let {
+                InfoRow("Last realtime event", java.time.Instant.ofEpochMilli(it).toString())
+            }
+            diagnostics.lastError?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onCopy) {
+                    Text("Copy diagnostics")
+                }
+                TextButton(onClick = onCheck, enabled = !isChecking && isConfigured) {
+                    Text(if (isChecking) "Checking…" else "Run again")
                 }
             }
         }

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
@@ -57,6 +58,9 @@ class Todo(Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     source: Mapped[str | None] = mapped_column(String, nullable=True)
     source_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Client-generated token used to collapse retries after a committed
+    # response is lost on the direct or relay transport.
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     assignee: Mapped[str | None] = mapped_column(String, nullable=True)
     enabled_skills: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array
     inbox_state: Mapped[str] = mapped_column(String, nullable=False, default="none")
@@ -98,5 +102,12 @@ class Todo(Base):
         Index("idx_todos_parent_id", "parent_id"),
         Index("idx_todos_sort_order", "sort_order"),
         Index("idx_todos_source", "source"),
+        Index(
+            "uq_todos_idempotency_key",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=text("idempotency_key IS NOT NULL"),
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
         Index("idx_todos_recurrence_rule", "recurrence_rule"),
     )

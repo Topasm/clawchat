@@ -171,8 +171,8 @@ export const koreanUiTranslations: Record<string, string> = {
   Connected: '연결됨',
   'Connecting...': '연결 중...',
   'Connecting…': '연결 중…',
-  'Connection names and URLs are saved locally. PINs are never saved.':
-    '연결 이름과 URL은 로컬에 저장됩니다. PIN은 저장되지 않습니다.',
+  'PINs are never saved. This device securely remembers the session until you sign out.':
+    'PIN은 저장하지 않습니다. 로그아웃할 때까지 이 기기의 보안 저장소에 로그인 세션을 기억합니다.',
   'Connection recovery': '연결 복구',
   connections: '사이',
   Connections: '사이',
@@ -1137,6 +1137,14 @@ Object.assign(koreanUiTranslations, {
   'Project execution settings saved': '프로젝트 실행 설정을 저장했습니다.',
   'Could not save project settings': '프로젝트 설정을 저장하지 못했습니다.',
   'Created locally, server sync failed': '로컬에는 만들었지만 서버 동기화에 실패했습니다.',
+  'Could not create conversation. Your message was not sent.':
+    '대화를 만들지 못해 메시지를 전송하지 않았습니다.',
+  'Load earlier messages': '이전 메시지 불러오기',
+  'Loading earlier messages...': '이전 메시지를 불러오는 중...',
+  'Not sent': '전송되지 않음',
+  'Response interrupted': '응답이 중단되었습니다.',
+  'Recent chats': '최근 대화',
+  'Sending...': '전송 중...',
   'Conversation deleted': '대화를 삭제했습니다.',
   'Failed to delete conversation on server': '서버에서 대화를 삭제하지 못했습니다.',
   'Failed to delete message on server': '서버에서 메시지를 삭제하지 못했습니다.',

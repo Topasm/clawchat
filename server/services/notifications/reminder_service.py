@@ -15,21 +15,47 @@ from ws.manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
 
-# In-memory dedup: set of (reminder_type, item_id, dedup_key)
-_sent_reminders: set[tuple[str, str, str]] = set()
+# The clients expose lead options up to one day. A bounded catch-up window
+# prevents stale reminders after a scheduler outage; exact occurrence keys are
+# retained across midnight so a 23:55 delivery is not repeated at 00:05.
+MAX_EVENT_REMINDER_LEAD_MINUTES = 1440
+MAX_EVENT_REMINDER_LEAD = timedelta(minutes=MAX_EVENT_REMINDER_LEAD_MINUTES)
+REMINDER_CATCH_UP = timedelta(minutes=30)
+EVENT_START_GRACE = timedelta(minutes=20)
+DELIVERY_KEY_RETENTION = timedelta(days=30)
+
+# In-memory dedup uses the same occurrence identity Android persists.
+_sent_reminders: dict[str, datetime] = {}
+
+
+def _delivery_key(
+    reminder_type: str,
+    occurrence_identity: str,
+    scheduled_at: datetime,
+) -> str:
+    family = "todo" if reminder_type in {"todo", "todo_overdue"} else reminder_type
+    return (
+        f"delivery:v2:{family}:{occurrence_identity}:"
+        f"{int(scheduled_at.timestamp())}"
+    )
+
+
+def _is_due_for_delivery(remind_at: datetime, now: datetime) -> bool:
+    return now - REMINDER_CATCH_UP <= remind_at <= now
 
 
 async def check_event_reminders(
     db: AsyncSession, ws_manager: ConnectionManager, user_id: str
 ) -> int:
-    """Find events starting within 60 min that have reminder_minutes set. Returns count sent."""
+    """Find event reminders whose configured lead time has just elapsed."""
     now = datetime.now(timezone.utc)
-    window_end = now + timedelta(minutes=60)
+    window_start = now - EVENT_START_GRACE
+    window_end = now + MAX_EVENT_REMINDER_LEAD
 
     q = (
         select(Event)
         .where(
-            Event.start_time >= now,
+            Event.start_time >= window_start,
             Event.start_time <= window_end,
             Event.reminder_minutes != None,  # noqa: E711
         )
@@ -38,17 +64,20 @@ async def check_event_reminders(
     sent = 0
 
     for event in events:
+        if event.reminder_minutes not in range(
+            0, MAX_EVENT_REMINDER_LEAD_MINUTES + 1
+        ):
+            continue
         # SQLite returns naive datetimes even for timezone-aware columns, and
         # `now` is aware. Comparing them raises TypeError, which aborted every
         # reminder check -- events, todos, and overdue alike, since this runs
         # first -- so no reminder was ever delivered.
         start_time = match_timezone(event.start_time, now)
         remind_at = start_time - timedelta(minutes=event.reminder_minutes)
-        if remind_at > now:
-            continue  # Not yet time to remind
+        if not _is_due_for_delivery(remind_at, now):
+            continue
 
-        dedup_key = start_time.isoformat()
-        key = ("event", event.id, dedup_key)
+        key = _delivery_key("event", event.id, start_time)
         if key in _sent_reminders:
             continue
 
@@ -61,9 +90,10 @@ async def check_event_reminders(
                 "title": event.title,
                 "message": f"'{event.title}' starts in {minutes_until} minute(s).",
                 "minutes_until": minutes_until,
+                "delivery_key": key,
             },
         })
-        _sent_reminders.add(key)
+        _sent_reminders[key] = now
         sent += 1
 
     # Check recurring event occurrences within the reminder window
@@ -77,7 +107,11 @@ async def check_event_reminders(
     recurring_events = (await db.execute(recurring_q)).scalars().all()
 
     for event in recurring_events:
-        occurrences = generate_occurrences(event, now, window_end)
+        if event.reminder_minutes not in range(
+            0, MAX_EVENT_REMINDER_LEAD_MINUTES + 1
+        ):
+            continue
+        occurrences = generate_occurrences(event, window_start, window_end)
         for occ in occurrences:
             occ_start = occ["start_time"]
             if isinstance(occ_start, str):
@@ -87,11 +121,12 @@ async def check_event_reminders(
             occ_start = match_timezone(occ_start, now)
 
             remind_at = occ_start - timedelta(minutes=event.reminder_minutes)
-            if remind_at > now:
+            if not _is_due_for_delivery(remind_at, now):
                 continue
 
             occ_dedup_key = occ["occurrence_date"]
-            key = ("event", event.id, occ_dedup_key)
+            occurrence_identity = f"{event.id}@{occ_dedup_key}"
+            key = _delivery_key("event", occurrence_identity, occ_start)
             if key in _sent_reminders:
                 continue
 
@@ -105,9 +140,10 @@ async def check_event_reminders(
                     "message": f"'{event.title}' starts in {minutes_until} minute(s).",
                     "minutes_until": minutes_until,
                     "occurrence_date": occ_dedup_key,
+                    "delivery_key": key,
                 },
             })
-            _sent_reminders.add(key)
+            _sent_reminders[key] = now
             sent += 1
 
     return sent
@@ -133,8 +169,7 @@ async def check_todo_reminders(
 
     for todo in todos:
         due_date = match_timezone(todo.due_date, now)
-        dedup_key = due_date.isoformat()
-        key = ("todo", todo.id, dedup_key)
+        key = _delivery_key("todo", todo.id, due_date)
         if key in _sent_reminders:
             continue
 
@@ -147,9 +182,10 @@ async def check_todo_reminders(
                 "title": todo.title,
                 "message": f"'{todo.title}' is due in {minutes_until} minute(s).",
                 "minutes_until": minutes_until,
+                "delivery_key": key,
             },
         })
-        _sent_reminders.add(key)
+        _sent_reminders[key] = now
         sent += 1
 
     return sent
@@ -172,7 +208,8 @@ async def check_overdue_todos(
     sent = 0
 
     for todo in todos:
-        key = ("todo_overdue", todo.id, "overdue")
+        due_date = match_timezone(todo.due_date, now)
+        key = _delivery_key("todo_overdue", todo.id, due_date)
         if key in _sent_reminders:
             continue
 
@@ -184,9 +221,10 @@ async def check_overdue_todos(
                 "title": todo.title,
                 "message": f"'{todo.title}' is overdue.",
                 "minutes_until": 0,
+                "delivery_key": key,
             },
         })
-        _sent_reminders.add(key)
+        _sent_reminders[key] = now
         sent += 1
 
     return sent
@@ -215,6 +253,14 @@ async def run_all_checks(
     return total
 
 
+def prune_sent_reminders(now: datetime | None = None) -> None:
+    """Discard old exact occurrences while retaining claims across midnight."""
+    cutoff = (now or datetime.now(timezone.utc)) - DELIVERY_KEY_RETENTION
+    expired = [key for key, sent_at in _sent_reminders.items() if sent_at < cutoff]
+    for key in expired:
+        _sent_reminders.pop(key, None)
+
+
 def clear_sent_reminders() -> None:
-    """Reset the dedup set — called at midnight."""
+    """Force-reset dedup state for tests and administrative recovery."""
     _sent_reminders.clear()

@@ -30,7 +30,7 @@ export default function ChatListPage() {
   const deleteConversationMutation = useDeleteConversation();
   const { isMobile } = usePlatform();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [quickChatsOpen, setQuickChatsOpen] = useState(false);
+  const [quickChatsOpen, setQuickChatsOpen] = useState(true);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [projectTitle, setProjectTitle] = useState('');
   const [projectGoal, setProjectGoal] = useState('');
@@ -229,8 +229,7 @@ export default function ChatListPage() {
               size={12}
               className={`cc-quick-chats__chevron${quickChatsOpen ? ' cc-quick-chats__chevron--open' : ''}`}
             />
-            {translateUi('\n            Quick conversations (')}
-            {quickChats.length})
+            {translateUi('Recent chats')} ({quickChats.length})
           </button>
           {quickChatsOpen && (
             <div className="cc-quick-chats__list">

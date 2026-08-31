@@ -334,7 +334,9 @@ export default function WorkspaceConnectionsSection() {
           )}
           <div className="cc-workspace-connect__actions">
             <span>
-              {translateUi('Connection names and URLs are saved locally. PINs are never saved.')}
+              {translateUi(
+                'PINs are never saved. This device securely remembers the session until you sign out.',
+              )}
             </span>
             <button
               type="submit"

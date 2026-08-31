@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import com.clawchat.android.widget.common.WidgetUpdater
 
 class RefreshTodosAction : ActionCallback {
     override suspend fun onAction(
@@ -11,6 +12,6 @@ class RefreshTodosAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        TodoTrackingWidget().update(context, glanceId)
+        WidgetUpdater.updateAll(context)
     }
 }

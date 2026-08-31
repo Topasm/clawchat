@@ -23,6 +23,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.ClawChat">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -31,7 +32,17 @@
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
 
@@ -75,6 +86,11 @@
         <!-- Notification action receiver -->
         <receiver
             android:name="com.clawchat.android.core.notification.ReminderActionReceiver"
+            android:exported="false" />
+
+        <!-- Deletes a durable shared capture only after an explicit user action. -->
+        <receiver
+            android:name=".share.ShareCaptureDiscardReceiver"
             android:exported="false" />
 
     </application>

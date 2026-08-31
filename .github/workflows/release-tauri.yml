@@ -1,4 +1,4 @@
-name: Release Tauri Desktop
+name: Release ClawChat
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: tauri-desktop-release
+  group: clawchat-release
   cancel-in-progress: false
 
 jobs:
@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin main:refs/remotes/origin/main
           test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)" || {
-            echo 'Desktop releases must run from the current origin/main commit.' >&2
+            echo 'ClawChat releases must run from the current origin/main commit.' >&2
             exit 1
           }
           version="$(node -p "require('./package.json').version")"
@@ -492,9 +492,133 @@ jobs:
               -ErrorAction SilentlyContinue
           }
 
+  android:
+    name: Android release
+    needs: preflight
+    runs-on: ubuntu-22.04
+    environment: android-release
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || secrets.RELEASE_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.RELEASE_KEYSTORE_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD }}
+      ANDROID_SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Verify generated Kotlin API contracts
+        run: node scripts/generate-api-contracts.js --check
+
+      - name: Validate Android release signing configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo 'ANDROID_KEYSTORE_BASE64 is required' >&2; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo 'ANDROID_KEYSTORE_PASSWORD or RELEASE_KEYSTORE_PASSWORD is required' >&2; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo 'ANDROID_KEY_ALIAS or RELEASE_KEYSTORE_ALIAS is required' >&2; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo 'ANDROID_KEY_PASSWORD or RELEASE_KEY_PASSWORD is required' >&2; exit 1; }
+          test -n "$ANDROID_SIGNING_CERT_SHA256" || { echo 'ANDROID_SIGNING_CERT_SHA256 Actions variable is required' >&2; exit 1; }
+          expected_signing_cert_sha256="$(
+            printf '%s' "$ANDROID_SIGNING_CERT_SHA256" \
+              | tr -d '[:space:]:-' \
+              | tr '[:upper:]' '[:lower:]'
+          )"
+          if [[ ! "$expected_signing_cert_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'ANDROID_SIGNING_CERT_SHA256 must be a 64-digit SHA-256 certificate fingerprint' >&2
+            exit 1
+          fi
+          printf 'ANDROID_SIGNING_CERT_SHA256_NORMALIZED=%s\n' \
+            "$expected_signing_cert_sha256" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+
+      - name: Import the Android release keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore="$RUNNER_TEMP/clawchat-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          test -s "$keystore"
+          printf 'ANDROID_KEYSTORE_FILE=%s\n' "$keystore" >> "$GITHUB_ENV"
+
+      - name: Test, lint, and build signed Android artifacts
+        working-directory: android
+        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all
+
+      - name: Verify the Android artifact signatures and version
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$apk"
+          test -s "$aab"
+          build_tools="$ANDROID_HOME/build-tools/36.0.0"
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" \
+            | tee "$RUNNER_TEMP/android-apk-signature.txt"
+          actual_signing_cert_sha256="$(
+            sed -nE 's/^Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]{64})$/\1/p' \
+              "$RUNNER_TEMP/android-apk-signature.txt" \
+              | tr '[:upper:]' '[:lower:]'
+          )"
+          if [[ ! "$actual_signing_cert_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo 'Unable to read exactly one SHA-256 digest for APK signer #1' >&2
+            exit 1
+          fi
+          if [[ "$actual_signing_cert_sha256" != "$ANDROID_SIGNING_CERT_SHA256_NORMALIZED" ]]; then
+            echo 'APK signing certificate does not match ANDROID_SIGNING_CERT_SHA256' >&2
+            exit 1
+          fi
+          jarsigner -verify -verbose -certs "$aab" \
+            | tee "$RUNNER_TEMP/android-aab-signature.txt"
+          grep -F 'jar verified.' "$RUNNER_TEMP/android-aab-signature.txt"
+          "$build_tools/aapt2" dump badging "$apk" | grep -F "versionName='$VERSION'"
+
+      - name: Stage verified Android release artifacts
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-android-artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk "release-android-artifacts/ClawChat-$VERSION.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "release-android-artifacts/ClawChat-$VERSION.aab"
+          (cd release-android-artifacts && sha256sum "ClawChat-$VERSION.apk" > "ClawChat-$VERSION.apk.sha256")
+          (cd release-android-artifacts && sha256sum --check "ClawChat-$VERSION.apk.sha256")
+          test "$(find release-android-artifacts -maxdepth 1 -type f | wc -l)" -eq 3
+
+      - name: Upload verified Android release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ClawChat-release-android
+          path: release-android-artifacts/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Remove the imported Android keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/clawchat-release.jks"
+
   publish:
-    name: Assemble verified desktop release
-    needs: [preflight, release]
+    name: Assemble verified cross-platform release
+    needs: [preflight, release, android]
     runs-on: ubuntu-22.04
     permissions:
       actions: read
@@ -524,10 +648,14 @@ jobs:
       - name: Verify final release inventory
         shell: bash
         run: |
+          set -euo pipefail
           test -s release-artifacts/latest.json
           test -s release-artifacts/checksums.txt
           test "$(find release-artifacts -maxdepth 1 -name '*.sig' -type f | wc -l)" -eq 3
-          test "$(find release-artifacts -maxdepth 1 -type f | wc -l)" -eq 10
+          test -s "release-artifacts/ClawChat-${{ needs.preflight.outputs.version }}.apk"
+          test -s "release-artifacts/ClawChat-${{ needs.preflight.outputs.version }}.aab"
+          test -s "release-artifacts/ClawChat-${{ needs.preflight.outputs.version }}.apk.sha256"
+          test "$(find release-artifacts -maxdepth 1 -type f | wc -l)" -eq 13
           node -e "const p=require('./release-artifacts/latest.json').platforms; for (const k of ['linux-x86_64','darwin-aarch64','windows-x86_64']) if (!p[k]) throw new Error('missing '+k)"
           (cd release-artifacts && sha256sum --check checksums.txt)
 
@@ -536,7 +664,7 @@ jobs:
         with:
           tag_name: ${{ needs.preflight.outputs.tag }}
           name: ClawChat v${{ needs.preflight.outputs.version }}
-          body: See the verified assets below to install or update ClawChat.
+          body: See the verified desktop installers and Android APK/AAB below to install or update ClawChat.
           target_commitish: ${{ github.sha }}
           draft: true
           prerelease: false

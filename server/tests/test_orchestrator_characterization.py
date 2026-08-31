@@ -895,7 +895,8 @@ async def test_general_chat_streams_and_saves_the_completion(
     await orchestrator.handle_message("user-1", conv_id, msg_id, "hello there")
 
     assert len(ws.stream_calls) == 1
-    assert ws.types() == ["conversation_updated"]
+    assert ws.types() == ["conversation_updated", "stream_end"]
+    assert ws.sent[-1]["data"]["conversation_id"] == conv_id
     async with session_factory() as db:
         saved = await db.get(Message, ws.stream_calls[0]["message_id"])
         assert saved.role == "assistant"

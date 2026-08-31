@@ -27,6 +27,15 @@ function fixture() {
   write('macos', 'ClawChat.app.tar.gz.sig', 'mac-signature\n');
   write('windows', 'ClawChat.exe');
   write('windows', 'ClawChat.exe.sig', 'windows-signature\n');
+  const androidApk = 'signed-android-apk';
+  const androidApkName = 'ClawChat-1.2.3.apk';
+  write('android', androidApkName, androidApk);
+  write('android', 'ClawChat-1.2.3.aab', 'signed-android-bundle');
+  write(
+    'android',
+    `${androidApkName}.sha256`,
+    `${crypto.createHash('sha256').update(androidApk).digest('hex')}  ${androidApkName}\n`,
+  );
 
   return {
     root,
@@ -70,11 +79,17 @@ test('builds one complete cross-platform updater manifest and checksum file', ()
       1,
       'the AppImage must be staged once, not once per role',
     );
-    assert.equal(releaseFiles.length, 10);
+    assert.equal(releaseFiles.length, 13);
+    assert.equal(
+      fs.readFileSync(path.join(project.outputDir, 'ClawChat-1.2.3.apk'), 'utf8'),
+      'signed-android-apk',
+    );
+    assert.ok(fs.existsSync(path.join(project.outputDir, 'ClawChat-1.2.3.aab')));
+    assert.ok(fs.existsSync(path.join(project.outputDir, 'ClawChat-1.2.3.apk.sha256')));
 
     const checksumPath = path.join(project.outputDir, 'checksums.txt');
     const checksumLines = fs.readFileSync(checksumPath, 'utf8').trim().split('\n');
-    assert.equal(checksumLines.length, 9);
+    assert.equal(checksumLines.length, 12);
     assert.ok(checksumLines.some((line) => line.endsWith('  latest.json')));
     assert.ok(!checksumLines.some((line) => line.endsWith('  checksums.txt')));
     for (const line of checksumLines) {
@@ -95,6 +110,9 @@ test('fails closed when an installer, updater, or updater signature is missing',
     ['linux', 'ClawChat.deb', /Linux DEB installer, found 0/],
     ['macos', 'ClawChat.app.tar.gz', /macOS updater archive, found 0/],
     ['windows', 'ClawChat.exe.sig', /missing updater signature/],
+    ['android', 'ClawChat-1.2.3.apk', /Android APK installer, found 0/],
+    ['android', 'ClawChat-1.2.3.aab', /Android App Bundle, found 0/],
+    ['android', 'ClawChat-1.2.3.apk.sha256', /Android APK checksum, found 0/],
   ]) {
     const project = fixture();
     try {
@@ -110,11 +128,7 @@ test('rejects empty signatures, duplicate artifacts, stale output, and mismatche
   const emptySignature = fixture();
   try {
     fs.writeFileSync(
-      path.join(
-        emptySignature.artifactsDir,
-        PLATFORM_DIRECTORIES.linux,
-        'ClawChat.AppImage.sig',
-      ),
+      path.join(emptySignature.artifactsDir, PLATFORM_DIRECTORIES.linux, 'ClawChat.AppImage.sig'),
       ' \n',
     );
     assert.throws(() => generate(emptySignature), /signature is empty/);
@@ -157,5 +171,20 @@ test('rejects empty signatures, duplicate artifacts, stale output, and mismatche
     );
   } finally {
     identity.cleanup();
+  }
+
+  const badAndroidDigest = fixture();
+  try {
+    fs.writeFileSync(
+      path.join(
+        badAndroidDigest.artifactsDir,
+        PLATFORM_DIRECTORIES.android,
+        'ClawChat-1.2.3.apk.sha256',
+      ),
+      `${'0'.repeat(64)}  ClawChat-1.2.3.apk\n`,
+    );
+    assert.throws(() => generate(badAndroidDigest), /Android APK checksum does not match/);
+  } finally {
+    badAndroidDigest.cleanup();
   }
 });

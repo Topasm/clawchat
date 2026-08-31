@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useChatStore } from '../../stores/useChatStore';
+import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 import type { ChatMessage } from '../../stores/useChatStore';
 import {
   useMessagesQuery,
@@ -10,7 +9,6 @@ import {
   useEditMessage,
   useDeleteMessage,
   useRegenerateMessage,
-  queryKeys,
 } from '../../hooks/queries';
 import ChatPanelMessages from './ChatPanelMessages';
 import ChatInput from './ChatInput';
@@ -32,43 +30,47 @@ export default function ChatPanel({
   variant = 'bottom',
 }: ChatPanelProps) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const isStreaming = useChatStore(
+    (s) => s.isStreaming && s.streamingConversationId === conversationId,
+  );
   const stopGeneration = useChatStore((s) => s.stopGeneration);
   const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
   const addStreamingMessage = useChatStore((s) => s.addStreamingMessage);
   const streamingMessages = useChatStore((s) => s.streamingMessages);
-  const clearStreamingMessages = useChatStore((s) => s.clearStreamingMessages);
+  const reconcileMessages = useChatStore((s) => s.reconcileMessages);
+  const updateStreamingMessageId = useChatStore((s) => s.updateStreamingMessageId);
   const setCurrentConversationId = useChatStore((s) => s.setCurrentConversationId);
   const createConversationMutation = useCreateConversation();
   const editMessageMutation = useEditMessage();
   const deleteMessageMutation = useDeleteMessage();
   const regenerateMutation = useRegenerateMessage();
-  const { data: queryMessages = [] } = useMessagesQuery(conversationId);
+  const {
+    data: queryMessages = [],
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMessagesQuery(conversationId);
+  const workspaceScope = getChatWorkspaceScope();
   // Merge query messages with streaming messages
   const messages: ChatMessage[] = useMemo(() => {
     const queryIds = new Set(queryMessages.map((m) => m._id));
-    const onlyStreaming = streamingMessages.filter((m) => !queryIds.has(m._id));
+    const onlyStreaming = streamingMessages.filter(
+      (m) =>
+        m.conversationId === conversationId &&
+        (!m.workspaceScope || m.workspaceScope === workspaceScope) &&
+        !queryIds.has(m._id),
+    );
     return [...onlyStreaming, ...queryMessages];
-  }, [queryMessages, streamingMessages]);
+  }, [conversationId, queryMessages, streamingMessages, workspaceScope]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   useEffect(() => {
     setCurrentConversationId(conversationId);
-    if (conversationId) clearStreamingMessages();
-    return () => setCurrentConversationId(null);
-  }, [conversationId, setCurrentConversationId, clearStreamingMessages]);
-  // Clear streaming messages when streaming ends and refetch
+  }, [conversationId, setCurrentConversationId]);
   useEffect(() => {
-    if (!isStreaming && streamingMessages.length > 0 && conversationId) {
-      const timer = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
-        clearStreamingMessages();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isStreaming, streamingMessages.length, conversationId, queryClient, clearStreamingMessages]);
+    if (!conversationId || queryMessages.length === 0) return;
+    reconcileMessages(conversationId, new Set(queryMessages.map((message) => message._id)));
+  }, [conversationId, queryMessages, reconcileMessages]);
   const handleStartEdit = useCallback(
     (messageId: string) => {
       const msg = messages.find((m) => m._id === messageId);
@@ -104,14 +106,20 @@ export default function ChatPanel({
         onSetConversationId(cid);
         setCurrentConversationId(cid);
       }
+      const optimisticMessageId = crypto.randomUUID();
+      const idempotencyKey = crypto.randomUUID();
       addStreamingMessage({
-        _id: crypto.randomUUID(),
+        _id: optimisticMessageId,
         text,
         createdAt: new Date(),
         user: { _id: 'user', name: 'You' },
+        conversationId: cid,
+        deliveryStatus: 'pending',
+        idempotencyKey,
+        workspaceScope: getChatWorkspaceScope(),
       });
       try {
-        await sendMessageStreaming(cid, text);
+        await sendMessageStreaming(cid, text, { optimisticMessageId, idempotencyKey });
       } catch {
         // Error handled in store
       }
@@ -164,6 +172,17 @@ export default function ChatPanel({
       <ChatPanelMessages
         conversationId={conversationId}
         messages={messages}
+        hasOlderMessages={hasNextPage}
+        isLoadingOlderMessages={isFetchingNextPage}
+        onLoadOlderMessages={() => void fetchNextPage()}
+        onRetryMessage={(message) => {
+          if (!conversationId || !message.idempotencyKey) return;
+          updateStreamingMessageId(message._id, message._id, 'pending');
+          void sendMessageStreaming(conversationId, message.text, {
+            optimisticMessageId: message._id,
+            idempotencyKey: message.idempotencyKey,
+          });
+        }}
         onEditMessage={handleStartEdit}
         onDeleteMessage={(messageId) =>
           conversationId && deleteMessageMutation.mutate({ conversationId, messageId })
@@ -187,6 +206,7 @@ export default function ChatPanel({
         onSend={handleSend}
         isStreaming={isStreaming}
         onStop={stopGeneration}
+        draftKey={getChatDraftKey(conversationId)}
         editingMessageId={editingMessageId}
         editingText={editingText}
         onCancelEdit={handleCancelEdit}

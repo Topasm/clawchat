@@ -1,5 +1,5 @@
 import type { SavedWorkspaceSession } from './workspaceCredentials';
-import { saveWorkspaceSession } from './workspaceCredentials';
+import { removeWorkspaceSession, saveWorkspaceSession } from './workspaceCredentials';
 import { logger } from './logger';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useWorkspaceStore, type WorkspaceProfile } from '../stores/useWorkspaceStore';
@@ -62,6 +62,15 @@ async function persistActiveRemoteSession(): Promise<void> {
   );
   if (!selected) return;
   await saveWorkspaceSession(selected.credentialRef, selected.session);
+}
+
+/** Remove the credential that makes the currently selected remote workspace PIN-less. */
+export async function forgetActiveRemoteWorkspaceSession(): Promise<void> {
+  const workspace = useWorkspaceStore.getState();
+  const profile = workspace.profiles.find(
+    (candidate) => candidate.kind === 'remote' && candidate.id === workspace.activeWorkspaceId,
+  );
+  if (profile?.credentialRef) await removeWorkspaceSession(profile.credentialRef);
 }
 
 export function startActiveRemoteSessionPersistence(): () => void {

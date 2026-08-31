@@ -19,13 +19,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.clawchat.android.feature.chat.ChatScreen
 import com.clawchat.android.feature.inbox.InboxScreen
 import com.clawchat.android.feature.onboarding.OnboardingScreen
+import com.clawchat.android.feature.review.ReviewInboxScreen
+import com.clawchat.android.feature.runs.AgentRunsScreen
 import com.clawchat.android.feature.settings.SettingsScreen
 import com.clawchat.android.feature.tasks.TasksScreen
 import com.clawchat.android.feature.calendar.CalendarScreen
@@ -164,6 +168,12 @@ fun ClawChatNavGraph(
                             restoreState = true
                         }
                     },
+                    onNavigateToReview = {
+                        navController.navigate(NavRoute.Review.route)
+                    },
+                    onNavigateToRuns = {
+                        navController.navigate(NavRoute.Runs.destination())
+                    },
                     onNavigateToSearch = {
                         navController.navigate(NavRoute.Search.route)
                     },
@@ -199,6 +209,43 @@ fun ClawChatNavGraph(
             }
             composable(NavRoute.Tasks.route) {
                 TasksScreen()
+            }
+            composable(NavRoute.Review.route) {
+                ReviewInboxScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSubject = { review ->
+                        val destination = when (review.subjectType) {
+                            com.clawchat.android.core.data.model.ReviewSubjectType.AGENT_RUN ->
+                                NavRoute.Runs.destination(review.subjectId)
+                            com.clawchat.android.core.data.model.ReviewSubjectType.PLAN_PROPOSAL -> NavRoute.Inbox.route
+                            else -> NavRoute.Tasks.route
+                        }
+                        navController.navigate(destination) { launchSingleTop = true }
+                    },
+                    onOpenRun = { runId ->
+                        navController.navigate(NavRoute.Runs.destination(runId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(
+                route = NavRoute.Runs.routePattern,
+                arguments = listOf(
+                    navArgument(NavRoute.Runs.ARG_RUN_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
+                AgentRunsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenReview = {
+                        navController.navigate(NavRoute.Review.route) { launchSingleTop = true }
+                    },
+                    initialRunId = entry.arguments?.getString(NavRoute.Runs.ARG_RUN_ID),
+                )
             }
             composable(NavRoute.Settings.route) {
                 SettingsScreen(

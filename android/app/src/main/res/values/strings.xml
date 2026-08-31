@@ -1,8 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ClawChat</string>
-    <string name="widget_todo_tracking_label">Today\'s Todos</string>
-    <string name="widget_todo_tracking_description">Shows today\'s todos with completion checkboxes</string>
-    <string name="widget_inbox_quick_add_label">Quick Add</string>
-    <string name="widget_inbox_quick_add_description">Quickly add items to your inbox</string>
+    <string name="app_name" translatable="false">ClawChat</string>
+    <string name="widget_todo_tracking_label">Today</string>
+    <string name="widget_todo_tracking_description">Add and complete today\'s tasks from your Home screen</string>
+    <string name="widget_inbox_quick_add_label">Add task</string>
+    <string name="widget_inbox_quick_add_description">Capture a task directly into your Inbox</string>
+    <string name="share_waiting_for_connection">Your shared item will be saved after you connect ClawChat</string>
+    <string name="share_saved">Saved to Inbox</string>
+    <plurals name="share_saved_with_attachments">
+        <item quantity="one">Saved to Inbox with %1$d attachment</item>
+        <item quantity="other">Saved to Inbox with %1$d attachments</item>
+    </plurals>
+    <plurals name="share_partially_saved">
+        <item quantity="one">Saved to Inbox: %1$d attached, %2$d item skipped</item>
+        <item quantity="other">Saved to Inbox: %1$d attached, %2$d items skipped</item>
+    </plurals>
+    <string name="share_rejected">Nothing shareable was found. ClawChat accepts images, PDF, text, Markdown, and ZIP files up to 10 MB.</string>
+    <string name="share_failed">Couldn’t save the shared item. Check your connection and try again.</string>
+    <string name="share_queued">Saved securely. ClawChat will add it to Inbox when connected.</string>
+    <string name="share_queue_full">The share queue is full. Open ClawChat and reconnect or discard an older capture before sharing again.</string>
+    <string name="share_malformed">This app sent an invalid share. Nothing was saved.</string>
+    <string name="share_channel_name">Shared captures</string>
+    <string name="share_delivery_complete_title">Shared item saved</string>
+    <string name="share_delivery_complete_no_attachments">Added to Inbox</string>
+    <plurals name="share_delivery_complete_with_attachments">
+        <item quantity="one">Added to Inbox with %1$d attachment</item>
+        <item quantity="other">Added to Inbox with %1$d attachments</item>
+    </plurals>
+    <plurals name="share_delivery_complete_with_skips">
+        <item quantity="one">Added to Inbox: %1$d attached, %2$d unsupported file skipped</item>
+        <item quantity="other">Added to Inbox: %1$d attached, %2$d unsupported files skipped</item>
+    </plurals>
+    <string name="share_direct_connection_title">Direct connection needed</string>
+    <string name="share_direct_connection_message">A shared file is too large for the 1 MiB relay. It remains stored securely and will upload when this phone can reach ClawChat directly.</string>
+    <string name="share_connection_required_title">Reconnect the original workspace</string>
+    <string name="share_connection_required_message">This capture belongs to another ClawChat workspace. It remains stored securely until that workspace is active.</string>
+    <string name="share_delivery_failed_title">Shared capture needs attention</string>
+    <string name="share_delivery_failed_message">ClawChat could not deliver this capture. Its files remain stored securely until you discard them.</string>
+    <string name="share_discard_action">Discard</string>
 </resources>

@@ -9,22 +9,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.SessionStore
-import com.clawchat.android.core.data.model.TodoCreate
-import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.notification.NotificationPermission
 import com.clawchat.android.core.notification.ReminderNotificationHelper
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.ui.update.AppUpdatePrompt
 import com.clawchat.android.core.update.AppUpdateManager
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import androidx.lifecycle.lifecycleScope
 import com.clawchat.android.navigation.ClawChatNavGraph
 import com.clawchat.android.navigation.reminderRoute
+import com.clawchat.android.share.ShareCaptureCoordinator
+import com.clawchat.android.share.ShareCaptureEvent
+import com.clawchat.android.share.ShareIntentParseResult
+import com.clawchat.android.share.ShareIntentParser
 import com.clawchat.android.ui.theme.ClawChatTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -34,8 +34,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var sessionStore: SessionStore
     @Inject lateinit var syncManager: SyncManager
-    @Inject lateinit var todoRepository: TodoRepository
     @Inject lateinit var updateManager: AppUpdateManager
+    @Inject lateinit var shareCaptureCoordinator: ShareCaptureCoordinator
 
     /** Route a tapped reminder asked for, consumed once the graph navigates. */
     private val pendingReminderRoute = MutableStateFlow<String?>(null)
@@ -47,17 +47,18 @@ class MainActivity : ComponentActivity() {
         handleReminderIntent(intent)
 
         setContent {
-            val isLoggedIn by sessionStore.isLoggedIn.collectAsState(initial = false)
-            val onboardingSkipped by sessionStore.onboardingSkipped.collectAsState(initial = false)
-            val accentColor by sessionStore.accentColor.collectAsState(initial = "system")
-            val themeMode by sessionStore.themeMode.collectAsState(initial = "light")
+            val isLoggedIn by sessionStore.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
+            val activeSession by sessionStore.activeSession.collectAsStateWithLifecycle(initialValue = null)
+            val onboardingSkipped by sessionStore.onboardingSkipped.collectAsStateWithLifecycle(initialValue = false)
+            val accentColor by sessionStore.accentColor.collectAsStateWithLifecycle(initialValue = "system")
+            val themeMode by sessionStore.themeMode.collectAsStateWithLifecycle(initialValue = "light")
 
             val context = LocalContext.current
-            val updateState by updateManager.state.collectAsState()
-            val reminderDeepLink by pendingReminderRoute.collectAsState()
+            val updateState by updateManager.state.collectAsStateWithLifecycle()
+            val reminderDeepLink by pendingReminderRoute.collectAsStateWithLifecycle()
             val notificationPermissionRequested by sessionStore
                 .notificationPermissionRequested
-                .collectAsState(initial = true)
+                .collectAsStateWithLifecycle(initialValue = true)
 
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
@@ -82,11 +83,18 @@ class MainActivity : ComponentActivity() {
                 updateManager.checkForUpdateIfDue()
             }
 
-            LaunchedEffect(isLoggedIn) {
-                if (isLoggedIn) {
+            LaunchedEffect(activeSession) {
+                // A workspace switch keeps isLoggedIn=true, so lifecycle must
+                // follow the complete session identity rather than that flag.
+                // This also prevents realtime events from the previous server
+                // surviving a direct/paired workspace transition.
+                syncManager.stop()
+                if (activeSession != null) {
                     syncManager.start()
-                } else {
-                    syncManager.stop()
+                    // A share can be captured before login or while the app is
+                    // not running. Workspace changes also wake captures that
+                    // are pinned to the newly active server.
+                    shareCaptureCoordinator.flush()
                 }
             }
 
@@ -99,6 +107,7 @@ class MainActivity : ComponentActivity() {
                         itemId = reminder.itemId,
                         title = reminder.title,
                         message = reminder.message,
+                        deliveryKey = reminder.deliveryKey,
                     )
                 }
             }
@@ -120,6 +129,26 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 syncManager.weeklyReview.collect { review ->
                     Toast.makeText(context, "Weekly review is ready!", Toast.LENGTH_LONG).show()
+                }
+            }
+
+            // Channel-backed events survive the small gap between the share
+            // intent arriving and Compose installing this collector.
+            LaunchedEffect(Unit) {
+                shareCaptureCoordinator.events.collect { event ->
+                    val (message, duration) = when (event) {
+                        ShareCaptureEvent.Queued ->
+                            getString(R.string.share_queued) to Toast.LENGTH_SHORT
+                        ShareCaptureEvent.QueueFull ->
+                            getString(R.string.share_queue_full) to Toast.LENGTH_LONG
+                        ShareCaptureEvent.Rejected ->
+                            getString(R.string.share_rejected) to Toast.LENGTH_LONG
+                        ShareCaptureEvent.Malformed ->
+                            getString(R.string.share_malformed) to Toast.LENGTH_LONG
+                        ShareCaptureEvent.Failed ->
+                            getString(R.string.share_failed) to Toast.LENGTH_LONG
+                    }
+                    Toast.makeText(context, message, duration).show()
                 }
             }
 
@@ -164,23 +193,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleShareIntent(intent: Intent?) {
-        if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return
-        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-
-        lifecycleScope.launch {
-            val result = todoRepository.createTodo(
-                TodoCreate(
-                    title = sharedText.take(200),
-                    source = "share_sheet",
-                    inboxState = "classifying",
-                )
-            )
-            when (result) {
-                is com.clawchat.android.core.network.ApiResult.Success ->
-                    Toast.makeText(this@MainActivity, "Saved to inbox", Toast.LENGTH_SHORT).show()
-                is com.clawchat.android.core.network.ApiResult.Error ->
-                    Toast.makeText(this@MainActivity, "Failed to save", Toast.LENGTH_SHORT).show()
-                is com.clawchat.android.core.network.ApiResult.Loading -> {}
+        when (val result = ShareIntentParser.parse(intent)) {
+            ShareIntentParseResult.NotShare -> return
+            ShareIntentParseResult.Malformed -> {
+                // Never retry an attacker-controlled malformed Parcelable on
+                // recreation. No part of the payload is accepted.
+                intent?.action = null
+                shareCaptureCoordinator.malformedIntent()
+            }
+            is ShareIntentParseResult.Accepted -> {
+                // Prevent a configuration change from processing the same
+                // launch intent twice. URI grants are copied immediately into
+                // app-private storage by the coordinator.
+                intent?.action = null
+                shareCaptureCoordinator.submit(result.payload)
             }
         }
     }

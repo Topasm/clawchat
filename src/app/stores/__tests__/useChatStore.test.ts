@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useChatStore, type ChatMessage } from '../useChatStore';
 
 function message(id: string, text = 'Hello'): ChatMessage {
@@ -12,7 +12,12 @@ function message(id: string, text = 'Hello'): ChatMessage {
 
 describe('useChatStore', () => {
   beforeEach(() => {
+    localStorage.clear();
     useChatStore.getState().resetToDemo();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('starts with empty ephemeral chat state', () => {
@@ -59,6 +64,85 @@ describe('useChatStore', () => {
 
     expect(useChatStore.getState().currentConversationId).toBe('conversation-1');
     expect(useChatStore.getState().isStreaming).toBe(true);
+  });
+
+  it('keeps optimistic messages when the active conversation changes', () => {
+    useChatStore.getState().addStreamingMessage({
+      ...message('pending-user', 'Remember this'),
+      conversationId: 'conversation-1',
+      deliveryStatus: 'pending',
+      user: { _id: 'user', name: 'You' },
+    });
+
+    useChatStore.getState().setCurrentConversationId('conversation-2');
+
+    expect(useChatStore.getState().streamingMessages).toEqual([
+      expect.objectContaining({ _id: 'pending-user', conversationId: 'conversation-1' }),
+    ]);
+  });
+
+  it('reconciles only messages confirmed by the authoritative conversation', () => {
+    const store = useChatStore.getState();
+    store.addStreamingMessage({
+      ...message('server-1'),
+      conversationId: 'conversation-1',
+      deliveryStatus: 'accepted',
+    });
+    store.addStreamingMessage({
+      ...message('server-2'),
+      conversationId: 'conversation-2',
+      deliveryStatus: 'accepted',
+    });
+
+    store.reconcileMessages('conversation-1', new Set(['server-1']));
+
+    expect(useChatStore.getState().streamingMessages.map((item) => item._id)).toEqual(['server-2']);
+  });
+
+  it('persists drafts and recoverable messages across rehydration', async () => {
+    const store = useChatStore.getState();
+    store.setCurrentConversationId('conversation-1');
+    store.setDraft('conversation-1', 'unfinished prompt');
+    store.addStreamingMessage({
+      ...message('partial-assistant', 'Partial response'),
+      conversationId: 'conversation-1',
+      deliveryStatus: 'streaming',
+    });
+    const persisted = localStorage.getItem('chat-session-storage:v1');
+    expect(persisted).not.toBeNull();
+
+    useChatStore.setState({
+      currentConversationId: null,
+      drafts: {},
+      streamingMessages: [],
+      isStreaming: false,
+      streamingConversationId: null,
+    });
+    localStorage.setItem('chat-session-storage:v1', persisted!);
+    await useChatStore.persist.rehydrate();
+
+    expect(useChatStore.getState()).toMatchObject({
+      currentConversationId: 'conversation-1',
+      drafts: { 'conversation-1': 'unfinished prompt' },
+      streamingMessages: [
+        expect.objectContaining({
+          _id: 'partial-assistant',
+          deliveryStatus: 'interrupted',
+        }),
+      ],
+      isStreaming: false,
+    });
+  });
+
+  it('keeps in-memory recovery state when local storage writes fail', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+
+    expect(() => {
+      useChatStore.getState().setDraft('conversation-1', 'still in memory');
+    }).not.toThrow();
+    expect(useChatStore.getState().drafts['conversation-1']).toBe('still in memory');
   });
 
   it('merges task progress updates', () => {

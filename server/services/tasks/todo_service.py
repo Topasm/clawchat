@@ -31,6 +31,7 @@ _ORDER_COLUMNS = {
     "updated_at": Todo.updated_at,
     "sort_order": Todo.sort_order,
     "priority": Todo.priority,
+    "due_date": Todo.due_date,
 }
 
 
@@ -71,7 +72,7 @@ async def get_todos(
     q = (
         select(Todo)
         .where(*conditions)
-        .order_by(order_clause)
+        .order_by(order_clause, Todo.id.asc())
         .offset((page - 1) * limit)
         .limit(limit)
     )
@@ -100,6 +101,7 @@ async def create_todo(
     sort_order: int = 0,
     source: str | None = None,
     source_id: str | None = None,
+    idempotency_key: str | None = None,
     assignee: str | None = None,
     enabled_skills: list[str] | None = None,
     inbox_state: str = "none",
@@ -133,6 +135,7 @@ async def create_todo(
         sort_order=sort_order,
         source=source,
         source_id=source_id,
+        idempotency_key=idempotency_key,
         assignee=assignee,
         enabled_skills=json.dumps(enabled_skills) if enabled_skills else None,
         inbox_state=inbox_state,

@@ -87,11 +87,10 @@ class ConnectionManager:
             })
             index += 1
 
-        await self.send_json(user_id, {
-            "type": "stream_end",
-            "data": {"message_id": message_id, "full_content": full_content},
-        })
-
+        # The orchestrator emits stream_end only after the assistant message
+        # has been committed.  Treating the final event as a durability
+        # acknowledgement prevents clients from clearing optimistic state and
+        # refetching before the row is visible.
         return full_content
 
 

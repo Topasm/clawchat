@@ -5,6 +5,7 @@ import com.clawchat.android.core.data.model.LoginRequest
 import com.clawchat.android.core.data.model.LoginResponse
 import com.clawchat.android.core.data.model.PairingClaimRequest
 import com.clawchat.android.core.data.model.PairingClaimResponse
+import com.clawchat.android.core.data.model.RefreshRequest
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -32,5 +33,11 @@ interface PairingApi {
     suspend fun login(
         @Url url: String,
         @Body body: LoginRequest,
+    ): LoginResponse
+
+    @POST
+    suspend fun refresh(
+        @Url url: String,
+        @Body body: RefreshRequest,
     ): LoginResponse
 }

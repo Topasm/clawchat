@@ -68,6 +68,66 @@ async def test_event_reminder_is_delivered(db_session, session_factory, ws):
     assert sent == 1
     assert _reminder_types(ws) == ["event"]
     assert "Standup" in ws.sent[0]["data"]["message"]
+    assert ws.sent[0]["data"]["delivery_key"].startswith("delivery:v2:event:")
+
+
+async def test_one_day_event_reminder_is_delivered_at_its_lead_time(
+    db_session, session_factory, ws
+):
+    start = datetime.now(timezone.utc) + timedelta(days=1)
+    db_session.add(
+        Event(
+            id=make_id("evt_"),
+            title="Tomorrow",
+            start_time=start,
+            reminder_minutes=1440,
+        )
+    )
+    await db_session.commit()
+
+    async with session_factory() as scheduler_db:
+        sent = await reminder_service.run_all_checks(scheduler_db, ws, "user")
+
+    assert sent == 1
+    assert _reminder_types(ws) == ["event"]
+
+
+async def test_long_lead_event_waits_until_remind_at(db_session, session_factory, ws):
+    start = datetime.now(timezone.utc) + timedelta(minutes=121)
+    db_session.add(
+        Event(
+            id=make_id("evt_"),
+            title="Not yet",
+            start_time=start,
+            reminder_minutes=120,
+        )
+    )
+    await db_session.commit()
+
+    async with session_factory() as scheduler_db:
+        sent = await reminder_service.run_all_checks(scheduler_db, ws, "user")
+
+    assert sent == 0
+
+
+async def test_long_lead_event_outside_catch_up_is_not_replayed(
+    db_session, session_factory, ws
+):
+    start = datetime.now(timezone.utc) + timedelta(minutes=30)
+    db_session.add(
+        Event(
+            id=make_id("evt_"),
+            title="Already covered",
+            start_time=start,
+            reminder_minutes=120,
+        )
+    )
+    await db_session.commit()
+
+    async with session_factory() as scheduler_db:
+        sent = await reminder_service.run_all_checks(scheduler_db, ws, "user")
+
+    assert sent == 0
 
 
 async def test_a_reminder_is_not_sent_before_its_lead_time(
@@ -136,6 +196,7 @@ async def test_todo_due_soon_is_reminded(db_session, session_factory, ws):
 
     assert sent == 1
     assert _reminder_types(ws) == ["todo"]
+    assert ws.sent[0]["data"]["delivery_key"].startswith("delivery:v2:todo:")
 
 
 async def test_completed_todos_are_not_reminded(db_session, session_factory, ws):
@@ -205,7 +266,7 @@ async def test_reminder_minutes_are_reported_from_the_stored_time(
     """A naive stored value read as if it were UTC-naive would skew this."""
     start = datetime.now(timezone.utc) + timedelta(minutes=15)
     db_session.add(
-        Event(id=make_id("evt_"), title="Soon", start_time=start, reminder_minutes=60)
+        Event(id=make_id("evt_"), title="Soon", start_time=start, reminder_minutes=30)
     )
     await db_session.commit()
 
@@ -213,3 +274,26 @@ async def test_reminder_minutes_are_reported_from_the_stored_time(
         await reminder_service.run_all_checks(scheduler_db, ws, "user")
 
     assert ws.sent[0]["data"]["minutes_until"] in (14, 15)
+
+
+def test_midnight_prune_retains_recent_occurrence_keys():
+    sent_at = datetime(2026, 8, 31, 23, 55, tzinfo=timezone.utc)
+    after_midnight = datetime(2026, 9, 1, 0, 5, tzinfo=timezone.utc)
+    key = "delivery:v2:event:event-1:1788220500"
+    reminder_service._sent_reminders[key] = sent_at
+
+    reminder_service.prune_sent_reminders(after_midnight)
+    assert key in reminder_service._sent_reminders
+
+    reminder_service.prune_sent_reminders(sent_at + timedelta(days=31))
+    assert key not in reminder_service._sent_reminders
+
+
+def test_delivery_key_unifies_upcoming_and_overdue_todo_occurrence():
+    due = datetime(2026, 9, 1, 1, 2, 3, 999999, tzinfo=timezone.utc)
+
+    upcoming = reminder_service._delivery_key("todo", "todo-1", due)
+    overdue = reminder_service._delivery_key("todo_overdue", "todo-1", due)
+
+    assert upcoming == overdue
+    assert upcoming == "delivery:v2:todo:todo-1:1788224523"

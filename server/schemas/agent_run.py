@@ -84,6 +84,16 @@ class AgentRunResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AgentRunDetailResponse(AgentRunResponse):
+    """Single-run inspection includes the full provider result.
+
+    List responses deliberately keep only ``result_summary`` so a large agent
+    transcript does not multiply the mobile payload size.
+    """
+
+    result: str | None = None
+
+
 class AgentRunEventResponse(BaseModel):
     id: str
     run_id: str

@@ -27,7 +27,7 @@ class AppUpdateManagerTest {
         fileName = "ClawChat-0.2.0.apk",
         downloadUrl = "https://example.test/ClawChat-0.2.0.apk",
         sizeBytes = 2048,
-        checksumUrl = null,
+        checksumUrl = "https://example.test/ClawChat-0.2.0.apk.sha256",
         releaseNotes = "Notes",
         releaseUrl = "https://example.test/releases/android-v0.2.0",
     )

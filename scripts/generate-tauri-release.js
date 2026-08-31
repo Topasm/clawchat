@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PLATFORM_DIRECTORIES = {
+  android: 'ClawChat-release-android',
   linux: 'ClawChat-release-linux',
   macos: 'ClawChat-release-macos-arm64',
   windows: 'ClawChat-release-windows',
@@ -51,6 +52,28 @@ function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
+function validateAndroidChecksum(apk, checksum) {
+  const lines = fs
+    .readFileSync(checksum, 'utf8')
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length !== 1) {
+    throw new Error(`Android APK checksum must contain exactly one digest: ${checksum}`);
+  }
+
+  const match = /^([a-f\d]{64}) [ *](.+)$/iu.exec(lines[0]);
+  if (!match) {
+    throw new Error(`Android APK checksum is malformed: ${checksum}`);
+  }
+  if (path.basename(match[2]) !== path.basename(apk)) {
+    throw new Error(`Android APK checksum names the wrong file: ${match[2]}`);
+  }
+  if (match[1].toLowerCase() !== sha256(apk)) {
+    throw new Error(`Android APK checksum does not match ${apk}`);
+  }
+}
+
 function validateReleaseIdentity(version, tag, repository) {
   if (
     typeof version !== 'string' ||
@@ -61,10 +84,7 @@ function validateReleaseIdentity(version, tag, repository) {
   if (tag !== `clawchat-v${version}`) {
     throw new Error(`release tag ${tag} does not match package version ${version}`);
   }
-  if (
-    typeof repository !== 'string' ||
-    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)
-  ) {
+  if (typeof repository !== 'string' || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
     throw new Error(`invalid GitHub repository: ${repository}`);
   }
 }
@@ -120,17 +140,17 @@ function generateTauriRelease({
   // expect (.AppImage.tar.gz, .nsis.zip) is never produced.
   const updaters = {
     'linux-x86_64': selectUpdater(platformFiles.linux, 'Linux updater bundle', '.AppImage'),
-    'darwin-aarch64': selectUpdater(
-      platformFiles.macos,
-      'macOS updater archive',
-      '.app.tar.gz',
-    ),
-    'windows-x86_64': selectUpdater(
-      platformFiles.windows,
-      'Windows updater bundle',
-      '.exe',
+    'darwin-aarch64': selectUpdater(platformFiles.macos, 'macOS updater archive', '.app.tar.gz'),
+    'windows-x86_64': selectUpdater(platformFiles.windows, 'Windows updater bundle', '.exe'),
+  };
+  const android = {
+    apk: selectOne(platformFiles.android, 'Android APK installer', (file) => file.endsWith('.apk')),
+    aab: selectOne(platformFiles.android, 'Android App Bundle', (file) => file.endsWith('.aab')),
+    checksum: selectOne(platformFiles.android, 'Android APK checksum', (file) =>
+      file.endsWith('.apk.sha256'),
     ),
   };
+  validateAndroidChecksum(android.apk, android.checksum);
 
   prepareOutputDirectory(outputDir);
   const releaseNames = new Map();
@@ -157,6 +177,14 @@ function generateTauriRelease({
   for (const [platform, updater] of Object.entries(updaters)) {
     copyArtifact(platform, updater.artifact);
     copyArtifact(platform, updater.signature);
+  }
+  for (const file of Object.values(android)) {
+    const releaseName = path.basename(file);
+    const destination = path.join(outputDir, releaseName);
+    if (fs.existsSync(destination)) {
+      throw new Error(`duplicate release artifact name: ${releaseName}`);
+    }
+    fs.copyFileSync(file, destination);
   }
 
   const platforms = Object.fromEntries(
@@ -203,9 +231,7 @@ if (require.main === module) {
   // dispatch ref (`main`) rather than the tag being cut. Prefer an unreserved
   // name, and keep GITHUB_REF_NAME as the fallback for tag-triggered runs.
   const tag =
-    process.env.RELEASE_TAG ||
-    process.env.GITHUB_REF_NAME ||
-    `clawchat-v${packageJson.version}`;
+    process.env.RELEASE_TAG || process.env.GITHUB_REF_NAME || `clawchat-v${packageJson.version}`;
   const repository = process.env.GITHUB_REPOSITORY || 'clawchat/clawchat';
   const result = generateTauriRelease({
     artifactsDir: path.resolve(repositoryRoot, artifactsArg),
@@ -223,5 +249,6 @@ if (require.main === module) {
 module.exports = {
   PLATFORM_DIRECTORIES,
   generateTauriRelease,
+  validateAndroidChecksum,
   validateReleaseIdentity,
 };

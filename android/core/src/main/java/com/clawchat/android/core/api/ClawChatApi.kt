@@ -28,6 +28,9 @@ interface ClawChatApi {
     @GET("api/todos")
     suspend fun listTodos(@QueryMap params: Map<String, String> = emptyMap()): PaginatedResponse<Todo>
 
+    @GET("api/todos/{id}")
+    suspend fun getTodo(@Path("id") id: String): Todo
+
     @POST("api/todos")
     suspend fun createTodo(@Body body: TodoCreate): Todo
 
@@ -39,6 +42,11 @@ interface ClawChatApi {
 
     @POST("api/todos/{todoId}/organize")
     suspend fun organizeTodo(@Path("todoId") todoId: String): Response<Unit>
+
+    // --- Task relationships ---
+
+    @GET("api/task-relationships")
+    suspend fun listTaskRelationships(@Query("task_id") taskId: String): List<TaskRelationship>
 
     // --- Events ---
 

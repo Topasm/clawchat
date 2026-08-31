@@ -43,6 +43,11 @@ data class PairingClaimResponse(
 data class LoginRequest(val pin: String)
 
 @Serializable
+data class RefreshRequest(
+    @SerialName("refresh_token") val refreshToken: String,
+)
+
+@Serializable
 data class LoginResponse(
     @SerialName("access_token") val accessToken: String,
     @SerialName("refresh_token") val refreshToken: String,
@@ -90,6 +95,8 @@ data class TodoCreate(
     @SerialName("parent_id") val parentId: String? = null,
     val source: String? = null,
     @SerialName("inbox_state") val inboxState: String? = null,
+    /** Stable operation identity so a retried quick capture cannot create a duplicate. */
+    @SerialName("idempotency_key") val idempotencyKey: String? = null,
 )
 
 @Serializable

@@ -1,14 +1,12 @@
 import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { useChatStore } from '../stores/useChatStore';
+import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import {
   useMessagesQuery,
   useConversationsQuery,
   useProjectsQuery,
   useDeleteMessage,
   useRegenerateMessage,
-  queryKeys,
 } from '../hooks/queries';
 import type { ChatMessage } from '../stores/useChatStore';
 import MessageBubble from '../components/chat-panel/MessageBubble';
@@ -22,15 +20,23 @@ export default function ChatPage() {
     conversationId: string;
   }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { data: queryMessages = [] } = useMessagesQuery(conversationId ?? null);
+  const {
+    data: queryMessages = [],
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMessagesQuery(conversationId ?? null);
+  const workspaceScope = getChatWorkspaceScope();
   const streamingMessages = useChatStore((s) => s.streamingMessages);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const isStreaming = useChatStore(
+    (s) => s.isStreaming && s.streamingConversationId === conversationId,
+  );
   const setCurrentConversationId = useChatStore((s) => s.setCurrentConversationId);
   const addStreamingMessage = useChatStore((s) => s.addStreamingMessage);
   const sendMessageStreaming = useChatStore((s) => s.sendMessageStreaming);
   const stopGeneration = useChatStore((s) => s.stopGeneration);
-  const clearStreamingMessages = useChatStore((s) => s.clearStreamingMessages);
+  const reconcileMessages = useChatStore((s) => s.reconcileMessages);
+  const updateStreamingMessageId = useChatStore((s) => s.updateStreamingMessageId);
   const deleteMessageMutation = useDeleteMessage();
   const regenerateMutation = useRegenerateMessage();
   const { data: conversations = [] } = useConversationsQuery();
@@ -41,43 +47,45 @@ export default function ChatPage() {
       project.id === convo?.project_id || project.root_task_id === convo?.project_todo_id,
   );
   const scrollRef = useRef<HTMLDivElement>(null);
+  const newestMessageIdRef = useRef<string | undefined>(undefined);
   // Merge query messages with streaming messages
   // Streaming messages are newest-first, query messages are newest-first
   const messages: ChatMessage[] = useMemo(() => {
     const queryIds = new Set(queryMessages.map((m) => m._id));
     // Only include streaming messages not yet in query cache
-    const onlyStreaming = streamingMessages.filter((m) => !queryIds.has(m._id));
+    const onlyStreaming = streamingMessages.filter(
+      (m) =>
+        m.conversationId === conversationId &&
+        (!m.workspaceScope || m.workspaceScope === workspaceScope) &&
+        !queryIds.has(m._id),
+    );
     return [...onlyStreaming, ...queryMessages];
-  }, [queryMessages, streamingMessages]);
+  }, [conversationId, queryMessages, streamingMessages, workspaceScope]);
   useEffect(() => {
     if (!conversationId) return;
     setCurrentConversationId(conversationId);
-    clearStreamingMessages();
-    return () => setCurrentConversationId(null);
-  }, [conversationId, setCurrentConversationId, clearStreamingMessages]);
-  // Clear streaming messages when streaming ends and refetch
+  }, [conversationId, setCurrentConversationId]);
   useEffect(() => {
-    if (!isStreaming && streamingMessages.length > 0 && conversationId) {
-      // Give a small delay for the server to persist, then refetch
-      const timer = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
-        clearStreamingMessages();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isStreaming, streamingMessages.length, conversationId, queryClient, clearStreamingMessages]);
+    if (!conversationId || queryMessages.length === 0) return;
+    reconcileMessages(conversationId, new Set(queryMessages.map((message) => message._id)));
+  }, [conversationId, queryMessages, reconcileMessages]);
   const handleSend = useCallback(
     async (text: string) => {
       if (!conversationId) return;
+      const optimisticMessageId = crypto.randomUUID();
+      const idempotencyKey = crypto.randomUUID();
       addStreamingMessage({
-        _id: crypto.randomUUID(),
+        _id: optimisticMessageId,
         text,
         createdAt: new Date(),
         user: { _id: 'user', name: 'You' },
+        conversationId,
+        deliveryStatus: 'pending',
+        idempotencyKey,
+        workspaceScope: getChatWorkspaceScope(),
       });
       try {
-        await sendMessageStreaming(conversationId, text);
+        await sendMessageStreaming(conversationId, text, { optimisticMessageId, idempotencyKey });
       } catch {
         // handled in store
       }
@@ -103,8 +111,16 @@ export default function ChatPage() {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [chronological, isStreaming]);
+    const newestMessageId = messages[0]?._id;
+    if (
+      isStreaming ||
+      !newestMessageIdRef.current ||
+      newestMessageIdRef.current !== newestMessageId
+    ) {
+      el.scrollTop = el.scrollHeight;
+    }
+    newestMessageIdRef.current = newestMessageId;
+  }, [chronological, isStreaming, messages]);
   return (
     <div className="cc-chat-page">
       <div className="cc-chat-page__header">
@@ -146,16 +162,45 @@ export default function ChatPage() {
       )}
 
       <div className="cc-chat-page__messages" ref={scrollRef}>
+        {hasNextPage && (
+          <button
+            type="button"
+            className="cc-chat-history__load-older"
+            disabled={isFetchingNextPage}
+            onClick={() => void fetchNextPage()}
+          >
+            {translateUi(
+              isFetchingNextPage ? 'Loading earlier messages...' : 'Load earlier messages',
+            )}
+          </button>
+        )}
         {chronological.map((msg) => (
           <MessageBubble
             key={msg._id}
             message={msg}
             projectIcon={projectTodo ? getProjectIcon(projectTodo.id) : undefined}
-            onDelete={() =>
-              conversationId && deleteMessageMutation.mutate({ conversationId, messageId: msg._id })
+            onDelete={
+              !msg.deliveryStatus
+                ? () =>
+                    conversationId &&
+                    deleteMessageMutation.mutate({ conversationId, messageId: msg._id })
+                : undefined
             }
             onRegenerate={
-              msg.user._id === 'assistant' ? () => handleRegenerate(msg._id) : undefined
+              !msg.deliveryStatus && msg.user._id === 'assistant'
+                ? () => handleRegenerate(msg._id)
+                : undefined
+            }
+            onRetry={
+              msg.deliveryStatus === 'failed' && msg.idempotencyKey && conversationId
+                ? () => {
+                    updateStreamingMessageId(msg._id, msg._id, 'pending');
+                    void sendMessageStreaming(conversationId, msg.text, {
+                      optimisticMessageId: msg._id,
+                      idempotencyKey: msg.idempotencyKey,
+                    });
+                  }
+                : undefined
             }
           />
         ))}
@@ -166,6 +211,7 @@ export default function ChatPage() {
         onSend={handleSend}
         isStreaming={isStreaming}
         onStop={stopGeneration}
+        draftKey={getChatDraftKey(conversationId)}
         placeholder={translateUi('Type a message...')}
       />
     </div>

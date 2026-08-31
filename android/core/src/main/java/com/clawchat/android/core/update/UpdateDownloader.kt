@@ -49,12 +49,10 @@ class UpdateDownloaderImpl @Inject constructor(
         val target = File(directory, sanitizeFileName(update.fileName))
         try {
             writeBody(update, target, onProgress)
-            val expected = update.checksumUrl?.let { fetchChecksum(it) }
-            if (expected != null) {
-                val actual = sha256(target)
-                if (!actual.equals(expected, ignoreCase = true)) {
-                    throw IOException("Update checksum mismatch: expected $expected, got $actual")
-                }
+            val expected = fetchChecksum(update.checksumUrl)
+            val actual = sha256(target)
+            if (!actual.equals(expected, ignoreCase = true)) {
+                throw IOException("Update checksum mismatch: expected $expected, got $actual")
             }
         } catch (error: Throwable) {
             target.delete()
@@ -97,13 +95,14 @@ class UpdateDownloaderImpl @Inject constructor(
         }
     }
 
-    private fun fetchChecksum(url: String): String? {
+    private fun fetchChecksum(url: String): String {
         val request = Request.Builder().url(url).build()
         return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Update checksum download failed: HTTP ${response.code}")
             }
             parseChecksum(response.body.string())
+                ?: throw IOException("Update checksum payload is invalid")
         }
     }
 

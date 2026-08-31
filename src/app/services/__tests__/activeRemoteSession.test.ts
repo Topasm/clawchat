@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { selectPersistableRemoteSession } from '../activeRemoteSession';
-import type { WorkspaceProfile } from '../../stores/useWorkspaceStore';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  forgetActiveRemoteWorkspaceSession,
+  selectPersistableRemoteSession,
+} from '../activeRemoteSession';
+import { useWorkspaceStore, type WorkspaceProfile } from '../../stores/useWorkspaceStore';
+import { loadWorkspaceSession, saveWorkspaceSession } from '../workspaceCredentials';
 
 const localProfile: WorkspaceProfile = {
   id: 'local',
@@ -38,6 +42,11 @@ const auth = {
 };
 
 describe('active remote session selection', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useWorkspaceStore.getState().reset();
+  });
+
   it('selects credentials only when the active profile owns the authenticated endpoint', () => {
     expect(
       selectPersistableRemoteSession(auth, {
@@ -63,5 +72,17 @@ describe('active remote session selection', () => {
         { profiles: [localProfile, remoteProfile], activeWorkspaceId: remoteProfile.id },
       ),
     ).toBeNull();
+  });
+
+  it('forgets the selected remote credential when the user signs out', async () => {
+    useWorkspaceStore.setState({
+      profiles: [localProfile, remoteProfile],
+      activeWorkspaceId: remoteProfile.id,
+    });
+    await saveWorkspaceSession(remoteProfile.credentialRef!, auth);
+
+    await forgetActiveRemoteWorkspaceSession();
+
+    await expect(loadWorkspaceSession(remoteProfile.credentialRef!)).resolves.toBeNull();
   });
 });

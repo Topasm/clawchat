@@ -72,6 +72,7 @@ from services.vault.obsidian_export_service import (
 )
 from skills import SKILL_REGISTRY, get_skill
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import deserialize_tags, serialize_tags
@@ -427,28 +428,51 @@ async def create_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo = await todo_service.create_todo(
-        db,
-        title=body.title,
-        description=body.description,
-        project_id=body.project_id,
-        status=body.status,
-        priority=body.priority,
-        due_date=body.due_date,
-        tags=body.tags,
-        parent_id=body.parent_id,
-        sort_order=body.sort_order or 0,
-        source=body.source,
-        source_id=body.source_id,
-        assignee=body.assignee,
-        enabled_skills=body.enabled_skills,
-        inbox_state=body.inbox_state,
-        estimated_minutes=body.estimated_minutes,
-        depends_on=body.depends_on,
-        recurrence_rule=body.recurrence_rule,
-        recurrence_end=body.recurrence_end,
-    )
-    await db.commit()
+    if body.idempotency_key:
+        existing = (
+            await db.execute(
+                select(Todo).where(Todo.idempotency_key == body.idempotency_key)
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            return await _enrich_todo_response(existing, db)
+
+    try:
+        todo = await todo_service.create_todo(
+            db,
+            title=body.title,
+            description=body.description,
+            project_id=body.project_id,
+            status=body.status,
+            priority=body.priority,
+            due_date=body.due_date,
+            tags=body.tags,
+            parent_id=body.parent_id,
+            sort_order=body.sort_order or 0,
+            source=body.source,
+            source_id=body.source_id,
+            idempotency_key=body.idempotency_key,
+            assignee=body.assignee,
+            enabled_skills=body.enabled_skills,
+            inbox_state=body.inbox_state,
+            estimated_minutes=body.estimated_minutes,
+            depends_on=body.depends_on,
+            recurrence_rule=body.recurrence_rule,
+            recurrence_end=body.recurrence_end,
+        )
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        if not body.idempotency_key:
+            raise
+        todo = (
+            await db.execute(
+                select(Todo).where(Todo.idempotency_key == body.idempotency_key)
+            )
+        ).scalar_one_or_none()
+        if todo is None:
+            raise
+        return await _enrich_todo_response(todo, db)
     await db.refresh(todo)
 
     # Trigger inbox pipeline for quick-capture root todos

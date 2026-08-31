@@ -4,10 +4,12 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import useVoiceInput from '../../hooks/useVoiceInput';
 import { CheckIcon, CloseIcon, MicrophoneIcon, SendIcon, StopIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
+import { useChatStore } from '../../stores/useChatStore';
 interface ChatInputProps {
-  onSend: (text: string) => void;
+  onSend: (text: string) => void | Promise<void>;
   isStreaming: boolean;
   onStop: () => void;
+  draftKey?: string;
   placeholder?: string;
   editingMessageId?: string | null;
   editingText?: string;
@@ -17,12 +19,16 @@ export default function ChatInput({
   onSend,
   isStreaming,
   onStop,
+  draftKey,
   placeholder = 'Type a message...',
   editingMessageId,
   editingText,
   onCancelEdit,
 }: ChatInputProps) {
-  const [text, setText] = useState('');
+  const storedDraft = useChatStore((state) => (draftKey ? (state.drafts[draftKey] ?? '') : ''));
+  const setDraft = useChatStore((state) => state.setDraft);
+  const [text, setText] = useState(() => storedDraft);
+  const [isSending, setIsSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendOnEnter = useSettingsStore((s) => s.sendOnEnter);
   const healthOK = useAuthStore((s) => s.healthOK);
@@ -57,22 +63,34 @@ export default function ChatInput({
       }
     }
   }, [editingMessageId, editingText]);
-  const handleSend = useCallback(() => {
+  useEffect(() => {
+    if (!isEditing) setText(storedDraft);
+  }, [draftKey, isEditing, storedDraft]);
+  const handleSend = useCallback(async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    onSend(trimmed);
-    setText('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    if (!trimmed || isSending) return;
+    setIsSending(true);
+    try {
+      await onSend(trimmed);
+      setText('');
+      if (draftKey) setDraft(draftKey, '');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    } catch {
+      // The caller reports the error. Keep the draft so the user can retry.
+    } finally {
+      setIsSending(false);
     }
-  }, [text, onSend]);
+  }, [draftKey, isSending, onSend, setDraft, text]);
   const handleCancel = useCallback(() => {
     setText('');
+    if (draftKey) setDraft(draftKey, '');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
     onCancelEdit?.();
-  }, [onCancelEdit]);
+  }, [draftKey, onCancelEdit, setDraft]);
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isEditing && e.key === 'Escape') {
       e.preventDefault();
@@ -81,12 +99,12 @@ export default function ChatInput({
     }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
       return;
     }
     if (sendOnEnter && e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
   const handleInput = () => {
@@ -104,6 +122,7 @@ export default function ChatInput({
         value={text}
         onChange={(e) => {
           setText(e.target.value);
+          if (draftKey && !isEditing) setDraft(draftKey, e.target.value);
           handleInput();
         }}
         onKeyDown={handleKeyDown}
@@ -149,8 +168,8 @@ export default function ChatInput({
           <button
             type="button"
             className="cc-chat-input__btn cc-chat-input__btn--send"
-            onClick={handleSend}
-            disabled={!text.trim()}
+            onClick={() => void handleSend()}
+            disabled={!text.trim() || isSending}
             title={
               !healthOK
                 ? translateUi('Server status uncertain \u2014 try sending anyway')

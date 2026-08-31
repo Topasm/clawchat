@@ -7,12 +7,12 @@ Active foundation work is tracked separately from release status:
 | Workstream                             | Implemented | Validated                                                             | Released |
 | -------------------------------------- | ----------- | --------------------------------------------------------------------- | -------- |
 | Canonical task status                  | Yes         | Backend/Web/Android generated-contract and serialization checks       | No       |
-| Normalized task relationships          | Yes         | Backend/Web/migration regression checks                               | No       |
+| Normalized task relationships          | Yes         | Backend/Web/Android/migration regression checks                       | No       |
 | Versioned AI plan proposals            | Yes         | Backend/Web/OpenAPI/migration/concurrency regression checks           | No       |
 | Deterministic execution graph insights | Yes         | Backend/Web/algorithm/performance regression checks                   | No       |
 | First-class Project identity           | Yes         | Backend/Web/OpenAPI/fresh-migration checks                            | No       |
-| Unified Review Inbox and Artifacts     | Yes         | Backend/Web/OpenAPI/version-lifecycle checks                          | No       |
-| AgentTask / AgentRun lifecycle         | Yes         | Backend/Web/cancellation/retry/restart/migration checks               | No       |
+| Unified Review Inbox and Artifacts     | Yes         | Backend/Web/Android/OpenAPI/version-lifecycle checks                  | No       |
+| AgentTask / AgentRun lifecycle         | Yes         | Backend/Web/Android/cancellation/retry/restart/migration checks       | No       |
 | Paseo execution provider               | Yes         | CLI contract/provider routing/reconnect/cancel/artifact/review checks | No       |
 | Inbox task placement canvas            | Yes         | Backend/Web/OpenAPI/migration/revision/undo checks                    | No       |
 | Inbox dependency connectors            | Yes         | Backend/Web/OpenAPI/revision/cycle/impact-preview checks              | No       |
@@ -283,12 +283,18 @@ Active foundation work is tracked separately from release status:
 - [x] UI: drag-and-drop file upload zone on task detail page
 - [x] Attachment list with preview (images) and download links
 - [x] Size limits and allowed file type validation
+- [x] Android Share-to-Task for URLs, images, PDFs, text, Markdown, and ZIP files
 
 ### Phase 6: Mobile
 
 - [x] Native Android app with Compose feature modules, widgets, notifications, and background work
 - [x] Bottom navigation for native Android and the shared mobile layout
 - [x] Complete Android release CI validation for the canonical task contract
+- [x] Mobile Review Inbox with approve, request-changes, and reject decisions
+- [x] Agent Run monitor with progress, event log, cancel, retry, and follow-up controls
+- [x] Lightweight normalized task-relationship context in task detail
+- [x] Credential-safe connection diagnostics and copyable support report
+- [x] Bounded multi-file Android share capture with partial-upload feedback
 - [x] Remove Capacitor and the provisional iOS shell; iOS is no longer a supported target
 
 ### Phase 7: Polish & Deploy

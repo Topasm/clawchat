@@ -10,6 +10,15 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** One atomic view of the connection fields needed by background work. */
+data class ActiveSession(
+    val token: String,
+    val apiBaseUrl: String?,
+    val hostId: String?,
+    val authMode: String?,
+    val refreshToken: String? = null,
+)
+
 /**
  * Stores session data (device token, server URL, device ID) in
  * DataStore Preferences. This is the single source of truth for
@@ -21,6 +30,7 @@ class SessionStore @Inject constructor(
 ) {
     companion object {
         private val KEY_TOKEN = stringPreferencesKey("device_token")
+        private val KEY_REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         private val KEY_API_BASE_URL = stringPreferencesKey("api_base_url")
         private val KEY_DEVICE_ID = stringPreferencesKey("device_id")
         private val KEY_HOST_NAME = stringPreferencesKey("host_name")
@@ -36,6 +46,7 @@ class SessionStore @Inject constructor(
     }
 
     val token: Flow<String?> = dataStore.data.map { it[KEY_TOKEN] }
+    val refreshToken: Flow<String?> = dataStore.data.map { it[KEY_REFRESH_TOKEN] }
     val apiBaseUrl: Flow<String?> = dataStore.data.map { it[KEY_API_BASE_URL] }
     val deviceId: Flow<String?> = dataStore.data.map { it[KEY_DEVICE_ID] }
     val hostName: Flow<String?> = dataStore.data.map { it[KEY_HOST_NAME] }
@@ -43,6 +54,19 @@ class SessionStore @Inject constructor(
     val hostPublicKey: Flow<String?> = dataStore.data.map { it[KEY_HOST_PUBLIC_KEY] }
     val relayUrl: Flow<String?> = dataStore.data.map { it[KEY_RELAY_URL] }
     val authMode: Flow<String?> = dataStore.data.map { it[KEY_AUTH_MODE] }
+    val activeSession: Flow<ActiveSession?> = dataStore.data.map { preferences ->
+        preferences[KEY_TOKEN]
+            ?.takeIf(String::isNotBlank)
+            ?.let { token ->
+                ActiveSession(
+                    token = token,
+                    apiBaseUrl = preferences[KEY_API_BASE_URL],
+                    hostId = preferences[KEY_HOST_ID],
+                    authMode = preferences[KEY_AUTH_MODE],
+                    refreshToken = preferences[KEY_REFRESH_TOKEN],
+                )
+            }
+    }
     val isLoggedIn: Flow<Boolean> = dataStore.data.map { it[KEY_TOKEN] != null }
     val onboardingSkipped: Flow<Boolean> = dataStore.data.map { it[KEY_ONBOARDING_SKIPPED] == true }
     val accentColor: Flow<String> = dataStore.data.map { it[KEY_ACCENT_COLOR] ?: "system" }
@@ -68,6 +92,7 @@ class SessionStore @Inject constructor(
         dataStore.edit { prefs ->
             prefs[KEY_DEVICE_ID] = deviceId
             prefs[KEY_TOKEN] = deviceToken
+            prefs.remove(KEY_REFRESH_TOKEN)
             prefs[KEY_API_BASE_URL] = apiBaseUrl
             prefs[KEY_HOST_NAME] = hostName
             prefs[KEY_HOST_ID] = hostId
@@ -80,13 +105,68 @@ class SessionStore @Inject constructor(
     /** Save session after manual login (URL + PIN). */
     suspend fun saveManualSession(
         accessToken: String,
+        refreshToken: String,
         apiBaseUrl: String,
     ) {
         dataStore.edit { prefs ->
             prefs[KEY_TOKEN] = accessToken
+            prefs[KEY_REFRESH_TOKEN] = refreshToken
             prefs[KEY_API_BASE_URL] = apiBaseUrl
             prefs[KEY_AUTH_MODE] = "manual"
         }
+    }
+
+    /**
+     * Atomically rotate a manual session only if it is still the session that
+     * received the 401. A slow refresh from workspace A must never overwrite a
+     * newer login to workspace B.
+     */
+    suspend fun rotateManualSession(
+        expectedAccessToken: String,
+        expectedRefreshToken: String,
+        expectedApiBaseUrl: String,
+        accessToken: String,
+        refreshToken: String,
+    ): Boolean {
+        var rotated = false
+        dataStore.edit { prefs ->
+            val sameSession = prefs[KEY_AUTH_MODE] == "manual" &&
+                prefs[KEY_TOKEN] == expectedAccessToken &&
+                prefs[KEY_REFRESH_TOKEN] == expectedRefreshToken &&
+                prefs[KEY_API_BASE_URL]?.trimEnd('/') == expectedApiBaseUrl.trimEnd('/')
+            if (sameSession) {
+                prefs[KEY_TOKEN] = accessToken
+                prefs[KEY_REFRESH_TOKEN] = refreshToken
+                prefs[KEY_API_BASE_URL] = expectedApiBaseUrl.trimEnd('/')
+                rotated = true
+            }
+        }
+        return rotated
+    }
+
+    /**
+     * Clear an unauthorized session only if it still owns [expectedAccessToken].
+     * A failed refresh from workspace A must not log out a workspace B session
+     * selected while that network request was in flight.
+     */
+    suspend fun clearSessionIfToken(expectedAccessToken: String): Boolean {
+        var cleared = false
+        dataStore.edit { prefs ->
+            if (prefs[KEY_TOKEN] == expectedAccessToken) {
+                prefs.remove(KEY_TOKEN)
+                prefs.remove(KEY_REFRESH_TOKEN)
+                prefs.remove(KEY_API_BASE_URL)
+                prefs.remove(KEY_DEVICE_ID)
+                prefs.remove(KEY_HOST_NAME)
+                prefs.remove(KEY_HOST_ID)
+                prefs.remove(KEY_HOST_PUBLIC_KEY)
+                prefs.remove(KEY_RELAY_URL)
+                prefs.remove(KEY_AUTH_MODE)
+                prefs.remove(KEY_ONBOARDING_SKIPPED)
+                cleared = true
+            }
+        }
+        return cleared
     }
 
     /** Mark onboarding as skipped (set up server later). */
@@ -115,6 +195,7 @@ class SessionStore @Inject constructor(
     suspend fun clearSession() {
         dataStore.edit { prefs ->
             prefs.remove(KEY_TOKEN)
+            prefs.remove(KEY_REFRESH_TOKEN)
             prefs.remove(KEY_API_BASE_URL)
             prefs.remove(KEY_DEVICE_ID)
             prefs.remove(KEY_HOST_NAME)

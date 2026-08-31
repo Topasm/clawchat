@@ -2,5 +2,6 @@
 <!-- Android 11 and older; data_extraction_rules.xml covers Android 12+. -->
 <full-backup-content>
     <exclude domain="file" path="datastore" />
+    <exclude domain="file" path="share-outbox" />
     <exclude domain="database" path="clawchat_cache" />
 </full-backup-content>

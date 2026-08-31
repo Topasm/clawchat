@@ -9,6 +9,10 @@ function readWorkflow() {
   return fs.readFileSync(workflowPath, 'utf8').replace(/\r\n/g, '\n');
 }
 
+test('uses the shared release tag prefix', () => {
+  assert.match(readWorkflow(), /tags: \['clawchat-v\*'\]/);
+});
+
 test('gates Android compilation on generated API contract drift', () => {
   const workflow = readWorkflow();
 
@@ -31,4 +35,3 @@ test('keeps tests, debug and release lint, installable debug output, and the rel
   assert.match(workflow, /android\/app\/build\/outputs\/apk\/debug\/app-debug\.apk/);
   assert.match(workflow, /android\/app\/build\/outputs\/bundle\/release\/app-release\.aab/);
 });
-

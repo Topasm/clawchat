@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -25,6 +26,7 @@ class TodoCreate(BaseModel):
     sort_order: int | None = None
     source: str | None = None
     source_id: str | None = None
+    idempotency_key: str | None = None
     assignee: str | None = None
     enabled_skills: list[str] | None = None
     inbox_state: str = "none"
@@ -38,6 +40,13 @@ class TodoCreate(BaseModel):
     recurrence_end: datetime | None = None
 
     _validate_source_id = field_validator("source_id")(_normalize_source_id)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def _normalize_idempotency_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return str(UUID(value))
 
 
 class TodoUpdate(BaseModel):

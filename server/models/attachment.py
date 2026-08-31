@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -18,10 +18,18 @@ class Attachment(Base):
     todo_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("todos.id", ondelete="CASCADE"), nullable=True
     )
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
     __table_args__ = (
         Index("idx_attachments_todo_id", "todo_id"),
+        Index(
+            "uq_attachments_idempotency_key",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=text("idempotency_key IS NOT NULL"),
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
     )

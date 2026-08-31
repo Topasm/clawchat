@@ -3,10 +3,12 @@ package com.clawchat.android.feature.tasks
 import app.cash.turbine.test
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.TaskStatus
+import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.TodoRepository
+import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
@@ -31,7 +33,9 @@ class TasksViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var todoRepository: TodoRepository
+    private lateinit var relationshipRepository: TaskRelationshipRepository
     private lateinit var syncManager: SyncManager
+    private lateinit var todoChanged: MutableSharedFlow<Unit>
     private lateinit var viewModel: TasksViewModel
 
     private val sampleTodo = Todo(
@@ -49,8 +53,11 @@ class TasksViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         todoRepository = mockk()
+        relationshipRepository = mockk()
         syncManager = mockk(relaxed = true)
-        every { syncManager.todoChanged } returns MutableSharedFlow()
+        todoChanged = MutableSharedFlow(extraBufferCapacity = 1)
+        every { syncManager.todoChanged } returns todoChanged
+        coEvery { relationshipRepository.listForTask(any()) } returns ApiResult.Success(emptyList())
     }
 
     @After
@@ -59,7 +66,7 @@ class TasksViewModelTest {
     }
 
     private fun createViewModel(): TasksViewModel {
-        return TasksViewModel(todoRepository, syncManager)
+        return TasksViewModel(todoRepository, syncManager, relationshipRepository)
     }
 
     @Test
@@ -265,5 +272,101 @@ class TasksViewModelTest {
 
         viewModel.onAction(TasksAction.SelectTask(null))
         assertNull(viewModel.uiState.value.selectedTask)
+    }
+
+    @Test
+    fun `selectTask loads normalized task relationships`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        val relationship = TaskRelationship(
+            id = "relationship-1",
+            sourceTaskId = "1",
+            targetTaskId = "2",
+            type = "depends_on",
+            label = "Finish first",
+            createdBy = "user",
+            createdAt = "2026-08-31T00:00:00Z",
+            updatedAt = "2026-08-31T00:00:00Z",
+        )
+        coEvery { relationshipRepository.listForTask("1") } returns
+            ApiResult.Success(listOf(relationship))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.selectTask(sampleTodo)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf(relationship), viewModel.uiState.value.relationships)
+        assertEquals(false, viewModel.uiState.value.isLoadingRelationships)
+        assertNull(viewModel.uiState.value.relationshipError)
+        coVerify(exactly = 1) { relationshipRepository.listForTask("1") }
+    }
+
+    @Test
+    fun `relationship titles resolve tasks outside the current filtered page`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(sampleTodo), total = 1))
+        val relationship = TaskRelationship(
+            id = "relationship-remote",
+            sourceTaskId = "1",
+            targetTaskId = "remote-task",
+            type = "depends_on",
+            createdBy = "user",
+            createdAt = "2026-08-31T00:00:00Z",
+            updatedAt = "2026-08-31T00:00:00Z",
+        )
+        coEvery { relationshipRepository.listForTask("1") } returns
+            ApiResult.Success(listOf(relationship))
+        coEvery { todoRepository.getTodo("remote-task") } returns ApiResult.Success(
+            Todo(id = "remote-task", title = "Remote prerequisite"),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.selectTask(sampleTodo)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            "Remote prerequisite",
+            viewModel.uiState.value.relationshipTaskTitles["remote-task"],
+        )
+        coVerify(exactly = 1) { todoRepository.getTodo("remote-task") }
+    }
+
+    @Test
+    fun `todo realtime event refreshes selected task and its relationships`() = runTest {
+        val updatedTodo = sampleTodo.copy(title = "Updated task")
+        val firstRelationship = TaskRelationship(
+            id = "relationship-1",
+            sourceTaskId = "1",
+            targetTaskId = "2",
+            type = "related",
+            createdBy = "user",
+            createdAt = "2026-08-31T00:00:00Z",
+            updatedAt = "2026-08-31T00:00:00Z",
+        )
+        val secondRelationship = firstRelationship.copy(id = "relationship-2", type = "depends_on")
+        coEvery { todoRepository.listTodos(any()) } returnsMany listOf(
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2)),
+            ApiResult.Success(PaginatedResponse(items = listOf(updatedTodo, sampleTodos[1]), total = 2)),
+        )
+        coEvery { todoRepository.getTodo("1") } returns ApiResult.Success(updatedTodo)
+        coEvery { relationshipRepository.listForTask("1") } returnsMany listOf(
+            ApiResult.Success(listOf(firstRelationship)),
+            ApiResult.Success(listOf(secondRelationship)),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.selectTask(sampleTodo)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        todoChanged.emit(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Updated task", viewModel.uiState.value.selectedTask?.title)
+        assertEquals(listOf(secondRelationship), viewModel.uiState.value.relationships)
+        coVerify(exactly = 2) { relationshipRepository.listForTask("1") }
     }
 }

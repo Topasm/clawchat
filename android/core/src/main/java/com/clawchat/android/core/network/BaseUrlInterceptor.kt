@@ -16,34 +16,33 @@ import javax.inject.Singleton
  * Retrofit instance to be created once with a placeholder URL,
  * then dynamically route to the actual server after pairing.
  *
- * Caches the parsed URL in-memory so only the first request
- * (or after a session change) hits DataStore.
+ * The active URL is resolved for every request. DataStore keeps the latest
+ * preferences in memory, and resolving it here avoids pinning OkHttp to the
+ * server that happened to be configured when the first request was made.
  */
 @Singleton
 class BaseUrlInterceptor @Inject constructor(
     private val sessionStore: SessionStore,
 ) : Interceptor {
 
-    @Volatile
-    private var cachedBaseUrl: HttpUrl? = null
-
-    @Volatile
-    private var baseUrlResolved = false
-
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
-
-        val newBaseUrl = if (baseUrlResolved) {
-            cachedBaseUrl
-        } else {
-            val raw = runBlocking { sessionStore.apiBaseUrl.first() }
-            val parsed = raw?.trimEnd('/')?.toHttpUrlOrNull()
-            cachedBaseUrl = parsed
-            baseUrlResolved = true
-            parsed
+        val session = runBlocking { sessionStore.activeSession.first() }
+        val expectedScope = originalRequest.tag(ExpectedSessionScope::class.java)?.value
+        val activeScope = when (session?.authMode) {
+            "paired" -> session.hostId
+            "manual" -> session.apiBaseUrl?.trimEnd('/')
+            else -> session?.hostId ?: session?.apiBaseUrl?.trimEnd('/')
         }
+        if (expectedScope != null && expectedScope != activeScope) {
+            // Durable background writes are owned by the workspace that first
+            // accepted them. Fail before routing or authentication if the user
+            // switches workspaces while a worker is in flight.
+            throw SessionScopeChangedException(expectedScope, activeScope)
+        }
+        val newBaseUrl = session?.apiBaseUrl?.trimEnd('/')?.toHttpUrlOrNull()
 
-        if (newBaseUrl == null) {
+        if (session == null || newBaseUrl == null) {
             return chain.proceed(originalRequest)
         }
 
@@ -55,14 +54,17 @@ class BaseUrlInterceptor @Inject constructor(
 
         val newRequest = originalRequest.newBuilder()
             .url(newUrl)
+            // AuthInterceptor must use this exact token/host snapshot. Reading
+            // both values independently can leak a newly selected workspace's
+            // token to a request already routed to the previous workspace.
+            .tag(AuthenticatedRoute::class.java, AuthenticatedRoute(newBaseUrl, session.token))
             .build()
 
         return chain.proceed(newRequest)
     }
-
-    /** Called by SessionStore after login/logout to invalidate the cache. */
-    fun invalidateBaseUrl() {
-        baseUrlResolved = false
-        cachedBaseUrl = null
-    }
 }
+
+internal data class AuthenticatedRoute(
+    val baseUrl: HttpUrl,
+    val token: String,
+)

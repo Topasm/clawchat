@@ -1,6 +1,7 @@
 """SSE chat contract: event ordering, send de-duplication, and intent handling."""
 
 import json
+from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 
 import pytest
@@ -179,6 +180,7 @@ async def test_repeated_send_with_same_key_stores_one_message(
 
     assert first.status_code == 202
     assert second.status_code == 202
+    assert first.json()["status"] == "accepted"
     # The retry resolves to the message the first attempt stored.
     assert first.json()["message_id"] == second.json()["message_id"]
 
@@ -192,6 +194,58 @@ async def test_repeated_send_with_same_key_stores_one_message(
     assert count == 1
     # The retry must not run the orchestrator a second time over the same message.
     assert len(chat_runtime.dispatched) == 1
+
+
+async def test_message_history_page_starts_with_the_latest_messages(
+    client: AsyncClient, auth_headers, db_session
+):
+    conversation_id = await _create_conversation(client, auth_headers)
+    started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    db_session.add_all(
+        [
+            Message(
+                conversation_id=conversation_id,
+                role="user",
+                content=f"message-{index}",
+                created_at=started_at + timedelta(seconds=index),
+            )
+            for index in range(60)
+        ]
+    )
+    await db_session.commit()
+
+    response = await client.get(
+        f"/api/chat/conversations/{conversation_id}/messages",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 60
+    assert len(payload["items"]) == 50
+    assert payload["items"][0]["content"] == "message-59"
+    assert payload["items"][-1]["content"] == "message-10"
+
+
+async def test_stream_metadata_reconciles_the_durable_user_message(
+    client: AsyncClient, auth_headers, monkeypatch
+):
+    monkeypatch.setattr(
+        "routers.chat.classify_intent",
+        lambda *args, **kwargs: _general_chat(),
+    )
+    conversation_id = await _create_conversation(client, auth_headers)
+
+    with stub_ai():
+        response = await client.post(
+            "/api/chat/stream",
+            headers=auth_headers,
+            json={"conversation_id": conversation_id, "content": "remember me"},
+        )
+
+    first_payload = json.loads(_sse_payloads(response.text)[0])
+    assert first_payload["conversation_id"] == conversation_id
+    assert first_payload["user_message_id"].startswith("msg_")
 
 
 async def test_sends_without_a_key_are_not_collapsed(

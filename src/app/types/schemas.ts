@@ -627,7 +627,7 @@ export const EventUpdateSchema = z.object({
 export const ConversationResponseSchema = z.object({
   id: z.string(),
   title: z.string().optional(),
-  last_message: z.string().optional(),
+  last_message: z.string().nullable().optional(),
   is_archived: z.boolean().optional(),
   project_id: z.string().nullable().optional(),
   project_todo_id: z.string().nullable().optional(),
@@ -663,6 +663,7 @@ export const SendMessageRequestSchema = z.object({
 export const StreamEventMetaSchema = z.object({
   conversation_id: z.string(),
   message_id: z.string(),
+  user_message_id: z.string().optional(),
 });
 
 export const StreamEventTokenSchema = z.object({

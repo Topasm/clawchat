@@ -32,7 +32,9 @@ Feature code must not read an Electron bridge or import `@tauri-apps/*` directly
 - [ ] Configure production credentials and verify OS-signed/notarized installers.
 - [x] Retire the Electron workflow and runtime after preserving the read-only data-import path.
 
-The native Android Compose client is outside this migration. Its HTTP and WebSocket contracts remain unchanged.
+The native Android Compose client is outside the desktop migration. Its HTTP
+and WebSocket contracts remain unchanged, but its signed APK/AAB now ships in
+the same `clawchat-v*` GitHub release as the Tauri desktop builds.
 
 ## Initial native command surface
 
@@ -157,17 +159,47 @@ For a non-GitHub update host, also set `TAURI_UPDATER_ENDPOINT` to an HTTPS endp
 https://github.com/<owner>/<repository>/releases/latest/download/latest.json
 ```
 
-Bump the release version in `package.json`, both root declarations in `package-lock.json`, `src-tauri/Cargo.toml`, and the `clawchat-tauri` entry in `src-tauri/Cargo.lock`. Keep `src-tauri/tauri.conf.json` pointing to `../package.json`; the renderer also injects that package version into Tauri/Web runtime metadata and the Settings About section. Verify the result before committing:
+Bump the release version in every declaration, including the Android
+`versionName` and Tauri package metadata. Keep `src-tauri/tauri.conf.json`
+pointing to `../package.json`; the renderer also injects that package version
+into Tauri/Web runtime metadata and the Settings About section. Verify the
+result before committing:
 
 ```bash
 npm run check:release-version
 ```
 
-Then run `Release Tauri Desktop` manually from the current `main` commit. A secret-free preflight job rejects version drift, a non-current `main` commit, or an existing `clawchat-v<version>` tag before any protected signing environment is entered. It also runs typecheck, frontend/script tests, migration audit, Rust core tests, and Rust formatting once; the three platform runners no longer duplicate those common checks.
+Then run `.github/workflows/release-tauri.yml`, named **Release ClawChat**, once
+from the current `main` commit. A secret-free preflight job rejects version
+drift, a non-current `main` commit, or an existing `clawchat-v<version>` tag
+before any protected desktop signing environment is entered. It also runs
+typecheck, frontend/script tests, migration audit, Rust core tests, and Rust
+formatting once; the platform runners no longer duplicate those common checks.
 
-The platform matrix builds and verifies Linux, Windows, and macOS independently, but it does not mutate a GitHub Release. Each runner stages only its verified installer, updater archive, and updater signature as a short-lived Actions artifact.
+The Android job requires the canonical `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`
+secrets. For compatibility it currently resolves `RELEASE_KEYSTORE_PASSWORD`,
+`RELEASE_KEYSTORE_ALIAS`, and `RELEASE_KEY_PASSWORD` as fallbacks for the last
+three; the base64 keystore secret has no fallback. It also requires the public
+`ANDROID_SIGNING_CERT_SHA256` Actions variable. These values should live in the
+Android job's `android-release` GitHub Environment, which remains separate from
+the desktop job's `desktop-release` environment. The job compares the pinned
+fingerprint with the built APK's signer digest before staging either Android
+artifact.
 
-After all three runners succeed, one dependent publish job downloads the complete set and fails closed unless it finds exactly one required installer and updater for every supported platform. It generates a single combined `latest.json`, creates `checksums.txt` for all 11 release payload files, verifies those checksums, and only then creates one draft GitHub Release containing 12 files in total. This avoids concurrent matrix jobs overwriting a partial updater manifest. Inspect every asset, signature, `latest.json`, and `checksums.txt`, then publish the draft; clients do not see a draft release.
+The platform matrix builds and verifies Linux, Windows, and macOS independently,
+while a sibling Android job tests, lints, signs, and verifies the APK/AAB. None
+of these build jobs mutates a GitHub Release. Each runner stages only verified
+files as short-lived Actions artifacts.
+
+After all desktop runners and Android succeed, one dependent publish job
+downloads the complete set and fails closed unless it finds every required
+desktop installer/updater/signature plus the signed APK, AAB, and APK checksum.
+It generates one combined `latest.json`, creates `checksums.txt` for the other
+12 release payload files, verifies those checksums, and only then creates one
+draft GitHub Release containing exactly 13 assets. This avoids concurrent jobs
+overwriting a partial release. Inspect every asset, signature, `latest.json`,
+and `checksums.txt`, then publish the draft; clients do not see a draft release.
 
 Tauri updater signatures are mandatory and independent from Apple notarization, Windows Authenticode, and Linux package signing, which remain a separate cutover gate.
 

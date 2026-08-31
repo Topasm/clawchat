@@ -168,6 +168,7 @@ class OnboardingViewModel @Inject constructor(
                 )
                 sessionStore.saveManualSession(
                     accessToken = response.accessToken,
+                    refreshToken = response.refreshToken,
                     apiBaseUrl = url,
                 )
                 _uiState.update { it.copy(isLoggingIn = false, step = OnboardingStep.READY) }

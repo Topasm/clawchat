@@ -42,6 +42,7 @@ sealed interface SyncEvent {
         val title: String,
         val message: String,
         val minutesUntil: Int,
+        val deliveryKey: String? = null,
     ) : SyncEvent
 
     /** A nudge notification from the server. */
@@ -68,6 +69,7 @@ sealed interface SyncEvent {
 class WebSocketClient @Inject constructor(
     private val sessionStore: SessionStore,
     private val relayClient: RelayClient,
+    private val sessionRefresher: SessionRefresher,
 ) {
     companion object {
         private const val TAG = "WebSocketClient"
@@ -173,7 +175,7 @@ class WebSocketClient @Inject constructor(
                         openConnectionWithTicket(baseUrl, token, result.ticket, generation)
                     }
                 }
-                TicketResult.Unauthorized -> handleAuthenticationFailure(generation)
+                TicketResult.Unauthorized -> handleAuthenticationFailure(generation, token)
                 TicketResult.RetryableFailure -> {
                     if (!isCurrent(generation)) return@launch
                     if (relayClient.subscribe(token) && isCurrent(generation)) {
@@ -263,8 +265,17 @@ class WebSocketClient @Inject constructor(
     private fun isCurrent(generation: Long): Boolean =
         shouldReconnect && connectionGeneration.get() == generation
 
-    private suspend fun handleAuthenticationFailure(generation: Long) {
+    private suspend fun handleAuthenticationFailure(
+        generation: Long,
+        rejectedAccessToken: String? = null,
+    ) {
         if (!isCurrent(generation)) return
+        val refreshedToken = sessionRefresher.refreshAfterUnauthorized(rejectedAccessToken)
+        if (!refreshedToken.isNullOrBlank() && isCurrent(generation)) {
+            Log.d(TAG, "Restored remembered session after authentication failure")
+            connect()
+            return
+        }
         Log.w(TAG, "Authentication failed; reconnect disabled until a new session is available")
         shouldReconnect = false
         connectionGeneration.incrementAndGet()
@@ -320,9 +331,18 @@ class WebSocketClient @Inject constructor(
                     val title = data.optString("title", "")
                     val message = data.optString("message", "")
                     val minutesUntil = data.optInt("minutes_until", 0)
+                    val deliveryKey = data.optString("delivery_key")
+                        .takeIf(String::isNotBlank)
                     Log.d(TAG, "Reminder: $title ($reminderType)")
                     _events.tryEmit(
-                        SyncEvent.Reminder(reminderType, itemId, title, message, minutesUntil)
+                        SyncEvent.Reminder(
+                            reminderType,
+                            itemId,
+                            title,
+                            message,
+                            minutesUntil,
+                            deliveryKey,
+                        )
                     )
                 }
                 "nudge" -> {

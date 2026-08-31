@@ -33,6 +33,7 @@ interface MessageBubbleProps {
   onDelete?: () => void;
   onRegenerate?: () => void;
   onEdit?: (messageId: string) => void;
+  onRetry?: () => void;
 }
 export default function MessageBubble({
   message,
@@ -40,6 +41,7 @@ export default function MessageBubble({
   onDelete,
   onRegenerate,
   onEdit,
+  onRetry,
 }: MessageBubbleProps) {
   const showTimestamps = useSettingsStore((s) => s.showTimestamps);
   const showAvatars = useSettingsStore((s) => s.showAvatars);
@@ -75,6 +77,24 @@ export default function MessageBubble({
               hour: 'numeric',
               minute: '2-digit',
             })}
+          </div>
+        )}
+        {message.deliveryStatus === 'pending' && (
+          <div className="cc-bubble__delivery">{translateUi('Sending...')}</div>
+        )}
+        {message.deliveryStatus === 'failed' && (
+          <div className="cc-bubble__delivery cc-bubble__delivery--failed">
+            {translateUi('Not sent')}
+            {onRetry && (
+              <button type="button" onClick={onRetry}>
+                {translateUi('Retry')}
+              </button>
+            )}
+          </div>
+        )}
+        {message.deliveryStatus === 'interrupted' && (
+          <div className="cc-bubble__delivery cc-bubble__delivery--failed">
+            {translateUi('Response interrupted')}
           </div>
         )}
         <div className="cc-bubble__actions">

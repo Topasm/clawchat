@@ -2,7 +2,12 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { wsClient } from '../services/wsClient';
 import { useAuthStore } from '../stores/useAuthStore';
-import { useChatStore, clearPendingRunTimeout, type ChatMessage } from '../stores/useChatStore';
+import {
+  getChatWorkspaceScope,
+  useChatStore,
+  clearPendingRunTimeout,
+  type ChatMessage,
+} from '../stores/useChatStore';
 import { useToastStore } from '../stores/useToastStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { notify } from '../services/platform';
@@ -10,6 +15,8 @@ import { playReminderSound } from '../services/reminderSound';
 import { platformApi } from '../platform';
 import { IS_DESKTOP } from '../types/platform';
 import apiClient from '../services/apiClient';
+import { refreshAuthSession } from '../services/sessionRefresh';
+import { logger } from '../services/logger';
 import { queryKeys } from './queries';
 import type { ConversationResponse } from '../types/api';
 import { invalidateTaskDerivedQueries } from './queries/invalidateTaskDerivedQueries';
@@ -53,12 +60,26 @@ export default function useWebSocket(): void {
         }
       }
     });
-    // Auth failure (server rejected token) — log out immediately
+    let disposed = false;
+    let authRecoveryInFlight = false;
+    // A restored access token may have expired while the app was closed. The
+    // refresh token is remembered in the OS credential vault, so recover it
+    // before treating the session as signed out and asking for the PIN again.
     wsClient.onAuthFailure = () => {
-      useToastStore
-        .getState()
-        .addToast('error', translateUi('Session expired. Please log in again.'));
-      useAuthStore.getState().logout();
+      if (authRecoveryInFlight) return;
+      authRecoveryInFlight = true;
+      void refreshAuthSession()
+        .catch((error) => {
+          logger.warn('Could not restore the remembered real-time session', error);
+          if (!disposed) {
+            useToastStore
+              .getState()
+              .addToast('error', translateUi('Session expired. Please log in again.'));
+          }
+        })
+        .finally(() => {
+          authRecoveryInFlight = false;
+        });
     };
     // Fail pending streaming state on disconnect so the UI doesn't get stuck
     wsClient.onDisconnect = () => {
@@ -151,15 +172,17 @@ export default function useWebSocket(): void {
         conversation_id: string;
       };
       const chatStore = useChatStore.getState();
-      if (d.conversation_id !== chatStore.currentConversationId) return;
       const placeholder: ChatMessage = {
         _id: d.message_id,
         text: '',
         createdAt: new Date(),
         user: { _id: 'assistant', name: 'ClawChat' },
+        conversationId: d.conversation_id,
+        deliveryStatus: 'streaming',
+        workspaceScope: getChatWorkspaceScope(),
       };
       chatStore.addStreamingMessage(placeholder);
-      chatStore.setStreamingState(true);
+      chatStore.setStreamingState(true, d.conversation_id);
     };
     const handleStreamChunk = (data: unknown) => {
       const d = data as {
@@ -178,7 +201,8 @@ export default function useWebSocket(): void {
       clearPendingRunTimeout();
       const chatStore = useChatStore.getState();
       chatStore.finalizeStreamMessage(d.message_id, d.full_content, d.metadata);
-      chatStore.setStreamingState(false);
+      chatStore.updateStreamingMessageId(d.message_id, d.message_id, 'accepted');
+      chatStore.setStreamingState(false, d.conversation_id);
       // Invalidate messages query to pick up finalized message from server
       const conversationId = d.conversation_id || chatStore.currentConversationId;
       if (conversationId) {
@@ -196,6 +220,7 @@ export default function useWebSocket(): void {
       const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
       useChatStore.setState({
         isStreaming: false,
+        streamingConversationId: null,
         streamAbortController: null,
       });
       const errorMsg =
@@ -214,6 +239,7 @@ export default function useWebSocket(): void {
       const conversationId = d.conversation_id || useChatStore.getState().currentConversationId;
       useChatStore.setState({
         isStreaming: false,
+        streamingConversationId: null,
         streamAbortController: null,
       });
       // Reload messages to get authoritative server state
@@ -313,6 +339,7 @@ export default function useWebSocket(): void {
     wsClient.on('stream_aborted', handleStreamAborted);
     wsClient.on('conversation_updated', handleConversationUpdated);
     return () => {
+      disposed = true;
       unsubNotifAction?.();
       unsubStatus();
       wsClient.off('tick', handleLivenessNoop);

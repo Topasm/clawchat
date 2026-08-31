@@ -40,7 +40,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +53,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.TaskStatus
+import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
@@ -74,11 +75,15 @@ import com.clawchat.android.core.ui.TaskCreateSheet
 fun TasksScreen(
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     if (state.selectedTask != null) {
         TaskDetailView(
             task = state.selectedTask!!,
+            relationships = state.relationships,
+            isLoadingRelationships = state.isLoadingRelationships,
+            relationshipError = state.relationshipError,
+            taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
             onBack = { viewModel.selectTask(null) },
             onToggle = { viewModel.toggleComplete(state.selectedTask!!.id) },
             onSetStatus = { status ->
@@ -443,6 +448,10 @@ private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
 @Composable
 private fun TaskDetailView(
     task: Todo,
+    relationships: List<TaskRelationship>,
+    isLoadingRelationships: Boolean,
+    relationshipError: String?,
+    taskTitles: Map<String, String>,
     onBack: () -> Unit,
     onToggle: () -> Unit,
     onSetStatus: (TaskStatus) -> Unit,
@@ -558,6 +567,42 @@ private fun TaskDetailView(
                 }
             }
 
+            item {
+                ClawSectionCard {
+                    ClawSectionHeader(
+                        title = "Task links",
+                        subtitle = "Dependencies and related work from the shared task graph.",
+                        count = relationships.size.takeIf { it > 0 },
+                    )
+                    when {
+                        isLoadingRelationships -> Text(
+                            text = "Loading task links…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        relationshipError != null -> Text(
+                            text = relationshipError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        relationships.isEmpty() -> Text(
+                            text = "No task links yet.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            relationships.forEach { relationship ->
+                                TaskRelationshipRow(
+                                    relationship = relationship,
+                                    currentTaskId = task.id,
+                                    taskTitles = taskTitles,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             val tags = task.tags
             if (!tags.isNullOrEmpty()) {
                 item {
@@ -577,6 +622,62 @@ private fun TaskDetailView(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TaskRelationshipRow(
+    relationship: TaskRelationship,
+    currentTaskId: String,
+    taskTitles: Map<String, String>,
+) {
+    val isOutgoing = relationship.sourceTaskId == currentTaskId
+    val otherTaskId = if (isOutgoing) relationship.targetTaskId else relationship.sourceTaskId
+    val otherTaskTitle = taskTitles[otherTaskId] ?: "Task ${otherTaskId.take(8)}"
+    val direction = when (relationship.type) {
+        "depends_on" -> if (isOutgoing) "Depends on" else "Required by"
+        "duplicate" -> if (isOutgoing) "Duplicates" else "Duplicated by"
+        "related" -> "Related to"
+        else -> relationship.type.replace('_', ' ').replaceFirstChar { it.uppercase() }
+    }
+
+    ClawListItemSurface {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    text = direction,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = otherTaskTitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                relationship.label?.takeIf { it.isNotBlank() }?.let { label ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            ClawStatusChip(
+                text = relationship.type.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                tone = if (relationship.type == "depends_on") ClawTone.Warning else ClawTone.Default,
+            )
         }
     }
 }

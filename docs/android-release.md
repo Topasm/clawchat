@@ -2,9 +2,10 @@
 
 The Android app updates itself from this repository's GitHub releases, the way
 a sideloaded open-source app does. A release build lists published releases,
-compares the newest `android-v*` tag against its own `versionName`, downloads
-that release's APK, verifies the SHA-256 digest published beside it, and hands
-the file to the system package installer.
+accepts the unified `clawchat-v*` tags as well as legacy `android-v*` tags,
+selects the newest compatible release that carries an APK, verifies the
+SHA-256 digest published beside it, and hands the file to the system package
+installer.
 
 There is no Play Store in this path, so the signing key is the entire trust
 anchor: **Android only installs an update over an existing app when both APKs
@@ -26,23 +27,60 @@ keytool -genkeypair -v \
   -keyalg RSA -keysize 4096 -validity 10000
 ```
 
-### 2. Register the secrets
+### 2. Register the signing configuration
+
+The Android job uses the protected `android-release` GitHub Environment,
+separate from the desktop job's `desktop-release` environment. Create and
+protect that environment first, then store the private signing values in it:
 
 ```bash
-base64 -w0 ~/keys/clawchat-release.jks | gh secret set ANDROID_KEYSTORE_BASE64
-gh secret set ANDROID_KEYSTORE_PASSWORD   # keystore password
-gh secret set ANDROID_KEY_ALIAS           # clawchat
-gh secret set ANDROID_KEY_PASSWORD        # key password
+base64 -w0 ~/keys/clawchat-release.jks | gh secret set ANDROID_KEYSTORE_BASE64 --env android-release
+gh secret set ANDROID_KEYSTORE_PASSWORD --env android-release   # keystore password
+gh secret set ANDROID_KEY_ALIAS --env android-release           # clawchat
+gh secret set ANDROID_KEY_PASSWORD --env android-release        # key password
 ```
 
-All four are required. The release workflow fails before it builds anything if
-any of them is missing, because a partially configured keystore would produce
-an APK signed with a different key — one that no installed copy can accept.
+Record the certificate fingerprint separately as an Actions variable in the
+same environment. Copy the `SHA256:` value printed by this command (a
+colon-separated fingerprint is accepted), then set it as shown:
+
+```bash
+keytool -list -v -keystore ~/keys/clawchat-release.jks -alias clawchat
+gh variable set ANDROID_SIGNING_CERT_SHA256 --env android-release --body 'AA:BB:...:FF'
+```
+
+`ANDROID_SIGNING_CERT_SHA256` is deliberately a variable, not a secret: a
+certificate fingerprint is public identity, not private key material. The
+workflow removes separators and normalizes case, requires exactly 64
+hexadecimal digits, and compares the result with the SHA-256 signer digest
+reported by `apksigner` for the built APK. A missing value, malformed value, or
+different keystore fails the release before any artifact is staged.
+
+Repository-scoped secrets and variables also resolve in this job, but the
+dedicated environment is recommended so Android signing can have its own
+reviewers and deployment policy.
+
+These four keystore secret names are canonical and all four are required. For
+repositories that already use the older names, the unified workflow currently
+accepts these fallbacks:
+
+| Canonical secret            | Legacy fallback             |
+| --------------------------- | --------------------------- |
+| `ANDROID_KEYSTORE_BASE64`   | None                        |
+| `ANDROID_KEYSTORE_PASSWORD` | `RELEASE_KEYSTORE_PASSWORD` |
+| `ANDROID_KEY_ALIAS`         | `RELEASE_KEYSTORE_ALIAS`    |
+| `ANDROID_KEY_PASSWORD`      | `RELEASE_KEY_PASSWORD`      |
+
+Prefer migrating to the canonical names. The workflow fails before Gradle runs
+if any resolved value is missing, because a partially configured keystore
+could produce an APK signed with a different key — one that no installed copy
+can accept.
 
 ### 3. Verify
 
 ```bash
-gh secret list  # ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+gh secret list --env android-release    # the four ANDROID_KEY* secrets
+gh variable list --env android-release  # ANDROID_SIGNING_CERT_SHA256
 ```
 
 ## Cutting a release
@@ -58,29 +96,40 @@ gh secret list  # ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KE
 2. Merge to `main`. The release only runs from the current `origin/main`
    commit.
 
-3. Run **Actions → Release Android → Run workflow**. It:
-   - re-runs the contract, unit-test, and lint gate,
-   - builds a signed `assembleRelease` APK and a `bundleRelease` AAB,
-   - verifies the APK's signing certificate and its `versionName`,
-   - writes `ClawChat-<version>.apk.sha256` next to the APK,
-   - creates a **draft** release tagged `android-v<version>`.
+3. Run the one cross-platform release workflow:
 
-4. Compare the printed signing certificate digest with the previous release,
-   then **publish the draft**. A draft is invisible to the GitHub API, so the
-   in-app updater does not offer the release until you publish it.
+   ```bash
+   gh workflow run release-tauri.yml --ref main
+   ```
 
-Desktop releases live in the same repository under `clawchat-v*` and carry no
-APK. The updater only considers `android-v*` tags, so the two release trains do
-not interfere.
+   In Actions this is named **Release ClawChat**. It:
+   - runs the shared release preflight,
+   - builds the desktop bundles and the signed Android APK/AAB in parallel,
+   - verifies the APK's signing certificate against
+     `ANDROID_SIGNING_CERT_SHA256` and checks its `versionName`,
+   - writes and verifies `ClawChat-<version>.apk.sha256`,
+   - assembles all assets into one **draft** release tagged
+     `clawchat-v<version>`.
+
+4. Confirm that the draft contains the APK, AAB, and APK checksum alongside the
+   desktop assets, then **publish the draft**. The workflow has already checked
+   the APK signer against the pinned certificate fingerprint. A draft is
+   invisible to the GitHub API, so the in-app updater does not offer the
+   release until you publish it.
+
+New Android and desktop builds share the `clawchat-v*` release train. The
+Android updater also keeps accepting existing `android-v*` releases for
+backward compatibility, but a candidate must carry an APK before it can be
+offered.
 
 ## What the app does
 
-| Step | Behavior |
-|---|---|
-| Check | At launch, at most once every 12 hours, and on demand from Settings → App updates |
-| Offer | A dialog with the release notes; **Download**, **Skip** (this version), or **Later** |
+| Step     | Behavior                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------- |
+| Check    | At launch, at most once every 12 hours, and on demand from Settings → App updates           |
+| Offer    | A dialog with the release notes; **Download**, **Skip** (this version), or **Later**        |
 | Download | Into `cacheDir/updates`, with progress; the SHA-256 asset must match or the file is deleted |
-| Install | `REQUEST_INSTALL_PACKAGES` + a `FileProvider` URI handed to the system installer |
+| Install  | `REQUEST_INSTALL_PACKAGES` + a `FileProvider` URI handed to the system installer            |
 
 Users can turn automatic checks off in Settings; the manual **Check now**
 button keeps working either way. A skipped version stops prompting until a
@@ -103,4 +152,4 @@ A fork publishing its own releases points the updater at its own repository:
 ## Related
 
 - [Desktop release and auto-update](./desktop-release.md) — the Tauri updater,
-  which uses a separate signing key and its own tag prefix.
+  which shares the release and tag but uses an independent signing key.

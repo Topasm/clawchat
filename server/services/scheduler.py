@@ -194,8 +194,8 @@ class Scheduler:
                 sleep_seconds = (tomorrow - now).total_seconds()
                 await asyncio.sleep(sleep_seconds)
 
-                reminder_service.clear_sent_reminders()
-                logger.info("Midnight: cleared reminder dedup set")
+                reminder_service.prune_sent_reminders()
+                logger.info("Midnight: pruned expired reminder dedup entries")
         except asyncio.CancelledError:
             logger.debug("Midnight reset loop cancelled")
 

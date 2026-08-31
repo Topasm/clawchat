@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.clawchat.android.core.R
 
@@ -30,20 +29,18 @@ object ReminderNotificationHelper {
      * Creates the "Reminders" notification channel.
      *
      * Safe to call multiple times — the system ignores the call if the channel
-     * already exists. Should be called from [android.app.Application.onCreate].
+    * already exists. Should be called from [android.app.Application.onCreate].
      */
     fun createChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = CHANNEL_DESCRIPTION
-            }
-            val manager = context.getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = CHANNEL_DESCRIPTION
         }
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
     }
 
     /**
@@ -61,11 +58,35 @@ object ReminderNotificationHelper {
         itemId: String,
         title: String,
         message: String,
-    ) {
+        deliveryKey: String? = null,
+        deduplicate: Boolean = true,
+    ): Boolean {
         // Android 13+ drops a notification posted without POST_NOTIFICATIONS,
         // and the user can switch the channel off at any time. Bail out rather
         // than build a notification nobody will see.
-        if (!NotificationPermission.isGranted(context)) return
+        if (!NotificationPermission.isGranted(context)) return false
+
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val channelImportance = manager.getNotificationChannel(CHANNEL_ID)?.importance
+        if (!reminderChannelAllowsNotifications(channelImportance)) {
+            return false
+        }
+
+        val claimedAt = System.currentTimeMillis()
+        val exactKey = deliveryKey?.takeIf(String::isNotBlank)
+        val claimKey = exactKey ?: recentReminderKey(reminderType, itemId)
+        val suppressionWindow = if (exactKey != null) {
+            EXACT_REMINDER_WINDOW_MILLIS
+        } else {
+            RECENT_REMINDER_WINDOW_MILLIS
+        }
+        val ledger = if (deduplicate) ReminderDeliveryLedger(context) else null
+        if (
+            ledger != null &&
+            !ledger.claim(claimKey, claimedAt, suppressionWindow)
+        ) {
+            return false
+        }
 
         val pendingIntent = buildPendingIntent(context, reminderType, itemId)
         val notificationId = itemId.hashCode()
@@ -99,8 +120,13 @@ object ReminderNotificationHelper {
             )
         }
 
-        val manager = context.getSystemService(NotificationManager::class.java)
-        manager.notify(notificationId, builder.build())
+        return try {
+            manager.notify(notificationId, builder.build())
+            true
+        } catch (error: RuntimeException) {
+            ledger?.release(claimKey, claimedAt)
+            throw error
+        }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────
@@ -132,3 +158,7 @@ object ReminderNotificationHelper {
         )
     }
 }
+
+/** A globally-enabled app can still have only its reminder channel disabled. */
+internal fun reminderChannelAllowsNotifications(channelImportance: Int?): Boolean =
+    channelImportance == null || channelImportance != NotificationManager.IMPORTANCE_NONE

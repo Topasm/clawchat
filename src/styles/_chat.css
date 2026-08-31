@@ -33,6 +33,32 @@
   text-align: right;
 }
 
+.cc-bubble__delivery {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-bubble--user .cc-bubble__delivery {
+  color: rgba(255, 255, 255, 0.72);
+  text-align: right;
+}
+
+.cc-bubble__delivery--failed {
+  color: var(--cc-danger);
+}
+
+.cc-bubble__delivery button {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
 .cc-bubble__actions {
   display: flex;
   gap: 2px;
@@ -179,6 +205,28 @@
   gap: 6px;
   overflow-y: auto;
   min-height: 0;
+}
+
+.cc-chat-history__load-older {
+  align-self: center;
+  margin: 2px auto 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-control);
+  color: var(--cc-text-secondary);
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cc-chat-history__load-older:hover:not(:disabled) {
+  color: var(--cc-text);
+  background: var(--cc-surface-secondary);
+}
+
+.cc-chat-history__load-older:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* --- Chat Input ------------------------------------------- */

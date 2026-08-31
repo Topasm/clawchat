@@ -12,6 +12,7 @@ from models.agent_run import AgentRun
 from models.agent_task import AgentTask
 from schemas.agent_run import (
     AgentRunEventResponse,
+    AgentRunDetailResponse,
     AgentRunHeartbeatRequest,
     AgentRunRecoveryResponse,
     AgentRunResponse,
@@ -49,14 +50,18 @@ async def list_runs(
     )
 
 
-@router.get("/{run_id}", response_model=AgentRunResponse)
+@router.get("/{run_id}", response_model=AgentRunDetailResponse)
 async def get_run(
     run_id: str,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
     run = await agent_run_service.require_run(db, run_id)
-    return await agent_run_service.build_run_response(db, run)
+    response = await agent_run_service.build_run_response(db, run)
+    return AgentRunDetailResponse(
+        **response.model_dump(mode="python"),
+        result=run.result,
+    )
 
 
 @router.get("/{run_id}/events", response_model=list[AgentRunEventResponse])

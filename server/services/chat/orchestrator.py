@@ -357,6 +357,18 @@ class Orchestrator:
             if not conv.title:
                 await self._generate_title(db, conv, content, user_id)
 
+        # stream_end is a durability acknowledgement: by the time a client
+        # receives it, an immediate history refetch must include this row.
+        await db.commit()
+        await self.ws.send_json(user_id, {
+            "type": "stream_end",
+            "data": {
+                "message_id": assistant_msg_id,
+                "conversation_id": conversation_id,
+                "full_content": full_content,
+            },
+        })
+
     async def _generate_title(
         self,
         db: AsyncSession,
@@ -400,6 +412,7 @@ class Orchestrator:
         if conv:
             conv.updated_at = datetime.now(timezone.utc)
 
+        await db.commit()
         await self.ws.send_json(user_id, {
             "type": "stream_start",
             "data": {"message_id": msg_id, "conversation_id": conversation_id},
@@ -408,7 +421,11 @@ class Orchestrator:
             "type": "stream_chunk",
             "data": {"message_id": msg_id, "content": text, "index": 0},
         })
-        stream_end_data: dict = {"message_id": msg_id, "full_content": text}
+        stream_end_data: dict = {
+            "message_id": msg_id,
+            "conversation_id": conversation_id,
+            "full_content": text,
+        }
         if metadata:
             stream_end_data["metadata"] = metadata
         await self.ws.send_json(user_id, {
@@ -433,6 +450,7 @@ class Orchestrator:
         )
         db.add(msg)
 
+        await db.commit()
         await self.ws.send_json(user_id, {
             "type": "stream_start",
             "data": {"message_id": msg_id, "conversation_id": conversation_id},
@@ -443,5 +461,9 @@ class Orchestrator:
         })
         await self.ws.send_json(user_id, {
             "type": "stream_end",
-            "data": {"message_id": msg_id, "full_content": text},
+            "data": {
+                "message_id": msg_id,
+                "conversation_id": conversation_id,
+                "full_content": text,
+            },
         })

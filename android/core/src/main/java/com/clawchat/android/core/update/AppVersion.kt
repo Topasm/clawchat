@@ -37,10 +37,21 @@ data class AppVersion(
         private val PATTERN =
             Regex("""^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$""")
 
-        /** Parse `0.2.0`, `v0.2.0`, or `android-v0.2.0`; null when the input is not a version. */
+        /**
+         * Parse a plain version or one from either the unified (`clawchat-v*`) or legacy
+         * Android (`android-v*`) release stream; null when the input is not a version.
+         */
         fun parse(raw: String?): AppVersion? {
-            val trimmed = raw?.trim()?.removePrefix(ANDROID_RELEASE_TAG_PREFIX)?.removePrefix("v")
-            val match = trimmed?.let { PATTERN.matchEntire(it) } ?: return null
+            val trimmed = raw?.trim() ?: return null
+            val version = when {
+                trimmed.startsWith(CLAWCHAT_RELEASE_TAG_PREFIX) ->
+                    trimmed.removePrefix(CLAWCHAT_RELEASE_TAG_PREFIX)
+                trimmed.startsWith(ANDROID_RELEASE_TAG_PREFIX) ->
+                    trimmed.removePrefix(ANDROID_RELEASE_TAG_PREFIX)
+                trimmed.startsWith("v") -> trimmed.removePrefix("v")
+                else -> trimmed
+            }
+            val match = PATTERN.matchEntire(version) ?: return null
             return AppVersion(
                 major = match.groupValues[1].toInt(),
                 minor = match.groupValues[2].toInt(),
@@ -52,8 +63,9 @@ data class AppVersion(
 }
 
 /**
- * Tag prefix for Android releases. Desktop releases live in the same
- * repository under `clawchat-v*`, and they carry no APK, so the updater only
- * ever considers tags with this prefix.
+ * Release tag prefixes understood by the Android updater. New releases share
+ * the `clawchat-v*` stream with desktop builds; `android-v*` remains supported
+ * so existing installations can still discover older Android-only releases.
  */
+const val CLAWCHAT_RELEASE_TAG_PREFIX = "clawchat-v"
 const val ANDROID_RELEASE_TAG_PREFIX = "android-v"

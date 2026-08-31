@@ -311,7 +311,11 @@ async def stream_chat(
 
     async def event_generator():
         meta = json.dumps(
-            {"conversation_id": body.conversation_id, "message_id": assistant_msg_id}
+            {
+                "conversation_id": body.conversation_id,
+                "message_id": assistant_msg_id,
+                "user_message_id": user_msg_id,
+            }
         )
         yield f"data: {meta}\n\n"
 
@@ -454,7 +458,10 @@ async def list_messages(
     q = (
         select(Message)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
+        # Page one is the most recent page.  Ordering ascending here returned
+        # the *oldest* 50 rows forever, which made new chat history appear to
+        # vanish as soon as a conversation crossed the page limit.
+        .order_by(Message.created_at.desc(), Message.id.desc())
         .offset(offset)
         .limit(limit)
     )

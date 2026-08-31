@@ -13,10 +13,11 @@ import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
-import androidx.glance.action.actionStartActivity
+import androidx.glance.action.actionStartActivity as actionStartActivityByComponent
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionStartActivity as actionStartActivityByIntent
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -73,7 +74,7 @@ private fun InboxQuickAddContent(
     inboxCount: Int?,
 ) {
     val context = LocalContext.current
-    val quickAddActivity = ComponentName(context.packageName, QuickAddActivity::class.java.name)
+    val quickAddIntent = QuickAddActivity.createIntent(context, QuickAddTarget.INBOX)
     val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
 
     Row(
@@ -86,7 +87,7 @@ private fun InboxQuickAddContent(
         // Inbox icon
         Image(
             provider = ImageProvider(R.drawable.ic_widget_inbox),
-            contentDescription = "Inbox",
+            contentDescription = context.getString(R.string.widget_inbox),
             colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
             modifier = GlanceModifier.size(24.dp),
         )
@@ -107,13 +108,16 @@ private fun InboxQuickAddContent(
                 )
                 .padding(horizontal = 12.dp, vertical = 10.dp)
                 .clickable(
-                    if (isLoggedIn) actionStartActivity(quickAddActivity)
-                    else actionStartActivity(mainActivity)
+                    if (isLoggedIn) actionStartActivityByIntent(quickAddIntent)
+                    else actionStartActivityByComponent(mainActivity)
                 ),
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(
-                text = if (isLoggedIn) "Add to inbox\u2026" else "Please log in",
+                text = context.getString(
+                    if (isLoggedIn) R.string.widget_add_to_inbox
+                    else R.string.widget_login_required
+                ),
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurfaceVariant,
                     fontSize = 14.sp,

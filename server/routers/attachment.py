@@ -2,16 +2,18 @@ import asyncio
 import contextlib
 import os
 import uuid
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
 from config import settings as app_settings
 from database import get_db
-from exceptions import NotFoundError, ValidationError
+from exceptions import ConflictError, NotFoundError, ValidationError
 from models.attachment import Attachment
 from schemas.attachment import AttachmentResponse
 from utils import make_id
@@ -89,13 +91,40 @@ def _to_response(att: Attachment) -> AttachmentResponse:
     )
 
 
+def _require_same_idempotency_owner(
+    attachment: Attachment,
+    todo_id: str | None,
+) -> None:
+    if attachment.todo_id != todo_id:
+        raise ConflictError(
+            "Attachment idempotency key is already owned by another task"
+        )
+
+
 @router.post("", response_model=AttachmentResponse, status_code=201)
 async def upload_attachment(
     file: UploadFile = File(...),
     todo_id: str | None = Query(None),
+    idempotency_key: str | None = Query(None, max_length=64),
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
+    if idempotency_key is not None:
+        try:
+            idempotency_key = str(UUID(idempotency_key))
+        except ValueError as error:
+            raise ValidationError("Invalid attachment idempotency key") from error
+        existing = (
+            await db.execute(
+                select(Attachment).where(
+                    Attachment.idempotency_key == idempotency_key
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            _require_same_idempotency_owner(existing, todo_id)
+            return _to_response(existing)
+
     if not file.filename:
         raise ValidationError("No filename provided")
 
@@ -128,10 +157,27 @@ async def upload_attachment(
         content_type=file.content_type or "application/octet-stream",
         size_bytes=size_bytes,
         todo_id=todo_id,
+        idempotency_key=idempotency_key,
     )
     db.add(attachment)
     try:
         await db.commit()
+    except IntegrityError:
+        _discard_partial_file(file_path)
+        await db.rollback()
+        if idempotency_key is None:
+            raise
+        existing = (
+            await db.execute(
+                select(Attachment).where(
+                    Attachment.idempotency_key == idempotency_key
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            raise
+        _require_same_idempotency_owner(existing, todo_id)
+        return _to_response(existing)
     except BaseException:
         # Never leave a file on disk that no row points at.
         _discard_partial_file(file_path)

@@ -2,6 +2,7 @@ package com.clawchat.android.core.network
 
 import android.util.Base64
 import android.util.Log
+import com.clawchat.android.core.data.ActiveSession
 import com.clawchat.android.core.data.SessionStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -59,10 +60,27 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
     @Volatile private var ready: CompletableDeferred<Unit>? = null
     @Volatile private var activeHostId: String? = null
 
-    suspend fun ensureConnected(): Boolean = connectionMutex.withLock {
+    suspend fun ensureConnected(expectedScope: String? = null): Boolean = connectionMutex.withLock {
+        val session = sessionStore.activeSession.first()
+        if (expectedScope != null && session?.connectionScope() != expectedScope) {
+            throw SessionScopeChangedException(expectedScope, session?.connectionScope())
+        }
+        // Relay pairing is host-scoped. A manual direct session can retain old
+        // pairing preferences during a transition, but share work must never
+        // fall back through that unrelated host.
+        if (expectedScope != null && session?.authMode != "paired") {
+            throw SessionScopeChangedException(expectedScope, session?.connectionScope())
+        }
         val relayUrl = sessionStore.relayUrl.first() ?: return false
         val hostId = sessionStore.hostId.first() ?: return false
         val hostPublicKey = sessionStore.hostPublicKey.first() ?: return false
+        if (expectedScope != null && hostId != expectedScope) {
+            throw SessionScopeChangedException(expectedScope, hostId)
+        }
+        val latestSession = sessionStore.activeSession.first()
+        if (expectedScope != null && latestSession?.connectionScope() != expectedScope) {
+            throw SessionScopeChangedException(expectedScope, latestSession?.connectionScope())
+        }
         if (activeHostId == hostId && ready?.isCompleted == true && webSocket != null) return true
 
         disconnectInternal()
@@ -123,7 +141,8 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
     }
 
     suspend fun execute(request: Request): Response {
-        if (!ensureConnected()) throw IllegalStateException("Relay is not configured")
+        val expectedScope = request.tag(ExpectedSessionScope::class.java)?.value
+        if (!ensureConnected(expectedScope)) throw IllegalStateException("Relay is not configured")
         val id = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<RelayResponse>()
         pending[id] = deferred
@@ -230,4 +249,10 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
 
     private fun decode(value: String): ByteArray =
         Base64.decode(value, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+
+    private fun ActiveSession.connectionScope(): String? = when (authMode) {
+        "paired" -> hostId
+        "manual" -> apiBaseUrl?.trimEnd('/')
+        else -> hostId ?: apiBaseUrl?.trimEnd('/')
+    }
 }

@@ -2,6 +2,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig, type Method } 
 import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from './logger';
 import { getOfflineQueueScope, offlineQueue } from './offlineQueue';
+import { refreshAuthSession } from './sessionRefresh';
 
 declare module 'axios' {
   // Keep Axios' generic defaults identical so request helpers such as
@@ -17,24 +18,6 @@ const apiClient = axios.create();
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
-}
-
-let isRefreshing = false;
-let refreshSubscribers: { resolve: (token: string) => void; reject: (error: unknown) => void }[] =
-  [];
-
-function onTokenRefreshed(newToken: string) {
-  refreshSubscribers.forEach((sub) => sub.resolve(newToken));
-  refreshSubscribers = [];
-}
-
-function onTokenRefreshFailed(error: unknown) {
-  refreshSubscribers.forEach((sub) => sub.reject(error));
-  refreshSubscribers = [];
-}
-
-function addRefreshSubscriber(resolve: (token: string) => void, reject: (error: unknown) => void) {
-  refreshSubscribers.push({ resolve, reject });
 }
 
 // Request interceptor: attach baseURL and Authorization header from auth store
@@ -163,7 +146,7 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const { refreshToken, serverUrl } = useAuthStore.getState();
+    const { refreshToken } = useAuthStore.getState();
 
     // No refresh token available — log out immediately
     if (!refreshToken) {
@@ -171,45 +154,16 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // If already refreshing, queue this request
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        addRefreshSubscriber(
-          (newToken: string) => {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            originalRequest._retry = true;
-            resolve(apiClient(originalRequest));
-          },
-          (err: unknown) => {
-            reject(err);
-          },
-        );
-      });
-    }
-
-    isRefreshing = true;
-
     try {
-      const response = await axios.post(`${serverUrl}/api/auth/refresh`, {
-        refresh_token: refreshToken,
-      });
-
-      const newToken: string = response.data.access_token;
-      const newRefreshToken: string = response.data.refresh_token;
-      useAuthStore.getState().setTokens(newToken, newRefreshToken);
+      const newToken = await refreshAuthSession();
 
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       originalRequest._retry = true;
-      onTokenRefreshed(newToken);
 
       return apiClient(originalRequest);
     } catch (refreshError) {
-      onTokenRefreshFailed(refreshError);
       logger.error('Token refresh error, logging out', refreshError);
-      useAuthStore.getState().logout();
       return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
     }
   },
 );
