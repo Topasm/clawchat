@@ -29,7 +29,7 @@ function isCurrentSession(serverUrl: string, refreshToken: string): boolean {
 export function refreshAuthSession(): Promise<string> {
   const { serverUrl, refreshToken } = useAuthStore.getState();
   if (!serverUrl || !refreshToken) {
-    useAuthStore.getState().logout();
+    void useAuthStore.getState().logout();
     return Promise.reject(new Error('No remembered session is available.'));
   }
 
@@ -62,7 +62,7 @@ export function refreshAuthSession(): Promise<string> {
       // A stale request from a workspace the user already left must never sign
       // the newly selected workspace out.
       if (isCurrentSession(serverUrl, refreshToken)) {
-        useAuthStore.getState().logout();
+        await useAuthStore.getState().logout();
       }
       throw error;
     }

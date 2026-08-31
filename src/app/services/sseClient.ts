@@ -81,7 +81,7 @@ export function connectSSE(
       if (!response.ok) {
         if (response.status === 401) {
           logger.warn('SSE received 401, logging out');
-          useAuthStore.getState().logout();
+          await useAuthStore.getState().logout();
           onError?.(new Error('Session expired'));
           return;
         }

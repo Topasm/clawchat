@@ -28,7 +28,8 @@ interface AuthState {
     serverUrl: string,
     session: { access_token: string; refresh_token?: string | null },
   ) => void;
-  logout: () => void;
+  /** Clears auth immediately and resolves after session-scoped stores are reset. */
+  logout: () => Promise<void>;
   setToken: (token: string) => void;
   setTokens: (token: string, refreshToken: string) => void;
   setLoading: (isLoading: boolean) => void;
@@ -98,7 +99,7 @@ export const useAuthStore = create<AuthState>()(
         // Explicit sign-out and confirmed refresh failures must also remove the
         // per-workspace credential. Otherwise selecting the same workspace can
         // silently restore a session the user believed they had forgotten.
-        void import('../services/activeRemoteSession')
+        const forgetRememberedSession = import('../services/activeRemoteSession')
           .then(({ forgetActiveRemoteWorkspaceSession }) => forgetActiveRemoteWorkspaceSession())
           .catch((error) => {
             console.warn('Could not forget the active workspace session.', error);
@@ -130,9 +131,23 @@ export const useAuthStore = create<AuthState>()(
           relayUrl: null,
           connectionStatus: 'disconnected' as ConnectionStatus,
         });
-        // Reset module and chat stores (lazy import to avoid circular deps)
-        import('./useModuleStore').then((m) => m.useModuleStore.getState().resetToDemo());
-        import('./useChatStore').then((m) => m.useChatStore.getState().resetToDemo());
+        // Reset module and chat stores lazily to avoid circular dependencies.
+        // Return the work so tests and coordinated workspace transitions can
+        // wait for it instead of leaving imports alive past environment teardown.
+        const resetModuleStore = import('./useModuleStore')
+          .then((module) => module.useModuleStore.getState().resetToDemo())
+          .catch((error) => {
+            console.warn('Could not reset the module store during logout.', error);
+          });
+        const resetChatStore = import('./useChatStore')
+          .then((module) => module.useChatStore.getState().resetToDemo())
+          .catch((error) => {
+            console.warn('Could not reset the chat store during logout.', error);
+          });
+
+        return Promise.all([forgetRememberedSession, resetModuleStore, resetChatStore]).then(
+          () => undefined,
+        );
       },
 
       setToken: (token: string) => set({ token }),

@@ -615,7 +615,7 @@ export default function SettingsPage() {
                 type="button"
                 className="cc-btn cc-btn--danger"
                 onClick={() => {
-                  logout();
+                  void logout();
                   navigate('/login');
                 }}
               >
