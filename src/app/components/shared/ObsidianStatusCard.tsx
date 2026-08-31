@@ -6,7 +6,7 @@ import {
   useObsidianScan,
   useObsidianFlushQueue,
   useObsidianRetryDeadLetter,
-} from '../../hooks/queries/useObsidianQueries';
+} from '../../hooks/queries';
 import { useTranslation, translateUi } from '../../i18n';
 import { useToastStore } from '../../stores/useToastStore';
 import SettingsRow from './SettingsRow';

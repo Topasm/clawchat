@@ -15,6 +15,48 @@ const WEEKDAYS = [
   { label: 'Fr', value: 'FR' },
   { label: 'Sa', value: 'SA' },
 ];
+const DEFAULT_COUNT = 10;
+
+interface ParsedRrule {
+  freq: Frequency;
+  byDay: string[];
+  endsType: EndsType;
+  endDate: string;
+  count: number;
+}
+
+function parseUntilDate(value: string | undefined): string {
+  const match = value?.match(/^(\d{4})(\d{2})(\d{2})/);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : '';
+}
+
+function parseRrule(value: string | undefined): ParsedRrule {
+  if (!value) {
+    return { freq: 'none', byDay: [], endsType: 'never', endDate: '', count: DEFAULT_COUNT };
+  }
+
+  const rule = value.replace(/^RRULE:/, '');
+  const params = Object.fromEntries(
+    rule.split(';').map((part) => {
+      const separator = part.indexOf('=');
+      return separator === -1 ? [part, ''] : [part.slice(0, separator), part.slice(separator + 1)];
+    }),
+  );
+  const freq = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(params.FREQ)
+    ? (params.FREQ as Frequency)
+    : 'none';
+  const endDate = parseUntilDate(params.UNTIL);
+  const parsedCount = Number(params.COUNT);
+
+  return {
+    freq,
+    byDay: params.BYDAY ? params.BYDAY.split(',').filter(Boolean) : [],
+    endsType: params.COUNT ? 'after_count' : params.UNTIL ? 'on_date' : 'never',
+    endDate,
+    count: Number.isFinite(parsedCount) && parsedCount > 0 ? parsedCount : DEFAULT_COUNT,
+  };
+}
+
 function buildRrule(
   freq: Frequency,
   byDay: string[],
@@ -41,26 +83,16 @@ export default function RecurrenceSelector({ value, onChange }: RecurrenceSelect
   const [byDay, setByDay] = useState<string[]>([]);
   const [endsType, setEndsType] = useState<EndsType>('never');
   const [endDate, setEndDate] = useState('');
-  const [count, setCount] = useState(10);
-  // Parse incoming value on mount
+  const [count, setCount] = useState(DEFAULT_COUNT);
+  // Keep the editor synchronized when a different task or a refreshed value arrives.
   useEffect(() => {
-    if (!value) {
-      setFreq('none');
-      return;
-    }
-    const rule = value.replace('RRULE:', '');
-    const params = Object.fromEntries(rule.split(';').map((p) => p.split('=')));
-    if (params.FREQ) setFreq(params.FREQ as Frequency);
-    if (params.BYDAY) setByDay(params.BYDAY.split(','));
-    if (params.COUNT) {
-      setEndsType('after_count');
-      setCount(Number(params.COUNT));
-    } else if (params.UNTIL) {
-      setEndsType('on_date');
-    } else {
-      setEndsType('never');
-    }
-  }, []); // Only parse on mount
+    const parsed = parseRrule(value);
+    setFreq(parsed.freq);
+    setByDay(parsed.byDay);
+    setEndsType(parsed.endsType);
+    setEndDate(parsed.endDate);
+    setCount(parsed.count);
+  }, [value]);
   const handleFreqChange = (f: Frequency) => {
     setFreq(f);
     if (f === 'none') {

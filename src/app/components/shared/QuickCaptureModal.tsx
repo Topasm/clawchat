@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { parseNaturalInput } from '../../utils/naturalLanguageParser';
-import { useToastStore } from '../../stores/useToastStore';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { useTodosQuery, useCreateTodo, queryKeys } from '../../hooks/queries';
+import { useTodosQuery, useCreateEvent, useCreateTodo, queryKeys } from '../../hooks/queries';
 import { hapticSuccess } from '../../utils/haptics';
 import Badge from './Badge';
 import { ArrowRightIcon, CalendarIcon, CheckCircleIcon } from './Icons';
@@ -18,7 +17,7 @@ interface QuickCaptureModalProps {
   defaultParentId?: string;
   parentTitle?: string;
 }
-type ReceiptMessage = 'Saved to Inbox' | 'Added as subtask' | 'Saved locally';
+type ReceiptMessage = 'Event created' | 'Saved to Inbox' | 'Added as subtask' | 'Saved locally';
 export default function QuickCaptureModal({
   isOpen,
   onClose,
@@ -35,6 +34,7 @@ export default function QuickCaptureModal({
   const queryClient = useQueryClient();
   const { data: todos = [] } = useTodosQuery();
   const createTodoMutation = useCreateTodo();
+  const createEventMutation = useCreateEvent();
   useEffect(() => {
     if (isOpen) {
       setText('');
@@ -77,6 +77,10 @@ export default function QuickCaptureModal({
       }
     }, 1500);
   };
+  const finishCapture = (message: ReceiptMessage) => {
+    showReceipt(message);
+    hapticSuccess();
+  };
   const handleKeepCapturing = () => {
     setKeepOpen(true);
     setText('');
@@ -87,7 +91,7 @@ export default function QuickCaptureModal({
   const handleReviewNow = () => {
     if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
     onClose();
-    navigate('/inbox');
+    navigate(receipt === 'Event created' ? '/calendar' : '/inbox');
   };
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -96,33 +100,47 @@ export default function QuickCaptureModal({
     const id = `local-${Date.now()}`;
     if (parsed.type === 'event') {
       const start = parsed.startTime || parsed.dueDate || new Date();
-      // Add event optimistically to query cache
-      const optimisticEvent: EventResponse = {
-        id,
-        title: parsed.title,
-        start_time: start.toISOString(),
-        created_at: now,
-        updated_at: now,
-      };
-      queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [
-        optimisticEvent,
-        ...(old ?? []),
-      ]);
-      showReceipt('Saved to Inbox');
+      if (isConnected) {
+        createEventMutation.mutate(
+          {
+            title: parsed.title,
+            start_time: start.toISOString(),
+            recurrence_rule: parsed.recurrenceRule ?? undefined,
+          },
+          { onSuccess: () => finishCapture('Event created') },
+        );
+      } else {
+        const optimisticEvent: EventResponse = {
+          id,
+          title: parsed.title,
+          start_time: start.toISOString(),
+          created_at: now,
+          updated_at: now,
+        };
+        queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [
+          optimisticEvent,
+          ...(old ?? []),
+        ]);
+        finishCapture('Saved locally');
+      }
     } else {
       if (isConnected) {
         // Use server createTodo mutation for inbox pipeline
-        createTodoMutation.mutate({
-          title: parsed.title,
-          priority: parsed.priority ?? 'medium',
-          due_date: parsed.dueDate?.toISOString(),
-          tags: [],
-          parent_id: defaultParentId,
-          source: defaultParentId ? undefined : 'quick_capture',
-          inbox_state: defaultParentId ? 'none' : 'classifying',
-          recurrence_rule: parsed.recurrenceRule ?? undefined,
-        });
-        showReceipt(defaultParentId ? 'Added as subtask' : 'Saved to Inbox');
+        createTodoMutation.mutate(
+          {
+            title: parsed.title,
+            priority: parsed.priority ?? 'medium',
+            due_date: parsed.dueDate?.toISOString(),
+            tags: [],
+            parent_id: defaultParentId,
+            source: defaultParentId ? undefined : 'quick_capture',
+            inbox_state: defaultParentId ? 'none' : 'classifying',
+            recurrence_rule: parsed.recurrenceRule ?? undefined,
+          },
+          {
+            onSuccess: () => finishCapture(defaultParentId ? 'Added as subtask' : 'Saved to Inbox'),
+          },
+        );
       } else {
         // Offline: local-only creation in query cache
         const optimisticTodo: TodoResponse = {
@@ -141,10 +159,9 @@ export default function QuickCaptureModal({
           optimisticTodo,
           ...(old ?? []),
         ]);
-        showReceipt('Saved locally');
+        finishCapture('Saved locally');
       }
     }
-    hapticSuccess();
   };
   return (
     <AnimatePresence>

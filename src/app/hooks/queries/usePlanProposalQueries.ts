@@ -220,21 +220,3 @@ export function useDismissPlanProposal() {
     onSettled: () => invalidatePlanData(queryClient),
   });
 }
-export function useRevertPlanChangeSet() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: revertPlanChangeSet,
-    onSuccess: (result) => {
-      useToastStore
-        .getState()
-        .addToast(
-          'success',
-          translateUi(result.already_reverted ? 'Plan was already undone' : 'Plan changes undone'),
-        );
-    },
-    onError: (error) => {
-      useToastStore.getState().addToast('error', getPlanProposalMutationError(error).message);
-    },
-    onSettled: () => invalidatePlanData(queryClient),
-  });
-}

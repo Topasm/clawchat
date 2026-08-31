@@ -2,8 +2,6 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-from sqlalchemy import select
 
 from domain.task import TaskStatus
 from models.todo import Todo

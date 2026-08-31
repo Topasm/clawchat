@@ -48,6 +48,21 @@ class SyncManagerTest {
     }
 
     @Test
+    fun `local mutation invalidates collectors without waiting for a websocket`() = runTest {
+        val fixture = fixture()
+        var todoChanges = 0
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            fixture.manager.todoChanged.collect { todoChanges++ }
+        }
+
+        fixture.manager.notifyTodoChanged()
+        advanceUntilIdle()
+
+        assertEquals(1, todoChanges)
+        verify(exactly = 0) { fixture.client.connect() }
+    }
+
+    @Test
     fun `an initial stop does not disable a later session`() = runTest {
         val fixture = fixture()
 

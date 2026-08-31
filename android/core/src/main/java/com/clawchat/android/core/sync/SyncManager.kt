@@ -88,6 +88,11 @@ class SyncManager internal constructor(
     private val _lastConnectionError = MutableStateFlow<String?>(null)
     val lastConnectionError: StateFlow<String?> = _lastConnectionError.asStateFlow()
 
+    /** Publish a mutation completed by this process without waiting for WebSocket echo. */
+    fun notifyTodoChanged() {
+        _todoChanged.tryEmit(Unit)
+    }
+
     /**
      * Reconciles realtime ownership with the active workspace. Activity
      * recreation is intentionally a no-op when the process singleton already
@@ -160,7 +165,7 @@ class SyncManager internal constructor(
                 is SyncEvent.ModuleChanged -> {
                     _lastEventAtEpochMillis.value = System.currentTimeMillis()
                     when (event.module) {
-                        "todos" -> _todoChanged.tryEmit(Unit)
+                        "todos" -> notifyTodoChanged()
                         "events" -> _eventChanged.tryEmit(Unit)
                         "reviews" -> _reviewChanged.tryEmit(Unit)
                         "runs" -> _runChanged.tryEmit(Unit)
@@ -184,7 +189,7 @@ class SyncManager internal constructor(
                     _lastConnectionError.value = null
                     // Repositories refetch authoritative state after a
                     // direct or relay reconnect to recover missed events.
-                    _todoChanged.tryEmit(Unit)
+                    notifyTodoChanged()
                     _eventChanged.tryEmit(Unit)
                     _reviewChanged.tryEmit(Unit)
                     _runChanged.tryEmit(Unit)

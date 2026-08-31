@@ -10,6 +10,7 @@
     <string name="inbox_organize_title">정리 필요</string>
     <string name="inbox_organize_subtitle">구조나 위치를 정해야 하는 항목입니다.</string>
     <string name="inbox_action_organize">정리</string>
+    <string name="inbox_action_today">오늘로</string>
     <string name="inbox_failed_title">실패</string>
     <string name="inbox_failed_subtitle">다시 시도하거나 직접 확인해야 하는 항목입니다.</string>
     <string name="inbox_action_retry">다시 시도</string>

@@ -67,7 +67,7 @@ class TodayRepositoryTest {
             localTodo("today", day),
             localTodo("overdue", date.minusDays(1).toString()),
         )
-        coEvery { localTodoDao.countUndatedPending() } returns 1
+        coEvery { localTodoDao.countOpenInbox() } returns 1
         val fromInclusive = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
         val toExclusive = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
         coEvery { localEventDao.getBetween(fromInclusive, toExclusive) } returns listOf(
@@ -89,7 +89,7 @@ class TodayRepositoryTest {
         assertEquals(listOf("today-event"), today.todayEvents.map { it.id })
         assertEquals(1, today.inboxCount)
         coVerify(exactly = 1) { localEventDao.getBetween(fromInclusive, toExclusive) }
-        coVerify(exactly = 0) { api.getToday() }
+        coVerify(exactly = 0) { api.getToday(any(), any(), any()) }
         coVerify(exactly = 0) { todoDao.getOpenDueBefore(any(), any()) }
         coVerify(exactly = 0) { eventDao.getBetween(any(), any(), any()) }
     }
@@ -117,7 +117,7 @@ class TodayRepositoryTest {
             switchingSessionStore,
             deviceZoneProvider,
         )
-        coEvery { api.getToday(any()) } answers {
+        coEvery { api.getToday(any(), any(), any()) } answers {
             states.value = serverRuntimeState("server:url:new", "https://new.example")
             TodayResponse(
                 todayTodos = listOf(Todo(id = "todo-1", title = "Old server task")),
@@ -134,6 +134,9 @@ class TodayRepositoryTest {
         val result = switchingRepository.getToday()
 
         assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) {
+            api.getToday(LocalDate.now(zoneId).toString(), 540, any())
+        }
         coVerify(exactly = 1) {
             todoDao.upsertAll(match { rows ->
                 rows.singleOrNull()?.workspaceKey == "server:url:old"

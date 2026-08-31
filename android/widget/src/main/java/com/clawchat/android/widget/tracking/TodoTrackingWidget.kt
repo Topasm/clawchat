@@ -44,7 +44,6 @@ import com.clawchat.android.widget.common.WidgetState
 import com.clawchat.android.widget.common.widgetBackground
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import com.clawchat.android.widget.quickadd.QuickAddActivity
-import com.clawchat.android.widget.quickadd.QuickAddTarget
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 
@@ -60,6 +59,7 @@ class TodoTrackingWidget : GlanceAppWidget() {
         val snapshot = loadTodoWidgetSnapshot(
             runtimeState = { sessionStore.runtimeState.first() },
             loadToday = { entryPoint.todayRepository().getToday() },
+            loadCachedToday = { entryPoint.todayRepository().getCachedToday() },
         )
 
         val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
@@ -91,7 +91,8 @@ private fun TodoTrackingContent(
     val size = LocalSize.current
     val isLoggedIn = state !is WidgetState.NotLoggedIn
     val isCompactHeight = size.height <= WidgetSize.Height2
-    val quickAddIntent = QuickAddActivity.createIntent(context, QuickAddTarget.TODAY)
+    val quickAddIntent = QuickAddActivity.createIntent(context)
+    val taskCount = (state as? WidgetState.Success)?.data?.itemCount
 
     Column(
         modifier = GlanceModifier
@@ -106,7 +107,11 @@ private fun TodoTrackingContent(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = context.getString(R.string.widget_today_title),
+                text = if (taskCount == null) {
+                    context.getString(R.string.widget_today_title)
+                } else {
+                    context.getString(R.string.widget_today_title_with_count, taskCount)
+                },
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     color = GlanceTheme.colors.onSurface,
@@ -289,7 +294,7 @@ private fun TodoRow(
 @Composable
 private fun AddTaskAction() {
     val context = LocalContext.current
-    val quickAddIntent = QuickAddActivity.createIntent(context, QuickAddTarget.TODAY)
+    val quickAddIntent = QuickAddActivity.createIntent(context)
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()

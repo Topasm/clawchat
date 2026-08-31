@@ -30,7 +30,7 @@ export type HostSessionPhase =
   /** Dead end — the reason is in `status.error` and/or `failure`. */
   | 'blocked';
 
-export type HostLoginFailureKind =
+type HostLoginFailureKind =
   /** The server never answered — it is not listening where we expect it. */
   | 'unreachable'
   /** The server answered and refused the credentials — usually a changed PIN. */
@@ -65,8 +65,8 @@ interface HostSessionState {
 }
 
 /** How long `retryHostStartup` keeps waiting for a `starting` server. */
-export const HOST_STARTUP_POLL_INTERVAL_MS = 500;
-export const HOST_STARTUP_POLL_ATTEMPTS = 40;
+const HOST_STARTUP_POLL_INTERVAL_MS = 500;
+const HOST_STARTUP_POLL_ATTEMPTS = 40;
 
 let statusSubscription: (() => void) | null = null;
 let startInFlight = false;

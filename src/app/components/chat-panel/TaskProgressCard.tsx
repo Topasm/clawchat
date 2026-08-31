@@ -1,4 +1,4 @@
-import { useChatStore, type TaskProgressData } from '../../stores/useChatStore';
+import { useChatStore } from '../../stores/useChatStore';
 import { translateUi } from '../../i18n';
 interface TaskProgressCardProps {
   taskId: string;

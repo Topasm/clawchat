@@ -1360,15 +1360,6 @@ export type DelegateResponse = z.infer<typeof DelegateResponseSchema>;
 // Obsidian vault integration
 // ---------------------------------------------------------------------------
 
-export const ObsidianStatusSchema = z.object({
-  enabled: z.boolean(),
-  vault_path: z.string(),
-  last_sync: z.string().nullable(),
-  db_task_count: z.number(),
-  cli_available: z.boolean(),
-  mode: z.enum(['cli', 'filesystem', 'disabled']),
-});
-
 export const ObsidianHealthSchema = z.object({
   vault_available: z.boolean(),
   vault_path: z.string(),
@@ -1419,20 +1410,6 @@ export const ObsidianHealthSchema = z.object({
   }),
 });
 
-export const ObsidianProjectSchema = z.object({
-  folder: z.string(),
-  name: z.string(),
-  todo_md_preview: z.string(),
-  doc_count: z.number(),
-  last_modified: z.number().nullable(),
-});
-
-export const ObsidianProjectsResponseSchema = z.object({
-  projects: z.array(ObsidianProjectSchema),
-  total: z.number(),
-  index_age_seconds: z.number().nullable(),
-});
-
 export const ObsidianScanResultSchema = z.object({
   files_scanned: z.number(),
   markers_found: z.number(),
@@ -1442,8 +1419,5 @@ export const ObsidianScanResultSchema = z.object({
   duration_ms: z.number(),
 });
 
-export type ObsidianStatus = z.infer<typeof ObsidianStatusSchema>;
 export type ObsidianHealth = z.infer<typeof ObsidianHealthSchema>;
-export type ObsidianProject = z.infer<typeof ObsidianProjectSchema>;
-export type ObsidianProjectsResponse = z.infer<typeof ObsidianProjectsResponseSchema>;
 export type ObsidianScanResult = z.infer<typeof ObsidianScanResultSchema>;

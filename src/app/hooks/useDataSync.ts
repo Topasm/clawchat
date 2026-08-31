@@ -8,7 +8,7 @@ import { useAuthStore } from '../stores/useAuthStore';
  * Activates React Query hooks that fetch + validate data.
  * Queries are disabled when serverUrl is not set.
  */
-export function useDataSync() {
+function useDataSync() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const todosQ = useTodosQuery();
   const eventsQ = useEventsQuery();

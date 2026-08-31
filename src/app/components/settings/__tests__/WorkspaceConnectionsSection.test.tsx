@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   appMode: 'host' as 'host' | 'client',
-  setAppMode: vi.fn(),
   nativeSetAppMode: vi.fn(),
   updateConfig: vi.fn(),
   getStatus: vi.fn(),
@@ -31,16 +30,6 @@ vi.mock('../../../services/workspaceCredentials', () => ({
 }));
 vi.mock('../../../services/apiClient', () => ({
   default: { get: mocks.apiGet },
-}));
-
-vi.mock('../../../hooks/useAppMode', () => ({
-  useAppMode: () => ({
-    appMode: mocks.appMode,
-    setAppMode: mocks.setAppMode,
-    isHost: mocks.appMode === 'host',
-    isClient: mocks.appMode === 'client',
-    loading: false,
-  }),
 }));
 
 vi.mock('../../../platform', () => ({
@@ -112,7 +101,6 @@ beforeEach(() => {
     applied: true,
     restartRequired: false,
   }));
-  mocks.setAppMode.mockResolvedValue(undefined);
   mocks.nativeSetAppMode.mockResolvedValue({
     config: {},
     previousStatus: { state: 'running', port: 8000 },

@@ -26,7 +26,7 @@ export const IS_LINUX = DESKTOP_OS === 'linux';
  * Desktop is excluded deliberately: a narrow Tauri window is still a desktop
  * app, and that is how it behaved before.
  */
-export const MOBILE_VIEWPORT_QUERY = '(max-width: 768px)';
+const MOBILE_VIEWPORT_QUERY = '(max-width: 768px)';
 
 function mobileViewport(): MediaQueryList | null {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {

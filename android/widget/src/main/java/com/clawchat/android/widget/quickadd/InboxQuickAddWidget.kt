@@ -33,12 +33,15 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.model.TaskStatus
+import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.widgetBackground
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
 class InboxQuickAddWidget : GlanceAppWidget() {
@@ -55,30 +58,39 @@ class InboxQuickAddWidget : GlanceAppWidget() {
         val inboxCount = if (isConfigured) {
             when (val result = entryPoint.todayRepository().getToday()) {
                 is ApiResult.Success -> result.data.inboxCount
-                else -> null
+                else -> try {
+                    cachedInboxCount(entryPoint.todoRepository().getCachedTodosFlow().first())
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
             }
         } else null
 
         provideContent {
             GlanceTheme {
-                InboxQuickAddContent(
-                    isConfigured = isConfigured,
-                    isLocal = workspaceMode == WorkspaceMode.LOCAL,
-                    inboxCount = inboxCount,
-                )
+                InboxQuickAddContent(isConfigured = isConfigured, inboxCount = inboxCount)
             }
         }
     }
 }
 
+internal fun cachedInboxCount(todos: List<Todo>): Int =
+    todos.count { todo ->
+        todo.status != TaskStatus.COMPLETED &&
+            todo.status != TaskStatus.CANCELLED &&
+            !todo.inboxState.isNullOrBlank() &&
+            todo.inboxState != "none"
+    }
+
 @Composable
 private fun InboxQuickAddContent(
     isConfigured: Boolean,
-    isLocal: Boolean,
     inboxCount: Int?,
 ) {
     val context = LocalContext.current
-    val quickAddIntent = QuickAddActivity.createIntent(context, QuickAddTarget.INBOX)
+    val quickAddIntent = QuickAddActivity.createIntent(context)
     val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
 
     Row(
@@ -119,8 +131,7 @@ private fun InboxQuickAddContent(
         ) {
             Text(
                 text = context.getString(
-                    if (isLocal) R.string.widget_add_task_prompt
-                    else if (isConfigured) R.string.widget_add_to_inbox
+                    if (isConfigured) R.string.widget_add_to_inbox
                     else R.string.widget_login_required
                 ),
                 style = TextStyle(

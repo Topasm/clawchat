@@ -147,8 +147,11 @@ interface LocalTodoDao {
         toExclusive: String,
     ): List<LocalTodoEntity>
 
-    @Query("SELECT COUNT(*) FROM local_todos WHERE dueDate IS NULL AND status = 'pending'")
-    suspend fun countUndatedPending(): Int
+    @Query(
+        "SELECT COUNT(*) FROM local_todos WHERE inboxState != 'none' " +
+            "AND status != 'completed' AND status != 'cancelled'",
+    )
+    suspend fun countOpenInbox(): Int
 
     @Query(
         """

@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-import sys
 from typing import Any
 
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
-from rich.text import Text
+from rich.table import Table
 
 console = Console()
 err_console = Console(stderr=True)
@@ -77,7 +75,6 @@ def print_todo_list(data: dict, *, as_json: bool = False, plain: bool = False) -
     items = data.get("items", [])
     total = data.get("total", len(items))
     page = data.get("page", 1)
-    limit = data.get("limit", 20)
 
     if not items:
         console.print("[dim]No todos found.[/]")

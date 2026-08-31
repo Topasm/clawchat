@@ -102,7 +102,7 @@ async def gather_review_data(db: AsyncSession) -> dict:
 def _format_review_prompt(data: dict) -> str:
     """Format review data into a prompt for the LLM."""
     lines = [
-        f"## Weekly Review Data",
+        "## Weekly Review Data",
         f"Period: {data['week_start'].strftime('%b %d')} - {data['week_end'].strftime('%b %d, %Y')}",
         f"Total open tasks: {data['total_open']}",
         "",

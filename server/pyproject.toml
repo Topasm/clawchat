@@ -26,6 +26,7 @@ dependencies = [
 dev = [
   "pytest>=8.0.0",
   "pytest-asyncio>=0.24.0",
+  "ruff==0.16.5",
 ]
 build = [
   "pyinstaller==6.22.2",
@@ -36,6 +37,9 @@ asyncio_mode = "auto"
 markers = [
   "integration: tests that require optional local services or external tools",
 ]
+
+[tool.ruff.lint]
+select = ["F"]
 
 [tool.uv]
 package = false

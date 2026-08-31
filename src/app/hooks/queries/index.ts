@@ -27,7 +27,6 @@ export {
   useGeneratePlanProposal,
   useApplyPlanProposal,
   useDismissPlanProposal,
-  useRevertPlanChangeSet,
   getPlanProposalMutationError,
   isStalePlanProposalError,
 } from './usePlanProposalQueries';
@@ -94,12 +93,10 @@ export {
 } from './useAdminQueries';
 export { useCapabilitiesQuery } from './useCapabilitiesQuery';
 export {
-  useObsidianStatusQuery,
   useObsidianHealthQuery,
-  useObsidianProjectsQuery,
-  useObsidianSyncStatusQuery,
   useObsidianSync,
   useObsidianReindex,
   useObsidianScan,
   useObsidianFlushQueue,
+  useObsidianRetryDeadLetter,
 } from './useObsidianQueries';

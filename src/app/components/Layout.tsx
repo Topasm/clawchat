@@ -154,14 +154,7 @@ export default function Layout() {
       return true;
     });
   }, [capabilities]);
-  const filteredSecondaryNavItems = useMemo(() => {
-    return secondaryNavItems.filter((item) => {
-      if (!capabilities) return true;
-      // Hide obsidian-related items when obsidian is not configured
-      // (Currently no dedicated obsidian nav item, but future-proof)
-      return true;
-    });
-  }, [capabilities]);
+  const filteredSecondaryNavItems = secondaryNavItems;
   const filteredUtilityNavItems = useMemo(
     () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings/app')),
     [isMac],

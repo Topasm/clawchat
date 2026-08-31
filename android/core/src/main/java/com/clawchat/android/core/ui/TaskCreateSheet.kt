@@ -25,12 +25,13 @@ import com.clawchat.android.core.R
 fun TaskCreateSheet(
     onDismiss: () -> Unit,
     onCreate: (TodoCreate) -> Unit,
+    initialDueDate: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf("medium") }
-    var dueDate by remember { mutableStateOf<String?>(null) }
+    var dueDate by remember(initialDueDate) { mutableStateOf(initialDueDate) }
     var showDatePicker by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current

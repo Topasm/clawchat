@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-
 from claw_cli import client, config
-from claw_cli.errors import AuthError, ServerError, NotFoundError
+from claw_cli.errors import AuthError, NotFoundError, ServerError
 
 
 @pytest.fixture(autouse=True)

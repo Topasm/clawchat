@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -141,6 +142,8 @@ fun InboxScreen(
                                 isError = false,
                                 showSpinner = false,
                                 onTaskClick = onTaskClick,
+                                secondaryActionLabel = stringResource(R.string.inbox_action_today),
+                                onSecondaryAction = viewModel::moveToToday,
                             )
                         }
                     }
@@ -160,6 +163,8 @@ fun InboxScreen(
                                 isError = false,
                                 showSpinner = false,
                                 onTaskClick = onTaskClick,
+                                secondaryActionLabel = stringResource(R.string.inbox_action_today),
+                                onSecondaryAction = viewModel::moveToToday,
                             )
                         }
                     }
@@ -282,6 +287,8 @@ private fun InboxSectionCard(
     isError: Boolean,
     showSpinner: Boolean,
     onTaskClick: (String) -> Unit,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: ((String) -> Unit)? = null,
 ) {
     ClawListSection(
         tone = tone,
@@ -319,6 +326,14 @@ private fun InboxSectionCard(
                     },
                     onClick = { onTaskClick(todo.id) },
                     isError = isError,
+                    secondaryActionLabel = secondaryActionLabel,
+                    onSecondaryAction = if (
+                        secondaryActionLabel != null && onSecondaryAction != null
+                    ) {
+                        { onSecondaryAction(todo.id) }
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -333,6 +348,8 @@ private fun InboxItemCard(
     onAction: (() -> Unit)? = null,
     onClick: () -> Unit = {},
     isError: Boolean = false,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     ClawListItemSurface(onClick = onClick) {
         Column(
@@ -397,6 +414,11 @@ private fun InboxItemCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
+                    if (secondaryActionLabel != null && onSecondaryAction != null) {
+                        TextButton(onClick = onSecondaryAction) {
+                            Text(secondaryActionLabel)
+                        }
+                    }
                     FilledTonalButton(onClick = onAction) {
                         if (isError) {
                             Icon(

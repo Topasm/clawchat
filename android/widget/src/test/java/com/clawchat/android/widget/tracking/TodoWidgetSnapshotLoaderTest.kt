@@ -4,6 +4,7 @@ import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.TodayResponse
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.repository.CachedToday
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.common.WidgetState
 import kotlinx.coroutines.test.runTest
@@ -43,6 +44,22 @@ class TodoWidgetSnapshotLoaderTest {
         assertEquals("local", snapshot.workspaceKey)
         val success = snapshot.state as WidgetState.Success
         assertEquals(listOf("todo-1"), success.data.today.map { it.id })
+    }
+
+    @Test
+    fun `temporary server failure replays cached today tasks`() = runTest {
+        val state = runtime(WorkspaceMode.SERVER, "server:a")
+
+        val snapshot = loadTodoWidgetSnapshot(
+            runtimeState = { state },
+            loadToday = { ApiResult.Error("offline") },
+            loadCachedToday = {
+                CachedToday(todayTodos = listOf(Todo("cached", "Cached task")))
+            },
+        )
+
+        val success = snapshot.state as WidgetState.Success
+        assertEquals(listOf("cached"), success.data.today.map { it.id })
     }
 
     @Test

@@ -108,6 +108,7 @@ data class TodoUpdate(
     @SerialName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
     @SerialName("sort_order") val sortOrder: Int? = null,
+    @SerialName("inbox_state") val inboxState: String? = null,
 )
 
 // --- Events ---
@@ -217,8 +218,8 @@ data class PaginatedResponse<T>(
 @Serializable
 data class TodayResponse(
     val greeting: String = "",
-    @SerialName("today_todos") val todayTodos: List<Todo> = emptyList(),
-    @SerialName("overdue_todos") val overdueTodos: List<Todo> = emptyList(),
+    @SerialName("today_tasks") val todayTodos: List<Todo> = emptyList(),
+    @SerialName("overdue_tasks") val overdueTodos: List<Todo> = emptyList(),
     @SerialName("today_events") val todayEvents: List<Event> = emptyList(),
     @SerialName("inbox_count") val inboxCount: Int = 0,
 )

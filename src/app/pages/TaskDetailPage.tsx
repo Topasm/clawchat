@@ -497,7 +497,7 @@ export default function TaskDetailPage() {
             <div className="cc-detail__section">
               <div className="cc-detail__section-title">{translateUi('Attachments')}</div>
               <FileDropZone todoId={taskId} />
-              <AttachmentList ownerId={taskId} ownerType="todo" />
+              <AttachmentList ownerId={taskId} />
             </div>
           )}
         </div>

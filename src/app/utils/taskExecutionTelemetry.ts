@@ -1,6 +1,6 @@
 import type { TaskExecutionTelemetryResponse } from '../types/api';
 import { translateUi } from '../i18n';
-export type TaskExecutionBadgeTone = 'active' | 'attention' | 'success' | 'error' | 'neutral';
+type TaskExecutionBadgeTone = 'active' | 'attention' | 'success' | 'error' | 'neutral';
 export interface TaskExecutionBadge {
   key: 'run' | 'review' | 'artifact';
   label: string;

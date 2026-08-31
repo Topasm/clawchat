@@ -10,6 +10,7 @@
     <string name="inbox_organize_title">Needs organizing</string>
     <string name="inbox_organize_subtitle">Captured items that still need structure or routing.</string>
     <string name="inbox_action_organize">Organize</string>
+    <string name="inbox_action_today">Move to Today</string>
     <string name="inbox_failed_title">Failed</string>
     <string name="inbox_failed_subtitle">These items need another attempt or a manual check.</string>
     <string name="inbox_action_retry">Retry</string>

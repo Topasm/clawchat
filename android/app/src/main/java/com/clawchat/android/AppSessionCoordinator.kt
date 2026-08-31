@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -70,13 +71,7 @@ class AppSessionCoordinator @Inject constructor(
                 // Glance rendering can suspend on a server request. collectLatest
                 // cancels that request if the workspace changes again, and each
                 // widget performs a final scope check before publishing content.
-                try {
-                    WidgetUpdater.updateAll(appContext)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    // Periodic widget work remains the recovery path.
-                }
+                updateWidgetsSafely()
             }
         }
 
@@ -109,7 +104,30 @@ class AppSessionCoordinator @Inject constructor(
             }
         }
 
+        // Repository mutations emit immediately, before a server WebSocket echo.
+        // collectLatest also coalesces the local signal and its near-simultaneous echo.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            syncManager.todoChanged.collectLatest {
+                delay(WIDGET_REFRESH_COALESCE_MILLIS)
+                updateWidgetsSafely()
+            }
+        }
+
         // Install event collectors before reconcile() can connect and emit.
         sessionJob.start()
+    }
+
+    private suspend fun updateWidgetsSafely() {
+        try {
+            WidgetUpdater.updateAll(appContext)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Periodic widget work remains the recovery path.
+        }
+    }
+
+    private companion object {
+        const val WIDGET_REFRESH_COALESCE_MILLIS = 150L
     }
 }

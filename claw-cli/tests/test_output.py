@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from io import StringIO
 
 import pytest
-from rich.console import Console
-
 from claw_cli import output
+from rich.console import Console
 
 
 @pytest.fixture(autouse=True)
@@ -28,8 +28,7 @@ class TestJsonOutput:
         assert json.loads(captured.out) == {"key": "value"}
 
     def test_print_json_handles_datetime(self, capsys):
-        from datetime import datetime
-        output.print_json({"ts": datetime(2026, 1, 1, 12, 0)})
+        output.print_json({"ts": datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)})
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert "2026" in data["ts"]

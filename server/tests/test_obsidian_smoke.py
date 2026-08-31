@@ -10,8 +10,6 @@ import os
 from unittest.mock import patch
 
 import pytest
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # Ensure test config is set before app imports
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
@@ -22,7 +20,6 @@ os.environ.setdefault("OBSIDIAN_CLI_COMMAND", "")
 os.environ.setdefault("ENABLE_SCHEDULER", "false")
 
 from services.vault import obsidian_cli_service as cli_svc # noqa: E402
-from services.vault.obsidian_export_service import export_todo  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -108,7 +105,6 @@ class TestObsidianSmoke:
     def test_write_queue_on_failure(self, tmp_path):
         """Failed writes are queued when companion_node_required is True."""
         # Create a directory where a file is expected — open() on a dir raises IsADirectoryError
-        blocker = tmp_path / "sub" / "blocked.md"
         (tmp_path / "sub").mkdir()
         (tmp_path / "sub" / "blocked.md").mkdir()  # dir where file expected
 

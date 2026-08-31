@@ -17,10 +17,9 @@ function formatFileSize(bytes: number): string {
 }
 interface AttachmentListProps {
   ownerId: string;
-  ownerType: 'todo';
 }
-export default function AttachmentList({ ownerId, ownerType }: AttachmentListProps) {
-  const { data: attachments, isLoading } = useAttachmentsQuery(ownerId, ownerType);
+export default function AttachmentList({ ownerId }: AttachmentListProps) {
+  const { data: attachments, isLoading } = useAttachmentsQuery(ownerId);
   const deleteMutation = useDeleteAttachment();
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const addToast = useToastStore((s) => s.addToast);

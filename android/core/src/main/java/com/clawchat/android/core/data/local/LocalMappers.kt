@@ -18,9 +18,9 @@ fun TodoCreate.toLocalEntity(id: String, now: String, zoneId: ZoneId): LocalTodo
     tags = tags?.joinToString(","),
     parentId = parentId,
     source = source,
-    // Local mode has no server-side AI inbox pipeline. Every capture is an
-    // ordinary task, including requests originating from Inbox/share widgets.
-    inboxState = "none",
+    // Local mode has no AI pipeline, but captures still remain in Inbox until
+    // the user explicitly schedules or otherwise organizes them.
+    inboxState = inboxState ?: "none",
     createdAt = now,
     updatedAt = now,
 )
@@ -41,6 +41,7 @@ fun LocalTodoEntity.applyUpdate(update: TodoUpdate, now: String, zoneId: ZoneId)
         completedAt = nextCompletedAt,
         tags = update.tags?.joinToString(",") ?: tags,
         sortOrder = update.sortOrder ?: sortOrder,
+        inboxState = update.inboxState ?: inboxState,
         updatedAt = now,
     )
 }

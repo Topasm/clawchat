@@ -118,7 +118,6 @@ def _backfill(bind) -> None:
         if row["project_todo_id"] is not None
     }
     children: dict[str, list[str]] = defaultdict(list)
-    by_id = {row["id"]: row for row in todo_rows}
     for row in todo_rows:
         if row["parent_id"] is not None:
             children[row["parent_id"]].append(row["id"])

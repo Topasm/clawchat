@@ -6,12 +6,9 @@ Simulates: auth login → add --capture → inbox → plan → plan apply → do
 from __future__ import annotations
 
 import json
-import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import httpx
 import pytest
-
 from claw_cli import config
 from claw_cli.cli import main
 from claw_cli.errors import EXIT_OK

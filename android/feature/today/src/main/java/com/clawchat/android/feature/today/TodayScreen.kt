@@ -268,6 +268,7 @@ fun TodayScreen(
     if (showQuickAdd) {
         TaskCreateSheet(
             onDismiss = { showQuickAdd = false },
+            initialDueDate = java.time.LocalDate.now().toString(),
             onCreate = { data ->
                 viewModel.createTask(data)
                 showQuickAdd = false

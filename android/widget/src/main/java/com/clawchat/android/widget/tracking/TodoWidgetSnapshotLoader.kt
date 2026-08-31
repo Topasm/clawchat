@@ -3,8 +3,10 @@ package com.clawchat.android.widget.tracking
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.TodayResponse
+import com.clawchat.android.core.data.repository.CachedToday
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.common.WidgetState
+import kotlinx.coroutines.CancellationException
 
 internal data class TodoWidgetSnapshot(
     val state: WidgetState<TodoWidgetUiModel>,
@@ -19,6 +21,7 @@ internal data class TodoWidgetSnapshot(
 internal suspend fun loadTodoWidgetSnapshot(
     runtimeState: suspend () -> AppRuntimeState,
     loadToday: suspend () -> ApiResult<TodayResponse>,
+    loadCachedToday: suspend () -> CachedToday = { CachedToday() },
 ): TodoWidgetSnapshot {
     val initial = runtimeState()
     val initialWorkspaceKey = initial.workspaceKey?.takeIf(String::isNotBlank)
@@ -27,6 +30,30 @@ internal suspend fun loadTodoWidgetSnapshot(
     }
 
     val result = loadToday()
+    val state = if (result is ApiResult.Error) {
+        val cached = try {
+            loadCachedToday()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            CachedToday()
+        }
+        if (cached.isEmpty) {
+            WidgetState.Error(result.message)
+        } else {
+            WidgetState.Success(
+                TodoWidgetUiModel.from(
+                    TodayResponse(
+                        todayTodos = cached.todayTodos,
+                        overdueTodos = cached.overdueTodos,
+                        todayEvents = cached.todayEvents,
+                    )
+                )
+            )
+        }
+    } else {
+        result.toWidgetState()
+    }
     val current = runtimeState()
     val currentWorkspaceKey = current.workspaceKey?.takeIf(String::isNotBlank)
     if (current.mode != initial.mode || currentWorkspaceKey != initialWorkspaceKey) {
@@ -43,7 +70,7 @@ internal suspend fun loadTodoWidgetSnapshot(
         return TodoWidgetSnapshot(state, currentWorkspaceKey)
     }
 
-    return TodoWidgetSnapshot(result.toWidgetState(), initialWorkspaceKey)
+    return TodoWidgetSnapshot(state, initialWorkspaceKey)
 }
 
 private fun ApiResult<TodayResponse>.toWidgetState(): WidgetState<TodoWidgetUiModel> = when (this) {

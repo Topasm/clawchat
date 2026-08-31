@@ -32,9 +32,6 @@ export const queryKeys = {
   adminConfig: ['admin', 'config'] as const,
   adminData: ['admin', 'data'] as const,
   capabilities: ['capabilities'] as const,
-  obsidianStatus: ['obsidian', 'status'] as const,
   obsidianHealth: ['obsidian', 'health'] as const,
-  obsidianProjects: ['obsidian', 'projects'] as const,
-  obsidianSyncStatus: ['obsidian', 'sync-status'] as const,
   obsidianQueue: ['obsidian', 'queue'] as const,
 };

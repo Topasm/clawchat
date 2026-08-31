@@ -23,7 +23,7 @@ export function transferredBatchTaskIds(event: React.DragEvent): string[] {
   }
 }
 
-export function draggedTaskId(event: React.DragEvent): string | null {
+function draggedTaskId(event: React.DragEvent): string | null {
   return event.dataTransfer.getData(INBOX_TASK_DRAG_TYPE) || null;
 }
 

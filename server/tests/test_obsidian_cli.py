@@ -4,7 +4,6 @@ write queue, dead letter queue, and exponential backoff.
 Uses mocked subprocess to avoid needing an actual Obsidian CLI binary.
 """
 
-import json
 import os
 import time
 from unittest.mock import MagicMock, patch

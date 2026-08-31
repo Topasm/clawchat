@@ -160,9 +160,6 @@ describe('wsClient', () => {
 
     await vi.advanceTimersByTimeAsync(10);
 
-    // Simulate incoming message — access the internal WebSocket
-    // We know the constructor creates a WebSocket, so we can access via the mock
-    const instances = vi.mocked(WebSocket);
     // Manually trigger onmessage on the most recent instance
     const ws = (wsClient as any).ws as MockWebSocket;
     ws.onmessage?.({ data: JSON.stringify({ type: 'test_event', data: { key: 'value' } }) });

@@ -9,8 +9,11 @@ internal data class TodoWidgetUiModel(
     val overdue: List<TodoWidgetItem>,
     val today: List<TodoWidgetItem>,
 ) {
+    val itemCount: Int
+        get() = overdue.size + today.size
+
     val isEmpty: Boolean
-        get() = overdue.isEmpty() && today.isEmpty()
+        get() = itemCount == 0
 
     companion object {
         fun from(response: TodayResponse): TodoWidgetUiModel {

@@ -18,6 +18,7 @@ import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.apiCall
 import com.clawchat.android.core.network.workspaceNotConfigured
 import kotlinx.coroutines.flow.first
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -57,18 +58,19 @@ class TodayRepositoryImpl @Inject constructor(
 
     override suspend fun getToday(): ApiResult<TodayResponse> {
         val runtimeState = currentRuntimeState()
+        val zoneId = deviceZoneProvider.current()
+        val day = LocalDate.now(zoneId)
         when (runtimeState.mode) {
             WorkspaceMode.UNCONFIGURED -> return workspaceNotConfigured()
             WorkspaceMode.SERVER -> Unit
             WorkspaceMode.LOCAL -> {
-                val zoneId = deviceZoneProvider.current()
-                val local = getLocalToday(LocalDate.now(zoneId), zoneId)
+                val local = getLocalToday(day, zoneId)
                 return ApiResult.Success(
                     TodayResponse(
                         todayTodos = local.todayTodos,
                         overdueTodos = local.overdueTodos,
                         todayEvents = local.todayEvents,
-                        inboxCount = localTodoDao.countUndatedPending(),
+                        inboxCount = localTodoDao.countOpenInbox(),
                     ),
                 )
             }
@@ -77,10 +79,12 @@ class TodayRepositoryImpl @Inject constructor(
             ?: return workspaceNotConfigured()
         val expectedScope = runtimeState.activeServerRequestScope()
             ?: return workspaceNotConfigured()
-        val result = apiCall { api.getToday(expectedScope) }
+        val utcOffsetMinutes = zoneId.rules.getOffset(Instant.now()).totalSeconds / 60
+        val result = apiCall {
+            api.getToday(day.toString(), utcOffsetMinutes, expectedScope)
+        }
         if (result is ApiResult.Success) {
             val today = result.data
-            val day = LocalDate.now()
             val fromInclusive = "${day}T00:00:00"
             val toExclusive = "${day.plusDays(1)}T00:00:00"
             todoDao.upsertAll(

@@ -1,8 +1,8 @@
 export const GRAPH_NODE_WIDTH = 244;
-export const GRAPH_NODE_HEIGHT = 118;
+const GRAPH_NODE_HEIGHT = 118;
 export const GRAPH_COLUMN_GAP = 104;
-export const GRAPH_ROW_GAP = 28;
-export const GRAPH_CANVAS_PADDING = 32;
+const GRAPH_ROW_GAP = 28;
+const GRAPH_CANVAS_PADDING = 32;
 
 export interface GraphTaskLike {
   id: string;
@@ -18,13 +18,13 @@ export interface GraphRelationshipLike {
   type: string;
 }
 
-export interface TaskGraphNodeLayout {
+interface TaskGraphNodeLayout {
   id: string;
   x: number;
   y: number;
 }
 
-export interface TaskGraphEdgeLayout {
+interface TaskGraphEdgeLayout {
   id: string;
   sourceId: string;
   targetId: string;
@@ -56,7 +56,7 @@ function canvasSize(nodes: TaskGraphNodeLayout[]): Pick<TaskGraphLayout, 'width'
 }
 
 /** Remove descendants hidden by collapsed structural parent nodes. */
-export function filterCollapsedTasks(
+function filterCollapsedTasks(
   tasks: GraphTaskLike[],
   collapsedIds: ReadonlySet<string>,
 ): GraphTaskLike[] {

@@ -257,9 +257,4 @@ export const useSettingsStore = create<SettingsState>()(
   ),
 );
 
-export {
-  APPLICATION_DEFAULT_SETTINGS,
-  DEFAULT_SETTINGS,
-  WORKSPACE_DEFAULT_SETTINGS,
-  WORKSPACE_SETTING_KEYS,
-};
+export { DEFAULT_SETTINGS };

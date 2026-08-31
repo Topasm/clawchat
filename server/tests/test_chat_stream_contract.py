@@ -4,13 +4,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import func, select
 
 from main import app
-from models.conversation import Conversation
 from models.message import Message
 from models.todo import Todo
 from services.chat.intent_classifier import IntentResult

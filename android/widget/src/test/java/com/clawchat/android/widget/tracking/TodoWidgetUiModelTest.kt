@@ -28,6 +28,7 @@ class TodoWidgetUiModelTest {
         assertEquals(listOf("today"), model.today.map { it.id })
         assertTrue(model.overdue.first().isHighPriority)
         assertTrue(model.overdue.all { it.isOverdue })
+        assertEquals(3, model.itemCount)
     }
 
     @Test

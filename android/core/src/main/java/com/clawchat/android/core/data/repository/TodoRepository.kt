@@ -17,8 +17,8 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.apiCall
-import com.clawchat.android.core.network.map
 import com.clawchat.android.core.network.workspaceNotConfigured
+import com.clawchat.android.core.sync.SyncManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -56,6 +56,7 @@ class TodoRepositoryImpl @Inject constructor(
     private val localTodoDao: LocalTodoDao,
     private val sessionStore: SessionStore,
     private val deviceZoneProvider: DeviceZoneProvider,
+    private val syncManager: SyncManager,
 ) : TodoRepository {
 
     override suspend fun listTodos(params: Map<String, String>): ApiResult<PaginatedResponse<Todo>> {
@@ -163,7 +164,9 @@ class TodoRepositoryImpl @Inject constructor(
                 } catch (error: IllegalArgumentException) {
                     return ApiResult.Error(error.message ?: "Invalid local task", code = 422)
                 }
-                return ApiResult.Success(localTodoDao.insertOrGet(entity).toModel())
+                val created = localTodoDao.insertOrGet(entity).toModel()
+                syncManager.notifyTodoChanged()
+                return ApiResult.Success(created)
             }
         }
         val workspaceKey = runtimeState.workspaceKey?.takeIf(String::isNotBlank)
@@ -173,6 +176,7 @@ class TodoRepositoryImpl @Inject constructor(
         val result = apiCall { api.createTodo(body, expectedScope) }
         if (result is ApiResult.Success) {
             todoDao.upsertAll(listOf(result.data.toEntity(workspaceKey)))
+            syncManager.notifyTodoChanged()
         }
         return result
     }
@@ -198,6 +202,7 @@ class TodoRepositoryImpl @Inject constructor(
                 } catch (error: IllegalArgumentException) {
                     return ApiResult.Error(error.message ?: "Invalid local task", code = 422)
                 }
+                syncManager.notifyTodoChanged()
                 return ApiResult.Success(updated.toModel())
             }
         }
@@ -208,6 +213,7 @@ class TodoRepositoryImpl @Inject constructor(
         val result = apiCall { api.updateTodo(id, body, expectedScope) }
         if (result is ApiResult.Success) {
             todoDao.upsertAll(listOf(result.data.toEntity(workspaceKey)))
+            syncManager.notifyTodoChanged()
         }
         return result
     }
@@ -223,6 +229,7 @@ class TodoRepositoryImpl @Inject constructor(
             WorkspaceMode.SERVER -> Unit
             WorkspaceMode.LOCAL -> {
                 localTodoDao.deleteById(id)
+                syncManager.notifyTodoChanged()
                 return ApiResult.Success(Unit)
             }
         }
@@ -233,6 +240,7 @@ class TodoRepositoryImpl @Inject constructor(
         val result = apiCall { api.deleteTodo(id, expectedScope) }
         if (result is ApiResult.Success) {
             todoDao.deleteById(workspaceKey, id)
+            syncManager.notifyTodoChanged()
         }
         return result
     }
@@ -245,7 +253,19 @@ class TodoRepositoryImpl @Inject constructor(
             WorkspaceMode.SERVER -> {
                 val expectedScope = runtimeState.activeServerRequestScope()
                     ?: return workspaceNotConfigured()
-                apiCall { api.organizeTodo(todoId, expectedScope) }.map { }
+                when (val result = apiCall { api.organizeTodo(todoId, expectedScope) }) {
+                    is ApiResult.Success -> {
+                        if (!result.data.isSuccessful) {
+                            return ApiResult.Error(
+                                message = "HTTP ${result.data.code()}",
+                                code = result.data.code(),
+                            )
+                        }
+                        ApiResult.Success(Unit)
+                    }
+                    is ApiResult.Error -> result
+                    is ApiResult.Loading -> result
+                }
             }
         }
     }

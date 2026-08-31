@@ -44,11 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.clawchat.android.widget.R
-import com.clawchat.android.widget.common.WidgetUpdater
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import java.util.UUID
@@ -59,7 +57,6 @@ class QuickAddActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val target = QuickAddTarget.fromWireValue(intent.getStringExtra(EXTRA_TARGET))
         val entryPoint = EntryPointAccessors.fromApplication(
             applicationContext,
             WidgetEntryPoint::class.java,
@@ -73,8 +70,6 @@ class QuickAddActivity : ComponentActivity() {
             val runtimeState by sessionStore.runtimeState.collectAsStateWithLifecycle(
                 initialValue = null,
             )
-            val isLocal = runtimeState?.mode == WorkspaceMode.LOCAL
-
             ClawChatTheme(
                 themeModeKey = themeMode,
                 accentColorKey = accentColor,
@@ -93,7 +88,6 @@ class QuickAddActivity : ComponentActivity() {
                 val submitTask: () -> Unit = {
                     val request = QuickAddRequestFactory.create(
                         title = text,
-                        target = target,
                         idempotencyKey = idempotencyKey,
                     )
                     val expectedWorkspaceKey = runtimeState?.workspaceKey
@@ -110,18 +104,9 @@ class QuickAddActivity : ComponentActivity() {
                                     keyboardController?.hide()
                                     Toast.makeText(
                                         this@QuickAddActivity,
-                                        getString(
-                                            if (isLocal && target == QuickAddTarget.INBOX) {
-                                                R.string.quick_add_task_success
-                                            } else if (target == QuickAddTarget.TODAY) {
-                                                R.string.quick_add_today_success
-                                            } else {
-                                                R.string.quick_add_inbox_success
-                                            }
-                                        ),
+                                        getString(R.string.quick_add_inbox_success),
                                         Toast.LENGTH_SHORT,
                                     ).show()
-                                    WidgetUpdater.updateAll(this@QuickAddActivity)
                                     finish()
                                 }
                                 is ApiResult.Error -> {
@@ -155,15 +140,7 @@ class QuickAddActivity : ComponentActivity() {
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = stringResource(
-                                    if (isLocal && target == QuickAddTarget.INBOX) {
-                                        R.string.quick_add_task_title
-                                    } else if (target == QuickAddTarget.TODAY) {
-                                        R.string.quick_add_today_title
-                                    } else {
-                                        R.string.quick_add_inbox_title
-                                    }
-                                ),
+                                text = stringResource(R.string.quick_add_inbox_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
@@ -232,17 +209,13 @@ class QuickAddActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val EXTRA_TARGET = "com.clawchat.android.widget.quickadd.TARGET"
-
-        fun createIntent(context: Context, target: QuickAddTarget): Intent =
+        fun createIntent(context: Context): Intent =
             Intent(context, QuickAddActivity::class.java)
-                .putExtra(EXTRA_TARGET, target.wireValue)
-                // Distinct data prevents launchers from reusing an Inbox pending intent for Today.
                 .setData(
                     Uri.Builder()
                         .scheme("clawchat")
                         .authority("quick-add")
-                        .appendPath(target.wireValue)
+                        .appendPath("inbox")
                         .build()
                 )
     }

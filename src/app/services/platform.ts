@@ -61,7 +61,7 @@ function showWebNotification(
  * Storage abstraction — localStorage on every supported runtime. The async
  * signature is kept so callers stay agnostic about the backing store.
  */
-export const storage = {
+const storage = {
   async get(key: string): Promise<string | null> {
     return localStorage.getItem(key);
   },

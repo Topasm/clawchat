@@ -595,7 +595,7 @@ export function useDeleteEventOccurrence() {
 // ---------------------------------------------------------------------------
 // Attachments
 // ---------------------------------------------------------------------------
-export function useAttachmentsQuery(ownerId: string, ownerType: 'todo') {
+export function useAttachmentsQuery(ownerId: string) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
     queryKey: queryKeys.attachments(ownerId),
@@ -627,7 +627,7 @@ export function useUploadAttachment() {
 export function useDeleteAttachment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ownerId }: { id: string; ownerId: string }) => {
+    mutationFn: async ({ id }: { id: string; ownerId: string }) => {
       await apiClient.delete(`/attachments/${id}`);
     },
     onSuccess: (_data, variables) => {

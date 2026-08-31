@@ -19,7 +19,11 @@ interface ClawChatApi {
     // --- Today ---
 
     @GET("api/today")
-    suspend fun getToday(@Tag expectedScope: ExpectedSessionScope? = null): TodayResponse
+    suspend fun getToday(
+        @Query("date") date: String? = null,
+        @Query("utc_offset_minutes") utcOffsetMinutes: Int? = null,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodayResponse
 
     @GET("api/today/briefing")
     suspend fun getBriefing(@Tag expectedScope: ExpectedSessionScope? = null): BriefingResponse

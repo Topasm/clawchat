@@ -10,7 +10,7 @@ import { useHostSessionStore } from '../../stores/useHostSessionStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import ToastContainer from '../shared/ToastContainer';
 
-export type SettingsPane = 'general' | 'workspace' | 'connections' | 'diagnostics';
+type SettingsPane = 'general' | 'workspace' | 'connections' | 'diagnostics';
 
 interface SettingsShellProps {
   activePane: SettingsPane;

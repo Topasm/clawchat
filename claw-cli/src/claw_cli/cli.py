@@ -7,12 +7,8 @@ import getpass
 import sys
 import time
 
-from claw_cli import __version__
-from claw_cli import config
-from claw_cli import client
-from claw_cli import output
-from claw_cli.errors import ClawError, EXIT_OK, EXIT_INPUT_ERROR
-
+from claw_cli import __version__, client, config, output
+from claw_cli.errors import EXIT_INPUT_ERROR, EXIT_OK, ClawError
 
 # ── Auth commands ────────────────────────────────────────────────────
 
@@ -192,7 +188,7 @@ def _plan_generate(todo_id: str, *, as_json: bool = False) -> int:
             plan = client.plan_latest(todo_id)
             output.print_plan(plan, as_json=as_json)
             return EXIT_OK
-        except Exception:
+        except ClawError:
             continue
 
     output.console.print("[yellow]Plan is still generating. Check back with:[/]")

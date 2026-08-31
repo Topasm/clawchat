@@ -20,7 +20,7 @@
     <string name="server_feature_connect_action">Connect a workspace</string>
     <string name="weekly_review_ready">Weekly review is ready!</string>
     <string name="widget_todo_tracking_label">Today</string>
-    <string name="widget_todo_tracking_description">Add and complete today\'s tasks from your Home screen</string>
+    <string name="widget_todo_tracking_description">Review today\'s tasks and capture new items into Inbox</string>
     <string name="widget_inbox_quick_add_label">Add task</string>
     <string name="widget_inbox_quick_add_description">Capture a task directly into your Inbox</string>
     <string name="share_rejected">Nothing shareable was found. ClawChat accepts images, PDF, text, Markdown, and ZIP files up to 10 MB.</string>

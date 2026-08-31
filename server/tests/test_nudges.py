@@ -7,7 +7,6 @@ hides this whole class of defect.
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from domain.task import TaskStatus
 from models.todo import Todo

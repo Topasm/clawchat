@@ -19,7 +19,7 @@
     <string name="server_feature_connect_action">Workspace 연결</string>
     <string name="weekly_review_ready">주간 리뷰가 준비됐습니다!</string>
     <string name="widget_todo_tracking_label">오늘</string>
-    <string name="widget_todo_tracking_description">홈 화면에서 오늘 할 일을 추가하고 완료합니다</string>
+    <string name="widget_todo_tracking_description">오늘 할 일을 확인하고 새 항목은 받은 편지함에 수집합니다</string>
     <string name="widget_inbox_quick_add_label">할 일 추가</string>
     <string name="widget_inbox_quick_add_description">받은 편지함에 할 일을 바로 추가합니다</string>
     <string name="share_rejected">공유할 수 있는 내용이 없습니다. 10MB 이하의 이미지, PDF, 텍스트, Markdown, ZIP 파일을 지원합니다.</string>

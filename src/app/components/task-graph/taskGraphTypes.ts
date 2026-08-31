@@ -3,7 +3,7 @@ import type { TaskGraphInsightNode, TaskStatus, TodoResponse } from '../../types
 
 export type TaskGraphMode = 'structure' | 'execution';
 
-export type TaskGraphNodeData = {
+type TaskGraphNodeData = {
   todo: TodoResponse;
   status: TaskStatus;
   mode: TaskGraphMode;

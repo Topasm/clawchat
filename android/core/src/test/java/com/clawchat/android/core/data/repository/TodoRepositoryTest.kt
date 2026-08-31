@@ -15,6 +15,7 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -23,9 +24,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import retrofit2.Response
 import java.io.IOException
 import java.time.ZoneId
 
@@ -39,12 +42,14 @@ class TodoRepositoryTest {
     private val deviceZoneProvider = mockk<DeviceZoneProvider> {
         every { current() } returns ZoneId.of("Asia/Seoul")
     }
+    private val syncManager = mockk<SyncManager>(relaxed = true)
     private val repository = TodoRepositoryImpl(
         api,
         todoDao,
         localTodoDao,
         sessionStore,
         deviceZoneProvider,
+        syncManager,
     )
 
     @Test
@@ -67,6 +72,7 @@ class TodoRepositoryTest {
                     rows.single().workspaceKey == "server:url:test"
             })
         }
+        io.mockk.verify(exactly = 1) { syncManager.notifyTodoChanged() }
     }
 
     @Test
@@ -108,6 +114,30 @@ class TodoRepositoryTest {
         assertTrue(result is ApiResult.Error)
         coVerify(exactly = 0) { todoDao.upsertAll(any()) }
         coVerify(exactly = 0) { todoDao.deleteById(any(), any()) }
+        io.mockk.verify(exactly = 0) { syncManager.notifyTodoChanged() }
+    }
+
+    @Test
+    fun `successful organize accepts an HTTP success response`() = runTest {
+        coEvery { api.organizeTodo("todo-1", any()) } returns Response.success(Unit)
+
+        val result = repository.organizeTodo("todo-1")
+
+        assertTrue(result is ApiResult.Success)
+        // The server pipeline publishes the real state transition later; an
+        // immediate invalidation here would overwrite Inbox's optimistic UI.
+        io.mockk.verify(exactly = 0) { syncManager.notifyTodoChanged() }
+    }
+
+    @Test
+    fun `failed organize does not publish a change`() = runTest {
+        coEvery { api.organizeTodo("todo-1", any()) } returns
+            Response.error(500, "failed".toResponseBody())
+
+        val result = repository.organizeTodo("todo-1")
+
+        assertTrue(result is ApiResult.Error)
+        io.mockk.verify(exactly = 0) { syncManager.notifyTodoChanged() }
     }
 
     @Test
@@ -128,6 +158,7 @@ class TodoRepositoryTest {
             localTodoDao,
             switchingSessionStore,
             deviceZoneProvider,
+            syncManager,
         )
         val request = TodoCreate(title = "Old workspace result")
         coEvery { api.createTodo(request, any()) } answers {
@@ -169,6 +200,7 @@ class TodoRepositoryTest {
             localTodoDao,
             scopedSessionStore,
             deviceZoneProvider,
+            syncManager,
         )
 
         scopedRepository.getCachedTodosFlow().first()
@@ -187,6 +219,7 @@ class TodoRepositoryTest {
             localTodoDao,
             localSessionStore,
             deviceZoneProvider,
+            syncManager,
         )
         val stored = LocalTodoEntity(
             id = "local-id",
@@ -232,7 +265,7 @@ class TodoRepositoryTest {
         assertTrue(listed is ApiResult.Success)
         assertEquals(listOf("local-id"), (listed as ApiResult.Success).data.items.map(Todo::id))
         assertTrue(created is ApiResult.Success)
-        assertEquals("none", (created as ApiResult.Success).data.inboxState)
+        assertEquals("captured", (created as ApiResult.Success).data.inboxState)
         assertTrue(updated is ApiResult.Success)
         val updatedTodo = (updated as ApiResult.Success).data
         assertEquals(TaskStatus.COMPLETED, updatedTodo.status)
@@ -249,6 +282,7 @@ class TodoRepositoryTest {
         coVerify(exactly = 0) { api.createTodo(any(), any()) }
         coVerify(exactly = 0) { api.updateTodo(any(), any(), any()) }
         coVerify(exactly = 0) { api.deleteTodo(any(), any()) }
+        io.mockk.verify(exactly = 3) { syncManager.notifyTodoChanged() }
     }
 
     @Test
@@ -262,6 +296,7 @@ class TodoRepositoryTest {
             localTodoDao,
             localSessionStore,
             deviceZoneProvider,
+            syncManager,
         )
         coEvery {
             localTodoDao.loadPage(
@@ -307,6 +342,7 @@ class TodoRepositoryTest {
             localTodoDao,
             localSessionStore,
             deviceZoneProvider,
+            syncManager,
         )
 
         val result = localRepository.createTodo(
@@ -331,6 +367,7 @@ class TodoRepositoryTest {
             localTodoDao,
             localSessionStore,
             deviceZoneProvider,
+            syncManager,
         )
         val insertedIds = mutableListOf<String>()
         coEvery { localTodoDao.insertOrGet(any()) } answers {

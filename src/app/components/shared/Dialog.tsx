@@ -28,4 +28,3 @@ export default function Dialog({ open, onOpenChange, title, children, className 
     </RadixDialog.Root>
   );
 }
-export { RadixDialog };

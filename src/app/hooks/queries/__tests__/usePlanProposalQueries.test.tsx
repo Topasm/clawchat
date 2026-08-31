@@ -12,7 +12,6 @@ import {
   useDismissPlanProposal,
   useGeneratePlanProposal,
   useLatestPlanProposalQuery,
-  useRevertPlanChangeSet,
 } from '../usePlanProposalQueries';
 
 const apiMocks = vi.hoisted(() => ({
@@ -213,31 +212,21 @@ describe('versioned plan proposal queries', () => {
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 
-  it('opts dismiss and explicit revert mutations out of offline queueing', async () => {
-    apiMocks.post
-      .mockResolvedValueOnce({
-        data: { status: 'rejected', todo_id: 'task-1', proposal_id: 'proposal-1' },
-      })
-      .mockResolvedValueOnce({ data: undoResponse });
+  it('opts dismiss mutations out of offline queueing', async () => {
+    apiMocks.post.mockResolvedValueOnce({
+      data: { status: 'rejected', todo_id: 'task-1', proposal_id: 'proposal-1' },
+    });
     const { wrapper } = createHarness();
     const { result: dismiss } = renderHook(() => useDismissPlanProposal(), { wrapper });
-    const { result: revert } = renderHook(() => useRevertPlanChangeSet(), { wrapper });
 
     await act(async () => {
       await dismiss.current.mutateAsync({ todoId: 'task-1', proposalId: 'proposal-1' });
-      await revert.current.mutateAsync('change-set-1');
     });
 
     expect(apiMocks.post).toHaveBeenNthCalledWith(
       1,
       '/todos/task-1/plan/dismiss',
       { proposal_id: 'proposal-1' },
-      { queueOfflineMutation: false },
-    );
-    expect(apiMocks.post).toHaveBeenNthCalledWith(
-      2,
-      '/change-sets/change-set-1/revert',
-      undefined,
       { queueOfflineMutation: false },
     );
   });

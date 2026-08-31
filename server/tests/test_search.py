@@ -1,6 +1,5 @@
 """Full-text search across messages, todos, and events."""
 
-from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
