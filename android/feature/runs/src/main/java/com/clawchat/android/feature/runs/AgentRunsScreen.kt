@@ -28,7 +28,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -38,6 +37,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -66,7 +66,6 @@ import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -112,11 +111,12 @@ fun AgentRunsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Agent runs",
-                        subtitle = "Monitor progress, unblock work, and review results.",
+                    Text(
+                        text = "Agent runs",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
@@ -150,12 +150,12 @@ fun AgentRunsScreen(
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = 40.dp,
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 4.dp,
+                        bottom = 24.dp,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
                         RunSummaryCard(state)
@@ -280,7 +280,7 @@ private fun RunFilters(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         AgentRunFilter.entries.forEach { filter ->
             FilterChip(
@@ -403,9 +403,9 @@ private fun AgentRunDetailSheet(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

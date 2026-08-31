@@ -16,6 +16,7 @@ import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.notification.NotificationPermission
 import com.clawchat.android.core.notification.ReminderNotificationHelper
 import com.clawchat.android.core.sync.SyncManager
+import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.clawchat.android.core.ui.update.AppUpdatePrompt
 import com.clawchat.android.core.update.AppUpdateManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +26,6 @@ import com.clawchat.android.share.ShareCaptureCoordinator
 import com.clawchat.android.share.ShareCaptureEvent
 import com.clawchat.android.share.ShareIntentParseResult
 import com.clawchat.android.share.ShareIntentParser
-import com.clawchat.android.ui.theme.ClawChatTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 

@@ -5,7 +5,6 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Arrangement
@@ -13,18 +12,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -32,16 +29,17 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,12 +58,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.ui.ClawEmptyState
-import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawSectionCard
-import com.clawchat.android.core.ui.ClawStatusChip
-import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.icons.ClawIcons
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -139,25 +132,27 @@ private fun ConversationListView(
 ) {
     Scaffold(
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Chat",
-                        subtitle = "Conversation is the primary interface.",
+                    Text(
+                        text = "Chat",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 colors = ClawTopBarColors(),
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                modifier = Modifier.navigationBarsPadding(),
+            SmallFloatingActionButton(
+                modifier = Modifier.size(48.dp),
                 onClick = onCreate,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New chat") },
+                shape = MaterialTheme.shapes.medium,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New chat")
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
@@ -201,8 +196,8 @@ private fun ConversationListView(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 72.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 items(conversations, key = { it.id }) { convo ->
                     ConversationCard(
@@ -220,20 +215,20 @@ private fun ConversationCard(
     conversation: Conversation,
     onClick: () -> Unit,
 ) {
-    ClawListItemSurface(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .defaultMinSize(minHeight = 60.dp)
+                .padding(horizontal = 2.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Surface(
-                shape = CircleShape,
+                shape = RoundedCornerShape(6.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                modifier = Modifier.size(46.dp),
+                modifier = Modifier.size(36.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
@@ -247,7 +242,7 @@ private fun ConversationCard(
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
                 Text(
                     text = conversation.title,
@@ -266,8 +261,10 @@ private fun ConversationCard(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
             )
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -308,12 +305,20 @@ private fun ChatDetailView(
 
     Scaffold(
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Conversation",
-                        subtitle = if (isStreaming) "Assistant is responding..." else "Ask anything about your day, tasks, or notes.",
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                        Text(
+                            text = "Conversation",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = if (isStreaming) "Assistant is responding…" else "Ask about tasks, notes, or your day",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -366,16 +371,20 @@ private fun ChatDetailView(
                     .fillMaxSize()
                     .padding(padding),
                 state = listState,
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (messages.isEmpty() && streamingText.isBlank()) {
                     item {
-                        ClawSectionCard {
-                            ClawStatusChip(text = "Start here", tone = ClawTone.Primary)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
                             Text(
                                 text = "Start the conversation",
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
@@ -422,101 +431,105 @@ private fun ChatComposer(
         shadowElevation = 0.dp,
         color = MaterialTheme.colorScheme.background,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TextField(
-                    value = inputText,
-                    onValueChange = onInputChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            "Message ClawChat...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        )
-                    },
-                    maxLines = 5,
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                    ),
-                )
-            }
-
-            Surface(
-                modifier = Modifier.size(50.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable(onClick = onVoiceInput),
-                    contentAlignment = Alignment.Center,
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
-                    Icon(
-                        ClawIcons.PhoneAndroid,
-                        contentDescription = "Voice input",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    TextField(
+                        value = inputText,
+                        onValueChange = onInputChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text(
+                                "Ask ClawChat anything…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            )
+                        },
+                        maxLines = 5,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                        ),
                     )
                 }
-            }
 
-            Surface(
-                modifier = Modifier.size(50.dp),
-                shape = CircleShape,
-                color = if (isStreaming) {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-                } else if (inputText.isNotBlank()) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.surface
-                },
-                border = if (isStreaming || inputText.isNotBlank()) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(if (isStreaming || inputText.isNotBlank()) 1f else 0.6f)
-                        .clickable(enabled = isStreaming || inputText.isNotBlank()) {
-                            if (isStreaming) onStop() else onSend()
-                        },
-                    contentAlignment = Alignment.Center,
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
-                    if (isStreaming) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable(onClick = onVoiceInput),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Icon(
-                            ClawIcons.Stop,
-                            contentDescription = "Stop",
-                            tint = MaterialTheme.colorScheme.error,
+                            ClawIcons.PhoneAndroid,
+                            contentDescription = "Voice input",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.size(48.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isStreaming) {
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                    } else if (inputText.isNotBlank()) {
+                        MaterialTheme.colorScheme.primary
                     } else {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = if (inputText.isNotBlank()) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                        MaterialTheme.colorScheme.surface
+                    },
+                    border = if (isStreaming || inputText.isNotBlank()) null else {
+                        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    },
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(if (isStreaming || inputText.isNotBlank()) 1f else 0.6f)
+                            .clickable(enabled = isStreaming || inputText.isNotBlank()) {
+                                if (isStreaming) onStop() else onSend()
                             },
-                        )
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isStreaming) {
+                            Icon(
+                                ClawIcons.Stop,
+                                contentDescription = "Stop",
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send",
+                                tint = if (inputText.isNotBlank()) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -532,57 +545,67 @@ private fun MessageBubble(
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
     val bubbleColor = if (isUser) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
     } else {
-        MaterialTheme.colorScheme.surface
+        Color.Transparent
     }
-    val contentColor = if (isUser) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-    val labelTone = if (isUser) ClawTone.Primary else ClawTone.Default
     val timeLabel = if (streaming) "Streaming" else formatMessageTime(message.createdAt)
+    val contentWidth = if (isUser) 0.88f else 1f
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = alignment,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        ClawStatusChip(
-            text = if (isUser) "You" else "Assistant",
-            tone = labelTone,
-        )
-        Surface(
-            modifier = Modifier.fillMaxWidth(if (isUser) 0.9f else 0.92f),
-            shape = if (isUser) {
-                RoundedCornerShape(24.dp, 24.dp, 8.dp, 24.dp)
-            } else {
-                RoundedCornerShape(24.dp, 24.dp, 24.dp, 8.dp)
-            },
-            color = bubbleColor,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                if (isUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.outlineVariant,
-            ),
+        Row(
+            modifier = Modifier.fillMaxWidth(contentWidth),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Text(
+                text = if (isUser) "You" else "Assistant",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                color = if (isUser) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            if (timeLabel.isNotBlank()) {
+                Text(
+                    text = timeLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (isUser) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(contentWidth),
+                shape = RoundedCornerShape(8.dp),
+                color = bubbleColor,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                ),
             ) {
                 Text(
                     text = message.content,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                if (timeLabel.isNotBlank()) {
-                    Text(
-                        text = timeLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = contentColor.copy(alpha = 0.7f),
-                    )
-                }
             }
+        } else {
+            Text(
+                text = message.content,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

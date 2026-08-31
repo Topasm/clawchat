@@ -5,7 +5,7 @@ import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,29 +16,29 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,13 +62,11 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawMetricPill
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
 
@@ -137,25 +136,27 @@ private fun TaskListView(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Tasks",
-                        subtitle = "Keep active work readable and focused.",
+                    Text(
+                        text = "Tasks",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 colors = ClawTopBarColors(),
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                modifier = Modifier.navigationBarsPadding(),
+            SmallFloatingActionButton(
+                modifier = Modifier.size(48.dp),
                 onClick = { showCreateSheet = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New task") },
+                shape = MaterialTheme.shapes.medium,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New task")
+            }
         },
     ) { padding ->
         Column(
@@ -186,7 +187,7 @@ private fun TaskListView(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     ClawEmptyState(
@@ -201,8 +202,8 @@ private fun TaskListView(
 
                 LazyColumn(
                     state = lazyListState,
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
                     items(filteredTasks, key = { it.id }) { task ->
                         SwipeableTaskRow(
@@ -238,47 +239,40 @@ private fun TaskSummaryCard(
     statusFilter: TaskStatus?,
     onSetFilter: (TaskStatus?) -> Unit,
 ) {
-    ClawSectionCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        ClawStatusChip(
-            text = "Active work",
-            tone = ClawTone.Primary,
-        )
-        Text(
-            text = if (totalCount == 0) "Nothing scheduled yet" else "$completedCount of $totalCount tasks complete",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Swipe for quick actions and keep the current focus visible.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            ClawMetricPill(
-                label = "Active",
-                value = activeCount.toString(),
+            Text(
+                text = if (totalCount == 0) {
+                    "No tasks yet"
+                } else {
+                    "$activeCount active  ·  $completedCount done  ·  $totalCount total"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            ClawMetricPill(
-                label = "Done",
-                value = completedCount.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "View",
-                value = when (statusFilter) {
+            Text(
+                text = when (statusFilter) {
                     null -> "All"
                     else -> taskStatusLabel(statusFilter)
                 },
-                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TaskFilterChip(
                 label = "All",
@@ -293,6 +287,7 @@ private fun TaskSummaryCard(
                 )
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     }
 }
 
@@ -302,15 +297,37 @@ private fun TaskFilterChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-            selectedLabelColor = MaterialTheme.colorScheme.primary,
-        ),
-    )
+    Box(
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.Tab,
+            )
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+        if (selected) {
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter),
+                thickness = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
 }
 
 @Composable
@@ -341,17 +358,15 @@ private fun TaskRow(
         label = "task_alpha",
     )
 
-    ClawListItemSurface(
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
+    ClawListItemSurface(onClick = onClick) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(completionAlpha),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 Checkbox(
@@ -367,7 +382,7 @@ private fun TaskRow(
                 )
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -396,8 +411,8 @@ private fun TaskRow(
                 }
             }
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 ClawStatusChip(
                     text = taskStatusLabel(task.status),
@@ -460,11 +475,12 @@ private fun TaskDetailView(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Task detail",
-                        subtitle = "Context, status, and metadata in one place.",
+                    Text(
+                        text = "Task detail",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
@@ -489,8 +505,8 @@ private fun TaskDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
                 ClawSectionCard {
@@ -646,7 +662,7 @@ private fun TaskRelationshipRow(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Column(
                 modifier = Modifier.weight(1f),

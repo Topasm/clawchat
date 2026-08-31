@@ -58,7 +58,7 @@ fun QrScannerScreen(
         }
         false -> {
             Column(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -67,12 +67,20 @@ fun QrScannerScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(24.dp))
-                Button(onClick = onManualEntry, modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = onManualEntry,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
                     Text("Connect manually")
                 }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
                     Text("Cancel")
                 }
             }
@@ -94,7 +102,7 @@ fun QrScannerScreen(
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
                         .background(Color.Black.copy(alpha = 0.6f))
-                        .padding(24.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
@@ -103,7 +111,7 @@ fun QrScannerScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,

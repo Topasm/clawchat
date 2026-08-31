@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.clawchat.android.widget.R
 import com.clawchat.android.widget.common.WidgetUpdater
 import com.clawchat.android.widget.di.WidgetEntryPoint
@@ -62,9 +64,16 @@ class QuickAddActivity : ComponentActivity() {
             WidgetEntryPoint::class.java,
         )
         val todoRepository = entryPoint.todoRepository()
+        val sessionStore = entryPoint.sessionStore()
 
         setContent {
-            MaterialTheme {
+            val themeMode by sessionStore.themeMode.collectAsState(initial = "light")
+            val accentColor by sessionStore.accentColor.collectAsState(initial = "system")
+
+            ClawChatTheme(
+                themeModeKey = themeMode,
+                accentColorKey = accentColor,
+            ) {
                 var text by rememberSaveable { mutableStateOf("") }
                 var idempotencyKey by rememberSaveable {
                     mutableStateOf(UUID.randomUUID().toString())
@@ -124,14 +133,14 @@ class QuickAddActivity : ComponentActivity() {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        shape = RoundedCornerShape(20.dp),
+                            .padding(horizontal = 12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface,
                         ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = stringResource(
                                     if (target == QuickAddTarget.TODAY) {
@@ -144,7 +153,7 @@ class QuickAddActivity : ComponentActivity() {
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
 
                             OutlinedTextField(
                                 value = text,
@@ -163,7 +172,7 @@ class QuickAddActivity : ComponentActivity() {
                                 placeholder = { Text(stringResource(R.string.quick_add_hint)) },
                                 singleLine = true,
                                 enabled = !isSubmitting,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 keyboardOptions = KeyboardOptions(
                                     capitalization = KeyboardCapitalization.Sentences,
                                     imeAction = ImeAction.Done,
@@ -171,7 +180,7 @@ class QuickAddActivity : ComponentActivity() {
                                 keyboardActions = KeyboardActions(onDone = { submitTask() }),
                             )
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -188,6 +197,7 @@ class QuickAddActivity : ComponentActivity() {
                                 FilledTonalButton(
                                     onClick = submitTask,
                                     enabled = text.isNotBlank() && !isSubmitting,
+                                    shape = RoundedCornerShape(6.dp),
                                 ) {
                                     Text(stringResource(R.string.quick_add_add))
                                 }

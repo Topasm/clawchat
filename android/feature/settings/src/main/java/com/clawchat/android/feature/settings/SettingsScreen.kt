@@ -10,18 +10,21 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -47,15 +50,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.PairedDevice
-import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawSectionCard
-import com.clawchat.android.core.ui.ClawSectionHeader
-import com.clawchat.android.core.ui.ClawStatusChip
-import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.theme.AccentColor
 import com.clawchat.android.core.ui.update.AppUpdateSection
@@ -83,7 +83,7 @@ fun SettingsScreen(
                     Text(
                         "Settings",
                         fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                     )
                 },
                 navigationIcon = {
@@ -102,20 +102,14 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
-                ClawSectionCard {
-                    ClawStatusChip(
-                        text = "Appearance",
-                        tone = ClawTone.Primary,
-                    )
-                    Text(
-                        text = "Choose the calmer, lighter presentation you want across the app.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                SettingsSection(
+                    title = "Appearance",
+                    subtitle = "Choose how ClawChat looks on this device.",
+                ) {
                     ThemeModeCard(
                         selectedKey = state.themeMode,
                         onSelect = viewModel::setThemeMode,
@@ -135,11 +129,10 @@ fun SettingsScreen(
 
             if (state.hostName.isNotBlank() || state.health != null) {
                 item {
-                    ClawSectionCard {
-                        ClawSectionHeader(
-                            title = "Server",
-                            subtitle = "Connection and AI status.",
-                        )
+                    SettingsSection(
+                        title = "Server",
+                        subtitle = "Connection and AI status.",
+                    ) {
                         ServerInfoCard(
                             version = state.health?.version,
                             aiProvider = state.health?.aiProvider,
@@ -168,18 +161,20 @@ fun SettingsScreen(
 
             if (state.devices.isNotEmpty()) {
                 item {
-                    ClawSectionCard {
-                        ClawSectionHeader(
-                            title = "Paired devices",
-                            subtitle = "Active mobile connections.",
-                            count = state.devices.size,
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            state.devices.forEach { device ->
+                    SettingsSection(
+                        title = "Paired devices",
+                        subtitle = "Active mobile connections.",
+                        count = state.devices.size,
+                    ) {
+                        Column {
+                            state.devices.forEachIndexed { index, device ->
                                 DeviceCard(
                                     device = device,
                                     onRevoke = { viewModel.revokeDevice(device.id) },
                                 )
+                                if (index < state.devices.lastIndex) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                }
                             }
                         }
                     }
@@ -197,13 +192,13 @@ fun SettingsScreen(
             }
 
             item {
-                ClawSectionCard {
-                    ClawSectionHeader(
-                        title = "Account",
-                        subtitle = "Sign out while keeping your visual preferences.",
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsSection(
+                    title = "Account",
+                    subtitle = "Sign out while keeping your visual preferences.",
+                    showDivider = false,
+                ) {
                     TextButton(
+                        modifier = Modifier.fillMaxWidth(),
                         onClick = {
                             viewModel.logout()
                             onLoggedOut()
@@ -212,12 +207,69 @@ fun SettingsScreen(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
                     ) {
-                        Icon(ClawIcons.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Log Out", fontWeight = FontWeight.Medium)
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(ClawIcons.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Log Out", fontWeight = FontWeight.Medium)
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    subtitle: String? = null,
+    count: Int? = null,
+    showDivider: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (!subtitle.isNullOrBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (count != null) {
+                    Text(
+                        text = count.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            content()
+        }
+        if (showDivider) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
@@ -230,86 +282,86 @@ private fun ConnectionDiagnosticsCard(
     onCopy: () -> Unit,
 ) {
     val isConfigured = diagnostics.serverOrigin != "Not configured"
-    ClawSectionCard {
-        ClawSectionHeader(
-            title = "Connection diagnostics",
-            subtitle = "A credential-safe snapshot for troubleshooting this device.",
-        )
-        ClawListItemSurface {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when {
-                                !isConfigured -> MaterialTheme.colorScheme.onSurfaceVariant
-                                diagnostics.httpReachable -> MaterialTheme.colorScheme.secondary
-                                else -> MaterialTheme.colorScheme.error
-                            },
-                        ),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
+    SettingsSection(
+        title = "Connection diagnostics",
+        subtitle = "A credential-safe snapshot for troubleshooting this device.",
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(
                         when {
-                            !isConfigured -> "No server configured"
-                            diagnostics.httpReachable -> "Server reachable"
-                            else -> "Server unavailable"
+                            !isConfigured -> MaterialTheme.colorScheme.onSurfaceVariant
+                            diagnostics.httpReachable -> MaterialTheme.colorScheme.secondary
+                            else -> MaterialTheme.colorScheme.error
                         },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        when {
-                            !isConfigured -> "Connect a server to run diagnostics"
-                            diagnostics.latencyMillis != null ->
-                                "HTTP check completed in ${diagnostics.latencyMillis}ms"
-                            else -> "HTTP check did not complete"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            InfoRow("Server", diagnostics.serverOrigin)
-            InfoRow("Transport", diagnostics.connectionMode)
-            InfoRow("Authentication", diagnostics.authMode)
-            diagnostics.serverVersion?.let { InfoRow("Server version", it) }
-            InfoRow(
-                "Realtime",
-                if (diagnostics.realtimeConnected) "Connected" else "Disconnected",
-                if (diagnostics.realtimeConnected) {
-                    MaterialTheme.colorScheme.secondary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                    ),
             )
-            diagnostics.lastRealtimeEventAtEpochMillis?.let {
-                InfoRow("Last realtime event", java.time.Instant.ofEpochMilli(it).toString())
-            }
-            diagnostics.lastError?.let { error ->
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = error,
+                    when {
+                        !isConfigured -> "No server configured"
+                        diagnostics.httpReachable -> "Server reachable"
+                        else -> "Server unavailable"
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    when {
+                        !isConfigured -> "Connect a server to run diagnostics"
+                        diagnostics.latencyMillis != null ->
+                            "HTTP check completed in ${diagnostics.latencyMillis}ms"
+                        else -> "HTTP check did not complete"
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = onCopy) {
-                    Text("Copy diagnostics")
-                }
-                TextButton(onClick = onCheck, enabled = !isChecking && isConfigured) {
-                    Text(if (isChecking) "Checking…" else "Run again")
-                }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        InfoRow("Server", diagnostics.serverOrigin)
+        InfoRow("Transport", diagnostics.connectionMode)
+        InfoRow("Authentication", diagnostics.authMode)
+        diagnostics.serverVersion?.let { InfoRow("Server version", it) }
+        InfoRow(
+            "Realtime",
+            if (diagnostics.realtimeConnected) "Connected" else "Disconnected",
+            if (diagnostics.realtimeConnected) {
+                MaterialTheme.colorScheme.secondary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        diagnostics.lastRealtimeEventAtEpochMillis?.let {
+            InfoRow("Last realtime event", java.time.Instant.ofEpochMilli(it).toString())
+        }
+        diagnostics.lastError?.let { error ->
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            TextButton(onClick = onCopy) {
+                Text("Copy diagnostics")
+            }
+            TextButton(onClick = onCheck, enabled = !isChecking && isConfigured) {
+                Text(if (isChecking) "Checking…" else "Run again")
             }
         }
     }
@@ -317,25 +369,22 @@ private fun ConnectionDiagnosticsCard(
 
 @Composable
 private fun ConnectServerCard(onSetupServer: () -> Unit) {
-    ClawSectionCard(tone = ClawTone.Primary, onClick = onSetupServer) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onSetupServer)
+                .defaultMinSize(minHeight = 56.dp)
+                .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                modifier = Modifier.size(44.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        ClawIcons.Cloud,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
+            Icon(
+                ClawIcons.Cloud,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp),
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Connect to Server",
@@ -349,6 +398,7 @@ private fun ConnectServerCard(onSetupServer: () -> Unit) {
                 )
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -357,7 +407,7 @@ private fun ThemeModeCard(
     selectedKey: String,
     onSelect: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             "Theme mode",
             style = MaterialTheme.typography.titleMedium,
@@ -365,7 +415,7 @@ private fun ThemeModeCard(
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ThemeMode.entries.forEach { mode ->
                 ThemeModeOption(
@@ -400,35 +450,35 @@ private fun ThemeModeOption(
     Surface(
         modifier = modifier,
         onClick = onClick,
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(6.dp),
         color = containerColor,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
         tonalElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(
                 modifier = Modifier
                     .size(width = 42.dp, height = 26.dp)
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(RoundedCornerShape(4.dp))
                     .background(
                         when (mode) {
-                            ThemeMode.Light -> Color(0xFFF9F7F3)
-                            ThemeMode.Dark -> Color(0xFF252320)
-                            ThemeMode.System -> Color(0xFFE7E1D8)
+                            ThemeMode.Light -> Color(0xFFF7F8FA)
+                            ThemeMode.Dark -> Color(0xFF181B1F)
+                            ThemeMode.System -> Color(0xFFE3E6EA)
                         },
                     )
                     .border(
                         1.dp,
                         when (mode) {
-                            ThemeMode.Light -> Color(0xFFE0D9CF)
-                            ThemeMode.Dark -> Color(0xFF555049)
-                            ThemeMode.System -> Color(0xFFD2CBC2)
+                            ThemeMode.Light -> Color(0xFFDDE1E6)
+                            ThemeMode.Dark -> Color(0xFF41464D)
+                            ThemeMode.System -> Color(0xFFC8CDD3)
                         },
-                        MaterialTheme.shapes.medium,
+                        RoundedCornerShape(4.dp),
                     ),
             )
             Text(
@@ -446,15 +496,15 @@ private fun AccentColorCard(
     selectedKey: String,
     onSelect: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             "Accent color",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             AccentColor.entries.forEach { accent ->
                 AccentSwatch(
@@ -482,28 +532,33 @@ private fun AccentSwatch(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(color)
-                .then(
-                    if (isSelected) {
-                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                    } else {
-                        Modifier
-                    },
-                )
+                .size(48.dp)
                 .clickable(role = Role.RadioButton, onClick = onClick),
         ) {
-            if (isSelected) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = "Selected",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(color)
+                    .then(
+                        if (isSelected) {
+                            Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
+                if (isSelected) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(4.dp))
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
@@ -521,23 +576,15 @@ private fun ServerInfoCard(
     hostName: String,
     authMode: String,
 ) {
-    ClawListItemSurface {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                modifier = Modifier.size(36.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        ClawIcons.Cloud,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
+            Icon(
+                ClawIcons.Cloud,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
             val aiOk = aiConnected == true
             Box(
                 modifier = Modifier
@@ -572,63 +619,67 @@ private fun ServerInfoCard(
 @Composable
 private fun InfoRow(label: String, value: String, valueColor: Color? = null) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.Top,
     ) {
         Text(
             label,
+            modifier = Modifier.weight(0.42f),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
+        Spacer(Modifier.width(8.dp))
         Text(
             value,
+            modifier = Modifier.weight(0.58f),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
 private fun DeviceCard(device: PairedDevice, onRevoke: () -> Unit) {
-    ClawListItemSurface {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            ClawIcons.PhoneAndroid,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                device.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(1.dp))
+            Text(
+                "${device.deviceType} \u00b7 Last seen ${device.lastSeen}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(
+            onClick = onRevoke,
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        ClawIcons.PhoneAndroid,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    device.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "${device.deviceType} \u00b7 Last seen ${device.lastSeen}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            TextButton(
-                onClick = onRevoke,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) {
-                Text("Revoke", style = MaterialTheme.typography.labelLarge)
-            }
+            Text("Revoke", style = MaterialTheme.typography.labelLarge)
         }
     }
 }

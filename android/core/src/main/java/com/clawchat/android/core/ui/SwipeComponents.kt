@@ -1,11 +1,11 @@
 package com.clawchat.android.core.ui
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import android.view.HapticFeedbackConstants
 
 /**
  * Shared swipe-to-dismiss background used across Today and Tasks screens.
@@ -55,8 +54,8 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(color, RoundedCornerShape(24.dp))
-            .padding(horizontal = 20.dp),
+            .background(color, MaterialTheme.shapes.extraSmall)
+            .padding(horizontal = 14.dp),
         contentAlignment = alignment,
     ) {
         if (icon != null) {

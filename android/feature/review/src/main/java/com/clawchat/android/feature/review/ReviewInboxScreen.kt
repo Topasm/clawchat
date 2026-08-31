@@ -88,7 +88,7 @@ fun ReviewInboxScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             text = if (selected == null) "Review" else selected.subjectTitle ?: "Review item",
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -157,7 +157,7 @@ fun ReviewInboxScreen(
                 Snackbar(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(16.dp),
+                        .padding(12.dp),
                     action = {
                         TextButton(
                             onClick = {
@@ -200,8 +200,8 @@ private fun ReviewList(
             }
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 items(state.items, key = ReviewItem::id) { item ->
                     ReviewRow(item = item, onClick = { onSelect(item.id) })
@@ -288,8 +288,8 @@ private fun ReviewDetail(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
             ClawSectionCard(tone = item.riskLevel.tone) {

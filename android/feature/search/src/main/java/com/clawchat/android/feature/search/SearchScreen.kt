@@ -70,7 +70,7 @@ fun SearchScreen(
                     Text(
                         "Search",
                         fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                     )
                 },
                 navigationIcon = {
@@ -86,8 +86,8 @@ fun SearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = state.query,
@@ -109,7 +109,7 @@ fun SearchScreen(
                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 SearchType.entries.forEach { type ->
                     FilterChip(
                         selected = type in state.activeTypes,
@@ -158,12 +158,16 @@ private fun LoadingRow() {
 private fun ResultList(state: SearchUiState, onOpenHit: (SearchHit) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         state.grouped.forEach { (type, hits) ->
             item(key = "header-${type.filterValue}") {
-                ClawSectionHeader(title = type.label, count = hits.size)
+                ClawSectionHeader(
+                    title = type.label,
+                    count = hits.size,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
             }
             items(items = hits, key = { "${type.filterValue}-${it.id}" }) { hit ->
                 HitRow(hit = hit, onClick = { onOpenHit(hit) })

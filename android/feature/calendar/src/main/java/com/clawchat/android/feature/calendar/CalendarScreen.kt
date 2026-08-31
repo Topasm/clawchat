@@ -20,16 +20,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -79,7 +79,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                     Text(
                         state.visibleMonth.format(MONTH_LABEL.withLocale(locale)),
                         fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleLarge,
                     )
                 },
                 actions = {
@@ -87,31 +87,33 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                         Text("Today")
                     }
                     IconButton(onClick = { viewModel.onAction(CalendarAction.ShowPreviousMonth) }) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Previous month")
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
                     }
                     IconButton(onClick = { viewModel.onAction(CalendarAction.ShowNextMonth) }) {
-                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next month")
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
                     }
                 },
                 colors = ClawTopBarColors(),
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            SmallFloatingActionButton(
+                modifier = Modifier.size(48.dp),
                 onClick = { editing = EditorTarget(null) },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New event") },
+                shape = MaterialTheme.shapes.medium,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New event")
+            }
         },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (state.isOffline) {
                 item {

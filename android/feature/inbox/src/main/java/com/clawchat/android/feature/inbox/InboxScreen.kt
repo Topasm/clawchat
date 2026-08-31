@@ -1,6 +1,5 @@
 package com.clawchat.android.feature.inbox
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,14 +16,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -37,14 +34,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawMetricPill
-import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.icons.ClawIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,11 +54,12 @@ fun InboxScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Inbox",
-                        subtitle = "Capture first, decide with context.",
+                    Text(
+                        text = "Inbox",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 colors = ClawTopBarColors(),
@@ -91,8 +87,8 @@ fun InboxScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
                         InboxSummaryCard(
@@ -200,7 +196,7 @@ fun InboxScreen(
             state.error?.let { error ->
                 Snackbar(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(12.dp)
                         .align(Alignment.BottomCenter),
                 ) {
                     Text(error)
@@ -223,41 +219,22 @@ private fun InboxSummaryCard(
     reviewSuggestion: Int,
     failed: Int,
 ) {
-    ClawSectionCard {
-        ClawStatusChip(
-            text = "Review queue",
-            tone = ClawTone.Primary,
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Text(
             text = if (totalItems == 0) "Nothing waiting right now" else "$totalItems item${if (totalItems == 1) "" else "s"} need attention",
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Use this queue to confirm AI suggestions, fix failures, and turn captures into structured work.",
+            text = "$planningNow planning  ·  $reviewSuggestion review  ·  $failed failed",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ClawMetricPill(
-                label = "Planning",
-                value = planningNow.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "Review",
-                value = reviewSuggestion.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "Failed",
-                value = failed.toString(),
-                modifier = Modifier.weight(1f),
-            )
-        }
     }
 }
 
@@ -274,30 +251,31 @@ private fun InboxSectionCard(
     showSpinner: Boolean,
     onTaskClick: (String) -> Unit,
 ) {
-    ClawSectionCard(tone = tone) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(42.dp),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface,
+    ClawListSection(
+        tone = tone,
+        header = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.size(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     icon()
                 }
+                ClawSectionHeader(
+                    modifier = Modifier.weight(1f),
+                    title = title,
+                    subtitle = subtitle,
+                    count = items.size,
+                )
             }
-            ClawSectionHeader(
-                modifier = Modifier.weight(1f),
-                title = title,
-                subtitle = subtitle,
-                count = items.size,
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items.forEachIndexed { index, todo ->
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            items.forEach { todo ->
                 InboxItemCard(
                     todo = todo,
                     showSpinner = showSpinner,
@@ -310,9 +288,6 @@ private fun InboxSectionCard(
                     onClick = { onTaskClick(todo.id) },
                     isError = isError,
                 )
-                if (index != items.lastIndex) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                }
             }
         }
     }
@@ -327,15 +302,13 @@ private fun InboxItemCard(
     onClick: () -> Unit = {},
     isError: Boolean = false,
 ) {
-    ClawListItemSurface {
+    ClawListItemSurface(onClick = onClick) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 if (showSpinner) {

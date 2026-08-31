@@ -97,13 +97,13 @@ private fun WelcomeStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // App icon placeholder
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier.size(80.dp),
         ) {
@@ -116,7 +116,7 @@ private fun WelcomeStep(
                 )
             }
         }
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
         Text(
             "Welcome to\nClawChat",
             style = MaterialTheme.typography.headlineLarge,
@@ -130,19 +130,19 @@ private fun WelcomeStep(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(32.dp))
         Button(
             onClick = onScanQr,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(6.dp),
         ) {
             Text("Scan QR Code", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = onManualConnect,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(6.dp),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
@@ -183,12 +183,12 @@ private fun ScanQrStep(
                 contentAlignment = Alignment.Center,
             ) {
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.padding(32.dp),
+                    modifier = Modifier.padding(20.dp),
                 ) {
                     Column(
-                        modifier = Modifier.padding(32.dp),
+                        modifier = Modifier.padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         CircularProgressIndicator(
@@ -213,7 +213,7 @@ private fun ScanQrStep(
                     .align(Alignment.TopCenter)
                     .padding(16.dp),
                 color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(6.dp),
             ) {
                 Text(
                     it,
@@ -241,7 +241,7 @@ private fun ServerStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
@@ -255,7 +255,7 @@ private fun ServerStep(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
         TextField(
             value = serverUrl,
@@ -264,7 +264,7 @@ private fun ServerStep(
             placeholder = { Text("http://192.168.1.100:8000") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(6.dp),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -287,7 +287,7 @@ private fun ServerStep(
         if (serverReachable == true) {
             Spacer(Modifier.height(8.dp))
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(4.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 Row(
@@ -316,12 +316,12 @@ private fun ServerStep(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
         Button(
             onClick = { if (serverReachable == true) onNext() else onCheck() },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(6.dp),
             enabled = serverUrl.isNotBlank() && !isChecking,
         ) {
             Text(
@@ -331,12 +331,12 @@ private fun ServerStep(
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
 
         OutlinedButton(
             onClick = onManualLogin,
             modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(6.dp),
             enabled = serverReachable == true,
         ) {
             Text("Log in with PIN instead")
@@ -369,7 +369,7 @@ private fun PairingStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
@@ -383,7 +383,7 @@ private fun PairingStep(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
         TextField(
             value = code,
@@ -391,7 +391,7 @@ private fun PairingStep(
             label = { Text("6-digit pairing code") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(6.dp),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -407,12 +407,12 @@ private fun PairingStep(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
         Button(
             onClick = onSubmit,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(6.dp),
             enabled = code.length == 6 && !isPairing,
         ) {
             if (isPairing) {
@@ -451,7 +451,7 @@ private fun ManualLoginStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
@@ -465,7 +465,7 @@ private fun ManualLoginStep(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
         TextField(
             value = pin,
@@ -473,7 +473,7 @@ private fun ManualLoginStep(
             label = { Text("PIN") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(6.dp),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -490,12 +490,12 @@ private fun ManualLoginStep(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
         Button(
             onClick = onSubmit,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(6.dp),
             enabled = pin.isNotBlank() && !isLoggingIn,
         ) {
             if (isLoggingIn) {
@@ -521,7 +521,7 @@ private fun ReadyStep(onComplete: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -540,7 +540,7 @@ private fun ReadyStep(onComplete: () -> Unit) {
                 )
             }
         }
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
         Text(
             "You\u2019re all set!",
             style = MaterialTheme.typography.headlineMedium,
@@ -554,11 +554,11 @@ private fun ReadyStep(onComplete: () -> Unit) {
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(32.dp))
         Button(
             onClick = onComplete,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = RoundedCornerShape(6.dp),
         ) {
             Text("Enter ClawChat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }

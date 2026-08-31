@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawSectionCard
+import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.update.UpdatePhase
 import com.clawchat.android.core.update.UpdateState
@@ -113,11 +113,15 @@ fun AppUpdateSection(
     onToggleAutoCheck: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ClawSectionCard(modifier = modifier) {
-        ClawSectionHeader(
-            title = "App updates",
-            subtitle = "Installed from GitHub releases.",
-        )
+    ClawListSection(
+        modifier = modifier,
+        header = {
+            ClawSectionHeader(
+                title = "App updates",
+                subtitle = "Installed from GitHub releases.",
+            )
+        },
+    ) {
         ClawListItemSurface {
             Row(
                 modifier = Modifier.fillMaxWidth(),

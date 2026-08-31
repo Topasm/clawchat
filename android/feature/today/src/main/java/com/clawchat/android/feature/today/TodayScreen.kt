@@ -11,31 +11,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,14 +55,12 @@ import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawMetricPill
-import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
 import com.clawchat.android.core.ui.icons.ClawIcons
@@ -96,11 +91,12 @@ fun TodayScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Today",
-                        subtitle = if (state.greeting.isBlank()) null else state.greeting,
+                    Text(
+                        text = "Today",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 actions = {
@@ -121,14 +117,15 @@ fun TodayScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                modifier = Modifier.navigationBarsPadding(),
+            SmallFloatingActionButton(
+                modifier = Modifier.size(48.dp),
                 onClick = { showQuickAdd = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Capture") },
+                shape = MaterialTheme.shapes.medium,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Capture task")
+            }
         },
     ) { padding ->
         PullToRefreshBox(
@@ -141,12 +138,12 @@ fun TodayScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 8.dp,
-                    bottom = 120.dp,
+                    start = 12.dp,
+                    end = 12.dp,
+                    top = 4.dp,
+                    bottom = 88.dp,
                 ),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (state.isOffline) {
                     item {
@@ -263,32 +260,34 @@ private fun AgentControlCard(
     onNavigateToReview: () -> Unit,
     onNavigateToRuns: () -> Unit,
 ) {
-    ClawSectionCard {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         ClawSectionHeader(
             title = "Agent activity",
-            subtitle = "Approve decisions, monitor progress, and intervene from your phone.",
+            subtitle = "Review decisions or check active runs.",
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            FilledTonalButton(
+            TextButton(
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateToReview,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ),
             ) {
                 Text("Review queue")
             }
-            OutlinedButton(
+            TextButton(
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateToRuns,
             ) {
                 Text("Agent runs")
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     }
 }
 
@@ -309,14 +308,15 @@ private fun TodayHeroCard(
         else -> "Use chat or quick capture to shape the rest of your day."
     }
 
-    ClawSectionCard {
-        ClawStatusChip(
-            text = "Today at a glance",
-            tone = ClawTone.Primary,
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         Text(
             text = greeting,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
@@ -324,47 +324,35 @@ private fun TodayHeroCard(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ClawMetricPill(
-                label = "Tasks",
-                value = "$completedTasks/$totalTasks",
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "Events",
-                value = eventCount.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "Inbox",
-                value = inboxCount.toString(),
-                modifier = Modifier.weight(1f),
+        if (totalTasks > 0) {
+            LinearProgressIndicator(
+                progress = { completedTasks.toFloat() / totalTasks.toFloat() },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
+        Text(
+            text = "$completedTasks/$totalTasks tasks  ·  $eventCount events  ·  $inboxCount inbox",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            FilledTonalButton(
+            TextButton(
                 modifier = Modifier.weight(1f),
                 onClick = onQuickAdd,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ),
             ) {
                 Text("Quick capture")
             }
-            OutlinedButton(
+            TextButton(
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateToInbox,
             ) {
                 Text("Open inbox")
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     }
 }
 
@@ -378,23 +366,24 @@ private fun TodoSectionCard(
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
 ) {
-    ClawSectionCard(tone = tone) {
-        ClawSectionHeader(
-            title = title,
-            subtitle = subtitle,
-            count = todos.size,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            todos.forEachIndexed { index, todo ->
+    ClawListSection(
+        tone = tone,
+        header = {
+            ClawSectionHeader(
+                title = title,
+                subtitle = subtitle,
+                count = todos.size,
+            )
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            todos.forEach { todo ->
                 SwipeableTodoCard(
                     todo = todo,
                     onToggle = { onToggle(todo.id) },
                     onDelete = { onDelete(todo.id) },
                     onSetDueToday = { onSetDueToday(todo.id) },
                 )
-                if (index != todos.lastIndex) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-                }
             }
         }
     }
@@ -427,7 +416,7 @@ private fun TodoRow(
                 .fillMaxWidth()
                 .alpha(if (isCompleted) 0.65f else 1f),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Checkbox(
                 checked = isCompleted,
@@ -442,7 +431,7 @@ private fun TodoRow(
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = todo.title,
@@ -451,8 +440,8 @@ private fun TodoRow(
                     textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
                 )
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     if (todo.status != TaskStatus.PENDING) {
                         ClawStatusChip(
@@ -495,18 +484,18 @@ private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
 
 @Composable
 private fun EventSectionCard(events: List<Event>) {
-    ClawSectionCard {
-        ClawSectionHeader(
-            title = "Calendar",
-            subtitle = "What the rest of the day is anchored around.",
-            count = events.size,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            events.forEachIndexed { index, event ->
+    ClawListSection(
+        header = {
+            ClawSectionHeader(
+                title = "Calendar",
+                subtitle = "What the rest of the day is anchored around.",
+                count = events.size,
+            )
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            events.forEach { event ->
                 EventRow(event = event)
-                if (index != events.lastIndex) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
-                }
             }
         }
     }
@@ -518,11 +507,11 @@ private fun EventRow(event: Event) {
         Row(
             modifier = Modifier
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(36.dp),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
             ) {
@@ -573,21 +562,25 @@ private fun InboxPreviewSection(
     totalInboxCount: Int,
     onNavigateToInbox: () -> Unit,
 ) {
-    ClawSectionCard(tone = ClawTone.Warning) {
-        ClawSectionHeader(
-            title = "Needs review",
-            subtitle = "Captured items waiting for your decision.",
-            count = totalInboxCount,
-            actionLabel = "Open inbox",
-            onActionClick = onNavigateToInbox,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    ClawListSection(
+        tone = ClawTone.Warning,
+        header = {
+            ClawSectionHeader(
+                title = "Needs review",
+                subtitle = "Captured items waiting for your decision.",
+                count = totalInboxCount,
+                actionLabel = "Open inbox",
+                onActionClick = onNavigateToInbox,
+            )
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             todos.forEach { todo ->
                 ClawListItemSurface {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Surface(
@@ -642,40 +635,43 @@ private fun InboxPreviewSection(
 @Composable
 private fun BriefingSection(briefing: BriefingResponse) {
     val suggestionCount = briefing.suggestions.size
-    ClawSectionCard {
-        ClawSectionHeader(
-            title = "Daily briefing",
-            subtitle = briefing.loadMessage.ifBlank { "AI summary for the day ahead." },
-            count = suggestionCount.takeIf { it > 0 },
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ClawStatusChip(
-                text = briefing.loadAssessment.replaceFirstChar { it.uppercase() },
-                tone = loadTone(briefing.loadAssessment),
+    ClawListSection(
+        header = {
+            ClawSectionHeader(
+                title = "Daily briefing",
+                subtitle = briefing.loadMessage.ifBlank { "AI summary for the day ahead." },
+                count = suggestionCount.takeIf { it > 0 },
             )
-            if (briefing.highlights.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 ClawStatusChip(
-                    text = "${briefing.highlights.size} highlight${if (briefing.highlights.size == 1) "" else "s"}",
-                    tone = ClawTone.Default,
+                    text = briefing.loadAssessment.replaceFirstChar { it.uppercase() },
+                    tone = loadTone(briefing.loadAssessment),
+                )
+                if (briefing.highlights.isNotEmpty()) {
+                    ClawStatusChip(
+                        text = "${briefing.highlights.size} highlight${if (briefing.highlights.size == 1) "" else "s"}",
+                        tone = ClawTone.Default,
+                    )
+                }
+            }
+            if (briefing.summary.isNotBlank()) {
+                Text(
+                    text = briefing.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        if (briefing.summary.isNotBlank()) {
-            Text(
-                text = briefing.summary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        },
+    ) {
         if (briefing.highlights.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 briefing.highlights.take(3).forEach { highlight ->
                     ClawListItemSurface {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -694,7 +690,7 @@ private fun BriefingSection(briefing: BriefingResponse) {
             }
         }
         if (briefing.suggestions.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 briefing.suggestions.forEach { suggestion ->
                     SuggestionActionCard(suggestion = suggestion)
                 }
@@ -709,7 +705,7 @@ private fun SuggestionActionCard(suggestion: BriefingSuggestion) {
         Row(
             modifier = Modifier
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(

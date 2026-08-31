@@ -1,4 +1,4 @@
-package com.clawchat.android.ui.theme
+package com.clawchat.android.core.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -11,8 +11,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.clawchat.android.core.ui.theme.AccentColor
-import com.clawchat.android.core.ui.theme.ThemeMode
 
 private val ClawPrimary = Color(0xFF2F67E8)
 private val ClawSecondary = Color(0xFF2D8A64)
@@ -31,18 +29,18 @@ private val LightColorScheme = lightColorScheme(
     onTertiary = Color.White,
     tertiaryContainer = Color(0xFFF0EBFF),
     onTertiaryContainer = Color(0xFF3B2B73),
-    background = Color(0xFFF4F1EC),
-    onBackground = Color(0xFF201E1A),
-    surface = Color(0xFFFCFAF7),
-    onSurface = Color(0xFF1F1E1A),
-    onSurfaceVariant = Color(0xFF706B63),
+    background = Color(0xFFF7F8FA),
+    onBackground = Color(0xFF181A1D),
+    surface = Color.White,
+    onSurface = Color(0xFF181A1D),
+    onSurfaceVariant = Color(0xFF626872),
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFF7F4EF),
-    surfaceContainer = Color(0xFFF1EEE8),
-    surfaceContainerHigh = Color(0xFFE9E5DE),
-    surfaceContainerHighest = Color(0xFFE1DDD5),
-    outline = Color(0xFFD1CBC2),
-    outlineVariant = Color(0xFFE7E1D8),
+    surfaceContainerLow = Color(0xFFF7F8FA),
+    surfaceContainer = Color(0xFFF0F2F5),
+    surfaceContainerHigh = Color(0xFFE9ECF0),
+    surfaceContainerHighest = Color(0xFFE3E6EA),
+    outline = Color(0xFFC9CED6),
+    outlineVariant = Color(0xFFE1E4E8),
     error = Color(0xFFBA1A1A),
     errorContainer = Color(0xFFFFDAD6),
     onError = Color.White,
@@ -62,18 +60,18 @@ private val DarkColorScheme = darkColorScheme(
     onTertiary = Color(0xFF453684),
     tertiaryContainer = Color(0xFF3B3357),
     onTertiaryContainer = Color(0xFFF0EAFF),
-    background = Color(0xFF191817),
-    onBackground = Color(0xFFF1EDE6),
-    surface = Color(0xFF21201E),
-    onSurface = Color(0xFFF3EFE8),
-    onSurfaceVariant = Color(0xFFBEB7AD),
-    surfaceContainerLowest = Color(0xFF171614),
-    surfaceContainerLow = Color(0xFF262421),
-    surfaceContainer = Color(0xFF2C2A27),
-    surfaceContainerHigh = Color(0xFF33302D),
-    surfaceContainerHighest = Color(0xFF3B3835),
-    outline = Color(0xFF8B847B),
-    outlineVariant = Color(0xFF494540),
+    background = Color(0xFF111316),
+    onBackground = Color(0xFFF3F4F6),
+    surface = Color(0xFF181B1F),
+    onSurface = Color(0xFFF3F4F6),
+    onSurfaceVariant = Color(0xFFA0A6AF),
+    surfaceContainerLowest = Color(0xFF0E1012),
+    surfaceContainerLow = Color(0xFF181B1F),
+    surfaceContainer = Color(0xFF22262B),
+    surfaceContainerHigh = Color(0xFF292E34),
+    surfaceContainerHighest = Color(0xFF30353B),
+    outline = Color(0xFF68707A),
+    outlineVariant = Color(0xFF30353B),
     error = Color(0xFFFFB4AB),
     errorContainer = Color(0xFF93000A),
     onError = Color(0xFF690005),
@@ -174,13 +172,15 @@ private val ClawTypography = Typography(
     ),
 )
 
-// Shapes with mobile-friendly Material 3 rounding.
+// Compact shapes shared with the desktop design language. Large rounding is
+// reserved for transient surfaces such as dialogs and sheets; everyday rows
+// and controls stay visually flat.
 private val ClawShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(30.dp),
+    extraSmall = RoundedCornerShape(2.dp),
+    small = RoundedCornerShape(4.dp),
+    medium = RoundedCornerShape(6.dp),
+    large = RoundedCornerShape(8.dp),
+    extraLarge = RoundedCornerShape(12.dp),
 )
 
 @Composable
