@@ -5,7 +5,6 @@ import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,9 +19,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,9 +42,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +84,16 @@ import com.clawchat.android.core.ui.localizedErrorMessage
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+
+internal val TASK_STATUS_FILTER_ORDER: List<TaskStatus?> = listOf(
+    TaskStatus.IN_PROGRESS,
+    TaskStatus.PENDING,
+    TaskStatus.COMPLETED,
+    TaskStatus.CANCELLED,
+    null,
+)
 
 @Composable
 fun TasksScreen(
@@ -114,7 +129,6 @@ fun TasksScreen(
             onDelete = viewModel::deleteTask,
             onSetDueToday = viewModel::setDueToday,
             onSetFilter = viewModel::setStatusFilter,
-            onRefresh = viewModel::loadTasks,
             onCreate = viewModel::createTask,
         )
     }
@@ -132,18 +146,36 @@ private fun TaskListView(
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onSetFilter: (TaskStatus?) -> Unit,
-    onRefresh: () -> Unit,
     onCreate: (TodoCreate) -> Unit,
 ) {
     var showCreateSheet by remember { mutableStateOf(false) }
 
-    val filteredTasks = tasks.filter { task ->
+    val taskCandidates = tasks.filter { task ->
         val inboxState = task.inboxState
         inboxState == null || inboxState == "none"
     }
-    val completedCount = filteredTasks.count { it.status == TaskStatus.COMPLETED }
-    val activeCount = filteredTasks.count {
+    val completedCount = taskCandidates.count { it.status == TaskStatus.COMPLETED }
+    val activeCount = taskCandidates.count {
         it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS
+    }
+    val initialPage = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { TASK_STATUS_FILTER_ORDER.size },
+    )
+    val pagerScope = rememberCoroutineScope()
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page -> onSetFilter(TASK_STATUS_FILTER_ORDER[page]) }
+    }
+
+    LaunchedEffect(statusFilter) {
+        val targetPage = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
+        if (!pagerState.isScrollInProgress && pagerState.settledPage != targetPage) {
+            pagerState.scrollToPage(targetPage)
+        }
     }
 
     Scaffold(
@@ -184,56 +216,38 @@ private fun TaskListView(
                 .padding(padding),
         ) {
             TaskSummaryCard(
-                totalCount = filteredTasks.size,
+                totalCount = taskCandidates.size,
                 activeCount = activeCount,
                 completedCount = completedCount,
-                statusFilter = statusFilter,
-                onSetFilter = onSetFilter,
+                statusFilter = TASK_STATUS_FILTER_ORDER[pagerState.currentPage],
+                onSetFilter = { filter ->
+                    val targetPage = TASK_STATUS_FILTER_ORDER.indexOf(filter)
+                    if (targetPage >= 0 && targetPage != pagerState.currentPage) {
+                        pagerScope.launch { pagerState.animateScrollToPage(targetPage) }
+                    }
+                },
             )
 
-            if (isLoading && filteredTasks.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.tasks_loading),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                key = { page -> TASK_STATUS_FILTER_ORDER[page]?.wireValue ?: "all" },
+            ) { page ->
+                val pageFilter = TASK_STATUS_FILTER_ORDER[page]
+                val pageTasks = if (pageFilter == null) {
+                    taskCandidates
+                } else {
+                    taskCandidates.filter { it.status == pageFilter }
                 }
-            } else if (filteredTasks.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ClawEmptyState(
-                        title = stringResource(R.string.tasks_empty_title),
-                        description = stringResource(R.string.tasks_empty_description),
-                        actionLabel = stringResource(R.string.tasks_create_task),
-                        onActionClick = { showCreateSheet = true },
-                    )
-                }
-            } else {
-                val lazyListState = rememberLazyListState()
-
-                LazyColumn(
-                    state = lazyListState,
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 88.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp),
-                ) {
-                    items(filteredTasks, key = { it.id }) { task ->
-                        SwipeableTaskRow(
-                            task = task,
-                            onToggle = { onToggle(task.id) },
-                            onDelete = { onDelete(task.id) },
-                            onSetDueToday = { onSetDueToday(task.id) },
-                            onClick = { onSelect(task) },
-                        )
-                    }
-                }
+                TaskStatusPage(
+                    tasks = pageTasks,
+                    isLoading = isLoading,
+                    onSelect = onSelect,
+                    onToggle = onToggle,
+                    onDelete = onDelete,
+                    onSetDueToday = onSetDueToday,
+                    onCreate = { showCreateSheet = true },
+                )
             }
         }
     }
@@ -249,6 +263,67 @@ private fun TaskListView(
     }
 }
 
+@Composable
+private fun TaskStatusPage(
+    tasks: List<Todo>,
+    isLoading: Boolean,
+    onSelect: (Todo) -> Unit,
+    onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetDueToday: (String) -> Unit,
+    onCreate: () -> Unit,
+) {
+    if (isLoading && tasks.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.tasks_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else if (tasks.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            ClawEmptyState(
+                title = stringResource(R.string.tasks_empty_title),
+                description = stringResource(R.string.tasks_empty_description),
+                actionLabel = stringResource(R.string.tasks_create_task),
+                onActionClick = onCreate,
+            )
+        }
+    } else {
+        val lazyListState = rememberLazyListState()
+
+        LazyColumn(
+            state = lazyListState,
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 0.dp,
+                bottom = 88.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            items(tasks, key = { it.id }) { task ->
+                SwipeableTaskRow(
+                    task = task,
+                    onToggle = { onToggle(task.id) },
+                    onDelete = { onDelete(task.id) },
+                    onSetDueToday = { onSetDueToday(task.id) },
+                    onClick = { onSelect(task) },
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TaskSummaryCard(
@@ -258,6 +333,13 @@ private fun TaskSummaryCard(
     statusFilter: TaskStatus?,
     onSetFilter: (TaskStatus?) -> Unit,
 ) {
+    val selectedFilterIndex = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
+    val filterListState = rememberLazyListState()
+
+    LaunchedEffect(selectedFilterIndex) {
+        filterListState.animateScrollToItem(selectedFilterIndex)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -304,20 +386,21 @@ private fun TaskSummaryCard(
                 color = MaterialTheme.colorScheme.primary,
             )
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            state = filterListState,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            TaskFilterChip(
-                label = stringResource(R.string.tasks_filter_all),
-                selected = statusFilter == null,
-                onClick = { onSetFilter(null) },
-            )
-            TaskStatus.entries.forEach { status ->
+            itemsIndexed(
+                items = TASK_STATUS_FILTER_ORDER,
+                key = { _, status -> status?.wireValue ?: "all" },
+            ) { _, status ->
                 TaskFilterChip(
-                    label = taskStatusLabel(status),
+                    label = if (status == null) {
+                        stringResource(R.string.tasks_filter_all)
+                    } else {
+                        taskStatusLabel(status)
+                    },
                     selected = statusFilter == status,
                     onClick = { onSetFilter(status) },
                 )

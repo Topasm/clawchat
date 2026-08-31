@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.clawchat.android.feature.tasks"
+    namespace = "com.clawchat.android.feature.planner"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
@@ -29,31 +29,25 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":feature:today"))
+    implementation(project(":feature:calendar"))
 
-    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
-    // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Navigation
-    implementation(libs.androidx.navigation.compose)
-
-    // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
-    testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
 }

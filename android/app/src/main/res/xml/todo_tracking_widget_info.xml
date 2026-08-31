@@ -1,6 +1,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:initialLayout="@layout/glance_default_loading_layout"
+    android:configure="com.clawchat.android.widget.configuration.WidgetConfigurationActivity"
     android:maxResizeWidth="624dp"
     android:maxResizeHeight="422dp"
     android:minWidth="180dp"
@@ -12,5 +13,6 @@
     android:targetCellHeight="2"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable"
     android:description="@string/widget_todo_tracking_description"
     tools:targetApi="31" />

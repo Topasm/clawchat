@@ -30,7 +30,7 @@ private const val TAG = "TasksViewModel"
 data class TasksUiState(
     val tasks: List<Todo> = emptyList(),
     val isLoading: Boolean = false,
-    val statusFilter: TaskStatus? = null, // null = all
+    val statusFilter: TaskStatus? = TaskStatus.IN_PROGRESS, // null = all
     val selectedTask: Todo? = null,
     val relationships: List<TaskRelationship> = emptyList(),
     val relationshipTaskTitles: Map<String, String> = emptyMap(),
@@ -43,11 +43,9 @@ sealed interface TasksAction {
     data class ToggleComplete(val todoId: String) : TasksAction
     data class SetFilter(val status: TaskStatus?) : TasksAction
     data class SelectTask(val task: Todo?) : TasksAction
-    data object Refresh : TasksAction
     data class Create(val input: TodoCreate) : TasksAction
     data class Update(val id: String, val update: TodoUpdate) : TasksAction
     data class Delete(val id: String) : TasksAction
-    data class ReorderTasks(val reorderedTasks: List<Todo>) : TasksAction
 }
 
 @HiltViewModel
@@ -83,16 +81,12 @@ class TasksViewModel @Inject constructor(
             is TasksAction.ToggleComplete -> doToggleComplete(action.todoId)
             is TasksAction.SetFilter -> doSetStatusFilter(action.status)
             is TasksAction.SelectTask -> doSelectTask(action.task)
-            is TasksAction.Refresh -> doLoadTasks()
             is TasksAction.Create -> doCreateTask(action.input)
             is TasksAction.Update -> doUpdateTask(action.id, action.update)
             is TasksAction.Delete -> doDeleteTask(action.id)
-            is TasksAction.ReorderTasks -> doReorderTasks(action.reorderedTasks)
         }
     }
 
-    // Public convenience methods — delegate to onAction for Screen composable compatibility
-    fun loadTasks() = onAction(TasksAction.Refresh)
     fun selectTask(task: Todo?) = onAction(TasksAction.SelectTask(task))
     fun toggleComplete(todoId: String) = onAction(TasksAction.ToggleComplete(todoId))
     fun setStatusFilter(status: TaskStatus?) = onAction(TasksAction.SetFilter(status))
@@ -100,23 +94,14 @@ class TasksViewModel @Inject constructor(
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
     fun setDueToday(id: String) = updateTask(id, TodoUpdate(dueDate = java.time.LocalDate.now().toString()))
-    fun reorderTasks(reordered: List<Todo>) = onAction(TasksAction.ReorderTasks(reordered))
-
-    private fun doReorderTasks(reordered: List<Todo>) {
-        _uiState.update { it.copy(tasks = reordered) }
-        viewModelScope.launch {
-            reordered.forEachIndexed { index, todo ->
-                todoRepository.updateTodo(todo.id, TodoUpdate(sortOrder = index))
-            }
-        }
-    }
 
     private fun doLoadTasks() {
         val generation = ++taskRequestGeneration
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val params = mutableMapOf<String, String>("limit" to "200")
-            _uiState.value.statusFilter?.let { params["status"] = it.wireValue }
+            // Keep one complete snapshot so status pages can switch instantly without a
+            // network round trip for every tab click or horizontal swipe.
+            val params = mapOf("limit" to "200")
             when (val result = todoRepository.listTodos(params)) {
                 is ApiResult.Success -> {
                     if (generation != taskRequestGeneration) return@launch
@@ -141,8 +126,8 @@ class TasksViewModel @Inject constructor(
     }
 
     private fun doSetStatusFilter(status: TaskStatus?) {
+        if (_uiState.value.statusFilter == status) return
         _uiState.update { it.copy(statusFilter = status) }
-        doLoadTasks()
     }
 
     private fun doSelectTask(task: Todo?) {

@@ -13,6 +13,7 @@ import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.currentState
 import androidx.glance.action.actionStartActivity as actionStartActivityByComponent
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -38,6 +39,7 @@ import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.R
+import com.clawchat.android.widget.common.WidgetAppearance
 import com.clawchat.android.widget.common.widgetBackground
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
@@ -69,8 +71,13 @@ class InboxQuickAddWidget : GlanceAppWidget() {
         } else null
 
         provideContent {
+            val appearance = WidgetAppearance.from(currentState())
             GlanceTheme {
-                InboxQuickAddContent(isConfigured = isConfigured, inboxCount = inboxCount)
+                InboxQuickAddContent(
+                    isConfigured = isConfigured,
+                    inboxCount = inboxCount,
+                    backgroundOpacity = appearance.backgroundOpacity,
+                )
             }
         }
     }
@@ -88,6 +95,7 @@ internal fun cachedInboxCount(todos: List<Todo>): Int =
 private fun InboxQuickAddContent(
     isConfigured: Boolean,
     inboxCount: Int?,
+    backgroundOpacity: Float,
 ) {
     val context = LocalContext.current
     val quickAddIntent = QuickAddActivity.createIntent(context)
@@ -96,7 +104,7 @@ private fun InboxQuickAddContent(
     Row(
         modifier = GlanceModifier
             .fillMaxSize()
-            .widgetBackground()
+            .widgetBackground(backgroundOpacity)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -70,6 +70,20 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun `task status pages start with in progress and put all last`() {
+        assertEquals(
+            listOf(
+                TaskStatus.IN_PROGRESS,
+                TaskStatus.PENDING,
+                TaskStatus.COMPLETED,
+                TaskStatus.CANCELLED,
+                null,
+            ),
+            TASK_STATUS_FILTER_ORDER,
+        )
+    }
+
+    @Test
     fun `initial load success populates tasks`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
@@ -80,6 +94,7 @@ class TasksViewModelTest {
             // Initial empty state
             val initial = awaitItem()
             assertEquals(emptyList<Todo>(), initial.tasks)
+            assertEquals(TaskStatus.IN_PROGRESS, initial.statusFilter)
 
             // Loading state
             val loading = awaitItem()
@@ -157,21 +172,21 @@ class TasksViewModelTest {
     }
 
     @Test
-    fun `setFilter updates filter and reloads`() = runTest {
+    fun `setFilter updates filter without reloading the complete snapshot`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coEvery { todoRepository.listTodos(match { it["status"] == "completed" }) } returns
-            ApiResult.Success(PaginatedResponse(items = listOf(sampleTodos[1]), total = 1))
-
         viewModel.onAction(TasksAction.SetFilter(TaskStatus.COMPLETED))
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.statusFilter)
-        assertEquals(1, viewModel.uiState.value.tasks.size)
+        assertEquals(sampleTodos, viewModel.uiState.value.tasks)
+        coVerify(exactly = 1) {
+            todoRepository.listTodos(match { "status" !in it })
+        }
     }
 
     @Test

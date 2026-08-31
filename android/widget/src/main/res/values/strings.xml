@@ -18,4 +18,15 @@
     <string name="quick_add_add">Add</string>
     <string name="quick_add_inbox_success">Added to Inbox</string>
     <string name="quick_add_failed">Couldn’t add task. Try again.</string>
+    <string name="widget_config_title">Widget appearance</string>
+    <string name="widget_config_description">Choose how much of your wallpaper shows through the widget background. On supported launchers, you can change this later from the widget menu.</string>
+    <string name="widget_config_preview">Preview</string>
+    <string name="widget_config_transparency">Background transparency</string>
+    <string name="widget_config_percent">%1$d%%</string>
+    <string name="widget_config_transparency_hint" formatted="false">0% is solid. At 100%, only the widget content remains visible.</string>
+    <string name="widget_config_cancel">Cancel</string>
+    <string name="widget_config_apply">Apply</string>
+    <string name="widget_config_save_failed">Couldn’t save the widget setting. Try again.</string>
+    <string name="widget_config_today_preview">Review today’s tasks and add new items to Inbox.</string>
+    <string name="widget_config_inbox_preview">Capture a new item directly into Inbox.</string>
 </resources>

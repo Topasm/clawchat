@@ -13,6 +13,7 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.currentState
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity as actionStartActivityByComponent
@@ -39,6 +40,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.clawchat.android.widget.R
+import com.clawchat.android.widget.common.WidgetAppearance
 import com.clawchat.android.widget.common.WidgetSize
 import com.clawchat.android.widget.common.WidgetState
 import com.clawchat.android.widget.common.widgetBackground
@@ -65,11 +67,13 @@ class TodoTrackingWidget : GlanceAppWidget() {
         val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
 
         provideContent {
+            val appearance = WidgetAppearance.from(currentState())
             GlanceTheme {
                 TodoTrackingContent(
                     state = snapshot.state,
                     mainActivity = mainActivity,
                     workspaceKey = snapshot.workspaceKey,
+                    backgroundOpacity = appearance.backgroundOpacity,
                 )
             }
         }
@@ -86,6 +90,7 @@ private fun TodoTrackingContent(
     state: WidgetState<TodoWidgetUiModel>,
     mainActivity: ComponentName,
     workspaceKey: String?,
+    backgroundOpacity: Float,
 ) {
     val context = LocalContext.current
     val size = LocalSize.current
@@ -97,7 +102,7 @@ private fun TodoTrackingContent(
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .widgetBackground(),
+            .widgetBackground(backgroundOpacity),
     ) {
         Row(
             modifier = GlanceModifier

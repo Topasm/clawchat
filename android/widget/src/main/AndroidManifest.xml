@@ -3,6 +3,16 @@
 
     <application>
         <activity
+            android:name="com.clawchat.android.widget.configuration.WidgetConfigurationActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ClawChat.WidgetConfiguration"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name="com.clawchat.android.widget.quickadd.QuickAddActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
