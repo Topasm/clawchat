@@ -129,7 +129,6 @@ internal class ShareOutboxNotifier @Inject constructor(
         internal const val EXTRA_CAPTURE_ID = "share_capture_id"
 
         fun createChannel(context: Context) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(
                 NotificationChannel(

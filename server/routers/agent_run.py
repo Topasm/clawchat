@@ -11,8 +11,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from models.agent_run import AgentRun
 from models.agent_task import AgentTask
 from schemas.agent_run import (
-    AgentRunEventResponse,
     AgentRunDetailResponse,
+    AgentRunEventResponse,
     AgentRunHeartbeatRequest,
     AgentRunRecoveryResponse,
     AgentRunResponse,

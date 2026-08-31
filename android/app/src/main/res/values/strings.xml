@@ -5,16 +5,6 @@
     <string name="widget_todo_tracking_description">Add and complete today\'s tasks from your Home screen</string>
     <string name="widget_inbox_quick_add_label">Add task</string>
     <string name="widget_inbox_quick_add_description">Capture a task directly into your Inbox</string>
-    <string name="share_waiting_for_connection">Your shared item will be saved after you connect ClawChat</string>
-    <string name="share_saved">Saved to Inbox</string>
-    <plurals name="share_saved_with_attachments">
-        <item quantity="one">Saved to Inbox with %1$d attachment</item>
-        <item quantity="other">Saved to Inbox with %1$d attachments</item>
-    </plurals>
-    <plurals name="share_partially_saved">
-        <item quantity="one">Saved to Inbox: %1$d attached, %2$d item skipped</item>
-        <item quantity="other">Saved to Inbox: %1$d attached, %2$d items skipped</item>
-    </plurals>
     <string name="share_rejected">Nothing shareable was found. ClawChat accepts images, PDF, text, Markdown, and ZIP files up to 10 MB.</string>
     <string name="share_failed">Couldn’t save the shared item. Check your connection and try again.</string>
     <string name="share_queued">Saved securely. ClawChat will add it to Inbox when connected.</string>

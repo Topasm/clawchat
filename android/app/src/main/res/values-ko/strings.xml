@@ -4,14 +4,6 @@
     <string name="widget_todo_tracking_description">홈 화면에서 오늘 할 일을 추가하고 완료합니다</string>
     <string name="widget_inbox_quick_add_label">할 일 추가</string>
     <string name="widget_inbox_quick_add_description">받은 편지함에 할 일을 바로 추가합니다</string>
-    <string name="share_waiting_for_connection">ClawChat 연결 후 공유 항목을 저장합니다</string>
-    <string name="share_saved">받은 편지함에 저장했습니다</string>
-    <plurals name="share_saved_with_attachments">
-        <item quantity="other">첨부 파일 %1$d개와 함께 받은 편지함에 저장했습니다</item>
-    </plurals>
-    <plurals name="share_partially_saved">
-        <item quantity="other">받은 편지함에 저장했습니다: %1$d개 첨부, %2$d개 건너뜀</item>
-    </plurals>
     <string name="share_rejected">공유할 수 있는 내용이 없습니다. 10MB 이하의 이미지, PDF, 텍스트, Markdown, ZIP 파일을 지원합니다.</string>
     <string name="share_failed">공유 항목을 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.</string>
     <string name="share_queued">안전하게 보관했습니다. 연결되면 ClawChat 받은 편지함에 추가합니다.</string>
