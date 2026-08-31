@@ -9,11 +9,6 @@
       "count": 1
     }
   },
-  "src/app/components/chat-panel/ChatPanelMessages.tsx": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
   "src/app/components/chat-panel/TaskProgressCard.tsx": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1

@@ -96,6 +96,7 @@ export const TodoCreateSchema = z.object({
   estimated_minutes: z.number().int().nullable().optional(),
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
+  idempotency_key: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   recurrence_rule: z.string().nullable().optional(),
   recurrence_end: z.string().nullable().optional(),
