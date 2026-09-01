@@ -8,10 +8,10 @@ import { markStartupPhaseAfterPaint } from './app/services/startupPerformance';
 import { hideStartupShell } from './app/services/startupSurface';
 import { IS_DESKTOP } from './app/types/platform';
 import { isWorkspaceSessionReady } from './app/services/nativeRoutePolicy';
-import { useCapabilitiesQuery } from './app/hooks/queries';
 
 // ── Lazy-loaded pages ────────────────────────────────────────────────
 const Layout = lazy(() => import('./app/components/Layout'));
+const WorkspaceStartRedirect = lazy(() => import('./app/pages/WorkspaceStartRedirect'));
 const LoginPage = lazy(() => import('./app/pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./app/pages/OnboardingPage'));
 const SchedulePage = lazy(() => import('./app/pages/SchedulePage'));
@@ -66,16 +66,6 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
       <RouteReadyMarker />
     </Suspense>
   );
-}
-
-/** Pick the first useful workspace surface while retaining old-server support. */
-function WorkspaceStartRedirect() {
-  const serverUrl = useAuthStore((state) => state.serverUrl);
-  const { data: capabilities, isLoading, isError } = useCapabilitiesQuery();
-
-  if (isLoading) return <PageFallback />;
-  const inboxUnavailable = !serverUrl || isError || capabilities?.features.inbox_pipeline === false;
-  return <Navigate to={inboxUnavailable ? '/tasks' : '/inbox'} replace />;
 }
 
 export default function AppRouter() {
@@ -225,7 +215,14 @@ export default function AppRouter() {
           </ErrorBoundary>
         }
       >
-        <Route path="/" element={<WorkspaceStartRedirect />} />
+        <Route
+          path="/"
+          element={
+            <LazyRoute>
+              <WorkspaceStartRedirect />
+            </LazyRoute>
+          }
+        />
         <Route path="/today" element={<Navigate to="/schedule/today" replace />} />
         <Route path="/schedule" element={<Navigate to="/schedule/today" replace />} />
         <Route
