@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tasks_cd_search">빠른 찾기</string>
+    <string name="tasks_cd_settings">설정</string>
     <string name="tasks_title">작업</string>
     <string name="tasks_cd_new_task">새 작업</string>
     <string name="tasks_loading">작업 불러오는 중…</string>

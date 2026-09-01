@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +76,7 @@ private const val ACTIVE_POLL_INTERVAL_MS = 3_000L
 @Composable
 fun ProgressScreen(
     onOpenSearch: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onOpenReview: (String) -> Unit = {},
     onOpenRun: (String) -> Unit = {},
     onOpenTask: (String) -> Unit = {},
@@ -101,19 +104,18 @@ fun ProgressScreen(
         }
     }
 
-    LaunchedEffect(state.lastCapturedTodo?.id) {
-        val captured = state.lastCapturedTodo ?: return@LaunchedEffect
-        captureText = ""
-        val result = snackbarHostState.showSnackbar(
-            message = capturedMessage,
-            actionLabel = undoLabel,
-            withDismissAction = true,
-            duration = SnackbarDuration.Long,
-        )
-        if (result == SnackbarResult.ActionPerformed) {
-            viewModel.undoCapture(captured.id)
-        } else {
-            viewModel.acknowledgeCapture(captured.id)
+    LaunchedEffect(viewModel) {
+        viewModel.captureEvents.collect { captured ->
+            captureText = ""
+            val result = snackbarHostState.showSnackbar(
+                message = capturedMessage,
+                actionLabel = undoLabel,
+                withDismissAction = true,
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoCapture(captured)
+            }
         }
     }
 
@@ -134,6 +136,12 @@ fun ProgressScreen(
                         Icon(
                             Icons.Default.Search,
                             contentDescription = stringResource(R.string.progress_search),
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.progress_settings),
                         )
                     }
                 },
@@ -493,21 +501,23 @@ private fun NowActionSheet(
                 )
             }
             if (isTodoQuestion) {
-                item.questions.forEachIndexed { index, question ->
+                item.questions.forEachIndexed { answerIndex, question ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             text = stringResource(
                                 R.string.progress_question_number,
-                                index + 1,
-                                question,
+                                answerIndex + 1,
+                                question.text,
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                         )
                         OutlinedTextField(
-                            value = todoAnswers[index],
+                            value = todoAnswers[answerIndex],
                             onValueChange = { value ->
-                                todoAnswers = todoAnswers.toMutableList().also { it[index] = value }
+                                todoAnswers = todoAnswers.toMutableList().also {
+                                    it[answerIndex] = value
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isPending,
@@ -547,10 +557,7 @@ private fun NowActionSheet(
                 onClick = {
                     when (item.action) {
                         NowAction.ANSWER -> if (isTodoQuestion) {
-                            onAnswerTodo(
-                                todoAnswers.mapIndexed { index, answer -> index.toString() to answer }
-                                    .toMap(),
-                            )
+                            onAnswerTodo(answersByOriginalIndex(item.questions, todoAnswers))
                         } else {
                             onAnswerRun(runAnswer)
                         }
@@ -604,7 +611,11 @@ private fun ProgressConnectionCard(state: ProgressUiState) {
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = stringResource(R.string.progress_summary, state.attentionCount),
+                    text = pluralStringResource(
+                        R.plurals.progress_summary,
+                        state.attentionCount,
+                        state.attentionCount,
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )

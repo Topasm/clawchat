@@ -9,6 +9,9 @@ import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import com.clawchat.android.MainActivity
 import com.clawchat.android.R
+import com.clawchat.android.core.data.AppRuntimeState
+import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.ReviewRepository
 import com.clawchat.android.core.data.repository.TodoRepository
@@ -25,6 +28,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.supervisorScope
 
 data class AttentionBadgeState(
@@ -38,6 +42,7 @@ class AttentionNotificationCoordinator @Inject constructor(
     private val todoRepository: TodoRepository,
     private val reviewRepository: ReviewRepository,
     private val agentRunRepository: AgentRunRepository,
+    private val sessionStore: SessionStore,
 ) {
     private val _badgeState = MutableStateFlow(AttentionBadgeState())
     val badgeState: StateFlow<AttentionBadgeState> = _badgeState.asStateFlow()
@@ -58,6 +63,10 @@ class AttentionNotificationCoordinator @Inject constructor(
         ) {
             return@supervisorScope false
         }
+        val runtimeState = sessionStore.runtimeState.first()
+        if (!isActiveServerWorkspace(runtimeState, workspaceKey)) {
+            return@supervisorScope false
+        }
 
         val items = buildNowContent(
             todos = todoResult.data.items,
@@ -76,6 +85,13 @@ class AttentionNotificationCoordinator @Inject constructor(
         AttentionNotificationHelper.cancelOtherWorkspaceNotifications(context, workspaceKey)
     }
 }
+
+internal fun isActiveServerWorkspace(
+    runtimeState: AppRuntimeState,
+    workspaceKey: String,
+): Boolean = runtimeState.mode == WorkspaceMode.SERVER &&
+    runtimeState.activeSession != null &&
+    runtimeState.workspaceKey == workspaceKey
 
 internal fun shouldNotifyForAttention(item: NowItem): Boolean = item.action in setOf(
     NowAction.ANSWER,

@@ -21,7 +21,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -68,6 +70,7 @@ class TasksViewModel @Inject constructor(
     private var taskRequestGeneration = 0L
     private var relationshipRequestGeneration = 0L
     private var deletionToken = 0L
+    private var deletionCommitJob: Job? = null
     private val relationshipTitleCache = mutableMapOf<String, String>()
 
     init {
@@ -322,7 +325,11 @@ class TasksViewModel @Inject constructor(
         val originalIndex = state.tasks.indexOfFirst { it.id == id }
         if (originalIndex < 0 || state.pendingDeletion?.task?.id == id) return
 
-        state.pendingDeletion?.let(::persistDeletion)
+        state.pendingDeletion?.let { previous ->
+            deletionCommitJob?.cancel()
+            deletionCommitJob = null
+            persistDeletion(previous)
+        }
         val pendingDeletion = PendingTaskDeletion(
             token = ++deletionToken,
             task = state.tasks[originalIndex],
@@ -335,9 +342,17 @@ class TasksViewModel @Inject constructor(
                 pendingDeletion = pendingDeletion,
             )
         }
+        deletionCommitJob = viewModelScope.launch {
+            delay(DELETE_UNDO_WINDOW_MS)
+            deletionCommitJob = null
+            commitDelete(pendingDeletion.token)
+        }
     }
 
     fun undoDelete(token: Long) {
+        if (_uiState.value.pendingDeletion?.token != token) return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
         _uiState.update { state ->
             val pending = state.pendingDeletion?.takeIf { it.token == token } ?: return@update state
             state.copy(
@@ -349,6 +364,8 @@ class TasksViewModel @Inject constructor(
 
     fun commitDelete(token: Long) {
         val pending = _uiState.value.pendingDeletion?.takeIf { it.token == token } ?: return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
         _uiState.update { state ->
             if (state.pendingDeletion?.token == token) state.copy(pendingDeletion = null) else state
         }
@@ -378,6 +395,7 @@ class TasksViewModel @Inject constructor(
     }
 
     private companion object {
+        const val DELETE_UNDO_WINDOW_MS = 10_000L
         const val MAX_RELATED_TITLE_LOOKUPS = 50
         const val MAX_CONCURRENT_TITLE_LOOKUPS = 8
     }

@@ -9,9 +9,13 @@
     <string name="progress_capture_priority_high">High priority</string>
     <string name="progress_capture_priority_low">Low priority</string>
     <string name="progress_search">Quick Find</string>
+    <string name="progress_settings">Settings</string>
     <string name="progress_title">Now</string>
     <string name="progress_refresh">Refresh Now</string>
-    <string name="progress_summary">%1$d need you</string>
+    <plurals name="progress_summary">
+        <item quantity="one">%1$d needs you</item>
+        <item quantity="other">%1$d need you</item>
+    </plurals>
     <string name="progress_realtime_connected">Realtime updates connected</string>
     <string name="progress_realtime_reconnecting">Realtime updates reconnecting; cached data remains available</string>
     <string name="progress_sync_pending">%1$d waiting</string>

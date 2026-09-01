@@ -55,8 +55,36 @@ class NowModelsTest {
         ).attentionItems.associateBy(NowItem::sourceId)
 
         assertTrue(items.getValue("with").canHandleOnDevice)
-        assertEquals(withQuestions.clarificationQuestions, items.getValue("with").questions)
+        assertEquals(
+            listOf(
+                NowQuestion(0, "When is it due?"),
+                NowQuestion(1, "Who should receive it?"),
+            ),
+            items.getValue("with").questions,
+        )
         assertFalse(items.getValue("without").canHandleOnDevice)
+    }
+
+    @Test
+    fun `blank questions are hidden without changing server answer indexes`() {
+        val item = buildNowContent(
+            todos = listOf(
+                todo("question", "questioning", nextAction = "answer").copy(
+                    clarificationQuestions = listOf("First?", "", "Third?"),
+                ),
+            ),
+            reviews = emptyList(),
+            runs = emptyList(),
+        ).attentionItems.single()
+
+        assertEquals(
+            listOf(NowQuestion(0, "First?"), NowQuestion(2, "Third?")),
+            item.questions,
+        )
+        assertEquals(
+            mapOf("0" to "First answer", "2" to "Third answer"),
+            answersByOriginalIndex(item.questions, listOf("First answer", "Third answer")),
+        )
     }
 
     @Test

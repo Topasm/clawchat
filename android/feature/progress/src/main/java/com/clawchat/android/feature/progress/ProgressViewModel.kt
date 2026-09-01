@@ -24,8 +24,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.combine
@@ -54,10 +56,13 @@ data class ProgressUiState(
     val actionError: String? = null,
     val isCapturing: Boolean = false,
     val captureError: String? = null,
-    val lastCapturedTodo: Todo? = null,
 ) {
+    private val computedNowContent by lazy(LazyThreadSafetyMode.NONE) {
+        buildNowContent(tasks, reviews, runs)
+    }
+
     val nowContent: NowContent
-        get() = buildNowContent(tasks, reviews, runs)
+        get() = computedNowContent
 
     val attentionItems: List<NowItem>
         get() = nowContent.attentionItems.take(ATTENTION_LIMIT)
@@ -129,6 +134,8 @@ class ProgressViewModel @Inject constructor(
         ProgressUiState(isConnected = syncManager.isConnected.value),
     )
     val uiState: StateFlow<ProgressUiState> = _uiState.asStateFlow()
+    private val _captureEvents = MutableSharedFlow<Todo>(extraBufferCapacity = 1)
+    val captureEvents = _captureEvents.asSharedFlow()
 
     private var loadJob: Job? = null
     private var reloadQueued = false
@@ -212,9 +219,8 @@ class ProgressViewModel @Inject constructor(
                         tasks = listOf(result.data) + state.tasks.filterNot { it.id == result.data.id },
                         isCapturing = false,
                         captureError = null,
-                        lastCapturedTodo = result.data,
                     )
-                }
+                }.also { _captureEvents.tryEmit(result.data) }
                 is ApiResult.Error -> _uiState.update {
                     it.copy(isCapturing = false, captureError = result.message)
                 }
@@ -225,15 +231,8 @@ class ProgressViewModel @Inject constructor(
         }
     }
 
-    fun acknowledgeCapture(todoId: String) {
-        _uiState.update { state ->
-            if (state.lastCapturedTodo?.id == todoId) state.copy(lastCapturedTodo = null) else state
-        }
-    }
-
-    fun undoCapture(todoId: String) {
-        val captured = _uiState.value.lastCapturedTodo?.takeIf { it.id == todoId } ?: return
-        _uiState.update { it.copy(lastCapturedTodo = null) }
+    fun undoCapture(captured: Todo) {
+        val todoId = captured.id
         viewModelScope.launch {
             when (val result = todoRepository.deleteTodo(todoId)) {
                 is ApiResult.Success -> _uiState.update { state ->

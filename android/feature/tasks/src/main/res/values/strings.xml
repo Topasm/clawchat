@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tasks_cd_search">Quick Find</string>
+    <string name="tasks_cd_settings">Settings</string>
     <string name="tasks_title">Tasks</string>
     <string name="tasks_cd_new_task">New task</string>
     <string name="tasks_loading">Loading tasks…</string>

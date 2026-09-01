@@ -49,6 +49,7 @@ fun PlannerScreen(
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     onPageChanged: (PlannerPage) -> Unit = {},
 ) {
     val initialIndex = PLANNER_PAGE_ORDER.indexOf(initialPage).coerceAtLeast(0)
@@ -81,6 +82,7 @@ fun PlannerScreen(
                     onNavigateToReview = onNavigateToReview,
                     onNavigateToRuns = onNavigateToRuns,
                     onNavigateToSearch = onNavigateToSearch,
+                    onNavigateToSettings = onNavigateToSettings,
                 )
                 PlannerPage.WEEK -> WeekScreen()
                 PlannerPage.MONTH -> CalendarScreen()

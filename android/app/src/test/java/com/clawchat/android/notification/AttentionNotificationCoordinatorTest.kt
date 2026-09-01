@@ -1,5 +1,8 @@
 package com.clawchat.android.notification
 
+import com.clawchat.android.core.data.AppRuntimeState
+import com.clawchat.android.core.data.ActiveSession
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.feature.progress.NowAction
 import com.clawchat.android.feature.progress.NowItem
 import com.clawchat.android.feature.progress.NowSource
@@ -8,6 +11,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AttentionNotificationCoordinatorTest {
+    @Test
+    fun `attention result only belongs to the active server workspace`() {
+        val server = AppRuntimeState(
+            mode = WorkspaceMode.SERVER,
+            activeSession = ActiveSession(
+                token = "token",
+                apiBaseUrl = "https://example.test",
+                hostId = null,
+                authMode = "manual",
+            ),
+            hasSavedServerSession = true,
+            workspaceKey = "workspace-b",
+        )
+
+        assertTrue(isActiveServerWorkspace(server, "workspace-b"))
+        assertFalse(isActiveServerWorkspace(server, "workspace-a"))
+        assertFalse(
+            isActiveServerWorkspace(
+                server.copy(mode = WorkspaceMode.LOCAL, activeSession = null),
+                "workspace-b",
+            ),
+        )
+    }
+
     @Test
     fun `only blocking verbs produce attention notifications`() {
         assertTrue(shouldNotifyForAttention(item(NowAction.ANSWER)))

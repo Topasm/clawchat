@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import com.clawchat.android.core.ui.icons.ClawIcons
@@ -156,6 +157,9 @@ fun ClawChatNavGraph(
     val navigateToSearch: () -> Unit = {
         navController.navigate(NavRoute.Search.route)
     }
+    val navigateToSettings: () -> Unit = {
+        navController.navigate(NavRoute.Settings.route) { launchSingleTop = true }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -193,7 +197,8 @@ fun ClawChatNavGraph(
             startDestination = startDestination,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(rootPadding),
+                .padding(rootPadding)
+                .consumeWindowInsets(rootPadding),
         ) {
             composable(NavRoute.Onboarding.route) {
                 OnboardingScreen(
@@ -217,6 +222,7 @@ fun ClawChatNavGraph(
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
+                    onNavigateToSettings = navigateToSettings,
                     onPageChanged = { plannerPage = it },
                 )
             }
@@ -278,6 +284,7 @@ fun ClawChatNavGraph(
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
+                    onNavigateToSettings = navigateToSettings,
                     onPageChanged = { plannerPage = it },
                 )
             }
@@ -296,6 +303,7 @@ fun ClawChatNavGraph(
                 ) {
                     ChatScreen(
                         onOpenSearch = navigateToSearch,
+                        onOpenSettings = navigateToSettings,
                     )
                 }
             }
@@ -306,6 +314,7 @@ fun ClawChatNavGraph(
                 ) {
                     ProgressScreen(
                         onOpenSearch = navigateToSearch,
+                        onOpenSettings = navigateToSettings,
                         onOpenReview = { reviewId -> navigateToReview(reviewId) },
                         onOpenRun = { runId ->
                             navController.navigate(NavRoute.Runs.destination(runId)) {
@@ -332,6 +341,7 @@ fun ClawChatNavGraph(
             ) { entry ->
                 TasksScreen(
                     onOpenSearch = navigateToSearch,
+                    onOpenSettings = navigateToSettings,
                     initialTodoId = entry.arguments?.getString(NavRoute.Tasks.ARG_TODO_ID),
                 )
             }

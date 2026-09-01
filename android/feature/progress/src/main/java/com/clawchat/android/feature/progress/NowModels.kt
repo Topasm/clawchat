@@ -36,10 +36,22 @@ data class NowItem(
     val summary: String? = null,
     val updatedAt: String,
     val riskLevel: ReviewRiskLevel? = null,
-    val questions: List<String> = emptyList(),
+    val questions: List<NowQuestion> = emptyList(),
     val canHandleOnDevice: Boolean,
     val hostHref: String? = null,
 )
+
+data class NowQuestion(
+    val originalIndex: Int,
+    val text: String,
+)
+
+internal fun answersByOriginalIndex(
+    questions: List<NowQuestion>,
+    answers: List<String>,
+): Map<String, String> = questions.mapIndexed { answerIndex, question ->
+    question.originalIndex.toString() to answers[answerIndex]
+}.toMap()
 
 data class NowContent(
     val attentionItems: List<NowItem>,
@@ -83,7 +95,11 @@ fun buildNowContent(
             summary = todo.planSummary ?: todo.automationError ?: todo.description,
             updatedAt = todo.updatedAt,
             questions = if (action == NowAction.ANSWER) {
-                todo.clarificationQuestions.orEmpty().filter(String::isNotBlank)
+                todo.clarificationQuestions.orEmpty().mapIndexedNotNull { index, question ->
+                    question.takeIf(String::isNotBlank)?.let {
+                        NowQuestion(originalIndex = index, text = it)
+                    }
+                }
             } else {
                 emptyList()
             },

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="chat_search">빠른 찾기</string>
+    <string name="chat_settings">설정</string>
     <string name="chat_title">채팅</string>
     <string name="chat_new_chat">새 채팅</string>
     <string name="chat_new_conversation_default_title">새 대화</string>

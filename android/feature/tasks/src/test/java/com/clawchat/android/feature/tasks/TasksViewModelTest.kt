@@ -287,7 +287,7 @@ class TasksViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.onAction(TasksAction.Delete("1"))
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         assertEquals(1, viewModel.uiState.value.tasks.size)
         assertEquals("2", viewModel.uiState.value.tasks.first().id)
@@ -296,6 +296,26 @@ class TasksViewModelTest {
 
         viewModel.commitDelete(viewModel.uiState.value.pendingDeletion!!.token)
         testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.pendingDeletion)
+        coVerify(exactly = 1) { todoRepository.deleteTodo("1") }
+    }
+
+    @Test
+    fun `deleteTask commits after undo window without screen involvement`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Success(Unit)
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        testDispatcher.scheduler.runCurrent()
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
+
+        testDispatcher.scheduler.advanceTimeBy(10_000L)
+        testDispatcher.scheduler.runCurrent()
 
         assertNull(viewModel.uiState.value.pendingDeletion)
         coVerify(exactly = 1) { todoRepository.deleteTodo("1") }
@@ -340,13 +360,14 @@ class TasksViewModelTest {
     fun `pending deletion stays hidden during realtime refresh`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Success(Unit)
 
         viewModel = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.deleteTask("1")
         todoChanged.emit(Unit)
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         assertEquals(listOf("2"), viewModel.uiState.value.tasks.map(Todo::id))
         assertEquals("1", viewModel.uiState.value.pendingDeletion?.task?.id)

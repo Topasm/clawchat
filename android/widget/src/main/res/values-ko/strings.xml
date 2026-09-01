@@ -14,6 +14,7 @@
     <string name="widget_add_to_inbox">받은 편지함에 추가…</string>
     <string name="quick_add_inbox_title">받은 편지함에 추가</string>
     <string name="quick_add_hint">무엇을 해야 하나요?</string>
+    <string name="quick_add_title_required">태그나 우선순위 외에 작업 제목도 입력하세요.</string>
     <string name="quick_add_cancel">취소</string>
     <string name="quick_add_add">추가</string>
     <string name="quick_add_inbox_success">받은 편지함에 추가했습니다</string>

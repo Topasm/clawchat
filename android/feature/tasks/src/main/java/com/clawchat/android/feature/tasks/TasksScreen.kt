@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -104,6 +105,7 @@ internal val TASK_STATUS_FILTER_ORDER: List<TaskStatus?> = listOf(
 @Composable
 fun TasksScreen(
     onOpenSearch: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     initialTodoId: String? = null,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
@@ -135,8 +137,6 @@ fun TasksScreen(
         )
         if (result == SnackbarResult.ActionPerformed) {
             viewModel.undoDelete(pending.token)
-        } else {
-            viewModel.commitDelete(pending.token)
         }
     }
 
@@ -164,6 +164,7 @@ fun TasksScreen(
             statusFilter = state.statusFilter,
             snackbarHostState = snackbarHostState,
             onOpenSearch = onOpenSearch,
+            onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectTask,
             onToggle = viewModel::toggleComplete,
             onDelete = viewModel::deleteTask,
@@ -182,6 +183,7 @@ private fun TaskListView(
     statusFilter: TaskStatus?,
     snackbarHostState: SnackbarHostState,
     onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSelect: (Todo) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -236,6 +238,12 @@ private fun TaskListView(
                         Icon(
                             Icons.Default.Search,
                             contentDescription = stringResource(R.string.tasks_cd_search),
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.tasks_cd_settings),
                         )
                     }
                 },

@@ -1,5 +1,6 @@
 package com.clawchat.android.feature.progress
 
+import app.cash.turbine.test
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.WorkspaceMode
@@ -208,6 +209,30 @@ class ProgressViewModelTest {
         assertEquals("todo:${capture.id}", viewModel.uiState.value.attentionItems.single().stableId)
         assertEquals("Offline queue unavailable", viewModel.uiState.value.actionError)
         assertNull(viewModel.uiState.value.pendingActionId)
+    }
+
+    @Test
+    fun `capture success is delivered once and can be undone`() = runTest {
+        val captured = todo(inboxState = "captured", nextAction = "organize")
+        stubInitial()
+        coEvery { todos.createTodo(any()) } returns ApiResult.Success(captured)
+        coEvery { todos.deleteTodo(captured.id) } returns ApiResult.Success(Unit)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.captureEvents.test {
+            viewModel.captureToInbox("Task #work")
+            advanceUntilIdle()
+
+            assertEquals(captured, awaitItem())
+            expectNoEvents()
+        }
+
+        viewModel.undoCapture(captured)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.tasks.none { it.id == captured.id })
+        coVerify(exactly = 1) { todos.deleteTodo(captured.id) }
     }
 
     private fun stubInitial(

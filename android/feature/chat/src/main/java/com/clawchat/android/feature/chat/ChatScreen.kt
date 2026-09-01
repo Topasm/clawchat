@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -131,6 +132,7 @@ internal fun parseDisplayDateTime(
 @Composable
 fun ChatScreen(
     onOpenSearch: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -155,6 +157,7 @@ fun ChatScreen(
             conversations = state.conversations,
             isLoading = state.isLoadingConversations,
             onOpenSearch = onOpenSearch,
+            onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectConversation,
             onCreate = { viewModel.createConversation(newConversationTitle) },
         )
@@ -167,6 +170,7 @@ private fun ConversationListView(
     conversations: List<Conversation>,
     isLoading: Boolean,
     onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSelect: (String) -> Unit,
     onCreate: () -> Unit,
 ) {
@@ -185,6 +189,12 @@ private fun ConversationListView(
                         Icon(
                             Icons.Default.Search,
                             contentDescription = stringResource(R.string.chat_search),
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.chat_settings),
                         )
                     }
                 },

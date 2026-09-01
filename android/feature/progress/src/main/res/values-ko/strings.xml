@@ -9,9 +9,12 @@
     <string name="progress_capture_priority_high">높은 우선순위</string>
     <string name="progress_capture_priority_low">낮은 우선순위</string>
     <string name="progress_search">빠른 찾기</string>
+    <string name="progress_settings">설정</string>
     <string name="progress_title">Now</string>
     <string name="progress_refresh">Now 새로고침</string>
-    <string name="progress_summary">확인 필요 %1$d개</string>
+    <plurals name="progress_summary">
+        <item quantity="other">확인 필요 %1$d개</item>
+    </plurals>
     <string name="progress_realtime_connected">실시간 업데이트 연결됨</string>
     <string name="progress_realtime_reconnecting">실시간 업데이트 재연결 중 · 저장된 내용은 계속 볼 수 있습니다</string>
     <string name="progress_sync_pending">동기화 대기 %1$d개</string>

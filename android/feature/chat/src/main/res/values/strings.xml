@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="chat_search">Quick Find</string>
+    <string name="chat_settings">Settings</string>
     <string name="chat_title">Chat</string>
     <string name="chat_new_chat">New chat</string>
     <string name="chat_new_conversation_default_title">New conversation</string>
