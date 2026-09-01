@@ -1,6 +1,6 @@
 [project]
 name = "clawchat-server"
-version = "1.4.8"
+version = "1.4.9"
 description = "ClawChat FastAPI backend"
 requires-python = ">=3.11"
 dependencies = [
