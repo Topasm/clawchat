@@ -2,6 +2,7 @@ package com.clawchat.android
 
 import android.app.Application
 import com.clawchat.android.core.notification.ReminderNotificationHelper
+import com.clawchat.android.notification.AttentionNotificationHelper
 import com.clawchat.android.share.ShareOutboxNotifier
 import com.clawchat.android.widget.work.WidgetWorkScheduler
 import dagger.hilt.android.HiltAndroidApp
@@ -14,6 +15,7 @@ class ClawChatApp : Application() {
     override fun onCreate() {
         super.onCreate()
         ReminderNotificationHelper.createChannel(this)
+        AttentionNotificationHelper.createChannel(this)
         ShareOutboxNotifier.createChannel(this)
         WidgetWorkScheduler.schedule(this)
         sessionCoordinator.start()

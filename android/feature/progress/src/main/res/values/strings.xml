@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="progress_title">Progress</string>
-    <string name="progress_refresh">Refresh progress</string>
-    <string name="progress_summary">%1$d need attention · %2$d active</string>
+    <string name="progress_capture_title">Add to Inbox</string>
+    <string name="progress_capture_hint">Write it down…  #tag  !high</string>
+    <string name="progress_capture_description">Saved immediately without a deadline. Add #tags or !high / !low only when useful.</string>
+    <string name="progress_capture_add">Add to Inbox</string>
+    <string name="progress_capture_saved">Added to Inbox</string>
+    <string name="progress_capture_undo">Undo</string>
+    <string name="progress_capture_priority_high">High priority</string>
+    <string name="progress_capture_priority_low">Low priority</string>
+    <string name="progress_search">Quick Find</string>
+    <string name="progress_title">Now</string>
+    <string name="progress_refresh">Refresh Now</string>
+    <string name="progress_summary">%1$d need you</string>
     <string name="progress_realtime_connected">Realtime updates connected</string>
     <string name="progress_realtime_reconnecting">Realtime updates reconnecting; cached data remains available</string>
     <string name="progress_sync_pending">%1$d waiting</string>
@@ -12,28 +21,33 @@
     <string name="progress_sync_delayed_description">Your changes are saved and will retry automatically.</string>
     <string name="progress_sync_retry">Retry</string>
     <string name="progress_sync_retrying">Retrying…</string>
-    <string name="progress_empty_title">Nothing is moving right now</string>
-    <string name="progress_empty_description">Agent activity, decisions, and in-progress tasks will appear here.</string>
+    <string name="progress_empty_title">Nothing needs you right now</string>
+    <string name="progress_empty_description">Questions, decisions, active work, and recent results will appear here.</string>
 
     <string name="progress_attention_title">Needs attention</string>
     <string name="progress_attention_description">Decisions, input requests, and failures that block progress.</string>
-    <string name="progress_open_review">Review</string>
-    <string name="progress_agent_title">Agent activity</string>
-    <string name="progress_agent_description">Actual queued or running agent executions.</string>
-    <string name="progress_open_runs">History</string>
-    <string name="progress_tasks_title">Task state · In progress</string>
-    <string name="progress_tasks_description">Workflow state only; it does not mean an agent is currently running.</string>
-    <string name="progress_open_tasks">All tasks</string>
-    <string name="progress_tasks_empty">No tasks are marked in progress.</string>
+    <string name="progress_processing">%1$d processing</string>
+    <string name="progress_active_title">In progress</string>
+    <string name="progress_active_description">Agent executions and work currently moving.</string>
     <string name="progress_recent_title">Recently finished</string>
     <string name="progress_recent_description">Latest completed tasks and terminal agent runs.</string>
 
     <string name="progress_task_state">Task state</string>
     <string name="progress_task_sync_pending">Sync waiting</string>
-    <string name="progress_risk_low">Low risk</string>
-    <string name="progress_risk_medium">Medium risk</string>
-    <string name="progress_risk_high">High risk</string>
-
+    <string name="progress_action_answer">Answer</string>
+    <string name="progress_action_approve">Approve</string>
+    <string name="progress_action_file">File</string>
+    <string name="progress_action_retry">Retry</string>
+    <string name="progress_action_cancel">Cancel</string>
+    <string name="progress_file_title">File this capture</string>
+    <string name="progress_file_tasks">Move to Tasks</string>
+    <string name="progress_file_today">Schedule today</string>
+    <string name="progress_retry_title">Retry this item?</string>
+    <string name="progress_answer_title">What should the agent do next?</string>
+    <string name="progress_answer_label">Your answer</string>
+    <string name="progress_answer_resume">Resume</string>
+    <string name="progress_question_number">%1$d. %2$s</string>
+    <string name="progress_questions_skip">Skip questions</string>
     <string name="progress_run_queued">Queued</string>
     <string name="progress_run_starting">Starting</string>
     <string name="progress_run_running">Running</string>

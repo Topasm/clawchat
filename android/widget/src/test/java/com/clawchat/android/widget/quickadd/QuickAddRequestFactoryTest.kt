@@ -32,6 +32,19 @@ class QuickAddRequestFactoryTest {
     }
 
     @Test
+    fun `explicit metadata is parsed without adding a deadline`() {
+        val request = QuickAddRequestFactory.create(
+            title = "Send report #work !high",
+            idempotencyKey = "operation-id",
+        )!!
+
+        assertEquals("Send report", request.title)
+        assertEquals(listOf("work"), request.tags)
+        assertEquals("high", request.priority)
+        assertNull(request.dueDate)
+    }
+
+    @Test
     fun `blank title or operation key is rejected`() {
         assertNull(
             QuickAddRequestFactory.create(

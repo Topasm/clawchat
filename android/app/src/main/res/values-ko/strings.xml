@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_attention_channel">확인 필요</string>
+    <string name="notification_attention_channel_description">답변, 승인 또는 재시도가 필요한 작업</string>
+    <string name="notification_attention_title">ClawChat에 확인이 필요합니다</string>
+    <plurals name="notification_attention_count">
+        <item quantity="other">확인이 필요한 항목 %1$d개</item>
+    </plurals>
+    <string name="notification_attention_answer">답변</string>
+    <string name="notification_attention_approve">승인</string>
+    <string name="notification_attention_retry">재시도</string>
+    <string name="notification_attention_file">정리</string>
     <string name="nav_schedule">일정</string>
-    <string name="nav_inbox">Inbox</string>
-    <string name="nav_progress">진행</string>
+    <string name="nav_progress">Now</string>
     <string name="nav_chat">채팅</string>
     <string name="nav_tasks">작업</string>
-    <string name="nav_search">검색</string>
-    <string name="nav_settings">설정</string>
-    <string name="nav_review">리뷰</string>
-    <string name="nav_runs">에이전트 실행</string>
-    <string name="navigation_primary_section">작업 공간</string>
-    <string name="navigation_more_section">더 보기</string>
-    <string name="navigation_local_workspace">이 기기</string>
-    <string name="navigation_server_workspace">연결된 Workspace</string>
-    <string name="navigation_setup_workspace">ClawChat 사용 방법 선택</string>
     <string name="server_feature_requires_workspace_title">Workspace 연결</string>
     <string name="server_feature_requires_workspace_description">이 기능은 ClawChat 서버에서 실행됩니다. 로컬 작업과 일정은 이 기기에 그대로 유지됩니다.</string>
     <string name="server_feature_connect_action">Workspace 연결</string>

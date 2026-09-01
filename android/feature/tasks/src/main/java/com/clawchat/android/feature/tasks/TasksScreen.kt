@@ -2,6 +2,7 @@ package com.clawchat.android.feature.tasks
 
 import android.os.Build
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -37,6 +39,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -73,7 +79,6 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
@@ -98,18 +103,40 @@ internal val TASK_STATUS_FILTER_ORDER: List<TaskStatus?> = listOf(
 
 @Composable
 fun TasksScreen(
-    onOpenNavigation: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
     initialTodoId: String? = null,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var initialSelectionConsumed by rememberSaveable(initialTodoId) { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val deletedMessage = stringResource(R.string.tasks_deleted)
+    val undoLabel = stringResource(R.string.tasks_undo)
+
+    BackHandler(enabled = state.selectedTask != null) {
+        viewModel.selectTask(null)
+    }
 
     LaunchedEffect(initialTodoId, state.tasks) {
         if (initialSelectionConsumed || initialTodoId == null) return@LaunchedEffect
         state.tasks.firstOrNull { it.id == initialTodoId }?.let { task ->
             initialSelectionConsumed = true
             viewModel.selectTask(task)
+        }
+    }
+
+    LaunchedEffect(state.pendingDeletion?.token) {
+        val pending = state.pendingDeletion ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = deletedMessage,
+            actionLabel = undoLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            viewModel.undoDelete(pending.token)
+        } else {
+            viewModel.commitDelete(pending.token)
         }
     }
 
@@ -120,6 +147,7 @@ fun TasksScreen(
             isLoadingRelationships = state.isLoadingRelationships,
             relationshipError = state.relationshipError,
             taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
+            snackbarHostState = snackbarHostState,
             onBack = { viewModel.selectTask(null) },
             onToggle = { viewModel.toggleComplete(state.selectedTask!!.id) },
             onSetStatus = { status ->
@@ -134,7 +162,8 @@ fun TasksScreen(
             tasks = state.tasks,
             isLoading = state.isLoading,
             statusFilter = state.statusFilter,
-            onOpenNavigation = onOpenNavigation,
+            snackbarHostState = snackbarHostState,
+            onOpenSearch = onOpenSearch,
             onSelect = viewModel::selectTask,
             onToggle = viewModel::toggleComplete,
             onDelete = viewModel::deleteTask,
@@ -151,7 +180,8 @@ private fun TaskListView(
     tasks: List<Todo>,
     isLoading: Boolean,
     statusFilter: TaskStatus?,
-    onOpenNavigation: () -> Unit,
+    snackbarHostState: SnackbarHostState,
+    onOpenSearch: () -> Unit,
     onSelect: (Todo) -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -191,6 +221,7 @@ private fun TaskListView(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -200,8 +231,13 @@ private fun TaskListView(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
+                actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.tasks_cd_search),
+                        )
+                    }
                 },
                 colors = ClawTopBarColors(),
             )
@@ -668,6 +704,7 @@ private fun TaskDetailView(
     isLoadingRelationships: Boolean,
     relationshipError: String?,
     taskTitles: Map<String, String>,
+    snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onToggle: () -> Unit,
     onSetStatus: (TaskStatus) -> Unit,
@@ -680,6 +717,7 @@ private fun TaskDetailView(
     )
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -698,7 +736,7 @@ private fun TaskDetailView(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onDelete(); onBack() }) {
+                    IconButton(onClick = onDelete) {
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = stringResource(R.string.tasks_cd_delete),

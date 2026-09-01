@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="progress_title">진행</string>
-    <string name="progress_refresh">진행 상황 새로고침</string>
-    <string name="progress_summary">확인 필요 %1$d개 · 진행 중 %2$d개</string>
+    <string name="progress_capture_title">Inbox에 추가</string>
+    <string name="progress_capture_hint">한 줄로 적으세요…  #태그  !높음</string>
+    <string name="progress_capture_description">마감일 없이 바로 저장합니다. 필요할 때만 #태그 또는 !높음 / !낮음을 붙이세요.</string>
+    <string name="progress_capture_add">Inbox에 추가</string>
+    <string name="progress_capture_saved">Inbox에 추가했습니다</string>
+    <string name="progress_capture_undo">되돌리기</string>
+    <string name="progress_capture_priority_high">높은 우선순위</string>
+    <string name="progress_capture_priority_low">낮은 우선순위</string>
+    <string name="progress_search">빠른 찾기</string>
+    <string name="progress_title">Now</string>
+    <string name="progress_refresh">Now 새로고침</string>
+    <string name="progress_summary">확인 필요 %1$d개</string>
     <string name="progress_realtime_connected">실시간 업데이트 연결됨</string>
     <string name="progress_realtime_reconnecting">실시간 업데이트 재연결 중 · 저장된 내용은 계속 볼 수 있습니다</string>
     <string name="progress_sync_pending">동기화 대기 %1$d개</string>
@@ -12,28 +21,33 @@
     <string name="progress_sync_delayed_description">변경 내용은 안전하게 저장되어 있으며 자동으로 다시 시도합니다.</string>
     <string name="progress_sync_retry">다시 시도</string>
     <string name="progress_sync_retrying">재시도 중…</string>
-    <string name="progress_empty_title">현재 진행 중인 항목이 없습니다</string>
-    <string name="progress_empty_description">에이전트 활동, 결정 요청, 진행 중 작업이 여기에 표시됩니다.</string>
+    <string name="progress_empty_title">지금 확인할 항목이 없습니다</string>
+    <string name="progress_empty_description">질문, 결정 요청, 진행 중 작업과 최근 결과가 여기에 표시됩니다.</string>
 
     <string name="progress_attention_title">확인 필요</string>
     <string name="progress_attention_description">진행을 막고 있는 결정, 입력 요청, 실패 항목입니다.</string>
-    <string name="progress_open_review">검토하기</string>
-    <string name="progress_agent_title">에이전트 활동</string>
-    <string name="progress_agent_description">실제로 대기 또는 실행 중인 에이전트 작업입니다.</string>
-    <string name="progress_open_runs">기록</string>
-    <string name="progress_tasks_title">작업 상태 · 진행 중</string>
-    <string name="progress_tasks_description">작업 흐름의 상태이며, 에이전트가 실행 중이라는 뜻은 아닙니다.</string>
-    <string name="progress_open_tasks">전체 작업</string>
-    <string name="progress_tasks_empty">진행 중으로 표시된 작업이 없습니다.</string>
+    <string name="progress_processing">%1$d개 처리 중</string>
+    <string name="progress_active_title">진행 중</string>
+    <string name="progress_active_description">현재 실행 중인 에이전트와 진행 중 작업입니다.</string>
     <string name="progress_recent_title">최근 완료</string>
     <string name="progress_recent_description">최근 완료한 작업과 종료된 에이전트 실행입니다.</string>
 
     <string name="progress_task_state">작업 상태</string>
     <string name="progress_task_sync_pending">동기화 대기</string>
-    <string name="progress_risk_low">낮은 위험</string>
-    <string name="progress_risk_medium">보통 위험</string>
-    <string name="progress_risk_high">높은 위험</string>
-
+    <string name="progress_action_answer">답변</string>
+    <string name="progress_action_approve">승인</string>
+    <string name="progress_action_file">정리</string>
+    <string name="progress_action_retry">재시도</string>
+    <string name="progress_action_cancel">취소</string>
+    <string name="progress_file_title">수집 항목 정리</string>
+    <string name="progress_file_tasks">작업으로 이동</string>
+    <string name="progress_file_today">오늘 일정으로</string>
+    <string name="progress_retry_title">이 항목을 다시 시도할까요?</string>
+    <string name="progress_answer_title">에이전트가 다음에 무엇을 해야 하나요?</string>
+    <string name="progress_answer_label">답변</string>
+    <string name="progress_answer_resume">계속 실행</string>
+    <string name="progress_question_number">%1$d. %2$s</string>
+    <string name="progress_questions_skip">질문 건너뛰기</string>
     <string name="progress_run_queued">대기 중</string>
     <string name="progress_run_starting">시작 중</string>
     <string name="progress_run_running">실행 중</string>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="inbox_back">뒤로</string>
     <string name="inbox_title">받은 편지함</string>
     <string name="inbox_loading">받은 편지함 불러오는 중…</string>
     <string name="inbox_planning_title">계획 중</string>

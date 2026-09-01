@@ -15,6 +15,7 @@ import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
+import com.clawchat.android.core.data.model.TodoQuestionAnswersRequest
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.apiCall
@@ -54,6 +55,8 @@ interface TodoRepository {
     ): ApiResult<Todo>
     suspend fun deleteTodo(id: String, expectedWorkspaceKey: String? = null): ApiResult<Unit>
     suspend fun organizeTodo(todoId: String): ApiResult<Unit>
+    suspend fun answerTodoQuestions(todoId: String, answers: Map<String, String>): ApiResult<Unit>
+    suspend fun skipTodoQuestions(todoId: String): ApiResult<Unit>
     fun getCachedTodosFlow(): Flow<List<Todo>>
 }
 
@@ -347,6 +350,58 @@ class TodoRepositoryImpl @Inject constructor(
                     }
                     is ApiResult.Error -> result
                     is ApiResult.Loading -> result
+                }
+            }
+        }
+    }
+
+    override suspend fun answerTodoQuestions(
+        todoId: String,
+        answers: Map<String, String>,
+    ): ApiResult<Unit> {
+        val normalized = answers.mapValues { (_, answer) -> answer.trim() }
+        if (normalized.isEmpty() || normalized.values.any(String::isEmpty)) {
+            return ApiResult.Error("Answer every question before continuing", code = 422)
+        }
+        return runQuestionAction(todoId) { expectedScope ->
+            api.answerTodoQuestions(
+                todoId,
+                TodoQuestionAnswersRequest(normalized),
+                expectedScope,
+            )
+        }
+    }
+
+    override suspend fun skipTodoQuestions(todoId: String): ApiResult<Unit> =
+        runQuestionAction(todoId) { expectedScope ->
+            api.skipTodoQuestions(todoId, expectedScope)
+        }
+
+    private suspend fun runQuestionAction(
+        todoId: String,
+        request: suspend (com.clawchat.android.core.network.ExpectedSessionScope) ->
+            com.clawchat.android.core.data.model.TodoWorkflowResponse,
+    ): ApiResult<Unit> {
+        val runtimeState = currentRuntimeState()
+        return when (runtimeState.mode) {
+            WorkspaceMode.UNCONFIGURED -> workspaceNotConfigured()
+            WorkspaceMode.LOCAL -> ApiResult.Error("AI planning questions require a server")
+            WorkspaceMode.SERVER -> {
+                val expectedScope = runtimeState.activeServerRequestScope()
+                    ?: return workspaceNotConfigured()
+                when (val result = apiCall { request(expectedScope) }) {
+                    is ApiResult.Success -> if (
+                        result.data.status == "processing" && result.data.todoId == todoId
+                    ) {
+                        ApiResult.Success(Unit)
+                    } else {
+                        ApiResult.Error(
+                            message = "Task is no longer waiting for answers",
+                            code = 409,
+                        )
+                    }
+                    is ApiResult.Error -> result
+                    ApiResult.Loading -> ApiResult.Loading
                 }
             }
         }

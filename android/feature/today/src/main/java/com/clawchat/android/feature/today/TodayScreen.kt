@@ -61,7 +61,6 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
@@ -81,7 +80,6 @@ import java.time.format.FormatStyle
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     showAgentFeatures: Boolean = true,
-    onOpenNavigation: () -> Unit = {},
     onNavigateToInbox: () -> Unit = {},
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
@@ -110,9 +108,6 @@ fun TodayScreen(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
-                },
-                navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
                 },
                 actions = {
                     IconButton(onClick = onNavigateToSearch) {

@@ -36,7 +36,14 @@ data class TasksUiState(
     val relationshipTaskTitles: Map<String, String> = emptyMap(),
     val isLoadingRelationships: Boolean = false,
     val relationshipError: String? = null,
+    val pendingDeletion: PendingTaskDeletion? = null,
     val error: String? = null,
+)
+
+data class PendingTaskDeletion(
+    val token: Long,
+    val task: Todo,
+    val originalIndex: Int,
 )
 
 sealed interface TasksAction {
@@ -60,6 +67,7 @@ class TasksViewModel @Inject constructor(
 
     private var taskRequestGeneration = 0L
     private var relationshipRequestGeneration = 0L
+    private var deletionToken = 0L
     private val relationshipTitleCache = mutableMapOf<String, String>()
 
     init {
@@ -107,10 +115,13 @@ class TasksViewModel @Inject constructor(
                     if (generation != taskRequestGeneration) return@launch
                     relationshipTitleCache.putAll(result.data.items.associate { it.id to it.title })
                     _uiState.update { state ->
+                        val visibleItems = result.data.items.filterNot { task ->
+                            task.id == state.pendingDeletion?.task?.id
+                        }
                         state.copy(
-                            tasks = result.data.items,
+                            tasks = visibleItems,
                             selectedTask = state.selectedTask?.let { selected ->
-                                result.data.items.firstOrNull { it.id == selected.id } ?: selected
+                                visibleItems.firstOrNull { it.id == selected.id } ?: selected
                             },
                             isLoading = false,
                         )
@@ -307,17 +318,62 @@ class TasksViewModel @Inject constructor(
     }
 
     private fun doDeleteTask(id: String) {
+        val state = _uiState.value
+        val originalIndex = state.tasks.indexOfFirst { it.id == id }
+        if (originalIndex < 0 || state.pendingDeletion?.task?.id == id) return
+
+        state.pendingDeletion?.let(::persistDeletion)
+        val pendingDeletion = PendingTaskDeletion(
+            token = ++deletionToken,
+            task = state.tasks[originalIndex],
+            originalIndex = originalIndex,
+        )
+        _uiState.update { current ->
+            current.copy(
+                tasks = current.tasks.filterNot { it.id == id },
+                selectedTask = if (current.selectedTask?.id == id) null else current.selectedTask,
+                pendingDeletion = pendingDeletion,
+            )
+        }
+    }
+
+    fun undoDelete(token: Long) {
+        _uiState.update { state ->
+            val pending = state.pendingDeletion?.takeIf { it.token == token } ?: return@update state
+            state.copy(
+                tasks = state.tasks.restore(pending),
+                pendingDeletion = null,
+            )
+        }
+    }
+
+    fun commitDelete(token: Long) {
+        val pending = _uiState.value.pendingDeletion?.takeIf { it.token == token } ?: return
+        _uiState.update { state ->
+            if (state.pendingDeletion?.token == token) state.copy(pendingDeletion = null) else state
+        }
+        persistDeletion(pending)
+    }
+
+    private fun persistDeletion(pending: PendingTaskDeletion) {
         viewModelScope.launch {
-            when (val result = todoRepository.deleteTodo(id)) {
-                is ApiResult.Success -> _uiState.update { state ->
+            when (val result = todoRepository.deleteTodo(pending.task.id)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Error -> _uiState.update { state ->
                     state.copy(
-                        tasks = state.tasks.filter { it.id != id },
-                        selectedTask = if (state.selectedTask?.id == id) null else state.selectedTask,
+                        tasks = state.tasks.restore(pending),
+                        error = result.message,
                     )
                 }
-                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
                 is ApiResult.Loading -> { /* not used here */ }
             }
+        }
+    }
+
+    private fun List<Todo>.restore(pending: PendingTaskDeletion): List<Todo> {
+        if (any { it.id == pending.task.id }) return this
+        return toMutableList().apply {
+            add(pending.originalIndex.coerceIn(0, size), pending.task)
         }
     }
 

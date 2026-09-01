@@ -25,6 +25,7 @@ import com.clawchat.android.core.update.AppUpdateManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.clawchat.android.navigation.ClawChatNavGraph
 import com.clawchat.android.navigation.reminderRoute
+import com.clawchat.android.notification.AttentionNotificationCoordinator
 import com.clawchat.android.share.ShareCaptureCoordinator
 import com.clawchat.android.share.ShareCaptureEvent
 import com.clawchat.android.share.ShareIntentParseResult
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var syncManager: SyncManager
     @Inject lateinit var updateManager: AppUpdateManager
     @Inject lateinit var shareCaptureCoordinator: ShareCaptureCoordinator
+    @Inject lateinit var attentionNotifications: AttentionNotificationCoordinator
 
     private data class PendingReminderNavigation(
         val route: String,
@@ -73,6 +75,7 @@ class MainActivity : ComponentActivity() {
             val shareFailedMessage = stringResource(R.string.share_failed)
             val updateState by updateManager.state.collectAsStateWithLifecycle()
             val reminderNavigation by pendingReminderRoute.collectAsStateWithLifecycle()
+            val attentionBadge by attentionNotifications.badgeState.collectAsStateWithLifecycle()
             val notificationPermissionRequested by sessionStore
                 .notificationPermissionRequested
                 .collectAsStateWithLifecycle(initialValue = true)
@@ -164,6 +167,9 @@ class MainActivity : ComponentActivity() {
                                 ?.takeIf { it.workspaceKey == state.workspaceKey }
                                 ?.route,
                             onDeepLinkHandled = { pendingReminderRoute.value = null },
+                            attentionCount = attentionBadge.count.takeIf {
+                                attentionBadge.workspaceKey == state.workspaceKey
+                            } ?: 0,
                         )
                     }
                 }

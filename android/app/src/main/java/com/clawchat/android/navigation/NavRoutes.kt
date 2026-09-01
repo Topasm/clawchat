@@ -17,7 +17,13 @@ sealed class NavRoute(val route: String) {
         fun destination(todoId: String? = null): String =
             todoId?.let { "$route?$ARG_TODO_ID=${Uri.encode(it)}" } ?: route
     }
-    data object Review : NavRoute("review")
+    data object Review : NavRoute("review") {
+        const val ARG_REVIEW_ID = "review_id"
+        val routePattern = "$route?$ARG_REVIEW_ID={$ARG_REVIEW_ID}"
+
+        fun destination(reviewId: String? = null): String =
+            reviewId?.let { "$route?$ARG_REVIEW_ID=${Uri.encode(it)}" } ?: route
+    }
     data object Runs : NavRoute("runs") {
         const val ARG_RUN_ID = "run_id"
         val routePattern = "$route?$ARG_RUN_ID={$ARG_RUN_ID}"

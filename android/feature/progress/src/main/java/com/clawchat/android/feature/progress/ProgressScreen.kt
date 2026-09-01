@@ -7,27 +7,47 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,12 +55,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
-import com.clawchat.android.core.data.model.ReviewItem
 import com.clawchat.android.core.data.model.ReviewRiskLevel
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.QuickCaptureParser
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
@@ -54,15 +73,18 @@ private const val ACTIVE_POLL_INTERVAL_MS = 3_000L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressScreen(
-    onOpenNavigation: () -> Unit = {},
-    onOpenReview: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    onOpenReview: (String) -> Unit = {},
     onOpenRun: (String) -> Unit = {},
-    onOpenRuns: () -> Unit = {},
     onOpenTask: (String) -> Unit = {},
-    onOpenTasks: () -> Unit = {},
     viewModel: ProgressViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedAction by remember { mutableStateOf<NowItem?>(null) }
+    var captureText by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val capturedMessage = stringResource(R.string.progress_capture_saved)
+    val undoLabel = stringResource(R.string.progress_capture_undo)
 
     LaunchedEffect(state.hasExecutingRuns) {
         if (!state.hasExecutingRuns) return@LaunchedEffect
@@ -72,8 +94,32 @@ fun ProgressScreen(
         }
     }
 
+    LaunchedEffect(selectedAction?.stableId, state.attentionItems, state.pendingActionId) {
+        val selectedId = selectedAction?.stableId ?: return@LaunchedEffect
+        if (state.pendingActionId == null && state.attentionItems.none { it.stableId == selectedId }) {
+            selectedAction = null
+        }
+    }
+
+    LaunchedEffect(state.lastCapturedTodo?.id) {
+        val captured = state.lastCapturedTodo ?: return@LaunchedEffect
+        captureText = ""
+        val result = snackbarHostState.showSnackbar(
+            message = capturedMessage,
+            actionLabel = undoLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            viewModel.undoCapture(captured.id)
+        } else {
+            viewModel.acknowledgeCapture(captured.id)
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -83,12 +129,11 @@ fun ProgressScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = { ClawNavigationMenuButton(onClick = onOpenNavigation) },
                 actions = {
-                    IconButton(onClick = viewModel::refresh, enabled = !state.isRefreshing) {
+                    IconButton(onClick = onOpenSearch) {
                         Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.progress_refresh),
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.progress_search),
                         )
                     }
                 },
@@ -96,39 +141,70 @@ fun ProgressScreen(
             )
         },
     ) { padding ->
-        when {
-            state.isLoading && !state.hasAnyContent -> Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            when {
+                state.isLoading && !state.hasAnyContent -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
 
-            else -> ProgressContent(
-                state = state,
-                onOpenReview = onOpenReview,
-                onOpenRun = onOpenRun,
-                onOpenRuns = onOpenRuns,
-                onOpenTask = onOpenTask,
-                onOpenTasks = onOpenTasks,
-                onRetryPending = viewModel::retryPending,
-                modifier = Modifier.padding(padding),
-            )
+                else -> ProgressContent(
+                    state = state,
+                    onOpenReview = onOpenReview,
+                    onOpenRun = onOpenRun,
+                    onOpenTask = onOpenTask,
+                    onSelectAction = { item ->
+                        viewModel.clearActionError()
+                        selectedAction = item
+                    },
+                    onRetryPending = viewModel::retryPending,
+                    captureText = captureText,
+                    onCaptureTextChange = { captureText = it },
+                    onCapture = { viewModel.captureToInbox(captureText) },
+                )
+            }
         }
+    }
+
+    selectedAction?.let { item ->
+        NowActionSheet(
+            item = item,
+            isPending = state.pendingActionId == item.stableId,
+            error = state.actionError,
+            onDismiss = {
+                if (state.pendingActionId == null) {
+                    viewModel.clearActionError()
+                    selectedAction = null
+                }
+            },
+            onFile = { dueToday -> viewModel.fileTodo(item, dueToday) },
+            onRetry = { viewModel.retryNowItem(item) },
+            onAnswerRun = { answer -> viewModel.answerRun(item, answer) },
+            onAnswerTodo = { answers -> viewModel.answerTodoQuestions(item, answers) },
+            onSkipTodoQuestions = { viewModel.skipTodoQuestions(item) },
+        )
     }
 }
 
 @Composable
 private fun ProgressContent(
     state: ProgressUiState,
-    onOpenReview: () -> Unit,
+    onOpenReview: (String) -> Unit,
     onOpenRun: (String) -> Unit,
-    onOpenRuns: () -> Unit,
     onOpenTask: (String) -> Unit,
-    onOpenTasks: () -> Unit,
+    onSelectAction: (NowItem) -> Unit,
     onRetryPending: () -> Unit,
+    captureText: String,
+    onCaptureTextChange: (String) -> Unit,
+    onCapture: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -138,6 +214,16 @@ private fun ProgressContent(
     ) {
         item(key = "connection") {
             ProgressConnectionCard(state)
+        }
+
+        item(key = "capture") {
+            QuickCaptureCard(
+                text = captureText,
+                isSubmitting = state.isCapturing,
+                error = state.captureError,
+                onTextChange = onCaptureTextChange,
+                onSubmit = onCapture,
+            )
         }
 
         state.errors.firstOrNull()?.let { error ->
@@ -203,61 +289,55 @@ private fun ProgressContent(
             }
         }
 
-        if (state.pendingReviews.isNotEmpty() || state.attentionRuns.isNotEmpty()) {
+        if (state.attentionItems.isNotEmpty()) {
             item(key = "attention_header") {
                 ClawSectionHeader(
                     title = stringResource(R.string.progress_attention_title),
                     subtitle = stringResource(R.string.progress_attention_description),
-                    count = state.attentionCount,
-                    actionLabel = if (state.pendingReviews.isNotEmpty()) {
-                        stringResource(R.string.progress_open_review)
-                    } else null,
-                    onActionClick = if (state.pendingReviews.isNotEmpty()) onOpenReview else null,
                 )
             }
-            items(state.pendingReviews, key = { "review:${it.id}" }) { review ->
-                ReviewProgressRow(review = review, onClick = onOpenReview)
-            }
-            items(state.attentionRuns, key = { "attention-run:${it.id}" }) { run ->
-                AgentRunProgressRow(run = run, onClick = { onOpenRun(run.id) })
+            items(state.attentionItems, key = NowItem::stableId) { item ->
+                NowAttentionRow(
+                    item = item,
+                    onClick = {
+                        if (item.canHandleOnDevice) {
+                            onSelectAction(item)
+                        } else {
+                            when (item.source) {
+                                NowSource.TODO -> item.todoId?.let(onOpenTask)
+                                NowSource.REVIEW -> onOpenReview(item.sourceId)
+                                NowSource.AGENT_RUN -> onOpenRun(item.sourceId)
+                            }
+                        }
+                    },
+                )
             }
         }
 
-        if (state.executingRuns.isNotEmpty()) {
-            item(key = "runs_header") {
+        if (state.processingCount > 0) {
+            item(key = "processing") {
+                ClawSectionCard {
+                    Text(
+                        text = stringResource(R.string.progress_processing, state.processingCount),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        if (state.executingRuns.isNotEmpty() || state.inProgressTasks.isNotEmpty()) {
+            item(key = "active_header") {
                 ClawSectionHeader(
-                    title = stringResource(R.string.progress_agent_title),
-                    subtitle = stringResource(R.string.progress_agent_description),
-                    count = state.executingRuns.size,
-                    actionLabel = stringResource(R.string.progress_open_runs),
-                    onActionClick = onOpenRuns,
+                    title = stringResource(R.string.progress_active_title),
+                    subtitle = stringResource(R.string.progress_active_description),
                 )
             }
             items(state.executingRuns, key = { "run:${it.id}" }) { run ->
                 AgentRunProgressRow(run = run, onClick = { onOpenRun(run.id) })
             }
-        }
-
-        item(key = "tasks_header") {
-            ClawSectionHeader(
-                title = stringResource(R.string.progress_tasks_title),
-                subtitle = stringResource(R.string.progress_tasks_description),
-                count = state.inProgressTasks.size,
-                actionLabel = stringResource(R.string.progress_open_tasks),
-                onActionClick = onOpenTasks,
-            )
-        }
-        items(state.inProgressTasks, key = { "task:${it.id}" }) { task ->
-            TaskProgressRow(task = task, onClick = { onOpenTask(task.id) })
-        }
-        if (state.inProgressTasks.isEmpty()) {
-            item(key = "tasks_empty") {
-                Text(
-                    text = stringResource(R.string.progress_tasks_empty),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            items(state.inProgressTasks, key = { "task:${it.id}" }) { task ->
+                TaskProgressRow(task = task, onClick = { onOpenTask(task.id) })
             }
         }
 
@@ -279,6 +359,242 @@ private fun ProgressContent(
 }
 
 @Composable
+private fun QuickCaptureCard(
+    text: String,
+    isSubmitting: Boolean,
+    error: String?,
+    onTextChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    val parsed = remember(text) { QuickCaptureParser.parse(text) }
+    ClawSectionCard(tone = ClawTone.Primary) {
+        Text(
+            text = stringResource(R.string.progress_capture_title),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        OutlinedTextField(
+            value = text,
+            onValueChange = { if (!isSubmitting) onTextChange(it) },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(stringResource(R.string.progress_capture_hint)) },
+            singleLine = true,
+            enabled = !isSubmitting,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(onDone = { if (parsed != null) onSubmit() }),
+            trailingIcon = {
+                IconButton(
+                    onClick = onSubmit,
+                    enabled = parsed != null && !isSubmitting,
+                ) {
+                    if (isSubmitting) {
+                        CircularProgressIndicator(modifier = Modifier.padding(8.dp))
+                    } else {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = stringResource(R.string.progress_capture_add),
+                        )
+                    }
+                }
+            },
+        )
+        parsed?.let { draft ->
+            val metadata = buildList {
+                if (draft.priority != "medium") add(
+                    stringResource(
+                        if (draft.priority == "high") {
+                            R.string.progress_capture_priority_high
+                        } else {
+                            R.string.progress_capture_priority_low
+                        },
+                    ),
+                )
+                addAll(draft.tags.map { "#$it" })
+            }
+            if (metadata.isNotEmpty()) {
+                Text(
+                    text = metadata.joinToString(" · "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        error?.let {
+            ClawStatusChip(text = localizedErrorMessage(it), tone = ClawTone.Error)
+        }
+        Text(
+            text = stringResource(R.string.progress_capture_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NowActionSheet(
+    item: NowItem,
+    isPending: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onFile: (dueToday: Boolean) -> Unit,
+    onRetry: () -> Unit,
+    onAnswerRun: (String) -> Unit,
+    onAnswerTodo: (Map<String, String>) -> Unit,
+    onSkipTodoQuestions: () -> Unit,
+) {
+    var runAnswer by remember(item.stableId) { mutableStateOf("") }
+    var todoAnswers by remember(item.stableId) {
+        mutableStateOf(List(item.questions.size) { "" })
+    }
+    val isTodoQuestion = item.source == NowSource.TODO && item.action == NowAction.ANSWER
+    val title = when (item.action) {
+        NowAction.ANSWER -> stringResource(R.string.progress_answer_title)
+        NowAction.RETRY -> stringResource(R.string.progress_retry_title)
+        NowAction.FILE -> stringResource(R.string.progress_file_title)
+        NowAction.APPROVE -> stringResource(R.string.progress_action_approve)
+    }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { !isPending },
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = { if (!isPending) onDismiss() },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            item.summary?.takeIf(String::isNotBlank)?.let { summary ->
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (isTodoQuestion) {
+                item.questions.forEachIndexed { index, question ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(
+                                R.string.progress_question_number,
+                                index + 1,
+                                question,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        OutlinedTextField(
+                            value = todoAnswers[index],
+                            onValueChange = { value ->
+                                todoAnswers = todoAnswers.toMutableList().also { it[index] = value }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isPending,
+                            minLines = 2,
+                            maxLines = 4,
+                            label = { Text(stringResource(R.string.progress_answer_label)) },
+                        )
+                    }
+                }
+            } else if (item.action == NowAction.ANSWER) {
+                OutlinedTextField(
+                    value = runAnswer,
+                    onValueChange = { runAnswer = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isPending,
+                    minLines = 3,
+                    maxLines = 6,
+                    label = { Text(stringResource(R.string.progress_answer_label)) },
+                )
+            }
+            error?.let {
+                Text(
+                    text = localizedErrorMessage(it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (isPending) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isPending && when {
+                    isTodoQuestion -> todoAnswers.isNotEmpty() && todoAnswers.all(String::isNotBlank)
+                    item.action == NowAction.ANSWER -> runAnswer.isNotBlank()
+                    else -> true
+                },
+                onClick = {
+                    when (item.action) {
+                        NowAction.ANSWER -> if (isTodoQuestion) {
+                            onAnswerTodo(
+                                todoAnswers.mapIndexed { index, answer -> index.toString() to answer }
+                                    .toMap(),
+                            )
+                        } else {
+                            onAnswerRun(runAnswer)
+                        }
+                        NowAction.RETRY -> onRetry()
+                        NowAction.FILE -> onFile(false)
+                        NowAction.APPROVE -> Unit
+                    }
+                },
+            ) {
+                Text(
+                    stringResource(
+                        when (item.action) {
+                            NowAction.ANSWER -> R.string.progress_answer_resume
+                            NowAction.RETRY -> R.string.progress_action_retry
+                            NowAction.FILE -> R.string.progress_file_tasks
+                            NowAction.APPROVE -> R.string.progress_action_approve
+                        },
+                    ),
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                if (isTodoQuestion) {
+                    TextButton(enabled = !isPending, onClick = onSkipTodoQuestions) {
+                        Text(stringResource(R.string.progress_questions_skip))
+                    }
+                }
+                if (item.action == NowAction.FILE) {
+                    TextButton(enabled = !isPending, onClick = { onFile(true) }) {
+                        Text(stringResource(R.string.progress_file_today))
+                    }
+                }
+                TextButton(enabled = !isPending, onClick = onDismiss) {
+                    Text(stringResource(R.string.progress_action_cancel))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProgressConnectionCard(state: ProgressUiState) {
     ClawSectionCard(tone = if (state.isConnected) ClawTone.Success else ClawTone.Warning) {
         Row(
@@ -288,7 +604,7 @@ private fun ProgressConnectionCard(state: ProgressUiState) {
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = stringResource(R.string.progress_summary, state.attentionCount, state.activeCount),
+                    text = stringResource(R.string.progress_summary, state.attentionCount),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -321,7 +637,7 @@ private fun ProgressConnectionCard(state: ProgressUiState) {
 }
 
 @Composable
-private fun ReviewProgressRow(review: ReviewItem, onClick: () -> Unit) {
+private fun NowAttentionRow(item: NowItem, onClick: () -> Unit) {
     ClawListItemSurface(onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -330,30 +646,49 @@ private fun ReviewProgressRow(review: ReviewItem, onClick: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = review.subjectTitle?.takeIf(String::isNotBlank) ?: review.summary,
+                    text = item.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = review.summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                item.summary?.takeIf(String::isNotBlank)?.let { summary ->
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             ClawStatusChip(
-                text = reviewRiskLabel(review.riskLevel),
-                tone = when (review.riskLevel) {
-                    ReviewRiskLevel.HIGH -> ClawTone.Error
-                    ReviewRiskLevel.MEDIUM -> ClawTone.Warning
-                    ReviewRiskLevel.LOW -> ClawTone.Default
-                },
+                text = nowActionLabel(item.action),
+                tone = nowActionTone(item),
             )
         }
     }
+}
+
+@Composable
+private fun nowActionLabel(action: NowAction): String = stringResource(
+    when (action) {
+        NowAction.ANSWER -> R.string.progress_action_answer
+        NowAction.APPROVE -> R.string.progress_action_approve
+        NowAction.FILE -> R.string.progress_action_file
+        NowAction.RETRY -> R.string.progress_action_retry
+    },
+)
+
+private fun nowActionTone(item: NowItem): ClawTone = when (item.action) {
+    NowAction.ANSWER -> ClawTone.Warning
+    NowAction.APPROVE -> when (item.riskLevel) {
+        ReviewRiskLevel.HIGH -> ClawTone.Error
+        ReviewRiskLevel.MEDIUM -> ClawTone.Warning
+        ReviewRiskLevel.LOW, null -> ClawTone.Primary
+    }
+    NowAction.FILE -> ClawTone.Default
+    NowAction.RETRY -> ClawTone.Error
 }
 
 @Composable
@@ -453,12 +788,3 @@ private fun agentRunTone(status: AgentRunStatus): ClawTone = when (status) {
     AgentRunStatus.FAILED -> ClawTone.Error
     AgentRunStatus.CANCELLED -> ClawTone.Default
 }
-
-@Composable
-private fun reviewRiskLabel(risk: ReviewRiskLevel): String = stringResource(
-    when (risk) {
-        ReviewRiskLevel.LOW -> R.string.progress_risk_low
-        ReviewRiskLevel.MEDIUM -> R.string.progress_risk_medium
-        ReviewRiskLevel.HIGH -> R.string.progress_risk_high
-    },
-)

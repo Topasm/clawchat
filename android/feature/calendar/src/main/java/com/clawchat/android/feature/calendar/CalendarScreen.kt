@@ -51,7 +51,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
@@ -65,7 +64,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
-    onOpenNavigation: () -> Unit = {},
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,9 +88,6 @@ fun CalendarScreen(
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleLarge,
                     )
-                },
-                navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
                 },
                 actions = {
                     TextButton(onClick = { viewModel.onAction(CalendarAction.ShowToday) }) {

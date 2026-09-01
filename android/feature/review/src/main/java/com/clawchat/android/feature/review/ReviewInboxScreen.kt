@@ -35,10 +35,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -62,7 +64,6 @@ import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.localizedErrorMessage
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -71,18 +72,27 @@ import kotlinx.serialization.json.jsonPrimitive
 @Composable
 fun ReviewInboxScreen(
     onBack: () -> Unit = {},
-    onOpenNavigation: (() -> Unit)? = null,
+    initialReviewId: String? = null,
     onOpenSubject: (ReviewItem) -> Unit = {},
     /** Opens the exact waiting-input run after requesting changes. */
     onOpenRun: (String) -> Unit = {},
     viewModel: ReviewInboxViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var initialSelectionConsumed by rememberSaveable(initialReviewId) { mutableStateOf(false) }
     val selected = state.selected
     val feedback = state.error?.let { localizedErrorMessage(it) }
         ?: state.notice
         ?: state.errorResource?.let { stringResource(it) }
         ?: state.noticeResource?.let { stringResource(it) }
+
+    LaunchedEffect(initialReviewId, state.items) {
+        if (initialSelectionConsumed || initialReviewId == null) return@LaunchedEffect
+        if (state.items.any { it.id == initialReviewId }) {
+            initialSelectionConsumed = true
+            viewModel.onAction(ReviewInboxAction.Select(initialReviewId))
+        }
+    }
 
     BackHandler(enabled = selected != null || state.isSubmitting) {
         if (!state.isSubmitting && selected != null) {
@@ -138,9 +148,6 @@ fun ReviewInboxScreen(
                     }
                 },
                 actions = {
-                    onOpenNavigation?.let { openNavigation ->
-                        ClawNavigationMenuButton(onClick = openNavigation)
-                    }
                     if (selected == null) {
                         IconButton(onClick = viewModel::refresh, enabled = !state.isRefreshing) {
                             Icon(

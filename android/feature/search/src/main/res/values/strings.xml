@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="search_title">Search</string>
+    <string name="search_title">Quick Find</string>
     <string name="search_cd_back">Back</string>
-    <string name="search_placeholder">Tasks, events, and messages</string>
+    <string name="search_placeholder">Find or jump anywhere</string>
     <string name="search_placeholder_local">Tasks and events</string>
     <string name="search_cd_clear_query">Clear query</string>
     <string name="search_no_matches_title">No matches</string>
@@ -13,4 +13,10 @@
     <string name="search_type_tasks">Tasks</string>
     <string name="search_type_events">Events</string>
     <string name="search_type_messages">Messages</string>
+    <string name="search_quick_destinations">Go to</string>
+    <string name="search_destination_now">Now</string>
+    <string name="search_destination_in_progress">In progress</string>
+    <string name="search_destination_schedule">Schedule</string>
+    <string name="search_destination_chat">Chat</string>
+    <string name="search_destination_settings">Settings</string>
 </resources>

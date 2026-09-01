@@ -5,10 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.ReviewItem
-import com.clawchat.android.core.data.model.ReviewRiskLevel
-import com.clawchat.android.core.data.model.ReviewSubjectType
+import com.clawchat.android.core.data.model.QuickCaptureParser
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.ReviewRepository
@@ -50,30 +50,20 @@ data class ProgressUiState(
     val pendingSyncCount: Int = 0,
     val hasPendingSyncFailure: Boolean = false,
     val isRetryingPendingSync: Boolean = false,
+    val pendingActionId: String? = null,
+    val actionError: String? = null,
+    val isCapturing: Boolean = false,
+    val captureError: String? = null,
+    val lastCapturedTodo: Todo? = null,
 ) {
-    val pendingReviews: List<ReviewItem>
-        get() = reviews.sortedWith(
-            compareBy<ReviewItem> { it.riskLevel.attentionOrder }
-                .thenByDescending { it.requestedAt },
-        )
+    val nowContent: NowContent
+        get() = buildNowContent(tasks, reviews, runs)
 
-    /** Waiting-review runs already represented by a ReviewItem are not duplicated. */
-    val attentionRuns: List<AgentRun>
-        get() {
-            val reviewedRunIds = reviews.asSequence()
-                .filter { it.subjectType == ReviewSubjectType.AGENT_RUN }
-                .map(ReviewItem::subjectId)
-                .toSet()
-            return runs
-                .filter { run ->
-                    (run.status == AgentRunStatus.WAITING_INPUT ||
-                        run.status == AgentRunStatus.WAITING_REVIEW ||
-                        (run.status == AgentRunStatus.FAILED && run.canRetry)) &&
-                        (run.status != AgentRunStatus.WAITING_REVIEW || run.id !in reviewedRunIds)
-                }
-                .sortedByDescending(AgentRun::updatedAt)
-                .take(ATTENTION_LIMIT)
-        }
+    val attentionItems: List<NowItem>
+        get() = nowContent.attentionItems.take(ATTENTION_LIMIT)
+
+    val processingCount: Int
+        get() = nowContent.processingCount
 
     val executingRuns: List<AgentRun>
         get() = runs.filter { it.status.isExecuting }.sortedByDescending(AgentRun::updatedAt)
@@ -92,12 +82,16 @@ data class ProgressUiState(
 
     val recentlyFinishedRuns: List<AgentRun>
         get() = runs
-            .filter { it.status.isTerminal && it.id !in attentionRuns.map(AgentRun::id) }
+            .filter { run ->
+                run.status.isTerminal && attentionItems.none {
+                    it.source == NowSource.AGENT_RUN && it.sourceId == run.id
+                }
+            }
             .sortedByDescending(AgentRun::updatedAt)
             .take(RECENT_LIMIT)
 
     val attentionCount: Int
-        get() = pendingReviews.size + attentionRuns.size
+        get() = nowContent.attentionItems.size
 
     val activeCount: Int
         get() = executingRuns.size + inProgressTasks.size
@@ -108,7 +102,7 @@ data class ProgressUiState(
     val hasAnyContent: Boolean
         get() = attentionCount > 0 || activeCount > 0 ||
             recentlyCompletedTasks.isNotEmpty() || recentlyFinishedRuns.isNotEmpty() ||
-            pendingSyncCount > 0
+            processingCount > 0 || pendingSyncCount > 0
 
     private val taskCandidates: List<Todo>
         get() = tasks.filter { it.inboxState == null || it.inboxState == "none" }
@@ -118,13 +112,6 @@ data class ProgressUiState(
         const val ATTENTION_LIMIT = 10
     }
 }
-
-private val ReviewRiskLevel.attentionOrder: Int
-    get() = when (this) {
-        ReviewRiskLevel.HIGH -> 0
-        ReviewRiskLevel.MEDIUM -> 1
-        ReviewRiskLevel.LOW -> 2
-    }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -204,6 +191,221 @@ class ProgressViewModel @Inject constructor(
         if (_uiState.value.hasExecutingRuns) load(silent = true)
     }
 
+    fun clearActionError() {
+        if (_uiState.value.pendingActionId == null) {
+            _uiState.update { it.copy(actionError = null) }
+        }
+    }
+
+    fun captureToInbox(raw: String) {
+        if (_uiState.value.isCapturing) return
+        val draft = QuickCaptureParser.parse(raw) ?: return
+        val request = draft.toTodoCreate(
+            source = "android_app",
+            idempotencyKey = java.util.UUID.randomUUID().toString(),
+        )
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCapturing = true, captureError = null) }
+            when (val result = todoRepository.createTodo(request)) {
+                is ApiResult.Success -> _uiState.update { state ->
+                    state.copy(
+                        tasks = listOf(result.data) + state.tasks.filterNot { it.id == result.data.id },
+                        isCapturing = false,
+                        captureError = null,
+                        lastCapturedTodo = result.data,
+                    )
+                }
+                is ApiResult.Error -> _uiState.update {
+                    it.copy(isCapturing = false, captureError = result.message)
+                }
+                ApiResult.Loading -> _uiState.update {
+                    it.copy(isCapturing = false, captureError = ACTION_INCOMPLETE_ERROR)
+                }
+            }
+        }
+    }
+
+    fun acknowledgeCapture(todoId: String) {
+        _uiState.update { state ->
+            if (state.lastCapturedTodo?.id == todoId) state.copy(lastCapturedTodo = null) else state
+        }
+    }
+
+    fun undoCapture(todoId: String) {
+        val captured = _uiState.value.lastCapturedTodo?.takeIf { it.id == todoId } ?: return
+        _uiState.update { it.copy(lastCapturedTodo = null) }
+        viewModelScope.launch {
+            when (val result = todoRepository.deleteTodo(todoId)) {
+                is ApiResult.Success -> _uiState.update { state ->
+                    state.copy(tasks = state.tasks.filterNot { it.id == todoId })
+                }
+                is ApiResult.Error -> _uiState.update { state ->
+                    state.copy(
+                        tasks = listOf(captured) + state.tasks.filterNot { it.id == captured.id },
+                        captureError = result.message,
+                    )
+                }
+                ApiResult.Loading -> _uiState.update { state ->
+                    state.copy(
+                        tasks = listOf(captured) + state.tasks.filterNot { it.id == captured.id },
+                        captureError = ACTION_INCOMPLETE_ERROR,
+                    )
+                }
+            }
+        }
+    }
+
+    fun fileTodo(item: NowItem, dueToday: Boolean) {
+        if (!beginAction(item, NowSource.TODO, NowAction.FILE)) return
+        viewModelScope.launch {
+            val update = TodoUpdate(
+                inboxState = "none",
+                dueDate = if (dueToday) java.time.LocalDate.now().toString() else null,
+            )
+            when (val result = todoRepository.updateTodo(item.sourceId, update)) {
+                is ApiResult.Success -> _uiState.update { state ->
+                    state.copy(
+                        tasks = state.tasks.replaceTodo(result.data),
+                        pendingActionId = null,
+                        actionError = null,
+                    )
+                }
+                is ApiResult.Error -> failAction(item.stableId, result.message)
+                ApiResult.Loading -> failAction(item.stableId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    fun retryNowItem(item: NowItem) {
+        if (!beginAction(item, item.source, NowAction.RETRY)) return
+        viewModelScope.launch {
+            when (item.source) {
+                NowSource.TODO -> retryTodo(item)
+                NowSource.AGENT_RUN -> retryRun(item)
+                NowSource.REVIEW -> failAction(item.stableId, ACTION_UNSUPPORTED_ERROR)
+            }
+        }
+    }
+
+    fun answerRun(item: NowItem, answer: String) {
+        val normalized = answer.trim()
+        if (normalized.isEmpty()) {
+            _uiState.update { it.copy(actionError = ACTION_ANSWER_REQUIRED_ERROR) }
+            return
+        }
+        if (!beginAction(item, NowSource.AGENT_RUN, NowAction.ANSWER)) return
+        viewModelScope.launch {
+            when (val result = agentRunRepository.resumeRun(item.sourceId, normalized)) {
+                is ApiResult.Success -> finishRunAction(item.stableId, result.data)
+                is ApiResult.Error -> failAction(item.stableId, result.message)
+                ApiResult.Loading -> failAction(item.stableId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    fun answerTodoQuestions(item: NowItem, answers: Map<String, String>) {
+        if (!beginAction(item, NowSource.TODO, NowAction.ANSWER)) return
+        viewModelScope.launch {
+            when (val result = todoRepository.answerTodoQuestions(item.sourceId, answers)) {
+                is ApiResult.Success -> finishTodoQuestions(item, answers)
+                is ApiResult.Error -> failAction(item.stableId, result.message)
+                ApiResult.Loading -> failAction(item.stableId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    fun skipTodoQuestions(item: NowItem) {
+        if (!beginAction(item, NowSource.TODO, NowAction.ANSWER)) return
+        viewModelScope.launch {
+            when (val result = todoRepository.skipTodoQuestions(item.sourceId)) {
+                is ApiResult.Success -> finishTodoQuestions(item, emptyMap())
+                is ApiResult.Error -> failAction(item.stableId, result.message)
+                ApiResult.Loading -> failAction(item.stableId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    private fun beginAction(item: NowItem, source: NowSource, action: NowAction): Boolean {
+        val current = _uiState.value
+        val isCurrent = current.attentionItems.any {
+            it.stableId == item.stableId && it.source == source && it.action == action
+        }
+        if (!isCurrent || !item.canHandleOnDevice || current.pendingActionId != null) return false
+        _uiState.update { it.copy(pendingActionId = item.stableId, actionError = null) }
+        return true
+    }
+
+    private suspend fun retryTodo(item: NowItem) {
+        when (val result = todoRepository.organizeTodo(item.sourceId)) {
+            is ApiResult.Success -> _uiState.update { state ->
+                state.copy(
+                    tasks = state.tasks.map { todo ->
+                        if (todo.id == item.sourceId) {
+                            todo.copy(
+                                inboxState = "planning",
+                                nextAction = "wait",
+                                automationError = null,
+                            )
+                        } else {
+                            todo
+                        }
+                    },
+                    pendingActionId = null,
+                    actionError = null,
+                )
+            }
+            is ApiResult.Error -> failAction(item.stableId, result.message)
+            ApiResult.Loading -> failAction(item.stableId, ACTION_INCOMPLETE_ERROR)
+        }
+    }
+
+    private suspend fun retryRun(item: NowItem) {
+        when (val result = agentRunRepository.retryRun(item.sourceId)) {
+            is ApiResult.Success -> finishRunAction(item.stableId, result.data)
+            is ApiResult.Error -> failAction(item.stableId, result.message)
+            ApiResult.Loading -> failAction(item.stableId, ACTION_INCOMPLETE_ERROR)
+        }
+    }
+
+    private fun finishRunAction(stableId: String, run: AgentRun) {
+        _uiState.update { state ->
+            if (state.pendingActionId != stableId) return@update state
+            state.copy(
+                runs = state.runs.filterNot { it.id == run.id } + run,
+                pendingActionId = null,
+                actionError = null,
+            )
+        }
+    }
+
+    private fun finishTodoQuestions(item: NowItem, answers: Map<String, String>) {
+        _uiState.update { state ->
+            if (state.pendingActionId != item.stableId) return@update state
+            state.copy(
+                tasks = state.tasks.map { todo ->
+                    if (todo.id == item.sourceId) {
+                        todo.copy(
+                            inboxState = "planning",
+                            nextAction = "wait",
+                            clarificationAnswers = answers.mapValues { it.value.trim() },
+                        )
+                    } else {
+                        todo
+                    }
+                },
+                pendingActionId = null,
+                actionError = null,
+            )
+        }
+    }
+
+    private fun failAction(stableId: String, message: String) {
+        _uiState.update { state ->
+            if (state.pendingActionId != stableId) return@update state
+            state.copy(pendingActionId = null, actionError = message)
+        }
+    }
+
     private fun load(userInitiated: Boolean = false, silent: Boolean = false) {
         if (loadJob?.isActive == true) {
             reloadQueued = true
@@ -250,5 +452,15 @@ class ProgressViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun List<Todo>.replaceTodo(updated: Todo): List<Todo> =
+        if (any { it.id == updated.id }) map { if (it.id == updated.id) updated else it }
+        else this + updated
+
+    private companion object {
+        const val ACTION_INCOMPLETE_ERROR = "Action did not complete"
+        const val ACTION_UNSUPPORTED_ERROR = "Open the review before deciding"
+        const val ACTION_ANSWER_REQUIRED_ERROR = "An answer is required"
     }
 }

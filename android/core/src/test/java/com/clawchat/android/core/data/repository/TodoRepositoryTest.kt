@@ -15,6 +15,8 @@ import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.model.TodoQuestionAnswersRequest
+import com.clawchat.android.core.data.model.TodoWorkflowResponse
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.notification.ReminderNotificationController
@@ -265,6 +267,67 @@ class TodoRepositoryTest {
 
         assertTrue(result is ApiResult.Error)
         io.mockk.verify(exactly = 0) { syncManager.notifyTodoChanged() }
+    }
+
+    @Test
+    fun `answer questions trims values and starts planning`() = runTest {
+        coEvery {
+            api.answerTodoQuestions(
+                "todo-1",
+                TodoQuestionAnswersRequest(mapOf("0" to "Friday", "1" to "Email")),
+                any(),
+            )
+        } returns TodoWorkflowResponse(status = "processing", todoId = "todo-1")
+
+        val result = repository.answerTodoQuestions(
+            "todo-1",
+            mapOf("0" to "  Friday  ", "1" to "Email"),
+        )
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) {
+            api.answerTodoQuestions(
+                "todo-1",
+                TodoQuestionAnswersRequest(mapOf("0" to "Friday", "1" to "Email")),
+                any(),
+            )
+        }
+    }
+
+    @Test
+    fun `answer questions rejects incomplete answers before network`() = runTest {
+        val result = repository.answerTodoQuestions(
+            "todo-1",
+            mapOf("0" to "Friday", "1" to "   "),
+        )
+
+        assertTrue(result is ApiResult.Error)
+        coVerify(exactly = 0) { api.answerTodoQuestions(any(), any(), any()) }
+    }
+
+    @Test
+    fun `skip questions starts planning`() = runTest {
+        coEvery { api.skipTodoQuestions("todo-1", any()) } returns
+            TodoWorkflowResponse(status = "processing", todoId = "todo-1")
+
+        val result = repository.skipTodoQuestions("todo-1")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { api.skipTodoQuestions("todo-1", any()) }
+    }
+
+    @Test
+    fun `stale question response is reported as conflict`() = runTest {
+        coEvery { api.skipTodoQuestions("todo-1", any()) } returns TodoWorkflowResponse(
+            status = "invalid_state",
+            todoId = "todo-1",
+            inboxState = "plan_ready",
+        )
+
+        val result = repository.skipTodoQuestions("todo-1")
+
+        assertTrue(result is ApiResult.Error)
+        assertEquals(409, (result as ApiResult.Error).code)
     }
 
     @Test

@@ -278,7 +278,7 @@ class TasksViewModelTest {
     }
 
     @Test
-    fun `deleteTask removes task from list`() = runTest {
+    fun `deleteTask hides task until deletion is committed`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
         coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Success(Unit)
@@ -291,6 +291,66 @@ class TasksViewModelTest {
 
         assertEquals(1, viewModel.uiState.value.tasks.size)
         assertEquals("2", viewModel.uiState.value.tasks.first().id)
+        assertEquals("1", viewModel.uiState.value.pendingDeletion?.task?.id)
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
+
+        viewModel.commitDelete(viewModel.uiState.value.pendingDeletion!!.token)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.pendingDeletion)
+        coVerify(exactly = 1) { todoRepository.deleteTodo("1") }
+    }
+
+    @Test
+    fun `undoDelete restores task at its original position without deleting`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        val token = viewModel.uiState.value.pendingDeletion!!.token
+        viewModel.undoDelete(token)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(sampleTodos, viewModel.uiState.value.tasks)
+        assertNull(viewModel.uiState.value.pendingDeletion)
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
+    }
+
+    @Test
+    fun `failed committed deletion restores task`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Error("Delete failed")
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        viewModel.commitDelete(viewModel.uiState.value.pendingDeletion!!.token)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(sampleTodos, viewModel.uiState.value.tasks)
+        assertEquals("Delete failed", viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `pending deletion stays hidden during realtime refresh`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        todoChanged.emit(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("2"), viewModel.uiState.value.tasks.map(Todo::id))
+        assertEquals("1", viewModel.uiState.value.pendingDeletion?.task?.id)
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
     }
 
     @Test

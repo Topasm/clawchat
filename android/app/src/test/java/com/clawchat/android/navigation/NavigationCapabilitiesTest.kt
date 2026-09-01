@@ -31,17 +31,19 @@ class NavigationCapabilitiesTest {
     }
 
     @Test
-    fun `server mode retains the connected primary navigation`() {
+    fun `server mode exposes four primary destinations and keeps detail routes open`() {
         assertEquals(
-            listOf("inbox", "progress", "today"),
+            listOf("progress", "tasks", "today", "chat"),
             NavigationCapabilities.primaryRoutes(WorkspaceMode.SERVER),
         )
         assertEquals(
-            listOf("tasks", "chat", "review", "runs", "search", "settings"),
+            listOf("search", "settings"),
             NavigationCapabilities.secondaryRoutes(WorkspaceMode.SERVER),
         )
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "progress"))
+        assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "inbox"))
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "review"))
+        assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "review?review_id=review-1"))
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "runs?run_id=run-1"))
         assertFalse(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "unknown"))
     }
@@ -55,9 +57,9 @@ class NavigationCapabilitiesTest {
     }
 
     @Test
-    fun `start destination follows workspace capture capability`() {
+    fun `start destination follows workspace mode`() {
         assertEquals("onboarding", NavigationCapabilities.startRoute(WorkspaceMode.UNCONFIGURED))
         assertEquals("tasks", NavigationCapabilities.startRoute(WorkspaceMode.LOCAL))
-        assertEquals("inbox", NavigationCapabilities.startRoute(WorkspaceMode.SERVER))
+        assertEquals("progress", NavigationCapabilities.startRoute(WorkspaceMode.SERVER))
     }
 }

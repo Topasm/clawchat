@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.text.format.DateFormat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,7 +65,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.ui.ClawEmptyState
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.icons.ClawIcons
 import java.time.Duration
@@ -129,11 +130,15 @@ internal fun parseDisplayDateTime(
 
 @Composable
 fun ChatScreen(
-    onOpenNavigation: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val newConversationTitle = stringResource(R.string.chat_new_conversation_default_title)
+
+    BackHandler(enabled = state.selectedConversationId != null) {
+        viewModel.clearSelection()
+    }
 
     if (state.selectedConversationId != null) {
         ChatDetailView(
@@ -149,7 +154,7 @@ fun ChatScreen(
         ConversationListView(
             conversations = state.conversations,
             isLoading = state.isLoadingConversations,
-            onOpenNavigation = onOpenNavigation,
+            onOpenSearch = onOpenSearch,
             onSelect = viewModel::selectConversation,
             onCreate = { viewModel.createConversation(newConversationTitle) },
         )
@@ -161,7 +166,7 @@ fun ChatScreen(
 private fun ConversationListView(
     conversations: List<Conversation>,
     isLoading: Boolean,
-    onOpenNavigation: () -> Unit,
+    onOpenSearch: () -> Unit,
     onSelect: (String) -> Unit,
     onCreate: () -> Unit,
 ) {
@@ -175,8 +180,13 @@ private fun ConversationListView(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
+                actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.chat_search),
+                        )
+                    }
                 },
                 colors = ClawTopBarColors(),
             )

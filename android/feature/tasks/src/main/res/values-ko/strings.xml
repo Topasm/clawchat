@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="tasks_cd_search">빠른 찾기</string>
     <string name="tasks_title">작업</string>
     <string name="tasks_cd_new_task">새 작업</string>
     <string name="tasks_loading">작업 불러오는 중…</string>
@@ -37,6 +38,8 @@
     <string name="tasks_detail_title">작업 상세</string>
     <string name="tasks_cd_back">뒤로</string>
     <string name="tasks_cd_delete">작업 삭제</string>
+    <string name="tasks_deleted">작업을 삭제했습니다</string>
+    <string name="tasks_undo">실행 취소</string>
     <string name="tasks_mark_complete">%1$s 완료로 표시</string>
     <string name="tasks_mark_incomplete">%1$s 미완료로 표시</string>
     <string name="tasks_description_title">설명</string>

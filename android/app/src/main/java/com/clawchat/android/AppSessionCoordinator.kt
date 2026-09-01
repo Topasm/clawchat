@@ -6,6 +6,7 @@ import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.notification.ReminderNotificationHelper
 import com.clawchat.android.core.notification.ReminderWorkScheduler
 import com.clawchat.android.core.sync.SyncManager
+import com.clawchat.android.notification.AttentionNotificationCoordinator
 import com.clawchat.android.share.ShareOutboxScheduler
 import com.clawchat.android.widget.common.WidgetUpdater
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,6 +16,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -31,6 +34,7 @@ class AppSessionCoordinator @Inject constructor(
     @ApplicationContext context: Context,
     private val sessionStore: SessionStore,
     private val syncManager: SyncManager,
+    private val attentionNotifications: AttentionNotificationCoordinator,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -61,6 +65,7 @@ class AppSessionCoordinator @Inject constructor(
                     appContext,
                     state.workspaceKey,
                 )
+                attentionNotifications.clearOtherWorkspaces(state.workspaceKey)
 
                 if (serverSession != null) {
                     // A capture can be accepted before login. Activating its
@@ -72,6 +77,9 @@ class AppSessionCoordinator @Inject constructor(
                 // cancels that request if the workspace changes again, and each
                 // widget performs a final scope check before publishing content.
                 updateWidgetsSafely()
+                state.workspaceKey?.takeIf { serverSession != null }?.let {
+                    attentionNotifications.refresh(it)
+                }
             }
         }
 
@@ -114,6 +122,21 @@ class AppSessionCoordinator @Inject constructor(
             }
         }
 
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            merge(
+                syncManager.todoChanged,
+                syncManager.reviewChanged,
+                syncManager.runChanged,
+            ).collectLatest {
+                delay(ATTENTION_REFRESH_COALESCE_MILLIS)
+                val state = sessionStore.runtimeState.first()
+                val workspaceKey = state.workspaceKey.takeIf {
+                    state.mode == WorkspaceMode.SERVER && state.activeSession != null
+                } ?: return@collectLatest
+                attentionNotifications.refresh(workspaceKey)
+            }
+        }
+
         // Install event collectors before reconcile() can connect and emit.
         sessionJob.start()
     }
@@ -130,5 +153,6 @@ class AppSessionCoordinator @Inject constructor(
 
     private companion object {
         const val WIDGET_REFRESH_COALESCE_MILLIS = 150L
+        const val ATTENTION_REFRESH_COALESCE_MILLIS = 350L
     }
 }

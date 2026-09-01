@@ -50,7 +50,6 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawListSection
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
@@ -66,7 +65,6 @@ import java.time.temporal.WeekFields
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeekScreen(
-    onOpenNavigation: () -> Unit = {},
     viewModel: WeekViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,7 +89,6 @@ fun WeekScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = { ClawNavigationMenuButton(onClick = onOpenNavigation) },
                 colors = ClawTopBarColors(),
             )
         },

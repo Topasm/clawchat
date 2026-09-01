@@ -6,30 +6,30 @@ import org.junit.Test
 class PlannerNavigationTest {
 
     @Test
-    fun `all planner pages select the single schedule drawer destination`() {
+    fun `all planner pages select the single schedule primary destination`() {
         assertEquals(
             NavRoute.Today.route,
-            plannerDrawerRoute(NavRoute.Today.route),
+            plannerPrimaryRoute(NavRoute.Today.route),
         )
         assertEquals(
             NavRoute.Today.route,
-            plannerDrawerRoute(NavRoute.Calendar.route),
+            plannerPrimaryRoute(NavRoute.Calendar.route),
         )
         assertEquals(
             NavRoute.Today.route,
-            plannerDrawerRoute(NavRoute.Today.route),
+            plannerPrimaryRoute(NavRoute.Today.route),
         )
     }
 
     @Test
-    fun `planner page does not change unrelated drawer destinations`() {
+    fun `planner page does not change unrelated primary destinations`() {
         assertEquals(
             NavRoute.Tasks.route,
-            plannerDrawerRoute(NavRoute.Tasks.route),
+            plannerPrimaryRoute(NavRoute.Tasks.route),
         )
         assertEquals(
             NavRoute.Progress.route,
-            plannerDrawerRoute(NavRoute.Progress.route),
+            plannerPrimaryRoute(NavRoute.Progress.route),
         )
     }
 }

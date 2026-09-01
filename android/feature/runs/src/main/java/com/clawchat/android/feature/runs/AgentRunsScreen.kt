@@ -68,7 +68,6 @@ import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.localizedErrorMessage
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
@@ -90,7 +89,6 @@ private const val ACTIVE_POLL_INTERVAL_MS = 3_000L
 fun AgentRunsScreen(
     viewModel: AgentRunsViewModel = hiltViewModel(),
     onBack: (() -> Unit)? = null,
-    onOpenNavigation: (() -> Unit)? = null,
     onOpenReview: (AgentRun) -> Unit = {},
     /** Exact review subject to reveal after navigation; consumed once. */
     initialRunId: String? = null,
@@ -138,9 +136,6 @@ fun AgentRunsScreen(
                     }
                 },
                 actions = {
-                    onOpenNavigation?.let { openNavigation ->
-                        ClawNavigationMenuButton(onClick = openNavigation)
-                    }
                     IconButton(onClick = viewModel::refresh) {
                         Icon(
                             Icons.Default.Refresh,

@@ -67,6 +67,19 @@ interface ClawChatApi {
         @Tag expectedScope: ExpectedSessionScope? = null,
     ): Response<Unit>
 
+    @POST("api/todos/{todoId}/answer-questions")
+    suspend fun answerTodoQuestions(
+        @Path("todoId") todoId: String,
+        @Body body: TodoQuestionAnswersRequest,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodoWorkflowResponse
+
+    @POST("api/todos/{todoId}/skip-questions")
+    suspend fun skipTodoQuestions(
+        @Path("todoId") todoId: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodoWorkflowResponse
+
     // --- Task relationships ---
 
     @GET("api/task-relationships")

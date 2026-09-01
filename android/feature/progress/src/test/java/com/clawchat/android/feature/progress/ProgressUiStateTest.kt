@@ -37,8 +37,26 @@ class ProgressUiStateTest {
             reviews = listOf(review(subjectId = waitingRun.id)),
         )
 
-        assertEquals(listOf("run-input"), state.attentionRuns.map(AgentRun::id))
+        assertEquals(
+            listOf("run:run-input", "review:review-run-review"),
+            state.attentionItems.map(NowItem::stableId),
+        )
         assertEquals(2, state.attentionCount)
+    }
+
+    @Test
+    fun `inbox actions are included in the single attention count`() {
+        val state = ProgressUiState(
+            tasks = listOf(
+                Todo(id = "question", title = "Question", inboxState = "questioning"),
+                Todo(id = "capture", title = "Capture", inboxState = "captured"),
+                Todo(id = "planning", title = "Planning", inboxState = "planning"),
+            ),
+        )
+
+        assertEquals(listOf(NowAction.ANSWER, NowAction.FILE), state.attentionItems.map(NowItem::action))
+        assertEquals(2, state.attentionCount)
+        assertEquals(1, state.processingCount)
     }
 
     @Test

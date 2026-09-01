@@ -78,6 +78,8 @@ data class Todo(
     @SerialName("source_id") val sourceId: String? = null,
     @SerialName("next_action") val nextAction: String? = null,
     @SerialName("plan_summary") val planSummary: String? = null,
+    @SerialName("clarification_questions") val clarificationQuestions: List<String>? = null,
+    @SerialName("clarification_answers") val clarificationAnswers: Map<String, String>? = null,
     @SerialName("sync_status") val syncStatus: String? = null,
     @SerialName("project_label") val projectLabel: String? = null,
     @SerialName("is_recurring") val isRecurring: Boolean = false,
@@ -112,6 +114,18 @@ data class TodoUpdate(
     @SerialName("inbox_state") val inboxState: String? = null,
     /** Device edit time used by the server's last-write-wins reconnect policy. */
     @SerialName("client_updated_at") val clientUpdatedAt: String? = null,
+)
+
+@Serializable
+data class TodoQuestionAnswersRequest(
+    val answers: Map<String, String>,
+)
+
+@Serializable
+data class TodoWorkflowResponse(
+    val status: String,
+    @SerialName("todo_id") val todoId: String,
+    @SerialName("inbox_state") val inboxState: String? = null,
 )
 
 // --- Events ---
