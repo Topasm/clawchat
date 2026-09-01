@@ -230,7 +230,9 @@ private fun TaskListView(
 
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
                 key = { page -> TASK_STATUS_FILTER_ORDER[page]?.wireValue ?: "all" },
             ) { page ->
                 val pageFilter = TASK_STATUS_FILTER_ORDER[page]
@@ -247,6 +249,7 @@ private fun TaskListView(
                     onDelete = onDelete,
                     onSetDueToday = onSetDueToday,
                     onCreate = { showCreateSheet = true },
+                    separateCompleted = pageFilter == null,
                 )
             }
         }
@@ -272,6 +275,7 @@ private fun TaskStatusPage(
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onCreate: () -> Unit,
+    separateCompleted: Boolean,
 ) {
     if (isLoading && tasks.isEmpty()) {
         Box(
@@ -300,8 +304,10 @@ private fun TaskStatusPage(
         }
     } else {
         val lazyListState = rememberLazyListState()
+        val sections = splitTasksForAllView(tasks, separateCompleted)
 
         LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             state = lazyListState,
             contentPadding = PaddingValues(
                 start = 12.dp,
@@ -309,9 +315,9 @@ private fun TaskStatusPage(
                 top = 0.dp,
                 bottom = 88.dp,
             ),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
+            verticalArrangement = Arrangement.Top,
         ) {
-            items(tasks, key = { it.id }) { task ->
+            items(sections.active, key = { it.id }) { task ->
                 SwipeableTaskRow(
                     task = task,
                     onToggle = { onToggle(task.id) },
@@ -320,7 +326,63 @@ private fun TaskStatusPage(
                     onClick = { onSelect(task) },
                 )
             }
+            if (sections.completed.isNotEmpty()) {
+                item(key = "completed_boundary") {
+                    CompletedTasksBoundary(count = sections.completed.size)
+                }
+                items(sections.completed, key = { it.id }) { task ->
+                    SwipeableTaskRow(
+                        task = task,
+                        onToggle = { onToggle(task.id) },
+                        onDelete = { onDelete(task.id) },
+                        onSetDueToday = { onSetDueToday(task.id) },
+                        onClick = { onSelect(task) },
+                    )
+                }
+            }
         }
+    }
+}
+
+internal data class TaskListSections(
+    val active: List<Todo>,
+    val completed: List<Todo>,
+)
+
+internal fun splitTasksForAllView(
+    tasks: List<Todo>,
+    separateCompleted: Boolean,
+): TaskListSections = if (separateCompleted) {
+    TaskListSections(
+        active = tasks.filterNot { it.status == TaskStatus.COMPLETED },
+        completed = tasks.filter { it.status == TaskStatus.COMPLETED },
+    )
+} else {
+    TaskListSections(active = tasks, completed = emptyList())
+}
+
+@Composable
+private fun CompletedTasksBoundary(count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Text(
+            text = stringResource(R.string.tasks_completed_boundary, count),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
     }
 }
 

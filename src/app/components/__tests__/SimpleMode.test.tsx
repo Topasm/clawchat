@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
       tags: [],
       parent_id: null,
       project_id: null,
+      inbox_state: 'none',
       sort_order: 0,
       created_at: '2026-08-30T10:00:00.000Z',
       updated_at: '2026-08-30T10:00:00.000Z',
@@ -29,9 +30,23 @@ const mocks = vi.hoisted(() => ({
       tags: [],
       parent_id: null,
       project_id: null,
+      inbox_state: 'none',
       sort_order: 0,
       created_at: '2026-08-29T10:00:00.000Z',
       updated_at: '2026-08-30T09:00:00.000Z',
+    },
+    {
+      id: 'inbox-task',
+      title: 'Classifying capture',
+      status: 'pending',
+      priority: 'medium',
+      tags: [],
+      parent_id: null,
+      project_id: null,
+      inbox_state: 'classifying',
+      sort_order: 0,
+      created_at: '2026-08-31T10:00:00.000Z',
+      updated_at: '2026-08-31T10:00:00.000Z',
     },
   ],
 }));
@@ -91,6 +106,7 @@ describe('SimpleMode', () => {
 
     expect(screen.getByText('Write release notes')).toBeInTheDocument();
     expect(screen.queryByText('Ship desktop build')).not.toBeInTheDocument();
+    expect(screen.queryByText('Classifying capture')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Task title' }), {
       target: { value: 'Plan tomorrow' },

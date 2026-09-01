@@ -7984,6 +7984,19 @@
             ],
             "title": "Assignee"
           },
+          "client_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Client edit time for last-write-wins offline synchronization",
+            "title": "Client Updated At"
+          },
           "depends_on": {
             "anyOf": [
               {
@@ -8326,7 +8339,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "1.4.6"
+    "version": "1.4.8"
   },
   "openapi": "3.1.0",
   "paths": {

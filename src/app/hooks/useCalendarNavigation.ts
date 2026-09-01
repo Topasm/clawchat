@@ -3,14 +3,14 @@ import { MONTH_NAMES, startOfWeek, toDateKey } from '../utils/calendarUtils';
 
 export type ViewMode = 'month' | 'week';
 
-export default function useCalendarNavigation() {
+export default function useCalendarNavigation(initialView: ViewMode = 'month') {
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
 
-  const [view, setView] = useState<ViewMode>('month');
+  const [view, setView] = useState<ViewMode>(initialView);
   const [currentDate, setCurrentDate] = useState(() => new Date(today));
 
   // Dialog state

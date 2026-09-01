@@ -8,12 +8,13 @@ import { markStartupPhaseAfterPaint } from './app/services/startupPerformance';
 import { hideStartupShell } from './app/services/startupSurface';
 import { IS_DESKTOP } from './app/types/platform';
 import { isWorkspaceSessionReady } from './app/services/nativeRoutePolicy';
+import { useCapabilitiesQuery } from './app/hooks/queries';
 
 // ── Lazy-loaded pages ────────────────────────────────────────────────
 const Layout = lazy(() => import('./app/components/Layout'));
 const LoginPage = lazy(() => import('./app/pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./app/pages/OnboardingPage'));
-const TodayPage = lazy(() => import('./app/pages/TodayPage'));
+const SchedulePage = lazy(() => import('./app/pages/SchedulePage'));
 const InboxPage = lazy(() => import('./app/pages/InboxPage'));
 const ChatListPage = lazy(() => import('./app/pages/ChatListPage'));
 const ProjectWorkspacePage = lazy(() => import('./app/pages/ProjectWorkspacePage'));
@@ -26,7 +27,6 @@ const EventDetailPage = lazy(() => import('./app/pages/EventDetailPage'));
 const SettingsPage = lazy(() => import('./app/pages/SettingsPage'));
 const SystemPromptPage = lazy(() => import('./app/pages/SystemPromptPage'));
 const SearchPage = lazy(() => import('./app/pages/SearchPage'));
-const CalendarPage = lazy(() => import('./app/pages/CalendarPage'));
 const AdminPage = lazy(() => import('./app/pages/AdminPage'));
 const ConnectionCenterPage = lazy(() => import('./app/pages/ConnectionCenterPage'));
 const DiagnosticsPage = lazy(() => import('./app/pages/DiagnosticsPage'));
@@ -66,6 +66,16 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
       <RouteReadyMarker />
     </Suspense>
   );
+}
+
+/** Pick the first useful workspace surface while retaining old-server support. */
+function WorkspaceStartRedirect() {
+  const serverUrl = useAuthStore((state) => state.serverUrl);
+  const { data: capabilities, isLoading, isError } = useCapabilitiesQuery();
+
+  if (isLoading) return <PageFallback />;
+  const inboxUnavailable = !serverUrl || isError || capabilities?.features.inbox_pipeline === false;
+  return <Navigate to={inboxUnavailable ? '/tasks' : '/inbox'} replace />;
 }
 
 export default function AppRouter() {
@@ -215,12 +225,15 @@ export default function AppRouter() {
           </ErrorBoundary>
         }
       >
+        <Route path="/" element={<WorkspaceStartRedirect />} />
+        <Route path="/today" element={<Navigate to="/schedule/today" replace />} />
+        <Route path="/schedule" element={<Navigate to="/schedule/today" replace />} />
         <Route
-          path="/today"
+          path="/schedule/:view"
           element={
-            <ErrorBoundary name="TodayPage">
+            <ErrorBoundary name="SchedulePage">
               <LazyRoute>
-                <TodayPage />
+                <SchedulePage />
               </LazyRoute>
             </ErrorBoundary>
           }
@@ -315,16 +328,7 @@ export default function AppRouter() {
             </ErrorBoundary>
           }
         />
-        <Route
-          path="/calendar"
-          element={
-            <ErrorBoundary name="CalendarPage">
-              <LazyRoute>
-                <CalendarPage />
-              </LazyRoute>
-            </ErrorBoundary>
-          }
-        />
+        <Route path="/calendar" element={<Navigate to="/schedule/month" replace />} />
         <Route
           path="/events/:eventId"
           element={
@@ -355,7 +359,7 @@ export default function AppRouter() {
             </ErrorBoundary>
           }
         />
-        <Route path="*" element={<Navigate to="/today" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

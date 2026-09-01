@@ -21,6 +21,7 @@
     </plurals>
     <string name="tasks_summary_format">%1$s · %2$s · %3$s</string>
     <string name="tasks_filter_all">All</string>
+    <string name="tasks_completed_boundary">Completed · %1$d</string>
 
     <string name="tasks_status_pending">Pending</string>
     <string name="tasks_status_in_progress">In progress</string>

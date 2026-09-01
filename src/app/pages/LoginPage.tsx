@@ -145,7 +145,7 @@ export default function LoginPage() {
     const { phase, status, failure } = useHostSessionStore.getState();
     if (phase === 'connected') {
       setActiveWorkspace(LOCAL_WORKSPACE_ID);
-      navigate('/today');
+      navigate('/');
       return;
     }
     if (status) setServerUrl(`http://localhost:${status.port}`);
@@ -234,7 +234,7 @@ export default function LoginPage() {
             hostPublicKey: result.host_public_key ?? parsed.host_public_key,
             apiVersion: '1',
           });
-          navigate('/today');
+          navigate('/');
         } catch (err) {
           setError((err as Error).message);
         } finally {
@@ -248,7 +248,7 @@ export default function LoginPage() {
         setError('');
         try {
           await login(parsed.serverUrl.replace(/\/+$/, ''), parsed.pin);
-          navigate('/today');
+          navigate('/');
         } catch (err) {
           setError((err as Error).message);
         } finally {
@@ -281,7 +281,7 @@ export default function LoginPage() {
           apiVersion: identity.apiVersion ?? health.apiVersion,
         });
       }
-      navigate('/today');
+      navigate('/');
     } catch (err) {
       setError((err as Error).message);
     } finally {

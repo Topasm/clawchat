@@ -42,8 +42,14 @@
 
     <string name="notification_reminders_channel">Reminders</string>
     <string name="notification_reminders_channel_description">Event and task reminders</string>
+    <string name="notification_reminders_summary_title">ClawChat reminders</string>
+    <plurals name="notification_reminders_summary_count">
+        <item quantity="one">%1$d reminder needs attention</item>
+        <item quantity="other">%1$d reminders need attention</item>
+    </plurals>
     <string name="notification_mark_done">Mark done</string>
     <string name="notification_todo_overdue">“%1$s” is overdue.</string>
+    <string name="notification_todo_due_today">“%1$s” is due today.</string>
     <plurals name="notification_todo_due_in_minutes">
         <item quantity="one">“%1$s” is due in %2$d minute.</item>
         <item quantity="other">“%1$s” is due in %2$d minutes.</item>

@@ -121,6 +121,7 @@ export const TodoUpdateSchema = z.object({
   inbox_state: InboxStateSchema.optional(),
   recurrence_rule: z.string().nullable().optional(),
   recurrence_end: z.string().nullable().optional(),
+  client_updated_at: z.string().optional(),
 });
 
 export const TaskPlacementRequestSchema = z.object({

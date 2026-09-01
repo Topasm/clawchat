@@ -1,24 +1,23 @@
 package com.clawchat.android.navigation
 
-import com.clawchat.android.feature.planner.PlannerPage
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PlannerNavigationTest {
 
     @Test
-    fun `today and week keep today selected while month selects calendar`() {
+    fun `all planner pages select the single schedule drawer destination`() {
         assertEquals(
             NavRoute.Today.route,
-            plannerDrawerRoute(NavRoute.Today.route, PlannerPage.TODAY),
+            plannerDrawerRoute(NavRoute.Today.route),
         )
         assertEquals(
             NavRoute.Today.route,
-            plannerDrawerRoute(NavRoute.Calendar.route, PlannerPage.WEEK),
+            plannerDrawerRoute(NavRoute.Calendar.route),
         )
         assertEquals(
-            NavRoute.Calendar.route,
-            plannerDrawerRoute(NavRoute.Today.route, PlannerPage.MONTH),
+            NavRoute.Today.route,
+            plannerDrawerRoute(NavRoute.Today.route),
         )
     }
 
@@ -26,7 +25,7 @@ class PlannerNavigationTest {
     fun `planner page does not change unrelated drawer destinations`() {
         assertEquals(
             NavRoute.Tasks.route,
-            plannerDrawerRoute(NavRoute.Tasks.route, PlannerPage.MONTH),
+            plannerDrawerRoute(NavRoute.Tasks.route),
         )
     }
 }

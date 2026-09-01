@@ -1,14 +1,24 @@
-import type { TodoResponse } from '../../types/api';
+import type { TaskStatus, TodoResponse } from '../../types/api';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
 import usePlatform from '../../hooks/usePlatform';
 import SegmentedControl from '../shared/SegmentedControl';
 import { translateUi } from '../../i18n';
 export type TasksViewMode = 'kanban' | 'list' | 'graph';
+export type TasksStatusFilter = TaskStatus | 'all';
+export const TASK_STATUS_FILTERS: TasksStatusFilter[] = [
+  'in_progress',
+  'pending',
+  'completed',
+  'cancelled',
+  'all',
+];
 interface TasksHeaderProps {
   todos: TodoResponse[];
   viewMode: TasksViewMode;
   onViewModeChange: (mode: TasksViewMode) => void;
   subtitle?: string;
+  statusFilter: TasksStatusFilter;
+  onStatusFilterChange: (filter: TasksStatusFilter) => void;
 }
 const VIEW_OPTIONS = [
   { label: 'Kanban', value: 'kanban' },
@@ -20,6 +30,8 @@ export default function TasksHeader({
   viewMode,
   onViewModeChange,
   subtitle,
+  statusFilter,
+  onStatusFilterChange,
 }: TasksHeaderProps) {
   const { isMobile } = usePlatform();
   return (
@@ -31,15 +43,39 @@ export default function TasksHeader({
         </div>
       </div>
       <div className="cc-tasks-header__actions">
-        <SegmentedControl
-          ariaLabel={translateUi('Task view')}
-          options={VIEW_OPTIONS.map((option) => ({
-            ...option,
-            label: translateUi(option.label),
-          }))}
-          value={viewMode}
-          onChange={(value) => onViewModeChange(value as TasksViewMode)}
-        />
+        <div className="cc-tasks-header__status-filter">
+          <SegmentedControl
+            ariaLabel={translateUi('Task status')}
+            options={TASK_STATUS_FILTERS.map((status) => ({
+              value: status,
+              label:
+                status === 'all'
+                  ? translateUi('All')
+                  : translateUi(
+                      status === 'in_progress'
+                        ? 'In Progress'
+                        : status === 'pending'
+                          ? 'Todo'
+                          : status === 'completed'
+                            ? 'Done'
+                            : 'Cancelled',
+                    ),
+            }))}
+            value={statusFilter}
+            onChange={(value) => onStatusFilterChange(value as TasksStatusFilter)}
+          />
+        </div>
+        <div className="cc-tasks-header__view-filter">
+          <SegmentedControl
+            ariaLabel={translateUi('Task view')}
+            options={VIEW_OPTIONS.map((option) => ({
+              ...option,
+              label: translateUi(option.label),
+            }))}
+            value={viewMode}
+            onChange={(value) => onViewModeChange(value as TasksViewMode)}
+          />
+        </div>
         {!isMobile && (
           <button
             className="cc-btn cc-btn--primary"

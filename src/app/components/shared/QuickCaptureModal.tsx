@@ -91,7 +91,7 @@ export default function QuickCaptureModal({
   const handleReviewNow = () => {
     if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
     onClose();
-    navigate(receipt === 'Event created' ? '/calendar' : '/inbox');
+    navigate(receipt === 'Event created' ? '/schedule/month' : '/inbox');
   };
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

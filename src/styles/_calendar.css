@@ -3,6 +3,16 @@
    ============================================================ */
 
 /* --- Main container --------------------------------------- */
+.cc-schedule {
+  min-height: 100%;
+}
+
+.cc-schedule__switcher {
+  display: flex;
+  justify-content: center;
+  padding: 16px 24px 0;
+}
+
 .cc-calendar {
   display: flex;
   flex-direction: column;

@@ -87,6 +87,9 @@
         <receiver
             android:name="com.clawchat.android.core.notification.ReminderActionReceiver"
             android:exported="false" />
+        <receiver
+            android:name="com.clawchat.android.core.notification.ReminderDismissReceiver"
+            android:exported="false" />
 
         <!-- Deletes a durable shared capture only after an explicit user action. -->
         <receiver

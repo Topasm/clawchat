@@ -41,8 +41,13 @@
 
     <string name="notification_reminders_channel">미리 알림</string>
     <string name="notification_reminders_channel_description">일정 및 작업 미리 알림</string>
+    <string name="notification_reminders_summary_title">ClawChat 미리 알림</string>
+    <plurals name="notification_reminders_summary_count">
+        <item quantity="other">확인할 미리 알림 %1$d개</item>
+    </plurals>
     <string name="notification_mark_done">완료</string>
     <string name="notification_todo_overdue">‘%1$s’ 작업의 기한이 지났습니다.</string>
+    <string name="notification_todo_due_today">‘%1$s’ 작업이 오늘 마감됩니다.</string>
     <plurals name="notification_todo_due_in_minutes">
         <item quantity="other">‘%1$s’ 작업이 %2$d분 후 마감됩니다.</item>
     </plurals>

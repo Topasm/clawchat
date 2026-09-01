@@ -109,6 +109,7 @@ class AppSessionCoordinator @Inject constructor(
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             syncManager.todoChanged.collectLatest {
                 delay(WIDGET_REFRESH_COALESCE_MILLIS)
+                ReminderWorkScheduler.runNow(appContext)
                 updateWidgetsSafely()
             }
         }

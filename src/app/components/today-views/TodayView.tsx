@@ -93,7 +93,7 @@ export default function TodayView({
             className="cc-btn cc-btn--ghost cc-btn--icon-touch"
             onClick={() =>
               navigate('/settings/app', {
-                state: settingsNavigationState('/today'),
+                state: settingsNavigationState('/schedule/today'),
               })
             }
             aria-label={translateUi('Open settings')}

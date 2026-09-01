@@ -11,7 +11,7 @@ class NavigationCapabilitiesTest {
     @Test
     fun `local mode exposes only device features`() {
         assertEquals(
-            listOf("today", "tasks", "calendar"),
+            listOf("tasks", "today"),
             NavigationCapabilities.primaryRoutes(WorkspaceMode.LOCAL),
         )
         assertEquals(
@@ -33,7 +33,7 @@ class NavigationCapabilitiesTest {
     @Test
     fun `server mode retains the connected primary navigation`() {
         assertEquals(
-            listOf("today", "inbox", "tasks", "chat", "calendar"),
+            listOf("inbox", "tasks", "today", "chat"),
             NavigationCapabilities.primaryRoutes(WorkspaceMode.SERVER),
         )
         assertEquals(
@@ -51,5 +51,12 @@ class NavigationCapabilitiesTest {
         assertTrue(NavigationCapabilities.secondaryRoutes(WorkspaceMode.UNCONFIGURED).isEmpty())
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.UNCONFIGURED, "onboarding"))
         assertFalse(NavigationCapabilities.canOpen(WorkspaceMode.UNCONFIGURED, "today"))
+    }
+
+    @Test
+    fun `start destination follows workspace capture capability`() {
+        assertEquals("onboarding", NavigationCapabilities.startRoute(WorkspaceMode.UNCONFIGURED))
+        assertEquals("tasks", NavigationCapabilities.startRoute(WorkspaceMode.LOCAL))
+        assertEquals("inbox", NavigationCapabilities.startRoute(WorkspaceMode.SERVER))
     }
 }

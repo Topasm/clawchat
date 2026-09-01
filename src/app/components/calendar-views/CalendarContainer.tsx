@@ -9,7 +9,15 @@ import CalendarHeader from './CalendarHeader';
 import MonthView from './MonthView';
 import WeekView from './WeekView';
 
-export default function CalendarContainer() {
+interface CalendarContainerProps {
+  initialView?: 'week' | 'month';
+  showViewToggle?: boolean;
+}
+
+export default function CalendarContainer({
+  initialView = 'month',
+  showViewToggle = true,
+}: CalendarContainerProps = {}) {
   const navigate = useNavigate();
   const { data: events = [] } = useEventsQuery();
 
@@ -30,7 +38,7 @@ export default function CalendarContainer() {
     setDialogOpen,
     dialogDate,
     dialogTime,
-  } = useCalendarNavigation();
+  } = useCalendarNavigation(initialView);
 
   const eventsByDate = useMemo(() => indexEventsByDate(events), [events]);
 
@@ -51,6 +59,7 @@ export default function CalendarContainer() {
         onPrev={goPrev}
         onNext={goNext}
         onToday={goToday}
+        showViewToggle={showViewToggle}
       />
 
       {view === 'month' ? (

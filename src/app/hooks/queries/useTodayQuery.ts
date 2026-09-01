@@ -7,6 +7,7 @@ import { getGreeting } from '../../utils/formatters';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { isTerminalTaskStatus } from '../../utils/taskStatus';
+import { isInboxTodo } from '../../utils/inboxState';
 
 interface TodayData {
   todayTasks: TodoResponse[];
@@ -33,13 +34,13 @@ function deriveTodayFromCache(
   todayEnd.setDate(todayEnd.getDate() + 1);
 
   const todayTasks = todos.filter((t) => {
-    if (!t.due_date) return false;
+    if (isInboxTodo(t) || !t.due_date) return false;
     const d = new Date(t.due_date);
     return d >= todayStart && d < todayEnd && !isTerminalTaskStatus(t.status);
   });
 
   const overdueTasks = todos.filter((t) => {
-    if (!t.due_date) return false;
+    if (isInboxTodo(t) || !t.due_date) return false;
     return new Date(t.due_date) < todayStart && !isTerminalTaskStatus(t.status);
   });
 
@@ -48,7 +49,7 @@ function deriveTodayFromCache(
     return d >= todayStart && d < todayEnd;
   });
 
-  const inboxCount = todos.filter((t) => !t.due_date && t.status === 'pending').length;
+  const inboxCount = todos.filter(isInboxTodo).length;
 
   return {
     todayTasks,
@@ -107,19 +108,19 @@ export default function useTodayData(): TodayData {
 
         return {
           todayTasks: todos.filter((t) => {
-            if (!t.due_date) return false;
+            if (isInboxTodo(t) || !t.due_date) return false;
             const d = new Date(t.due_date);
             return d >= todayStart && d < todayEnd && !isTerminalTaskStatus(t.status);
           }),
           overdueTasks: todos.filter((t) => {
-            if (!t.due_date) return false;
+            if (isInboxTodo(t) || !t.due_date) return false;
             return new Date(t.due_date) < todayStart && !isTerminalTaskStatus(t.status);
           }),
           todayEvents: events.filter((e) => {
             const d = new Date(e.start_time);
             return d >= todayStart && d < todayEnd;
           }),
-          inboxCount: todos.filter((t) => !t.due_date && t.status === 'pending').length,
+          inboxCount: todos.filter(isInboxTodo).length,
           greeting: getGreeting(),
           todayDate: now.toISOString().split('T')[0],
         };

@@ -21,7 +21,7 @@ object DatabaseModule {
             ClawChatDatabase::class.java,
             ClawChatDatabase.DB_NAME,
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 
@@ -36,4 +36,8 @@ object DatabaseModule {
 
     @Provides
     fun provideLocalEventDao(db: ClawChatDatabase): LocalEventDao = db.localEventDao()
+
+    @Provides
+    fun providePendingTodoMutationDao(db: ClawChatDatabase): PendingTodoMutationDao =
+        db.pendingTodoMutationDao()
 }

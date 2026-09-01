@@ -53,7 +53,7 @@ export default function OnboardingPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (token) {
-      navigate('/today', { replace: true });
+      navigate('/', { replace: true });
     }
   }, [token, navigate]);
   // Check the embedded server status through the active desktop adapter.

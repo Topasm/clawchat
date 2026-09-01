@@ -39,7 +39,6 @@ import type { HealthResponse } from '../types/api';
 import type { ColorPalette } from '../config/theme';
 // --- SVG icon components ---
 import {
-  SunIcon,
   InboxIcon,
   ChatIcon,
   TasksIcon,
@@ -51,6 +50,8 @@ import {
   RunsIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
+import { isTaskTodo } from '../utils/inboxState';
+import { getAttentionBadgeCounts } from '../utils/attentionBadge';
 import UpdateNotification from './shared/UpdateNotification';
 import { StatusDot } from './shared/WorkspacePrimitives';
 import { platformApi } from '../platform';
@@ -100,15 +101,14 @@ const CONNECTION_LABEL_KEYS: Record<ConnectionStatus, string> = {
   reconnecting: 'connection.reconnecting',
 };
 const primaryNavItems = [
-  { to: '/today', labelKey: 'nav.today', Icon: SunIcon },
   { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
+  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
+  { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
   { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
 const secondaryNavItems = [
-  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
   { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
   { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
-  { to: '/calendar', labelKey: 'nav.calendar', Icon: NavCalendarIcon },
 ];
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
@@ -137,6 +137,7 @@ export default function Layout() {
   const touchStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const quickCapture = useQuickCaptureStore();
+  const serverUrl = useAuthStore((state) => state.serverUrl);
   const { data: capabilities } = useCapabilitiesQuery();
   const { data: todos = [] } = useTodosQuery();
   const { data: pendingReviews = [] } = useReviewsQuery();
@@ -148,13 +149,21 @@ export default function Layout() {
   }, [isDesktop, simpleMode]);
   // Conditionally filter nav items based on server capabilities
   const filteredPrimaryNavItems = useMemo(() => {
+    if (!serverUrl) return primaryNavItems.filter((item) => item.to !== '/inbox');
     if (!capabilities) return primaryNavItems;
     return primaryNavItems.filter((item) => {
       if (item.to === '/inbox' && !capabilities.features.inbox_pipeline) return false;
       return true;
     });
-  }, [capabilities]);
+  }, [capabilities, serverUrl]);
   const filteredSecondaryNavItems = secondaryNavItems;
+  const availableMobileTabs = useMemo(
+    () =>
+      !serverUrl || capabilities?.features.inbox_pipeline === false
+        ? mobileTabs.filter((item) => item.to !== '/inbox')
+        : mobileTabs,
+    [capabilities, serverUrl],
+  );
   const filteredUtilityNavItems = useMemo(
     () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings/app')),
     [isMac],
@@ -186,7 +195,6 @@ export default function Layout() {
   // Offline queue: monitor network status and flush on reconnect
   const { isFlushing, pendingCount } = useNetworkStatus(refresh);
   // Health check polling
-  const serverUrl = useAuthStore((s) => s.serverUrl);
   const setHealthOK = useAuthStore((s) => s.setHealthOK);
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
   useEffect(() => {
@@ -235,27 +243,21 @@ export default function Layout() {
     ? t('connection.syncing')
     : t(CONNECTION_LABEL_KEYS[connectionStatus]);
   // Badge counts
-  const inboxCount = useMemo(
-    () => todos.filter((todo) => !todo.due_date && todo.status === 'pending').length,
-    [todos],
-  );
-  // Tasks that are due now or already late — what "needs attention today" means.
-  const dueCount = useMemo(() => {
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
-    return todos.filter((todo) => {
-      if (todo.status !== 'pending' || !todo.due_date) return false;
-      const due = new Date(todo.due_date);
-      return !Number.isNaN(due.getTime()) && due <= endOfToday;
-    }).length;
-  }, [todos]);
+  const {
+    inboxCount,
+    dueCount,
+    total: attentionBadgeCount,
+  } = useMemo(() => getAttentionBadgeCounts(todos), [todos]);
   const openTaskCount = useMemo(
-    () => todos.filter((todo) => todo.status === 'pending' || todo.status === 'in_progress').length,
+    () =>
+      todos.filter(
+        (todo) => isTaskTodo(todo) && (todo.status === 'pending' || todo.status === 'in_progress'),
+      ).length,
     [todos],
   );
   const navBadgeCounts = useMemo<Record<string, number>>(
     () => ({
-      '/today': dueCount,
+      '/schedule': dueCount,
       '/inbox': inboxCount,
       '/tasks': openTaskCount,
       '/review': pendingReviews.length,
@@ -265,16 +267,16 @@ export default function Layout() {
   // The OS icon badge stands for "needs you now", so it counts unfiled work
   // plus anything due or overdue -- not the whole open backlog.
   useEffect(() => {
-    void setAppBadge(inboxCount + dueCount);
-  }, [inboxCount, dueCount]);
+    void setAppBadge(attentionBadgeCount);
+  }, [attentionBadgeCount]);
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
   const activeMobileTabIndex = useMemo(
     () =>
-      mobileTabs.findIndex(
+      availableMobileTabs.findIndex(
         (tab) => location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`),
       ),
-    [location.pathname],
+    [availableMobileTabs, location.pathname],
   );
   const canSwipeTabs = isMobile && !onChatPage && activeMobileTabIndex >= 0;
   const isDetailPage =
@@ -435,10 +437,10 @@ export default function Layout() {
       return;
     }
     if (!canSwipeTabs) return;
-    if (dx < 0 && activeMobileTabIndex < mobileTabs.length - 1) {
-      navigate(mobileTabs[activeMobileTabIndex + 1].to);
+    if (dx < 0 && activeMobileTabIndex < availableMobileTabs.length - 1) {
+      navigate(availableMobileTabs[activeMobileTabIndex + 1].to);
     } else if (dx > 0 && activeMobileTabIndex > 0) {
-      navigate(mobileTabs[activeMobileTabIndex - 1].to);
+      navigate(availableMobileTabs[activeMobileTabIndex - 1].to);
     }
   };
   const handleRefresh = useCallback(() => {
@@ -518,7 +520,7 @@ export default function Layout() {
             {mobileMainContent}
           </div>
           <FloatingActionButton />
-          <BottomNav />
+          <BottomNav tabs={availableMobileTabs} />
         </>
       ) : (
         <PanelGroup orientation="horizontal" id="cc-layout">

@@ -508,6 +508,18 @@ async def update_todo(
     _user: str = Depends(get_current_user),
 ):
     data = body.model_dump(exclude_unset=True)
+    client_updated_at = data.pop("client_updated_at", None)
+    if client_updated_at is not None:
+        current = await todo_service.get_todo(db, todo_id)
+        server_updated_at = current.updated_at
+        if server_updated_at.tzinfo is None:
+            server_updated_at = server_updated_at.replace(tzinfo=timezone.utc)
+        if client_updated_at.tzinfo is None:
+            client_updated_at = client_updated_at.replace(tzinfo=timezone.utc)
+        if server_updated_at > client_updated_at:
+            # Another device wrote later while this client was offline. Return
+            # the winning row so every client converges without a retry loop.
+            return await _enrich_todo_response(current, db)
     todo = await todo_service.update_todo(db, todo_id, **data)
     await db.commit()
     await db.refresh(todo)

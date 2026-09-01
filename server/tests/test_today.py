@@ -79,3 +79,40 @@ async def test_today_inbox_count_tracks_open_inbox_workflow_items_only(
     body = response.json()
     assert body["inbox_count"] == 1
     assert [todo["title"] for todo in body["needs_review"]] == ["Captured"]
+
+
+@pytest.mark.asyncio
+async def test_today_keeps_inbox_workflow_items_out_of_schedule_buckets(
+    client,
+    auth_headers,
+    db_session,
+):
+    scheduled = Todo(
+        title="Organised today task",
+        due_date=datetime(2026, 9, 1, 3, tzinfo=timezone.utc),
+        inbox_state="none",
+    )
+    captured = Todo(
+        title="Captured with parsed date",
+        due_date=datetime(2026, 9, 1, 4, tzinfo=timezone.utc),
+        inbox_state="captured",
+    )
+    processing = Todo(
+        title="Processing in progress",
+        status=TaskStatus.IN_PROGRESS,
+        inbox_state="planning",
+    )
+    db_session.add_all([scheduled, captured, processing])
+    await db_session.commit()
+
+    response = await client.get(
+        "/api/today",
+        params={"date": "2026-09-01", "utc_offset_minutes": 540},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [todo["title"] for todo in body["today_tasks"]] == ["Organised today task"]
+    assert captured.id not in {todo["id"] for todo in body["overdue_tasks"]}
+    assert processing.id not in {todo["id"] for todo in body["today_tasks"]}

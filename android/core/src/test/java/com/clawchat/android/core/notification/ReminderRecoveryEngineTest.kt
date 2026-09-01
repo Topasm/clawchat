@@ -13,6 +13,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.ZoneId
 
 class ReminderRecoveryEngineTest {
     private val now = Instant.parse("2026-08-31T01:00:00Z")
@@ -91,6 +92,34 @@ class ReminderRecoveryEngineTest {
     }
 
     @Test
+    fun `date-only deadline alerts on the device local due day`() = runTest {
+        val seoulNow = Instant.parse("2026-08-31T15:10:00Z") // 2026-09-01 00:10 KST
+        val source = FakeSource(
+            remoteTodos = ApiResult.Success(
+                listOf(
+                    todoWithDueText("today", "2026-09-01"),
+                    todoWithDueText("server-midnight", "2026-09-01T00:00:00"),
+                    todoWithDueText("tomorrow", "2026-09-02"),
+                ),
+            ),
+        )
+        val harness = harness(
+            source = source,
+            clock = Clock.fixed(seoulNow, ZoneOffset.UTC),
+            zoneId = ZoneId.of("Asia/Seoul"),
+        )
+
+        harness.engine.recover()
+
+        assertEquals(
+            setOf("today", "server-midnight"),
+            harness.delivered.map { it.itemId }.toSet(),
+        )
+        assertTrue(harness.delivered.all { it.reminderType == "todo_due_today" })
+        assertEquals(Instant.parse("2026-09-01T15:00:00Z"), source.lastTodoDueBefore)
+    }
+
+    @Test
     fun `event horizon supports two-hour and one-day leads but waits for remindAt`() = runTest {
         val source = FakeSource(
             remoteEvents = ApiResult.Success(
@@ -106,7 +135,7 @@ class ReminderRecoveryEngineTest {
         harness.engine.recover()
 
         assertEquals(setOf("two-hour", "one-day"), harness.delivered.map { it.itemId }.toSet())
-        assertEquals(now.plusSeconds(60 * 60), source.lastTodoDueBefore)
+        assertEquals(Instant.parse("2026-09-01T00:00:00Z"), source.lastTodoDueBefore)
         assertEquals(LocalDate.parse("2026-09-01"), source.lastEventTo)
     }
 
@@ -339,6 +368,7 @@ class ReminderRecoveryEngineTest {
         claims: FakeClaims = FakeClaims(),
         cacheTrust: FakeCacheTrust = FakeCacheTrust(),
         clock: Clock = this.clock,
+        zoneId: ZoneId = ZoneOffset.UTC,
     ): Harness {
         val delivered = mutableListOf<RecoveredReminder>()
         var sessionClears = 0
@@ -353,6 +383,7 @@ class ReminderRecoveryEngineTest {
             claims = claims,
             cacheTrust = cacheTrust,
             clock = clock,
+            zoneId = zoneId,
         )
         return Harness(engine, delivered) { sessionClears }
     }
@@ -362,6 +393,9 @@ class ReminderRecoveryEngineTest {
         due: Instant,
         status: TaskStatus = TaskStatus.PENDING,
     ) = Todo(id = id, title = id, dueDate = due.toString(), status = status)
+
+    private fun todoWithDueText(id: String, due: String) =
+        Todo(id = id, title = id, dueDate = due, status = TaskStatus.PENDING)
 
     private fun event(id: String, start: String, reminderMinutes: Int) = Event(
         id = id,

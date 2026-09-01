@@ -109,6 +109,8 @@ data class TodoUpdate(
     val tags: List<String>? = null,
     @SerialName("sort_order") val sortOrder: Int? = null,
     @SerialName("inbox_state") val inboxState: String? = null,
+    /** Device edit time used by the server's last-write-wins reconnect policy. */
+    @SerialName("client_updated_at") val clientUpdatedAt: String? = null,
 )
 
 // --- Events ---

@@ -12,7 +12,13 @@
 .cc-tasks-header__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.cc-tasks-header__status-filter .cc-segmented__option {
+  min-width: 58px;
 }
 
 .cc-tasks-header__actions .cc-segmented__option {
@@ -1167,7 +1173,9 @@
     gap: 10px;
   }
   .cc-tasks-header__actions,
-  .cc-tasks-header__actions .cc-segmented {
+  .cc-tasks-header__actions .cc-segmented,
+  .cc-tasks-header__status-filter,
+  .cc-tasks-header__view-filter {
     width: 100%;
   }
   .cc-tasks-header__actions .cc-segmented__option {

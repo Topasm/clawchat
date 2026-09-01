@@ -9,6 +9,7 @@ interface CalendarHeaderProps {
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
+  showViewToggle?: boolean;
 }
 export default function CalendarHeader({
   headerLabel,
@@ -17,6 +18,7 @@ export default function CalendarHeader({
   onPrev,
   onNext,
   onToday,
+  showViewToggle = true,
 }: CalendarHeaderProps) {
   return (
     <div className="cc-calendar__header">
@@ -48,17 +50,19 @@ export default function CalendarHeader({
           </button>
         </div>
       </div>
-      <div className="cc-calendar__header-right">
-        <SegmentedControl
-          ariaLabel={translateUi('Calendar view')}
-          options={[
-            { label: translateUi('Month'), value: 'month' },
-            { label: translateUi('Week'), value: 'week' },
-          ]}
-          value={view}
-          onChange={(v) => onViewChange(v as ViewMode)}
-        />
-      </div>
+      {showViewToggle && (
+        <div className="cc-calendar__header-right">
+          <SegmentedControl
+            ariaLabel={translateUi('Calendar view')}
+            options={[
+              { label: translateUi('Month'), value: 'month' },
+              { label: translateUi('Week'), value: 'week' },
+            ]}
+            value={view}
+            onChange={(v) => onViewChange(v as ViewMode)}
+          />
+        </div>
+      )}
     </div>
   );
 }

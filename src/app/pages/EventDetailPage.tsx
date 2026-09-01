@@ -91,7 +91,7 @@ export default function EventDetailPage() {
       return;
     }
     deleteEventMutation.mutate(eventId);
-    navigate('/today');
+    navigate('/schedule/today');
   };
   const handleDeleteMode = async (mode: 'this_only' | 'this_and_future' | 'all') => {
     if (!eventId || !event) return;
@@ -103,7 +103,7 @@ export default function EventDetailPage() {
         event.occurrence_date ?? new Date(event.start_time).toISOString().slice(0, 10);
       deleteOccurrenceMutation.mutate({ eventId, date: occDate, mode });
     }
-    navigate('/today');
+    navigate('/schedule/today');
   };
   if (!event) {
     return (
@@ -112,7 +112,7 @@ export default function EventDetailPage() {
         <button
           type="button"
           className="cc-btn cc-btn--secondary cc-mt-16"
-          onClick={() => navigate('/today')}
+          onClick={() => navigate('/schedule/today')}
         >
           {translateUi('\n          Back to today\n        ')}
         </button>

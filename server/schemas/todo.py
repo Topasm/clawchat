@@ -72,6 +72,10 @@ class TodoUpdate(BaseModel):
     source_id: str | None = None
     recurrence_rule: str | None = None
     recurrence_end: datetime | None = None
+    client_updated_at: datetime | None = Field(
+        default=None,
+        description="Client edit time for last-write-wins offline synchronization",
+    )
 
     _validate_source_id = field_validator("source_id")(_normalize_source_id)
 

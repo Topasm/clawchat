@@ -60,23 +60,19 @@ private data class DrawerNavItem(
 )
 
 private val allDrawerNavItems = listOf(
-    DrawerNavItem(NavRoute.Today.route, ClawIcons.Today, R.string.nav_today),
     DrawerNavItem(NavRoute.Inbox.route, ClawIcons.Inbox, R.string.nav_inbox),
     DrawerNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, R.string.nav_tasks),
+    DrawerNavItem(NavRoute.Today.route, Icons.Default.DateRange, R.string.nav_schedule),
     DrawerNavItem(NavRoute.Chat.route, ClawIcons.Chat, R.string.nav_chat),
-    DrawerNavItem(NavRoute.Calendar.route, Icons.Default.DateRange, R.string.nav_calendar),
     DrawerNavItem(NavRoute.Review.route, ClawIcons.CheckCircle, R.string.nav_review),
     DrawerNavItem(NavRoute.Runs.route, Icons.Default.PlayArrow, R.string.nav_runs),
     DrawerNavItem(NavRoute.Search.route, Icons.Default.Search, R.string.nav_search),
     DrawerNavItem(NavRoute.Settings.route, Icons.Default.Settings, R.string.nav_settings),
 )
 
-internal fun plannerDrawerRoute(currentRoute: String?, page: PlannerPage): String? =
+internal fun plannerDrawerRoute(currentRoute: String?): String? =
     when (currentRoute) {
-        NavRoute.Today.route, NavRoute.Calendar.route -> when (page) {
-            PlannerPage.MONTH -> NavRoute.Calendar.route
-            PlannerPage.TODAY, PlannerPage.WEEK -> NavRoute.Today.route
-        }
+        NavRoute.Today.route, NavRoute.Calendar.route -> NavRoute.Today.route
         else -> currentRoute
     }
 
@@ -95,11 +91,7 @@ fun ClawChatNavGraph(
     onDeepLinkHandled: () -> Unit = {},
 ) {
     val navController = rememberNavController()
-    val startDestination = if (workspaceMode == WorkspaceMode.UNCONFIGURED) {
-        NavRoute.Onboarding.route
-    } else {
-        NavRoute.Today.route
-    }
+    val startDestination = NavigationCapabilities.startRoute(workspaceMode)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     val drawerItemsByRoute = remember { allDrawerNavItems.associateBy(DrawerNavItem::route) }
@@ -129,7 +121,7 @@ fun ClawChatNavGraph(
             else -> Unit
         }
         navController.navigate(route) {
-            popUpTo(NavRoute.Today.route)
+            popUpTo(navController.graph.findStartDestination().id)
             launchSingleTop = true
         }
         onDeepLinkHandled()
@@ -138,7 +130,7 @@ fun ClawChatNavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val currentBaseRoute = currentRoute?.substringBefore('?')
-    val selectedDrawerRoute = plannerDrawerRoute(currentBaseRoute, plannerPage)
+    val selectedDrawerRoute = plannerDrawerRoute(currentBaseRoute)
     val openNavigation: () -> Unit = {
         coroutineScope.launch { drawerState.open() }
     }
@@ -208,12 +200,12 @@ fun ClawChatNavGraph(
             composable(NavRoute.Onboarding.route) {
                 OnboardingScreen(
                     onComplete = {
-                        navController.navigate(NavRoute.Today.route) {
+                        navController.navigate(NavRoute.Inbox.route) {
                             popUpTo(NavRoute.Onboarding.route) { inclusive = true }
                         }
                     },
                     onSkip = {
-                        navController.navigate(NavRoute.Today.route) {
+                        navController.navigate(NavRoute.Tasks.route) {
                             popUpTo(NavRoute.Onboarding.route) { inclusive = true }
                         }
                     },

@@ -18,6 +18,7 @@
     </plurals>
     <string name="tasks_summary_format">%1$s · %2$s · %3$s</string>
     <string name="tasks_filter_all">전체</string>
+    <string name="tasks_completed_boundary">완료됨 · %1$d개</string>
 
     <string name="tasks_status_pending">대기 중</string>
     <string name="tasks_status_in_progress">진행 중</string>

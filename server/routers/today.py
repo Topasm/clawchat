@@ -100,6 +100,7 @@ async def get_today(
         .where(
             Todo.due_date >= today_start,
             Todo.due_date < tomorrow_start,
+            Todo.inbox_state == "none",
             Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.created_at.asc())
@@ -109,6 +110,7 @@ async def get_today(
     # Also include in-progress tasks not due today
     in_progress_q = select(Todo).where(
         Todo.status == TaskStatus.IN_PROGRESS,
+        Todo.inbox_state == "none",
         or_(
             Todo.due_date == None,  # noqa: E711
             Todo.due_date < today_start,
@@ -123,6 +125,7 @@ async def get_today(
         select(Todo)
         .where(
             Todo.due_date < today_start,
+            Todo.inbox_state == "none",
             Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
         )
         .order_by(Todo.due_date.asc())

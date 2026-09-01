@@ -82,4 +82,25 @@ class DatabaseMigrationsTest {
         }
         assertTrue(MIGRATION_2_3.startVersion == 2 && MIGRATION_2_3.endVersion == 3)
     }
+
+    @Test
+    fun `migration 3 to 4 adds the durable todo mutation queue`() {
+        val database = mockk<SupportSQLiteDatabase>(relaxed = true)
+
+        MIGRATION_3_4.migrate(database)
+
+        verify(exactly = 1) {
+            database.execSQL(match { sql ->
+                sql.contains("CREATE TABLE IF NOT EXISTS `pending_todo_mutations`") &&
+                    sql.contains("PRIMARY KEY(`workspaceKey`, `operationId`)")
+            })
+        }
+        verify(exactly = 1) {
+            database.execSQL(match { sql ->
+                sql.contains("index_pending_todo_workspace_item_time") &&
+                    sql.contains("`workspaceKey`, `todoId`, `changedAt`")
+            })
+        }
+        assertTrue(MIGRATION_3_4.startVersion == 3 && MIGRATION_3_4.endVersion == 4)
+    }
 }

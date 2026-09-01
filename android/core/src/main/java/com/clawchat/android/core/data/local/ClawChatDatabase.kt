@@ -9,8 +9,9 @@ import androidx.room.RoomDatabase
         EventEntity::class,
         LocalTodoEntity::class,
         LocalEventEntity::class,
+        PendingTodoMutationEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class ClawChatDatabase : RoomDatabase() {
@@ -18,6 +19,7 @@ abstract class ClawChatDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
     abstract fun localTodoDao(): LocalTodoDao
     abstract fun localEventDao(): LocalEventDao
+    abstract fun pendingTodoMutationDao(): PendingTodoMutationDao
 
     companion object {
         const val DB_NAME = "clawchat_cache"

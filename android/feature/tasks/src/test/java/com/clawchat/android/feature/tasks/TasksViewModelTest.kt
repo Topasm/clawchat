@@ -84,6 +84,25 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun `all page keeps completed tasks in a separate bottom section`() {
+        val pending = Todo(id = "pending", title = "Pending", status = TaskStatus.PENDING)
+        val completed = Todo(id = "completed", title = "Completed", status = TaskStatus.COMPLETED)
+        val inProgress = Todo(
+            id = "in-progress",
+            title = "In progress",
+            status = TaskStatus.IN_PROGRESS,
+        )
+
+        val sections = splitTasksForAllView(
+            tasks = listOf(completed, pending, inProgress),
+            separateCompleted = true,
+        )
+
+        assertEquals(listOf(pending, inProgress), sections.active)
+        assertEquals(listOf(completed), sections.completed)
+    }
+
+    @Test
     fun `initial load success populates tasks`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))

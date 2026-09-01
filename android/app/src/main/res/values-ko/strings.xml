@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="nav_today">오늘</string>
-    <string name="nav_calendar">캘린더</string>
-    <string name="nav_inbox">받은 편지함</string>
+    <string name="nav_schedule">일정</string>
+    <string name="nav_inbox">Inbox</string>
     <string name="nav_chat">채팅</string>
     <string name="nav_tasks">작업</string>
     <string name="nav_search">검색</string>

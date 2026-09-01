@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">ClawChat</string>
-    <string name="nav_today">Today</string>
-    <string name="nav_calendar">Calendar</string>
+    <string name="nav_schedule">Schedule</string>
     <string name="nav_inbox">Inbox</string>
     <string name="nav_chat">Chat</string>
     <string name="nav_tasks">Tasks</string>

@@ -9,6 +9,7 @@ import type { TodoResponse } from '../types/api';
 import { formatDueDate } from '../utils/formatters';
 import { CalendarIcon, CheckIcon, ExpandIcon, PlusIcon } from './shared/Icons';
 import '../../styles/_simple-mode.css';
+import { isTaskTodo } from '../utils/inboxState';
 
 type SimpleTaskFilter = 'open' | 'completed';
 
@@ -35,6 +36,7 @@ export default function SimpleMode() {
   const visibleTodos = useMemo(
     () =>
       todos
+        .filter(isTaskTodo)
         .filter((todo) =>
           filter === 'completed'
             ? todo.status === 'completed'
@@ -47,10 +49,11 @@ export default function SimpleMode() {
         }),
     [filter, todos],
   );
-  const openCount = todos.filter(
+  const taskTodos = todos.filter(isTaskTodo);
+  const openCount = taskTodos.filter(
     (todo) => todo.status === 'pending' || todo.status === 'in_progress',
   ).length;
-  const completedCount = todos.filter((todo) => todo.status === 'completed').length;
+  const completedCount = taskTodos.filter((todo) => todo.status === 'completed').length;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();

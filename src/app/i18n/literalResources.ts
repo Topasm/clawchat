@@ -720,6 +720,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Task list': '작업 목록',
   'Task not found': '작업을 찾을 수 없습니다',
   'Task relationship graph': '작업 관계 그래프',
+  'Task status': '작업 상태',
   'Task title': '작업 제목',
   tasks: '작업',
   Tasks: '할 일',

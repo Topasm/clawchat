@@ -502,7 +502,7 @@ export default function SettingsPage() {
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
-              onClick={() => navigate('/calendar')}
+              onClick={() => navigate('/schedule/month')}
             >
               {t('workspaceSettings.actions.open')}
             </button>

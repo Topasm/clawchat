@@ -195,9 +195,17 @@ class MainActivity : ComponentActivity() {
         val workspaceKey = intent.getStringExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY)
             ?: return
         val route = reminderRoute(reminderType) ?: return
+        if (intent.hasExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID)) {
+            val notificationId = intent.getIntExtra(
+                ReminderNotificationHelper.EXTRA_NOTIFICATION_ID,
+                0,
+            )
+            ReminderNotificationHelper.dismissReminderNotification(this, notificationId)
+        }
         intent.removeExtra(ReminderNotificationHelper.EXTRA_REMINDER_TYPE)
         intent.removeExtra(ReminderNotificationHelper.EXTRA_ITEM_ID)
         intent.removeExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY)
+        intent.removeExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID)
         pendingReminderRoute.value = PendingReminderNavigation(
             route = route,
             workspaceKey = workspaceKey,

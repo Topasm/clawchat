@@ -128,3 +128,25 @@ val MIGRATION_2_3: Migration = object : Migration(2, 3) {
         )
     }
 }
+
+/** Adds a workspace-scoped durable queue for edits made while disconnected. */
+val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `pending_todo_mutations` (
+                `workspaceKey` TEXT NOT NULL,
+                `operationId` TEXT NOT NULL,
+                `todoId` TEXT NOT NULL,
+                `payload` TEXT NOT NULL,
+                `changedAt` TEXT NOT NULL,
+                PRIMARY KEY(`workspaceKey`, `operationId`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_pending_todo_workspace_item_time` " +
+                "ON `pending_todo_mutations` (`workspaceKey`, `todoId`, `changedAt`)",
+        )
+    }
+}
