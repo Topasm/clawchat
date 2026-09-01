@@ -27,5 +27,9 @@ class PlannerNavigationTest {
             NavRoute.Tasks.route,
             plannerDrawerRoute(NavRoute.Tasks.route),
         )
+        assertEquals(
+            NavRoute.Progress.route,
+            plannerDrawerRoute(NavRoute.Progress.route),
+        )
     }
 }

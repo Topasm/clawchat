@@ -23,6 +23,8 @@ import com.clawchat.android.core.notification.ReminderNotificationController
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.sync.PendingTodoUpdate
 import com.clawchat.android.core.sync.PendingTodoUpdateStore
+import com.clawchat.android.core.sync.PendingTodoCreate
+import com.clawchat.android.core.sync.PendingTodoDelete
 import com.clawchat.android.core.sync.applyPending
 import com.clawchat.android.core.sync.mergedUpdate
 import kotlinx.coroutines.flow.Flow
@@ -129,6 +131,9 @@ class TodoRepositoryImpl @Inject constructor(
             todoDao.upsertAll(mergedItems.map { it.toEntity(workspaceKey) })
             return ApiResult.Success(result.data.copy(items = mergedItems))
         }
+        if (result is ApiResult.Error && result.isRetryableMutationFailure()) {
+            return cachedServerTodos(workspaceKey, params)
+        }
         return result
     }
 
@@ -185,10 +190,27 @@ class TodoRepositoryImpl @Inject constructor(
             ?: return workspaceNotConfigured()
         val expectedScope = runtimeState.activeServerRequestScope()
             ?: return workspaceNotConfigured()
-        val result = apiCall { api.createTodo(body, expectedScope) }
+        val operationId = body.idempotencyKey
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: UUID.randomUUID().toString()
+        if (runCatching { UUID.fromString(operationId) }.isFailure) {
+            return ApiResult.Error("Invalid idempotency key", code = 422)
+        }
+        val outbound = body.copy(idempotencyKey = operationId)
+        val result = apiCall { api.createTodo(outbound, expectedScope) }
         if (result is ApiResult.Success) {
             todoDao.upsertAll(listOf(result.data.toEntity(workspaceKey)))
             syncManager.notifyTodoChanged()
+            return result
+        }
+        if (result is ApiResult.Error && result.isRetryableMutationFailure()) {
+            val changedAt = Instant.now().toString()
+            pendingUpdates.enqueueCreate(workspaceKey, operationId, outbound, changedAt)
+            val optimistic = outbound.toPendingTodo(operationId, changedAt)
+            todoDao.upsertAll(listOf(optimistic.toEntity(workspaceKey)))
+            syncManager.notifyTodoChanged()
+            return ApiResult.Success(optimistic)
         }
         return result
     }
@@ -279,11 +301,28 @@ class TodoRepositoryImpl @Inject constructor(
             ?: return workspaceNotConfigured()
         val expectedScope = runtimeState.activeServerRequestScope()
             ?: return workspaceNotConfigured()
-        val result = apiCall { api.deleteTodo(id, expectedScope) }
-        if (result is ApiResult.Success) {
+        val changedAt = Instant.now().toString()
+        if (pendingUpdates.hasPendingCreate(workspaceKey, id)) {
+            pendingUpdates.enqueueDelete(workspaceKey, id, changedAt)
             todoDao.deleteById(workspaceKey, id)
             reminderNotifications.dismissTodo(workspaceKey, id)
             syncManager.notifyTodoChanged()
+            return ApiResult.Success(Unit)
+        }
+        val result = apiCall { api.deleteTodo(id, expectedScope) }
+        if (result is ApiResult.Success) {
+            pendingUpdates.removeTodo(workspaceKey, id)
+            todoDao.deleteById(workspaceKey, id)
+            reminderNotifications.dismissTodo(workspaceKey, id)
+            syncManager.notifyTodoChanged()
+            return result
+        }
+        if (result is ApiResult.Error && result.isRetryableMutationFailure()) {
+            pendingUpdates.enqueueDelete(workspaceKey, id, changedAt)
+            todoDao.deleteById(workspaceKey, id)
+            reminderNotifications.dismissTodo(workspaceKey, id)
+            syncManager.notifyTodoChanged()
+            return ApiResult.Success(Unit)
         }
         return result
     }
@@ -336,19 +375,72 @@ class TodoRepositoryImpl @Inject constructor(
     private suspend fun currentRuntimeState(): AppRuntimeState = sessionStore.runtimeState.first()
 
     private suspend fun mergePending(workspaceKey: String, todos: List<Todo>): List<Todo> {
-        val pendingByTodo = pendingUpdates.forWorkspace(workspaceKey)
+        val mutations = pendingUpdates.allForWorkspace(workspaceKey)
+        val updatesByTodo = mutations.filterIsInstance<PendingTodoUpdate>()
             .groupBy(PendingTodoUpdate::todoId)
-        return todos.map { todo ->
-            val pending = pendingByTodo[todo.id].orEmpty()
-            if (pending.isEmpty()) {
-                todo
-            } else {
-                todo.applyPending(
-                    update = pending.mergedUpdate(),
-                    changedAt = pending.maxOf(PendingTodoUpdate::changedAt),
+        val createsByOperation = mutations.filterIsInstance<PendingTodoCreate>()
+            .associateBy(PendingTodoCreate::operationId)
+        val deletedTodoIds = mutations.filterIsInstance<PendingTodoDelete>()
+            .mapTo(mutableSetOf(), PendingTodoDelete::todoId)
+        val matchedCreateIds = mutableSetOf<String>()
+
+        val remote = todos.mapNotNull { todo ->
+            val pendingCreate = todo.idempotencyKey?.let(createsByOperation::get)
+            val mutationTodoId = pendingCreate?.todoId ?: todo.id
+            if (pendingCreate != null) matchedCreateIds += pendingCreate.todoId
+            if (mutationTodoId in deletedTodoIds || todo.id in deletedTodoIds) return@mapNotNull null
+            val updates = updatesByTodo[mutationTodoId].orEmpty() + updatesByTodo[todo.id].orEmpty()
+            when {
+                updates.isNotEmpty() -> todo.applyPending(
+                    update = updates.mergedUpdate(),
+                    changedAt = updates.maxOf(PendingTodoUpdate::changedAt),
                 )
+                pendingCreate != null -> todo.copy(syncStatus = "pending")
+                else -> todo
             }
         }
+
+        val localCreates = mutations.filterIsInstance<PendingTodoCreate>()
+            .filterNot { it.todoId in matchedCreateIds || it.todoId in deletedTodoIds }
+            .mapNotNull { todoDao.getById(workspaceKey, it.todoId)?.toModel() }
+            .map { it.copy(syncStatus = "pending") }
+        return localCreates + remote
+    }
+
+    private suspend fun cachedServerTodos(
+        workspaceKey: String,
+        params: Map<String, String>,
+    ): ApiResult<PaginatedResponse<Todo>> {
+        val mutations = pendingUpdates.allForWorkspace(workspaceKey)
+        val pendingIds = mutations
+            .mapTo(mutableSetOf()) { it.todoId }
+        val deletedIds = mutations
+            .filterIsInstance<PendingTodoDelete>()
+            .mapTo(mutableSetOf(), PendingTodoDelete::todoId)
+        var cached = todoDao.getAll(workspaceKey)
+            .asSequence()
+            .map { it.toModel() }
+            .filterNot { it.id in deletedIds }
+            .map { todo -> if (todo.id in pendingIds) todo.copy(syncStatus = "pending") else todo }
+        params["status"]?.let { status -> cached = cached.filter { it.status.wireValue == status } }
+        params["priority"]?.let { priority -> cached = cached.filter { it.priority == priority } }
+        params["inbox_state"]?.let { inbox -> cached = cached.filter { it.inboxState == inbox } }
+        params["due_before"]?.let { dueBefore ->
+            cached = cached.filter { it.dueDate != null && it.dueDate < dueBefore }
+        }
+        if (params["root_only"] == "true") cached = cached.filter { it.parentId == null }
+        val all = cached.toList()
+        val limit = params["limit"]?.toIntOrNull()?.coerceAtLeast(0) ?: 50
+        val page = params["page"]?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val offset = ((page - 1).toLong() * limit).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        return ApiResult.Success(
+            PaginatedResponse(
+                items = all.drop(offset).take(limit),
+                total = all.size,
+                page = page,
+                limit = limit,
+            ),
+        )
     }
 
     private fun TodoCreate.localOperationId(): String = idempotencyKey
@@ -360,6 +452,22 @@ class TodoRepositoryImpl @Inject constructor(
             ).toString()
         }
         ?: UUID.randomUUID().toString()
+
+    private fun TodoCreate.toPendingTodo(id: String, changedAt: String): Todo = Todo(
+        id = id,
+        title = title,
+        description = description,
+        priority = priority,
+        dueDate = dueDate,
+        tags = tags,
+        parentId = parentId,
+        source = source,
+        idempotencyKey = idempotencyKey,
+        inboxState = inboxState ?: "none",
+        syncStatus = "pending",
+        createdAt = changedAt,
+        updatedAt = changedAt,
+    )
 
 }
 

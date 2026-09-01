@@ -2,6 +2,7 @@
 <resources>
     <string name="nav_schedule">일정</string>
     <string name="nav_inbox">Inbox</string>
+    <string name="nav_progress">진행</string>
     <string name="nav_chat">채팅</string>
     <string name="nav_tasks">작업</string>
     <string name="nav_search">검색</string>

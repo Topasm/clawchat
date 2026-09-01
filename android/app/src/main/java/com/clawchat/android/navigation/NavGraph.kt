@@ -47,6 +47,7 @@ import com.clawchat.android.feature.settings.SettingsScreen
 import com.clawchat.android.feature.tasks.TasksScreen
 import com.clawchat.android.feature.planner.PlannerPage
 import com.clawchat.android.feature.planner.PlannerScreen
+import com.clawchat.android.feature.progress.ProgressScreen
 import com.clawchat.android.feature.search.SearchScreen
 import com.clawchat.android.R
 import com.clawchat.android.core.data.WorkspaceMode
@@ -61,8 +62,9 @@ private data class DrawerNavItem(
 
 private val allDrawerNavItems = listOf(
     DrawerNavItem(NavRoute.Inbox.route, ClawIcons.Inbox, R.string.nav_inbox),
-    DrawerNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, R.string.nav_tasks),
+    DrawerNavItem(NavRoute.Progress.route, Icons.Default.PlayArrow, R.string.nav_progress),
     DrawerNavItem(NavRoute.Today.route, Icons.Default.DateRange, R.string.nav_schedule),
+    DrawerNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, R.string.nav_tasks),
     DrawerNavItem(NavRoute.Chat.route, ClawIcons.Chat, R.string.nav_chat),
     DrawerNavItem(NavRoute.Review.route, ClawIcons.CheckCircle, R.string.nav_review),
     DrawerNavItem(NavRoute.Runs.route, Icons.Default.PlayArrow, R.string.nav_runs),
@@ -274,8 +276,45 @@ fun ClawChatNavGraph(
                     ChatScreen(onOpenNavigation = openNavigation)
                 }
             }
-            composable(NavRoute.Tasks.route) {
-                TasksScreen(onOpenNavigation = openNavigation)
+            composable(NavRoute.Progress.route) {
+                ServerOnlyDestination(
+                    workspaceMode = workspaceMode,
+                    onConnectWorkspace = openConnectionSetup,
+                ) {
+                    ProgressScreen(
+                        onOpenNavigation = openNavigation,
+                        onOpenReview = navigateToReview,
+                        onOpenRun = { runId ->
+                            navController.navigate(NavRoute.Runs.destination(runId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenRuns = navigateToRuns,
+                        onOpenTask = { todoId ->
+                            navController.navigate(NavRoute.Tasks.destination(todoId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenTasks = {
+                            navController.navigate(NavRoute.Tasks.route) { launchSingleTop = true }
+                        },
+                    )
+                }
+            }
+            composable(
+                route = NavRoute.Tasks.routePattern,
+                arguments = listOf(
+                    navArgument(NavRoute.Tasks.ARG_TODO_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
+                TasksScreen(
+                    onOpenNavigation = openNavigation,
+                    initialTodoId = entry.arguments?.getString(NavRoute.Tasks.ARG_TODO_ID),
+                )
             }
             composable(NavRoute.Review.route) {
                 ServerOnlyDestination(

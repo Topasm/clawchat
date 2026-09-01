@@ -101,7 +101,7 @@ class ReviewInboxViewModelTest {
         coEvery { runRepository.getRun("run-1") } returns ApiResult.Success(authoritativeRun())
         coEvery { runRepository.listEvents("run-1") } returns ApiResult.Success(emptyList())
         coEvery {
-            repository.decide("review-run", ReviewDecision.APPROVED, "looks good")
+            repository.decide(runReview, ReviewDecision.APPROVED, "looks good")
         } returns ApiResult.Success(
             ReviewDecisionResponse(runReview.copy(status = ReviewStatus.APPROVED)),
         )
@@ -116,7 +116,7 @@ class ReviewInboxViewModelTest {
         viewModel.onAction(ReviewInboxAction.Decide(ReviewDecision.APPROVED))
         advanceUntilIdle()
 
-        coVerify { repository.decide("review-run", ReviewDecision.APPROVED, "looks good") }
+        coVerify { repository.decide(runReview, ReviewDecision.APPROVED, "looks good") }
         assertTrue(viewModel.uiState.value.items.isEmpty())
         assertNull(viewModel.uiState.value.selected)
     }
@@ -144,7 +144,7 @@ class ReviewInboxViewModelTest {
         coEvery { runRepository.getRun("run-1") } returns ApiResult.Success(authoritativeRun())
         coEvery { runRepository.listEvents("run-1") } returns ApiResult.Success(emptyList())
         coEvery {
-            repository.decide("review-run", ReviewDecision.CHANGES_REQUESTED, null)
+            repository.decide(runReview, ReviewDecision.CHANGES_REQUESTED, null)
         } returns ApiResult.Success(
             ReviewDecisionResponse(runReview.copy(status = ReviewStatus.CHANGES_REQUESTED)),
         )

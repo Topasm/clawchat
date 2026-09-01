@@ -70,6 +70,7 @@ data class Todo(
     @SerialName("parent_id") val parentId: String? = null,
     @SerialName("sort_order") val sortOrder: Int = 0,
     val source: String? = null,
+    @SerialName("idempotency_key") val idempotencyKey: String? = null,
     val assignee: String? = null,
     @SerialName("inbox_state") val inboxState: String? = null,
     @SerialName("estimated_minutes") val estimatedMinutes: Int? = null,

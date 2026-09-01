@@ -209,6 +209,15 @@ async def test_agent_approval_returns_typed_handoff_and_releases_ready_task_once
     assert nodes[still_blocked.id].direct_blocker_ids == ["todo_other_blocker"]
     await db_session.commit()
 
+    replay = await client.post(
+        f"/api/reviews/{review.id}/decision",
+        headers=auth_headers,
+        json={"decision": "approved", "note": "Adopt and continue"},
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["review"]["status"] == "approved"
+    assert replay.json()["outcome"] == {}
+
     duplicate = await client.post(
         f"/api/reviews/{review.id}/decision",
         headers=auth_headers,

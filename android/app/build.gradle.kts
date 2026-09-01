@@ -117,6 +117,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:runs"))
     implementation(project(":feature:review"))
+    implementation(project(":feature:progress"))
     implementation(project(":widget"))
 
     // Compose

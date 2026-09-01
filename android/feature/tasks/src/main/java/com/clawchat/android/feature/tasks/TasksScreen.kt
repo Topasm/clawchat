@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -98,9 +99,19 @@ internal val TASK_STATUS_FILTER_ORDER: List<TaskStatus?> = listOf(
 @Composable
 fun TasksScreen(
     onOpenNavigation: () -> Unit = {},
+    initialTodoId: String? = null,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var initialSelectionConsumed by rememberSaveable(initialTodoId) { mutableStateOf(false) }
+
+    LaunchedEffect(initialTodoId, state.tasks) {
+        if (initialSelectionConsumed || initialTodoId == null) return@LaunchedEffect
+        state.tasks.firstOrNull { it.id == initialTodoId }?.let { task ->
+            initialSelectionConsumed = true
+            viewModel.selectTask(task)
+        }
+    }
 
     if (state.selectedTask != null) {
         TaskDetailView(

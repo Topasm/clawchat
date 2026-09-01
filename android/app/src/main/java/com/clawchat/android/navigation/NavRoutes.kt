@@ -9,7 +9,14 @@ sealed class NavRoute(val route: String) {
     data object Calendar : NavRoute("calendar")
     data object Chat : NavRoute("chat")
     data object Inbox : NavRoute("inbox")
-    data object Tasks : NavRoute("tasks")
+    data object Progress : NavRoute("progress")
+    data object Tasks : NavRoute("tasks") {
+        const val ARG_TODO_ID = "todo_id"
+        val routePattern = "$route?$ARG_TODO_ID={$ARG_TODO_ID}"
+
+        fun destination(todoId: String? = null): String =
+            todoId?.let { "$route?$ARG_TODO_ID=${Uri.encode(it)}" } ?: route
+    }
     data object Review : NavRoute("review")
     data object Runs : NavRoute("runs") {
         const val ARG_RUN_ID = "run_id"

@@ -93,6 +93,11 @@ class SyncManager internal constructor(
         _todoChanged.tryEmit(Unit)
     }
 
+    /** Publish a review mutation completed locally or by reconnect replay. */
+    fun notifyReviewChanged() {
+        _reviewChanged.tryEmit(Unit)
+    }
+
     /**
      * Reconciles realtime ownership with the active workspace. Activity
      * recreation is intentionally a no-op when the process singleton already
@@ -167,7 +172,7 @@ class SyncManager internal constructor(
                     when (event.module) {
                         "todos" -> notifyTodoChanged()
                         "events" -> _eventChanged.tryEmit(Unit)
-                        "reviews" -> _reviewChanged.tryEmit(Unit)
+                        "reviews" -> notifyReviewChanged()
                         "runs" -> _runChanged.tryEmit(Unit)
                     }
                 }
@@ -191,7 +196,7 @@ class SyncManager internal constructor(
                     // direct or relay reconnect to recover missed events.
                     notifyTodoChanged()
                     _eventChanged.tryEmit(Unit)
-                    _reviewChanged.tryEmit(Unit)
+                    notifyReviewChanged()
                     _runChanged.tryEmit(Unit)
                 }
                 is SyncEvent.Disconnected -> {

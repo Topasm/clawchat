@@ -49,6 +49,7 @@ class TodoRepositoryTest {
     }
     private val syncManager = mockk<SyncManager>(relaxed = true)
     private val pendingUpdates = mockk<PendingTodoUpdateStore>(relaxed = true) {
+        coEvery { allForWorkspace(any()) } returns emptyList()
         coEvery { forWorkspace(any()) } returns emptyList()
         coEvery { forTodo(any(), any()) } returns emptyList()
     }
@@ -127,6 +128,62 @@ class TodoRepositoryTest {
     }
 
     @Test
+    fun `offline create is queued with a stable id and cached immediately`() = runTest {
+        val operationId = "00000000-0000-0000-0000-000000000099"
+        val request = TodoCreate(
+            title = "Captured offline",
+            inboxState = "captured",
+            idempotencyKey = operationId,
+        )
+        coEvery { api.createTodo(request, any()) } throws IOException("offline")
+
+        val result = repository.createTodo(request)
+
+        assertTrue(result is ApiResult.Success)
+        val optimistic = (result as ApiResult.Success).data
+        assertEquals(operationId, optimistic.id)
+        assertEquals("pending", optimistic.syncStatus)
+        coVerify(exactly = 1) {
+            pendingUpdates.enqueueCreate(
+                "server:url:test",
+                operationId,
+                request,
+                any(),
+            )
+        }
+        coVerify(exactly = 1) {
+            todoDao.upsertAll(match { it.single().id == operationId })
+        }
+    }
+
+    @Test
+    fun `offline delete hides the task and queues a tombstone`() = runTest {
+        coEvery { api.deleteTodo("todo-1", any()) } throws IOException("offline")
+
+        val result = repository.deleteTodo("todo-1")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) {
+            pendingUpdates.enqueueDelete("server:url:test", "todo-1", any())
+        }
+        coVerify(exactly = 1) { todoDao.deleteById("server:url:test", "todo-1") }
+        io.mockk.verify(exactly = 1) { syncManager.notifyTodoChanged() }
+    }
+
+    @Test
+    fun `deleting an offline create never calls delete with its local id`() = runTest {
+        coEvery { pendingUpdates.hasPendingCreate("server:url:test", "local-1") } returns true
+
+        val result = repository.deleteTodo("local-1")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 0) { api.deleteTodo(any(), any()) }
+        coVerify(exactly = 1) {
+            pendingUpdates.enqueueDelete("server:url:test", "local-1", any())
+        }
+    }
+
+    @Test
     fun `offline mutation is queued and applied optimistically to Room`() = runTest {
         coEvery { api.updateTodo(any(), any(), any()) } throws IOException("offline")
         coEvery { todoDao.getById("server:url:test", "todo-1") } returns
@@ -166,7 +223,7 @@ class TodoRepositoryTest {
             page = 1,
             limit = 50,
         )
-        coEvery { pendingUpdates.forWorkspace("server:url:test") } returns listOf(
+        coEvery { pendingUpdates.allForWorkspace("server:url:test") } returns listOf(
             PendingTodoUpdate(
                 operationId = "operation-1",
                 todoId = "todo-1",
@@ -232,7 +289,10 @@ class TodoRepositoryTest {
             pendingUpdates,
             reminderNotifications,
         )
-        val request = TodoCreate(title = "Old workspace result")
+        val request = TodoCreate(
+            title = "Old workspace result",
+            idempotencyKey = "00000000-0000-0000-0000-000000000042",
+        )
         coEvery { api.createTodo(request, any()) } answers {
             states.value = appRuntimeState(
                 mode = WorkspaceMode.SERVER,

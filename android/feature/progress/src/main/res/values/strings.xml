@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="progress_title">Progress</string>
+    <string name="progress_refresh">Refresh progress</string>
+    <string name="progress_summary">%1$d need attention · %2$d active</string>
+    <string name="progress_realtime_connected">Realtime updates connected</string>
+    <string name="progress_realtime_reconnecting">Realtime updates reconnecting; cached data remains available</string>
+    <string name="progress_sync_pending">%1$d waiting</string>
+    <string name="progress_synced">Synced</string>
+    <string name="progress_no_pending">No edits waiting</string>
+    <string name="progress_sync_delayed_title">Sync is taking longer</string>
+    <string name="progress_sync_delayed_description">Your changes are saved and will retry automatically.</string>
+    <string name="progress_sync_retry">Retry</string>
+    <string name="progress_sync_retrying">Retrying…</string>
+    <string name="progress_empty_title">Nothing is moving right now</string>
+    <string name="progress_empty_description">Agent activity, decisions, and in-progress tasks will appear here.</string>
+
+    <string name="progress_attention_title">Needs attention</string>
+    <string name="progress_attention_description">Decisions, input requests, and failures that block progress.</string>
+    <string name="progress_open_review">Review</string>
+    <string name="progress_agent_title">Agent activity</string>
+    <string name="progress_agent_description">Actual queued or running agent executions.</string>
+    <string name="progress_open_runs">History</string>
+    <string name="progress_tasks_title">Task state · In progress</string>
+    <string name="progress_tasks_description">Workflow state only; it does not mean an agent is currently running.</string>
+    <string name="progress_open_tasks">All tasks</string>
+    <string name="progress_tasks_empty">No tasks are marked in progress.</string>
+    <string name="progress_recent_title">Recently finished</string>
+    <string name="progress_recent_description">Latest completed tasks and terminal agent runs.</string>
+
+    <string name="progress_task_state">Task state</string>
+    <string name="progress_task_sync_pending">Sync waiting</string>
+    <string name="progress_risk_low">Low risk</string>
+    <string name="progress_risk_medium">Medium risk</string>
+    <string name="progress_risk_high">High risk</string>
+
+    <string name="progress_run_queued">Queued</string>
+    <string name="progress_run_starting">Starting</string>
+    <string name="progress_run_running">Running</string>
+    <string name="progress_run_waiting_input">Needs input</string>
+    <string name="progress_run_waiting_review">Ready to review</string>
+    <string name="progress_run_completed">Completed</string>
+    <string name="progress_run_failed">Failed</string>
+    <string name="progress_run_cancelled">Cancelled</string>
+</resources>

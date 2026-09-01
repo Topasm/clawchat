@@ -20,12 +20,13 @@ internal object NavigationCapabilities {
 
     private val serverPrimaryRoutes = listOf(
         NavRoute.Inbox.route,
-        NavRoute.Tasks.route,
+        NavRoute.Progress.route,
         NavRoute.Today.route,
-        NavRoute.Chat.route,
     )
 
     private val serverSecondaryRoutes = listOf(
+        NavRoute.Tasks.route,
+        NavRoute.Chat.route,
         NavRoute.Review.route,
         NavRoute.Runs.route,
         NavRoute.Search.route,

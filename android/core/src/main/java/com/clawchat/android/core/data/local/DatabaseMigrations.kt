@@ -150,3 +150,44 @@ val MIGRATION_3_4: Migration = object : Migration(3, 4) {
         )
     }
 }
+
+/** Expands the edit queue to create/delete operations and adds review decisions. */
+val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE `pending_todo_mutations` " +
+                "ADD COLUMN `operationType` TEXT NOT NULL DEFAULT 'update'",
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `pending_review_decisions` (
+                `workspaceKey` TEXT NOT NULL,
+                `reviewId` TEXT NOT NULL,
+                `subjectId` TEXT NOT NULL,
+                `decision` TEXT NOT NULL,
+                `note` TEXT,
+                `changedAt` TEXT NOT NULL,
+                PRIMARY KEY(`workspaceKey`, `reviewId`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_pending_review_workspace_time` " +
+                "ON `pending_review_decisions` (`workspaceKey`, `changedAt`)",
+        )
+    }
+}
+
+/** Persists retry diagnostics for each durable Outbox item. */
+val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        listOf("pending_todo_mutations", "pending_review_decisions").forEach { table ->
+            db.execSQL(
+                "ALTER TABLE `$table` ADD COLUMN `attemptCount` INTEGER NOT NULL DEFAULT 0",
+            )
+            db.execSQL("ALTER TABLE `$table` ADD COLUMN `lastAttemptAt` TEXT")
+            db.execSQL("ALTER TABLE `$table` ADD COLUMN `lastError` TEXT")
+            db.execSQL("ALTER TABLE `$table` ADD COLUMN `nextRetryAt` TEXT")
+        }
+    }
+}

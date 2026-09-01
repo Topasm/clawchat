@@ -100,6 +100,7 @@ class ProjectTodoResponse(BaseModel):
     sort_order: int = 0
     source: str | None = None
     source_id: str | None = None
+    idempotency_key: str | None = None
     assignee: str | None = None
     enabled_skills: list[str] | None = None
     inbox_state: str = "none"

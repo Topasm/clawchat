@@ -3,6 +3,7 @@
     <string name="app_name" translatable="false">ClawChat</string>
     <string name="nav_schedule">Schedule</string>
     <string name="nav_inbox">Inbox</string>
+    <string name="nav_progress">Progress</string>
     <string name="nav_chat">Chat</string>
     <string name="nav_tasks">Tasks</string>
     <string name="nav_search">Search</string>

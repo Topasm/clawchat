@@ -10,8 +10,9 @@ import androidx.room.RoomDatabase
         LocalTodoEntity::class,
         LocalEventEntity::class,
         PendingTodoMutationEntity::class,
+        PendingReviewDecisionEntity::class,
     ],
-    version = 4,
+    version = 6,
     exportSchema = true,
 )
 abstract class ClawChatDatabase : RoomDatabase() {
@@ -20,6 +21,7 @@ abstract class ClawChatDatabase : RoomDatabase() {
     abstract fun localTodoDao(): LocalTodoDao
     abstract fun localEventDao(): LocalEventDao
     abstract fun pendingTodoMutationDao(): PendingTodoMutationDao
+    abstract fun pendingReviewDecisionDao(): PendingReviewDecisionDao
 
     companion object {
         const val DB_NAME = "clawchat_cache"

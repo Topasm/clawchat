@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="progress_title">진행</string>
+    <string name="progress_refresh">진행 상황 새로고침</string>
+    <string name="progress_summary">확인 필요 %1$d개 · 진행 중 %2$d개</string>
+    <string name="progress_realtime_connected">실시간 업데이트 연결됨</string>
+    <string name="progress_realtime_reconnecting">실시간 업데이트 재연결 중 · 저장된 내용은 계속 볼 수 있습니다</string>
+    <string name="progress_sync_pending">동기화 대기 %1$d개</string>
+    <string name="progress_synced">동기화됨</string>
+    <string name="progress_no_pending">대기 중인 편집 없음</string>
+    <string name="progress_sync_delayed_title">동기화가 지연되고 있습니다</string>
+    <string name="progress_sync_delayed_description">변경 내용은 안전하게 저장되어 있으며 자동으로 다시 시도합니다.</string>
+    <string name="progress_sync_retry">다시 시도</string>
+    <string name="progress_sync_retrying">재시도 중…</string>
+    <string name="progress_empty_title">현재 진행 중인 항목이 없습니다</string>
+    <string name="progress_empty_description">에이전트 활동, 결정 요청, 진행 중 작업이 여기에 표시됩니다.</string>
+
+    <string name="progress_attention_title">확인 필요</string>
+    <string name="progress_attention_description">진행을 막고 있는 결정, 입력 요청, 실패 항목입니다.</string>
+    <string name="progress_open_review">검토하기</string>
+    <string name="progress_agent_title">에이전트 활동</string>
+    <string name="progress_agent_description">실제로 대기 또는 실행 중인 에이전트 작업입니다.</string>
+    <string name="progress_open_runs">기록</string>
+    <string name="progress_tasks_title">작업 상태 · 진행 중</string>
+    <string name="progress_tasks_description">작업 흐름의 상태이며, 에이전트가 실행 중이라는 뜻은 아닙니다.</string>
+    <string name="progress_open_tasks">전체 작업</string>
+    <string name="progress_tasks_empty">진행 중으로 표시된 작업이 없습니다.</string>
+    <string name="progress_recent_title">최근 완료</string>
+    <string name="progress_recent_description">최근 완료한 작업과 종료된 에이전트 실행입니다.</string>
+
+    <string name="progress_task_state">작업 상태</string>
+    <string name="progress_task_sync_pending">동기화 대기</string>
+    <string name="progress_risk_low">낮은 위험</string>
+    <string name="progress_risk_medium">보통 위험</string>
+    <string name="progress_risk_high">높은 위험</string>
+
+    <string name="progress_run_queued">대기 중</string>
+    <string name="progress_run_starting">시작 중</string>
+    <string name="progress_run_running">실행 중</string>
+    <string name="progress_run_waiting_input">입력 필요</string>
+    <string name="progress_run_waiting_review">검토 준비됨</string>
+    <string name="progress_run_completed">완료</string>
+    <string name="progress_run_failed">실패</string>
+    <string name="progress_run_cancelled">취소됨</string>
+</resources>

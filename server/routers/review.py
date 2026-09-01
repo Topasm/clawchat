@@ -70,6 +70,12 @@ async def decide_review(
     _user: str = Depends(get_current_user),
 ):
     item = await review_item_service.get_review_item(db, review_id)
+    # Mobile/relay transports can lose a committed response. Replaying the
+    # exact confirmed decision is a read-only success; a different decision
+    # still conflicts below and can never overwrite another client.
+    if item.status == body.decision:
+        response = await review_item_service.build_review_response(db, item)
+        return ReviewDecisionResponse(review=response, outcome={})
     if item.status not in {ReviewStatus.PENDING, ReviewStatus.CHANGES_REQUESTED}:
         raise ConflictError(f"Review item cannot be decided from {item.status}")
     item.review_note = body.note
