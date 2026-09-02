@@ -31,6 +31,9 @@
     <string name="onboarding_ready_description">ClawChat is ready to use.</string>
     <string name="onboarding_enter_clawchat">Enter ClawChat</string>
     <string name="onboarding_camera_permission_required">Camera permission is required to scan QR codes.</string>
+    <string name="onboarding_camera_unavailable">Couldn’t start the camera. Try again or connect manually.</string>
+    <string name="onboarding_retry_camera">Try camera again</string>
+    <string name="onboarding_invalid_qr">This isn’t a ClawChat pairing QR code. Try another code.</string>
     <string name="onboarding_cancel">Cancel</string>
     <string name="onboarding_point_camera_at_qr">Point your camera at the QR code on your desktop</string>
     <string name="onboarding_enter_code_manually">Enter code manually</string>

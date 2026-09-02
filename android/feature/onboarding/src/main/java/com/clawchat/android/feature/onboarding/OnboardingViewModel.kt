@@ -15,6 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 enum class OnboardingStep { WELCOME, SCAN_QR, SERVER, PAIRING, MANUAL_LOGIN, READY }
@@ -233,28 +237,45 @@ class OnboardingViewModel @Inject constructor(
     fun skipOnboarding() = useLocalMode()
 
     /** Parse a scanned QR payload and auto-fill server URL + code. */
-    fun handleQrPayload(json: String) {
-        try {
-            val obj = org.json.JSONObject(json)
-            if (obj.optString("type") != "clawchat_pair") return
-            val serverUrl = obj.optString("server_url", "")
-            val code = obj.optString("code", "")
-            val hostId = obj.optString("host_id", "").ifBlank { null }
-            val hostPublicKey = obj.optString("host_public_key", "").ifBlank { null }
-            if (serverUrl.isNotBlank() && code.isNotBlank()) {
-                _uiState.update {
-                    it.copy(
-                        serverUrl = serverUrl,
-                        pairingCode = code,
-                        autoClaimAfterHealthCheck = true,
-                        expectedHostId = hostId,
-                        expectedHostPublicKey = hostPublicKey,
-                    )
-                }
-                checkServer()
-            }
-        } catch (_: Exception) {
-            // Not valid QR payload
+    fun handleQrPayload(json: String): Boolean {
+        val payload = parsePairingQrPayload(json) ?: return false
+        _uiState.update {
+            it.copy(
+                serverUrl = payload.serverUrl,
+                pairingCode = payload.code,
+                autoClaimAfterHealthCheck = true,
+                expectedHostId = payload.hostId,
+                expectedHostPublicKey = payload.hostPublicKey,
+            )
         }
+        checkServer()
+        return true
     }
 }
+
+internal data class PairingQrPayload(
+    val serverUrl: String,
+    val code: String,
+    val hostId: String?,
+    val hostPublicKey: String?,
+)
+
+internal fun parsePairingQrPayload(json: String): PairingQrPayload? = runCatching {
+    val obj = Json.parseToJsonElement(json).jsonObject
+    if (obj["type"]?.jsonPrimitive?.contentOrNull != "clawchat_pair") {
+        return@runCatching null
+    }
+
+    val serverUrl = obj["server_url"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+    val code = obj["code"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+    if (serverUrl.isBlank() || code.length != 6 || !code.all(Char::isDigit)) {
+        return@runCatching null
+    }
+
+    PairingQrPayload(
+        serverUrl = serverUrl,
+        code = code,
+        hostId = obj["host_id"]?.jsonPrimitive?.contentOrNull?.ifBlank { null },
+        hostPublicKey = obj["host_public_key"]?.jsonPrimitive?.contentOrNull?.ifBlank { null },
+    )
+}.getOrNull()

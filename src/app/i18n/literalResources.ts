@@ -1277,6 +1277,17 @@ Object.assign(koreanUiTranslations, {
   'ClawChat will open at system login.': '시스템 로그인 시 ClawChat이 열립니다.',
   'Launch at system login disabled.': '시스템 로그인 시 실행을 비활성화했습니다.',
   'LAN access enabled with the updated PIN.': '변경된 PIN으로 LAN 접근을 활성화했습니다.',
+  'Local network access enabled.': '로컬 네트워크 접근을 활성화했습니다.',
+  'Enter a PIN containing 6 to 32 digits before enabling local access.':
+    '로컬 접근을 활성화하려면 숫자 6~32자리 PIN을 입력하세요.',
+  'Set a new 6 to 32 digit PIN before enabling local network access.':
+    '로컬 네트워크 접근을 활성화하려면 숫자 6~32자리 새 PIN을 설정하세요.',
+  'Turn on Local server before enabling local network access.':
+    '로컬 네트워크 접근을 활성화하려면 먼저 로컬 서버를 켜세요.',
+  'Restarting the local server…': '로컬 서버를 다시 시작하는 중…',
+  'Change the default PIN before enabling LAN access':
+    'LAN 접근을 활성화하기 전에 기본 PIN을 변경하세요.',
+  'PIN must contain between 6 and 32 digits': 'PIN은 숫자 6~32자리여야 합니다.',
   'Local workspace security updated.': '로컬 워크스페이스 보안을 업데이트했습니다.',
   'Automatic port selection enabled.': '자동 포트 선택을 활성화했습니다.',
   'Local port set to {{port}}.': '로컬 포트를 {{port}}(으)로 설정했습니다.',

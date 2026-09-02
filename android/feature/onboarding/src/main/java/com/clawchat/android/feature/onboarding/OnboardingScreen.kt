@@ -198,7 +198,7 @@ private fun WelcomeStep(
 private fun ScanQrStep(
     isConnecting: Boolean,
     error: OnboardingError?,
-    onQrScanned: (String) -> Unit,
+    onQrScanned: (String) -> Boolean,
     onCancel: () -> Unit,
     onManualEntry: () -> Unit,
 ) {
