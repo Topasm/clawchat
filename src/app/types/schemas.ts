@@ -36,6 +36,13 @@ export const RefreshRequestSchema = z.object({
 // -- Todos ------------------------------------------------------------------
 
 export const TaskStatusSchema = z.enum(TASK_STATUSES);
+/**
+ * Server-owned field the clients no longer read, set, or display (the
+ * priority feature was removed from every UI). Kept in the response/request
+ * schemas below purely so they keep mirroring server/openapi.json — deleting
+ * it here would drift from a field the backend still returns and accepts.
+ */
+const PrioritySchema = z.enum(['urgent', 'high', 'medium', 'low']);
 const InboxStateSchema = z.enum([
   'none',
   'classifying',
@@ -52,6 +59,7 @@ export const TodoResponseSchema = z.object({
   description: z.string().nullable().optional(),
   project_id: z.string().nullable().optional(),
   status: TaskStatusSchema,
+  priority: PrioritySchema.optional(),
   due_date: z.string().nullable().optional(),
   tags: z.array(z.string()).nullable().optional(),
   completed_at: z.string().nullable().optional(),
@@ -83,6 +91,7 @@ export const TodoCreateSchema = z.object({
   description: z.string().optional(),
   project_id: z.string().nullable().optional(),
   status: TaskStatusSchema.optional(),
+  priority: PrioritySchema.optional(),
   due_date: z.string().optional(),
   tags: z.array(z.string()).optional(),
   parent_id: z.string().nullable().optional(),
@@ -104,6 +113,7 @@ export const TodoUpdateSchema = z.object({
   description: z.string().optional(),
   project_id: z.string().nullable().optional(),
   status: TaskStatusSchema.optional(),
+  priority: PrioritySchema.optional(),
   due_date: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
   parent_id: z.string().nullable().optional(),
@@ -223,6 +233,7 @@ export const ProjectTodoResponseSchema = z.object({
   description: z.string().nullable().optional(),
   project_id: z.string().nullable().optional(),
   status: TaskStatusSchema,
+  priority: PrioritySchema.optional(),
   due_date: z.string().nullable().optional(),
   tags: z.array(z.string()).nullable().optional(),
   completed_at: z.string().nullable().optional(),
@@ -873,6 +884,7 @@ export type BriefingResponse = z.infer<typeof BriefingResponseSchema>;
 export const BulkTodoUpdateSchema = z.object({
   ids: z.array(z.string()).min(1),
   status: TaskStatusSchema.optional(),
+  priority: PrioritySchema.optional(),
   tags: z.array(z.string()).optional(),
   delete: z.boolean().optional(),
 });
@@ -1169,7 +1181,7 @@ export const PlanSubtaskSchema = z
     description: z.string().max(10_000).nullable().optional(),
     estimated_minutes: z.number().int().min(1).max(10_080).nullable().optional(),
     due_date: IsoDateSchema.nullable().optional(),
-    priority: z.enum(['urgent', 'high', 'medium', 'low']).nullable().optional(),
+    priority: PrioritySchema.nullable().optional(),
     depends_on_indices: z.array(z.number().int().min(0).max(49)).max(50).optional(),
   })
   .strict();
