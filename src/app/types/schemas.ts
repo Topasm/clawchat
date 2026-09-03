@@ -235,6 +235,7 @@ export const ProjectTodoResponseSchema = z.object({
   sort_order: z.number().optional(),
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
+  idempotency_key: z.string().nullable().optional(),
   assignee: z.string().nullable().optional(),
   enabled_skills: z.array(z.string()).nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
