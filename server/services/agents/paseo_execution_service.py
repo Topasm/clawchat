@@ -18,7 +18,11 @@ from models.agent_task import AgentTask
 from models.artifact import Artifact
 from models.project import Project
 from models.todo import Todo
-from services.agents import agent_run_service, agent_task_service
+from services.agents import (
+    agent_run_service,
+    agent_task_service,
+    execution_host_service,
+)
 from services.review import artifact_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -253,7 +257,8 @@ async def execute_run(
                 await agent_run_service.mark_starting(db, run)
                 task.status = "running"
                 await db.commit()
-            workspace_path = (project.execution_workspace_path or "").strip()
+            workspace = await execution_host_service.resolve_workspace(db, project)
+            workspace_path = workspace.path or ""
             if not workspace_path:
                 raise ValidationError(
                     "Configure the project's execution workspace path before using Paseo"

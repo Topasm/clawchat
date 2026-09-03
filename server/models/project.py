@@ -59,6 +59,19 @@ class Project(Base):
         String,
         nullable=True,
     )
+    #: The machine this project's work runs on. Null keeps the historical
+    #: behaviour: whichever machine the server itself runs on.
+    #:
+    #: Deliberately not a foreign key: SQLite cannot add one in place, and
+    #: rebuilding ``projects`` to gain it would briefly drop the table and fire
+    #: SET NULL cascades from every project-scoped row. Deleting a host clears
+    #: the references through ``execution_host_service`` instead.
+    execution_host_id: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+    #: Compatibility shadow of the chosen host's path in ``project_host_paths``;
+    #: no longer the read model.
     execution_workspace_path: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,

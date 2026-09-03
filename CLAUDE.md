@@ -89,5 +89,6 @@ Native Kotlin + Jetpack Compose app. Multi-module Gradle project (app, core, fea
 - Run `npm run generate:api` after a server contract change; never hand-edit generated TypeScript/Kotlin runtime enum values
 - Task status is server-owned: `pending | in_progress | completed | cancelled`; `blocked` is derived from dependencies
 - Task relationships are server-owned rows in `task_relationships`; for `depends_on`, source is the dependent task and target is its prerequisite. `todos.depends_on` is a deprecated compatibility shadow, not a client read model
+- A workspace path is meaningless without its machine: projects record a path per host in `project_host_paths` and name one `execution_host_id` to run on. Work never falls back to another host, and nothing is queued for a machine that is off: delegating to an unreachable host is refused with `EXECUTION_HOST_UNAVAILABLE`, which is distinct from the work being unconfigured. `projects.execution_workspace_path` is a compatibility shadow
 - Relationship provenance is server-owned. Preserve retained edge IDs/metadata, validate the whole DAG, and keep the durable migration marker atomic with legacy import
 - Docker deployment: single `docker-compose.yml` with `--profile ollama` for local LLM

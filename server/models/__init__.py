@@ -1,5 +1,6 @@
 from models.conversation import Conversation  # noqa: F401
 from models.project import Project  # noqa: F401
+from models.execution_host import ExecutionHost, ProjectHostPath  # noqa: F401
 from models.review_item import ReviewItem  # noqa: F401
 from models.artifact import Artifact, ArtifactRevision  # noqa: F401
 from models.message import Message  # noqa: F401

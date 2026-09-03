@@ -1,0 +1,244 @@
+"""Choosing the machine a project's work runs on.
+
+A project names one host and records the path its workspace has there. Work is
+never moved elsewhere on its own: another machine holds different files.
+
+Nothing is queued for a machine that is off. Work is only handed to a host that
+is reachable at that moment, and asking for it otherwise is refused -- which is
+honest about what will happen, and leaves no backlog to wake up into hours
+later against files that have moved on.
+
+"Offline" is therefore not "unconfigured". A project whose host is asleep is
+fully described and runs as soon as that machine is back; a project with no
+host and no path cannot run until someone says where it lives.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import settings
+from exceptions import ValidationError
+from models.execution_host import ExecutionHost, ProjectHostPath
+from models.project import Project
+
+#: A remote host is considered gone once it stops checking in. Kept generous:
+#: a laptop that missed one heartbeat is not offline.
+HOST_HEARTBEAT_GRACE = timedelta(minutes=5)
+
+
+@dataclass(frozen=True)
+class WorkspaceResolution:
+    """Where a project's work runs, and why it cannot when it cannot."""
+
+    host: ExecutionHost | None
+    path: str | None
+    is_available: bool
+
+    @property
+    def is_unconfigured(self) -> bool:
+        """Nobody has said where this project's work lives."""
+        return not self.path
+
+    @property
+    def is_offline(self) -> bool:
+        """The chosen machine is known but cannot take work right now."""
+        return not self.is_unconfigured and not self.is_available
+
+
+def host_is_available(
+    host: ExecutionHost,
+    path: str | None,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Whether [host] can take work for [path] right now."""
+    if not host.is_enabled or not path:
+        return False
+    if host.kind == "local":
+        # The decisive check for the local host: a path belonging to another
+        # machine is simply not here. Reporting that as "the wrong machine"
+        # beats failing obscurely somewhere deeper in the run.
+        return os.path.isdir(os.path.expanduser(path))
+    if host.kind == "paseo":
+        if not settings.paseo_enabled:
+            return False
+        if host.last_seen_at is None:
+            # Never probed. The adapter reports a real failure on first use,
+            # which is more informative than refusing to try.
+            return True
+        return _checked_in_recently(host, now=now)
+    if host.kind == "worker":
+        # A worker only exists while its app is running, so silence means the
+        # machine is asleep or the app is closed. Never having checked in is
+        # the same as gone: there is nothing to send work to.
+        return host.last_seen_at is not None and _checked_in_recently(host, now=now)
+    return False
+
+
+def _checked_in_recently(host: ExecutionHost, *, now: datetime | None = None) -> bool:
+    if host.last_seen_at is None:
+        return False
+    reference = now or datetime.now(timezone.utc)
+    last_seen = host.last_seen_at
+    if last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    return reference - last_seen <= HOST_HEARTBEAT_GRACE
+
+
+async def get_host_path(db: AsyncSession, project_id: str, host_id: str) -> str | None:
+    """The path this project's workspace has on one host."""
+    return (
+        await db.execute(
+            select(ProjectHostPath.path).where(
+                ProjectHostPath.project_id == project_id,
+                ProjectHostPath.host_id == host_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def list_host_paths(db: AsyncSession, project_id: str) -> list[ProjectHostPath]:
+    """Every machine this project has been given a path on."""
+    return list(
+        (
+            await db.execute(
+                select(ProjectHostPath)
+                .where(ProjectHostPath.project_id == project_id)
+                .order_by(ProjectHostPath.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+async def resolve_workspace(
+    db: AsyncSession,
+    project: Project,
+    *,
+    now: datetime | None = None,
+) -> WorkspaceResolution:
+    """Resolve the machine and path this project's work runs on."""
+    if project.execution_host_id:
+        host = await db.get(ExecutionHost, project.execution_host_id)
+        if host is not None:
+            path = await get_host_path(db, project.id, host.id)
+            # The legacy column still answers for a host recorded before paths
+            # were per-machine.
+            path = path or (project.execution_workspace_path or "").strip() or None
+            return WorkspaceResolution(
+                host=host,
+                path=path,
+                is_available=host_is_available(host, path, now=now),
+            )
+
+    legacy_path = (project.execution_workspace_path or "").strip() or None
+    if legacy_path is None:
+        return WorkspaceResolution(host=None, path=None, is_available=False)
+
+    local = await get_local_host(db)
+    if local is None:
+        # No host has been registered at all: the historical shape, where the
+        # path was handed straight to the provider. That is deliberately not
+        # checked against this filesystem -- a Paseo workspace path lives on
+        # the Paseo machine and was never expected to exist here.
+        return WorkspaceResolution(host=None, path=legacy_path, is_available=True)
+
+    return WorkspaceResolution(
+        host=local,
+        path=legacy_path,
+        is_available=host_is_available(local, legacy_path, now=now),
+    )
+
+
+async def get_local_host(db: AsyncSession) -> ExecutionHost | None:
+    """The machine this server runs on, if it has been registered."""
+    return (
+        await db.execute(
+            select(ExecutionHost).where(ExecutionHost.kind == "local").limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def delete_host(db: AsyncSession, host: ExecutionHost) -> None:
+    """Remove a host and release the projects pointing at it.
+
+    ``projects.execution_host_id`` carries no foreign key, so the references
+    are cleared here rather than by the database. A project left pointing at a
+    deleted host would read as waiting for a machine that no longer exists.
+    """
+    await db.execute(
+        update(Project)
+        .where(Project.execution_host_id == host.id)
+        .values(execution_host_id=None)
+    )
+    await db.delete(host)
+    await db.flush()
+
+
+async def ensure_local_host(
+    db: AsyncSession,
+    label: str = "This server",
+) -> ExecutionHost:
+    """Register the server's own machine so a first path has somewhere to go."""
+    existing = await get_local_host(db)
+    if existing is not None:
+        return existing
+    host = ExecutionHost(label=label, kind="local")
+    db.add(host)
+    await db.flush()
+    return host
+
+
+async def register_worker(
+    db: AsyncSession,
+    *,
+    label: str,
+    platform: str | None = None,
+) -> ExecutionHost:
+    """Record that a desktop app on some machine is available to run work.
+
+    Identity is the label the app reports, so reopening the app on the same
+    machine checks the same host back in rather than growing a new one on
+    every launch.
+    """
+    host = (
+        await db.execute(select(ExecutionHost).where(ExecutionHost.label == label.strip()))
+    ).scalar_one_or_none()
+    if host is not None and host.kind != "worker":
+        # Refuse before touching the row: the label belongs to a machine that
+        # is reached a different way, and checking it in would misreport it.
+        raise ValidationError(
+            "That name already belongs to a different kind of host.",
+            details={"reason": "label_kind_conflict"},
+        )
+    now = datetime.now(timezone.utc)
+    if host is None:
+        host = ExecutionHost(
+            label=label.strip(),
+            kind="worker",
+            platform=platform,
+            last_seen_at=now,
+        )
+        db.add(host)
+        await db.flush()
+        return host
+
+    host.last_seen_at = now
+    if platform:
+        host.platform = platform
+    await db.flush()
+    return host
+
+
+async def record_heartbeat(db: AsyncSession, host: ExecutionHost) -> ExecutionHost:
+    """Keep a worker counted as reachable."""
+    host.last_seen_at = datetime.now(timezone.utc)
+    await db.flush()
+    return host

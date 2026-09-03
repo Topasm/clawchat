@@ -634,6 +634,41 @@ in the response.
 
 ---
 
+## Execution Hosts
+
+```
+GET    /api/execution-hosts                        # Machines registered to run work
+POST   /api/execution-hosts                        # Register one
+PATCH  /api/execution-hosts/:id                    # Rename, retarget, enable/disable
+DELETE /api/execution-hosts/:id                    # Remove, releasing projects pinned to it
+
+GET    /api/projects/:id/workspace                 # Where this project runs, and whether it can now
+PUT    /api/projects/:id/workspace/paths           # Record the project's path on one machine
+DELETE /api/projects/:id/workspace/paths/:host_id  # Forget that path
+PUT    /api/projects/:id/workspace/host            # Choose the machine work runs on
+```
+
+A workspace path only means something together with the machine holding it:
+`/Users/me/papers` is real on a laptop and absent on the server. A project
+therefore records a path per host and names the one host its work runs on.
+
+Work is never moved to another machine on its own, even when the project has a
+path there — another machine holds different files. Nor is it queued for a
+machine that is off: delegating to an unreachable host is refused with
+`EXECUTION_HOST_UNAVAILABLE`. Holding the work instead would run it hours later
+against files that have moved on, so the request fails while the person is
+still there to decide. The distinct `PASEO_WORKSPACE_REQUIRED` still means
+nobody has said where the work lives.
+
+A desktop app checks its own machine in through `POST /api/execution-hosts/register`
+(idempotent per label) and keeps it counted as reachable with
+`POST /api/execution-hosts/:id/heartbeat`. A worker that stops checking in is
+treated as gone, since it only exists while its app is running.
+
+`projects.execution_workspace_path` remains as a compatibility shadow of the
+chosen host's path, the way `todos.depends_on` does, and is no longer the read
+model.
+
 ## Attachment Endpoints
 
 ```
