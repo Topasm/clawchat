@@ -160,9 +160,7 @@ export default function CalendarCreateDialog({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={
-              kind === 'task' ? translateUi('Task title') : translateUi('Event title')
-            }
+            placeholder={kind === 'task' ? translateUi('Task title') : translateUi('Event title')}
             autoFocus
           />
         </div>

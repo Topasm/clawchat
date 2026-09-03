@@ -616,6 +616,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Root updates:': '루트 업데이트:',
   Run: '달리다',
   'Run filters': '필터 실행',
+  'Runs from today until this day.': '오늘부터 이 날까지 진행합니다.',
   'Run with agent': '에이전트와 함께 실행',
   Running: '달리기',
   'Running agents': '에이전트 실행',
@@ -804,6 +805,7 @@ export const koreanUiTranslations: Record<string, string> = {
   Weekly: '주간',
   'Welcome to ClawChat': 'ClawChat에 오신 것을 환영합니다.',
   'What are you working toward?': '당신은 무엇을 위해 노력하고 있나요?',
+  'What to add': '무엇을 추가할까요',
   'When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current site URL is usually correct.':
     'ClawChat이 역방향 프록시나 터널을 통해 열리면 이를 현재 사이트 URL로 두는 것이 일반적으로 정확합니다.',
   'Workspaces & Connections': '작업 공간 및 연결',
@@ -875,6 +877,7 @@ Object.assign(koreanUiTranslations, {
   due: '마감',
   Due: '마감일',
   'Due / Estimate / Blockers': '마감일 / 예상 시간 / 차단 요인',
+  'Due date': '마감일',
   Edit: '편집',
   'Enter ClawChat': 'ClawChat 시작',
   Estimate: '예상 시간',

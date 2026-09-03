@@ -54,7 +54,9 @@ export default function WeekView({
               className={`cc-calendar__week-col-header${isToday ? ' cc-calendar__week-col-header--today' : ''}`}
             >
               <span className="cc-calendar__week-day-name">{DAY_NAMES[date.getDay()]}</span>
-              <span className={`cc-calendar__week-day-number${isToday ? ' cc-calendar__week-day-number--today' : ''}`}>
+              <span
+                className={`cc-calendar__week-day-number${isToday ? ' cc-calendar__week-day-number--today' : ''}`}
+              >
                 {date.getDate()}
               </span>
             </div>
@@ -89,7 +91,11 @@ export default function WeekView({
         {/* Time gutter */}
         <div className="cc-calendar__time-gutter">
           {hours.map((h) => (
-            <div key={h} className="cc-calendar__time-label" style={{ top: `${(h - WEEK_START_HOUR) * 60}px` }}>
+            <div
+              key={h}
+              className="cc-calendar__time-label"
+              style={{ top: `${(h - WEEK_START_HOUR) * 60}px` }}
+            >
               {formatTimeLabel(h)}
             </div>
           ))}
@@ -102,7 +108,11 @@ export default function WeekView({
           const totalMinutes = (WEEK_END_HOUR - WEEK_START_HOUR) * 60;
 
           return (
-            <div key={colIdx} className="cc-calendar__week-col" style={{ height: `${totalMinutes}px` }}>
+            <div
+              key={colIdx}
+              className="cc-calendar__week-col"
+              style={{ height: `${totalMinutes}px` }}
+            >
               {/* Hour grid lines */}
               {hours.map((h) => (
                 <div

@@ -3,8 +3,6 @@
   "files": {
     "src/app/components/calendar-views/EventBlock.tsx": "23e46287f7052ed0669c9204b3e1023ac548d08a11e0d2bdf0312bdf8178b0d3",
     "src/app/components/calendar-views/EventPill.tsx": "85ef1ade4d21084c5572eacb6c71e8584c00279ca5fd6b7c30a7b733de6a6783",
-    "src/app/components/calendar-views/WeekView.tsx": "282b9f211ef5191479c82a7fc0bad5fb86c80c3e34a1f2f7e8c9f1ca0bf3f30f",
-    "src/app/components/shared/EventCard.tsx": "7ed769a0e19477da82aa01e6863fa133efefc4a918a86949d9a68dc0add1b321",
     "src/app/components/shared/SectionHeader.tsx": "9bcd7a8f52766aa7a5d08edaeb6d4a7d6baa57f0117db2c6cc321f7a7ca3f618",
     "src/app/components/shared/SegmentedControl.tsx": "8c91d1f15a81b7f05f0039fe6a39928705bb666a38f7b65cc7ff8c8ad07fa647",
     "src/app/components/shared/Skeleton.tsx": "60d73c7e08fb0cbf6dff581a29c5a1661f0beae88c7aac26cbbe0c91b5e48522",

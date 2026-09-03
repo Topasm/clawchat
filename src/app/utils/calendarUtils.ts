@@ -163,8 +163,7 @@ export function indexTasksByDate(
   // holds more tasks than the cell can show.
   for (const bucket of map.values()) {
     bucket.sort((a, b) => {
-      const byDue =
-        new Date(a.todo.due_date!).getTime() - new Date(b.todo.due_date!).getTime();
+      const byDue = new Date(a.todo.due_date!).getTime() - new Date(b.todo.due_date!).getTime();
       return byDue !== 0 ? byDue : a.todo.title.localeCompare(b.todo.title);
     });
   }
