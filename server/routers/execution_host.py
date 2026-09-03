@@ -6,6 +6,7 @@ from exceptions import NotFoundError, ValidationError
 from fastapi import APIRouter, Depends
 from models.execution_host import ExecutionHost, ProjectHostPath
 from schemas.execution_host import (
+    ClaimedJobResponse,
     ExecutionHostCreate,
     ExecutionHostResponse,
     ExecutionHostUpdate,
@@ -164,3 +165,24 @@ async def heartbeat(
     await db.commit()
     await db.refresh(host)
     return host
+
+
+@router.post("/{host_id}/jobs/claim", response_model=ClaimedJobResponse | None)
+async def claim_next_job(
+    host_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Take the next run waiting for this machine, or nothing.
+
+    Polled by the worker. Claiming also counts as checking in, so a machine
+    asking for work is by definition reachable.
+    """
+    host = await db.get(ExecutionHost, host_id)
+    if host is None:
+        raise NotFoundError("Execution host not found")
+
+    await execution_host_service.record_heartbeat(db, host)
+    job = await execution_host_service.claim_next_job(db, host)
+    await db.commit()
+    return job

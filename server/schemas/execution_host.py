@@ -77,3 +77,13 @@ class ProjectWorkspaceResponse(BaseModel):
     is_unconfigured: bool = True
     #: Every machine this project has a path on.
     paths: list[ProjectHostPathResponse] = []
+
+
+class ClaimedJobResponse(BaseModel):
+    """The work a machine has just taken responsibility for."""
+
+    run_id: str
+    instruction: str
+    #: Directory the CLI runs in, on the claiming machine.
+    cwd: str
+    model: str | None = None

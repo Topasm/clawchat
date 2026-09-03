@@ -665,6 +665,31 @@ A desktop app checks its own machine in through `POST /api/execution-hosts/regis
 `POST /api/execution-hosts/:id/heartbeat`. A worker that stops checking in is
 treated as gone, since it only exists while its app is running.
 
+#### Work handed to a worker
+
+```
+POST /api/execution-hosts/:id/jobs/claim   # take the next run waiting for this machine
+POST /api/runs/:run_id/heartbeat           # progress, while it runs (existing)
+POST /api/runs/:run_id/result              # finish: result, or error
+```
+
+Delegating a task whose project runs on a worker creates the run and stops
+there: nothing executes on the server. The run stays `queued` until that
+machine claims it, which it only does while its app is running and asking for
+work — so a queued run is never work waiting for a machine that is off, because
+delegation refuses that case up front.
+
+Claiming moves the run out of `queued` in the transaction that returns it, so
+two polls, or a worker restarted mid-poll, cannot both pick up the same run. A
+run whose project has lost its path on that machine fails at claim time rather
+than being handed over with nowhere to run.
+
+The result goes through the same `mark_waiting_review` path as work the server
+ran itself, so where a run executed changes nothing about how its result is
+reviewed. `agent_runs.host_id` remains the label a provider reported after the
+fact; `agent_runs.execution_host_id` is the registered machine the work was
+addressed to before it ran.
+
 `projects.execution_workspace_path` remains as a compatibility shadow of the
 chosen host's path, the way `todos.depends_on` does, and is no longer the read
 model.

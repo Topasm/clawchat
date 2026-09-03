@@ -242,3 +242,90 @@ async def test_a_sleeping_worker_leaves_its_project_waiting(db_session):
 
     assert resolution.is_offline is True
     assert resolution.is_unconfigured is False
+
+
+# --- claiming work --------------------------------------------------------
+
+
+async def _queued_run(db, project: Project, host: ExecutionHost, **overrides):
+    from models.agent_run import AgentRun
+    from models.agent_task import AgentTask
+
+    task = AgentTask(task_type="code", agent_type="code", instruction="Do the thing")
+    db.add(task)
+    await db.flush()
+    defaults = dict(
+        agent_task_id=task.id,
+        project_id=project.id,
+        attempt=1,
+        instruction_snapshot="Do the thing",
+        provider="worker",
+        execution_host_id=host.id,
+        status="queued",
+    )
+    defaults.update(overrides)
+    run = AgentRun(**defaults)
+    db.add(run)
+    await db.flush()
+    return run
+
+
+async def test_a_worker_claims_the_run_waiting_for_it(db_session, tmp_path):
+    project = await _project(db_session)
+    worker = await _host(db_session, label="MacBook", kind="worker")
+    await _bind(db_session, project, worker, str(tmp_path))
+    run = await _queued_run(db_session, project, worker)
+
+    job = await execution_host_service.claim_next_job(db_session, worker)
+
+    assert job is not None
+    assert job.run_id == run.id
+    assert job.cwd == str(tmp_path)
+    assert job.instruction == "Do the thing"
+
+
+# Two polls, or a worker restarted mid-poll, must not both pick up the run.
+async def test_a_claimed_run_is_not_handed_out_twice(db_session, tmp_path):
+    project = await _project(db_session)
+    worker = await _host(db_session, label="MacBook", kind="worker")
+    await _bind(db_session, project, worker, str(tmp_path))
+    await _queued_run(db_session, project, worker)
+
+    first = await execution_host_service.claim_next_job(db_session, worker)
+    second = await execution_host_service.claim_next_job(db_session, worker)
+
+    assert first is not None
+    assert second is None
+
+
+async def test_a_worker_is_not_handed_another_machines_work(db_session, tmp_path):
+    project = await _project(db_session)
+    worker = await _host(db_session, label="MacBook", kind="worker")
+    other = await _host(db_session, label="Studio", kind="worker")
+    await _bind(db_session, project, worker, str(tmp_path))
+    await _queued_run(db_session, project, worker)
+
+    assert await execution_host_service.claim_next_job(db_session, other) is None
+
+
+# The path can be removed between queueing and the next poll.
+async def test_a_run_whose_path_is_gone_fails_instead_of_being_handed_over(
+    db_session,
+    tmp_path,
+):
+    from models.agent_run import AgentRun
+
+    project = await _project(db_session)
+    worker = await _host(db_session, label="MacBook", kind="worker")
+    await _bind(db_session, project, worker, str(tmp_path))
+    run = await _queued_run(db_session, project, worker)
+    await db_session.execute(
+        ProjectHostPath.__table__.delete().where(
+            ProjectHostPath.project_id == project.id
+        )
+    )
+
+    job = await execution_host_service.claim_next_job(db_session, worker)
+
+    assert job is None
+    assert (await db_session.get(AgentRun, run.id)).status == "failed"

@@ -20,6 +20,19 @@ class AgentRunResumeRequest(BaseModel):
     follow_up_instruction: str = Field(min_length=1, max_length=10_000)
 
 
+class AgentRunResultRequest(BaseModel):
+    """What a worker reports back when its run finishes."""
+
+    result: str | None = None
+    error: str | None = None
+
+    @model_validator(mode="after")
+    def validate_outcome(self):
+        if bool(self.result) == bool(self.error):
+            raise ValueError("Report exactly one of result or error")
+        return self
+
+
 class AgentRunTransitionRequest(BaseModel):
     status: AgentRunStatus
     message: str | None = Field(default=None, max_length=10_000)

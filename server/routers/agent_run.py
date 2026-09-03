@@ -16,6 +16,7 @@ from schemas.agent_run import (
     AgentRunHeartbeatRequest,
     AgentRunRecoveryResponse,
     AgentRunResponse,
+    AgentRunResultRequest,
     AgentRunResumeRequest,
     AgentRunRetryRequest,
     AgentRunTransitionRequest,
@@ -323,6 +324,32 @@ async def return_run_task_to_ready(
     await notify_module_data_changed("runs")
     await notify_module_data_changed("todos")
     return result
+
+
+@router.post("/{run_id}/result", response_model=AgentRunResponse)
+async def report_run_result(
+    run_id: str,
+    body: AgentRunResultRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Finish a run executed elsewhere.
+
+    A worker runs the CLI on its own machine and reports the outcome here, so
+    the result lands in the same review flow as work the server ran itself.
+    """
+    run = await agent_run_service.require_run(db, run_id)
+    if body.error:
+        await agent_run_service.mark_failed(db, run, body.error)
+    else:
+        task = await db.get(AgentTask, run.agent_task_id)
+        if task is None:
+            raise NotFoundError("Agent task not found")
+        await agent_run_service.mark_waiting_review(db, run, task, body.result or "")
+    await db.commit()
+    await notify_module_data_changed("runs")
+    await notify_module_data_changed("todos")
+    return await agent_run_service.build_run_response(db, run)
 
 
 @router.post("/{run_id}/transition", response_model=AgentRunResponse)
