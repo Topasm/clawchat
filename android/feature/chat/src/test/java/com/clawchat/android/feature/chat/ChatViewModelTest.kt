@@ -113,6 +113,33 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `deleting a conversation removes it from the list`() = runTest {
+        coEvery { repository.deleteConversation("c1") } returns ApiResult.Success(Unit)
+
+        val viewModel = viewModel()
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.deleteConversation("c1")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.conversations.isEmpty())
+    }
+
+    // The row leaves the list right away; a failure has to bring it back
+    // rather than leaving the user unsure whether the delete took.
+    @Test
+    fun `a failed delete restores the conversation and reports why`() = runTest {
+        coEvery { repository.deleteConversation("c1") } returns ApiResult.Error("offline")
+
+        val viewModel = viewModel()
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.deleteConversation("c1")
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("c1"), viewModel.uiState.value.conversations.map { it.id })
+        assertEquals("offline", viewModel.uiState.value.error)
+    }
+
+    @Test
     fun `sending needs a conversation and a non-blank message`() = runTest {
         val viewModel = viewModel()
         dispatcher.scheduler.advanceUntilIdle()

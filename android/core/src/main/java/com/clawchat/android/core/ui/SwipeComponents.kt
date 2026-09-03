@@ -80,7 +80,7 @@ private fun SwipeBackground(
             ) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.task_swipe_delete),
+                    contentDescription = stringResource(R.string.common_swipe_delete),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
