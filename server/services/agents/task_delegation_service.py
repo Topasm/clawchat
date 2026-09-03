@@ -24,6 +24,7 @@ from schemas.task import DelegateRequest
 from services.agents import (
     agent_run_service,
     agent_task_service,
+    execution_host_service,
     paseo_execution_service,
 )
 from services.planning import (
@@ -125,10 +126,30 @@ async def delegate_todo_to_skill(
                 message="Paseo execution is disabled on this ClawChat server",
                 status_code=503,
             )
-        if project is None or not (project.execution_workspace_path or "").strip():
+        if project is None:
             raise AppError(
                 code="PASEO_WORKSPACE_REQUIRED",
                 message="Configure the project's execution workspace path before using Paseo",
+                status_code=409,
+            )
+        workspace = await execution_host_service.resolve_workspace(db, project)
+        if workspace.is_unconfigured:
+            raise AppError(
+                code="PASEO_WORKSPACE_REQUIRED",
+                message="Configure the project's execution workspace path before using Paseo",
+                status_code=409,
+            )
+        if workspace.is_offline:
+            # Refused rather than queued: this work belongs on that machine
+            # alone, and holding it until the machine returns would run it much
+            # later against files that have moved on in the meantime.
+            host_label = workspace.host.label if workspace.host else "The host"
+            raise AppError(
+                code="EXECUTION_HOST_UNAVAILABLE",
+                message=(
+                    f"{host_label} is offline. Open ClawChat there, or move this "
+                    "project to a machine that is running."
+                ),
                 status_code=409,
             )
     elif active_ai is None:

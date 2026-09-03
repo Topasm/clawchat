@@ -17,6 +17,7 @@ from routers import calendar as calendar_router
 from routers import capabilities as capabilities_router
 from routers import change_set as change_set_router
 from routers import chat as chat_router
+from routers import execution_host as execution_host_router
 from routers import execution_provider as execution_provider_router
 from routers import notifications as notifications_router
 from routers import obsidian as obsidian_router
@@ -219,6 +220,11 @@ app.include_router(agent_run_router.router, prefix="/api/runs", tags=["runs"])
 app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
 app.include_router(project_router.router, prefix="/api/projects", tags=["projects"])
+app.include_router(
+    execution_host_router.router,
+    prefix="/api/execution-hosts",
+    tags=["execution-hosts"],
+)
 app.include_router(
     execution_provider_router.router,
     prefix="/api/execution-providers",
