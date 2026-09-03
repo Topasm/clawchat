@@ -3,7 +3,6 @@ package com.clawchat.android.feature.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.Event
-import com.clawchat.android.core.data.model.EventCreate
 import com.clawchat.android.core.data.model.EventUpdate
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
@@ -47,7 +46,6 @@ sealed interface CalendarAction {
     data object ShowToday : CalendarAction
     data object Refresh : CalendarAction
     data class SelectDate(val date: LocalDate) : CalendarAction
-    data class Create(val input: EventCreate) : CalendarAction
     data class CreateTask(val input: TodoCreate) : CalendarAction
     data class Update(val id: String, val input: EventUpdate) : CalendarAction
     data class Delete(val event: Event) : CalendarAction
@@ -86,7 +84,6 @@ class CalendarViewModel @Inject constructor(
                 loadTasks()
             }
             is CalendarAction.SelectDate -> selectDate(action.date)
-            is CalendarAction.Create -> mutate { eventRepository.createEvent(action.input) }
             is CalendarAction.CreateTask -> mutateTask { todoRepository.createTodo(action.input) }
             is CalendarAction.Update -> mutate { eventRepository.updateEvent(action.id, action.input) }
             is CalendarAction.Delete -> mutate { deleteEvent(action.event) }
