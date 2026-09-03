@@ -29,18 +29,14 @@ function fillTitle(value: string) {
   fireEvent.change(screen.getByLabelText('Title'), { target: { value } });
 }
 
-function switchToEvent() {
-  fireEvent.click(screen.getByRole('button', { name: 'Event' }));
-}
-
 describe('CalendarCreateDialog', () => {
   beforeEach(() => {
     apiMocks.post.mockReset();
   });
 
   // The workspace is task-oriented, so a day picked on the calendar is a
-  // deadline. Creating an event instead is the deliberate, secondary path.
-  it('creates a task due on the picked day by default', async () => {
+  // deadline — there is no separate "event" to switch to.
+  it('creates a task due on the picked day', async () => {
     apiMocks.post.mockResolvedValue({ data: { id: 'todo-1' } });
     renderDialog();
 
@@ -54,39 +50,21 @@ describe('CalendarCreateDialog', () => {
     expect(new Date(payload.due_date).getFullYear()).toBe(2026);
     expect(new Date(payload.due_date).getMonth()).toBe(8);
     expect(new Date(payload.due_date).getDate()).toBe(1);
-  });
-
-  // Regression: the dialog used to fabricate a `local-<timestamp>` event and
-  // write it straight into the query cache without ever calling the server, so
-  // a created event disappeared on the next refetch.
-  it('sends a new event to the server', async () => {
-    apiMocks.post.mockResolvedValue({ data: { id: 'evt-1' } });
-    renderDialog();
-
-    switchToEvent();
-    fillTitle('Standup');
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    await waitFor(() => expect(apiMocks.post).toHaveBeenCalledTimes(1));
-    const [path, payload] = apiMocks.post.mock.calls[0];
-    expect(path).toBe('/events');
-    expect(payload).toMatchObject({ title: 'Standup' });
-    expect(payload.start_time).toEqual(expect.any(String));
     // Server-owned fields must never be invented by the client.
     expect(payload).not.toHaveProperty('id');
     expect(payload).not.toHaveProperty('created_at');
     expect(payload).not.toHaveProperty('updated_at');
   });
 
-  it('does not collect a location or a note on an event', () => {
+  it('does not offer a location or a note, or a separate event mode', () => {
     renderDialog();
-    switchToEvent();
 
+    expect(screen.queryByRole('button', { name: 'Event' })).toBeNull();
     expect(screen.queryByLabelText('Location')).toBeNull();
     expect(screen.queryByLabelText('Description')).toBeNull();
   });
 
-  it('closes only after the server accepts the event', async () => {
+  it('closes only after the server accepts the task', async () => {
     let resolvePost: (value: unknown) => void = () => {};
     apiMocks.post.mockImplementation(
       () =>
@@ -96,14 +74,13 @@ describe('CalendarCreateDialog', () => {
     );
     const { onOpenChange } = renderDialog();
 
-    switchToEvent();
-    fillTitle('Retro');
+    fillTitle('Retro notes');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled());
     expect(onOpenChange).not.toHaveBeenCalled();
 
-    resolvePost({ data: { id: 'evt-2' } });
+    resolvePost({ data: { id: 'todo-2' } });
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
@@ -111,7 +88,6 @@ describe('CalendarCreateDialog', () => {
     apiMocks.post.mockRejectedValue(new Error('offline'));
     const { onOpenChange } = renderDialog();
 
-    switchToEvent();
     fillTitle('Planning');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
