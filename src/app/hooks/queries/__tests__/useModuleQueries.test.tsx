@@ -17,6 +17,7 @@ import {
   useUpdateTodo,
 } from '../useModuleQueries';
 import { queryKeys } from '../queryKeys';
+import { useToastStore } from '../../../stores/useToastStore';
 
 const apiMocks = vi.hoisted(() => ({
   patch: vi.fn(),
@@ -190,6 +191,38 @@ describe('todo mutations', () => {
       true,
     );
     expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
+  });
+
+  // Completing a task can hide it from the current view (e.g. Today), so the
+  // toast itself has to be the way back — not just a status flip on the row.
+  it('offers to undo a completed task, and undoing reopens it', async () => {
+    apiMocks.patch.mockResolvedValue({ data: {} });
+    const { queryClient, wrapper } = createHarness();
+    const { result } = renderHook(() => useToggleTodoComplete(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: todo.id, currentStatus: 'pending' });
+    });
+
+    const toast = useToastStore.getState().toasts.at(-1);
+    expect(toast?.message).toBe('Task completed');
+    expect(toast?.action?.label).toBe('Undo');
+    expect(apiMocks.patch).toHaveBeenLastCalledWith(`/todos/${todo.id}`, {
+      status: 'completed',
+    });
+
+    await act(async () => {
+      toast?.action?.onClick();
+      await waitFor(() => expect(apiMocks.patch).toHaveBeenCalledTimes(2));
+    });
+
+    expect(apiMocks.patch).toHaveBeenLastCalledWith(`/todos/${todo.id}`, {
+      status: 'pending',
+    });
+    expect(
+      queryClient.getQueryData<TodoResponse[]>(queryKeys.todos)?.find((t) => t.id === todo.id)
+        ?.status,
+    ).toBe('pending');
   });
 
   it('invalidates derived graph data after reordering tasks', async () => {
