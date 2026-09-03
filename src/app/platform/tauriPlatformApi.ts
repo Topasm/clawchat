@@ -11,6 +11,7 @@ import type {
   ServerStatus,
   UpdateDownloadProgress,
   UpdateInfo,
+  WorkerRunResult,
   WorkspaceViewMode,
 } from './nativePlatformTypes';
 import { TAURI_COMMANDS, TAURI_EVENTS } from './tauriCommands';
@@ -69,6 +70,9 @@ export const tauriPlatformApi: NativePlatformApi = {
     onDownloadProgress: (callback) =>
       subscribe<UpdateDownloadProgress>(TAURI_EVENTS.updateDownloadProgress, callback),
     onUpdateDownloaded: (callback) => subscribe<void>(TAURI_EVENTS.updateDownloaded, callback),
+  },
+  worker: {
+    run: (request) => invoke<WorkerRunResult>(TAURI_COMMANDS.workerRun, { request }),
   },
   server: {
     getStatus: () => invoke<ServerStatus>(TAURI_COMMANDS.serverGetStatus),

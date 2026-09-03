@@ -686,7 +686,16 @@ than being handed over with nowhere to run.
 
 The result goes through the same `mark_waiting_review` path as work the server
 ran itself, so where a run executed changes nothing about how its result is
-reviewed. `agent_runs.host_id` remains the label a provider reported after the
+reviewed.
+
+The desktop app is the worker. Its polling loop lives in the renderer so it
+inherits the session the app already holds, and the Rust shell contributes only
+what a browser cannot do: starting a CLI in a directory on that machine. The
+CLI may write — editing the project is the work — and is held to the directory
+the binding named, so what a run can touch is decided by the binding rather
+than by the model. Both CLIs run without stopping for approval, because the
+person who delegated the task is on another device and a prompt nobody answers
+is a run that hangs; the result still waits for review on the server. `agent_runs.host_id` remains the label a provider reported after the
 fact; `agent_runs.execution_host_id` is the registered machine the work was
 addressed to before it ran.
 
