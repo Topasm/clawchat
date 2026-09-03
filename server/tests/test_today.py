@@ -82,6 +82,40 @@ async def test_today_inbox_count_tracks_open_inbox_workflow_items_only(
 
 
 @pytest.mark.asyncio
+async def test_today_surfaces_pending_tasks_with_no_due_date(
+    client,
+    auth_headers,
+    db_session,
+):
+    # Otherwise this task is neither "today" nor "overdue" and simply
+    # vanishes from the daily view.
+    undated = Todo(title="Undated pending task", inbox_state="none")
+    dated = Todo(
+        title="Dated task",
+        due_date=datetime(2026, 9, 1, 3, tzinfo=timezone.utc),
+        inbox_state="none",
+    )
+    undated_but_in_inbox = Todo(title="Still triaging", inbox_state="captured")
+    undated_but_completed = Todo(
+        title="Already done",
+        status=TaskStatus.COMPLETED,
+        inbox_state="none",
+    )
+    db_session.add_all([undated, dated, undated_but_in_inbox, undated_but_completed])
+    await db_session.commit()
+
+    response = await client.get(
+        "/api/today",
+        params={"date": "2026-09-01", "utc_offset_minutes": 540},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [todo["id"] for todo in body["needs_date_tasks"]] == [undated.id]
+
+
+@pytest.mark.asyncio
 async def test_today_keeps_inbox_workflow_items_out_of_schedule_buckets(
     client,
     auth_headers,

@@ -238,6 +238,9 @@ data class TodayResponse(
     @SerialName("today_tasks") val todayTodos: List<Todo> = emptyList(),
     @SerialName("overdue_tasks") val overdueTodos: List<Todo> = emptyList(),
     @SerialName("today_events") val todayEvents: List<Event> = emptyList(),
+    // Pending tasks with no due date at all — neither "today" nor "overdue"
+    // claims them, so without this they never surface anywhere.
+    @SerialName("needs_date_tasks") val needsDateTodos: List<Todo> = emptyList(),
     @SerialName("inbox_count") val inboxCount: Int = 0,
 )
 

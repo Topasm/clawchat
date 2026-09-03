@@ -291,6 +291,7 @@ describe('Zod schemas', () => {
         overdue_tasks: [],
         today_events: [],
         needs_review: [],
+        needs_date_tasks: [],
         inbox_count: 5,
         greeting: 'Good morning',
         date: '2026-02-22',

@@ -133,6 +133,20 @@ async def get_today(
     )
     overdue_tasks = (await db.execute(overdue_q)).scalars().all()
 
+    # Pending tasks with no due date at all: not "today", not "overdue" —
+    # otherwise they never surface anywhere and effectively vanish. In
+    # progress tasks with no due date are already folded into all_today.
+    needs_date_q = (
+        select(Todo)
+        .where(
+            Todo.due_date == None,  # noqa: E711
+            Todo.inbox_state == "none",
+            Todo.status == TaskStatus.PENDING,
+        )
+        .order_by(Todo.created_at.asc())
+    )
+    needs_date_tasks = (await db.execute(needs_date_q)).scalars().all()
+
     # Today's events
     events_q = (
         select(Event)
@@ -165,6 +179,7 @@ async def get_today(
         overdue_tasks=[_todo_to_response(t) for t in overdue_tasks],
         today_events=[_event_to_response(e) for e in today_events],
         needs_review=[_todo_to_response(t) for t in needs_review_todos],
+        needs_date_tasks=[_todo_to_response(t) for t in needs_date_tasks],
         inbox_count=inbox_count,
         greeting=_get_greeting(utc_offset_minutes),
         date=today,

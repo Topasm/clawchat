@@ -412,6 +412,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Multi-Agent Task': '다중 에이전트 작업',
   'Must wait for': '기다려야 한다',
   Name: '이름',
+  'Needs a date': '날짜 미정',
   'Needs organizing': '정리가 필요함',
   'Needs review': '검토 필요',
   Never: '절대',
