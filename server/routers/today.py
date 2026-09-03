@@ -12,6 +12,7 @@ from models.todo import Todo
 from schemas.calendar import EventResponse
 from schemas.today import TodayResponse
 from schemas.todo import TodoResponse
+from services.ai import resolve_active_ai
 from services.notifications.briefing_service import generate_briefing
 from utils import deserialize_tags
 from utils.inbox_display import get_next_action
@@ -70,7 +71,7 @@ async def get_briefing(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     result = await generate_briefing(db, ai_service)
     return {
         "summary": result.get("summary", ""),

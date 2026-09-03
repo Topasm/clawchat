@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
 
     app.state.paseo_adapter = paseo_execution_service.adapter_from_settings()
 
-    claude_code = ClaudeCodeProvider()
+    claude_code = ClaudeCodeProvider(model=settings.claude_code_model)
     codex_cli = CodexCLIProvider(model=settings.codex_cli_model)
     codex_api = CodexAPIProvider(
         api_key=settings.codex_api_key,
@@ -272,7 +272,7 @@ async def health(db: AsyncSession = Depends(get_db)):
     codex_cli_status = getattr(app.state, "codex_cli_status", "unknown")
     if active_provider == "claude_code":
         effective_connected = claude_code_status == "available"
-        ai_model = "claude (via CLI)"
+        ai_model = f"claude {settings.claude_code_model or 'default'} (via CLI)"
     elif active_provider == "codex":
         effective_connected = codex_api_status == "available"
         ai_model = settings.codex_model
@@ -297,6 +297,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "ai_connected": effective_connected,
         "claude_code_status": claude_code_status,
         "claude_code_version": getattr(app.state, "claude_code_version", None),
+        "claude_code_model": settings.claude_code_model,
         "codex_api_status": codex_api_status,
         "codex_model": settings.codex_model,
         "codex_cli_status": codex_cli_status,

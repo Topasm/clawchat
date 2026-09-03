@@ -29,6 +29,7 @@ from schemas.chat import (
     SendMessageResponse,
 )
 from schemas.common import PaginatedResponse
+from services.ai import resolve_active_ai
 from services.chat.conversation_context import (
     build_first_class_project_context,
     build_project_context,
@@ -304,7 +305,7 @@ async def stream_chat(
         messages.append({"role": msg.role, "content": msg.content})
 
     assistant_msg_id = make_id("msg_")
-    ai_service = getattr(request.app.state, "active_ai", request.app.state.ai_service)
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
     orchestrator = getattr(request.app.state, "orchestrator", None)
     user_msg_id = user_msg.id

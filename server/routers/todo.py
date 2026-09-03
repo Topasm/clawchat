@@ -50,6 +50,7 @@ from schemas.todo import (
 from services.agents import (
     task_delegation_service,
 )
+from services.ai import resolve_active_ai
 from services.planning import (
     inbox_pipeline_service,
     inbox_triage_service,
@@ -477,7 +478,7 @@ async def create_todo(
 
     # Trigger inbox pipeline for quick-capture root todos
     if todo.inbox_state == "classifying" and not todo.parent_id:
-        ai_service = request.app.state.ai_service
+        ai_service = resolve_active_ai(request.app.state)
         session_factory = request.app.state.session_factory
 
         async def _run_pipeline():
@@ -612,11 +613,7 @@ async def preview_inbox_triage(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    ai_service = getattr(request.app.state, "active_ai", None) or getattr(
-        request.app.state,
-        "ai_service",
-        None,
-    )
+    ai_service = resolve_active_ai(request.app.state)
     if ai_service is None:
         raise AppError(
             code="AI_UNAVAILABLE",
@@ -722,7 +719,7 @@ async def organize_todo(
     todo = await db.get(Todo, todo_id)
     if not todo:
         raise NotFoundError("Todo not found")
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
 
     async def _run_organize():
@@ -757,7 +754,7 @@ async def answer_questions(
     await notify_module_data_changed("todos")
 
     # Trigger planning in background with Q&A context
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
 
     async def _run_planning():
@@ -789,7 +786,7 @@ async def skip_questions(
     await notify_module_data_changed("todos")
 
     # Trigger planning in background without Q&A context
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
 
     async def _run_planning():
@@ -831,9 +828,7 @@ async def generate_graph_plan(
 ):
     """Generate and persist a proposal without creating any child todos."""
     try:
-        ai_service = getattr(request.app.state, "active_ai", None)
-        if ai_service is None:
-            ai_service = request.app.state.ai_service
+        ai_service = resolve_active_ai(request.app.state)
         result = await plan_proposal_service.generate_proposal(
             db,
             ai_service,
@@ -933,7 +928,7 @@ async def delegate_todo(
     state = request.app.state
     runtime = task_delegation_service.DelegationRuntime(
         session_factory=getattr(state, "session_factory", None),
-        active_ai=getattr(state, "active_ai", None) or getattr(state, "ai_service", None),
+        active_ai=resolve_active_ai(state),
         active_ai_provider=getattr(state, "active_ai_provider", "openclaw"),
         paseo_adapter=getattr(state, "paseo_adapter", None),
     )

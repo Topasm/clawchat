@@ -29,7 +29,7 @@ async def get_capabilities(
         ai_available = (
             getattr(request.app.state, "claude_code_status", "") == "available"
         )
-        ai_model = "claude (via CLI)"
+        ai_model = f"claude {settings.claude_code_model or 'default'} (via CLI)"
     elif active_provider == "codex":
         ai_available = (
             getattr(request.app.state, "codex_api_status", "") == "available"

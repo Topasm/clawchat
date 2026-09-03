@@ -35,7 +35,7 @@ docker compose up --build -d                    # Server only (BYO LLM)
 docker compose --profile ollama up --build -d   # Server + Ollama
 ```
 
-Server config is via environment variables (see `.env.example`). Key vars: `AI_PROVIDER` (`ollama`, `openai`, `claude_code`, or `codex`), `AI_BASE_URL`, `AI_MODEL`, `CODEX_API_KEY`/`OPENAI_API_KEY`, `CODEX_MODEL`, and `PIN`. `JWT_SECRET` auto-generates if not set. For remote access: `PUBLIC_URL` (backend, used in pairing QR codes), `VITE_DEFAULT_SERVER_URL` (frontend build-time default).
+Server config is via environment variables (see `.env.example`). Key vars: `AI_PROVIDER` (`ollama`, `openai`, `claude_code`, or `codex`), `AI_BASE_URL`, `AI_MODEL`, `CODEX_API_KEY`/`OPENAI_API_KEY`, `CODEX_MODEL`, and `PIN`. CLI providers pick their own cost tier: `CLAUDE_CODE_MODEL` (default `sonnet`, passed to `claude --model`; empty defers to the CLI default) and `CODEX_CLI_MODEL` (default `gpt-5.6-luna`; empty defers to `~/.codex/config.toml`). `JWT_SECRET` auto-generates if not set. For remote access: `PUBLIC_URL` (backend, used in pairing QR codes), `VITE_DEFAULT_SERVER_URL` (frontend build-time default).
 
 ## Architecture
 
