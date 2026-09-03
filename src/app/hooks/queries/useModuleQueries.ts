@@ -362,7 +362,10 @@ export function useDeleteTodo() {
 }
 export function useToggleTodoComplete() {
   const queryClient = useQueryClient();
-  return useMutation({
+  // Referenced from its own onSuccess below, for the toast's Undo action.
+  // Safe because that callback only ever runs after this assignment
+  // completes — a mutation can't succeed before useMutation returns.
+  const mutation = useMutation({
     mutationFn: async ({ id, currentStatus }: { id: string; currentStatus: TaskStatus }) => {
       const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
       await apiClient.patch(`/todos/${id}`, { status: newStatus });
@@ -375,13 +378,24 @@ export function useToggleTodoComplete() {
       queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) =>
         (old ?? []).map((t) => (t.id === id ? { ...t, status: newStatus } : t)),
       );
+      return { previous };
+    },
+    onSuccess: (newStatus, { id }) => {
       useToastStore
         .getState()
         .addToast(
           'success',
           translateUi(newStatus === 'completed' ? 'Task completed' : 'Task reopened'),
+          {
+            duration: 5000,
+            action: {
+              label: translateUi('Undo'),
+              // Toggling again is the undo: it re-runs this same mutation in
+              // reverse, with the same optimistic update and rollback.
+              onClick: () => mutation.mutate({ id, currentStatus: newStatus }),
+            },
+          },
         );
-      return { previous };
     },
     onError: (_err, _variables, context) => {
       if (context?.previous) {
@@ -397,6 +411,7 @@ export function useToggleTodoComplete() {
       void invalidateTaskDerivedQueries(queryClient);
     },
   });
+  return mutation;
 }
 export function useSetTaskStatus() {
   const queryClient = useQueryClient();
