@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_today_title">오늘</string>
-    <string name="widget_today_title_with_count">오늘 · %1$d</string>
     <string name="widget_add_task">받은 편지함에 추가</string>
     <string name="widget_refresh">새로고침</string>
     <string name="widget_login_required">위젯을 사용하려면 ClawChat을 먼저 설정하세요</string>
     <string name="widget_loading">불러오는 중…</string>
     <string name="widget_load_error">작업을 불러오지 못했습니다</string>
-    <string name="widget_empty">오늘 할 작업이 없습니다</string>
-    <string name="widget_overdue">기한 지남</string>
+    <string name="widget_empty">다가오는 마감 없음</string>
     <string name="widget_mark_done">%1$s 완료 처리</string>
     <string name="widget_inbox">받은 편지함</string>
     <string name="widget_add_to_inbox">받은 편지함에 추가…</string>
@@ -28,6 +25,14 @@
     <string name="widget_config_cancel">취소</string>
     <string name="widget_config_apply">적용</string>
     <string name="widget_config_save_failed">위젯 설정을 저장하지 못했습니다. 다시 시도하세요.</string>
-    <string name="widget_config_today_preview">오늘 할 일을 확인하고 새 항목은 받은 편지함에 추가합니다.</string>
+    <string name="widget_config_tasks_preview">다가오는 마감을 순서대로 보여주고 새 항목은 받은 편지함에 추가합니다.</string>
     <string name="widget_config_inbox_preview">새 항목을 받은 편지함에 바로 수집합니다.</string>
+    <string name="widget_tasks_title">작업</string>
+    <string name="widget_tasks_title_with_count">작업 · %1$d</string>
+    <string name="widget_due_today">D-DAY</string>
+    <string name="widget_days_remaining">D-%1$d</string>
+    <string name="widget_days_overdue">D+%1$d</string>
+    <string name="widget_config_horizon">표시 기간</string>
+    <string name="widget_config_horizon_days">%1$d일</string>
+    <string name="widget_config_horizon_hint">며칠 앞의 마감까지 보여줄지 정합니다. 기한이 지난 작업은 항상 표시됩니다.</string>
 </resources>

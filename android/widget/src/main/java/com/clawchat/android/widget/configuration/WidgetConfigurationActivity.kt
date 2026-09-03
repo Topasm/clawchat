@@ -52,7 +52,13 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.clawchat.android.widget.R
+import com.clawchat.android.widget.common.DEFAULT_WIDGET_HORIZON_DAYS
+import com.clawchat.android.widget.common.MAX_WIDGET_HORIZON_DAYS
+import com.clawchat.android.widget.common.MIN_WIDGET_HORIZON_DAYS
 import com.clawchat.android.widget.common.WidgetAppearance
+import com.clawchat.android.widget.common.WidgetHorizonDaysKey
+import com.clawchat.android.widget.common.coerceHorizonDays
+import com.clawchat.android.widget.common.widgetHorizonDays
 import com.clawchat.android.widget.common.WidgetBackgroundOpacityKey
 import com.clawchat.android.widget.quickadd.InboxQuickAddWidget
 import com.clawchat.android.widget.quickadd.InboxQuickAddWidgetReceiver
@@ -90,6 +96,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
         setContent {
             ClawChatTheme(themeModeKey = "system") {
                 var savedAppearance by remember { mutableStateOf<WidgetAppearance?>(null) }
+                var savedHorizonDays by remember { mutableIntStateOf(DEFAULT_WIDGET_HORIZON_DAYS) }
 
                 LaunchedEffect(glanceId) {
                     val preferences = getAppWidgetState(
@@ -97,6 +104,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                         PreferencesGlanceStateDefinition,
                         glanceId,
                     )
+                    savedHorizonDays = widgetHorizonDays(preferences)
                     savedAppearance = WidgetAppearance.from(preferences)
                 }
 
@@ -112,13 +120,15 @@ class WidgetConfigurationActivity : ComponentActivity() {
                     WidgetConfigurationScreen(
                         widgetKind = widgetKind,
                         initialTransparency = appearance.backgroundTransparencyPercent,
+                        initialHorizonDays = savedHorizonDays,
                         onCancel = ::finish,
-                        onApply = { transparency ->
+                        onApply = { transparency, horizonDays ->
                             saveConfiguration(
                                 glanceId = glanceId,
                                 appWidgetId = appWidgetId,
                                 widgetKind = widgetKind,
                                 appearance = WidgetAppearance.fromTransparency(transparency),
+                                horizonDays = horizonDays,
                             )
                         },
                     )
@@ -131,10 +141,12 @@ class WidgetConfigurationActivity : ComponentActivity() {
     private fun WidgetConfigurationScreen(
         widgetKind: ConfigurableWidgetKind,
         initialTransparency: Int,
+        initialHorizonDays: Int,
         onCancel: () -> Unit,
-        onApply: suspend (Int) -> Unit,
+        onApply: suspend (Int, Int) -> Unit,
     ) {
         var transparency by rememberSaveable { mutableIntStateOf(initialTransparency) }
+        var horizonDays by rememberSaveable { mutableIntStateOf(initialHorizonDays) }
         var isSaving by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
         val appearance = WidgetAppearance.fromTransparency(transparency)
@@ -201,6 +213,40 @@ class WidgetConfigurationActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
+                if (widgetKind == ConfigurableWidgetKind.Tasks) {
+                    Spacer(Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.widget_config_horizon),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.widget_config_horizon_days,
+                                horizonDays,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Slider(
+                        value = horizonDays.toFloat(),
+                        onValueChange = { horizonDays = coerceHorizonDays(it.roundToInt()) },
+                        valueRange = MIN_WIDGET_HORIZON_DAYS.toFloat()..MAX_WIDGET_HORIZON_DAYS.toFloat(),
+                        steps = MAX_WIDGET_HORIZON_DAYS - MIN_WIDGET_HORIZON_DAYS - 1,
+                        enabled = !isSaving,
+                    )
+                    Text(
+                        text = stringResource(R.string.widget_config_horizon_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
                 Spacer(Modifier.height(32.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -219,7 +265,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                 isSaving = true
                                 scope.launch {
                                     try {
-                                        onApply(transparency)
+                                        onApply(transparency, horizonDays)
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
                                     } catch (_: Exception) {
@@ -292,9 +338,11 @@ class WidgetConfigurationActivity : ComponentActivity() {
         appWidgetId: Int,
         widgetKind: ConfigurableWidgetKind,
         appearance: WidgetAppearance,
+        horizonDays: Int,
     ) {
         updateAppWidgetState(this@WidgetConfigurationActivity, glanceId) { preferences ->
             preferences[WidgetBackgroundOpacityKey] = appearance.backgroundOpacityPercent
+            preferences[WidgetHorizonDaysKey] = coerceHorizonDays(horizonDays)
         }
 
         try {
@@ -318,10 +366,10 @@ private enum class ConfigurableWidgetKind(
     val titleResource: Int,
     val previewResource: Int,
 ) {
-    Today(
+    Tasks(
         widget = TodoTrackingWidget(),
-        titleResource = R.string.widget_today_title,
-        previewResource = R.string.widget_config_today_preview,
+        titleResource = R.string.widget_tasks_title,
+        previewResource = R.string.widget_config_tasks_preview,
     ),
     Inbox(
         widget = InboxQuickAddWidget(),
@@ -331,7 +379,7 @@ private enum class ConfigurableWidgetKind(
 
     companion object {
         fun fromProvider(className: String?): ConfigurableWidgetKind? = when (className) {
-            TodoTrackingWidgetReceiver::class.java.name -> Today
+            TodoTrackingWidgetReceiver::class.java.name -> Tasks
             InboxQuickAddWidgetReceiver::class.java.name -> Inbox
             else -> null
         }
