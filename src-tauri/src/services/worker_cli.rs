@@ -127,8 +127,8 @@ pub async fn run(request: WorkerRunRequest) -> Result<WorkerRunResult, String> {
         "codex" => "codex",
         other => return Err(format!("Unsupported worker provider: {other}")),
     };
-    let cli = find_cli(program)
-        .ok_or_else(|| format!("{program} is not installed on this machine"))?;
+    let cli =
+        find_cli(program).ok_or_else(|| format!("{program} is not installed on this machine"))?;
 
     let args = build_args(&request)?;
     let mut command = Command::new(cli);
@@ -180,7 +180,11 @@ pub async fn run(request: WorkerRunRequest) -> Result<WorkerRunResult, String> {
 
     Ok(WorkerRunResult {
         output: stdout,
-        error: if stderr.is_empty() { None } else { Some(stderr) },
+        error: if stderr.is_empty() {
+            None
+        } else {
+            Some(stderr)
+        },
     })
 }
 
@@ -213,7 +217,10 @@ mod tests {
     fn codex_may_write_inside_the_workspace_only() {
         let args = build_args(&request("codex", None)).expect("args");
 
-        let sandbox = args.iter().position(|arg| arg == "--sandbox").expect("sandbox");
+        let sandbox = args
+            .iter()
+            .position(|arg| arg == "--sandbox")
+            .expect("sandbox");
         assert_eq!(args[sandbox + 1], "workspace-write");
         assert!(!args.contains(&"danger-full-access".to_owned()));
     }
