@@ -17,7 +17,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -40,7 +39,6 @@ import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.clawchat.android.core.data.model.Event
-import com.clawchat.android.core.data.model.EventCreate
 import com.clawchat.android.core.data.model.EventUpdate
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.ui.ReminderMinutesPicker
@@ -51,9 +49,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 /**
- * Adds to the calendar, or edits one event.
+ * Adds a task to the calendar, or edits one event.
  *
- * A new entry is a task by default: this workspace is task-oriented, so a day
+ * A new entry is always a task: this workspace is task-oriented, so a day
  * picked on the calendar is a deadline to work towards rather than an
  * appointment. Editing an existing event stays an event.
  *
@@ -66,7 +64,6 @@ fun EventEditorSheet(
     event: Event?,
     defaultDate: LocalDate,
     onDismiss: () -> Unit,
-    onCreate: (EventCreate) -> Unit,
     onCreateTask: (TodoCreate) -> Unit,
     onUpdate: (String, EventUpdate) -> Unit,
 ) {
@@ -79,9 +76,8 @@ fun EventEditorSheet(
         localizedTimeFormatter(locale, is24Hour)
     }
 
-    // Editing always concerns the event that was tapped; only a new entry can
-    // choose what it is.
-    var addsTask by remember { mutableStateOf(event == null) }
+    // A new entry is always a task; only editing ever concerns an event.
+    val addsTask = event == null
     var title by remember { mutableStateOf(event?.title.orEmpty()) }
     var isAllDay by remember { mutableStateOf(event?.isAllDay == true) }
     var reminderMinutes by remember { mutableStateOf(event?.reminderMinutes) }
@@ -109,29 +105,10 @@ fun EventEditorSheet(
         ) {
             Text(
                 stringResource(
-                    when {
-                        event != null -> R.string.calendar_edit_event
-                        addsTask -> R.string.calendar_new_task
-                        else -> R.string.calendar_new_event
-                    },
+                    if (event != null) R.string.calendar_edit_event else R.string.calendar_new_task,
                 ),
                 style = MaterialTheme.typography.titleLarge,
             )
-
-            if (event == null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = addsTask,
-                        onClick = { addsTask = true },
-                        label = { Text(stringResource(R.string.calendar_kind_task)) },
-                    )
-                    FilterChip(
-                        selected = !addsTask,
-                        onClick = { addsTask = false },
-                        label = { Text(stringResource(R.string.calendar_kind_event)) },
-                    )
-                }
-            }
 
             OutlinedTextField(
                 value = title,
@@ -215,6 +192,7 @@ fun EventEditorSheet(
                                 ),
                             )
                         } else {
+                            checkNotNull(event) { "Only editing an existing event reaches here." }
                             val start = LocalDateTime.of(
                                 date,
                                 if (isAllDay) LocalTime.MIDNIGHT else startTime,
@@ -222,28 +200,16 @@ fun EventEditorSheet(
                             val end = endTime
                                 ?.takeIf { !isAllDay }
                                 ?.let { LocalDateTime.of(date, it).toString() }
-                            if (event == null) {
-                                onCreate(
-                                    EventCreate(
-                                        title = title.trim(),
-                                        startTime = start.toString(),
-                                        endTime = end,
-                                        isAllDay = isAllDay,
-                                        reminderMinutes = reminderMinutes,
-                                    ),
-                                )
-                            } else {
-                                onUpdate(
-                                    event.recurringEventId ?: event.id,
-                                    EventUpdate(
-                                        title = title.trim(),
-                                        startTime = start.toString(),
-                                        endTime = end,
-                                        isAllDay = isAllDay,
-                                        reminderMinutes = reminderMinutes,
-                                    ),
-                                )
-                            }
+                            onUpdate(
+                                event.recurringEventId ?: event.id,
+                                EventUpdate(
+                                    title = title.trim(),
+                                    startTime = start.toString(),
+                                    endTime = end,
+                                    isAllDay = isAllDay,
+                                    reminderMinutes = reminderMinutes,
+                                ),
+                            )
                         }
                     },
                     enabled = title.trim().isNotBlank(),

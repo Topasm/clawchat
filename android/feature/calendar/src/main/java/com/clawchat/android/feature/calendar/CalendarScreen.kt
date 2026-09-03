@@ -207,10 +207,6 @@ fun CalendarScreen(
             event = target.event,
             defaultDate = state.selectedDate,
             onDismiss = { editing = null },
-            onCreate = {
-                viewModel.onAction(CalendarAction.Create(it))
-                editing = null
-            },
             onCreateTask = {
                 viewModel.onAction(CalendarAction.CreateTask(it))
                 editing = null

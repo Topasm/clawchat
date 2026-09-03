@@ -16,7 +16,6 @@ export default function useCalendarNavigation(initialView: ViewMode = 'month') {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDate, setDialogDate] = useState<string | undefined>();
-  const [dialogTime, setDialogTime] = useState<string | undefined>();
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -53,15 +52,18 @@ export default function useCalendarNavigation(initialView: ViewMode = 'month') {
   // Click handlers
   const handleDayClick = useCallback((date: Date) => {
     setDialogDate(toDateKey(date));
-    setDialogTime(undefined);
     setDialogOpen(true);
   }, []);
 
-  const handleTimeSlotClick = useCallback((date: Date, hour: number) => {
-    setDialogDate(toDateKey(date));
-    setDialogTime(`${String(hour).padStart(2, '0')}:00`);
-    setDialogOpen(true);
-  }, []);
+  // The week grid is still hour-by-hour for legibility, but there is no
+  // time-of-day to capture anymore: every slot on a day opens the same
+  // task dialog for that day.
+  const handleTimeSlotClick = useCallback(
+    (date: Date, _hour: number) => {
+      handleDayClick(date);
+    },
+    [handleDayClick],
+  );
 
   // Header label
   const headerLabel =
@@ -93,6 +95,5 @@ export default function useCalendarNavigation(initialView: ViewMode = 'month') {
     dialogOpen,
     setDialogOpen,
     dialogDate,
-    dialogTime,
   };
 }

@@ -38,7 +38,6 @@ export default function CalendarContainer({
     dialogOpen,
     setDialogOpen,
     dialogDate,
-    dialogTime,
   } = useCalendarNavigation(initialView);
 
   const eventsByDate = useMemo(() => indexEventsByDate(events), [events]);
@@ -99,7 +98,6 @@ export default function CalendarContainer({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         initialDate={dialogDate}
-        initialTime={dialogTime}
       />
     </div>
   );

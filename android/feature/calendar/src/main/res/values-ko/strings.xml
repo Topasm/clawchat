@@ -3,10 +3,9 @@
     <string name="calendar_today">오늘</string>
     <string name="calendar_previous_month">이전 달</string>
     <string name="calendar_next_month">다음 달</string>
-    <string name="calendar_new_event">새 일정</string>
     <string name="calendar_offline_last_synced_month">오프라인 — 마지막으로 동기화한 달을 표시 중</string>
     <string name="calendar_nothing_scheduled">일정 없음</string>
-    <string name="calendar_nothing_scheduled_description">이 날짜에 일정을 추가하거나 위에서 다른 날짜를 선택하세요.</string>
+    <string name="calendar_nothing_scheduled_description">이 날짜에 작업을 추가하거나 위에서 다른 날짜를 선택하세요.</string>
     <string name="calendar_all_day">종일</string>
     <string name="calendar_repeats">반복</string>
     <string name="calendar_delete_event">일정 삭제</string>
@@ -19,8 +18,6 @@
     <string name="calendar_ok">확인</string>
     <string name="calendar_new_task">새 작업</string>
     <string name="calendar_new_entry">달력에 추가</string>
-    <string name="calendar_kind_task">작업</string>
-    <string name="calendar_kind_event">일정</string>
     <string name="calendar_task_span_hint">오늘부터 이 날까지 진행합니다.</string>
     <string name="calendar_task_due">마감</string>
     <string name="calendar_task_overdue">기한 지남</string>
