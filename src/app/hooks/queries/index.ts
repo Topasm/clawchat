@@ -1,5 +1,13 @@
 export { queryKeys } from './queryKeys';
 export {
+  useExecutionHostsQuery,
+  useProjectWorkspaceQuery,
+  useSetProjectHostPath,
+  useSetProjectExecutionHost,
+  useDeleteProjectHostPath,
+} from './useExecutionHostQueries';
+export type { ExecutionHost, ProjectWorkspace } from './useExecutionHostQueries';
+export {
   useTodosQuery,
   useEventsQuery,
   useCreateTodo,

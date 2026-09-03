@@ -78,6 +78,7 @@ export const translationResources = {
           importExport: 'Import / Export',
           obsidianDesktop: 'Obsidian Desktop',
           thisMachine: 'This machine',
+          machines: 'Machines',
           serverConnection: 'Server Connection',
           connectMobile: 'Connect Mobile Device',
         },
@@ -186,6 +187,10 @@ export const translationResources = {
           exportHint: 'Download todos, events, and conversations as JSON',
           importData: 'Import data',
           importHint: 'Restore from a previously exported JSON file',
+        },
+        machines: {
+          thisServer: 'The machine running the server',
+          desktopApp: 'A ClawChat app checking in',
         },
         thisMachine: {
           name: 'Machine name',
@@ -388,6 +393,7 @@ export const translationResources = {
           importExport: '가져오기 / 내보내기',
           obsidianDesktop: 'Obsidian 데스크톱',
           thisMachine: '이 기기',
+          machines: '기기 목록',
           serverConnection: '서버 연결',
           connectMobile: '모바일 기기 연결',
         },
@@ -497,6 +503,10 @@ export const translationResources = {
           exportHint: '할 일, 일정 및 대화를 JSON으로 다운로드합니다',
           importData: '데이터 가져오기',
           importHint: '이전에 내보낸 JSON 파일에서 복원합니다',
+        },
+        machines: {
+          thisServer: '서버가 도는 기기',
+          desktopApp: '체크인 중인 ClawChat 앱',
         },
         thisMachine: {
           name: '기기 이름',

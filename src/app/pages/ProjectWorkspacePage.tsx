@@ -12,6 +12,7 @@ import { ChatBubbleIcon, ChevronLeftIcon, ChevronRightIcon } from '../components
 import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
 import type { ProjectOverviewResponse } from '../types/api';
+import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
 import { translateUi } from '../i18n';
 function formatMinutes(minutes: number | null | undefined) {
   if (minutes == null) return translateUi('Unknown');
@@ -160,6 +161,8 @@ export default function ProjectWorkspacePage() {
             </div>
           </section>
 
+          <ProjectWorkspaceHosts projectId={project.id} />
+
           <ProjectExecutionSettings project={project} />
 
           <section className="cc-project-workspace__section">
@@ -228,7 +231,6 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
   const updateProject = useUpdateProject(project.id);
   const [provider, setProvider] = useState(project.default_execution_provider || 'builtin');
   const [model, setModel] = useState(project.default_execution_model || 'codex');
-  const [workspacePath, setWorkspacePath] = useState(project.execution_workspace_path || '');
   const [isolation, setIsolation] = useState<'local' | 'worktree'>(
     project.execution_workspace_isolation || 'local',
   );
@@ -236,7 +238,6 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
   useEffect(() => {
     setProvider(project.default_execution_provider || 'builtin');
     setModel(project.default_execution_model || 'codex');
-    setWorkspacePath(project.execution_workspace_path || '');
     setIsolation(project.execution_workspace_isolation || 'local');
     setBaseBranch(project.execution_base_branch || '');
   }, [project]);
@@ -249,7 +250,6 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
     updateProject.mutate({
       default_execution_provider: provider,
       default_execution_model: provider === 'paseo' ? model.trim() || 'codex' : null,
-      execution_workspace_path: workspacePath.trim() || null,
       execution_workspace_isolation: isolation,
       execution_base_branch: isolation === 'worktree' ? baseBranch.trim() || null : null,
     });
@@ -313,15 +313,6 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
                 ))}
               </datalist>
             </label>
-            <label className="cc-project-execution-form__path">
-              <span>{translateUi('Repository path on the Paseo host')}</span>
-              <input
-                value={workspacePath}
-                onChange={(event) => setWorkspacePath(event.target.value)}
-                placeholder={translateUi('/srv/repos/my-project')}
-                required
-              />
-            </label>
             <label>
               <span>{translateUi('Isolation')}</span>
               <select
@@ -349,7 +340,7 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
           <button
             type="submit"
             className="cc-btn cc-btn--primary"
-            disabled={updateProject.isPending || (provider === 'paseo' && !workspacePath.trim())}
+            disabled={updateProject.isPending}
           >
             {updateProject.isPending
               ? translateUi('Saving\u2026')
