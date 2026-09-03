@@ -71,9 +71,11 @@ class TodoWidgetSnapshotLoaderTest {
     }
 
     // The cache is whatever was last synced, not the horizon slice, so a task
-    // outside the window must not reappear through the offline path.
+    // outside the window must not reappear through the offline path. Having
+    // nothing left to draw is an empty widget, not a failed one: the cache did
+    // answer, and "no deadlines ahead" is the honest reading of that answer.
     @Test
-    fun `cached tasks beyond the horizon stay off the widget`() = runTest {
+    fun `cached tasks beyond the horizon leave the widget empty rather than failed`() = runTest {
         val state = runtime(WorkspaceMode.SERVER, "server:a")
 
         val snapshot = loadTodoWidgetSnapshot(
@@ -81,6 +83,23 @@ class TodoWidgetSnapshotLoaderTest {
             runtimeState = { state },
             loadDeadlines = { ApiResult.Error("offline") },
             loadCachedTodos = { listOf(Todo("far", "Next month", dueDate = dueIn(40))) },
+        )
+
+        val success = snapshot.state as WidgetState.Success
+        assertTrue(success.data.isEmpty)
+    }
+
+    // With nothing cached at all there is no answer to show, so the widget
+    // must say so instead of claiming an empty schedule.
+    @Test
+    fun `an empty cache surfaces the failure`() = runTest {
+        val state = runtime(WorkspaceMode.SERVER, "server:a")
+
+        val snapshot = loadTodoWidgetSnapshot(
+            horizonDays = horizonDays,
+            runtimeState = { state },
+            loadDeadlines = { ApiResult.Error("offline") },
+            loadCachedTodos = { emptyList() },
         )
 
         assertTrue(snapshot.state is WidgetState.Error)
