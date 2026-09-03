@@ -22,4 +22,7 @@
     <plurals name="week_active_tasks">
         <item quantity="other">활성 작업 %1$d개</item>
     </plurals>
+    <plurals name="week_timeline_more">
+        <item quantity="other">마감 %1$d개 더</item>
+    </plurals>
 </resources>
