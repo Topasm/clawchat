@@ -74,14 +74,13 @@ async def create_todo(ctx: IntentContext) -> IntentReply:
         ctx.db,
         title=ctx.params.get("title", "Untitled task"),
         description=ctx.params.get("description"),
-        priority=ctx.params.get("priority", "medium"),
         parent_id=parent_id,
         project_id=project_id,
         due_date=_parse_due_date(ctx.params.get("due_date")),
         recurrence_rule=ctx.params.get("recurrence_rule"),
     )
     return (
-        f"Created task: '{todo.title}' with {todo.priority} priority.",
+        f"Created task: '{todo.title}'.",
         {"action_type": "todo_created", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
     )
 
@@ -136,8 +135,6 @@ async def update_todo(ctx: IntentContext) -> IntentReply:
     updates = {}
     if params.get("description"):
         updates["description"] = params["description"]
-    if params.get("priority"):
-        updates["priority"] = params["priority"]
     if params.get("due_date"):
         updates["due_date"] = _parse_due_date(params["due_date"])
     if params.get("status"):

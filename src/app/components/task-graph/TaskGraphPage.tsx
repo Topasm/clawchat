@@ -31,9 +31,7 @@ export default function TaskGraphPage({
     [statusFilter, taskTodos],
   );
   const filteredTodos = useKanbanFilters(scopedTodos, filters);
-  const hasExternalFilter = Boolean(
-    filters.searchQuery || filters.priorities.length || filters.tags.length,
-  );
+  const hasExternalFilter = Boolean(filters.searchQuery || filters.tags.length);
 
   // When a filter matches a child, retain its ancestors and visible
   // dependencies so the result still has useful graph context.

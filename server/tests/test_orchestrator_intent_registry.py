@@ -97,9 +97,9 @@ def _ctx(db, intent, params=None, **kwargs):
 
 async def test_a_todo_handler_runs_without_an_orchestrator(db_session):
     text, metadata = await todo_intents.create_todo(
-        _ctx(db_session, "create_todo", {"title": "Standalone", "priority": "low"})
+        _ctx(db_session, "create_todo", {"title": "Standalone"})
     )
-    assert text == "Created task: 'Standalone' with low priority."
+    assert text == "Created task: 'Standalone'."
     stored = (
         await db_session.execute(select(Todo).where(Todo.title == "Standalone"))
     ).scalars().all()

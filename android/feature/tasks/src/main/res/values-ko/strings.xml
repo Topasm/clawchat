@@ -30,10 +30,6 @@
     <string name="tasks_inbox_review">검토</string>
     <string name="tasks_inbox_organize">정리</string>
     <string name="tasks_inbox_failed">실패</string>
-    <string name="tasks_priority_low">낮음</string>
-    <string name="tasks_priority_medium">보통</string>
-    <string name="tasks_priority_high">높음</string>
-    <string name="tasks_priority_urgent">긴급</string>
     <string name="tasks_recurring">반복</string>
 
     <string name="tasks_detail_title">작업 상세</string>

@@ -114,12 +114,6 @@
 }
 
 /* --- Badge ------------------------------------------------ */
-.cc-badge__priority-icon {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-}
-
 .cc-badge {
   display: inline-flex;
   align-items: center;
@@ -130,23 +124,6 @@
   font-weight: 500;
   white-space: nowrap;
   line-height: 1.5;
-}
-
-.cc-badge--priority-urgent {
-  background: color-mix(in srgb, var(--cc-priority-urgent) 15%, transparent);
-  color: var(--cc-priority-urgent);
-}
-.cc-badge--priority-high {
-  background: color-mix(in srgb, var(--cc-priority-high) 15%, transparent);
-  color: var(--cc-priority-high);
-}
-.cc-badge--priority-medium {
-  background: color-mix(in srgb, var(--cc-priority-medium) 15%, transparent);
-  color: var(--cc-priority-medium);
-}
-.cc-badge--priority-low {
-  background: color-mix(in srgb, var(--cc-priority-low) 15%, transparent);
-  color: var(--cc-priority-low);
 }
 
 .cc-badge--due-overdue {

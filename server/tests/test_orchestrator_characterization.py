@@ -154,17 +154,17 @@ def test_module_intent_names_are_frozen():
 
 async def test_create_todo_reply_and_metadata(orchestrator, db_session):
     text, metadata = await resolve(
-        orchestrator, db_session, "create_todo", {"title": "Buy milk", "priority": "high"}
+        orchestrator, db_session, "create_todo", {"title": "Buy milk"}
     )
-    assert text == "Created task: 'Buy milk' with high priority."
+    assert text == "Created task: 'Buy milk'."
     assert metadata["action_type"] == "todo_created"
     assert metadata["module"] == "todos"
     assert metadata["todo_title"] == "Buy milk"
 
 
-async def test_create_todo_defaults_title_and_priority(orchestrator, db_session):
+async def test_create_todo_defaults_title(orchestrator, db_session):
     text, _ = await resolve(orchestrator, db_session, "create_todo", {})
-    assert text == "Created task: 'Untitled task' with medium priority."
+    assert text == "Created task: 'Untitled task'."
 
 
 async def test_create_todo_inherits_the_conversation_project(orchestrator, db_session):
@@ -246,7 +246,6 @@ async def test_update_todo_applies_known_fields(orchestrator, db_session):
         {
             "title": "Refactor",
             "description": "split it up",
-            "priority": "high",
             "due_date": "2026-09-01T09:00:00+00:00",
             "status": TaskStatus.IN_PROGRESS,
         },
@@ -259,7 +258,6 @@ async def test_update_todo_applies_known_fields(orchestrator, db_session):
         "todo_title": "Refactor",
     }
     assert todo.description == "split it up"
-    assert todo.priority == "high"
 
 
 async def test_delete_todo_reports_the_removed_task(orchestrator, db_session):

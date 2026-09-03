@@ -242,7 +242,6 @@ class TodayViewModelTest {
         val input = TodoCreate(
             title = "Quick",
             description = "From sheet",
-            priority = "high",
             dueDate = "2026-03-23",
             source = "quick_capture",
             inboxState = "classifying",

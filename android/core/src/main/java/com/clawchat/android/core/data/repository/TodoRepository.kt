@@ -97,13 +97,12 @@ class TodoRepositoryImpl @Inject constructor(
                 val requestedOrder = params["order_by"]
                 val orderBy = when (requestedOrder) {
                     null -> "default"
-                    "created_at", "updated_at", "sort_order", "priority", "due_date" ->
+                    "created_at", "updated_at", "sort_order", "due_date" ->
                         requestedOrder
                     else -> "created_at"
                 }
                 val localPage = localTodoDao.loadPage(
                     status = params["status"],
-                    priority = params["priority"],
                     inboxState = params["inbox_state"],
                     filterParent = params.containsKey("parent_id"),
                     parentId = params["parent_id"],
@@ -478,7 +477,6 @@ class TodoRepositoryImpl @Inject constructor(
             .filterNot { it.id in deletedIds }
             .map { todo -> if (todo.id in pendingIds) todo.copy(syncStatus = "pending") else todo }
         params["status"]?.let { status -> cached = cached.filter { it.status.wireValue == status } }
-        params["priority"]?.let { priority -> cached = cached.filter { it.priority == priority } }
         params["inbox_state"]?.let { inbox -> cached = cached.filter { it.inboxState == inbox } }
         params["due_before"]?.let { dueBefore ->
             cached = cached.filter { it.dueDate != null && it.dueDate < dueBefore }
@@ -512,7 +510,6 @@ class TodoRepositoryImpl @Inject constructor(
         id = id,
         title = title,
         description = description,
-        priority = priority,
         dueDate = dueDate,
         tags = tags,
         parentId = parentId,

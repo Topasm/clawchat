@@ -12,7 +12,6 @@ function todo(id: string, overrides: Partial<TodoResponse> = {}): TodoResponse {
     id,
     title: id,
     status: 'pending',
-    priority: 'medium',
     created_at: '2026-08-26T00:00:00Z',
     updated_at: '2026-08-26T00:00:00Z',
     ...overrides,

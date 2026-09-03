@@ -18,10 +18,6 @@
     <string name="task_title_hint">무엇을 해야 하나요?</string>
     <string name="task_notes_label">메모</string>
     <string name="task_notes_hint">세부 내용을 추가하세요…</string>
-    <string name="task_priority_label">우선순위</string>
-    <string name="task_priority_low">낮음</string>
-    <string name="task_priority_medium">보통</string>
-    <string name="task_priority_high">높음</string>
     <string name="task_clear_due_date">마감일 지우기</string>
     <string name="task_add_due_date">마감일 추가</string>
     <string name="task_create_action">만들기</string>

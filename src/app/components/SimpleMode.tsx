@@ -64,7 +64,6 @@ export default function SimpleMode() {
       createTodo.mutate({
         title: trimmedTitle,
         status: 'pending',
-        priority: 'medium',
         tags: [],
         source: 'quick_capture',
         inbox_state: 'classifying',
@@ -75,7 +74,6 @@ export default function SimpleMode() {
         id: `local-${Date.now()}`,
         title: trimmedTitle,
         status: 'pending',
-        priority: 'medium',
         tags: [],
         parent_id: null,
         project_id: null,

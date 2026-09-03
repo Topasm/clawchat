@@ -78,30 +78,6 @@
   border-color: currentColor;
 }
 
-.cc-kanban-filter__chip--urgent.cc-kanban-filter__chip--active {
-  background: color-mix(in srgb, var(--cc-priority-urgent) 15%, transparent);
-  color: var(--cc-priority-urgent);
-  border-color: var(--cc-priority-urgent);
-}
-
-.cc-kanban-filter__chip--high.cc-kanban-filter__chip--active {
-  background: color-mix(in srgb, var(--cc-priority-high) 15%, transparent);
-  color: var(--cc-priority-high);
-  border-color: var(--cc-priority-high);
-}
-
-.cc-kanban-filter__chip--medium.cc-kanban-filter__chip--active {
-  background: color-mix(in srgb, var(--cc-priority-medium) 15%, transparent);
-  color: var(--cc-priority-medium);
-  border-color: var(--cc-priority-medium);
-}
-
-.cc-kanban-filter__chip--low.cc-kanban-filter__chip--active {
-  background: color-mix(in srgb, var(--cc-priority-low) 15%, transparent);
-  color: var(--cc-priority-low);
-  border-color: var(--cc-priority-low);
-}
-
 /* -- Dropdowns ----------------------------------------------- */
 
 .cc-kanban-filter__select {

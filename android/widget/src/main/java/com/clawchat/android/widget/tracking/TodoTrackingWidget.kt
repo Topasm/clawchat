@@ -301,16 +301,6 @@ private fun TodoRow(
             maxLines = 1,
         )
 
-        if (todo.isHighPriority) {
-            Spacer(GlanceModifier.width(4.dp))
-            Image(
-                provider = ImageProvider(R.drawable.ic_widget_priority),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(GlanceTheme.colors.error),
-                modifier = GlanceModifier.size(16.dp),
-            )
-        }
-
         if (!compact) {
             Spacer(GlanceModifier.width(8.dp))
             RunwayBar(todo = todo)

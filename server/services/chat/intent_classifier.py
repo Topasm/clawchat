@@ -13,7 +13,7 @@ Intents:
 - general_chat: General conversation, questions, greetings, or anything that doesn't match other intents
 - create_todo: User wants to create a task/todo (e.g., "remind me to buy groceries")
 - query_todos: User wants to list or search tasks (e.g., "what are my tasks?")
-- update_todo: User wants to modify a task (e.g., "change the priority of...")
+- update_todo: User wants to modify a task (e.g., "change the due date of...")
 - delete_todo: User wants to remove a task
 - complete_todo: User wants to mark a task as done
 - create_event: User wants to be somewhere at a clock time (e.g., "schedule a meeting tomorrow at 3pm"). A day with no clock time is a deadline, not an event -- use create_todo with a due_date for those.
@@ -73,11 +73,6 @@ INTENT_TOOLS_SCHEMA = [
                     "due_date": {
                         "type": "string",
                         "description": "Due date in ISO 8601 format if applicable",
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["low", "medium", "high", "urgent"],
-                        "description": "Priority level if applicable",
                     },
                     "start_time": {
                         "type": "string",

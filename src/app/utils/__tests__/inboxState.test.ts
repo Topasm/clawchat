@@ -7,7 +7,6 @@ function todo(overrides: Partial<TodoResponse> = {}): TodoResponse {
     id: 'task-1',
     title: 'Task',
     status: 'pending',
-    priority: 'medium',
     created_at: '2026-09-01T00:00:00.000Z',
     updated_at: '2026-09-01T00:00:00.000Z',
     ...overrides,

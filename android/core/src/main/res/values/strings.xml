@@ -18,10 +18,6 @@
     <string name="task_title_hint">What needs to be done?</string>
     <string name="task_notes_label">Notes</string>
     <string name="task_notes_hint">Add details…</string>
-    <string name="task_priority_label">Priority</string>
-    <string name="task_priority_low">Low</string>
-    <string name="task_priority_medium">Medium</string>
-    <string name="task_priority_high">High</string>
     <string name="task_clear_due_date">Clear due date</string>
     <string name="task_add_due_date">Add due date</string>
     <string name="task_create_action">Create</string>

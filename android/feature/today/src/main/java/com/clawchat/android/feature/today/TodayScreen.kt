@@ -550,7 +550,6 @@ private fun TodoRow(
                             tone = taskStatusTone(todo.status),
                         )
                     }
-                    PriorityChip(todo.priority)
                     todo.dueDate?.let {
                         ClawStatusChip(
                             text = localizedDateLabel(it),
@@ -835,28 +834,6 @@ private fun SuggestionActionCard(suggestion: BriefingSuggestion) {
             )
         }
     }
-}
-
-@Composable
-private fun PriorityChip(priority: String) {
-    val tone = when (priority.lowercase()) {
-        "high", "urgent" -> ClawTone.Error
-        "medium" -> ClawTone.Warning
-        else -> ClawTone.Default
-    }
-    ClawStatusChip(
-        text = priorityLabel(priority),
-        tone = tone,
-    )
-}
-
-@Composable
-private fun priorityLabel(priority: String): String = when (priority.lowercase()) {
-    "low" -> stringResource(R.string.today_priority_low)
-    "medium" -> stringResource(R.string.today_priority_medium)
-    "high" -> stringResource(R.string.today_priority_high)
-    "urgent" -> stringResource(R.string.today_priority_urgent)
-    else -> priority
 }
 
 @Composable

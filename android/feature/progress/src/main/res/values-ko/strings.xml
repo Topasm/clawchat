@@ -6,8 +6,6 @@
     <string name="progress_capture_add">Inbox에 추가</string>
     <string name="progress_capture_saved">Inbox에 추가했습니다</string>
     <string name="progress_capture_undo">되돌리기</string>
-    <string name="progress_capture_priority_high">높은 우선순위</string>
-    <string name="progress_capture_priority_low">낮은 우선순위</string>
     <string name="progress_search">빠른 찾기</string>
     <string name="progress_settings">설정</string>
     <string name="progress_title">Now</string>

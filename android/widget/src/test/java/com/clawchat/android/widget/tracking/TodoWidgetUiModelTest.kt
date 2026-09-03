@@ -101,32 +101,16 @@ class TodoWidgetUiModelTest {
         assertEquals(1, result.itemCount)
     }
 
-    @Test
-    fun `urgent and high priority tasks are marked`() {
-        val result = model(
-            listOf(
-                todo(id = "urgent", priority = "urgent", dueDate = "2026-09-11T23:59:00"),
-                todo(id = "normal", priority = "medium", dueDate = "2026-09-12T23:59:00"),
-            ),
-        )
-
-        val byId = result.items.associateBy { it.id }
-        assertTrue(byId.getValue("urgent").isHighPriority)
-        assertFalse(byId.getValue("normal").isHighPriority)
-    }
-
     private fun todo(
         id: String,
         title: String = "Task $id",
         status: TaskStatus = TaskStatus.PENDING,
-        priority: String = "medium",
         dueDate: String? = null,
         inboxState: String? = "none",
     ) = Todo(
         id = id,
         title = title,
         status = status,
-        priority = priority,
         dueDate = dueDate,
         inboxState = inboxState,
     )

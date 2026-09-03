@@ -59,7 +59,6 @@ internal data class TodoWidgetUiModel(
                         } else {
                             (daysRemaining.toFloat() / horizonDays.coerceAtLeast(1)).coerceIn(0f, 1f)
                         },
-                        isHighPriority = todo.priority == "high" || todo.priority == "urgent",
                     )
                 }
                 .sortedWith(compareBy({ it.daysRemaining }, { it.title }))
@@ -77,7 +76,6 @@ internal data class TodoWidgetItem(
     val daysRemaining: Int,
     /** How much of the horizon is left, 0f..1f. */
     val runwayFraction: Float,
-    val isHighPriority: Boolean,
 ) {
     val isOverdue: Boolean
         get() = daysRemaining < 0

@@ -31,11 +31,6 @@ export interface ColorPalette {
   completedGreen: string;
   overdueRed: string;
 
-  priorityUrgent: string;
-  priorityHigh: string;
-  priorityMedium: string;
-  priorityLow: string;
-
   shadow: string;
   deleteBackground: string;
   metaTagBackground: string;
@@ -72,11 +67,6 @@ export const lightColors: ColorPalette = {
   completedGreen: '#34C759',
   overdueRed: '#FF3B30',
 
-  priorityUrgent: '#FF3B30',
-  priorityHigh: '#FF9500',
-  priorityMedium: '#FFCC00',
-  priorityLow: '#8E8E93',
-
   shadow: '#000000',
   deleteBackground: '#FFF0F0',
   metaTagBackground: 'rgba(0,0,0,0.04)',
@@ -112,11 +102,6 @@ export const darkColors: ColorPalette = {
   inboxYellow: '#FFD60A',
   completedGreen: '#30D158',
   overdueRed: '#FF453A',
-
-  priorityUrgent: '#FF453A',
-  priorityHigh: '#FF9F0A',
-  priorityMedium: '#FFD60A',
-  priorityLow: '#8E8E93',
 
   shadow: '#000000',
   deleteBackground: '#3A2020',

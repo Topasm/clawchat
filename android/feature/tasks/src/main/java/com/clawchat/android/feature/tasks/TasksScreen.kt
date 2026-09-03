@@ -34,10 +34,13 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -47,7 +50,9 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clawchat.android.core.R as CoreR
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
@@ -153,6 +159,11 @@ fun TasksScreen(
             onSetStatus = { status ->
                 state.selectedTask?.let { task ->
                     viewModel.updateTask(task.id, TodoUpdate(status = status))
+                }
+            },
+            onSetDueDate = { date ->
+                state.selectedTask?.let { task ->
+                    viewModel.updateTask(task.id, TodoUpdate(dueDate = date))
                 }
             },
             onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
@@ -661,7 +672,6 @@ private fun TaskRow(
                     text = taskStatusLabel(task.status),
                     tone = taskStatusTone(task.status),
                 )
-                PriorityChip(task.priority)
                 task.dueDate?.let {
                     ClawStatusChip(
                         text = localizedDateLabel(it),
@@ -716,9 +726,11 @@ private fun TaskDetailView(
     onBack: () -> Unit,
     onToggle: () -> Unit,
     onSetStatus: (TaskStatus) -> Unit,
+    onSetDueDate: (String) -> Unit,
     onDelete: () -> Unit,
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
+    var showDatePicker by remember { mutableStateOf(false) }
     val checkboxDescription = stringResource(
         if (isCompleted) R.string.tasks_mark_incomplete else R.string.tasks_mark_complete,
         task.title,
@@ -827,9 +839,14 @@ private fun TaskDetailView(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        PriorityChip(task.priority)
                         task.dueDate?.let {
-                            ClawStatusChip(text = localizedDateLabel(it), tone = ClawTone.Warning)
+                            InputChip(
+                                selected = true,
+                                onClick = { showDatePicker = true },
+                                label = { Text(localizedDateLabel(it)) },
+                            )
+                        } ?: TextButton(onClick = { showDatePicker = true }) {
+                            Text(stringResource(CoreR.string.task_add_due_date))
                         }
                         if (task.isRecurring) {
                             ClawStatusChip(
@@ -903,6 +920,30 @@ private fun TaskDetailView(
             }
         }
     }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val instant = java.time.Instant.ofEpochMilli(millis)
+                        val localDate = instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                        onSetDueDate(localDate.toString())
+                    }
+                    showDatePicker = false
+                }) { Text(stringResource(CoreR.string.common_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(CoreR.string.common_cancel))
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
 @Composable
@@ -971,33 +1012,11 @@ private fun TaskRelationshipRow(
 }
 
 @Composable
-private fun PriorityChip(priority: String) {
-    val tone = when (priority.lowercase()) {
-        "high", "urgent" -> ClawTone.Error
-        "medium" -> ClawTone.Warning
-        else -> ClawTone.Default
-    }
-    ClawStatusChip(
-        text = priorityLabel(priority),
-        tone = tone,
-    )
-}
-
-@Composable
 private fun relationshipTypeLabel(type: String): String = when (type) {
     "depends_on" -> stringResource(R.string.tasks_relationship_type_depends_on)
     "duplicate" -> stringResource(R.string.tasks_relationship_type_duplicate)
     "related" -> stringResource(R.string.tasks_relationship_type_related)
     else -> type.replace('_', ' ')
-}
-
-@Composable
-private fun priorityLabel(priority: String): String = when (priority.lowercase()) {
-    "low" -> stringResource(R.string.tasks_priority_low)
-    "medium" -> stringResource(R.string.tasks_priority_medium)
-    "high" -> stringResource(R.string.tasks_priority_high)
-    "urgent" -> stringResource(R.string.tasks_priority_urgent)
-    else -> priority
 }
 
 @Composable

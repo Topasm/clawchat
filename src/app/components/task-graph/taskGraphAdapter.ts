@@ -23,7 +23,6 @@ export function todoFromGraphInsight(
     id: insight.task_id,
     title: insight.title,
     status: insight.status,
-    priority: 'medium',
     due_date: insight.due_date,
     tags: [],
     parent_id: insight.parent_id,

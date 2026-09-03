@@ -28,7 +28,6 @@ import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 import { getTaskStatusLabel, isTerminalTaskStatus } from '../utils/taskStatus';
 import { translateUi } from '../i18n';
-const PRIORITIES: Array<TodoResponse['priority']> = ['low', 'medium', 'high', 'urgent'];
 const SKILL_OPTIONS = [
   { id: 'plan', label: 'Plan' },
   { id: 'research', label: 'Research' },
@@ -118,12 +117,6 @@ export default function TaskDetailPage() {
     setDescription(val);
     persistField({ description: val });
   };
-  const cyclePriority = () => {
-    if (!task) return;
-    const idx = PRIORITIES.indexOf(task.priority);
-    const next = PRIORITIES[(idx + 1) % PRIORITIES.length];
-    persistField({ priority: next });
-  };
   const handleDelete = async () => {
     if (!taskId) return;
     deleteTodoMutation.mutate(taskId);
@@ -175,10 +168,6 @@ export default function TaskDetailPage() {
   const isPlanned = childTasks.length > 0;
   const dueInfo =
     task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
-  // Blocker info from child tasks
-  const blockedByRelationships = todos.filter(
-    (t) => t.parent_id === taskId && !isTerminalTaskStatus(t.status),
-  );
   return (
     <div className="cc-detail cc-exec-panel">
       {/* Top: Status + Quick Actions */}
@@ -193,9 +182,6 @@ export default function TaskDetailPage() {
           />
         </div>
         <div className="cc-exec-panel__badges">
-          <button type="button" className="cc-detail__field-btn" onClick={cyclePriority}>
-            <Badge variant="priority" level={task.priority || 'medium'} />
-          </button>
           {task.status !== 'pending' && (
             <Badge variant="status">{getTaskStatusLabel(task.status)}</Badge>
           )}
@@ -253,32 +239,48 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Section 2: Due / Estimate / Recurrence / Blockers */}
-      {(dueInfo ||
-        task.estimated_minutes ||
-        task.is_recurring ||
-        blockedByRelationships.length > 0) && (
-        <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-title">
-            {translateUi('Due / Estimate / Blockers')}
-          </div>
-          <div className="cc-exec-panel__info-grid">
-            {dueInfo && (
-              <div
-                className={`cc-exec-panel__info-item cc-exec-panel__info-item--${dueInfo.variant}`}
-              >
-                <span className="cc-exec-panel__info-label">{translateUi('Due')}</span>
-                <span className="cc-exec-panel__info-value">{dueInfo.label}</span>
-              </div>
-            )}
-            {task.estimated_minutes && (
-              <div className="cc-exec-panel__info-item">
-                <span className="cc-exec-panel__info-label">{translateUi('Estimate')}</span>
-                <span className="cc-exec-panel__info-value">{task.estimated_minutes}m</span>
-              </div>
-            )}
-          </div>
+      <div className="cc-exec-panel__section">
+        <div className="cc-exec-panel__section-title">
+          {translateUi('Due / Estimate / Blockers')}
         </div>
-      )}
+        <div className="cc-exec-panel__info-grid">
+          <div
+            className={`cc-exec-panel__info-item${dueInfo ? ` cc-exec-panel__info-item--${dueInfo.variant}` : ''}`}
+          >
+            <span className="cc-exec-panel__info-label">{translateUi('Due')}</span>
+            <div className="cc-exec-panel__due-editor">
+              <input
+                type="date"
+                className="cc-event-form__input cc-exec-panel__due-input"
+                value={task.due_date ? task.due_date.slice(0, 10) : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  persistField({
+                    due_date: val ? new Date(`${val}T23:59:00`).toISOString() : null,
+                  });
+                }}
+              />
+              {task.due_date && (
+                <button
+                  type="button"
+                  className="cc-exec-panel__due-clear"
+                  onClick={() => persistField({ due_date: null })}
+                  aria-label={translateUi('Clear due date')}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {dueInfo && <span className="cc-exec-panel__info-value">{dueInfo.label}</span>}
+          </div>
+          {task.estimated_minutes && (
+            <div className="cc-exec-panel__info-item">
+              <span className="cc-exec-panel__info-label">{translateUi('Estimate')}</span>
+              <span className="cc-exec-panel__info-value">{task.estimated_minutes}m</span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Section 2b: Recurrence */}
       <div className="cc-exec-panel__section">

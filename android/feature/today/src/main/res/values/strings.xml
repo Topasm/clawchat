@@ -93,10 +93,6 @@
     <string name="today_suggestion_break_down">Break down</string>
     <string name="today_suggestion_prioritize">Prioritize</string>
 
-    <string name="today_priority_low">Low</string>
-    <string name="today_priority_medium">Medium</string>
-    <string name="today_priority_high">High</string>
-    <string name="today_priority_urgent">Urgent</string>
     <plurals name="today_reminder_minutes_before">
         <item quantity="one">%1$d min before</item>
         <item quantity="other">%1$d min before</item>

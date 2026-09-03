@@ -431,7 +431,6 @@ class TodoRepositoryTest {
             localTodoDao.loadPage(
                 "pending",
                 null,
-                null,
                 false,
                 null,
                 false,
@@ -503,7 +502,6 @@ class TodoRepositoryTest {
             localTodoDao.loadPage(
                 "in_progress",
                 null,
-                null,
                 false,
                 null,
                 false,
@@ -529,7 +527,7 @@ class TodoRepositoryTest {
         val page = (result as ApiResult.Success).data
         assertEquals(1_201, page.total)
         assertEquals(2, page.page)
-        coVerify(exactly = 1) { localTodoDao.loadPage(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { localTodoDao.loadPage(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test

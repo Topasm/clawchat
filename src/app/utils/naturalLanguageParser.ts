@@ -3,7 +3,6 @@ interface ParsedInput {
   type: 'task' | 'event' | 'note';
   dueDate: Date | null;
   startTime: Date | null;
-  priority: 'urgent' | 'high' | 'low' | null;
   recurrenceRule: string | null;
 }
 
@@ -13,7 +12,6 @@ export function parseNaturalInput(text: string): ParsedInput {
     type: 'task',
     dueDate: null,
     startTime: null,
-    priority: null,
     recurrenceRule: null,
   };
   let cleanTitle = text.trim();
@@ -136,18 +134,6 @@ export function parseNaturalInput(text: string): ParsedInput {
     result.type = 'event';
   } else if (/\b(note|remember that|fyi)\b/i.test(cleanTitle)) {
     result.type = 'note';
-  }
-
-  // Priority detection
-  if (/\b(urgent|asap)\b/i.test(cleanTitle)) {
-    result.priority = 'urgent';
-    cleanTitle = cleanTitle.replace(/\b(urgent|asap)\b/i, '').trim();
-  } else if (/\b(important|high priority)\b/i.test(cleanTitle)) {
-    result.priority = 'high';
-    cleanTitle = cleanTitle.replace(/\b(important|high priority)\b/i, '').trim();
-  } else if (/\b(low priority)\b/i.test(cleanTitle)) {
-    result.priority = 'low';
-    cleanTitle = cleanTitle.replace(/\b(low priority)\b/i, '').trim();
   }
 
   result.title = cleanTitle.replace(/\s+/g, ' ').trim();

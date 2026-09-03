@@ -85,10 +85,6 @@
     <string name="today_suggestion_break_down">작업 나누기</string>
     <string name="today_suggestion_prioritize">우선순위 지정</string>
 
-    <string name="today_priority_low">낮음</string>
-    <string name="today_priority_medium">보통</string>
-    <string name="today_priority_high">높음</string>
-    <string name="today_priority_urgent">긴급</string>
     <plurals name="today_reminder_minutes_before">
         <item quantity="other">%1$d분 전</item>
     </plurals>

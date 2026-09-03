@@ -84,7 +84,6 @@ export function useCreateTodo() {
         id: `temp-${Date.now()}`,
         title: newTodo.title,
         status: newTodo.status ?? 'pending',
-        priority: newTodo.priority,
         due_date: newTodo.due_date,
         tags: newTodo.tags ?? [],
         parent_id: newTodo.parent_id ?? null,

@@ -217,7 +217,6 @@ class TasksViewModelTest {
         val input = TodoCreate(
             title = "New task",
             description = "Notes",
-            priority = "high",
             dueDate = "2026-03-23",
             source = "quick_capture",
             inboxState = "classifying",

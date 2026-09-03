@@ -33,10 +33,6 @@
     <string name="tasks_inbox_review">Review</string>
     <string name="tasks_inbox_organize">Organize</string>
     <string name="tasks_inbox_failed">Failed</string>
-    <string name="tasks_priority_low">Low</string>
-    <string name="tasks_priority_medium">Medium</string>
-    <string name="tasks_priority_high">High</string>
-    <string name="tasks_priority_urgent">Urgent</string>
     <string name="tasks_recurring">Recurring</string>
 
     <string name="tasks_detail_title">Task detail</string>

@@ -325,10 +325,6 @@ private fun WeekTaskRow(task: Todo, onToggle: () -> Unit) {
                             tone = ClawTone.Primary,
                         )
                     }
-                    ClawStatusChip(
-                        text = priorityLabel(task.priority),
-                        tone = priorityTone(task.priority),
-                    )
                     if (task.isRecurring) {
                         ClawStatusChip(
                             text = stringResource(R.string.week_recurring),
@@ -341,17 +337,3 @@ private fun WeekTaskRow(task: Todo, onToggle: () -> Unit) {
     }
 }
 
-@Composable
-private fun priorityLabel(priority: String): String = when (priority.lowercase()) {
-    "low" -> stringResource(R.string.week_priority_low)
-    "medium" -> stringResource(R.string.week_priority_medium)
-    "high" -> stringResource(R.string.week_priority_high)
-    "urgent" -> stringResource(R.string.week_priority_urgent)
-    else -> priority
-}
-
-private fun priorityTone(priority: String): ClawTone = when (priority.lowercase()) {
-    "high", "urgent" -> ClawTone.Error
-    "medium" -> ClawTone.Warning
-    else -> ClawTone.Default
-}

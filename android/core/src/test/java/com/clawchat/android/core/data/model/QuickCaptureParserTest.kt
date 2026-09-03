@@ -10,17 +10,15 @@ class QuickCaptureParserTest {
         val draft = QuickCaptureParser.parse("  금요일 보고서 확인  ")!!
 
         assertEquals("금요일 보고서 확인", draft.title)
-        assertEquals("medium", draft.priority)
         assertEquals(emptyList<String>(), draft.tags)
         assertNull(draft.toTodoCreate("android_app", "key").dueDate)
     }
 
     @Test
-    fun `explicit tags and priority are removed from title`() {
-        val draft = QuickCaptureParser.parse("보고서 확인 #업무 !높음 #Work #업무")!!
+    fun `explicit tags are removed from title`() {
+        val draft = QuickCaptureParser.parse("보고서 확인 #업무 #Work #업무")!!
 
         assertEquals("보고서 확인", draft.title)
-        assertEquals("high", draft.priority)
         assertEquals(listOf("업무", "Work"), draft.tags)
     }
 
@@ -34,7 +32,7 @@ class QuickCaptureParserTest {
 
     @Test
     fun `metadata without a title is rejected`() {
-        assertNull(QuickCaptureParser.parse("#업무 !high"))
+        assertNull(QuickCaptureParser.parse("#업무"))
         assertNull(QuickCaptureParser.parse("   "))
     }
 }

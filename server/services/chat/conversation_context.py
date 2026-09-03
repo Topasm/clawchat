@@ -28,10 +28,7 @@ async def build_project_context(db: AsyncSession, project_todo_id: str) -> str:
     if subtasks:
         ctx += f"Tasks ({len(subtasks)}):\n"
         for task in subtasks:
-            ctx += f"  - [{task.status}] {task.title}"
-            if task.priority != "medium":
-                ctx += f" ({task.priority})"
-            ctx += "\n"
+            ctx += f"  - [{task.status}] {task.title}\n"
     return ctx
 
 

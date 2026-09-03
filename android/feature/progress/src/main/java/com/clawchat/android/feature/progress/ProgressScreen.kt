@@ -410,18 +410,7 @@ private fun QuickCaptureCard(
             },
         )
         parsed?.let { draft ->
-            val metadata = buildList {
-                if (draft.priority != "medium") add(
-                    stringResource(
-                        if (draft.priority == "high") {
-                            R.string.progress_capture_priority_high
-                        } else {
-                            R.string.progress_capture_priority_low
-                        },
-                    ),
-                )
-                addAll(draft.tags.map { "#$it" })
-            }
+            val metadata = draft.tags.map { "#$it" }
             if (metadata.isNotEmpty()) {
                 Text(
                     text = metadata.joinToString(" · "),

@@ -63,7 +63,6 @@ data class Todo(
     val title: String,
     val description: String? = null,
     val status: TaskStatus = TaskStatus.PENDING,
-    val priority: String = "medium",
     @SerialName("due_date") val dueDate: String? = null,
     @SerialName("completed_at") val completedAt: String? = null,
     val tags: List<String>? = null,
@@ -92,7 +91,6 @@ data class Todo(
 data class TodoCreate(
     val title: String,
     val description: String? = null,
-    val priority: String = "medium",
     @SerialName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
     @SerialName("parent_id") val parentId: String? = null,
@@ -107,7 +105,6 @@ data class TodoUpdate(
     val title: String? = null,
     val description: String? = null,
     val status: TaskStatus? = null,
-    val priority: String? = null,
     @SerialName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
     @SerialName("sort_order") val sortOrder: Int? = null,
