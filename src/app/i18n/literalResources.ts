@@ -829,6 +829,21 @@ export const koreanUiTranslations: Record<string, string> = {
 // Product terminology and short action labels need context that generic
 // machine translation cannot infer reliably.
 Object.assign(koreanUiTranslations, {
+  'No machines registered yet. Open ClawChat on a machine and turn that machine on in its settings.':
+    '등록된 기기가 없습니다. 그 기기에서 ClawChat을 열고 설정에서 켜세요.',
+  'Not set up': '설정되지 않음',
+  'Offline — work here is refused until it is back':
+    '오프라인 — 돌아올 때까지 이 기기 작업은 거절됩니다',
+  'Where this runs': '어디서 실행하나',
+  'A path belongs to one machine. Record it per machine, then pick the one this project runs on.':
+    '경로는 기기마다 다릅니다. 기기별로 기록한 뒤 이 프로젝트가 돌 기기를 고르세요.',
+  'Loading machines…': '기기를 불러오는 중…',
+  'Runs here': '여기서 실행',
+  'Path on this machine': '이 기기에서의 경로',
+  'Save path': '경로 저장',
+  'Run here': '여기서 실행하기',
+  Forget: '지우기',
+
   ", and the server's own output in": ', 서버 자체 출력은',
   ', then return here and click Retry.': '에서 설치한 뒤 여기로 돌아와 다시 시도하세요.',
   '· current revision': '· 현재 리비전',

@@ -9,6 +9,7 @@ import SettingsRow from '../components/shared/SettingsRow';
 import SettingsSection from '../components/shared/SettingsSection';
 import Toggle from '../components/shared/Toggle';
 import { StatusDot } from '../components/shared/WorkspacePrimitives';
+import { useExecutionHostsQuery } from '../hooks/queries';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
 import usePlatform from '../hooks/usePlatform';
 import { useTranslation, translateUi } from '../i18n';
@@ -121,6 +122,7 @@ export default function SettingsPage() {
   const setWorkerLabel = useSettingsStore((state) => state.setWorkerLabel);
   const workerProvider = useSettingsStore((state) => state.workerProvider);
   const setWorkerProvider = useSettingsStore((state) => state.setWorkerProvider);
+  const { data: executionHosts = [] } = useExecutionHostsQuery();
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
@@ -592,6 +594,26 @@ export default function SettingsPage() {
                 onChange={setWorkerEnabled}
               />
             </SettingsRow>
+          </SettingsSection>
+        )}
+
+        {executionHosts.length > 0 && (
+          <SettingsSection title={t('workspaceSettings.sections.machines')}>
+            {executionHosts.map((host) => (
+              <SettingsRow
+                key={host.id}
+                label={host.label}
+                sublabel={
+                  host.kind === 'local'
+                    ? t('workspaceSettings.machines.thisServer')
+                    : host.kind === 'worker'
+                      ? t('workspaceSettings.machines.desktopApp')
+                      : host.target || host.kind
+                }
+              >
+                <StatusDot tone={host.is_enabled ? 'success' : 'neutral'} />
+              </SettingsRow>
+            ))}
           </SettingsSection>
         )}
 

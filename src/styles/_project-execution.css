@@ -72,3 +72,66 @@
     grid-column: auto;
   }
 }
+
+/* Where a project runs -----------------------------------------------------
+ *
+ * One block per registered machine, because a path means nothing without the
+ * machine holding it. The chosen one is marked rather than sorted first: the
+ * list is short, and a stable order is easier to scan than a moving one.
+ */
+.cc-project-hosts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-2);
+}
+
+.cc-project-host {
+  border: 1px solid var(--cc-border);
+  border-left: 2px solid transparent;
+  padding: var(--cc-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-2);
+}
+
+.cc-project-host--selected {
+  border-left-color: var(--cc-primary);
+  background: var(--cc-selected-surface);
+}
+
+.cc-project-host__header {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+}
+
+.cc-project-host__kind {
+  font-size: 11px;
+  color: var(--cc-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cc-project-host__badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cc-primary);
+  margin-left: auto;
+}
+
+.cc-project-host__row {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+  flex-wrap: wrap;
+}
+
+.cc-project-host__row .cc-settings-input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.cc-project-workspace__hint {
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+}

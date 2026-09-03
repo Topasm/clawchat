@@ -13,6 +13,8 @@ export const queryKeys = {
   projects: ['projects'] as const,
   project: (id: string) => ['projects', id] as const,
   executionProviders: ['execution-providers'] as const,
+  executionHosts: ['execution-hosts'] as const,
+  projectWorkspace: (id: string) => ['projects', id, 'workspace'] as const,
   skills: ['skills'] as const,
   reviews: ['reviews'] as const,
   reviewList: (status: string, projectId?: string | null) =>
