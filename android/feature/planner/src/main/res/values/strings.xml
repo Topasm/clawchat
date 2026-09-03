@@ -23,4 +23,8 @@
         <item quantity="one">%1$d active task</item>
         <item quantity="other">%1$d active tasks</item>
     </plurals>
+    <plurals name="week_timeline_more">
+        <item quantity="one">+%1$d more deadline</item>
+        <item quantity="other">+%1$d more deadlines</item>
+    </plurals>
 </resources>

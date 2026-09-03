@@ -189,6 +189,15 @@ private fun WeekContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (state.spans.isNotEmpty()) {
+                        WeekTimeline(
+                            range = it,
+                            spans = state.spans,
+                            today = LocalDate.now(),
+                            locale = locale,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
             }
         }
