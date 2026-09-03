@@ -20,6 +20,7 @@ export const TAURI_COMMANDS = {
   updaterCheck: 'updater_check',
   updaterDownload: 'updater_download',
   updaterInstall: 'updater_install',
+  workerRun: 'worker_run',
 } as const;
 
 export const TAURI_EVENTS = {

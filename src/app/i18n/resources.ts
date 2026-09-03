@@ -77,6 +77,7 @@ export const translationResources = {
           workspace: 'Workspace',
           importExport: 'Import / Export',
           obsidianDesktop: 'Obsidian Desktop',
+          thisMachine: 'This machine',
           serverConnection: 'Server Connection',
           connectMobile: 'Connect Mobile Device',
         },
@@ -185,6 +186,16 @@ export const translationResources = {
           exportHint: 'Download todos, events, and conversations as JSON',
           importData: 'Import data',
           importHint: 'Restore from a previously exported JSON file',
+        },
+        thisMachine: {
+          name: 'Machine name',
+          nameHint: 'How this machine appears when choosing where a project runs',
+          namePlaceholder: 'e.g. MacBook',
+          cli: 'Agent CLI',
+          runWork: 'Run work sent here',
+          runWorkHint:
+            'Runs the CLI in the project folder on this machine, with permission to edit it',
+          nameRequired: 'Name this machine first',
         },
         obsidianDesktop: {
           vaultPath: 'Vault path',
@@ -376,6 +387,7 @@ export const translationResources = {
           workspace: '워크스페이스',
           importExport: '가져오기 / 내보내기',
           obsidianDesktop: 'Obsidian 데스크톱',
+          thisMachine: '이 기기',
           serverConnection: '서버 연결',
           connectMobile: '모바일 기기 연결',
         },
@@ -485,6 +497,15 @@ export const translationResources = {
           exportHint: '할 일, 일정 및 대화를 JSON으로 다운로드합니다',
           importData: '데이터 가져오기',
           importHint: '이전에 내보낸 JSON 파일에서 복원합니다',
+        },
+        thisMachine: {
+          name: '기기 이름',
+          nameHint: '프로젝트를 어디서 실행할지 고를 때 이 이름으로 표시됩니다',
+          namePlaceholder: '예: 맥북',
+          cli: '에이전트 CLI',
+          runWork: '이 기기로 보낸 작업 실행',
+          runWorkHint: '이 기기의 프로젝트 폴더에서 CLI를 실행하며, 그 폴더를 수정할 수 있습니다',
+          nameRequired: '기기 이름을 먼저 정하세요',
         },
         obsidianDesktop: {
           vaultPath: 'Vault 경로',

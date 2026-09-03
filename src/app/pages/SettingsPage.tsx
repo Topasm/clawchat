@@ -7,6 +7,7 @@ import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import SettingsRow from '../components/shared/SettingsRow';
 import SettingsSection from '../components/shared/SettingsSection';
+import Toggle from '../components/shared/Toggle';
 import { StatusDot } from '../components/shared/WorkspacePrimitives';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
 import usePlatform from '../hooks/usePlatform';
@@ -15,6 +16,7 @@ import { platformApi } from '../platform';
 import apiClient from '../services/apiClient';
 import { settingsNavigationState } from '../services/settingsNavigation';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import { useToastStore } from '../stores/useToastStore';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { openObsidianVault } from '../utils/openObsidian';
@@ -113,6 +115,12 @@ export default function SettingsPage() {
   const logout = useAuthStore((state) => state.logout);
   const addToast = useToastStore((state) => state.addToast);
   const isHost = useWorkspaceStore((state) => state.activeWorkspaceId === LOCAL_WORKSPACE_ID);
+  const workerEnabled = useSettingsStore((state) => state.workerEnabled);
+  const setWorkerEnabled = useSettingsStore((state) => state.setWorkerEnabled);
+  const workerLabel = useSettingsStore((state) => state.workerLabel);
+  const setWorkerLabel = useSettingsStore((state) => state.setWorkerLabel);
+  const workerProvider = useSettingsStore((state) => state.workerProvider);
+  const setWorkerProvider = useSettingsStore((state) => state.setWorkerProvider);
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
@@ -545,6 +553,47 @@ export default function SettingsPage() {
 
         <CalendarSubscriptionCard />
         <ObsidianStatusCard />
+
+        {isDesktop && (
+          <SettingsSection title={t('workspaceSettings.sections.thisMachine')}>
+            <SettingsRow
+              label={t('workspaceSettings.thisMachine.name')}
+              sublabel={t('workspaceSettings.thisMachine.nameHint')}
+            >
+              <input
+                className="cc-settings-input"
+                type="text"
+                value={workerLabel}
+                onChange={(event) => setWorkerLabel(event.target.value)}
+                placeholder={t('workspaceSettings.thisMachine.namePlaceholder')}
+              />
+            </SettingsRow>
+            <SettingsRow label={t('workspaceSettings.thisMachine.cli')}>
+              <SegmentedControl
+                ariaLabel={t('workspaceSettings.thisMachine.cli')}
+                options={[
+                  { label: translateUi('Claude Code'), value: 'claude' },
+                  { label: translateUi('Codex'), value: 'codex' },
+                ]}
+                value={workerProvider}
+                onChange={setWorkerProvider}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={t('workspaceSettings.thisMachine.runWork')}
+              sublabel={
+                workerLabel.trim()
+                  ? t('workspaceSettings.thisMachine.runWorkHint')
+                  : t('workspaceSettings.thisMachine.nameRequired')
+              }
+            >
+              <Toggle
+                checked={workerEnabled && workerLabel.trim().length > 0}
+                onChange={setWorkerEnabled}
+              />
+            </SettingsRow>
+          </SettingsSection>
+        )}
 
         {isDesktop && isHost && (
           <SettingsSection title={t('workspaceSettings.sections.obsidianDesktop')}>

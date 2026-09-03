@@ -21,6 +21,7 @@ fn main() {
         "updater_check",
         "updater_download",
         "updater_install",
+        "worker_run",
     ];
 
     tauri_build::try_build(

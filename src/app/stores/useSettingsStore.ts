@@ -41,6 +41,14 @@ interface SettingsState {
   // Security
   biometricEnabled: boolean;
 
+  // This machine
+  /** Run work addressed to this machine, on this machine. Desktop only. */
+  workerEnabled: boolean;
+  /** How this machine is named to the server, and in the host list. */
+  workerLabel: string;
+  /** Which CLI runs the work here. */
+  workerProvider: string;
+
   // Streak
   streak: StreakData;
 
@@ -65,6 +73,9 @@ interface SettingsState {
   setSaveHistory: (v: boolean) => void;
   setAnalyticsEnabled: (v: boolean) => void;
   setBiometricEnabled: (v: boolean) => void;
+  setWorkerEnabled: (v: boolean) => void;
+  setWorkerLabel: (v: string) => void;
+  setWorkerProvider: (v: string) => void;
   setStreak: (v: StreakData) => void;
 
   // Actions
@@ -97,6 +108,12 @@ const APPLICATION_DEFAULT_SETTINGS = {
   analyticsEnabled: false,
 
   biometricEnabled: false,
+
+  // Off until someone says this machine should take work: it starts a CLI
+  // with write access here, which is not a default to inherit silently.
+  workerEnabled: false,
+  workerLabel: '',
+  workerProvider: 'claude',
 
   streak: { lastCompletedDate: '', currentStreak: 0 },
 } as const;
@@ -184,6 +201,9 @@ export const useSettingsStore = create<SettingsState>()(
       setSaveHistory: (saveHistory) => set({ saveHistory }),
       setAnalyticsEnabled: (analyticsEnabled) => set({ analyticsEnabled }),
       setBiometricEnabled: (biometricEnabled) => set({ biometricEnabled }),
+      setWorkerEnabled: (workerEnabled) => set({ workerEnabled }),
+      setWorkerLabel: (workerLabel) => set({ workerLabel }),
+      setWorkerProvider: (workerProvider) => set({ workerProvider }),
       setStreak: (streak) => set({ streak }),
 
       resetApplicationPreferences: () => set({ ...APPLICATION_DEFAULT_SETTINGS }),
