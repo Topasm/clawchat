@@ -90,13 +90,14 @@ fun TodayScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showQuickAdd by remember { mutableStateOf(false) }
 
-    val totalTasks = state.todayTodos.size + state.overdueTodos.size
-    val completedTasks = (state.todayTodos + state.overdueTodos).count {
+    val totalTasks = state.todayTodos.size + state.overdueTodos.size + state.needsDateTodos.size
+    val completedTasks = (state.todayTodos + state.overdueTodos + state.needsDateTodos).count {
         it.status == TaskStatus.COMPLETED
     }
     val hasContent = (showAgentFeatures && state.briefing != null) ||
         state.overdueTodos.isNotEmpty() ||
         state.todayTodos.isNotEmpty() ||
+        state.needsDateTodos.isNotEmpty() ||
         state.todayEvents.isNotEmpty() ||
         (showAgentFeatures && state.inboxPreview.isNotEmpty())
 
@@ -218,6 +219,20 @@ fun TodayScreen(
                             subtitle = stringResource(R.string.today_focus_subtitle),
                             todos = state.todayTodos,
                             tone = ClawTone.Primary,
+                            onToggle = viewModel::toggleComplete,
+                            onDelete = viewModel::deleteTask,
+                            onSetDueToday = viewModel::setDueToday,
+                        )
+                    }
+                }
+
+                if (state.needsDateTodos.isNotEmpty()) {
+                    item {
+                        TodoSectionCard(
+                            title = stringResource(R.string.today_needs_date_title),
+                            subtitle = stringResource(R.string.today_needs_date_subtitle),
+                            todos = state.needsDateTodos,
+                            tone = ClawTone.Warning,
                             onToggle = viewModel::toggleComplete,
                             onDelete = viewModel::deleteTask,
                             onSetDueToday = viewModel::setDueToday,

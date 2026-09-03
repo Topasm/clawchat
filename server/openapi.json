@@ -7798,6 +7798,14 @@
             "title": "Inbox Count",
             "type": "integer"
           },
+          "needs_date_tasks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TodoResponse"
+            },
+            "title": "Needs Date Tasks",
+            "type": "array"
+          },
           "needs_review": {
             "default": [],
             "items": {

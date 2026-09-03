@@ -698,6 +698,7 @@ export const TodayResponseSchema = z.object({
   overdue_tasks: z.array(TodoResponseSchema),
   today_events: z.array(EventResponseSchema),
   needs_review: z.array(TodoResponseSchema).default([]),
+  needs_date_tasks: z.array(TodoResponseSchema).default([]),
   inbox_count: z.number(),
   greeting: z.string(),
   date: z.string(),

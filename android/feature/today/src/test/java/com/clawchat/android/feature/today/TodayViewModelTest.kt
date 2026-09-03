@@ -50,11 +50,18 @@ class TodayViewModelTest {
         status = TaskStatus.PENDING,
     )
 
+    private val sampleUndatedTodo = Todo(
+        id = "3",
+        title = "Undated task",
+        status = TaskStatus.PENDING,
+    )
+
     private val sampleTodayResponse = TodayResponse(
         greeting = "Good morning!",
         todayTodos = listOf(sampleTodo),
         overdueTodos = listOf(sampleOverdueTodo),
         todayEvents = emptyList(),
+        needsDateTodos = listOf(sampleUndatedTodo),
         inboxCount = 3,
     )
 
@@ -92,6 +99,7 @@ class TodayViewModelTest {
         assertEquals("Good morning!", state.greeting)
         assertEquals(1, state.todayTodos.size)
         assertEquals(1, state.overdueTodos.size)
+        assertEquals(1, state.needsDateTodos.size)
         assertEquals(3, state.inboxCount)
         assertEquals(false, state.isRefreshing)
         assertNull(state.error)
@@ -298,5 +306,25 @@ class TodayViewModelTest {
                 TodoUpdate(dueDate = java.time.LocalDate.now().toString()),
             )
         }
+    }
+
+    @Test
+    fun `setDueToday moves an undated todo into today list`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
+        coEvery { todoRepository.updateTodo("3", any()) } returns
+            ApiResult.Success(sampleUndatedTodo.copy(dueDate = java.time.LocalDate.now().toString()))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.setDueToday("3")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updated = viewModel.uiState.value
+        assertEquals(0, updated.needsDateTodos.size)
+        assertEquals(2, updated.todayTodos.size)
+        assertEquals("3", updated.todayTodos.last().id)
     }
 }

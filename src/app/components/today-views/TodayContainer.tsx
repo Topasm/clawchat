@@ -9,7 +9,16 @@ import TodayView from './TodayView';
 const NEEDS_REVIEW_LIMIT = 5;
 
 export default function TodayContainer() {
-  const { todayTasks, overdueTasks, todayEvents, inboxCount, greeting, todayDate, isLoading } = useTodayData();
+  const {
+    todayTasks,
+    overdueTasks,
+    todayEvents,
+    needsDateTasks,
+    inboxCount,
+    greeting,
+    todayDate,
+    isLoading,
+  } = useTodayData();
   const { progress, streak } = useTodayProgress();
   const { briefingData, briefingLoading } = useTodayBriefing();
   useTodayHotkeys();
@@ -29,6 +38,7 @@ export default function TodayContainer() {
       todayTasks={todayTasks}
       overdueTasks={overdueTasks}
       todayEvents={todayEvents}
+      needsDateTasks={needsDateTasks}
       inboxCount={inboxCount}
       isLoading={isLoading}
       progress={progress}
