@@ -67,6 +67,7 @@ import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawTopBarColors
+import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.icons.ClawIcons
 import java.time.Duration
 import java.time.LocalDateTime
@@ -160,6 +161,7 @@ fun ChatScreen(
             onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectConversation,
             onCreate = { viewModel.createConversation(newConversationTitle) },
+            onDelete = viewModel::deleteConversation,
         )
     }
 }
@@ -173,6 +175,7 @@ private fun ConversationListView(
     onOpenSettings: () -> Unit,
     onSelect: (String) -> Unit,
     onCreate: () -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -261,10 +264,12 @@ private fun ConversationListView(
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 items(conversations, key = { it.id }) { convo ->
-                    ConversationCard(
-                        conversation = convo,
-                        onClick = { onSelect(convo.id) },
-                    )
+                    SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                        ConversationCard(
+                            conversation = convo,
+                            onClick = { onSelect(convo.id) },
+                        )
+                    }
                 }
             }
         }

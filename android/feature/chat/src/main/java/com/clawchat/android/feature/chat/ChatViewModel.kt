@@ -66,6 +66,22 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    fun deleteConversation(id: String) {
+        // Optimistic: the row leaves the list immediately, and comes back on
+        // failure rather than leaving the user unsure whether it worked.
+        val previousConversations = _uiState.value.conversations
+        _uiState.update { it.copy(conversations = it.conversations.filterNot { c -> c.id == id }) }
+        viewModelScope.launch {
+            when (val result = conversationRepository.deleteConversation(id)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Error -> _uiState.update {
+                    it.copy(conversations = previousConversations, error = result.message)
+                }
+                is ApiResult.Loading -> { /* not used here */ }
+            }
+        }
+    }
+
     fun createConversation(title: String) {
         viewModelScope.launch {
             when (val result = conversationRepository.createConversation(mapOf("title" to title))) {
