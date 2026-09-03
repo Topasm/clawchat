@@ -23,6 +23,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from domain.agent_run import AgentRunStatus
 from exceptions import ValidationError
 from models.execution_host import ExecutionHost, ProjectHostPath
 from models.project import Project
@@ -242,3 +243,59 @@ async def record_heartbeat(db: AsyncSession, host: ExecutionHost) -> ExecutionHo
     host.last_seen_at = datetime.now(timezone.utc)
     await db.flush()
     return host
+
+
+@dataclass(frozen=True)
+class ClaimedJob:
+    """A run a worker has taken responsibility for."""
+
+    run_id: str
+    instruction: str
+    cwd: str
+    model: str | None
+
+
+async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | None:
+    """Hand this machine the oldest run waiting for it, or nothing.
+
+    Claiming moves the run out of ``queued`` in the same transaction that
+    returns it, so two polls of the same worker -- or a worker restarted
+    mid-poll -- cannot both pick up the same work.
+    """
+    from models.agent_run import AgentRun  # local: keeps the model graph acyclic
+
+    run = (
+        await db.execute(
+            select(AgentRun)
+            .where(
+                AgentRun.execution_host_id == host.id,
+                AgentRun.status == AgentRunStatus.QUEUED,
+            )
+            .order_by(AgentRun.created_at.asc())
+            .limit(1)
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if run is None:
+        return None
+
+    project = await db.get(Project, run.project_id) if run.project_id else None
+    cwd = await get_host_path(db, project.id, host.id) if project else None
+    if not cwd:
+        # The path was removed after the run was queued. Fail it rather than
+        # handing the worker a job it has nowhere to run.
+        run.status = AgentRunStatus.FAILED
+        run.error = "This project no longer has a path on that machine."
+        await db.flush()
+        return None
+
+    run.status = AgentRunStatus.STARTING
+    run.host_id = host.label
+    run.heartbeat_at = datetime.now(timezone.utc)
+    await db.flush()
+    return ClaimedJob(
+        run_id=run.id,
+        instruction=run.instruction_snapshot,
+        cwd=cwd,
+        model=run.model,
+    )

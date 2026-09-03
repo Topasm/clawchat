@@ -923,6 +923,35 @@
         "title": "AgentRunResponse",
         "type": "object"
       },
+      "AgentRunResultRequest": {
+        "description": "What a worker reports back when its run finishes.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          }
+        },
+        "title": "AgentRunResultRequest",
+        "type": "object"
+      },
       "AgentRunResumeRequest": {
         "properties": {
           "follow_up_instruction": {
@@ -1947,6 +1976,41 @@
           "version"
         ],
         "title": "CapabilitiesResponse",
+        "type": "object"
+      },
+      "ClaimedJobResponse": {
+        "description": "The work a machine has just taken responsibility for.",
+        "properties": {
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "instruction",
+          "cwd"
+        ],
+        "title": "ClaimedJobResponse",
         "type": "object"
       },
       "ClaudeCodeStatusResponse": {
@@ -11117,6 +11181,62 @@
         ]
       }
     },
+    "/api/execution-hosts/{host_id}/jobs/claim": {
+      "post": {
+        "description": "Take the next run waiting for this machine, or nothing.\n\nPolled by the worker. Claiming also counts as checking in, so a machine\nasking for work is by definition reachable.",
+        "operationId": "claim_next_job_api_execution_hosts__host_id__jobs_claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ClaimedJobResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Claim Next Job Api Execution Hosts  Host Id  Jobs Claim Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Claim Next Job",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
     "/api/execution-providers": {
       "get": {
         "operationId": "list_execution_providers_api_execution_providers_get",
@@ -12726,6 +12846,64 @@
           }
         ],
         "summary": "Heartbeat Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/result": {
+      "post": {
+        "description": "Finish a run executed elsewhere.\n\nA worker runs the CLI on its own machine and reports the outcome here, so\nthe result lands in the same review flow as work the server ran itself.",
+        "operationId": "report_run_result_api_runs__run_id__result_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Report Run Result",
         "tags": [
           "runs"
         ]

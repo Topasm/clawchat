@@ -110,10 +110,38 @@ async def delegate_todo_to_skill(
     configured_provider = body.execution_provider or (
         project.default_execution_provider if project else None
     )
+    workspace = (
+        await execution_host_service.resolve_workspace(db, project)
+        if project is not None
+        else None
+    )
+    #: Planning happens on the server against the database, so it never travels.
+    worker_host = (
+        workspace.host
+        if workspace is not None
+        and skill_id != "plan"
+        and workspace.host is not None
+        and workspace.host.kind == "worker"
+        else None
+    )
+    if worker_host is not None and workspace is not None and workspace.is_offline:
+        raise AppError(
+            code="EXECUTION_HOST_UNAVAILABLE",
+            message=(
+                f"{worker_host.label} is offline. Open ClawChat there, or move "
+                "this project to a machine that is running."
+            ),
+            status_code=409,
+        )
+
     provider = (
-        "paseo"
-        if configured_provider == "paseo" and skill_id != "plan"
-        else active_provider
+        "worker"
+        if worker_host is not None
+        else (
+            "paseo"
+            if configured_provider == "paseo" and skill_id != "plan"
+            else active_provider
+        )
     )
     paseo_adapter = None
     if provider == "paseo":
@@ -132,8 +160,7 @@ async def delegate_todo_to_skill(
                 message="Configure the project's execution workspace path before using Paseo",
                 status_code=409,
             )
-        workspace = await execution_host_service.resolve_workspace(db, project)
-        if workspace.is_unconfigured:
+        if workspace is None or workspace.is_unconfigured:
             raise AppError(
                 code="PASEO_WORKSPACE_REQUIRED",
                 message="Configure the project's execution workspace path before using Paseo",
@@ -152,7 +179,7 @@ async def delegate_todo_to_skill(
                 ),
                 status_code=409,
             )
-    elif active_ai is None:
+    elif worker_host is None and active_ai is None:
         raise AppError(
             code="AI_UNAVAILABLE",
             message="No execution provider is available",
@@ -175,7 +202,13 @@ async def delegate_todo_to_skill(
         task,
         provider=provider,
         model=run_model,
-        host_id=paseo_adapter.host_label if paseo_adapter else None,
+        host_id=(
+            paseo_adapter.host_label
+            if paseo_adapter
+            else worker_host.label
+            if worker_host
+            else None
+        ),
         update_todo_status=skill_id != "plan" and not body.require_ready,
     )
 
@@ -250,7 +283,12 @@ async def delegate_todo_to_skill(
             await notify_module_data_changed("reviews")
             await notify_module_data_changed("projects")
 
-    if provider == "paseo":
+    if worker_host is not None:
+        # Nothing starts here: the run stays queued until that machine claims
+        # it, which it only does while it is running and asking for work.
+        run.execution_host_id = worker_host.id
+        await db.commit()
+    elif provider == "paseo":
         agent_run_service.launch_execution(
             run.id,
             paseo_execution_service.execute_run(
