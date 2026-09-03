@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from domain.task import TaskStatus
+from models.event import Event
 from models.todo import Todo
 from services.chat.orchestrator import Orchestrator
 from utils import make_id
@@ -172,3 +173,62 @@ async def test_delegate_task_is_left_to_the_orchestrator_path(orchestrator, db_s
     """Delegation reports progress over its own events, so it has no
     one-shot textual form."""
     assert await _resolve(orchestrator, db_session, "delegate_task", {}) is None
+
+
+# --- a day is a deadline, a clock time is an appointment ------------------
+
+
+async def test_a_dateless_time_becomes_a_task_deadline(orchestrator, db_session):
+    # The classifier hands back midnight when the message only named a day.
+    # Creating a midnight event would put an appointment nobody attends on the
+    # calendar; this workspace treats that day as something to finish by.
+    text, metadata = await _resolve(
+        orchestrator,
+        db_session,
+        "create_event",
+        {"title": "File the report", "start_time": "2026-09-05T00:00:00"},
+    )
+
+    todo = (
+        await db_session.execute(select(Todo).where(Todo.title == "File the report"))
+    ).scalar_one()
+    assert todo.due_date.date() == datetime(2026, 9, 5).date()
+    assert metadata["action_type"] == "todo_created"
+    assert "File the report" in text
+
+    events = (await db_session.execute(select(Event))).scalars().all()
+    assert events == []
+
+
+async def test_a_clock_time_still_creates_an_event(orchestrator, db_session):
+    _text, metadata = await _resolve(
+        orchestrator,
+        db_session,
+        "create_event",
+        {"title": "Standup", "start_time": "2026-09-05T15:00:00"},
+    )
+
+    event = (
+        await db_session.execute(select(Event).where(Event.title == "Standup"))
+    ).scalar_one()
+    assert event.start_time.hour == 15
+    assert metadata["action_type"] == "event_created"
+
+
+async def test_midnight_with_an_end_time_stays_an_event(orchestrator, db_session):
+    # An explicit span is a real all-day booking, not a deadline.
+    await _resolve(
+        orchestrator,
+        db_session,
+        "create_event",
+        {
+            "title": "Company offsite",
+            "start_time": "2026-09-05T00:00:00",
+            "end_time": "2026-09-06T00:00:00",
+        },
+    )
+
+    event = (
+        await db_session.execute(select(Event).where(Event.title == "Company offsite"))
+    ).scalar_one()
+    assert event.end_time is not None

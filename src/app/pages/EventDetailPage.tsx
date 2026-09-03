@@ -43,14 +43,10 @@ export default function EventDetailPage() {
   const deleteOccurrenceMutation = useDeleteEventOccurrence();
   const event = events.find((e) => e.id === eventId);
   const [title, setTitle] = useState(event?.title ?? '');
-  const [location, setLocation] = useState(event?.location ?? '');
-  const [description, setDescription] = useState(event?.description ?? '');
   const [showDeleteMode, setShowDeleteMode] = useState(false);
   useEffect(() => {
     if (event) {
       setTitle(event.title);
-      setLocation(event.location ?? '');
-      setDescription(event.description ?? '');
     }
   }, [event]);
   const serverUpdateEvent = useCallback(
@@ -75,14 +71,6 @@ export default function EventDetailPage() {
   const handleTitleChange = (val: string) => {
     setTitle(val);
     persistField({ title: val });
-  };
-  const handleLocationChange = (val: string) => {
-    setLocation(val);
-    persistField({ location: val });
-  };
-  const handleDescriptionChange = (val: string) => {
-    setDescription(val);
-    persistField({ description: val });
   };
   const handleDelete = async () => {
     if (!eventId) return;
@@ -140,36 +128,12 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      <div className="cc-detail__field">
-        <span className="cc-detail__field-label">{translateUi('Location')}</span>
-        <input
-          className="cc-detail__field-btn"
-          style={{
-            border: 'none',
-            flex: 1,
-            background: 'transparent',
-            color: 'var(--cc-text)',
-            fontSize: 14,
-          }}
-          value={location}
-          onChange={(e) => handleLocationChange(e.target.value)}
-          placeholder={translateUi('Add location')}
-        />
-      </div>
-
       {event.recurrence_rule && (
         <div className="cc-detail__field">
           <span className="cc-detail__field-label">{translateUi('Repeats')}</span>
           <div className="cc-detail__field-value">{describeRecurrence(event.recurrence_rule)}</div>
         </div>
       )}
-
-      <textarea
-        className="cc-detail__textarea"
-        value={description}
-        onChange={(e) => handleDescriptionChange(e.target.value)}
-        placeholder={translateUi('Add a description...')}
-      />
 
       <button
         type="button"

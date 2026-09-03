@@ -113,12 +113,6 @@
   white-space: nowrap;
 }
 
-.cc-card__location {
-  font-size: 11px;
-  color: var(--cc-text-tertiary);
-  margin-top: 2px;
-}
-
 /* --- Badge ------------------------------------------------ */
 .cc-badge__priority-icon {
   width: 12px;

@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
 import Dialog from './Dialog';
+import SegmentedControl from './SegmentedControl';
 import Toggle from './Toggle';
 import RecurrenceSelector from './RecurrenceSelector';
-import { useCreateEvent } from '../../hooks/queries';
+import { useCreateEvent, useCreateTodo } from '../../hooks/queries';
 import type { EventCreate } from '../../types/api';
 import { translateUi } from '../../i18n';
-interface EventCreateDialogProps {
+
+interface CalendarCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Pre-fill the start date (ISO string or YYYY-MM-DD). */
+  /** Pre-fill the date (ISO string or YYYY-MM-DD). */
   initialDate?: string;
-  /** Pre-fill the start time (HH:MM, 24h). */
+  /** Pre-fill the start time (HH:MM, 24h). Events only. */
   initialTime?: string;
 }
+
+type CreateKind = 'task' | 'event';
+
 const REMINDER_OPTIONS = [
   { label: 'None', value: '' },
   { label: '5 minutes before', value: '5' },
@@ -21,32 +26,42 @@ const REMINDER_OPTIONS = [
   { label: '1 hour before', value: '60' },
   { label: '1 day before', value: '1440' },
 ];
+
 function toLocalDateStr(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
-export default function EventCreateDialog({
+
+/**
+ * Adding to the calendar creates a task by default: this workspace is
+ * task-oriented, so a day picked on the calendar is a deadline to work
+ * towards, not an appointment. Events stay available for the meetings and
+ * subscribed entries that genuinely happen at a time.
+ */
+export default function CalendarCreateDialog({
   open,
   onOpenChange,
   initialDate,
   initialTime,
-}: EventCreateDialogProps) {
+}: CalendarCreateDialogProps) {
   const createEvent = useCreateEvent();
+  const createTodo = useCreateTodo();
+  const [kind, setKind] = useState<CreateKind>('task');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
   const [isAllDay, setIsAllDay] = useState(false);
-  const [location, setLocation] = useState('');
-  const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [reminder, setReminder] = useState('');
   const [recurrenceRule, setRecurrenceRule] = useState<string | undefined>();
+
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
+      setKind('task');
       setTitle('');
       setDate(initialDate ? initialDate.slice(0, 10) : toLocalDateStr(new Date()));
       setStartTime(initialTime ?? '09:00');
@@ -59,15 +74,39 @@ export default function EventCreateDialog({
         setEndTime('10:00');
       }
       setIsAllDay(false);
-      setLocation('');
-      setDescription('');
       setTagsInput('');
       setReminder('');
       setRecurrenceRule(undefined);
     }
   }, [open, initialDate, initialTime]);
+
+  const isPending = kind === 'task' ? createTodo.isPending : createEvent.isPending;
+
+  const parseTags = () =>
+    tagsInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
   const handleSave = () => {
-    if (!title.trim() || createEvent.isPending) return;
+    if (!title.trim() || isPending) return;
+
+    if (kind === 'task') {
+      const tags = parseTags();
+      // End of the chosen day: the deadline is "by then", not "at midnight".
+      const dueIso = new Date(`${date}T23:59:00`).toISOString();
+      createTodo.mutate(
+        {
+          title: title.trim(),
+          due_date: dueIso,
+          tags: tags.length > 0 ? tags : undefined,
+          recurrence_rule: recurrenceRule || undefined,
+        },
+        { onSuccess: () => onOpenChange(false) },
+      );
+      return;
+    }
+
     let startIso: string;
     let endIso: string | undefined;
     if (isAllDay) {
@@ -78,16 +117,11 @@ export default function EventCreateDialog({
       startIso = new Date(`${date}T${startTime}:00`).toISOString();
       endIso = new Date(`${date}T${endTime}:00`).toISOString();
     }
-    const tags = tagsInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const tags = parseTags();
     const payload: EventCreate = {
       title: title.trim(),
-      description: description.trim() || undefined,
       start_time: startIso,
       end_time: endIso,
-      location: location.trim() || undefined,
       is_all_day: isAllDay || undefined,
       reminder_minutes: reminder ? Number(reminder) : undefined,
       recurrence_rule: recurrenceRule || undefined,
@@ -97,17 +131,28 @@ export default function EventCreateDialog({
     // reports both the success toast and any failure.
     createEvent.mutate(payload, { onSuccess: () => onOpenChange(false) });
   };
+
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={translateUi('New Event')}
+      title={kind === 'task' ? translateUi('New Task') : translateUi('New Event')}
       className="cc-event-dialog"
     >
       <div className="cc-event-form">
+        <SegmentedControl
+          ariaLabel={translateUi('What to add')}
+          options={[
+            { label: translateUi('Task'), value: 'task' },
+            { label: translateUi('Event'), value: 'event' },
+          ]}
+          value={kind}
+          onChange={(value) => setKind(value as CreateKind)}
+        />
+
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-title">
-            {translateUi('\n            Title\n          ')}
+            {translateUi('Title')}
           </label>
           <input
             id="evt-title"
@@ -115,14 +160,16 @@ export default function EventCreateDialog({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={translateUi('Event title')}
+            placeholder={
+              kind === 'task' ? translateUi('Task title') : translateUi('Event title')
+            }
             autoFocus
           />
         </div>
 
         <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-date">
-            {translateUi('\n            Date\n          ')}
+            {kind === 'task' ? translateUi('Due date') : translateUi('Date')}
           </label>
           <input
             id="evt-date"
@@ -131,73 +178,54 @@ export default function EventCreateDialog({
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
+          {kind === 'task' && (
+            <span className="cc-event-form__hint">
+              {translateUi('Runs from today until this day.')}
+            </span>
+          )}
         </div>
 
-        <div className="cc-event-form__row">
-          <span className="cc-event-form__label">{translateUi('All day')}</span>
-          <Toggle checked={isAllDay} onChange={setIsAllDay} />
-        </div>
+        {kind === 'event' && (
+          <>
+            <div className="cc-event-form__row">
+              <span className="cc-event-form__label">{translateUi('All day')}</span>
+              <Toggle checked={isAllDay} onChange={setIsAllDay} />
+            </div>
 
-        {!isAllDay && (
-          <div className="cc-event-form__time-row">
-            <div className="cc-event-form__field cc-event-form__field--half">
-              <label className="cc-event-form__label" htmlFor="evt-start">
-                {translateUi('\n                Start time\n              ')}
-              </label>
-              <input
-                id="evt-start"
-                className="cc-event-form__input"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div className="cc-event-form__field cc-event-form__field--half">
-              <label className="cc-event-form__label" htmlFor="evt-end">
-                {translateUi('\n                End time\n              ')}
-              </label>
-              <input
-                id="evt-end"
-                className="cc-event-form__input"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
-            </div>
-          </div>
+            {!isAllDay && (
+              <div className="cc-event-form__time-row">
+                <div className="cc-event-form__field cc-event-form__field--half">
+                  <label className="cc-event-form__label" htmlFor="evt-start">
+                    {translateUi('Start time')}
+                  </label>
+                  <input
+                    id="evt-start"
+                    className="cc-event-form__input"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="cc-event-form__field cc-event-form__field--half">
+                  <label className="cc-event-form__label" htmlFor="evt-end">
+                    {translateUi('End time')}
+                  </label>
+                  <input
+                    id="evt-end"
+                    className="cc-event-form__input"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-location">
-            {translateUi('\n            Location\n          ')}
-          </label>
-          <input
-            id="evt-location"
-            className="cc-event-form__input"
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder={translateUi('Add location (optional)')}
-          />
-        </div>
-
-        <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-desc">
-            {translateUi('\n            Description\n          ')}
-          </label>
-          <textarea
-            id="evt-desc"
-            className="cc-event-form__textarea"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={translateUi('Add description (optional)')}
-            rows={3}
-          />
-        </div>
-
-        <div className="cc-event-form__field">
           <label className="cc-event-form__label" htmlFor="evt-tags">
-            {translateUi('\n            Tags\n          ')}
+            {translateUi('Tags')}
           </label>
           <input
             id="evt-tags"
@@ -209,23 +237,25 @@ export default function EventCreateDialog({
           />
         </div>
 
-        <div className="cc-event-form__field">
-          <label className="cc-event-form__label" htmlFor="evt-reminder">
-            {translateUi('\n            Reminder\n          ')}
-          </label>
-          <select
-            id="evt-reminder"
-            className="cc-event-form__select"
-            value={reminder}
-            onChange={(e) => setReminder(e.target.value)}
-          >
-            {REMINDER_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {translateUi(opt.label)}
-              </option>
-            ))}
-          </select>
-        </div>
+        {kind === 'event' && (
+          <div className="cc-event-form__field">
+            <label className="cc-event-form__label" htmlFor="evt-reminder">
+              {translateUi('Reminder')}
+            </label>
+            <select
+              id="evt-reminder"
+              className="cc-event-form__select"
+              value={reminder}
+              onChange={(e) => setReminder(e.target.value)}
+            >
+              {REMINDER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {translateUi(opt.label)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <RecurrenceSelector value={recurrenceRule} onChange={setRecurrenceRule} />
 
@@ -235,15 +265,15 @@ export default function EventCreateDialog({
             className="cc-btn cc-btn--ghost"
             onClick={() => onOpenChange(false)}
           >
-            {translateUi('\n            Cancel\n          ')}
+            {translateUi('Cancel')}
           </button>
           <button
             type="button"
             className="cc-btn cc-btn--primary"
-            disabled={!title.trim() || createEvent.isPending}
+            disabled={!title.trim() || isPending}
             onClick={handleSave}
           >
-            {createEvent.isPending ? translateUi('Saving...') : translateUi('Save')}
+            {isPending ? translateUi('Saving...') : translateUi('Save')}
           </button>
         </div>
       </div>

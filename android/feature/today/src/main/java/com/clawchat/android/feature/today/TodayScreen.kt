@@ -624,14 +624,6 @@ private fun EventRow(event: Event) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                val location = event.location
-                if (!location.isNullOrBlank()) {
-                    Text(
-                        text = location,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
             event.reminderMinutes?.let { minutes ->
                 ClawStatusChip(

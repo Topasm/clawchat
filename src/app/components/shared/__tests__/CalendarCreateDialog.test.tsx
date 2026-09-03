@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import EventCreateDialog from '../EventCreateDialog';
+import CalendarCreateDialog from '../CalendarCreateDialog';
 
 const apiMocks = vi.hoisted(() => ({ post: vi.fn() }));
 
@@ -18,7 +18,7 @@ function renderDialog(onOpenChange = vi.fn()) {
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
-  render(<EventCreateDialog open onOpenChange={onOpenChange} initialDate="2026-09-01" />, {
+  render(<CalendarCreateDialog open onOpenChange={onOpenChange} initialDate="2026-09-01" />, {
     wrapper,
   });
 
@@ -29,18 +29,41 @@ function fillTitle(value: string) {
   fireEvent.change(screen.getByLabelText('Title'), { target: { value } });
 }
 
-describe('EventCreateDialog', () => {
+function switchToEvent() {
+  fireEvent.click(screen.getByRole('button', { name: 'Event' }));
+}
+
+describe('CalendarCreateDialog', () => {
   beforeEach(() => {
     apiMocks.post.mockReset();
+  });
+
+  // The workspace is task-oriented, so a day picked on the calendar is a
+  // deadline. Creating an event instead is the deliberate, secondary path.
+  it('creates a task due on the picked day by default', async () => {
+    apiMocks.post.mockResolvedValue({ data: { id: 'todo-1' } });
+    renderDialog();
+
+    fillTitle('Ship the release');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(apiMocks.post).toHaveBeenCalledTimes(1));
+    const [path, payload] = apiMocks.post.mock.calls[0];
+    expect(path).toBe('/todos');
+    expect(payload).toMatchObject({ title: 'Ship the release' });
+    expect(new Date(payload.due_date).getFullYear()).toBe(2026);
+    expect(new Date(payload.due_date).getMonth()).toBe(8);
+    expect(new Date(payload.due_date).getDate()).toBe(1);
   });
 
   // Regression: the dialog used to fabricate a `local-<timestamp>` event and
   // write it straight into the query cache without ever calling the server, so
   // a created event disappeared on the next refetch.
-  it('sends the new event to the server', async () => {
+  it('sends a new event to the server', async () => {
     apiMocks.post.mockResolvedValue({ data: { id: 'evt-1' } });
     renderDialog();
 
+    switchToEvent();
     fillTitle('Standup');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -55,6 +78,14 @@ describe('EventCreateDialog', () => {
     expect(payload).not.toHaveProperty('updated_at');
   });
 
+  it('does not collect a location or a note on an event', () => {
+    renderDialog();
+    switchToEvent();
+
+    expect(screen.queryByLabelText('Location')).toBeNull();
+    expect(screen.queryByLabelText('Description')).toBeNull();
+  });
+
   it('closes only after the server accepts the event', async () => {
     let resolvePost: (value: unknown) => void = () => {};
     apiMocks.post.mockImplementation(
@@ -65,6 +96,7 @@ describe('EventCreateDialog', () => {
     );
     const { onOpenChange } = renderDialog();
 
+    switchToEvent();
     fillTitle('Retro');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -79,6 +111,7 @@ describe('EventCreateDialog', () => {
     apiMocks.post.mockRejectedValue(new Error('offline'));
     const { onOpenChange } = renderDialog();
 
+    switchToEvent();
     fillTitle('Planning');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -87,7 +120,7 @@ describe('EventCreateDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
-  it('does not submit an untitled event', () => {
+  it('does not submit an untitled entry', () => {
     renderDialog();
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
