@@ -9,10 +9,7 @@ interface EventCardProps {
 export default function EventCard({ event, onClick }: EventCardProps) {
   return (
     <div className="cc-card cc-card--event" onClick={onClick}>
-      <div
-        className="cc-card__accent-bar"
-        style={{ background: 'var(--cc-primary)' }}
-      />
+      <div className="cc-card__accent-bar" style={{ background: 'var(--cc-primary)' }} />
       <div className="cc-card__body">
         <div className="cc-card__title">{event.title}</div>
         <div className="cc-card__time">
