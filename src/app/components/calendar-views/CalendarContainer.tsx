@@ -1,10 +1,10 @@
 import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEventsQuery } from '../../hooks/queries';
+import { useEventsQuery, useTodosQuery } from '../../hooks/queries';
 import useCalendarNavigation from '../../hooks/useCalendarNavigation';
-import { indexEventsByDate } from '../../utils/calendarUtils';
-import type { EventResponse } from '../../types/api';
-import EventCreateDialog from '../shared/EventCreateDialog';
+import { indexEventsByDate, indexTasksByDate } from '../../utils/calendarUtils';
+import type { EventResponse, TodoResponse } from '../../types/api';
+import CalendarCreateDialog from '../shared/CalendarCreateDialog';
 import CalendarHeader from './CalendarHeader';
 import MonthView from './MonthView';
 import WeekView from './WeekView';
@@ -20,6 +20,7 @@ export default function CalendarContainer({
 }: CalendarContainerProps = {}) {
   const navigate = useNavigate();
   const { data: events = [] } = useEventsQuery();
+  const { data: todos = [] } = useTodosQuery();
 
   const {
     today,
@@ -41,11 +42,20 @@ export default function CalendarContainer({
   } = useCalendarNavigation(initialView);
 
   const eventsByDate = useMemo(() => indexEventsByDate(events), [events]);
+  const tasksByDate = useMemo(() => indexTasksByDate(todos, today), [todos, today]);
 
   const handleEventClick = useCallback(
     (ev: EventResponse, e: React.MouseEvent) => {
       e.stopPropagation();
       navigate(`/events/${ev.id}`);
+    },
+    [navigate],
+  );
+
+  const handleTaskClick = useCallback(
+    (todo: TodoResponse, e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigate(`/tasks/${todo.id}`);
     },
     [navigate],
   );
@@ -68,20 +78,24 @@ export default function CalendarContainer({
           month={month}
           today={today}
           eventsByDate={eventsByDate}
+          tasksByDate={tasksByDate}
           onDayClick={handleDayClick}
           onEventClick={handleEventClick}
+          onTaskClick={handleTaskClick}
         />
       ) : (
         <WeekView
           currentDate={currentDate}
           today={today}
           eventsByDate={eventsByDate}
+          tasksByDate={tasksByDate}
           onTimeSlotClick={handleTimeSlotClick}
           onEventClick={handleEventClick}
+          onTaskClick={handleTaskClick}
         />
       )}
 
-      <EventCreateDialog
+      <CalendarCreateDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         initialDate={dialogDate}

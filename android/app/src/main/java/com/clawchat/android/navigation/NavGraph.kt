@@ -223,6 +223,11 @@ fun ClawChatNavGraph(
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
                     onNavigateToSettings = navigateToSettings,
+                    onOpenTask = { todoId ->
+                        navController.navigate(NavRoute.Tasks.destination(todoId)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onPageChanged = { plannerPage = it },
                 )
             }
@@ -285,6 +290,11 @@ fun ClawChatNavGraph(
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
                     onNavigateToSettings = navigateToSettings,
+                    onOpenTask = { todoId ->
+                        navController.navigate(NavRoute.Tasks.destination(todoId)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onPageChanged = { plannerPage = it },
                 )
             }

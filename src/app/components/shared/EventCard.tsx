@@ -19,9 +19,6 @@ export default function EventCard({ event, onClick }: EventCardProps) {
           {formatTime(event.start_time)}
           {event.end_time && ` - ${formatTime(event.end_time)}`}
         </div>
-        {event.location && (
-          <div className="cc-card__location">{event.location}</div>
-        )}
       </div>
     </div>
   );

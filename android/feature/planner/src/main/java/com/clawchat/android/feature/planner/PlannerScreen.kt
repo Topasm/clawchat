@@ -50,6 +50,7 @@ fun PlannerScreen(
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    onOpenTask: (String) -> Unit = {},
     onPageChanged: (PlannerPage) -> Unit = {},
 ) {
     val initialIndex = PLANNER_PAGE_ORDER.indexOf(initialPage).coerceAtLeast(0)
@@ -85,7 +86,7 @@ fun PlannerScreen(
                     onNavigateToSettings = onNavigateToSettings,
                 )
                 PlannerPage.WEEK -> WeekScreen()
-                PlannerPage.MONTH -> CalendarScreen()
+                PlannerPage.MONTH -> CalendarScreen(onOpenTask = onOpenTask)
             }
         }
 

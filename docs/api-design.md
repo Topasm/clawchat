@@ -484,7 +484,7 @@ POST   /api/events                 # Create an event
 GET    /api/events/:id             # Get a specific event
 PATCH  /api/events/:id             # Update an event
 DELETE /api/events/:id             # Delete an event
-GET    /api/events/export.ics      # Download all events as iCalendar (bearer auth)
+GET    /api/events/export.ics      # Download events + task deadlines as iCalendar (bearer auth)
 GET    /api/events/subscription    # Subscription status (bearer auth)
 POST   /api/events/subscription    # Issue/reissue the subscription URL (bearer auth)
 DELETE /api/events/subscription    # Revoke the subscription URL (bearer auth)
@@ -517,6 +517,13 @@ GET    /api/events/feed/:token.ics # The subscribable feed itself (no header)
 
 ### Calendar Subscription (ICS feed)
 
+Both the download and the feed carry two kinds of entry: events as they are
+stored, and every open task with a due date as an all-day entry on the day it
+is due. A task-oriented workspace still wants its deadlines to show up in
+whichever calendar the person actually looks at, and an all-day `VEVENT`
+renders everywhere a `VTODO` would be dropped. Completed and cancelled tasks,
+and tasks with no due date, are left out.
+
 `GET /api/events/export.ics` is a bearer-authenticated *download*. External
 calendar applications cannot use it: Google Calendar, Apple Calendar, Outlook
 and Thunderbird fetch a subscribed URL on their own schedule and have no way to
@@ -526,7 +533,8 @@ point whose credential lives in the URL.
 #### Security properties — read before sharing the URL
 
 > **Anyone who has the feed URL can read your entire calendar.**
-> Every event title, description, location and time is served to any client
+> Every event title, description, location and time — and every open task
+> title, description and deadline — is served to any client
 > that requests that URL, with no login, from anywhere the server is reachable.
 > The URL *is* the credential. Treat it like a password: do not post it in a
 > shared document, a chat channel, or a public issue.

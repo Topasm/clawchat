@@ -12,11 +12,16 @@
     <string name="calendar_delete_event">Delete event</string>
     <string name="calendar_edit_event">Edit event</string>
     <string name="calendar_title">Title</string>
-    <string name="calendar_notes">Notes</string>
-    <string name="calendar_location">Location</string>
     <string name="calendar_end">End</string>
     <string name="calendar_cancel">Cancel</string>
     <string name="calendar_create">Create</string>
     <string name="calendar_save">Save</string>
     <string name="calendar_ok">OK</string>
+    <string name="calendar_new_task">New task</string>
+    <string name="calendar_new_entry">Add to calendar</string>
+    <string name="calendar_kind_task">Task</string>
+    <string name="calendar_kind_event">Event</string>
+    <string name="calendar_task_span_hint">Runs from today until this day.</string>
+    <string name="calendar_task_due">Due</string>
+    <string name="calendar_task_overdue">Overdue</string>
 </resources>

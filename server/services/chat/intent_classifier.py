@@ -16,7 +16,7 @@ Intents:
 - update_todo: User wants to modify a task (e.g., "change the priority of...")
 - delete_todo: User wants to remove a task
 - complete_todo: User wants to mark a task as done
-- create_event: User wants to schedule a calendar event (e.g., "schedule a meeting tomorrow")
+- create_event: User wants to be somewhere at a clock time (e.g., "schedule a meeting tomorrow at 3pm"). A day with no clock time is a deadline, not an event -- use create_todo with a due_date for those.
 - query_events: User wants to check their calendar (e.g., "what's on my schedule?")
 - update_event: User wants to modify an event
 - delete_event: User wants to cancel an event
