@@ -276,7 +276,10 @@ CODEX_MODEL=gpt-5.3-codex
 CODEX_REASONING_EFFORT=medium
 
 # Local Codex CLI (optional; uses the existing `codex login`)
-CODEX_CLI_MODEL=                            # Empty uses ~/.codex/config.toml
+CODEX_CLI_MODEL=gpt-5.6-luna                # Empty uses ~/.codex/config.toml
+
+# Local Claude Code CLI (optional; uses the existing `claude` login)
+CLAUDE_CODE_MODEL=sonnet                    # Empty uses the CLI's own default
 
 # File Uploads
 UPLOAD_DIR=data/uploads                     # Directory for uploaded files

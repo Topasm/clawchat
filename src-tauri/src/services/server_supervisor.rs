@@ -310,6 +310,12 @@ impl ServerSupervisor {
                 "CODEX_API_KEY_FILE",
                 self.paths.app_data_dir.join("codex-api-key"),
             )
+            // Without this the packaged server restarts on AI_PROVIDER every
+            // time, discarding the provider picked in the settings screen.
+            .env(
+                "AI_PROVIDER_FILE",
+                self.paths.app_data_dir.join("active-ai-provider"),
+            )
             .env("UPLOAD_DIR", uploads);
         if !config.obsidian_vault_path.is_empty() {
             command.env("OBSIDIAN_VAULT_PATH", &config.obsidian_vault_path);
