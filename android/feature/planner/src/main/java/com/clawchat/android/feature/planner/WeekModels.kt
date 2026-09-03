@@ -61,8 +61,13 @@ internal fun Todo.dueLocalDate(zoneId: ZoneId): LocalDate? = dueDate?.let { raw 
     runCatching { LocalDate.parse(raw.toStoredDueDate(zoneId)) }.getOrNull()
 }
 
-/** One task's stretch across the visible week, as column indices 0..6. */
-internal data class WeekTaskSpan(
+/**
+ * One task's stretch across the visible week, as column indices 0..6.
+ *
+ * Public because it rides on [WeekUiState], which the Hilt-provided view model
+ * exposes; an internal type there is not expressible in that signature.
+ */
+data class WeekTaskSpan(
     val todo: Todo,
     val startIndex: Int,
     val endIndex: Int,
