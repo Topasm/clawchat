@@ -871,6 +871,7 @@ Object.assign(koreanUiTranslations, {
   'Cannot apply:': '적용할 수 없음:',
   Change: '변경',
   Clear: '지우기',
+  'Clear due date': '마감일 지우기',
   Close: '닫기',
   Completed: '완료됨',
   connections: '연결',
