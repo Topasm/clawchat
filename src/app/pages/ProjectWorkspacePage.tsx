@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  useDeleteProject,
   useGetOrCreateProjectConversation,
   useExecutionProvidersQuery,
   useProjectQuery,
@@ -31,6 +32,7 @@ export default function ProjectWorkspacePage() {
   const { data: project, isLoading, isError } = useProjectQuery(projectId);
   const { data: todos = [] } = useTodosQuery();
   const getConversation = useGetOrCreateProjectConversation();
+  const deleteProject = useDeleteProject();
   const projectTasks = useMemo(
     () =>
       todos
@@ -83,6 +85,24 @@ export default function ProjectWorkspacePage() {
         >
           <ChatBubbleIcon size={15} />
           {translateUi(' Context chat\n        ')}
+        </button>
+        <button
+          type="button"
+          className="cc-btn cc-btn--danger"
+          disabled={deleteProject.isPending}
+          onClick={() => {
+            if (
+              window.confirm(
+                translateUi('Delete “{{title}}”? Its tasks go back to the Inbox.', {
+                  title: project.title,
+                }),
+              )
+            ) {
+              deleteProject.mutate(project.id, { onSuccess: () => navigate('/projects') });
+            }
+          }}
+        >
+          {translateUi('Delete project')}
         </button>
       </header>
 

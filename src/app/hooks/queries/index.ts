@@ -49,6 +49,7 @@ export {
   useProjectQuery,
   useCreateProject,
   useUpdateProject,
+  useDeleteProject,
   useConversationsQuery,
   useMessagesQuery,
   useCreateConversation,

@@ -133,6 +133,7 @@ export default function InboxPage() {
     onPlace: placement.placeTask,
     onPlaceBatch: placement.placeTaskBatch,
     onPreviewDependency: dependency.requestPreview,
+    onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
   };
   const treeBusy =
     placementRevision == null ||

@@ -35,6 +35,37 @@
   padding: 0;
 }
 
+/* The project title is the way to the project page. */
+.cc-inbox-tree__project-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.cc-inbox-tree__project-link:hover strong,
+.cc-inbox-tree__project-link:focus-visible strong {
+  text-decoration: underline;
+}
+
+/* Tasks with no project: shown so they are not lost, dragged like the rest. */
+.cc-inbox-tree__project--unfiled {
+  border-top: 1px dashed var(--cc-border);
+}
+
+.cc-inbox-tree__hint {
+  margin: 0;
+  padding: 0 14px 6px;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
 .cc-inbox-tree__project {
   overflow: hidden;
   border: 0;

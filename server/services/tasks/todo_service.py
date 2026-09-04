@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from domain.task import TaskStatus
-from exceptions import NotFoundError, ValidationError
+from exceptions import AppError, NotFoundError, ValidationError
 from models.project import Project
 from models.todo import Todo
 from services.vault.obsidian_export_service import (
@@ -229,6 +229,20 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
 
 async def delete_todo(db: AsyncSession, todo_id: str) -> None:
     todo = await get_todo(db, todo_id)
+    # A project's root looks like any other task in a list, but deleting it
+    # leaves the project with no root and no way back into its context.
+    owning_project = (
+        await db.execute(
+            select(Project.id).where(Project.root_task_id == todo.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if owning_project is not None:
+        raise AppError(
+            code="PROJECT_ROOT_TASK",
+            message="This task is a project's root; delete the project instead",
+            status_code=409,
+            details={"project_id": owning_project, "todo_id": todo.id},
+        )
     deleted_id = todo.id
     dependent_source_ids = await task_relationship_service.dependent_source_ids(
         db,
