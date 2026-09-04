@@ -24,6 +24,7 @@ import RecurrenceSelector from '../components/shared/RecurrenceSelector';
 import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
+import TaskAgentThreadSection from '../components/task-detail/TaskAgentThreadSection';
 import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 import { getTaskStatusLabel, isTerminalTaskStatus } from '../utils/taskStatus';
@@ -319,6 +320,8 @@ export default function TaskDetailPage() {
           </div>
         </div>
       )}
+
+      <TaskAgentThreadSection taskId={task.id} />
 
       {/* Section 4: Plan / Research / Execute (action bar) */}
       <div className="cc-exec-panel__section">

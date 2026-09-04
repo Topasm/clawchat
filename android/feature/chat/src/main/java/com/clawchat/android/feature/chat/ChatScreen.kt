@@ -65,6 +65,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
+import com.clawchat.android.core.data.model.RunUpdate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.SwipeToDismissCard
@@ -688,6 +689,69 @@ private fun MessageBubble(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            message.runUpdate?.let { update -> RunUpdateCard(update) }
+        }
+    }
+}
+
+/**
+ * An agent run reporting into its thread. The message above already says what
+ * happened; this names the state and, when the run is waiting on the user,
+ * where to act -- answering and reviewing live on the Progress tab here.
+ */
+@Composable
+private fun RunUpdateCard(update: RunUpdate) {
+    val statusLabel = stringResource(
+        when (update.status) {
+            "waiting_input" -> R.string.chat_run_status_waiting_input
+            "waiting_review" -> R.string.chat_run_status_waiting_review
+            "completed" -> R.string.chat_run_status_completed
+            "cancelled" -> R.string.chat_run_status_cancelled
+            "failed" -> R.string.chat_run_status_failed
+            else -> R.string.chat_run_status_running
+        },
+    )
+    val accent = when {
+        update.status == "failed" -> MaterialTheme.colorScheme.error
+        update.needsUser -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.4f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.chat_run_update_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = accent,
+                )
+            }
+            if (update.needsUser) {
+                Text(
+                    text = stringResource(R.string.chat_run_needs_you_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -40,7 +40,7 @@ def test_every_module_intent_has_a_handler():
 
 def test_the_registry_holds_exactly_the_expected_intents():
     assert intent_ids() == sorted(
-        set(MODULE_INTENTS) | {"search", "daily_briefing", "weekly_review"}
+        set(MODULE_INTENTS) | {"search", "daily_briefing", "weekly_review", "query_runs"}
     )
 
 

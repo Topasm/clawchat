@@ -168,6 +168,39 @@
   margin-top: 4px;
 }
 
+.cc-task-progress__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cc-task-progress__actions .cc-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.cc-task-progress--attention {
+  border-color: var(--cc-warning);
+}
+
+.cc-run-status-card__reply {
+  margin-top: 8px;
+}
+
+.cc-run-status-card__reply textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: var(--cc-radius-md);
+  border: 1px solid var(--cc-border);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+}
+
 .cc-task-progress__subtasks {
   margin-top: 8px;
   display: flex;

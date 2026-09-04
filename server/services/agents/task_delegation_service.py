@@ -260,6 +260,9 @@ async def delegate_todo_to_skill(
                         run_task.result,
                         progress=100,
                     )
+                    await agent_run_service.notify_run_state(
+                        run_db, run_row, run_task, user_id=user_id
+                    )
                     await run_db.commit()
                 except Exception as exc:
                     run_task.status = "failed"

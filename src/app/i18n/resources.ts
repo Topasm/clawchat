@@ -7,6 +7,7 @@ export const translationResources = {
       nav: {
         inbox: 'Inbox',
         projects: 'Projects',
+        attention: 'Attention',
         review: 'Review',
         runs: 'Runs',
         tasks: 'Tasks',
@@ -322,6 +323,7 @@ export const translationResources = {
       nav: {
         inbox: 'Inbox',
         projects: '프로젝트',
+        attention: '확인 필요',
         review: '검토',
         runs: '실행',
         tasks: '작업',

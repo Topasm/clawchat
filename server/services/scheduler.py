@@ -88,6 +88,7 @@ class Scheduler:
             asyncio.create_task(self._reminder_loop(), name="scheduler-reminders"),
             asyncio.create_task(self._briefing_loop(), name="scheduler-briefing"),
             asyncio.create_task(self._midnight_reset_loop(), name="scheduler-midnight"),
+            asyncio.create_task(self._run_watchdog_loop(), name="scheduler-run-watchdog"),
         ]
 
         # Weekly review loop
@@ -248,6 +249,36 @@ class Scheduler:
                     logger.exception("Error generating weekly review")
         except asyncio.CancelledError:
             logger.debug("Weekly review loop cancelled")
+
+    async def _run_watchdog_loop(self) -> None:
+        """Fail runs whose heartbeat lapsed; remind about runs waiting for input."""
+        from services.agents import run_watchdog_service
+
+        interval = max(settings.run_watchdog_interval_seconds, 5)
+        heartbeat_timeout = timedelta(minutes=settings.run_heartbeat_timeout_minutes)
+        remind_after = timedelta(minutes=settings.run_input_reminder_minutes)
+        logger.info("Run watchdog started (interval: %ds)", interval)
+        try:
+            while True:
+                try:
+                    async with self.session_factory() as db:
+                        report = await run_watchdog_service.sweep(
+                            db,
+                            heartbeat_timeout=heartbeat_timeout,
+                            remind_after=remind_after,
+                        )
+                        await db.commit()
+                    if report.failed_run_ids or report.reminded_run_ids:
+                        for module in ("runs", "reviews", "todos"):
+                            await self.ws_manager.send_json(
+                                "user",
+                                {"type": "module_data_changed", "data": {"module": module}},
+                            )
+                except Exception:
+                    logger.exception("Error in run watchdog loop")
+                await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            logger.debug("Run watchdog loop cancelled")
 
     async def _nudge_loop(self) -> None:
         """Periodically check for stale/forgotten tasks and send AI-generated nudges."""

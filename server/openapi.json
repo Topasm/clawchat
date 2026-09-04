@@ -275,6 +275,17 @@
             ],
             "title": "Completed At"
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -694,6 +705,17 @@
               }
             ],
             "title": "Completed At"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           },
           "created_at": {
             "format": "date-time",
@@ -7052,6 +7074,69 @@
         "title": "TaskBatchPlacementResponse",
         "type": "object"
       },
+      "TaskCommentCreate": {
+        "additionalProperties": false,
+        "description": "Post one comment onto a task's thread.",
+        "properties": {
+          "content": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "todo_id": {
+            "title": "Todo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "todo_id",
+          "content"
+        ],
+        "title": "TaskCommentCreate",
+        "type": "object"
+      },
+      "TaskCommentResponse": {
+        "description": "Persisted task comment returned by the API.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "todo_id": {
+            "title": "Todo Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "todo_id",
+          "content",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TaskCommentResponse",
+        "type": "object"
+      },
       "TaskDependencyCommandRequest": {
         "additionalProperties": false,
         "description": "Revision-sensitive dependency connector command.",
@@ -13295,6 +13380,163 @@
         "tags": [
           "settings",
           "settings"
+        ]
+      }
+    },
+    "/api/task-comments": {
+      "get": {
+        "operationId": "list_task_comments_api_task_comments_get",
+        "parameters": [
+          {
+            "description": "Comma-separated todo IDs",
+            "in": "query",
+            "name": "todo_ids",
+            "required": true,
+            "schema": {
+              "description": "Comma-separated todo IDs",
+              "title": "Todo Ids",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCommentResponse"
+                  },
+                  "title": "Response List Task Comments Api Task Comments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Task Comments",
+        "tags": [
+          "task-comments"
+        ]
+      },
+      "post": {
+        "operationId": "create_task_comment_api_task_comments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCommentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCommentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Todo or task comment not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Task Comment",
+        "tags": [
+          "task-comments"
+        ]
+      }
+    },
+    "/api/task-comments/{comment_id}": {
+      "delete": {
+        "operationId": "delete_task_comment_api_task_comments__comment_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "title": "Comment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Todo or task comment not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Task Comment",
+        "tags": [
+          "task-comments"
         ]
       }
     },

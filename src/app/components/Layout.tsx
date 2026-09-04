@@ -32,7 +32,12 @@ import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
 import { ChevronLeftIcon, ChevronRightIcon, CollapseIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
-import { useCapabilitiesQuery, useReviewsQuery, useTodosQuery } from '../hooks/queries';
+import {
+  useCapabilitiesQuery,
+  useReviewsQuery,
+  useRunsAwaitingInputQuery,
+  useTodosQuery,
+} from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
@@ -48,7 +53,6 @@ import {
   AdminIcon,
   NavCalendarIcon,
   ReviewIcon,
-  RunsIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
@@ -103,10 +107,9 @@ const primaryNavItems = [
   { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
   { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
-const secondaryNavItems = [
-  { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
-  { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
-];
+// Runs and Review stay reachable as the log and the history; the nav offers
+// the one place that lists what has stopped for the user.
+const secondaryNavItems = [{ to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon }];
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
@@ -138,6 +141,7 @@ export default function Layout() {
   const { data: capabilities } = useCapabilitiesQuery();
   const { data: todos = [] } = useTodosQuery();
   const { data: pendingReviews = [] } = useReviewsQuery();
+  const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
   useEffect(() => {
     if (!isDesktop) return;
     void platformApi.appWindow
@@ -255,15 +259,17 @@ export default function Layout() {
       '/schedule': dueCount,
       '/inbox': inboxCount,
       '/tasks': openTaskCount,
-      '/review': pendingReviews.length,
+      '/attention': pendingReviews.length + runsAwaitingInput.length,
     }),
-    [dueCount, inboxCount, openTaskCount, pendingReviews.length],
+    [dueCount, inboxCount, openTaskCount, pendingReviews.length, runsAwaitingInput.length],
   );
-  // The OS icon badge stands for "needs you now", so it counts unfiled work
-  // plus anything due or overdue -- not the whole open backlog.
+  // The OS icon badge stands for "needs you now": unfiled work, anything due
+  // or overdue, and every agent that has stopped for your input or review --
+  // not the whole open backlog.
+  const agentAttentionCount = runsAwaitingInput.length + pendingReviews.length;
   useEffect(() => {
-    void setAppBadge(attentionBadgeCount);
-  }, [attentionBadgeCount]);
+    void setAppBadge(attentionBadgeCount + agentAttentionCount);
+  }, [attentionBadgeCount, agentAttentionCount]);
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
   const activeMobileTabIndex = useMemo(

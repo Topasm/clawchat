@@ -2,6 +2,9 @@ package com.clawchat.android.core.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 // --- Health ---
 
@@ -215,7 +218,31 @@ data class Message(
     val role: String, // "user" | "assistant" | "system"
     @SerialName("created_at") val createdAt: String = "",
     val intent: String? = null,
-)
+    /** Action card payload; `action_type = "run_update"` is an agent run reporting into its thread. */
+    val metadata: JsonObject? = null,
+) {
+    val runUpdate: RunUpdate?
+        get() = metadata?.takeIf { it["action_type"]?.jsonPrimitive?.contentOrNull == "run_update" }
+            ?.let { data ->
+                RunUpdate(
+                    runId = data["run_id"]?.jsonPrimitive?.contentOrNull,
+                    status = data["status"]?.jsonPrimitive?.contentOrNull ?: "running",
+                    title = data["title"]?.jsonPrimitive?.contentOrNull,
+                    error = data["error"]?.jsonPrimitive?.contentOrNull,
+                )
+            }
+}
+
+/** What a `run_update` chat message says about its run. */
+data class RunUpdate(
+    val runId: String?,
+    val status: String,
+    val title: String?,
+    val error: String?,
+) {
+    val needsUser: Boolean
+        get() = status == "waiting_input" || status == "waiting_review"
+}
 
 // --- Paginated Response ---
 

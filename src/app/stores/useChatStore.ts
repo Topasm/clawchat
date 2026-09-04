@@ -54,11 +54,14 @@ export function clearPendingRunTimeout() {
   }
 }
 export interface TaskProgressData {
+  /** AgentRun lifecycle value; `waiting_review` and `waiting_input` mean the user is up. */
   status?: string;
   progress?: number;
   message?: string;
   result?: string;
   error?: string;
+  run_id?: string;
+  review_id?: string;
   sub_tasks?: Array<{
     id: string;
     instruction: string;

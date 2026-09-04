@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.agent_run import AgentRunStatus
 from models.agent_task import AgentTask
 from models.agent_run import AgentRun
 from services.agents import agent_run_service
@@ -16,6 +17,44 @@ from utils import make_id, strip_markdown_fences
 from ws.manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
+
+# How a built-in agent asks the user something instead of guessing. The model
+# is told to use this prefix only when it cannot finish otherwise; the executor
+# turns such a reply into a ``waiting_input`` run rather than a result.
+NEEDS_INPUT_PREFIX = "NEEDS_INPUT:"
+ASK_USER_INSTRUCTION = (
+    "\n\nIf you cannot finish without a decision or information that only the "
+    f"user has, reply with a single line starting with {NEEDS_INPUT_PREFIX} "
+    "followed by one clear question, and nothing else. Otherwise never use that "
+    "prefix. When the task includes a follow-up instruction from the user, treat "
+    "it as the answer and finish the work."
+)
+
+
+def parse_needs_input(result: str) -> str | None:
+    """Return the question a reply is asking, or None when it is a result."""
+    stripped = result.strip()
+    if not stripped.startswith(NEEDS_INPUT_PREFIX):
+        return None
+    question = stripped[len(NEEDS_INPUT_PREFIX):].strip()
+    return question or "The agent needs more information to continue."
+
+
+async def request_input(db: AsyncSession, task: AgentTask, question: str) -> None:
+    """Park the task's run in ``waiting_input`` with the agent's question.
+
+    The run transition notifies the user and writes the question into the
+    thread; a follow-up resumes the same attempt with the answer appended to
+    its instruction. Caller commits.
+    """
+    task.status = "running"
+    task.progress_message = question
+    run = await _attached_run(db, task)
+    if run is not None:
+        await agent_run_service.transition_run(
+            db, run, AgentRunStatus.WAITING_INPUT, question
+        )
+    await db.flush()
 
 # Specialized agent system prompts
 AGENT_PROMPTS: dict[str, str] = {
@@ -225,9 +264,15 @@ async def execute_task(
         await db.commit()
 
         result = await ai_service.generate_completion(
-            system_prompt=system_prompt,
+            system_prompt=system_prompt + ASK_USER_INSTRUCTION,
             user_message=task.instruction,
         )
+
+        question = parse_needs_input(result)
+        if question is not None:
+            await request_input(db, task, question)
+            await db.commit()
+            return
 
         await update_progress(db, task, 90, "Finalizing...", ws_manager, user_id)
         await mark_completed(db, task, result)
@@ -237,6 +282,8 @@ async def execute_task(
         if task.parent_task_id:
             await _check_parent_completion(db, task.parent_task_id, ai_service, ws_manager, user_id)
 
+        # ``run_status`` is what the chat card shows: a top-level result is
+        # waiting for review at this point, not done.
         await ws_manager.send_json(user_id, {
             "type": "task_completed",
             "data": {
@@ -246,6 +293,7 @@ async def execute_task(
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
                 "run_id": run.id,
+                "run_status": str(run.status),
             },
         })
     except Exception as exc:
@@ -266,6 +314,7 @@ async def execute_task(
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
                 "run_id": run.id,
+                "run_status": str(run.status),
             },
         })
 
@@ -401,6 +450,7 @@ async def _check_parent_completion(
     await db.commit()
 
     status = "task_completed" if parent.status == "completed" else "task_failed"
+    parent_run = await _attached_run(db, parent)
     await ws_manager.send_json(user_id, {
         "type": status,
         "data": {
@@ -409,5 +459,7 @@ async def _check_parent_completion(
             "result": parent.result if parent.status == "completed" else None,
             "error": parent.error if parent.status == "failed" else None,
             "conversation_id": parent.conversation_id,
+            "run_id": parent_run.id if parent_run is not None else None,
+            "run_status": str(parent_run.status) if parent_run is not None else None,
         },
     })

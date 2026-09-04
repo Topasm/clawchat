@@ -20,6 +20,7 @@ const ChatListPage = lazy(() => import('./app/pages/ChatListPage'));
 const ProjectWorkspacePage = lazy(() => import('./app/pages/ProjectWorkspacePage'));
 const ReviewPage = lazy(() => import('./app/pages/ReviewPage'));
 const RunsPage = lazy(() => import('./app/pages/RunsPage'));
+const AttentionPage = lazy(() => import('./app/pages/AttentionPage'));
 const ChatPage = lazy(() => import('./app/pages/ChatPage'));
 const AllTasksPage = lazy(() => import('./app/pages/AllTasksPage'));
 const TaskDetailPage = lazy(() => import('./app/pages/TaskDetailPage'));
@@ -281,6 +282,16 @@ export default function AppRouter() {
             <ErrorBoundary name="RunsPage">
               <LazyRoute>
                 <RunsPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/attention"
+          element={
+            <ErrorBoundary name="AttentionPage">
+              <LazyRoute>
+                <AttentionPage />
               </LazyRoute>
             </ErrorBoundary>
           }

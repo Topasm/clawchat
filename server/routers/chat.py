@@ -30,10 +30,7 @@ from schemas.chat import (
 )
 from schemas.common import PaginatedResponse
 from services.ai import resolve_active_ai
-from services.chat.conversation_context import (
-    build_first_class_project_context,
-    build_project_context,
-)
+from services.chat.conversation_context import build_conversation_context
 from services.chat.intent_classifier import classify_intent
 from utils import make_id
 
@@ -277,7 +274,7 @@ async def stream_chat(
     body: SendMessageRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user_id: str = Depends(get_current_user),
 ):
     conv = await db.get(Conversation, body.conversation_id)
     if not conv:
@@ -295,11 +292,7 @@ async def stream_chat(
     rows = (await db.execute(q)).scalars().all()
     history = list(reversed(rows))
 
-    system_content = SYSTEM_PROMPT
-    if conv.project_id:
-        system_content += await build_first_class_project_context(db, conv.project_id)
-    elif conv.project_todo_id:
-        system_content += await build_project_context(db, conv.project_todo_id)
+    system_content = SYSTEM_PROMPT + await build_conversation_context(db, conv)
     messages = [{"role": "system", "content": system_content}]
     for msg in history:
         messages.append({"role": msg.role, "content": msg.content})
@@ -339,6 +332,8 @@ async def stream_chat(
                         intent_result.intent,
                         intent_result.params,
                         body.content,
+                        user_id=user_id,
+                        message_id=user_msg_id,
                     )
                     if resolved is not None:
                         action_text, action_metadata = resolved

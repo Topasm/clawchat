@@ -22,6 +22,7 @@ Intents:
 - delete_event: User wants to cancel an event
 - search: User wants to search across all data (e.g., "find everything about VLA")
 - delegate_task: User wants to assign a complex async task to the AI agent
+- query_runs: User asks how delegated agent work is going or what the agent is doing now (e.g., "how's the research going?", "is anything waiting on me?")
 - daily_briefing: User wants a summary of their day (e.g., "what's my day look like?")
 - suggest_time: User wants scheduling suggestions (e.g., "when should I schedule a team meeting?")
 - check_conflicts: User wants to check for scheduling conflicts (e.g., "do I have anything at 3pm?")
@@ -54,6 +55,7 @@ INTENT_TOOLS_SCHEMA = [
                             "delete_event",
                             "search",
                             "delegate_task",
+                            "query_runs",
                             "daily_briefing",
                             "suggest_time",
                             "check_conflicts",
