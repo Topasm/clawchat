@@ -8,13 +8,16 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.model.Conversation
+import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -26,7 +29,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -37,6 +42,7 @@ class TasksViewModelTest {
     private lateinit var todoRepository: TodoRepository
     private lateinit var relationshipRepository: TaskRelationshipRepository
     private lateinit var conversationRepository: ConversationRepository
+    private lateinit var taskCommentRepository: TaskCommentRepository
     private lateinit var syncManager: SyncManager
     private lateinit var todoChanged: MutableSharedFlow<Unit>
     private lateinit var viewModel: TasksViewModel
@@ -58,6 +64,7 @@ class TasksViewModelTest {
         todoRepository = mockk()
         relationshipRepository = mockk()
         conversationRepository = mockk()
+        taskCommentRepository = mockk()
         syncManager = mockk(relaxed = true)
         todoChanged = MutableSharedFlow(extraBufferCapacity = 1)
         every { syncManager.todoChanged } returns todoChanged
@@ -70,7 +77,62 @@ class TasksViewModelTest {
     }
 
     private fun createViewModel(): TasksViewModel {
-        return TasksViewModel(todoRepository, syncManager, relationshipRepository, conversationRepository)
+        return TasksViewModel(
+            todoRepository,
+            syncManager,
+            relationshipRepository,
+            conversationRepository,
+            taskCommentRepository,
+        )
+    }
+
+    @Test
+    fun `only unfinished experiment tasks require verdict confirmation`() {
+        val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
+        val hashedExperiment = sampleTodo.copy(tags = listOf("#exp/E65b"))
+
+        assertTrue(requiresVerdictConfirmation(experiment, TaskStatus.COMPLETED))
+        assertTrue(requiresVerdictConfirmation(hashedExperiment, TaskStatus.COMPLETED))
+        assertFalse(requiresVerdictConfirmation(sampleTodo, TaskStatus.COMPLETED))
+        assertFalse(requiresVerdictConfirmation(experiment, TaskStatus.IN_PROGRESS))
+        assertFalse(
+            requiresVerdictConfirmation(
+                experiment.copy(status = TaskStatus.COMPLETED),
+                TaskStatus.COMPLETED,
+            ),
+        )
+    }
+
+    @Test
+    fun `completing an experiment later records missing verdict after completion`() = runTest {
+        val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
+        val completed = experiment.copy(status = TaskStatus.COMPLETED)
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(experiment), total = 1))
+        coEvery { todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED)) } returns
+            ApiResult.Success(completed)
+        coEvery { taskCommentRepository.addComment("1", "판정 미기록") } returns
+            ApiResult.Success(
+                TaskComment(
+                    id = "comment-1",
+                    todoId = "1",
+                    content = "판정 미기록",
+                    createdBy = "user",
+                    createdAt = "2026-09-04T00:00:00Z",
+                    updatedAt = "2026-09-04T00:00:00Z",
+                ),
+            )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.completeExperiment("1", verdictRecorded = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.tasks.single().status)
+        coVerifyOrder {
+            todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED))
+            taskCommentRepository.addComment("1", "판정 미기록")
+        }
     }
 
     @Test

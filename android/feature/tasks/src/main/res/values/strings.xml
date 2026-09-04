@@ -42,6 +42,10 @@
     <string name="tasks_undo">Undo</string>
     <string name="tasks_mark_complete">Mark %1$s complete</string>
     <string name="tasks_mark_incomplete">Mark %1$s incomplete</string>
+    <string name="tasks_experiment_completion_title">Complete experiment task</string>
+    <string name="tasks_experiment_completion_question">Did you record the verdict in the original document?</string>
+    <string name="tasks_experiment_verdict_recorded">Recorded</string>
+    <string name="tasks_experiment_verdict_later">Later</string>
     <string name="tasks_description_title">Description</string>
     <string name="tasks_description_subtitle">Notes and supporting detail.</string>
     <string name="tasks_details_title">Details</string>

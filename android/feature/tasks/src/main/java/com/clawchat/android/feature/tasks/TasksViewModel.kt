@@ -9,6 +9,7 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
@@ -66,6 +67,7 @@ class TasksViewModel @Inject constructor(
     private val syncManager: SyncManager,
     private val relationshipRepository: TaskRelationshipRepository,
     private val conversationRepository: ConversationRepository,
+    private val taskCommentRepository: TaskCommentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TasksUiState())
@@ -127,6 +129,9 @@ class TasksViewModel @Inject constructor(
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
     fun setDueToday(id: String) = updateTask(id, TodoUpdate(dueDate = java.time.LocalDate.now().toString()))
+    fun setTaskStatus(id: String, status: TaskStatus) = doSetTaskStatus(id, status)
+    fun completeExperiment(todoId: String, verdictRecorded: Boolean) =
+        doSetTaskStatus(todoId, TaskStatus.COMPLETED, recordMissingVerdict = !verdictRecorded)
 
     private fun doLoadTasks() {
         val generation = ++taskRequestGeneration
@@ -273,13 +278,23 @@ class TasksViewModel @Inject constructor(
     }
 
     private fun doToggleComplete(todoId: String) {
+        val todo = _uiState.value.tasks.find { it.id == todoId } ?: return
+        val newStatus = if (todo.status == TaskStatus.COMPLETED) {
+            TaskStatus.PENDING
+        } else {
+            TaskStatus.COMPLETED
+        }
+        doSetTaskStatus(todoId, newStatus)
+    }
+
+    private fun doSetTaskStatus(
+        todoId: String,
+        newStatus: TaskStatus,
+        recordMissingVerdict: Boolean = false,
+    ) {
         viewModelScope.launch {
             val todo = _uiState.value.tasks.find { it.id == todoId } ?: return@launch
-            val newStatus = if (todo.status == TaskStatus.COMPLETED) {
-                TaskStatus.PENDING
-            } else {
-                TaskStatus.COMPLETED
-            }
+            if (todo.status == newStatus) return@launch
 
             try {
                 _uiState.optimistic(
@@ -306,6 +321,13 @@ class TasksViewModel @Inject constructor(
                 ) {
                     val result = todoRepository.updateTodo(todoId, TodoUpdate(status = newStatus))
                     if (result is ApiResult.Error) throw Exception(result.message)
+                }
+                if (recordMissingVerdict) {
+                    when (val result = taskCommentRepository.addComment(todoId, MISSING_VERDICT_COMMENT)) {
+                        is ApiResult.Success -> Unit
+                        is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                        ApiResult.Loading -> Unit
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -424,6 +446,7 @@ class TasksViewModel @Inject constructor(
     private companion object {
         const val DELETE_UNDO_WINDOW_MS = 10_000L
         const val PROJECT_ROOT_SOURCE = "project_root"
+        const val MISSING_VERDICT_COMMENT = "판정 미기록"
         const val MAX_RELATED_TITLE_LOOKUPS = 50
         const val MAX_CONCURRENT_TITLE_LOOKUPS = 8
     }

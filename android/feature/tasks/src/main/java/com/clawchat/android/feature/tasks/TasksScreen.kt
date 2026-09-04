@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -110,6 +111,13 @@ internal val TASK_STATUS_FILTER_ORDER: List<TaskStatus?> = listOf(
     null,
 )
 
+internal fun requiresVerdictConfirmation(todo: Todo, nextStatus: TaskStatus): Boolean =
+    nextStatus == TaskStatus.COMPLETED &&
+        todo.status != TaskStatus.COMPLETED &&
+        todo.tags.orEmpty().any { it.removePrefix("#").startsWith("exp/") }
+
+private fun taskTagLabel(tag: String): String = "#${tag.removePrefix("#")}"
+
 @Composable
 fun TasksScreen(
     onOpenSearch: () -> Unit = {},
@@ -126,6 +134,14 @@ fun TasksScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val deletedMessage = stringResource(R.string.tasks_deleted)
     val undoLabel = stringResource(R.string.tasks_undo)
+    var pendingExperimentCompletionId by remember { mutableStateOf<String?>(null) }
+    val requestStatusChange: (Todo, TaskStatus) -> Unit = { task, status ->
+        if (requiresVerdictConfirmation(task, status)) {
+            pendingExperimentCompletionId = task.id
+        } else {
+            viewModel.setTaskStatus(task.id, status)
+        }
+    }
 
     BackHandler(enabled = state.selectedTask != null) {
         viewModel.selectTask(null)
@@ -161,10 +177,19 @@ fun TasksScreen(
             taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
             snackbarHostState = snackbarHostState,
             onBack = { viewModel.selectTask(null) },
-            onToggle = { viewModel.toggleComplete(state.selectedTask!!.id) },
+            onToggle = {
+                state.selectedTask?.let { task ->
+                    val status = if (task.status == TaskStatus.COMPLETED) {
+                        TaskStatus.PENDING
+                    } else {
+                        TaskStatus.COMPLETED
+                    }
+                    requestStatusChange(task, status)
+                }
+            },
             onSetStatus = { status ->
                 state.selectedTask?.let { task ->
-                    viewModel.updateTask(task.id, TodoUpdate(status = status))
+                    requestStatusChange(task, status)
                 }
             },
             onSetDueDate = { date ->
@@ -184,11 +209,46 @@ fun TasksScreen(
             onOpenSearch = onOpenSearch,
             onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectTask,
-            onToggle = viewModel::toggleComplete,
+            onToggle = { task ->
+                val status = if (task.status == TaskStatus.COMPLETED) {
+                    TaskStatus.PENDING
+                } else {
+                    TaskStatus.COMPLETED
+                }
+                requestStatusChange(task, status)
+            },
             onDelete = viewModel::deleteTask,
             onSetDueToday = viewModel::setDueToday,
             onSetFilter = viewModel::setStatusFilter,
             onCreate = viewModel::createTask,
+        )
+    }
+
+    pendingExperimentCompletionId?.let { todoId ->
+        AlertDialog(
+            onDismissRequest = { pendingExperimentCompletionId = null },
+            title = { Text(stringResource(R.string.tasks_experiment_completion_title)) },
+            text = { Text(stringResource(R.string.tasks_experiment_completion_question)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingExperimentCompletionId = null
+                        viewModel.completeExperiment(todoId, verdictRecorded = true)
+                    },
+                ) {
+                    Text(stringResource(R.string.tasks_experiment_verdict_recorded))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingExperimentCompletionId = null
+                        viewModel.completeExperiment(todoId, verdictRecorded = false)
+                    },
+                ) {
+                    Text(stringResource(R.string.tasks_experiment_verdict_later))
+                }
+            },
         )
     }
 }
@@ -203,7 +263,7 @@ private fun TaskListView(
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelect: (Todo) -> Unit,
-    onToggle: (String) -> Unit,
+    onToggle: (Todo) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onSetFilter: (TaskStatus?) -> Unit,
@@ -344,7 +404,7 @@ private fun TaskStatusPage(
     tasks: List<Todo>,
     isLoading: Boolean,
     onSelect: (Todo) -> Unit,
-    onToggle: (String) -> Unit,
+    onToggle: (Todo) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onCreate: () -> Unit,
@@ -393,7 +453,7 @@ private fun TaskStatusPage(
             items(sections.active, key = { it.id }) { task ->
                 SwipeableTaskRow(
                     task = task,
-                    onToggle = { onToggle(task.id) },
+                    onToggle = { onToggle(task) },
                     onDelete = { onDelete(task.id) },
                     onSetDueToday = { onSetDueToday(task.id) },
                     onClick = { onSelect(task) },
@@ -406,7 +466,7 @@ private fun TaskStatusPage(
                 items(sections.completed, key = { it.id }) { task ->
                     SwipeableTaskRow(
                         task = task,
-                        onToggle = { onToggle(task.id) },
+                        onToggle = { onToggle(task) },
                         onDelete = { onDelete(task.id) },
                         onSetDueToday = { onSetDueToday(task.id) },
                         onClick = { onSelect(task) },
@@ -679,6 +739,12 @@ private fun TaskRow(
                     text = taskStatusLabel(task.status),
                     tone = taskStatusTone(task.status),
                 )
+                task.tags.orEmpty().filter(String::isNotBlank).forEach { tag ->
+                    ClawStatusChip(
+                        text = taskTagLabel(tag),
+                        tone = ClawTone.Default,
+                    )
+                }
                 task.dueDate?.let {
                     ClawStatusChip(
                         text = localizedDateLabel(it),
@@ -924,7 +990,10 @@ private fun TaskDetailView(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             tags.forEach { tag ->
-                                ClawStatusChip(text = tag, tone = ClawTone.Default)
+                                ClawStatusChip(
+                                    text = taskTagLabel(tag),
+                                    tone = ClawTone.Default,
+                                )
                             }
                         }
                     }

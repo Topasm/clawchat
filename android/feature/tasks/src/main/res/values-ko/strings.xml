@@ -39,6 +39,10 @@
     <string name="tasks_undo">실행 취소</string>
     <string name="tasks_mark_complete">%1$s 완료로 표시</string>
     <string name="tasks_mark_incomplete">%1$s 미완료로 표시</string>
+    <string name="tasks_experiment_completion_title">실험 작업 완료</string>
+    <string name="tasks_experiment_completion_question">판정을 원문 문서에 기록했나요?</string>
+    <string name="tasks_experiment_verdict_recorded">기록함</string>
+    <string name="tasks_experiment_verdict_later">나중에</string>
     <string name="tasks_description_title">설명</string>
     <string name="tasks_description_subtitle">메모와 참고할 세부 내용입니다.</string>
     <string name="tasks_details_title">세부 정보</string>
