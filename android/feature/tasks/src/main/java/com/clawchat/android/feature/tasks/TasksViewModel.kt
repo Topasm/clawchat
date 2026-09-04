@@ -140,8 +140,13 @@ class TasksViewModel @Inject constructor(
                     if (generation != taskRequestGeneration) return@launch
                     relationshipTitleCache.putAll(result.data.items.associate { it.id to it.title })
                     _uiState.update { state ->
+                        // A project's root todo is the project's container, not a task.
+                        // Listed here it carried the project's own name, so completing or
+                        // deleting "the task" hit the project -- which then lived on with
+                        // no root and looked like the task had come back.
                         val visibleItems = result.data.items.filterNot { task ->
-                            task.id == state.pendingDeletion?.task?.id
+                            task.id == state.pendingDeletion?.task?.id ||
+                                task.source == PROJECT_ROOT_SOURCE
                         }
                         state.copy(
                             tasks = visibleItems,
@@ -418,6 +423,7 @@ class TasksViewModel @Inject constructor(
 
     private companion object {
         const val DELETE_UNDO_WINDOW_MS = 10_000L
+        const val PROJECT_ROOT_SOURCE = "project_root"
         const val MAX_RELATED_TITLE_LOOKUPS = 50
         const val MAX_CONCURRENT_TITLE_LOOKUPS = 8
     }

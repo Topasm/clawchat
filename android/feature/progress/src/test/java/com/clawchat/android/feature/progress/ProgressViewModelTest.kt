@@ -270,6 +270,18 @@ class ProgressViewModelTest {
     }
 
     @Test
+    fun `a project root in progress is not a work card`() = runTest {
+        val root = todo(id = "root-1", inboxState = "none")
+            .copy(status = TaskStatus.IN_PROGRESS, source = "project_root")
+        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
+        stubInitial(todos = listOf(root, active))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf("active-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
+    }
+
+    @Test
     fun `start now creates the task and puts it under In progress`() = runTest {
         stubInitial()
         val created = todo(id = "new-1", inboxState = "none")

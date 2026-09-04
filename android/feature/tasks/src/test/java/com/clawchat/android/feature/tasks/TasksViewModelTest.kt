@@ -107,6 +107,17 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun `a project's root todo is not listed as a task`() = runTest {
+        val root = Todo(id = "root", title = "Paper", status = TaskStatus.PENDING, source = "project_root")
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos + root, total = 3))
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("1", "2"), viewModel.uiState.value.tasks.map(Todo::id))
+    }
+
+    @Test
     fun `discussing a task opens the thread scoped to it`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))

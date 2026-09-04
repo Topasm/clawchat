@@ -110,8 +110,12 @@ data class ProgressUiState(
         get() = attentionCount > 0 || activeCount > 0 ||
             processingCount > 0 || pendingSyncCount > 0
 
+    // Project roots are containers named after their project, never work in
+    // themselves; a work card for one would act on the project.
     private val taskCandidates: List<Todo>
-        get() = tasks.filter { it.inboxState == null || it.inboxState == "none" }
+        get() = tasks.filter {
+            (it.inboxState == null || it.inboxState == "none") && it.source != "project_root"
+        }
 
     private companion object {
         const val ATTENTION_LIMIT = 10
