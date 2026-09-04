@@ -1,3 +1,3 @@
 """Single source of truth for the ClawChat server version."""
 
-APP_VERSION = "1.4.17"
+APP_VERSION = "1.4.18"
