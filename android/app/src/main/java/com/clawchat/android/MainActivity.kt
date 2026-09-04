@@ -6,26 +6,32 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import android.graphics.Color
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.notification.NotificationPermission
 import com.clawchat.android.core.notification.ReminderNotificationHelper
 import com.clawchat.android.core.sync.SyncManager
+import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.clawchat.android.core.ui.update.AppUpdatePrompt
 import com.clawchat.android.core.update.AppUpdateManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.clawchat.android.navigation.ClawChatNavGraph
 import com.clawchat.android.navigation.reminderRoute
+import com.clawchat.android.notification.AttentionNotificationCoordinator
 import com.clawchat.android.share.ShareCaptureCoordinator
 import com.clawchat.android.share.ShareCaptureEvent
 import com.clawchat.android.share.ShareIntentParseResult
 import com.clawchat.android.share.ShareIntentParser
-import com.clawchat.android.ui.theme.ClawChatTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -36,26 +42,49 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var syncManager: SyncManager
     @Inject lateinit var updateManager: AppUpdateManager
     @Inject lateinit var shareCaptureCoordinator: ShareCaptureCoordinator
+    @Inject lateinit var attentionNotifications: AttentionNotificationCoordinator
 
-    /** Route a tapped reminder asked for, consumed once the graph navigates. */
-    private val pendingReminderRoute = MutableStateFlow<String?>(null)
+    private data class PendingReminderNavigation(
+        val route: String,
+        val workspaceKey: String,
+    )
+
+    /** Workspace-scoped reminder destination, consumed once the graph navigates. */
+    private val pendingReminderRoute = MutableStateFlow<PendingReminderNavigation?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Both bars stay fully transparent in either polarity: the default
+        // styles paint a scrim chosen from the device's dark-mode setting,
+        // which is not necessarily the theme this app resolved. ClawChatTheme
+        // owns the icon polarity to match.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         handleShareIntent(intent)
         handleReminderIntent(intent)
 
         setContent {
-            val isLoggedIn by sessionStore.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
-            val activeSession by sessionStore.activeSession.collectAsStateWithLifecycle(initialValue = null)
-            val onboardingSkipped by sessionStore.onboardingSkipped.collectAsStateWithLifecycle(initialValue = false)
+            // Null is a real loading state. Waiting for the first atomic
+            // DataStore snapshot prevents a persisted local workspace from
+            // flashing the onboarding screen during process startup.
+            val runtimeState by sessionStore.runtimeState.collectAsStateWithLifecycle(initialValue = null)
             val accentColor by sessionStore.accentColor.collectAsStateWithLifecycle(initialValue = "system")
             val themeMode by sessionStore.themeMode.collectAsStateWithLifecycle(initialValue = "light")
 
             val context = LocalContext.current
+            val weeklyReviewReadyMessage = stringResource(R.string.weekly_review_ready)
+            val shareQueuedMessage = stringResource(R.string.share_queued)
+            val shareSavedLocallyMessage = stringResource(R.string.share_saved_locally)
+            val shareFilesRequireServerMessage = stringResource(R.string.share_files_require_server)
+            val shareQueueFullMessage = stringResource(R.string.share_queue_full)
+            val shareRejectedMessage = stringResource(R.string.share_rejected)
+            val shareMalformedMessage = stringResource(R.string.share_malformed)
+            val shareFailedMessage = stringResource(R.string.share_failed)
             val updateState by updateManager.state.collectAsStateWithLifecycle()
-            val reminderDeepLink by pendingReminderRoute.collectAsStateWithLifecycle()
+            val reminderNavigation by pendingReminderRoute.collectAsStateWithLifecycle()
+            val attentionBadge by attentionNotifications.badgeState.collectAsStateWithLifecycle()
             val notificationPermissionRequested by sessionStore
                 .notificationPermissionRequested
                 .collectAsStateWithLifecycle(initialValue = true)
@@ -64,11 +93,16 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.RequestPermission(),
             ) { /* The system keeps the answer; a denial is not retried. */ }
 
-            // Android 13+ drops every reminder until the user grants this, and
-            // the system ignores a second request, so ask exactly once — after
-            // the app has a server to receive reminders from.
-            LaunchedEffect(isLoggedIn, notificationPermissionRequested) {
-                if (!isLoggedIn || notificationPermissionRequested) return@LaunchedEffect
+            // Local reminders need the same permission as server reminders, so
+            // ask once after either workspace mode has been selected.
+            LaunchedEffect(runtimeState?.mode, notificationPermissionRequested) {
+                if (
+                    runtimeState?.mode == null ||
+                    runtimeState?.mode == WorkspaceMode.UNCONFIGURED ||
+                    notificationPermissionRequested
+                ) {
+                    return@LaunchedEffect
+                }
                 if (!NotificationPermission.isRuntimePermission()) return@LaunchedEffect
                 if (NotificationPermission.isGranted(context)) return@LaunchedEffect
                 sessionStore.markNotificationPermissionRequested()
@@ -83,52 +117,21 @@ class MainActivity : ComponentActivity() {
                 updateManager.checkForUpdateIfDue()
             }
 
-            LaunchedEffect(activeSession) {
-                // A workspace switch keeps isLoggedIn=true, so lifecycle must
-                // follow the complete session identity rather than that flag.
-                // This also prevents realtime events from the previous server
-                // surviving a direct/paired workspace transition.
-                syncManager.stop()
-                if (activeSession != null) {
-                    syncManager.start()
-                    // A share can be captured before login or while the app is
-                    // not running. Workspace changes also wake captures that
-                    // are pinned to the newly active server.
-                    shareCaptureCoordinator.flush()
-                }
-            }
-
-            // Show notifications for reminders received via WebSocket
-            LaunchedEffect(Unit) {
-                syncManager.reminder.collect { reminder ->
-                    ReminderNotificationHelper.showReminderNotification(
-                        context = context,
-                        reminderType = reminder.reminderType,
-                        itemId = reminder.itemId,
-                        title = reminder.title,
-                        message = reminder.message,
-                        deliveryKey = reminder.deliveryKey,
-                    )
-                }
-            }
-
-            // Show notifications for nudges received via WebSocket
-            LaunchedEffect(Unit) {
-                syncManager.nudge.collect { nudge ->
-                    ReminderNotificationHelper.showReminderNotification(
-                        context = context,
-                        reminderType = "nudge",
-                        itemId = nudge.todoId ?: "",
-                        title = nudge.title,
-                        message = nudge.message,
-                    )
+            LaunchedEffect(runtimeState?.workspaceKey, reminderNavigation?.workspaceKey) {
+                val workspaceKey = runtimeState?.workspaceKey
+                if (reminderNavigation?.workspaceKey != workspaceKey) {
+                    pendingReminderRoute.value = null
                 }
             }
 
             // Show toast for weekly review received via WebSocket
             LaunchedEffect(Unit) {
-                syncManager.weeklyReview.collect { review ->
-                    Toast.makeText(context, "Weekly review is ready!", Toast.LENGTH_LONG).show()
+                syncManager.weeklyReview.collect {
+                    Toast.makeText(
+                        context,
+                        weeklyReviewReadyMessage,
+                        Toast.LENGTH_LONG,
+                    ).show()
                 }
             }
 
@@ -138,15 +141,19 @@ class MainActivity : ComponentActivity() {
                 shareCaptureCoordinator.events.collect { event ->
                     val (message, duration) = when (event) {
                         ShareCaptureEvent.Queued ->
-                            getString(R.string.share_queued) to Toast.LENGTH_SHORT
+                            shareQueuedMessage to Toast.LENGTH_SHORT
+                        ShareCaptureEvent.SavedLocally ->
+                            shareSavedLocallyMessage to Toast.LENGTH_SHORT
+                        ShareCaptureEvent.FilesRequireServer ->
+                            shareFilesRequireServerMessage to Toast.LENGTH_LONG
                         ShareCaptureEvent.QueueFull ->
-                            getString(R.string.share_queue_full) to Toast.LENGTH_LONG
+                            shareQueueFullMessage to Toast.LENGTH_LONG
                         ShareCaptureEvent.Rejected ->
-                            getString(R.string.share_rejected) to Toast.LENGTH_LONG
+                            shareRejectedMessage to Toast.LENGTH_LONG
                         ShareCaptureEvent.Malformed ->
-                            getString(R.string.share_malformed) to Toast.LENGTH_LONG
+                            shareMalformedMessage to Toast.LENGTH_LONG
                         ShareCaptureEvent.Failed ->
-                            getString(R.string.share_failed) to Toast.LENGTH_LONG
+                            shareFailedMessage to Toast.LENGTH_LONG
                     }
                     Toast.makeText(context, message, duration).show()
                 }
@@ -156,12 +163,25 @@ class MainActivity : ComponentActivity() {
                 themeModeKey = themeMode,
                 accentColorKey = accentColor,
             ) {
-                ClawChatNavGraph(
-                    isLoggedIn = isLoggedIn,
-                    onboardingSkipped = onboardingSkipped,
-                    deepLinkRoute = reminderDeepLink,
-                    onDeepLinkHandled = { pendingReminderRoute.value = null },
-                )
+                runtimeState?.let { state ->
+                    // ViewModels cache workspace-shaped data. Recreate the
+                    // graph when its identity changes so local and server UI
+                    // state can never bleed across a mode switch.
+                    key(state.workspaceKey ?: state.mode.name) {
+                        ClawChatNavGraph(
+                            isLoggedIn = state.mode == WorkspaceMode.SERVER && state.activeSession != null,
+                            onboardingSkipped = state.mode == WorkspaceMode.LOCAL,
+                            workspaceMode = state.mode,
+                            deepLinkRoute = reminderNavigation
+                                ?.takeIf { it.workspaceKey == state.workspaceKey }
+                                ?.route,
+                            onDeepLinkHandled = { pendingReminderRoute.value = null },
+                            attentionCount = attentionBadge.count.takeIf {
+                                attentionBadge.workspaceKey == state.workspaceKey
+                            } ?: 0,
+                        )
+                    }
+                }
                 AppUpdatePrompt(
                     state = updateState,
                     onDownload = updateManager::downloadUpdate,
@@ -187,9 +207,24 @@ class MainActivity : ComponentActivity() {
     private fun handleReminderIntent(intent: Intent?) {
         val reminderType = intent?.getStringExtra(ReminderNotificationHelper.EXTRA_REMINDER_TYPE)
             ?: return
+        val workspaceKey = intent.getStringExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY)
+            ?: return
+        val route = reminderRoute(reminderType) ?: return
+        if (intent.hasExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID)) {
+            val notificationId = intent.getIntExtra(
+                ReminderNotificationHelper.EXTRA_NOTIFICATION_ID,
+                0,
+            )
+            ReminderNotificationHelper.dismissReminderNotification(this, notificationId)
+        }
         intent.removeExtra(ReminderNotificationHelper.EXTRA_REMINDER_TYPE)
         intent.removeExtra(ReminderNotificationHelper.EXTRA_ITEM_ID)
-        pendingReminderRoute.value = reminderRoute(reminderType)
+        intent.removeExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY)
+        intent.removeExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID)
+        pendingReminderRoute.value = PendingReminderNavigation(
+            route = route,
+            workspaceKey = workspaceKey,
+        )
     }
 
     private fun handleShareIntent(intent: Intent?) {

@@ -1,38 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
-import {
-  ObsidianStatusSchema,
-  ObsidianHealthSchema,
-  ObsidianProjectsResponseSchema,
-  ObsidianScanResultSchema,
-} from '../../types/schemas';
-import type {
-  ObsidianStatus,
-  ObsidianHealth,
-  ObsidianProjectsResponse,
-  ObsidianScanResult,
-} from '../../types/schemas';
+import { ObsidianHealthSchema, ObsidianScanResultSchema } from '../../types/schemas';
+import type { ObsidianHealth, ObsidianScanResult } from '../../types/schemas';
 import { queryKeys } from './queryKeys';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 
 // ---------------------------------------------------------------------------
 // Query hooks
 // ---------------------------------------------------------------------------
-
-export function useObsidianStatusQuery() {
-  const serverUrl = useAuthStore((s) => s.serverUrl);
-
-  return useQuery<ObsidianStatus>({
-    queryKey: queryKeys.obsidianStatus,
-    queryFn: async () => {
-      const res = await apiClient.get('/obsidian/status');
-      return ObsidianStatusSchema.parse(res.data);
-    },
-    enabled: !!serverUrl,
-    staleTime: 30_000,
-  });
-}
 
 export function useObsidianHealthQuery(enabled = true) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
@@ -42,35 +18,6 @@ export function useObsidianHealthQuery(enabled = true) {
     queryFn: async () => {
       const res = await apiClient.get('/obsidian/health');
       return ObsidianHealthSchema.parse(res.data);
-    },
-    enabled: !!serverUrl && enabled,
-    staleTime: 15_000,
-    refetchInterval: 60_000,
-  });
-}
-
-export function useObsidianProjectsQuery(enabled = true) {
-  const serverUrl = useAuthStore((s) => s.serverUrl);
-
-  return useQuery<ObsidianProjectsResponse>({
-    queryKey: queryKeys.obsidianProjects,
-    queryFn: async () => {
-      const res = await apiClient.get('/obsidian/projects');
-      return ObsidianProjectsResponseSchema.parse(res.data);
-    },
-    enabled: !!serverUrl && enabled,
-    staleTime: 60_000,
-  });
-}
-
-export function useObsidianSyncStatusQuery(enabled = true) {
-  const serverUrl = useAuthStore((s) => s.serverUrl);
-
-  return useQuery({
-    queryKey: queryKeys.obsidianSyncStatus,
-    queryFn: async () => {
-      const res = await apiClient.get('/obsidian/sync-status');
-      return res.data;
     },
     enabled: !!serverUrl && enabled,
     staleTime: 15_000,
@@ -90,7 +37,6 @@ export function useObsidianSync() {
       return res.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.obsidianStatus });
       qc.invalidateQueries({ queryKey: queryKeys.obsidianHealth });
     },
   });
@@ -104,7 +50,6 @@ export function useObsidianReindex() {
       return res.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.obsidianProjects });
       qc.invalidateQueries({ queryKey: queryKeys.obsidianHealth });
     },
   });
@@ -118,7 +63,6 @@ export function useObsidianScan() {
       return ObsidianScanResultSchema.parse(res.data);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.obsidianSyncStatus });
       qc.invalidateQueries({ queryKey: queryKeys.obsidianHealth });
       qc.invalidateQueries({ queryKey: queryKeys.todos });
       void invalidateTaskDerivedQueries(qc);

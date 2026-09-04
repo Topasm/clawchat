@@ -4,8 +4,10 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.clawchat.android.core.R
 import com.clawchat.android.core.data.ActiveSession
 import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
@@ -25,6 +27,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.Locale
 
@@ -50,7 +53,16 @@ class ReminderCheckWorker(
             val sessionStore = dependencies.sessionStore()
             val ledger = ReminderDeliveryLedger(applicationContext)
             val engine = ReminderRecoveryEngine(
-                session = { sessionStore.activeSession.first()?.toReminderSession() },
+                session = {
+                    val runtimeState = sessionStore.runtimeState.first()
+                    when (runtimeState.mode) {
+                        WorkspaceMode.LOCAL -> LOCAL_REMINDER_SESSION
+                        WorkspaceMode.SERVER -> runtimeState.activeSession?.toReminderSession(
+                            runtimeState.workspaceKey,
+                        )
+                        WorkspaceMode.UNCONFIGURED -> null
+                    }
+                },
                 clearSession = sessionStore::clearSession,
                 source = RepositoryReminderRecoverySource(
                     dependencies.todoRepository(),
@@ -62,7 +74,8 @@ class ReminderCheckWorker(
                         reminderType = reminder.reminderType,
                         itemId = reminder.itemId,
                         title = reminder.title,
-                        message = reminder.message,
+                        message = reminder.localizedMessage(applicationContext),
+                        workspaceKey = reminder.workspaceKey,
                         // The recovery engine has already atomically claimed
                         // both the exact reminder and the cross-channel key.
                         deduplicate = false,
@@ -93,6 +106,7 @@ class ReminderCheckWorker(
 
     private companion object {
         const val TAG = "ReminderCheckWorker"
+        val LOCAL_REMINDER_SESSION = ReminderSession(token = "", scope = "local")
     }
 }
 
@@ -116,6 +130,7 @@ internal enum class ReminderRecoveryResult {
 internal data class ReminderSession(
     val token: String,
     val scope: String,
+    val workspaceKey: String = scope,
 )
 
 internal data class RecoveredReminder(
@@ -123,9 +138,11 @@ internal data class RecoveredReminder(
     val itemId: String,
     val title: String,
     val message: String,
+    val distanceMinutes: Long = 0,
     val scheduledAt: Instant,
     val exactClaimKey: String,
     val isOverdue: Boolean,
+    val workspaceKey: String,
 )
 
 internal interface ReminderRecoverySource {
@@ -194,12 +211,19 @@ internal class ReminderRecoveryEngine(
     private val claims: ReminderClaimStore,
     private val cacheTrust: ReminderCacheTrustStore,
     private val clock: Clock = Clock.systemUTC(),
+    private val zoneId: ZoneId = ZoneId.systemDefault(),
 ) {
     suspend fun recover(): ReminderRecoveryResult {
         val initialSession = session() ?: return ReminderRecoveryResult.NoSession
 
         val now = clock.instant()
-        val todoHorizon = now.plus(TODO_REMINDER_HORIZON)
+        // Date-only task deadlines mean the user's local calendar day, not UTC
+        // midnight. Fetch through the end of today so those tasks can alert on
+        // the due date even when their stored timestamp is more than an hour away.
+        val endOfLocalToday = now.atZone(zoneId).toLocalDate().plusDays(1)
+            .atStartOfDay(zoneId).toInstant()
+        val todoReminderHorizon = now.plus(TODO_REMINDER_HORIZON)
+        val todoFetchHorizon = maxOf(todoReminderHorizon, endOfLocalToday)
         val eventHorizon = now.plus(EVENT_REMINDER_HORIZON)
         // LocalDate.ofInstant was only added to Android at API 34. The
         // equivalent Java 8 path keeps the WorkManager fallback valid on our
@@ -207,7 +231,7 @@ internal class ReminderRecoveryEngine(
         val fromDate = now.minus(EVENT_START_GRACE).atZone(ZoneOffset.UTC).toLocalDate()
         val toDate = eventHorizon.atZone(ZoneOffset.UTC).toLocalDate()
 
-        val remoteTodos = source.fetchTodos(todoHorizon)
+        val remoteTodos = source.fetchTodos(todoFetchHorizon)
         if (remoteTodos.isAuthenticationFailure()) {
             return endAuthenticatedSession(initialSession)
         }
@@ -246,8 +270,11 @@ internal class ReminderRecoveryEngine(
         }
 
         val candidates = (
-            todos.mapNotNull { it.toRecoveredReminder(now, todoHorizon) } +
-                events.mapNotNull { it.toRecoveredReminder(now, eventHorizon) }
+            todos.mapNotNull {
+                it.toRecoveredReminder(now, todoReminderHorizon, initialSession.workspaceKey, zoneId)
+            } + events.mapNotNull {
+                it.toRecoveredReminder(now, eventHorizon, initialSession.workspaceKey)
+            }
             )
             .distinctBy(RecoveredReminder::exactClaimKey)
             .sortedWith(
@@ -291,11 +318,18 @@ internal class ReminderRecoveryEngine(
     }
 
     private suspend fun deliver(candidate: RecoveredReminder, claimedAt: Long): Boolean {
-        if (!claims.claim(candidate.exactClaimKey, claimedAt, EXACT_REMINDER_WINDOW_MILLIS)) {
+        val exactClaimKey = workspaceReminderClaimKey(
+            candidate.workspaceKey,
+            candidate.exactClaimKey,
+        )
+        if (!claims.claim(exactClaimKey, claimedAt, EXACT_REMINDER_WINDOW_MILLIS)) {
             return false
         }
 
-        val recentKey = recentReminderKey(candidate.reminderType, candidate.itemId)
+        val recentKey = workspaceReminderClaimKey(
+            candidate.workspaceKey,
+            recentReminderKey(candidate.reminderType, candidate.itemId),
+        )
         if (!claims.claim(recentKey, claimedAt, RECENT_REMINDER_WINDOW_MILLIS)) {
             // A recent WebSocket delivery owns the coarse claim. Retaining the
             // exact claim records that this scheduled occurrence was covered.
@@ -306,14 +340,14 @@ internal class ReminderRecoveryEngine(
             if (!notifier(candidate)) {
                 // Permission/channel failures must not consume the reminder;
                 // it can be recovered after the user enables notifications.
-                claims.release(candidate.exactClaimKey, claimedAt)
+                claims.release(exactClaimKey, claimedAt)
                 claims.release(recentKey, claimedAt)
                 false
             } else {
                 true
             }
         } catch (error: Exception) {
-            claims.release(candidate.exactClaimKey, claimedAt)
+            claims.release(exactClaimKey, claimedAt)
             claims.release(recentKey, claimedAt)
             throw error
         }
@@ -328,9 +362,34 @@ internal class ReminderRecoveryEngine(
     }
 }
 
-private fun Todo.toRecoveredReminder(now: Instant, horizon: Instant): RecoveredReminder? {
+private fun Todo.toRecoveredReminder(
+    now: Instant,
+    horizon: Instant,
+    workspaceKey: String,
+    zoneId: ZoneId,
+): RecoveredReminder? {
     if (status != TaskStatus.PENDING && status != TaskStatus.IN_PROGRESS) return null
-    val due = dueDate?.toReminderInstant() ?: return null
+    val rawDue = dueDate ?: return null
+    val dueDateOnly = rawDue.toReminderDateOnly()
+    if (dueDateOnly != null) {
+        val today = now.atZone(zoneId).toLocalDate()
+        if (dueDateOnly > today) return null
+        val overdue = dueDateOnly < today
+        val due = dueDateOnly.atStartOfDay(zoneId).toInstant()
+        val type = if (overdue) "todo_overdue" else "todo_due_today"
+        return RecoveredReminder(
+            reminderType = type,
+            itemId = id,
+            title = title,
+            message = if (overdue) "'$title' is overdue." else "'$title' is due today.",
+            scheduledAt = due,
+            exactClaimKey = reminderDeliveryKey(type, id, due.epochSecond),
+            isOverdue = overdue,
+            workspaceKey = workspaceKey,
+        )
+    }
+
+    val due = rawDue.toReminderInstant() ?: return null
     if (due > horizon) return null
 
     val overdue = due < now
@@ -345,13 +404,19 @@ private fun Todo.toRecoveredReminder(now: Instant, horizon: Instant): RecoveredR
         } else {
             "'$title' is due in $minutesUntil minute(s)."
         },
+        distanceMinutes = minutesUntil,
         scheduledAt = due,
         exactClaimKey = reminderDeliveryKey(type, id, due.epochSecond),
         isOverdue = overdue,
+        workspaceKey = workspaceKey,
     )
 }
 
-private fun Event.toRecoveredReminder(now: Instant, horizon: Instant): RecoveredReminder? {
+private fun Event.toRecoveredReminder(
+    now: Instant,
+    horizon: Instant,
+    workspaceKey: String,
+): RecoveredReminder? {
     val leadMinutes = reminderMinutes ?: return null
     if (leadMinutes !in 0..MAX_SUPPORTED_EVENT_REMINDER_MINUTES) return null
     val start = startTime.toReminderInstant() ?: return null
@@ -372,19 +437,50 @@ private fun Event.toRecoveredReminder(now: Instant, horizon: Instant): Recovered
         } else {
             "'$title' starts in $distanceMinutes minute(s)."
         },
+        distanceMinutes = distanceMinutes,
         scheduledAt = start,
         exactClaimKey = reminderDeliveryKey("event", occurrenceKey, start.epochSecond),
         isOverdue = started,
+        workspaceKey = workspaceKey,
     )
 }
 
-internal fun ActiveSession.toReminderSession(): ReminderSession? {
+private fun RecoveredReminder.localizedMessage(context: Context): String {
+    val quantity = distanceMinutes.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
+    return when (reminderType) {
+        "todo_overdue" -> context.getString(R.string.notification_todo_overdue, title)
+        "todo_due_today" -> context.getString(R.string.notification_todo_due_today, title)
+        "todo" -> context.resources.getQuantityString(
+            R.plurals.notification_todo_due_in_minutes,
+            quantity,
+            title,
+            distanceMinutes,
+        )
+        "event" -> context.resources.getQuantityString(
+            if (isOverdue) {
+                R.plurals.notification_event_started_minutes_ago
+            } else {
+                R.plurals.notification_event_starts_in_minutes
+            },
+            quantity,
+            title,
+            distanceMinutes,
+        )
+        else -> message
+    }
+}
+
+internal fun ActiveSession.toReminderSession(workspaceKey: String? = null): ReminderSession? {
     val stableScope = if (authMode == "paired" && !hostId.isNullOrBlank()) {
         "host:${hostId.trim()}"
     } else {
         apiBaseUrl.toNormalizedReminderBaseUrl()?.let { "url:$it" }
     } ?: return null
-    return ReminderSession(token = token, scope = stableScope)
+    return ReminderSession(
+        token = token,
+        scope = stableScope,
+        workspaceKey = workspaceKey ?: stableScope,
+    )
 }
 
 internal fun String?.toNormalizedReminderBaseUrl(): String? {
@@ -411,6 +507,18 @@ private fun String.toReminderInstant(): Instant? =
         // an offset. Server reminder checks interpret those values as UTC too.
         ?: runCatching { LocalDateTime.parse(this).toInstant(ZoneOffset.UTC) }.getOrNull()
         ?: runCatching { LocalDate.parse(this).atStartOfDay().toInstant(ZoneOffset.UTC) }.getOrNull()
+
+/** Server datetime serialization preserves a date-picker deadline as midnight. */
+private fun String.toReminderDateOnly(): LocalDate? {
+    runCatching { LocalDate.parse(this) }.getOrNull()?.let { return it }
+    runCatching { LocalDateTime.parse(this) }.getOrNull()?.let { value ->
+        if (value.toLocalTime() == java.time.LocalTime.MIDNIGHT) return value.toLocalDate()
+    }
+    runCatching { OffsetDateTime.parse(this) }.getOrNull()?.let { value ->
+        if (value.toLocalTime() == java.time.LocalTime.MIDNIGHT) return value.toLocalDate()
+    }
+    return null
+}
 
 private fun ApiResult<*>.isAuthenticationFailure(): Boolean =
     this is ApiResult.Error && (code == 401 || code == 403)

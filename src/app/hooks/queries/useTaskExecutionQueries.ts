@@ -2,15 +2,39 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useToastStore } from '../../stores/useToastStore';
+import type { ProjectResponse, Skill, TodoResponse } from '../../types/api';
 import { DelegateResponseSchema, SkillsResponseSchema } from '../../types/schemas';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 import { queryKeys } from './queryKeys';
 import { translateUi } from '../../i18n';
+import { useTodosQuery } from './useModuleQueries';
+import { useProjectsQuery } from './useChatQueries';
 export interface StartReadyTaskExecutionVariables {
   todoId: string;
   skillId: string;
   executionProvider: string;
   model?: string | null;
+}
+
+export function resolveExecutionSkillId(
+  task: Pick<TodoResponse, 'enabled_skills'>,
+  skills: Skill[],
+): string | null {
+  const executableSkills = skills.filter((skill) => skill.id !== 'plan');
+  return (
+    task.enabled_skills?.find((id) => executableSkills.some((skill) => skill.id === id)) ??
+    executableSkills[0]?.id ??
+    null
+  );
+}
+
+function executionProject(
+  task: Pick<TodoResponse, 'project_id'>,
+  projects: ProjectResponse[],
+  fallbackProjectId?: string | null,
+) {
+  const projectId = task.project_id ?? fallbackProjectId;
+  return projects.find((project) => project.id === projectId) ?? null;
 }
 export function useSkillsQuery(enabled = true) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
@@ -73,4 +97,52 @@ export function useStartReadyTaskExecution() {
       useToastStore.getState().addToast('error', executionErrorMessage(error));
     },
   });
+}
+
+/** Start exactly one Ready task with its Project defaults after an explicit click. */
+export function useRunReadyTaskWithProjectDefaults(enabled = true) {
+  const todosQuery = useTodosQuery(enabled);
+  const projectsQuery = useProjectsQuery(enabled);
+  const skillsQuery = useSkillsQuery(enabled);
+  const startExecution = useStartReadyTaskExecution();
+
+  const configurationFor = (todoId: string, fallbackProjectId?: string | null) => {
+    const task = todosQuery.data?.find((todo) => todo.id === todoId);
+    if (!task) return null;
+    const project = executionProject(task, projectsQuery.data ?? [], fallbackProjectId);
+    if (!project) return null;
+    const skillId = resolveExecutionSkillId(task, skillsQuery.data?.skills ?? []);
+    if (!skillId) return null;
+    return { task, project, skillId };
+  };
+
+  const runTask = async (todoId: string, fallbackProjectId?: string | null) => {
+    const configuration = configurationFor(todoId, fallbackProjectId);
+    if (!configuration) {
+      useToastStore
+        .getState()
+        .addToast('warning', translateUi('The next Ready task is still loading.'));
+      return null;
+    }
+    try {
+      return await startExecution.mutateAsync({
+        todoId,
+        skillId: configuration.skillId,
+        executionProvider: configuration.project.default_execution_provider || 'builtin',
+        model: configuration.project.default_execution_model,
+      });
+    } catch {
+      // The underlying mutation presents the server's actionable error.
+      return null;
+    }
+  };
+
+  return {
+    runTask,
+    canRunTask: (todoId: string, fallbackProjectId?: string | null) =>
+      Boolean(configurationFor(todoId, fallbackProjectId)),
+    isPending: startExecution.isPending,
+    isPreparing:
+      enabled && (todosQuery.isLoading || projectsQuery.isLoading || skillsQuery.isLoading),
+  };
 }

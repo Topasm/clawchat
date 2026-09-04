@@ -1,11 +1,9 @@
 """Test that vault scan loop respects OBSIDIAN_WATCH_ENABLED setting."""
 
-import asyncio
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-import pytest_asyncio
 
 from services.scheduler import Scheduler
 

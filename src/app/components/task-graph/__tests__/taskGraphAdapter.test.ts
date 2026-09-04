@@ -3,6 +3,8 @@ import type { TaskGraphInsightNode, TodoResponse } from '../../../types/api';
 import {
   augmentTaskGraphTodos,
   buildTaskGraphElements,
+  collectDefaultCollapsedTaskIds,
+  collectTaskSubtreeIds,
   expandTaskGraphContext,
   mergeExecutionRelationships,
 } from '../taskGraphAdapter';
@@ -12,7 +14,6 @@ function todo(id: string, overrides: Partial<TodoResponse> = {}): TodoResponse {
     id,
     title: id,
     status: 'pending',
-    priority: 'medium',
     created_at: '2026-08-26T00:00:00Z',
     updated_at: '2026-08-26T00:00:00Z',
     ...overrides,
@@ -40,6 +41,37 @@ const baseOptions = {
   relationships,
   onToggleCollapse: vi.fn(),
 };
+
+describe('collectTaskSubtreeIds', () => {
+  it('starts from the project root Todo rather than the first-class Project id', () => {
+    const projectTodos = [
+      todo('todo_root', { project_id: 'project_1', source: 'project_root' }),
+      todo('todo_child', { project_id: 'project_1', parent_id: 'todo_root' }),
+      todo('todo_grandchild', { project_id: 'project_1', parent_id: 'todo_child' }),
+      todo('todo_other', { project_id: 'project_2' }),
+    ];
+
+    expect([...collectTaskSubtreeIds('todo_root', projectTodos)]).toEqual([
+      'todo_root',
+      'todo_child',
+      'todo_grandchild',
+    ]);
+    expect([...collectTaskSubtreeIds('project_1', projectTodos)]).toEqual(['project_1']);
+  });
+});
+
+describe('collectDefaultCollapsedTaskIds', () => {
+  it('collapses question nodes that own project depth-two experiment steps', () => {
+    const projectTodos = [
+      todo('question', { parent_id: 'project-root' }),
+      todo('experiment-a', { parent_id: 'question' }),
+      todo('experiment-b', { parent_id: 'question' }),
+      todo('standalone', { parent_id: 'project-root' }),
+    ];
+
+    expect([...collectDefaultCollapsedTaskIds(projectTodos, 'project-root')]).toEqual(['question']);
+  });
+});
 
 function insight(
   taskId: string,

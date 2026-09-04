@@ -1,6 +1,5 @@
 """Incremental vault watcher and index refresh tests."""
 
-import os
 import threading
 from unittest.mock import patch
 

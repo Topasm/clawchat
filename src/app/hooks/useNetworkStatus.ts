@@ -8,7 +8,7 @@ import { logger } from '../services/logger';
  * Must be used inside a component that also renders `useDataSync` (e.g., Layout).
  * Accepts a `refresh` callback to pull fresh data after flushing.
  */
-export function useNetworkStatus(refresh: () => void) {
+function useNetworkStatus(refresh: () => void) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const token = useAuthStore((s) => s.token);
   const queueScope = getOfflineQueueScope({ serverUrl, token });

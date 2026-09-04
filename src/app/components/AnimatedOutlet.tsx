@@ -20,6 +20,9 @@ export default function AnimatedOutlet() {
 
   // Freeze the current outlet so it stays rendered during exit animation
   // (React Router v7 returns null for the old route on navigate)
+  // `outlet` is intentionally keyed only by pathname; including it would
+  // replace the exiting route before AnimatePresence finishes its transition.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const frozenOutlet = useMemo(() => outlet, [location.pathname]);
 
   if (isMobile) {

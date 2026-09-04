@@ -148,13 +148,19 @@ async def build_review_response(
         if run and task:
             title = todo.title if todo else task.instruction[:120]
             description = run.result_summary
-            href = f"/runs?run_id={run.id}"
+            # The thread holds the whole story; the run page is the fallback.
+            href = (
+                f"/chats/{task.conversation_id}"
+                if task.conversation_id
+                else f"/runs?run_id={run.id}"
+            )
             approval_impact = (
                 await agent_review_handoff_service.build_approval_impact(db, todo)
             )
             metadata = {
                 "run_id": run.id,
                 "agent_task_id": task.id,
+                "conversation_id": task.conversation_id,
                 "attempt": run.attempt,
                 "provider": run.provider,
                 "run_status": run.status,

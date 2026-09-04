@@ -6,6 +6,7 @@ import usePlatform from '../hooks/usePlatform';
 import {
   useDeleteTodo,
   useExecutionProvidersQuery,
+  useGetOrCreateProjectConversation,
   useProjectsQuery,
   useSkillsQuery,
   useStartReadyTaskExecution,
@@ -38,6 +39,7 @@ export default function InboxPage() {
   const graphInsights = useTaskGraphInsightsQuery(null);
   const { data: executionTelemetry = [] } = useTaskExecutionTelemetryQuery();
   const startReadyExecution = useStartReadyTaskExecution();
+  const getConversation = useGetOrCreateProjectConversation();
   const { isMobile } = usePlatform();
   const addToast = useToastStore((s) => s.addToast);
   const toggleMutation = useToggleTodoComplete();
@@ -133,6 +135,12 @@ export default function InboxPage() {
     onPlace: placement.placeTask,
     onPlaceBatch: placement.placeTaskBatch,
     onPreviewDependency: dependency.requestPreview,
+    onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
+    // Captured under the project's root, the task lands in this project's
+    // branch of the tree and skips the Inbox queue.
+    onAddTask: (_projectId: string, rootTaskId: string | null) => {
+      if (rootTaskId) useQuickCaptureStore.getState().open({ defaultParentId: rootTaskId });
+    },
   };
   const treeBusy =
     placementRevision == null ||
@@ -182,6 +190,11 @@ export default function InboxPage() {
           onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
           onOrganize={handleOrganize}
           onRetry={handleRetry}
+          onApplyTriageAndOpen={() => {
+            void triage.applyPreview().then((targetProjectId) => {
+              if (targetProjectId) navigate(`/projects/${targetProjectId}`);
+            });
+          }}
         />
         {!isMobile && (
           <InboxTriageTree
@@ -214,6 +227,12 @@ export default function InboxPage() {
           }
           onReturnToInbox={(taskId) => void placement.placeTask(taskId, null, null)}
           onNavigate={(path) => navigate(path)}
+          onOpenConversation={(taskId) => {
+            void getConversation.mutateAsync(taskId).then(
+              (conversation) => navigate(`/chats/${conversation.id}`),
+              () => addToast('error', translateUi('Failed')),
+            );
+          }}
         />
       </div>
     </div>

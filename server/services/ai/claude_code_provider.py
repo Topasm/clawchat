@@ -98,7 +98,10 @@ class ClaudeCodeProvider:
     Windows SelectorEventLoop incompatibility with asyncio subprocesses.
     """
 
-    def __init__(self):
+    supports_native_tool_calling = False
+
+    def __init__(self, *, model: str = ""):
+        self.model = model.strip()
         self._cli_path: Optional[str] = None
 
     async def check_availability(self) -> tuple[ClaudeCodeStatus, Optional[str]]:
@@ -152,6 +155,9 @@ class ClaudeCodeProvider:
             "--max-turns", "1",
             "--verbose",
         ]
+
+        if self.model:
+            cmd.extend(["--model", self.model])
 
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
@@ -250,6 +256,8 @@ class ClaudeCodeProvider:
             "--output-format", "text",
             "--max-turns", "1",
         ]
+        if self.model:
+            cmd.extend(["--model", self.model])
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
         cmd.extend(["-p", prompt])

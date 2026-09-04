@@ -35,6 +35,18 @@ export default function ChatPanelMessages({
   const newestMessageIdRef = useRef<string | undefined>(undefined);
 
   const chronological = useMemo(() => [...messages].reverse(), [messages]);
+  const durableRunReferences = useMemo(() => {
+    const runIds = new Set<string>();
+    const taskIds = new Set<string>();
+    for (const message of messages) {
+      if (message.metadata?.action_type !== 'run_update') continue;
+      if (typeof message.metadata.run_id === 'string') runIds.add(message.metadata.run_id);
+      if (typeof message.metadata.agent_task_id === 'string') {
+        taskIds.add(message.metadata.agent_task_id);
+      }
+    }
+    return { runIds, taskIds };
+  }, [messages]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -78,6 +90,13 @@ export default function ChatPanelMessages({
           }
           onEdit={!msg.deliveryStatus && msg.user._id === 'user' ? onEditMessage : undefined}
           onRetry={msg.deliveryStatus === 'failed' ? () => onRetryMessage?.(msg) : undefined}
+          suppressTaskProgress={
+            msg.metadata?.action_type === 'task_delegated' &&
+            ((typeof msg.metadata.run_id === 'string' &&
+              durableRunReferences.runIds.has(msg.metadata.run_id)) ||
+              (typeof msg.metadata.task_id === 'string' &&
+                durableRunReferences.taskIds.has(msg.metadata.task_id)))
+          }
         />
       ))}
       {isStreaming && messages[0]?.text === '' && <StreamingIndicator />}

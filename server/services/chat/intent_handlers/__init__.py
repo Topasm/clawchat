@@ -33,6 +33,7 @@ MODULE_INTENTS = {
     "update_todo": "update a todo",
     "delete_todo": "delete a todo",
     "complete_todo": "complete a todo",
+    "plan_task": "plan a task",
     "create_event": "create a calendar event",
     "query_events": "check your calendar",
     "update_event": "update a calendar event",
@@ -63,6 +64,9 @@ class IntentContext:
     params: dict
     content: str = ""
     conversation_id: str | None = None
+    #: For handlers that start background work of their own (planning). Absent
+    #: in tests that drive a handler directly; such work then runs inline.
+    session_factory: Any = None
 
 
 class IntentHandler(Protocol):

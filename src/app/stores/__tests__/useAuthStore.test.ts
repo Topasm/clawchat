@@ -87,7 +87,7 @@ describe('useAuthStore', () => {
       connectionStatus: 'connected',
     });
 
-    useAuthStore.getState().logout();
+    await useAuthStore.getState().logout();
 
     const state = useAuthStore.getState();
     expect(state.token).toBeNull();
@@ -96,7 +96,7 @@ describe('useAuthStore', () => {
     expect(state.connectionStatus).toBe('disconnected');
   });
 
-  it('best-effort revokes the server refresh session on logout', () => {
+  it('best-effort revokes the server refresh session on logout', async () => {
     const fetchSpy = vi
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
@@ -106,7 +106,7 @@ describe('useAuthStore', () => {
       serverUrl: 'https://host.example',
     });
 
-    useAuthStore.getState().logout();
+    await useAuthStore.getState().logout();
 
     expect(fetchSpy).toHaveBeenCalledWith(
       'https://host.example/api/auth/logout',
@@ -119,7 +119,7 @@ describe('useAuthStore', () => {
     fetchSpy.mockRestore();
   });
 
-  it('logout clears persisted and in-memory data for the active host', () => {
+  it('logout clears persisted and in-memory data for the active host', async () => {
     useAuthStore.setState({
       token: 'test-token',
       serverUrl: 'https://host.example',
@@ -129,13 +129,13 @@ describe('useAuthStore', () => {
     persistQueryCache('host:host-1');
     expect(localStorage.getItem(getQueryCacheStorageKey('host:host-1'))).not.toBeNull();
 
-    useAuthStore.getState().logout();
+    await useAuthStore.getState().logout();
 
     expect(queryClient.getQueryData(['todos'])).toBeUndefined();
     expect(localStorage.getItem(getQueryCacheStorageKey('host:host-1'))).toBeNull();
   });
 
-  it('keeps offline mutations scoped to the signed-out principal', () => {
+  it('keeps offline mutations scoped to the signed-out principal', async () => {
     const serverUrl = 'https://host.example';
     const token = createToken('user-a');
     const originalScope = getOfflineQueueScope({ serverUrl, token });
@@ -143,7 +143,7 @@ describe('useAuthStore', () => {
     useAuthStore.setState({ token, serverUrl });
     offlineQueue.enqueue(originalScope, 'post', '/todos', { title: 'private' });
 
-    useAuthStore.getState().logout();
+    await useAuthStore.getState().logout();
 
     expect(offlineQueue.getCount(originalScope)).toBe(1);
     expect(offlineQueue.getCount(otherScope)).toBe(0);

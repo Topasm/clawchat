@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-import json
-import sys
-from io import StringIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
-
 from claw_cli.cli import build_parser, main
 from claw_cli.errors import (
-    EXIT_OK, EXIT_INPUT_ERROR, EXIT_AUTH_ERROR, EXIT_SERVER_ERROR, EXIT_NOT_FOUND,
-    AuthError, ServerError, NotFoundError, InputError,
+    EXIT_AUTH_ERROR,
+    EXIT_INPUT_ERROR,
+    EXIT_NOT_FOUND,
+    EXIT_OK,
+    EXIT_SERVER_ERROR,
+    AuthError,
+    InputError,
+    NotFoundError,
+    ServerError,
 )
 
 

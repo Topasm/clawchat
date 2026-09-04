@@ -36,6 +36,12 @@ export const RefreshRequestSchema = z.object({
 // -- Todos ------------------------------------------------------------------
 
 export const TaskStatusSchema = z.enum(TASK_STATUSES);
+/**
+ * Server-owned field the clients no longer read, set, or display (the
+ * priority feature was removed from every UI). Kept in the response/request
+ * schemas below purely so they keep mirroring server/openapi.json — deleting
+ * it here would drift from a field the backend still returns and accepts.
+ */
 const PrioritySchema = z.enum(['urgent', 'high', 'medium', 'low']);
 const InboxStateSchema = z.enum([
   'none',
@@ -96,6 +102,7 @@ export const TodoCreateSchema = z.object({
   estimated_minutes: z.number().int().nullable().optional(),
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
+  idempotency_key: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   recurrence_rule: z.string().nullable().optional(),
   recurrence_end: z.string().nullable().optional(),
@@ -107,7 +114,7 @@ export const TodoUpdateSchema = z.object({
   project_id: z.string().nullable().optional(),
   status: TaskStatusSchema.optional(),
   priority: PrioritySchema.optional(),
-  due_date: z.string().optional(),
+  due_date: z.string().nullable().optional(),
   tags: z.array(z.string()).optional(),
   parent_id: z.string().nullable().optional(),
   sort_order: z.number().optional(),
@@ -120,6 +127,7 @@ export const TodoUpdateSchema = z.object({
   inbox_state: InboxStateSchema.optional(),
   recurrence_rule: z.string().nullable().optional(),
   recurrence_end: z.string().nullable().optional(),
+  client_updated_at: z.string().optional(),
 });
 
 export const TaskPlacementRequestSchema = z.object({
@@ -233,6 +241,7 @@ export const ProjectTodoResponseSchema = z.object({
   sort_order: z.number().optional(),
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
+  idempotency_key: z.string().nullable().optional(),
   assignee: z.string().nullable().optional(),
   enabled_skills: z.array(z.string()).nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
@@ -252,6 +261,7 @@ export const ProjectResponseSchema = z.object({
   title: z.string(),
   goal: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  execution_instructions: z.string().nullable().optional(),
   status: ProjectStatusSchema,
   deadline: z.string().nullable().optional(),
   root_task_id: z.string().nullable().optional(),
@@ -266,6 +276,9 @@ export const ProjectResponseSchema = z.object({
   task_count: z.number().int().nonnegative(),
   completed_task_count: z.number().int().nonnegative(),
   conversation_id: z.string().nullable().optional(),
+  execution_host_id: z.string().nullable().optional(),
+  execution_host_label: z.string().nullable().optional(),
+  execution_host_online: z.boolean().nullable().optional(),
 });
 
 export const ProjectOverviewResponseSchema = ProjectResponseSchema.extend({
@@ -281,6 +294,7 @@ export const ProjectCreateSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   goal: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  execution_instructions: z.string().nullable().optional(),
   status: ProjectStatusSchema.optional(),
   deadline: z.string().nullable().optional(),
   default_execution_provider: z.string().nullable().optional(),
@@ -631,6 +645,7 @@ export const ConversationResponseSchema = z.object({
   is_archived: z.boolean().optional(),
   project_id: z.string().nullable().optional(),
   project_todo_id: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -695,6 +710,7 @@ export const TodayResponseSchema = z.object({
   overdue_tasks: z.array(TodoResponseSchema),
   today_events: z.array(EventResponseSchema),
   needs_review: z.array(TodoResponseSchema).default([]),
+  needs_date_tasks: z.array(TodoResponseSchema).default([]),
   inbox_count: z.number(),
   greeting: z.string(),
   date: z.string(),
@@ -1019,6 +1035,7 @@ export const AgentRunResponseSchema = z.object({
   todo_id: z.string().nullable(),
   todo_title: z.string().nullable(),
   todo_status: TaskStatusSchema.nullable(),
+  conversation_id: z.string().nullable().optional(),
   task_type: z.string(),
   instruction: z.string(),
   instruction_snapshot: z.string(),
@@ -1026,6 +1043,7 @@ export const AgentRunResponseSchema = z.object({
   provider: z.string(),
   model: z.string().nullable(),
   host_id: z.string().nullable(),
+  host_label: z.string().nullable().optional(),
   workspace_id: z.string().nullable(),
   external_run_id: z.string().nullable(),
   status: AgentRunStatusSchema,
@@ -1072,6 +1090,9 @@ export const TaskExecutionTelemetryResponseSchema = z.object({
   latest_run_provider: z.string().nullable(),
   latest_run_progress_message: z.string().nullable(),
   latest_run_updated_at: z.string().nullable(),
+  human_wait_seconds: z.number().int().nonnegative(),
+  question_count: z.number().int().nonnegative(),
+  average_resume_seconds: z.number().int().nonnegative().nullable(),
   pending_review_count: z.number().int().nonnegative(),
   artifact_count: z.number().int().nonnegative(),
   latest_artifact_id: z.string().nullable(),
@@ -1359,15 +1380,6 @@ export type DelegateResponse = z.infer<typeof DelegateResponseSchema>;
 // Obsidian vault integration
 // ---------------------------------------------------------------------------
 
-export const ObsidianStatusSchema = z.object({
-  enabled: z.boolean(),
-  vault_path: z.string(),
-  last_sync: z.string().nullable(),
-  db_task_count: z.number(),
-  cli_available: z.boolean(),
-  mode: z.enum(['cli', 'filesystem', 'disabled']),
-});
-
 export const ObsidianHealthSchema = z.object({
   vault_available: z.boolean(),
   vault_path: z.string(),
@@ -1418,20 +1430,6 @@ export const ObsidianHealthSchema = z.object({
   }),
 });
 
-export const ObsidianProjectSchema = z.object({
-  folder: z.string(),
-  name: z.string(),
-  todo_md_preview: z.string(),
-  doc_count: z.number(),
-  last_modified: z.number().nullable(),
-});
-
-export const ObsidianProjectsResponseSchema = z.object({
-  projects: z.array(ObsidianProjectSchema),
-  total: z.number(),
-  index_age_seconds: z.number().nullable(),
-});
-
 export const ObsidianScanResultSchema = z.object({
   files_scanned: z.number(),
   markers_found: z.number(),
@@ -1441,8 +1439,5 @@ export const ObsidianScanResultSchema = z.object({
   duration_ms: z.number(),
 });
 
-export type ObsidianStatus = z.infer<typeof ObsidianStatusSchema>;
 export type ObsidianHealth = z.infer<typeof ObsidianHealthSchema>;
-export type ObsidianProject = z.infer<typeof ObsidianProjectSchema>;
-export type ObsidianProjectsResponse = z.infer<typeof ObsidianProjectsResponseSchema>;
 export type ObsidianScanResult = z.infer<typeof ObsidianScanResultSchema>;

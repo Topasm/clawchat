@@ -1,23 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">ClawChat</string>
+    <string name="notification_attention_channel">Needs attention</string>
+    <string name="notification_attention_channel_description">Questions, approvals, and failed work that need your action</string>
+    <string name="notification_attention_title">ClawChat needs you</string>
+    <plurals name="notification_attention_count">
+        <item quantity="one">%1$d item needs your attention</item>
+        <item quantity="other">%1$d items need your attention</item>
+    </plurals>
+    <string name="notification_attention_answer">Answer</string>
+    <string name="notification_attention_approve">Approve</string>
+    <string name="notification_attention_retry">Retry</string>
+    <string name="notification_attention_file">File</string>
+    <string name="nav_schedule">Schedule</string>
+    <string name="nav_progress">Now</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="server_feature_requires_workspace_title">Connect a workspace</string>
+    <string name="server_feature_requires_workspace_description">This feature runs on a ClawChat server. Your local tasks and calendar will stay on this device.</string>
+    <string name="server_feature_connect_action">Connect a workspace</string>
+    <string name="weekly_review_ready">Weekly review is ready!</string>
     <string name="widget_todo_tracking_label">Today</string>
-    <string name="widget_todo_tracking_description">Add and complete today\'s tasks from your Home screen</string>
+    <string name="widget_todo_tracking_description">Review today\'s tasks and capture new items into Inbox</string>
     <string name="widget_inbox_quick_add_label">Add task</string>
     <string name="widget_inbox_quick_add_description">Capture a task directly into your Inbox</string>
-    <string name="share_waiting_for_connection">Your shared item will be saved after you connect ClawChat</string>
-    <string name="share_saved">Saved to Inbox</string>
-    <plurals name="share_saved_with_attachments">
-        <item quantity="one">Saved to Inbox with %1$d attachment</item>
-        <item quantity="other">Saved to Inbox with %1$d attachments</item>
-    </plurals>
-    <plurals name="share_partially_saved">
-        <item quantity="one">Saved to Inbox: %1$d attached, %2$d item skipped</item>
-        <item quantity="other">Saved to Inbox: %1$d attached, %2$d items skipped</item>
-    </plurals>
     <string name="share_rejected">Nothing shareable was found. ClawChat accepts images, PDF, text, Markdown, and ZIP files up to 10 MB.</string>
     <string name="share_failed">Couldn’t save the shared item. Check your connection and try again.</string>
     <string name="share_queued">Saved securely. ClawChat will add it to Inbox when connected.</string>
+    <string name="share_saved_locally">Saved to this device</string>
+    <string name="share_files_require_server">File attachments require a server connection</string>
+    <plurals name="share_multiple_files_title">
+        <item quantity="one">%1$d shared file</item>
+        <item quantity="other">%1$d shared files</item>
+    </plurals>
     <string name="share_queue_full">The share queue is full. Open ClawChat and reconnect or discard an older capture before sharing again.</string>
     <string name="share_malformed">This app sent an invalid share. Nothing was saved.</string>
     <string name="share_channel_name">Shared captures</string>

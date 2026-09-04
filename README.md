@@ -7,9 +7,11 @@ plans, finds the next ready task, runs approved work with AI agents, and routes 
 result back to you for review. Tasks, projects, dependency graphs, calendar,
 documents, and chat stay connected in one workspace.
 
-You keep control of the workflow and the data. ClawChat runs on your own FastAPI
+You keep control of the workflow and the data. ClawChat can run on your own FastAPI
 server and SQLite database, with shared web and Tauri clients plus a native Android
-app.
+app. Android can also start as a standalone, on-device todo workspace with no
+server account or PIN, then connect to a server later when you want shared projects
+and agent features.
 
 ## What makes it agentic?
 
@@ -22,7 +24,7 @@ app.
 - **Stay in control** — Preview consequential changes, require explicit approval,
   and keep the entire workspace on infrastructure you own.
 
-## Quick Start (local)
+## Quick Start (self-hosted development)
 
 ```bash
 make setup          # install frontend + backend dependencies, create .env
@@ -35,6 +37,16 @@ Requires **Node.js >= 22** (Node 24 LTS recommended), **Python >= 3.11**, and
 OpenAI-compatible endpoint, Claude Code, the Codex CLI, or the OpenAI Codex
 Responses API.
 Backend installs are reproduced from the committed `server/uv.lock`.
+
+### Android: local or connected
+
+On first launch, choose **Use on this device** for a compact offline todo,
+calendar, search, reminder, share-capture, and widget experience backed only by
+the phone's Room database. Choose **Connect a workspace** for synchronized data,
+chat, Review Inbox, and agent-run controls. A remembered server session can be
+switched off while local mode is active and reactivated without entering the PIN
+again. The native Android interface follows the device language and includes
+English and Korean resources.
 
 ## Docker
 

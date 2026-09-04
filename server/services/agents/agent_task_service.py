@@ -3,19 +3,149 @@
 import asyncio
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.agent_run import AgentRunStatus
 from models.agent_task import AgentTask
 from models.agent_run import AgentRun
 from services.agents import agent_run_service
+from services.agents.run_context_service import active_execution_instruction
 from services.ai.ai_service import AIService
 from utils import make_id, strip_markdown_fences
 from ws.manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
+
+# How a built-in agent asks the user something instead of guessing. The model
+# is told to use this prefix only when it cannot finish otherwise; the executor
+# turns such a reply into a ``waiting_input`` run rather than a result.
+NEEDS_INPUT_PREFIX = "NEEDS_INPUT:"
+ASK_USER_INSTRUCTION = (
+    "\n\nIf you cannot finish without a decision or information that only the "
+    f"user has, reply with a single line starting with {NEEDS_INPUT_PREFIX} "
+    "followed by one clear question, and nothing else. Otherwise never use that "
+    "prefix. When the task includes a follow-up instruction from the user, treat "
+    "it as the answer and finish the work."
+)
+
+ASK_USER_TOOL_INSTRUCTION = (
+    "\n\nIf you cannot finish without a decision or information that only the "
+    "user has, call ask_user with one clear question and any short choices. "
+    "Otherwise answer normally and do not call the tool."
+)
+ASK_USER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ask_user",
+        "description": "Pause this task and ask the user for required input.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string"},
+                "options": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 6,
+                },
+            },
+            "required": ["question"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+@dataclass(frozen=True)
+class AgentInputRequest:
+    question: str
+    options: tuple[str, ...] = ()
+
+
+def parse_needs_input(result: str) -> str | None:
+    """Return the question a reply is asking, or None when it is a result."""
+    stripped = result.strip()
+    if not stripped.startswith(NEEDS_INPUT_PREFIX):
+        return None
+    question = stripped[len(NEEDS_INPUT_PREFIX):].strip()
+    return question or "The agent needs more information to continue."
+
+
+async def generate_agent_turn(
+    ai_service: AIService,
+    *,
+    system_prompt: str,
+    user_message: str,
+) -> tuple[str | None, AgentInputRequest | None]:
+    """Generate a result or a structured request for user input."""
+    if getattr(ai_service, "supports_native_tool_calling", False):
+        try:
+            response = await ai_service.function_call(
+                system_prompt=system_prompt + ASK_USER_TOOL_INSTRUCTION,
+                user_message=user_message,
+                tools=[ASK_USER_TOOL],
+                tool_choice="auto",
+            )
+            message = response.get("choices", [{}])[0].get("message", {})
+            for call in message.get("tool_calls") or []:
+                function = call.get("function") or {}
+                if function.get("name") != "ask_user":
+                    continue
+                arguments = function.get("arguments") or "{}"
+                parsed = json.loads(arguments) if isinstance(arguments, str) else arguments
+                question = str(parsed.get("question") or "").strip()
+                if not question:
+                    continue
+                raw_options = parsed.get("options") or []
+                options = tuple(
+                    str(option).strip()
+                    for option in raw_options[:6]
+                    if str(option).strip()
+                ) if isinstance(raw_options, list) else ()
+                return None, AgentInputRequest(question, options)
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                return content.strip(), None
+        except Exception:
+            logger.warning("Structured ask_user failed; using text fallback", exc_info=True)
+
+    result = await ai_service.generate_completion(
+        system_prompt=system_prompt + ASK_USER_INSTRUCTION,
+        user_message=user_message,
+    )
+    question = parse_needs_input(result)
+    if question is not None:
+        return None, AgentInputRequest(question)
+    return result, None
+
+
+async def request_input(
+    db: AsyncSession,
+    task: AgentTask,
+    question: str,
+    options: tuple[str, ...] = (),
+) -> None:
+    """Park the task's run in ``waiting_input`` with the agent's question.
+
+    The run transition notifies the user and writes the question into the
+    thread; a follow-up resumes the same attempt with the answer appended to
+    its instruction. Caller commits.
+    """
+    task.status = "running"
+    task.progress_message = question
+    run = await _attached_run(db, task)
+    if run is not None:
+        await agent_run_service.transition_run(
+            db,
+            run,
+            AgentRunStatus.WAITING_INPUT,
+            question,
+            payload={"question": question, "options": list(options)},
+        )
+    await db.flush()
 
 # Specialized agent system prompts
 AGENT_PROMPTS: dict[str, str] = {
@@ -218,25 +348,36 @@ async def execute_task(
     await db.commit()
 
     system_prompt = AGENT_PROMPTS.get(task.agent_type, AGENT_PROMPTS["general"])
+    execution_instruction = run.instruction_snapshot
 
     try:
         # Send initial progress
         await update_progress(db, task, 10, "Starting task...", ws_manager, user_id)
         await db.commit()
 
-        result = await ai_service.generate_completion(
+        result, input_request = await generate_agent_turn(
+            ai_service,
             system_prompt=system_prompt,
-            user_message=task.instruction,
+            user_message=execution_instruction,
         )
 
+        if input_request is not None:
+            await request_input(
+                db, task, input_request.question, input_request.options
+            )
+            await db.commit()
+            return
+
         await update_progress(db, task, 90, "Finalizing...", ws_manager, user_id)
-        await mark_completed(db, task, result)
+        await mark_completed(db, task, result or "")
         await db.commit()
 
         # Check if this is a sub-task and update parent
         if task.parent_task_id:
             await _check_parent_completion(db, task.parent_task_id, ai_service, ws_manager, user_id)
 
+        # ``run_status`` is what the chat card shows: a top-level result is
+        # waiting for review at this point, not done.
         await ws_manager.send_json(user_id, {
             "type": "task_completed",
             "data": {
@@ -246,6 +387,7 @@ async def execute_task(
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
                 "run_id": run.id,
+                "run_status": str(run.status),
             },
         })
     except Exception as exc:
@@ -266,6 +408,7 @@ async def execute_task(
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
                 "run_id": run.id,
+                "run_status": str(run.status),
             },
         })
 
@@ -287,7 +430,7 @@ async def _execute_coordinator(
         # Use AI to decompose the task
         response = await ai_service.generate_completion(
             system_prompt=AGENT_PROMPTS["coordinator"],
-            user_message=task.instruction,
+            user_message=await active_execution_instruction(db, task),
         )
 
         # Parse sub-task definitions
@@ -401,6 +544,7 @@ async def _check_parent_completion(
     await db.commit()
 
     status = "task_completed" if parent.status == "completed" else "task_failed"
+    parent_run = await _attached_run(db, parent)
     await ws_manager.send_json(user_id, {
         "type": status,
         "data": {
@@ -409,5 +553,7 @@ async def _check_parent_completion(
             "result": parent.result if parent.status == "completed" else None,
             "error": parent.error if parent.status == "failed" else None,
             "conversation_id": parent.conversation_id,
+            "run_id": parent_run.id if parent_run is not None else None,
+            "run_status": str(parent_run.status) if parent_run is not None else None,
         },
     })

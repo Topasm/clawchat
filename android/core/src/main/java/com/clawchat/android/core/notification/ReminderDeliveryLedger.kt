@@ -106,12 +106,20 @@ internal const val RECENT_REMINDER_WINDOW_MILLIS = 30L * 60 * 1_000
 internal const val EXACT_REMINDER_WINDOW_MILLIS = 30L * 24 * 60 * 60 * 1_000
 
 internal fun reminderTypeFamily(reminderType: String): String = when (reminderType) {
-    "todo", "todo_overdue" -> "todo"
+    "todo", "todo_due_today", "todo_overdue" -> "todo"
     else -> reminderType
 }
 
 internal fun recentReminderKey(reminderType: String, itemId: String): String =
     "recent:${reminderTypeFamily(reminderType)}:$itemId"
+
+/**
+ * Keeps reminder claims independent across local and remembered server
+ * workspaces. The length prefix prevents ambiguous keys when a workspace
+ * identity itself contains separators.
+ */
+internal fun workspaceReminderClaimKey(workspaceKey: String, claimKey: String): String =
+    "workspace:v1:${workspaceKey.length}:$workspaceKey:$claimKey"
 
 /**
  * Stable cross-channel identity. Epoch seconds intentionally match the

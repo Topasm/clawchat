@@ -1,16 +1,15 @@
 """SSE chat contract: event ordering, send de-duplication, and intent handling."""
 
+import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import func, select
 
 from main import app
-from models.conversation import Conversation
 from models.message import Message
 from models.todo import Todo
 from services.chat.intent_classifier import IntentResult
@@ -402,3 +401,74 @@ async def test_intent_failure_falls_back_to_chat(
         json.loads(p)["token"] for p in payloads if p != "[DONE]" and "token" in json.loads(p)
     ]
     assert "".join(tokens) == "ok"
+
+
+async def _delegate_intent():
+    return IntentResult(
+        intent="delegate_task",
+        params={"instruction": "Research battery suppliers", "task_type": "research"},
+    )
+
+
+class DelegatingStubAI(StubAI):
+    """A provider the delegated run can actually execute against."""
+
+    async def generate_completion(self, *, system_prompt, user_message):
+        return f"Result for {user_message}"
+
+
+async def test_streaming_chat_delegates_a_task(
+    client: AsyncClient, auth_headers, db_session, monkeypatch
+):
+    """Delegation used to be skipped on SSE: Android got prose and no run."""
+    from models.agent_run import AgentRun
+    from models.agent_task import AgentTask
+
+    monkeypatch.setattr(
+        "routers.chat.classify_intent",
+        lambda *args, **kwargs: _delegate_intent(),
+    )
+    conversation_id = await _create_conversation(client, auth_headers)
+
+    with stub_ai(DelegatingStubAI()):
+        resp = await client.post(
+            "/api/chat/stream",
+            headers=auth_headers,
+            json={"conversation_id": conversation_id, "content": "research suppliers"},
+        )
+        assert resp.status_code == 200
+        # Let the background run finish before the stub provider is removed.
+        for _ in range(100):
+            await asyncio.sleep(0.01)
+            db_session.expire_all()
+            statuses = (await db_session.execute(select(AgentRun.status))).scalars().all()
+            if statuses and statuses[0] in {"waiting_review", "failed"}:
+                break
+
+    tasks = (
+        await db_session.execute(
+            select(AgentTask).where(AgentTask.conversation_id == conversation_id)
+        )
+    ).scalars().all()
+    assert len(tasks) == 1
+    assert tasks[0].instruction == "Research battery suppliers"
+    run = (await db_session.execute(select(AgentRun))).scalars().one()
+    assert run.agent_task_id == tasks[0].id
+    assert run.status == "waiting_review"
+
+    payloads = _sse_payloads(resp.text)
+    tokens = [
+        json.loads(p)["token"] for p in payloads if p != "[DONE]" and "token" in json.loads(p)
+    ]
+    assert "queued" in "".join(tokens) or "skill chain" in "".join(tokens)
+    stored = (
+        await db_session.execute(
+            select(Message).where(
+                Message.conversation_id == conversation_id,
+                Message.role == "assistant",
+                Message.intent == "delegate_task",
+            )
+        )
+    ).scalars().all()
+    assert len(stored) == 1
+    assert json.loads(stored[0].metadata_json)["action_type"] == "task_delegated"

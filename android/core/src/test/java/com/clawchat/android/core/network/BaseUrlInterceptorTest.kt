@@ -16,13 +16,10 @@ import org.junit.Test
 class BaseUrlInterceptorTest {
 
     @Test
-    fun `a pre-auth request does not pin the placeholder after login`() {
-        val placeholderServer = MockWebServer()
+    fun `authenticated request fails closed until a server is active`() {
         val configuredServer = MockWebServer()
-        placeholderServer.start()
         configuredServer.start()
         try {
-            placeholderServer.enqueue(MockResponse().setBody("placeholder"))
             configuredServer.enqueue(MockResponse().setBody("configured"))
 
             val activeSession = MutableStateFlow<ActiveSession?>(null)
@@ -32,11 +29,11 @@ class BaseUrlInterceptorTest {
                 .addInterceptor(BaseUrlInterceptor(sessionStore))
                 .build()
             val request = Request.Builder()
-                .url(placeholderServer.url("/api/health"))
+                .url("http://127.0.0.1:8000/api/health")
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                assertEquals("placeholder", response.body.string())
+            assertThrows(NoActiveServerException::class.java) {
+                client.newCall(request).execute()
             }
 
             activeSession.value = session(configuredServer.url("/").toString(), "token")
@@ -45,7 +42,6 @@ class BaseUrlInterceptorTest {
             }
             assertEquals("/api/health", configuredServer.takeRequest().requestUrl?.encodedPath)
         } finally {
-            placeholderServer.shutdown()
             configuredServer.shutdown()
         }
     }

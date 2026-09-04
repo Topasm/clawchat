@@ -47,6 +47,20 @@ class ApiResultTest {
     }
 
     @Test
+    fun `io failures keep a stable network error prefix for localization`() = runTest {
+        val result = apiCall<Unit> { throw java.io.IOException("connection reset") }
+
+        assertEquals("Network error: connection reset", (result as ApiResult.Error).message)
+    }
+
+    @Test
+    fun `unexpected failures keep a stable unknown error prefix for localization`() = runTest {
+        val result = apiCall<Unit> { throw IllegalStateException("bad response") }
+
+        assertEquals("Unknown error: bad response", (result as ApiResult.Error).message)
+    }
+
+    @Test
     fun `coroutine cancellation is never converted into an API error`() = runTest {
         val cancellation = CancellationException("stopped")
 

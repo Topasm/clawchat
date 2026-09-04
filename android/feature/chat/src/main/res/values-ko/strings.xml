@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_search">빠른 찾기</string>
+    <string name="chat_settings">설정</string>
+    <string name="chat_title">채팅</string>
+    <string name="chat_new_chat">새 채팅</string>
+    <string name="chat_new_conversation_default_title">새 대화</string>
+    <string name="chat_loading_conversations">대화를 불러오는 중…</string>
+    <string name="chat_no_conversations">아직 대화가 없습니다</string>
+    <string name="chat_no_conversations_description">채팅을 시작하면 어시스턴트가 할 일과 일정을 정리해 줍니다.</string>
+    <string name="chat_start_chatting">대화 시작</string>
+    <string name="chat_conversation">대화</string>
+    <string name="chat_assistant_responding">어시스턴트가 답변 중…</string>
+    <string name="chat_conversation_subtitle">할 일, 메모 또는 오늘 일정에 관해 물어보세요</string>
+    <string name="chat_back">뒤로</string>
+    <string name="chat_speak_now">지금 말씀하세요…</string>
+    <string name="chat_loading_messages">메시지를 불러오는 중…</string>
+    <string name="chat_start_conversation">대화를 시작해 보세요</string>
+    <string name="chat_start_conversation_description">오늘 마감인 일을 묻거나, 자연어로 할 일을 추가하거나, 남은 작업을 요약해 달라고 해 보세요.</string>
+    <string name="chat_input_placeholder">ClawChat에 무엇이든 물어보세요…</string>
+    <string name="chat_voice_input">음성 입력</string>
+    <string name="chat_stop">중지</string>
+    <string name="chat_send">보내기</string>
+    <string name="chat_streaming">답변 중</string>
+    <string name="chat_you">나</string>
+    <string name="chat_assistant">어시스턴트</string>
+    <string name="chat_run_update_label">에이전트 실행</string>
+    <string name="chat_run_status_waiting_input">입력 필요</string>
+    <string name="chat_run_status_waiting_review">검토 대기 중</string>
+    <string name="chat_run_status_completed">완료</string>
+    <string name="chat_run_status_cancelled">취소됨</string>
+    <string name="chat_run_status_failed">실패</string>
+    <string name="chat_run_status_running">실행 중</string>
+    <string name="chat_run_needs_you_hint">진행 탭에서 답하거나 검토할 수 있습니다.</string>
+    <string name="chat_agent_answer_placeholder">에이전트에게 답변…</string>
+    <string name="chat_agent_send_answer">답변 보내기</string>
+    <string name="chat_permission_allow">허용</string>
+    <string name="chat_permission_deny">거부</string>
+    <string name="chat_review_approve">승인</string>
+    <string name="chat_review_reject">거절</string>
+    <string name="chat_background_task">백그라운드 작업</string>
+    <string name="chat_multi_agent_task">멀티 에이전트 작업</string>
+    <string name="chat_task_queued">대기 중</string>
+    <string name="chat_agent_run_conversations">에이전트 실행 대화</string>
+    <string name="chat_task_threads">작업·프로젝트 스레드</string>
+    <string name="chat_just_now">방금 전</string>
+    <plurals name="chat_minutes_ago">
+        <item quantity="other">%1$d분 전</item>
+    </plurals>
+    <plurals name="chat_hours_ago">
+        <item quantity="other">%1$d시간 전</item>
+    </plurals>
+    <plurals name="chat_days_ago">
+        <item quantity="other">%1$d일 전</item>
+    </plurals>
+</resources>

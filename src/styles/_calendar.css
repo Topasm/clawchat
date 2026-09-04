@@ -3,6 +3,16 @@
    ============================================================ */
 
 /* --- Main container --------------------------------------- */
+.cc-schedule {
+  min-height: 100%;
+}
+
+.cc-schedule__switcher {
+  display: flex;
+  justify-content: center;
+  padding: 16px 24px 0;
+}
+
 .cc-calendar {
   display: flex;
   flex-direction: column;
@@ -512,4 +522,90 @@
   .cc-calendar__time-label {
     font-size: 9px;
   }
+}
+
+/* Task deadline bars ------------------------------------------------------
+ *
+ * A task runs from today through its due date, so the bar is drawn once per
+ * day and the position modifiers bleed the joining edges into the cell
+ * padding. That is what turns a row of buttons into one continuous stretch.
+ */
+.cc-calendar__task-bar {
+  display: flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  min-width: 0;
+  background: color-mix(in srgb, var(--cc-secondary) 22%, transparent);
+  border-left: 2px solid transparent;
+  transition: background 0.15s ease;
+}
+
+.cc-calendar__task-bar:hover {
+  background: color-mix(in srgb, var(--cc-secondary) 38%, transparent);
+}
+
+.cc-calendar__task-bar--start {
+  border-radius: var(--cc-radius-sm) 0 0 var(--cc-radius-sm);
+  border-left-color: var(--cc-secondary);
+  margin-right: -6px;
+}
+
+.cc-calendar__task-bar--middle {
+  margin-left: -6px;
+  margin-right: -6px;
+}
+
+.cc-calendar__task-bar--end {
+  border-radius: 0 var(--cc-radius-sm) var(--cc-radius-sm) 0;
+  margin-left: -6px;
+}
+
+.cc-calendar__task-bar--single {
+  border-radius: var(--cc-radius-sm);
+  border-left-color: var(--cc-secondary);
+}
+
+/* The due day is the point of the bar, so overdue work stays loud. */
+.cc-calendar__task-bar--overdue {
+  background: color-mix(in srgb, var(--cc-overdue-red) 20%, transparent);
+  border-left-color: var(--cc-overdue-red);
+}
+
+.cc-calendar__task-bar--overdue:hover {
+  background: color-mix(in srgb, var(--cc-overdue-red) 34%, transparent);
+}
+
+.cc-calendar__task-bar-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Week view: deadlines have no time of day, so they sit above the hour grid */
+.cc-calendar__week-tasks {
+  display: flex;
+  border-bottom: 1px solid var(--cc-border);
+  flex-shrink: 0;
+}
+
+.cc-calendar__week-tasks-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+.cc-calendar__week-tasks-col:empty {
+  min-height: 0;
 }

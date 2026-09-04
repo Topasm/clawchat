@@ -13,15 +13,17 @@ Intents:
 - general_chat: General conversation, questions, greetings, or anything that doesn't match other intents
 - create_todo: User wants to create a task/todo (e.g., "remind me to buy groceries")
 - query_todos: User wants to list or search tasks (e.g., "what are my tasks?")
-- update_todo: User wants to modify a task (e.g., "change the priority of...")
+- update_todo: User wants to modify a task (e.g., "change the due date of...")
 - delete_todo: User wants to remove a task
 - complete_todo: User wants to mark a task as done
-- create_event: User wants to schedule a calendar event (e.g., "schedule a meeting tomorrow")
+- plan_task: User asks to plan a task or break it into steps (e.g., "plan this", "break it down into steps", "계획 세워줘"). Put the task's name in title when one is named.
+- create_event: User wants to be somewhere at a clock time (e.g., "schedule a meeting tomorrow at 3pm"). A day with no clock time is a deadline, not an event -- use create_todo with a due_date for those.
 - query_events: User wants to check their calendar (e.g., "what's on my schedule?")
 - update_event: User wants to modify an event
 - delete_event: User wants to cancel an event
 - search: User wants to search across all data (e.g., "find everything about VLA")
 - delegate_task: User wants to assign a complex async task to the AI agent
+- query_runs: User asks how delegated agent work is going or what the agent is doing now (e.g., "how's the research going?", "is anything waiting on me?")
 - daily_briefing: User wants a summary of their day (e.g., "what's my day look like?")
 - suggest_time: User wants scheduling suggestions (e.g., "when should I schedule a team meeting?")
 - check_conflicts: User wants to check for scheduling conflicts (e.g., "do I have anything at 3pm?")
@@ -48,12 +50,14 @@ INTENT_TOOLS_SCHEMA = [
                             "update_todo",
                             "delete_todo",
                             "complete_todo",
+                            "plan_task",
                             "create_event",
                             "query_events",
                             "update_event",
                             "delete_event",
                             "search",
                             "delegate_task",
+                            "query_runs",
                             "daily_briefing",
                             "suggest_time",
                             "check_conflicts",
@@ -70,14 +74,17 @@ INTENT_TOOLS_SCHEMA = [
                         "type": "string",
                         "description": "Description or body text if applicable",
                     },
+                    "parent_title": {
+                        "type": "string",
+                        "description": (
+                            "For create_todo: the existing task the new one belongs under, "
+                            "when the user names one (e.g. 'add a step under X', "
+                            "'X 아래에 추가')"
+                        ),
+                    },
                     "due_date": {
                         "type": "string",
                         "description": "Due date in ISO 8601 format if applicable",
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["low", "medium", "high", "urgent"],
-                        "description": "Priority level if applicable",
                     },
                     "start_time": {
                         "type": "string",

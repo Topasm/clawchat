@@ -38,7 +38,7 @@ android {
         applicationId = "com.clawchat.android"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionName = "1.4.4"
+        versionName = "1.4.20"
         versionCode = androidVersionCode(versionName!!)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -97,6 +97,10 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        generateLocaleConfig = true
+    }
+
     packaging {
         resources.excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
     }
@@ -105,8 +109,7 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":feature:onboarding"))
-    implementation(project(":feature:today"))
-    implementation(project(":feature:calendar"))
+    implementation(project(":feature:planner"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:tasks"))
     implementation(project(":feature:inbox"))
@@ -114,6 +117,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:runs"))
     implementation(project(":feature:review"))
+    implementation(project(":feature:progress"))
     implementation(project(":widget"))
 
     // Compose

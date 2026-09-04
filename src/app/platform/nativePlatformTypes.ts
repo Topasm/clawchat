@@ -31,6 +31,34 @@ export interface UpdateDownloadProgress {
   percent?: number;
 }
 
+export interface WorkerRunRequest {
+  /** "claude" or "codex". */
+  provider: string;
+  prompt: string;
+  /** Directory the CLI runs in, as the server recorded it for this machine. */
+  cwd: string;
+  model?: string | null;
+}
+
+export interface WorkerRunResult {
+  output: string;
+  error?: string | null;
+}
+
+/** One README-like file read from a bound folder on this machine. */
+export interface WorkspaceContextFile {
+  /** Relative to the bound directory. */
+  path: string;
+  text: string;
+}
+
+export interface NativeWorkerApi {
+  /** Runs an agent CLI here, in the project's directory on this machine. */
+  run: (request: WorkerRunRequest) => Promise<WorkerRunResult>;
+  /** What a bound folder says about itself, bounded and without following links. */
+  readContext: (path: string) => Promise<WorkspaceContextFile[]>;
+}
+
 export interface NativeUpdaterApi {
   checkForUpdates: () => Promise<UpdateInfo | null>;
   downloadUpdate: () => Promise<void>;
@@ -118,6 +146,8 @@ export interface NativeSystemApi {
    * on-screen instructions.
    */
   openCameraSettings: () => Promise<void>;
+  /** Open a validated Markdown path or obsidian:// document target. */
+  openCanonicalDocument: (target: string) => Promise<void>;
 }
 
 export interface NativeAppWindowApi {
@@ -146,6 +176,8 @@ export interface NativePlatformApi {
     setBadgeCount: (count: number) => Promise<void>;
   };
   updater: NativeUpdaterApi;
+  /** Runs work this machine was addressed for. Null where there is no shell. */
+  worker: NativeWorkerApi | null;
   server: NativeServerApi;
   system: NativeSystemApi;
   appWindow: NativeAppWindowApi;

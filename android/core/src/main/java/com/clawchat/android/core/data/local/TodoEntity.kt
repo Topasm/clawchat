@@ -1,13 +1,41 @@
 package com.clawchat.android.core.data.local
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
+import androidx.room.Index
 
-@Entity(tableName = "todos")
+/** A server-owned task cached under the stable workspace that returned it. */
+@Entity(
+    tableName = "todos",
+    primaryKeys = ["workspaceKey", "id"],
+    indices = [
+        Index(
+            name = "index_todos_workspace_order",
+            value = ["workspaceKey", "sortOrder", "createdAt", "id"],
+            orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC],
+        ),
+        Index(
+            name = "index_todos_workspace_due_date",
+            value = ["workspaceKey", "dueDate", "status"],
+        ),
+        Index(
+            name = "index_todos_workspace_project_order",
+            value = ["workspaceKey", "projectId", "sortOrder", "createdAt", "id"],
+            orders = [
+                Index.Order.ASC,
+                Index.Order.ASC,
+                Index.Order.ASC,
+                Index.Order.DESC,
+                Index.Order.ASC,
+            ],
+        ),
+    ],
+)
 data class TodoEntity(
-    @PrimaryKey val id: String,
+    val workspaceKey: String,
+    val id: String,
     val title: String,
     val description: String? = null,
+    val projectId: String? = null,
     val status: String = "pending",
     val priority: String = "medium",
     val dueDate: String? = null,
@@ -15,7 +43,13 @@ data class TodoEntity(
     val tags: String? = null,  // JSON array as string
     val parentId: String? = null,
     val sortOrder: Int = 0,
+    val source: String? = null,
+    val sourceId: String? = null,
+    val idempotencyKey: String? = null,
+    val assignee: String? = null,
     val inboxState: String = "none",
+    val estimatedMinutes: Int? = null,
+    val projectLabel: String? = null,
     val isRecurring: Boolean = false,
     val recurrenceRule: String? = null,
     val createdAt: String,

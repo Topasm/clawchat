@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_welcome_title">ClawChat에\n오신 것을 환영합니다</string>
+    <string name="onboarding_welcome_description">이 기기에서만 쓰는 개인 할 일 목록으로 시작하거나, 동기화와 에이전트 기능을 위해 ClawChat 서버에 연결하세요.</string>
+    <string name="onboarding_use_on_this_device">이 기기에서 사용</string>
+    <string name="onboarding_local_mode_description">데이터는 이 휴대전화에만 저장되며 서버 동기화와 AI는 꺼집니다. 설정에서 나중에 연결할 수 있습니다.</string>
+    <string name="onboarding_connect_with_qr">QR 코드로 서버 연결</string>
+    <string name="onboarding_connect_manually">직접 연결</string>
+    <string name="onboarding_connecting">연결 중…</string>
+    <string name="onboarding_connect_server_title">서버에 연결</string>
+    <string name="onboarding_connect_server_description">ClawChat 서버의 URL을 입력하세요.</string>
+    <string name="onboarding_server_url">서버 URL</string>
+    <string name="onboarding_server_reachable">서버에 연결할 수 있습니다</string>
+    <string name="onboarding_next_pair_device">다음 — 기기 페어링</string>
+    <string name="onboarding_check_connection">연결 확인</string>
+    <string name="onboarding_login_with_pin_instead">대신 PIN으로 로그인</string>
+    <string name="onboarding_use_on_this_device_instead">대신 이 기기에서 사용</string>
+    <string name="onboarding_pair_with_desktop">데스크톱과 페어링</string>
+    <string name="onboarding_pair_with_desktop_description">데스크톱에서 ClawChat의 설정 &gt; 기기로 이동해 페어링 코드를 생성하세요.</string>
+    <string name="onboarding_pairing_code">6자리 페어링 코드</string>
+    <string name="onboarding_pair">페어링</string>
+    <string name="onboarding_back">뒤로</string>
+    <string name="onboarding_use_pin_instead">대신 PIN 사용</string>
+    <string name="onboarding_login_with_pin">PIN으로 로그인</string>
+    <string name="onboarding_login_with_pin_description">서버의 PIN을 입력해 직접 연결하세요.</string>
+    <string name="onboarding_pin">PIN</string>
+    <string name="onboarding_log_in">로그인</string>
+    <string name="onboarding_ready_title">설정이 완료되었습니다!</string>
+    <string name="onboarding_ready_description">이제 ClawChat을 사용할 수 있습니다.</string>
+    <string name="onboarding_enter_clawchat">ClawChat 시작</string>
+    <string name="onboarding_camera_permission_required">QR 코드를 스캔하려면 카메라 권한이 필요합니다.</string>
+    <string name="onboarding_camera_unavailable">카메라를 시작하지 못했습니다. 다시 시도하거나 직접 연결하세요.</string>
+    <string name="onboarding_retry_camera">카메라 다시 시도</string>
+    <string name="onboarding_invalid_qr">ClawChat 페어링 QR 코드가 아닙니다. 다른 코드를 스캔하세요.</string>
+    <string name="onboarding_cancel">취소</string>
+    <string name="onboarding_point_camera_at_qr">데스크톱에 표시된 QR 코드를 카메라로 비추세요</string>
+    <string name="onboarding_enter_code_manually">코드 직접 입력</string>
+    <string name="onboarding_error_local_mode_failed">로컬 모드를 저장하지 못했습니다. 다시 시도하세요.</string>
+    <string name="onboarding_error_cannot_reach_server">서버에 연결할 수 없습니다. 주소와 연결 상태를 확인한 후 다시 시도하세요.</string>
+    <string name="onboarding_error_pairing_failed">기기를 페어링하지 못했습니다. 코드를 확인하고 다시 시도하세요.</string>
+    <string name="onboarding_error_login_failed">로그인하지 못했습니다. PIN을 확인하고 다시 시도하세요.</string>
+    <string name="onboarding_error_host_identity_mismatch">서버 정보가 스캔한 QR 코드와 일치하지 않습니다.</string>
+    <string name="onboarding_error_host_id_mismatch">서버 ID가 스캔한 QR 코드와 일치하지 않습니다.</string>
+</resources>

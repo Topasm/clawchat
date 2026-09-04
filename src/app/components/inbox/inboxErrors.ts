@@ -14,7 +14,7 @@ function errorResponse(error: unknown): InboxErrorResponse | undefined {
   return (error as { response?: InboxErrorResponse }).response;
 }
 
-export function errorStatus(error: unknown): number | undefined {
+function errorStatus(error: unknown): number | undefined {
   return errorResponse(error)?.status;
 }
 

@@ -5,20 +5,41 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface EventDao {
-    @Query("SELECT * FROM events ORDER BY startTime ASC")
-    fun getAllFlow(): Flow<List<EventEntity>>
+    @Query(
+        "SELECT * FROM events WHERE workspaceKey = :workspaceKey " +
+            "ORDER BY startTime ASC, id ASC",
+    )
+    fun getAllFlow(workspaceKey: String): Flow<List<EventEntity>>
 
     @Upsert
     suspend fun upsertAll(events: List<EventEntity>)
 
-    @Query("DELETE FROM events")
-    suspend fun deleteAll()
+    @Query("DELETE FROM events WHERE workspaceKey = :workspaceKey")
+    suspend fun deleteAll(workspaceKey: String)
 
-    @Query("SELECT * FROM events WHERE substr(startTime, 1, 10) BETWEEN :from AND :to ORDER BY startTime ASC")
-    suspend fun getBetween(from: String, to: String): List<EventEntity>
+    @Query("DELETE FROM events WHERE workspaceKey = :workspaceKey AND id = :id")
+    suspend fun deleteById(workspaceKey: String, id: String)
 
-    @Query("DELETE FROM events WHERE substr(startTime, 1, 10) BETWEEN :from AND :to")
-    suspend fun deleteBetween(from: String, to: String)
+    @Query(
+        "SELECT * FROM events WHERE workspaceKey = :workspaceKey " +
+            "AND startTime >= :fromInclusive AND startTime < :toExclusive " +
+            "ORDER BY startTime ASC, id ASC",
+    )
+    suspend fun getBetween(
+        workspaceKey: String,
+        fromInclusive: String,
+        toExclusive: String,
+    ): List<EventEntity>
+
+    @Query(
+        "DELETE FROM events WHERE workspaceKey = :workspaceKey " +
+            "AND startTime >= :fromInclusive AND startTime < :toExclusive",
+    )
+    suspend fun deleteBetween(
+        workspaceKey: String,
+        fromInclusive: String,
+        toExclusive: String,
+    )
 
     /**
      * Replaces the cache for one date range. Upserting alone would leave an
@@ -27,8 +48,16 @@ interface EventDao {
      * cached.
      */
     @Transaction
-    suspend fun replaceRange(from: String, to: String, events: List<EventEntity>) {
-        deleteBetween(from, to)
+    suspend fun replaceRange(
+        workspaceKey: String,
+        fromInclusive: String,
+        toExclusive: String,
+        events: List<EventEntity>,
+    ) {
+        require(events.all { it.workspaceKey == workspaceKey }) {
+            "Cannot write events into a different workspace cache"
+        }
+        deleteBetween(workspaceKey, fromInclusive, toExclusive)
         upsertAll(events)
     }
 }

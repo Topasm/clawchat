@@ -1,5 +1,5 @@
 import Dialog from './Dialog';
-import { SHORTCUTS, type ShortcutScope } from '../../keyboard/registry';
+import { SHORTCUTS, type ShortcutScope } from '../../keyboard';
 import { translateUi } from '../../i18n';
 interface ShortcutsHelpProps {
   open: boolean;

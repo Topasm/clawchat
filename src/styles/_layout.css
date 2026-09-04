@@ -259,6 +259,30 @@
   font-weight: 400;
 }
 
+/* What this machine is doing as a worker: idle, busy (pulsing), or not yet checked in. */
+.cc-worker-status {
+  border-top: 0;
+}
+.cc-worker-status--idle .cc-connection-status__dot {
+  background: var(--cc-success);
+}
+.cc-worker-status--connecting .cc-connection-status__dot {
+  background: var(--cc-disabled);
+}
+.cc-worker-status--busy .cc-connection-status__dot {
+  background: var(--cc-primary);
+  animation: cc-worker-pulse 1.4s ease-in-out infinite;
+}
+@keyframes cc-worker-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .cc-connection-status--connected .cc-connection-status__dot {
   background: var(--cc-success);
 }

@@ -310,6 +310,12 @@ impl ServerSupervisor {
                 "CODEX_API_KEY_FILE",
                 self.paths.app_data_dir.join("codex-api-key"),
             )
+            // Without this the packaged server restarts on AI_PROVIDER every
+            // time, discarding the provider picked in the settings screen.
+            .env(
+                "AI_PROVIDER_FILE",
+                self.paths.app_data_dir.join("active-ai-provider"),
+            )
             .env("UPLOAD_DIR", uploads);
         if !config.obsidian_vault_path.is_empty() {
             command.env("OBSIDIAN_VAULT_PATH", &config.obsidian_vault_path);
@@ -649,7 +655,9 @@ mod tests {
         let selected = choose_start_port(requested).expect("fallback port");
 
         assert_ne!(selected, requested);
-        TcpListener::bind(("127.0.0.1", selected)).expect("selected port is free");
+        // The probe listener is intentionally released before returning so
+        // the sidecar can bind. Rebinding here would race every other process
+        // asking the OS for an ephemeral port and make this test flaky.
     }
 
     #[test]
@@ -657,7 +665,6 @@ mod tests {
         let selected = choose_start_port(0).expect("concrete port");
 
         assert_ne!(selected, 0);
-        TcpListener::bind(("127.0.0.1", selected)).expect("selected port is free");
     }
 
     #[test]

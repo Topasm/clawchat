@@ -2,10 +2,10 @@ package com.clawchat.android.feature.tasks
 
 import android.os.Build
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,44 +16,70 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clawchat.android.core.R as CoreR
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
@@ -61,21 +87,86 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawMetricPill
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
+import com.clawchat.android.core.ui.datePickerDate
+import com.clawchat.android.core.ui.localizedErrorMessage
+import com.clawchat.android.core.ui.toDatePickerMillis
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+
+internal val TASK_STATUS_FILTER_ORDER: List<TaskStatus?> = listOf(
+    TaskStatus.IN_PROGRESS,
+    TaskStatus.PENDING,
+    TaskStatus.COMPLETED,
+    TaskStatus.CANCELLED,
+    null,
+)
+
+internal fun requiresVerdictConfirmation(todo: Todo, nextStatus: TaskStatus): Boolean =
+    nextStatus == TaskStatus.COMPLETED &&
+        todo.status != TaskStatus.COMPLETED &&
+        todo.tags.orEmpty().any { it.removePrefix("#").startsWith("exp/") }
+
+private fun taskTagLabel(tag: String): String = "#${tag.removePrefix("#")}"
 
 @Composable
 fun TasksScreen(
+    onOpenSearch: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    initialTodoId: String? = null,
+    onOpenConversation: (String) -> Unit = {},
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
+    LaunchedEffect(viewModel) {
+        viewModel.openThreadEvents.collect(onOpenConversation)
+    }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var initialSelectionConsumed by rememberSaveable(initialTodoId) { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val deletedMessage = stringResource(R.string.tasks_deleted)
+    val undoLabel = stringResource(R.string.tasks_undo)
+    var pendingExperimentCompletionId by remember { mutableStateOf<String?>(null) }
+    val requestStatusChange: (Todo, TaskStatus) -> Unit = { task, status ->
+        if (requiresVerdictConfirmation(task, status)) {
+            pendingExperimentCompletionId = task.id
+        } else {
+            viewModel.setTaskStatus(task.id, status)
+        }
+    }
+
+    BackHandler(enabled = state.selectedTask != null) {
+        viewModel.selectTask(null)
+    }
+
+    LaunchedEffect(initialTodoId, state.tasks) {
+        if (initialSelectionConsumed || initialTodoId == null) return@LaunchedEffect
+        state.tasks.firstOrNull { it.id == initialTodoId }?.let { task ->
+            initialSelectionConsumed = true
+            viewModel.selectTask(task)
+        }
+    }
+
+    LaunchedEffect(state.pendingDeletion?.token) {
+        val pending = state.pendingDeletion ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = deletedMessage,
+            actionLabel = undoLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            viewModel.undoDelete(pending.token)
+        }
+    }
 
     if (state.selectedTask != null) {
         TaskDetailView(
@@ -84,27 +175,80 @@ fun TasksScreen(
             isLoadingRelationships = state.isLoadingRelationships,
             relationshipError = state.relationshipError,
             taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
+            snackbarHostState = snackbarHostState,
             onBack = { viewModel.selectTask(null) },
-            onToggle = { viewModel.toggleComplete(state.selectedTask!!.id) },
+            onToggle = {
+                state.selectedTask?.let { task ->
+                    val status = if (task.status == TaskStatus.COMPLETED) {
+                        TaskStatus.PENDING
+                    } else {
+                        TaskStatus.COMPLETED
+                    }
+                    requestStatusChange(task, status)
+                }
+            },
             onSetStatus = { status ->
                 state.selectedTask?.let { task ->
-                    viewModel.updateTask(task.id, TodoUpdate(status = status))
+                    requestStatusChange(task, status)
+                }
+            },
+            onSetDueDate = { date ->
+                state.selectedTask?.let { task ->
+                    viewModel.updateTask(task.id, TodoUpdate(dueDate = date))
                 }
             },
             onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
+            onDiscuss = { viewModel.openTaskThread(state.selectedTask!!.id) },
         )
     } else {
         TaskListView(
             tasks = state.tasks,
             isLoading = state.isLoading,
             statusFilter = state.statusFilter,
+            snackbarHostState = snackbarHostState,
+            onOpenSearch = onOpenSearch,
+            onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectTask,
-            onToggle = viewModel::toggleComplete,
+            onToggle = { task ->
+                val status = if (task.status == TaskStatus.COMPLETED) {
+                    TaskStatus.PENDING
+                } else {
+                    TaskStatus.COMPLETED
+                }
+                requestStatusChange(task, status)
+            },
             onDelete = viewModel::deleteTask,
             onSetDueToday = viewModel::setDueToday,
             onSetFilter = viewModel::setStatusFilter,
-            onRefresh = viewModel::loadTasks,
             onCreate = viewModel::createTask,
+        )
+    }
+
+    pendingExperimentCompletionId?.let { todoId ->
+        AlertDialog(
+            onDismissRequest = { pendingExperimentCompletionId = null },
+            title = { Text(stringResource(R.string.tasks_experiment_completion_title)) },
+            text = { Text(stringResource(R.string.tasks_experiment_completion_question)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingExperimentCompletionId = null
+                        viewModel.completeExperiment(todoId, verdictRecorded = true)
+                    },
+                ) {
+                    Text(stringResource(R.string.tasks_experiment_verdict_recorded))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingExperimentCompletionId = null
+                        viewModel.completeExperiment(todoId, verdictRecorded = false)
+                    },
+                ) {
+                    Text(stringResource(R.string.tasks_experiment_verdict_later))
+                }
+            },
         )
     }
 }
@@ -115,47 +259,88 @@ private fun TaskListView(
     tasks: List<Todo>,
     isLoading: Boolean,
     statusFilter: TaskStatus?,
+    snackbarHostState: SnackbarHostState,
+    onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSelect: (Todo) -> Unit,
-    onToggle: (String) -> Unit,
+    onToggle: (Todo) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onSetFilter: (TaskStatus?) -> Unit,
-    onRefresh: () -> Unit,
     onCreate: (TodoCreate) -> Unit,
 ) {
     var showCreateSheet by remember { mutableStateOf(false) }
 
-    val filteredTasks = tasks.filter { task ->
+    val taskCandidates = tasks.filter { task ->
         val inboxState = task.inboxState
         inboxState == null || inboxState == "none"
     }
-    val completedCount = filteredTasks.count { it.status == TaskStatus.COMPLETED }
-    val activeCount = filteredTasks.count {
+    val completedCount = taskCandidates.count { it.status == TaskStatus.COMPLETED }
+    val activeCount = taskCandidates.count {
         it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS
+    }
+    val initialPage = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { TASK_STATUS_FILTER_ORDER.size },
+    )
+    val pagerScope = rememberCoroutineScope()
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page -> onSetFilter(TASK_STATUS_FILTER_ORDER[page]) }
+    }
+
+    LaunchedEffect(statusFilter) {
+        val targetPage = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
+        if (!pagerState.isScrollInProgress && pagerState.settledPage != targetPage) {
+            pagerState.scrollToPage(targetPage)
+        }
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Tasks",
-                        subtitle = "Keep active work readable and focused.",
+                    Text(
+                        text = stringResource(R.string.tasks_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
+                },
+                actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.tasks_cd_search),
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.tasks_cd_settings),
+                        )
+                    }
                 },
                 colors = ClawTopBarColors(),
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                modifier = Modifier.navigationBarsPadding(),
+            SmallFloatingActionButton(
+                modifier = Modifier.size(48.dp),
                 onClick = { showCreateSheet = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New task") },
+                shape = MaterialTheme.shapes.medium,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.tasks_cd_new_task),
+                )
+            }
         },
     ) { padding ->
         Column(
@@ -164,56 +349,41 @@ private fun TaskListView(
                 .padding(padding),
         ) {
             TaskSummaryCard(
-                totalCount = filteredTasks.size,
+                totalCount = taskCandidates.size,
                 activeCount = activeCount,
                 completedCount = completedCount,
-                statusFilter = statusFilter,
-                onSetFilter = onSetFilter,
+                statusFilter = TASK_STATUS_FILTER_ORDER[pagerState.currentPage],
+                onSetFilter = { filter ->
+                    val targetPage = TASK_STATUS_FILTER_ORDER.indexOf(filter)
+                    if (targetPage >= 0 && targetPage != pagerState.currentPage) {
+                        pagerScope.launch { pagerState.animateScrollToPage(targetPage) }
+                    }
+                },
             )
 
-            if (isLoading && filteredTasks.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "Loading tasks...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                key = { page -> TASK_STATUS_FILTER_ORDER[page]?.wireValue ?: "all" },
+            ) { page ->
+                val pageFilter = TASK_STATUS_FILTER_ORDER[page]
+                val pageTasks = if (pageFilter == null) {
+                    taskCandidates
+                } else {
+                    taskCandidates.filter { it.status == pageFilter }
                 }
-            } else if (filteredTasks.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ClawEmptyState(
-                        title = "No tasks in this view",
-                        description = "Create something new or switch filters to revisit completed work.",
-                        actionLabel = "Create task",
-                        onActionClick = { showCreateSheet = true },
-                    )
-                }
-            } else {
-                val lazyListState = rememberLazyListState()
-
-                LazyColumn(
-                    state = lazyListState,
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(filteredTasks, key = { it.id }) { task ->
-                        SwipeableTaskRow(
-                            task = task,
-                            onToggle = { onToggle(task.id) },
-                            onDelete = { onDelete(task.id) },
-                            onSetDueToday = { onSetDueToday(task.id) },
-                            onClick = { onSelect(task) },
-                        )
-                    }
-                }
+                TaskStatusPage(
+                    tasks = pageTasks,
+                    isLoading = isLoading,
+                    onSelect = onSelect,
+                    onToggle = onToggle,
+                    onDelete = onDelete,
+                    onSetDueToday = onSetDueToday,
+                    onCreate = { showCreateSheet = true },
+                    separateCompleted = pageFilter == null,
+                )
             }
         }
     }
@@ -229,6 +399,126 @@ private fun TaskListView(
     }
 }
 
+@Composable
+private fun TaskStatusPage(
+    tasks: List<Todo>,
+    isLoading: Boolean,
+    onSelect: (Todo) -> Unit,
+    onToggle: (Todo) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetDueToday: (String) -> Unit,
+    onCreate: () -> Unit,
+    separateCompleted: Boolean,
+) {
+    if (isLoading && tasks.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = stringResource(R.string.tasks_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else if (tasks.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            ClawEmptyState(
+                title = stringResource(R.string.tasks_empty_title),
+                description = stringResource(R.string.tasks_empty_description),
+                actionLabel = stringResource(R.string.tasks_create_task),
+                onActionClick = onCreate,
+            )
+        }
+    } else {
+        val lazyListState = rememberLazyListState()
+        val sections = splitTasksForAllView(tasks, separateCompleted)
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = lazyListState,
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 0.dp,
+                bottom = 88.dp,
+            ),
+            verticalArrangement = Arrangement.Top,
+        ) {
+            items(sections.active, key = { it.id }) { task ->
+                SwipeableTaskRow(
+                    task = task,
+                    onToggle = { onToggle(task) },
+                    onDelete = { onDelete(task.id) },
+                    onSetDueToday = { onSetDueToday(task.id) },
+                    onClick = { onSelect(task) },
+                )
+            }
+            if (sections.completed.isNotEmpty()) {
+                item(key = "completed_boundary") {
+                    CompletedTasksBoundary(count = sections.completed.size)
+                }
+                items(sections.completed, key = { it.id }) { task ->
+                    SwipeableTaskRow(
+                        task = task,
+                        onToggle = { onToggle(task) },
+                        onDelete = { onDelete(task.id) },
+                        onSetDueToday = { onSetDueToday(task.id) },
+                        onClick = { onSelect(task) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+internal data class TaskListSections(
+    val active: List<Todo>,
+    val completed: List<Todo>,
+)
+
+internal fun splitTasksForAllView(
+    tasks: List<Todo>,
+    separateCompleted: Boolean,
+): TaskListSections = if (separateCompleted) {
+    TaskListSections(
+        active = tasks.filterNot { it.status == TaskStatus.COMPLETED },
+        completed = tasks.filter { it.status == TaskStatus.COMPLETED },
+    )
+} else {
+    TaskListSections(active = tasks, completed = emptyList())
+}
+
+@Composable
+private fun CompletedTasksBoundary(count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Text(
+            text = stringResource(R.string.tasks_completed_boundary, count),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TaskSummaryCard(
@@ -238,61 +528,80 @@ private fun TaskSummaryCard(
     statusFilter: TaskStatus?,
     onSetFilter: (TaskStatus?) -> Unit,
 ) {
-    ClawSectionCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        ClawStatusChip(
-            text = "Active work",
-            tone = ClawTone.Primary,
-        )
-        Text(
-            text = if (totalCount == 0) "Nothing scheduled yet" else "$completedCount of $totalCount tasks complete",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Swipe for quick actions and keep the current focus visible.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    val selectedFilterIndex = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
+    val filterListState = rememberLazyListState()
+
+    LaunchedEffect(selectedFilterIndex) {
+        filterListState.animateScrollToItem(selectedFilterIndex)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            ClawMetricPill(
-                label = "Active",
-                value = activeCount.toString(),
+            Text(
+                text = if (totalCount == 0) {
+                    stringResource(R.string.tasks_none_yet)
+                } else {
+                    stringResource(
+                        R.string.tasks_summary_format,
+                        pluralStringResource(
+                            R.plurals.tasks_summary_active,
+                            activeCount,
+                            activeCount,
+                        ),
+                        pluralStringResource(
+                            R.plurals.tasks_summary_completed,
+                            completedCount,
+                            completedCount,
+                        ),
+                        pluralStringResource(
+                            R.plurals.tasks_summary_total,
+                            totalCount,
+                            totalCount,
+                        ),
+                    )
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            ClawMetricPill(
-                label = "Done",
-                value = completedCount.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "View",
-                value = when (statusFilter) {
-                    null -> "All"
+            Text(
+                text = when (statusFilter) {
+                    null -> stringResource(R.string.tasks_filter_all)
                     else -> taskStatusLabel(statusFilter)
                 },
-                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            state = filterListState,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            TaskFilterChip(
-                label = "All",
-                selected = statusFilter == null,
-                onClick = { onSetFilter(null) },
-            )
-            TaskStatus.entries.forEach { status ->
+            itemsIndexed(
+                items = TASK_STATUS_FILTER_ORDER,
+                key = { _, status -> status?.wireValue ?: "all" },
+            ) { _, status ->
                 TaskFilterChip(
-                    label = taskStatusLabel(status),
+                    label = if (status == null) {
+                        stringResource(R.string.tasks_filter_all)
+                    } else {
+                        taskStatusLabel(status)
+                    },
                     selected = statusFilter == status,
                     onClick = { onSetFilter(status) },
                 )
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     }
 }
 
@@ -302,15 +611,37 @@ private fun TaskFilterChip(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-            selectedLabelColor = MaterialTheme.colorScheme.primary,
-        ),
-    )
+    Box(
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .selectable(
+                selected = selected,
+                onClick = onClick,
+                role = Role.Tab,
+            )
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+        if (selected) {
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter),
+                thickness = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
 }
 
 @Composable
@@ -335,27 +666,32 @@ private fun TaskRow(
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     val view = LocalView.current
+    val checkboxDescription = stringResource(
+        if (isCompleted) R.string.tasks_mark_incomplete else R.string.tasks_mark_complete,
+        task.title,
+    )
     val completionAlpha by animateFloatAsState(
         targetValue = if (isCompleted) 0.65f else 1f,
         animationSpec = tween(durationMillis = 220),
         label = "task_alpha",
     )
 
-    ClawListItemSurface(
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
+    ClawListItemSurface(onClick = onClick) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(completionAlpha),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 Checkbox(
                     checked = isCompleted,
+                    modifier = Modifier.semantics {
+                        contentDescription = checkboxDescription
+                    },
                     onCheckedChange = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -367,7 +703,7 @@ private fun TaskRow(
                 )
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -396,24 +732,29 @@ private fun TaskRow(
                 }
             }
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 ClawStatusChip(
                     text = taskStatusLabel(task.status),
                     tone = taskStatusTone(task.status),
                 )
-                PriorityChip(task.priority)
+                task.tags.orEmpty().filter(String::isNotBlank).forEach { tag ->
+                    ClawStatusChip(
+                        text = taskTagLabel(tag),
+                        tone = ClawTone.Default,
+                    )
+                }
                 task.dueDate?.let {
                     ClawStatusChip(
-                        text = it,
+                        text = localizedDateLabel(it),
                         tone = ClawTone.Warning,
                     )
                 }
                 inboxStateLabel(task.inboxState)?.let { label ->
                     ClawStatusChip(
                         text = label,
-                        tone = if (label == "Failed") ClawTone.Error else ClawTone.Default,
+                        tone = if (task.inboxState == "error") ClawTone.Error else ClawTone.Default,
                     )
                 }
             }
@@ -421,20 +762,22 @@ private fun TaskRow(
     }
 }
 
+@Composable
 private fun inboxStateLabel(inboxState: String?): String? = when (inboxState) {
     null, "none" -> null
-    "classifying", "planning" -> "Planning"
-    "plan_ready" -> "Review"
-    "captured" -> "Organize"
-    "error" -> "Failed"
-    else -> inboxState.replaceFirstChar { it.uppercase() }
+    "classifying", "planning" -> stringResource(R.string.tasks_inbox_planning)
+    "plan_ready" -> stringResource(R.string.tasks_inbox_review)
+    "captured" -> stringResource(R.string.tasks_inbox_organize)
+    "error" -> stringResource(R.string.tasks_inbox_failed)
+    else -> inboxState.replace('_', ' ')
 }
 
+@Composable
 private fun taskStatusLabel(status: TaskStatus): String = when (status) {
-    TaskStatus.PENDING -> "Pending"
-    TaskStatus.IN_PROGRESS -> "In progress"
-    TaskStatus.COMPLETED -> "Completed"
-    TaskStatus.CANCELLED -> "Cancelled"
+    TaskStatus.PENDING -> stringResource(R.string.tasks_status_pending)
+    TaskStatus.IN_PROGRESS -> stringResource(R.string.tasks_status_in_progress)
+    TaskStatus.COMPLETED -> stringResource(R.string.tasks_status_completed)
+    TaskStatus.CANCELLED -> stringResource(R.string.tasks_status_cancelled)
 }
 
 private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
@@ -452,31 +795,45 @@ private fun TaskDetailView(
     isLoadingRelationships: Boolean,
     relationshipError: String?,
     taskTitles: Map<String, String>,
+    snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onToggle: () -> Unit,
     onSetStatus: (TaskStatus) -> Unit,
+    onSetDueDate: (String) -> Unit,
     onDelete: () -> Unit,
+    onDiscuss: () -> Unit = {},
 ) {
+    val isCompleted = task.status == TaskStatus.COMPLETED
+    var showDatePicker by remember { mutableStateOf(false) }
+    val checkboxDescription = stringResource(
+        if (isCompleted) R.string.tasks_mark_incomplete else R.string.tasks_mark_complete,
+        task.title,
+    )
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Task detail",
-                        subtitle = "Context, status, and metadata in one place.",
+                    Text(
+                        text = stringResource(R.string.tasks_detail_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.tasks_cd_back),
+                        )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onDelete(); onBack() }) {
+                    IconButton(onClick = onDelete) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = "Delete",
+                            contentDescription = stringResource(R.string.tasks_cd_delete),
                             tint = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -489,8 +846,8 @@ private fun TaskDetailView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
                 ClawSectionCard {
@@ -504,7 +861,10 @@ private fun TaskDetailView(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
-                            checked = task.status == TaskStatus.COMPLETED,
+                            checked = isCompleted,
+                            modifier = Modifier.semantics {
+                                contentDescription = checkboxDescription
+                            },
                             onCheckedChange = { onToggle() },
                         )
                         Text(
@@ -532,8 +892,8 @@ private fun TaskDetailView(
                 item {
                     ClawSectionCard {
                         ClawSectionHeader(
-                            title = "Description",
-                            subtitle = "Notes and supporting detail.",
+                            title = stringResource(R.string.tasks_description_title),
+                            subtitle = stringResource(R.string.tasks_description_subtitle),
                         )
                         Text(
                             text = description,
@@ -546,57 +906,71 @@ private fun TaskDetailView(
             item {
                 ClawSectionCard {
                     ClawSectionHeader(
-                        title = "Details",
-                        subtitle = "Operational metadata for this task.",
+                        title = stringResource(R.string.tasks_details_title),
+                        subtitle = stringResource(R.string.tasks_details_subtitle),
                     )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        PriorityChip(task.priority)
                         task.dueDate?.let {
-                            ClawStatusChip(text = it, tone = ClawTone.Warning)
+                            InputChip(
+                                selected = true,
+                                onClick = { showDatePicker = true },
+                                label = { Text(localizedDateLabel(it)) },
+                            )
+                        } ?: TextButton(onClick = { showDatePicker = true }) {
+                            Text(stringResource(CoreR.string.task_add_due_date))
                         }
                         if (task.isRecurring) {
-                            ClawStatusChip(text = "Recurring", tone = ClawTone.Success)
+                            ClawStatusChip(
+                                text = stringResource(R.string.tasks_recurring),
+                                tone = ClawTone.Success,
+                            )
                         }
                         inboxStateLabel(task.inboxState)?.let {
                             ClawStatusChip(text = it, tone = ClawTone.Default)
                         }
                     }
+                    // The thread about this task: steps and delegated runs start there.
+                    TextButton(onClick = onDiscuss) {
+                        Text(stringResource(R.string.tasks_discuss_with_agent))
+                    }
                 }
             }
 
-            item {
-                ClawSectionCard {
-                    ClawSectionHeader(
-                        title = "Task links",
-                        subtitle = "Dependencies and related work from the shared task graph.",
-                        count = relationships.size.takeIf { it > 0 },
-                    )
-                    when {
-                        isLoadingRelationships -> Text(
-                            text = "Loading task links…",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            if (task.syncStatus != "local") {
+                item {
+                    ClawSectionCard {
+                        ClawSectionHeader(
+                            title = stringResource(R.string.tasks_links_title),
+                            subtitle = stringResource(R.string.tasks_links_subtitle),
+                            count = relationships.size.takeIf { it > 0 },
                         )
-                        relationshipError != null -> Text(
-                            text = relationshipError,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        relationships.isEmpty() -> Text(
-                            text = "No task links yet.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            relationships.forEach { relationship ->
-                                TaskRelationshipRow(
-                                    relationship = relationship,
-                                    currentTaskId = task.id,
-                                    taskTitles = taskTitles,
-                                )
+                        when {
+                            isLoadingRelationships -> Text(
+                                text = stringResource(R.string.tasks_links_loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            relationshipError != null -> Text(
+                                text = localizedErrorMessage(relationshipError),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            relationships.isEmpty() -> Text(
+                                text = stringResource(R.string.tasks_links_empty),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                relationships.forEach { relationship ->
+                                    TaskRelationshipRow(
+                                        relationship = relationship,
+                                        currentTaskId = task.id,
+                                        taskTitles = taskTitles,
+                                    )
+                                }
                             }
                         }
                     }
@@ -608,20 +982,49 @@ private fun TaskDetailView(
                 item {
                     ClawSectionCard {
                         ClawSectionHeader(
-                            title = "Tags",
-                            subtitle = "Labels attached to this work item.",
+                            title = stringResource(R.string.tasks_tags_title),
+                            subtitle = stringResource(R.string.tasks_tags_subtitle),
                         )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             tags.forEach { tag ->
-                                ClawStatusChip(text = tag, tone = ClawTone.Default)
+                                ClawStatusChip(
+                                    text = taskTagLabel(tag),
+                                    tone = ClawTone.Default,
+                                )
                             }
                         }
                     }
                 }
             }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = task.dueDate
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?.toDatePickerMillis(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        onSetDueDate(datePickerDate(millis).toString())
+                    }
+                    showDatePicker = false
+                }) { Text(stringResource(CoreR.string.common_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(CoreR.string.common_cancel))
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }
@@ -634,19 +1037,28 @@ private fun TaskRelationshipRow(
 ) {
     val isOutgoing = relationship.sourceTaskId == currentTaskId
     val otherTaskId = if (isOutgoing) relationship.targetTaskId else relationship.sourceTaskId
-    val otherTaskTitle = taskTitles[otherTaskId] ?: "Task ${otherTaskId.take(8)}"
+    val otherTaskTitle = taskTitles[otherTaskId]
+        ?: stringResource(R.string.tasks_fallback_title, otherTaskId.take(8))
     val direction = when (relationship.type) {
-        "depends_on" -> if (isOutgoing) "Depends on" else "Required by"
-        "duplicate" -> if (isOutgoing) "Duplicates" else "Duplicated by"
-        "related" -> "Related to"
-        else -> relationship.type.replace('_', ' ').replaceFirstChar { it.uppercase() }
+        "depends_on" -> if (isOutgoing) {
+            stringResource(R.string.tasks_relationship_depends_on)
+        } else {
+            stringResource(R.string.tasks_relationship_required_by)
+        }
+        "duplicate" -> if (isOutgoing) {
+            stringResource(R.string.tasks_relationship_duplicates)
+        } else {
+            stringResource(R.string.tasks_relationship_duplicated_by)
+        }
+        "related" -> stringResource(R.string.tasks_relationship_related_to)
+        else -> relationship.type.replace('_', ' ')
     }
 
     ClawListItemSurface {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Column(
                 modifier = Modifier.weight(1f),
@@ -675,7 +1087,7 @@ private fun TaskRelationshipRow(
                 }
             }
             ClawStatusChip(
-                text = relationship.type.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                text = relationshipTypeLabel(relationship.type),
                 tone = if (relationship.type == "depends_on") ClawTone.Warning else ClawTone.Default,
             )
         }
@@ -683,14 +1095,21 @@ private fun TaskRelationshipRow(
 }
 
 @Composable
-private fun PriorityChip(priority: String) {
-    val tone = when (priority.lowercase()) {
-        "high", "urgent" -> ClawTone.Error
-        "medium" -> ClawTone.Warning
-        else -> ClawTone.Default
+private fun relationshipTypeLabel(type: String): String = when (type) {
+    "depends_on" -> stringResource(R.string.tasks_relationship_type_depends_on)
+    "duplicate" -> stringResource(R.string.tasks_relationship_type_duplicate)
+    "related" -> stringResource(R.string.tasks_relationship_type_related)
+    else -> type.replace('_', ' ')
+}
+
+@Composable
+private fun localizedDateLabel(rawDate: String): String {
+    val locale = LocalLocale.current.platformLocale
+    return remember(rawDate, locale) {
+        runCatching {
+            LocalDate.parse(rawDate).format(
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale),
+            )
+        }.getOrDefault(rawDate)
     }
-    ClawStatusChip(
-        text = priority.replaceFirstChar { it.uppercase() },
-        tone = tone,
-    )
 }

@@ -14,6 +14,7 @@ interface PlanReviewDiffProps {
   isDismissing?: boolean;
   isRegenerating?: boolean;
   compact?: boolean;
+  allowRegenerate?: boolean;
 }
 export default function PlanReviewDiff({
   plan,
@@ -25,6 +26,7 @@ export default function PlanReviewDiff({
   isDismissing,
   isRegenerating,
   compact,
+  allowRegenerate = true,
 }: PlanReviewDiffProps) {
   const subtasks = plan.subtasks;
   const [selection, setSelection] = useState<{
@@ -108,14 +110,16 @@ export default function PlanReviewDiff({
               'This older proposal cannot be applied safely. Generate a revision-aware plan.',
             )}
           </span>
-          <button
-            type="button"
-            className="cc-btn cc-btn--ghost"
-            onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
-            disabled={isRegenerating}
-          >
-            {isRegenerating ? translateUi('Regenerating\u2026') : translateUi('Regenerate')}
-          </button>
+          {allowRegenerate && (
+            <button
+              type="button"
+              className="cc-btn cc-btn--ghost"
+              onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
+              disabled={isRegenerating}
+            >
+              {isRegenerating ? translateUi('Regenerating\u2026') : translateUi('Regenerate')}
+            </button>
+          )}
         </div>
       )}
 
@@ -125,7 +129,7 @@ export default function PlanReviewDiff({
             <strong>
               {translateUi('The task graph changed after this proposal was created.')}
             </strong>
-            {!normalizedApplyError?.staleDetails && (
+            {!normalizedApplyError?.staleDetails && allowRegenerate && (
               <>{translateUi(' Regenerate it from the current graph before applying.')}</>
             )}
             {normalizedApplyError?.staleDetails && (
@@ -137,14 +141,18 @@ export default function PlanReviewDiff({
               </>
             )}
           </span>
-          <button
-            type="button"
-            className="cc-btn cc-btn--ghost"
-            onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
-            disabled={isRegenerating}
-          >
-            {isRegenerating ? translateUi('Regenerating\u2026') : translateUi('Regenerate')}
-          </button>
+          {allowRegenerate ? (
+            <button
+              type="button"
+              className="cc-btn cc-btn--ghost"
+              onClick={() => void Promise.resolve(onRegenerate()).catch(() => undefined)}
+              disabled={isRegenerating}
+            >
+              {isRegenerating ? translateUi('Regenerating\u2026') : translateUi('Regenerate')}
+            </button>
+          ) : (
+            <span>{translateUi('Ask the agent to propose this change again.')}</span>
+          )}
         </div>
       )}
 

@@ -1,7 +1,12 @@
 package com.clawchat.android.core.data.repository
 
 import com.clawchat.android.core.api.ClawChatApi
+import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.local.DeviceZoneProvider
 import com.clawchat.android.core.data.local.EventDao
+import com.clawchat.android.core.data.local.LocalEventDao
+import com.clawchat.android.core.data.local.LocalTodoDao
 import com.clawchat.android.core.data.local.TodoDao
 import com.clawchat.android.core.data.local.toEntity
 import com.clawchat.android.core.data.local.toModel
@@ -11,8 +16,11 @@ import com.clawchat.android.core.data.model.TodayResponse
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.apiCall
+import com.clawchat.android.core.network.workspaceNotConfigured
 import kotlinx.coroutines.flow.first
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,27 +50,84 @@ class TodayRepositoryImpl @Inject constructor(
     private val api: ClawChatApi,
     private val todoDao: TodoDao,
     private val eventDao: EventDao,
+    private val localTodoDao: LocalTodoDao,
+    private val localEventDao: LocalEventDao,
+    private val sessionStore: SessionStore,
+    private val deviceZoneProvider: DeviceZoneProvider,
 ) : TodayRepository {
 
     override suspend fun getToday(): ApiResult<TodayResponse> {
-        val result = apiCall { api.getToday() }
+        val runtimeState = currentRuntimeState()
+        val zoneId = deviceZoneProvider.current()
+        val day = LocalDate.now(zoneId)
+        when (runtimeState.mode) {
+            WorkspaceMode.UNCONFIGURED -> return workspaceNotConfigured()
+            WorkspaceMode.SERVER -> Unit
+            WorkspaceMode.LOCAL -> {
+                val local = getLocalToday(day, zoneId)
+                return ApiResult.Success(
+                    TodayResponse(
+                        todayTodos = local.todayTodos,
+                        overdueTodos = local.overdueTodos,
+                        todayEvents = local.todayEvents,
+                        inboxCount = localTodoDao.countOpenInbox(),
+                    ),
+                )
+            }
+        }
+        val workspaceKey = runtimeState.workspaceKey?.takeIf(String::isNotBlank)
+            ?: return workspaceNotConfigured()
+        val expectedScope = runtimeState.activeServerRequestScope()
+            ?: return workspaceNotConfigured()
+        val utcOffsetMinutes = zoneId.rules.getOffset(Instant.now()).totalSeconds / 60
+        val result = apiCall {
+            api.getToday(day.toString(), utcOffsetMinutes, expectedScope)
+        }
         if (result is ApiResult.Success) {
             val today = result.data
-            val day = LocalDate.now().toString()
-            todoDao.upsertAll((today.todayTodos + today.overdueTodos).map { it.toEntity() })
+            val fromInclusive = "${day}T00:00:00"
+            val toExclusive = "${day.plusDays(1)}T00:00:00"
+            todoDao.upsertAll(
+                (today.todayTodos + today.overdueTodos).map { it.toEntity(workspaceKey) },
+            )
             // Scoped to today so this does not clear the range the calendar
             // cached, while still dropping an event that was deleted upstream.
-            eventDao.replaceRange(day, day, today.todayEvents.map { it.toEntity() })
+            eventDao.replaceRange(
+                workspaceKey,
+                fromInclusive,
+                toExclusive,
+                today.todayEvents.map { it.toEntity(workspaceKey) },
+            )
         }
         return result
     }
 
-    override suspend fun getBriefing(): ApiResult<BriefingResponse> =
-        apiCall { api.getBriefing() }
+    override suspend fun getBriefing(): ApiResult<BriefingResponse> {
+        val runtimeState = currentRuntimeState()
+        return when (runtimeState.mode) {
+            WorkspaceMode.UNCONFIGURED -> workspaceNotConfigured()
+            WorkspaceMode.LOCAL -> ApiResult.Error("AI briefing requires a server")
+            WorkspaceMode.SERVER -> {
+                val expectedScope = runtimeState.activeServerRequestScope()
+                    ?: return workspaceNotConfigured()
+                apiCall { api.getBriefing(expectedScope) }
+            }
+        }
+    }
 
     override suspend fun getCachedToday(today: LocalDate): CachedToday {
+        val runtimeState = currentRuntimeState()
+        when (runtimeState.mode) {
+            WorkspaceMode.UNCONFIGURED -> return CachedToday()
+            WorkspaceMode.LOCAL -> return getLocalToday(today, deviceZoneProvider.current())
+            WorkspaceMode.SERVER -> Unit
+        }
+
         val boundary = today.toString()
-        val open = todoDao.getOpenDueThrough(boundary).map { it.toModel() }
+        val tomorrow = today.plusDays(1).toString()
+        val workspaceKey = runtimeState.workspaceKey?.takeIf(String::isNotBlank)
+            ?: return CachedToday()
+        val open = todoDao.getOpenDueBefore(workspaceKey, tomorrow).map { it.toModel() }
         // The server owns the real bucketing; offline, the due date is all the
         // device has to separate what is due today from what is already late.
         val (dueToday, overdue) = open.partition { todo ->
@@ -71,7 +136,33 @@ class TodayRepositoryImpl @Inject constructor(
         return CachedToday(
             todayTodos = dueToday,
             overdueTodos = overdue,
-            todayEvents = eventDao.getAllFlow().first().map { it.toModel() },
+            todayEvents = eventDao.getBetween(
+                workspaceKey,
+                "${today}T00:00:00",
+                "${today.plusDays(1)}T00:00:00",
+            ).map { it.toModel() },
         )
     }
+
+    private suspend fun getLocalToday(today: LocalDate, zoneId: ZoneId): CachedToday {
+        val boundary = today.toString()
+        val tomorrow = today.plusDays(1).toString()
+        val open = localTodoDao.getOpenDueBefore(tomorrow).map { it.toModel() }
+        val (dueToday, overdue) = open.partition { todo ->
+            todo.dueDate?.take(boundary.length) == boundary
+        }
+        val inProgressOutsideToday = localTodoDao
+            .getInProgressOutside(boundary, tomorrow)
+            .map { it.toModel() }
+        val fromInclusive = today.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val toExclusive = today.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+        return CachedToday(
+            todayTodos = (dueToday + inProgressOutsideToday).distinctBy(Todo::id),
+            overdueTodos = overdue,
+            todayEvents = localEventDao.getBetween(fromInclusive, toExclusive).map { it.toModel() },
+        )
+    }
+
+    private suspend fun currentRuntimeState() = sessionStore.runtimeState.first()
+
 }

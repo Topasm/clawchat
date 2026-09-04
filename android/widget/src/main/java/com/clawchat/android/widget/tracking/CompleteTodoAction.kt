@@ -10,6 +10,7 @@ import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.common.WidgetUpdater
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.flow.first
 
 /**
  * A widget checkbox is a one-way "done" action, not a status toggle.
@@ -22,16 +23,26 @@ class CompleteTodoAction : ActionCallback {
         parameters: ActionParameters,
     ) {
         val todoId = parameters[TodoTrackingWidget.TODO_ID_KEY] ?: return
+        val expectedWorkspaceKey = parameters[TodoTrackingWidget.WORKSPACE_KEY] ?: return
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java,
         )
+        if (entryPoint.sessionStore().runtimeState.first().workspaceKey != expectedWorkspaceKey) {
+            WidgetUpdater.updateAll(context)
+            return
+        }
         val handler = TodoCompletionActionHandler { id, update ->
-            entryPoint.todoRepository().updateTodo(id, update) is ApiResult.Success
+            entryPoint.todoRepository().updateTodo(
+                id,
+                update,
+                expectedWorkspaceKey,
+            ) is ApiResult.Success
         }
 
-        handler.complete(todoId)
-        WidgetUpdater.updateAll(context)
+        if (handler.complete(todoId)) {
+            WidgetUpdater.updateAll(context)
+        }
     }
 }
 

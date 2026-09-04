@@ -1,25 +1,43 @@
+import { useState } from 'react';
 import type { AgentRunApprovalImpact, AgentRunReviewOutcome } from '../../types/api';
 import { translateUi } from '../../i18n';
+
+interface StartedRun {
+  run_id: string;
+}
+
 interface AgentRunReviewHandoffProps {
   taskTitle?: string | null;
   impact?: AgentRunApprovalImpact | null;
   outcome?: AgentRunReviewOutcome | null;
   onOpenTask: (taskId: string) => void;
-  onOpenInbox: () => void;
+  onRunNext?: (task: { id: string; title: string }) => Promise<StartedRun | null>;
+  canRunNext?: boolean;
+  isStartingNext?: boolean;
+  onChooseAnother?: () => void;
+  onStop?: () => void;
+  onOpenRun?: (runId: string) => void;
 }
 export default function AgentRunReviewHandoff({
   taskTitle,
   impact,
   outcome,
   onOpenTask,
-  onOpenInbox,
+  onRunNext,
+  canRunNext = false,
+  isStartingNext = false,
+  onChooseAnother,
+  onStop,
+  onOpenRun,
 }: AgentRunReviewHandoffProps) {
+  const [startedRun, setStartedRun] = useState<StartedRun | null>(null);
   if (!impact && !outcome) return null;
   const isApplied = Boolean(outcome);
   const todoId = outcome?.todo_id ?? impact?.todo_id;
   const graphRevision = outcome?.graph_revision ?? impact?.graph_revision;
   const newlyReadyTasks = outcome?.newly_ready_tasks ?? impact?.newly_ready_tasks ?? [];
   const readyCount = newlyReadyTasks.length;
+  const nextTask = newlyReadyTasks[0];
   const completedLabel = taskTitle ? `“${taskTitle}”` : 'The linked task';
   return (
     <section
@@ -92,14 +110,73 @@ export default function AgentRunReviewHandoff({
 
       {isApplied && (
         <div className="cc-agent-review-handoff__actions">
-          {todoId && (
-            <button className="cc-btn" type="button" onClick={() => onOpenTask(todoId)}>
-              {translateUi('\n              Open completed task\n            ')}
-            </button>
+          {startedRun ? (
+            <>
+              {onOpenRun && (
+                <button
+                  className="cc-btn cc-btn--primary"
+                  type="button"
+                  onClick={() => onOpenRun(startedRun.run_id)}
+                >
+                  {translateUi('Open started run')}
+                </button>
+              )}
+              {onChooseAnother && (
+                <button className="cc-btn" type="button" onClick={onChooseAnother}>
+                  {translateUi('Back to project')}
+                </button>
+              )}
+              {onStop && (
+                <button className="cc-btn cc-btn--ghost" type="button" onClick={onStop}>
+                  {translateUi('Done')}
+                </button>
+              )}
+            </>
+          ) : nextTask && onRunNext ? (
+            <>
+              <button
+                className="cc-btn cc-btn--primary"
+                type="button"
+                disabled={!canRunNext || isStartingNext}
+                title={
+                  canRunNext
+                    ? translateUi('Start “{{title}}” with the Project defaults', {
+                        title: nextTask.title,
+                      })
+                    : translateUi('Preparing the next Ready task…')
+                }
+                onClick={async () => {
+                  const result = await onRunNext(nextTask);
+                  if (result) setStartedRun(result);
+                }}
+              >
+                {isStartingNext ? translateUi('Starting…') : translateUi('Run next')}
+              </button>
+              {onChooseAnother && (
+                <button className="cc-btn" type="button" onClick={onChooseAnother}>
+                  {translateUi('Choose another')}
+                </button>
+              )}
+              {onStop && (
+                <button className="cc-btn cc-btn--ghost" type="button" onClick={onStop}>
+                  {translateUi('Stop here')}
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              {todoId && (
+                <button className="cc-btn" type="button" onClick={() => onOpenTask(todoId)}>
+                  {translateUi('Open completed task')}
+                </button>
+              )}
+              {onStop && (
+                <button className="cc-btn cc-btn--primary" type="button" onClick={onStop}>
+                  {translateUi('Done')}
+                </button>
+              )}
+            </>
           )}
-          <button className="cc-btn cc-btn--primary" type="button" onClick={onOpenInbox}>
-            {translateUi('\n            Open Inbox\n          ')}
-          </button>
         </div>
       )}
     </section>

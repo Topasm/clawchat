@@ -1,6 +1,5 @@
 package com.clawchat.android.feature.inbox
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,58 +12,70 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawMetricPill
-import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
 import com.clawchat.android.core.ui.icons.ClawIcons
+import com.clawchat.android.core.ui.localizedErrorMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
     viewModel: InboxViewModel = hiltViewModel(),
     onTaskClick: (String) -> Unit = {},
+    onBack: () -> Unit = {},
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Inbox",
-                        subtitle = "Capture first, decide with context.",
+                    Text(
+                        text = stringResource(R.string.inbox_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.inbox_back),
+                        )
+                    }
                 },
                 colors = ClawTopBarColors(),
             )
@@ -83,7 +94,7 @@ fun InboxScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Loading inbox...",
+                        text = stringResource(R.string.inbox_loading),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -91,8 +102,8 @@ fun InboxScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
                         InboxSummaryCard(
@@ -106,8 +117,8 @@ fun InboxScreen(
                     if (state.planningNow.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Planning now",
-                                subtitle = "The assistant is actively classifying or planning these items.",
+                                title = stringResource(R.string.inbox_planning_title),
+                                subtitle = stringResource(R.string.inbox_planning_subtitle),
                                 tone = ClawTone.Primary,
                                 icon = {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
@@ -125,18 +136,20 @@ fun InboxScreen(
                     if (state.reviewSuggestion.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Review suggestion",
-                                subtitle = "AI has a recommendation ready for your confirmation.",
+                                title = stringResource(R.string.inbox_review_title),
+                                subtitle = stringResource(R.string.inbox_review_subtitle),
                                 tone = ClawTone.Warning,
                                 icon = {
                                     Icon(Icons.Default.CheckCircle, contentDescription = null)
                                 },
                                 items = state.reviewSuggestion,
-                                actionLabel = "Review",
+                                actionLabel = stringResource(R.string.inbox_action_review),
                                 onAction = viewModel::organize,
                                 isError = false,
                                 showSpinner = false,
                                 onTaskClick = onTaskClick,
+                                secondaryActionLabel = stringResource(R.string.inbox_action_today),
+                                onSecondaryAction = viewModel::moveToToday,
                             )
                         }
                     }
@@ -144,18 +157,20 @@ fun InboxScreen(
                     if (state.needsOrganizing.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Needs organizing",
-                                subtitle = "Captured items that still need structure or routing.",
+                                title = stringResource(R.string.inbox_organize_title),
+                                subtitle = stringResource(R.string.inbox_organize_subtitle),
                                 tone = ClawTone.Default,
                                 icon = {
                                     Icon(ClawIcons.Inbox, contentDescription = null)
                                 },
                                 items = state.needsOrganizing,
-                                actionLabel = "Organize",
+                                actionLabel = stringResource(R.string.inbox_action_organize),
                                 onAction = viewModel::organize,
                                 isError = false,
                                 showSpinner = false,
                                 onTaskClick = onTaskClick,
+                                secondaryActionLabel = stringResource(R.string.inbox_action_today),
+                                onSecondaryAction = viewModel::moveToToday,
                             )
                         }
                     }
@@ -163,14 +178,14 @@ fun InboxScreen(
                     if (state.failed.isNotEmpty()) {
                         item {
                             InboxSectionCard(
-                                title = "Failed",
-                                subtitle = "These items need another attempt or a manual check.",
+                                title = stringResource(R.string.inbox_failed_title),
+                                subtitle = stringResource(R.string.inbox_failed_subtitle),
                                 tone = ClawTone.Error,
                                 icon = {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                 },
                                 items = state.failed,
-                                actionLabel = "Retry",
+                                actionLabel = stringResource(R.string.inbox_action_retry),
                                 onAction = viewModel::retryOrganize,
                                 isError = true,
                                 showSpinner = false,
@@ -182,8 +197,8 @@ fun InboxScreen(
                     if (isEmpty(state)) {
                         item {
                             ClawEmptyState(
-                                title = "Inbox is clear",
-                                description = "New captures will appear here when they need planning or review.",
+                                title = stringResource(R.string.inbox_empty_title),
+                                description = stringResource(R.string.inbox_empty_description),
                                 icon = {
                                     Icon(
                                         Icons.Default.CheckCircle,
@@ -200,10 +215,10 @@ fun InboxScreen(
             state.error?.let { error ->
                 Snackbar(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(12.dp)
                         .align(Alignment.BottomCenter),
                 ) {
-                    Text(error)
+                    Text(localizedErrorMessage(error))
                 }
             }
         }
@@ -223,41 +238,46 @@ private fun InboxSummaryCard(
     reviewSuggestion: Int,
     failed: Int,
 ) {
-    ClawSectionCard {
-        ClawStatusChip(
-            text = "Review queue",
-            tone = ClawTone.Primary,
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Text(
-            text = if (totalItems == 0) "Nothing waiting right now" else "$totalItems item${if (totalItems == 1) "" else "s"} need attention",
-            style = MaterialTheme.typography.headlineSmall,
+            text = if (totalItems == 0) {
+                stringResource(R.string.inbox_nothing_waiting)
+            } else {
+                pluralStringResource(R.plurals.inbox_items_need_attention, totalItems, totalItems)
+            },
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
         )
+        val planningSummary = pluralStringResource(
+            R.plurals.inbox_summary_planning,
+            planningNow,
+            planningNow,
+        )
+        val reviewSummary = pluralStringResource(
+            R.plurals.inbox_summary_review,
+            reviewSuggestion,
+            reviewSuggestion,
+        )
+        val failedSummary = pluralStringResource(
+            R.plurals.inbox_summary_failed,
+            failed,
+            failed,
+        )
         Text(
-            text = "Use this queue to confirm AI suggestions, fix failures, and turn captures into structured work.",
+            text = stringResource(
+                R.string.inbox_summary_format,
+                planningSummary,
+                reviewSummary,
+                failedSummary,
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ClawMetricPill(
-                label = "Planning",
-                value = planningNow.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "Review",
-                value = reviewSuggestion.toString(),
-                modifier = Modifier.weight(1f),
-            )
-            ClawMetricPill(
-                label = "Failed",
-                value = failed.toString(),
-                modifier = Modifier.weight(1f),
-            )
-        }
     }
 }
 
@@ -273,31 +293,34 @@ private fun InboxSectionCard(
     isError: Boolean,
     showSpinner: Boolean,
     onTaskClick: (String) -> Unit,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: ((String) -> Unit)? = null,
 ) {
-    ClawSectionCard(tone = tone) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(42.dp),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surface,
+    ClawListSection(
+        tone = tone,
+        header = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.size(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     icon()
                 }
+                ClawSectionHeader(
+                    modifier = Modifier.weight(1f),
+                    title = title,
+                    subtitle = subtitle,
+                    count = items.size,
+                )
             }
-            ClawSectionHeader(
-                modifier = Modifier.weight(1f),
-                title = title,
-                subtitle = subtitle,
-                count = items.size,
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items.forEachIndexed { index, todo ->
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            items.forEach { todo ->
                 InboxItemCard(
                     todo = todo,
                     showSpinner = showSpinner,
@@ -309,10 +332,15 @@ private fun InboxSectionCard(
                     },
                     onClick = { onTaskClick(todo.id) },
                     isError = isError,
+                    secondaryActionLabel = secondaryActionLabel,
+                    onSecondaryAction = if (
+                        secondaryActionLabel != null && onSecondaryAction != null
+                    ) {
+                        { onSecondaryAction(todo.id) }
+                    } else {
+                        null
+                    },
                 )
-                if (index != items.lastIndex) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                }
             }
         }
     }
@@ -326,29 +354,29 @@ private fun InboxItemCard(
     onAction: (() -> Unit)? = null,
     onClick: () -> Unit = {},
     isError: Boolean = false,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
-    ClawListItemSurface {
+    ClawListItemSurface(onClick = onClick) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 if (showSpinner) {
                     ClawStatusChip(
-                        text = "Working",
+                        text = stringResource(R.string.inbox_state_working),
                         tone = ClawTone.Primary,
                     )
                 } else {
                     ClawStatusChip(
                         text = when {
-                            isError -> "Attention"
-                            todo.inboxState == "plan_ready" -> "Suggestion"
-                            else -> "Captured"
+                            isError -> stringResource(R.string.inbox_state_attention)
+                            todo.inboxState == "plan_ready" -> stringResource(R.string.inbox_state_suggestion)
+                            else -> stringResource(R.string.inbox_state_captured)
                         },
                         tone = if (isError) ClawTone.Error else ClawTone.Warning,
                     )
@@ -392,6 +420,11 @@ private fun InboxItemCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
+                    if (secondaryActionLabel != null && onSecondaryAction != null) {
+                        TextButton(onClick = onSecondaryAction) {
+                            Text(secondaryActionLabel)
+                        }
+                    }
                     FilledTonalButton(onClick = onAction) {
                         if (isError) {
                             Icon(

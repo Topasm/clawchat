@@ -50,11 +50,18 @@ class TodayViewModelTest {
         status = TaskStatus.PENDING,
     )
 
+    private val sampleUndatedTodo = Todo(
+        id = "3",
+        title = "Undated task",
+        status = TaskStatus.PENDING,
+    )
+
     private val sampleTodayResponse = TodayResponse(
         greeting = "Good morning!",
         todayTodos = listOf(sampleTodo),
         overdueTodos = listOf(sampleOverdueTodo),
         todayEvents = emptyList(),
+        needsDateTodos = listOf(sampleUndatedTodo),
         inboxCount = 3,
     )
 
@@ -92,6 +99,7 @@ class TodayViewModelTest {
         assertEquals("Good morning!", state.greeting)
         assertEquals(1, state.todayTodos.size)
         assertEquals(1, state.overdueTodos.size)
+        assertEquals(1, state.needsDateTodos.size)
         assertEquals(3, state.inboxCount)
         assertEquals(false, state.isRefreshing)
         assertNull(state.error)
@@ -138,6 +146,19 @@ class TodayViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(false, viewModel.uiState.value.isOffline)
+    }
+
+    @Test
+    fun `an empty inbox skips the secondary task query`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(
+            sampleTodayResponse.copy(inboxCount = 0),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(emptyList<Todo>(), viewModel.uiState.value.inboxPreview)
+        coVerify(exactly = 0) { todoRepository.listTodos(any()) }
     }
 
     @Test
@@ -221,7 +242,6 @@ class TodayViewModelTest {
         val input = TodoCreate(
             title = "Quick",
             description = "From sheet",
-            priority = "high",
             dueDate = "2026-03-23",
             source = "quick_capture",
             inboxState = "classifying",
@@ -285,5 +305,25 @@ class TodayViewModelTest {
                 TodoUpdate(dueDate = java.time.LocalDate.now().toString()),
             )
         }
+    }
+
+    @Test
+    fun `setDueToday moves an undated todo into today list`() = runTest {
+        coEvery { todayRepository.getToday() } returns ApiResult.Success(sampleTodayResponse)
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = emptyList(), total = 0))
+        coEvery { todoRepository.updateTodo("3", any()) } returns
+            ApiResult.Success(sampleUndatedTodo.copy(dueDate = java.time.LocalDate.now().toString()))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.setDueToday("3")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updated = viewModel.uiState.value
+        assertEquals(0, updated.needsDateTodos.size)
+        assertEquals(2, updated.todayTodos.size)
+        assertEquals("3", updated.todayTodos.last().id)
     }
 }

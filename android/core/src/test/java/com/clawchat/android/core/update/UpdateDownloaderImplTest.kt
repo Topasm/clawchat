@@ -17,7 +17,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import java.io.IOException
 import java.security.MessageDigest
 
 class UpdateDownloaderImplTest {
@@ -52,6 +51,7 @@ class UpdateDownloaderImplTest {
         val error = downloadFailure()
 
         assertEquals("Update checksum download failed: HTTP 503", error.message)
+        assertEquals(UpdateFailure.ChecksumHttpError(503), error.failure)
         assertStagingDirectoryIsEmpty()
         assertEquals("/ClawChat-1.4.5.apk", server.takeRequest().path)
         assertEquals("/ClawChat-1.4.5.apk.sha256", server.takeRequest().path)
@@ -65,6 +65,7 @@ class UpdateDownloaderImplTest {
         val error = downloadFailure()
 
         assertEquals("Update checksum payload is invalid", error.message)
+        assertEquals(UpdateFailure.InvalidChecksumPayload, error.failure)
         assertStagingDirectoryIsEmpty()
     }
 
@@ -76,6 +77,7 @@ class UpdateDownloaderImplTest {
         val error = downloadFailure()
 
         assertTrue(error.message.orEmpty().startsWith("Update checksum mismatch:"))
+        assertEquals(UpdateFailure.ChecksumMismatch, error.failure)
         assertStagingDirectoryIsEmpty()
     }
 
@@ -99,10 +101,10 @@ class UpdateDownloaderImplTest {
         assertFalse(file.isDirectory)
     }
 
-    private suspend fun downloadFailure(): IOException = try {
+    private suspend fun downloadFailure(): UpdateDownloadException = try {
         downloader.download(update()) { _, _ -> }
         throw AssertionError("Expected the update download to fail")
-    } catch (error: IOException) {
+    } catch (error: UpdateDownloadException) {
         error
     }
 

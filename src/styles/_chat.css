@@ -45,7 +45,7 @@
 }
 
 .cc-bubble__delivery--failed {
-  color: var(--cc-danger);
+  color: var(--cc-error);
 }
 
 .cc-bubble__delivery button {
@@ -173,10 +173,25 @@
 }
 
 .cc-chat-panel__header-title {
-  flex: 1;
   font-size: 13px;
   font-weight: 600;
   color: var(--cc-text);
+}
+
+.cc-chat-panel__header-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cc-chat-panel__header-copy small {
+  overflow: hidden;
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cc-chat-panel__header-btn {
@@ -232,6 +247,7 @@
 /* --- Chat Input ------------------------------------------- */
 .cc-chat-input {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
   padding: 10px 14px;
@@ -239,6 +255,33 @@
   background: var(--cc-surface);
   flex-shrink: 0;
   box-sizing: border-box;
+}
+
+.cc-chat-input__mode {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--cc-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cc-chat-input__mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cc-chat-input__mode button:hover {
+  background: var(--cc-primary-light);
 }
 
 .cc-chat-input__textarea {

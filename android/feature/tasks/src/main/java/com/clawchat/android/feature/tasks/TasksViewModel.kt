@@ -8,21 +8,28 @@ import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.util.optimistic
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 private const val TAG = "TasksViewModel"
@@ -30,24 +37,29 @@ private const val TAG = "TasksViewModel"
 data class TasksUiState(
     val tasks: List<Todo> = emptyList(),
     val isLoading: Boolean = false,
-    val statusFilter: TaskStatus? = null, // null = all
+    val statusFilter: TaskStatus? = TaskStatus.IN_PROGRESS, // null = all
     val selectedTask: Todo? = null,
     val relationships: List<TaskRelationship> = emptyList(),
     val relationshipTaskTitles: Map<String, String> = emptyMap(),
     val isLoadingRelationships: Boolean = false,
     val relationshipError: String? = null,
+    val pendingDeletion: PendingTaskDeletion? = null,
     val error: String? = null,
+)
+
+data class PendingTaskDeletion(
+    val token: Long,
+    val task: Todo,
+    val originalIndex: Int,
 )
 
 sealed interface TasksAction {
     data class ToggleComplete(val todoId: String) : TasksAction
     data class SetFilter(val status: TaskStatus?) : TasksAction
     data class SelectTask(val task: Todo?) : TasksAction
-    data object Refresh : TasksAction
     data class Create(val input: TodoCreate) : TasksAction
     data class Update(val id: String, val update: TodoUpdate) : TasksAction
     data class Delete(val id: String) : TasksAction
-    data class ReorderTasks(val reorderedTasks: List<Todo>) : TasksAction
 }
 
 @HiltViewModel
@@ -55,13 +67,35 @@ class TasksViewModel @Inject constructor(
     private val todoRepository: TodoRepository,
     private val syncManager: SyncManager,
     private val relationshipRepository: TaskRelationshipRepository,
+    private val conversationRepository: ConversationRepository,
+    private val taskCommentRepository: TaskCommentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TasksUiState())
     val uiState: StateFlow<TasksUiState> = _uiState.asStateFlow()
 
+    /** Conversation ids to open: the thread scoped to a task the user asked to discuss. */
+    private val _openThreadEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val openThreadEvents = _openThreadEvents.asSharedFlow()
+
+    /**
+     * Open (creating if needed) the thread about this task, where what the
+     * agent creates becomes steps of the task and delegated work runs it.
+     */
+    fun openTaskThread(todoId: String) {
+        viewModelScope.launch {
+            when (val result = conversationRepository.getOrCreateForTodo(todoId)) {
+                is ApiResult.Success -> _openThreadEvents.tryEmit(result.data.id)
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                ApiResult.Loading -> Unit
+            }
+        }
+    }
+
     private var taskRequestGeneration = 0L
     private var relationshipRequestGeneration = 0L
+    private var deletionToken = 0L
+    private var deletionCommitJob: Job? = null
     private val relationshipTitleCache = mutableMapOf<String, String>()
 
     init {
@@ -83,16 +117,12 @@ class TasksViewModel @Inject constructor(
             is TasksAction.ToggleComplete -> doToggleComplete(action.todoId)
             is TasksAction.SetFilter -> doSetStatusFilter(action.status)
             is TasksAction.SelectTask -> doSelectTask(action.task)
-            is TasksAction.Refresh -> doLoadTasks()
             is TasksAction.Create -> doCreateTask(action.input)
             is TasksAction.Update -> doUpdateTask(action.id, action.update)
             is TasksAction.Delete -> doDeleteTask(action.id)
-            is TasksAction.ReorderTasks -> doReorderTasks(action.reorderedTasks)
         }
     }
 
-    // Public convenience methods — delegate to onAction for Screen composable compatibility
-    fun loadTasks() = onAction(TasksAction.Refresh)
     fun selectTask(task: Todo?) = onAction(TasksAction.SelectTask(task))
     fun toggleComplete(todoId: String) = onAction(TasksAction.ToggleComplete(todoId))
     fun setStatusFilter(status: TaskStatus?) = onAction(TasksAction.SetFilter(status))
@@ -100,32 +130,34 @@ class TasksViewModel @Inject constructor(
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
     fun setDueToday(id: String) = updateTask(id, TodoUpdate(dueDate = java.time.LocalDate.now().toString()))
-    fun reorderTasks(reordered: List<Todo>) = onAction(TasksAction.ReorderTasks(reordered))
-
-    private fun doReorderTasks(reordered: List<Todo>) {
-        _uiState.update { it.copy(tasks = reordered) }
-        viewModelScope.launch {
-            reordered.forEachIndexed { index, todo ->
-                todoRepository.updateTodo(todo.id, TodoUpdate(sortOrder = index))
-            }
-        }
-    }
+    fun setTaskStatus(id: String, status: TaskStatus) = doSetTaskStatus(id, status)
+    fun completeExperiment(todoId: String, verdictRecorded: Boolean) =
+        doSetTaskStatus(todoId, TaskStatus.COMPLETED, recordMissingVerdict = !verdictRecorded)
 
     private fun doLoadTasks() {
         val generation = ++taskRequestGeneration
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val params = mutableMapOf<String, String>("limit" to "200")
-            _uiState.value.statusFilter?.let { params["status"] = it.wireValue }
+            // Keep one complete snapshot so status pages can switch instantly without a
+            // network round trip for every tab click or horizontal swipe.
+            val params = mapOf("limit" to "200")
             when (val result = todoRepository.listTodos(params)) {
                 is ApiResult.Success -> {
                     if (generation != taskRequestGeneration) return@launch
                     relationshipTitleCache.putAll(result.data.items.associate { it.id to it.title })
                     _uiState.update { state ->
+                        // A project's root todo is the project's container, not a task.
+                        // Listed here it carried the project's own name, so completing or
+                        // deleting "the task" hit the project -- which then lived on with
+                        // no root and looked like the task had come back.
+                        val visibleItems = result.data.items.filterNot { task ->
+                            task.id == state.pendingDeletion?.task?.id ||
+                                task.source == PROJECT_ROOT_SOURCE
+                        }
                         state.copy(
-                            tasks = result.data.items,
+                            tasks = visibleItems,
                             selectedTask = state.selectedTask?.let { selected ->
-                                result.data.items.firstOrNull { it.id == selected.id } ?: selected
+                                visibleItems.firstOrNull { it.id == selected.id } ?: selected
                             },
                             isLoading = false,
                         )
@@ -141,8 +173,8 @@ class TasksViewModel @Inject constructor(
     }
 
     private fun doSetStatusFilter(status: TaskStatus?) {
+        if (_uiState.value.statusFilter == status) return
         _uiState.update { it.copy(statusFilter = status) }
-        doLoadTasks()
     }
 
     private fun doSelectTask(task: Todo?) {
@@ -247,13 +279,23 @@ class TasksViewModel @Inject constructor(
     }
 
     private fun doToggleComplete(todoId: String) {
+        val todo = _uiState.value.tasks.find { it.id == todoId } ?: return
+        val newStatus = if (todo.status == TaskStatus.COMPLETED) {
+            TaskStatus.PENDING
+        } else {
+            TaskStatus.COMPLETED
+        }
+        doSetTaskStatus(todoId, newStatus)
+    }
+
+    private fun doSetTaskStatus(
+        todoId: String,
+        newStatus: TaskStatus,
+        recordMissingVerdict: Boolean = false,
+    ) {
         viewModelScope.launch {
             val todo = _uiState.value.tasks.find { it.id == todoId } ?: return@launch
-            val newStatus = if (todo.status == TaskStatus.COMPLETED) {
-                TaskStatus.PENDING
-            } else {
-                TaskStatus.COMPLETED
-            }
+            if (todo.status == newStatus) return@launch
 
             try {
                 _uiState.optimistic(
@@ -278,6 +320,19 @@ class TasksViewModel @Inject constructor(
                         )
                     },
                 ) {
+                    if (recordMissingVerdict) {
+                        when (
+                            val result = taskCommentRepository.addComment(
+                                todoId,
+                                MISSING_VERDICT_COMMENT,
+                                missingVerdictOperationId(todoId),
+                            )
+                        ) {
+                            is ApiResult.Success -> Unit
+                            is ApiResult.Error -> throw Exception(result.message)
+                            ApiResult.Loading -> throw Exception("Comment request did not complete")
+                        }
+                    }
                     val result = todoRepository.updateTodo(todoId, TodoUpdate(status = newStatus))
                     if (result is ApiResult.Error) throw Exception(result.message)
                 }
@@ -285,6 +340,7 @@ class TasksViewModel @Inject constructor(
                 throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Optimistic update failed", e)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -322,22 +378,88 @@ class TasksViewModel @Inject constructor(
     }
 
     private fun doDeleteTask(id: String) {
+        val state = _uiState.value
+        val originalIndex = state.tasks.indexOfFirst { it.id == id }
+        if (originalIndex < 0 || state.pendingDeletion?.task?.id == id) return
+
+        state.pendingDeletion?.let { previous ->
+            deletionCommitJob?.cancel()
+            deletionCommitJob = null
+            persistDeletion(previous)
+        }
+        val pendingDeletion = PendingTaskDeletion(
+            token = ++deletionToken,
+            task = state.tasks[originalIndex],
+            originalIndex = originalIndex,
+        )
+        _uiState.update { current ->
+            current.copy(
+                tasks = current.tasks.filterNot { it.id == id },
+                selectedTask = if (current.selectedTask?.id == id) null else current.selectedTask,
+                pendingDeletion = pendingDeletion,
+            )
+        }
+        deletionCommitJob = viewModelScope.launch {
+            delay(DELETE_UNDO_WINDOW_MS)
+            deletionCommitJob = null
+            commitDelete(pendingDeletion.token)
+        }
+    }
+
+    fun undoDelete(token: Long) {
+        if (_uiState.value.pendingDeletion?.token != token) return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
+        _uiState.update { state ->
+            val pending = state.pendingDeletion?.takeIf { it.token == token } ?: return@update state
+            state.copy(
+                tasks = state.tasks.restore(pending),
+                pendingDeletion = null,
+            )
+        }
+    }
+
+    fun commitDelete(token: Long) {
+        val pending = _uiState.value.pendingDeletion?.takeIf { it.token == token } ?: return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
+        _uiState.update { state ->
+            if (state.pendingDeletion?.token == token) state.copy(pendingDeletion = null) else state
+        }
+        persistDeletion(pending)
+    }
+
+    private fun persistDeletion(pending: PendingTaskDeletion) {
         viewModelScope.launch {
-            when (val result = todoRepository.deleteTodo(id)) {
-                is ApiResult.Success -> _uiState.update { state ->
+            when (val result = todoRepository.deleteTodo(pending.task.id)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Error -> _uiState.update { state ->
                     state.copy(
-                        tasks = state.tasks.filter { it.id != id },
-                        selectedTask = if (state.selectedTask?.id == id) null else state.selectedTask,
+                        tasks = state.tasks.restore(pending),
+                        error = result.message,
                     )
                 }
-                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
                 is ApiResult.Loading -> { /* not used here */ }
             }
         }
     }
 
+    private fun List<Todo>.restore(pending: PendingTaskDeletion): List<Todo> {
+        if (any { it.id == pending.task.id }) return this
+        return toMutableList().apply {
+            add(pending.originalIndex.coerceIn(0, size), pending.task)
+        }
+    }
+
     private companion object {
+        const val DELETE_UNDO_WINDOW_MS = 10_000L
+        const val PROJECT_ROOT_SOURCE = "project_root"
+        const val MISSING_VERDICT_COMMENT = "판정 미기록"
         const val MAX_RELATED_TITLE_LOOKUPS = 50
         const val MAX_CONCURRENT_TITLE_LOOKUPS = 8
     }
 }
+
+internal fun missingVerdictOperationId(todoId: String): String = UUID.nameUUIDFromBytes(
+    "clawchat:missing-verdict:$todoId".toByteArray(Charsets.UTF_8),
+).toString()

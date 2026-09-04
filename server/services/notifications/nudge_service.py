@@ -47,7 +47,6 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
         candidates.append({
             "todo_id": t.id,
             "title": t.title,
-            "priority": t.priority,
             "reason": f"No activity for {days} days",
             "suggested_action": "break_down_or_reschedule",
             "urgency": 1,
@@ -72,10 +71,9 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
         candidates.append({
             "todo_id": t.id,
             "title": t.title,
-            "priority": t.priority,
             "reason": f"Due in {hours} hour{'s' if hours != 1 else ''} but not started",
             "suggested_action": "start_now",
-            "urgency": 3 if t.priority in ("high", "urgent") else 2,
+            "urgency": 2,
         })
 
     # 3. Inbox items sitting too long — created > 2 days ago, still in inbox
@@ -95,7 +93,6 @@ async def find_nudge_candidates(db: AsyncSession) -> list[dict]:
         candidates.append({
             "todo_id": t.id,
             "title": t.title,
-            "priority": t.priority,
             "reason": f"Sitting in inbox for {days} days",
             "suggested_action": "organize",
             "urgency": 1,
@@ -124,7 +121,6 @@ async def generate_nudge(
         prompt = (
             f"Generate a brief, friendly nudge notification for a task:\n"
             f"Task: {top['title']}\n"
-            f"Priority: {top['priority']}\n"
             f"Issue: {top['reason']}\n"
             f"Suggested action: {top['suggested_action']}\n\n"
             f"Respond with ONLY a single short sentence (under 100 chars) that gently reminds "

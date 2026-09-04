@@ -2,11 +2,14 @@ import { useNavigate } from 'react-router-dom';
 import { CalendarIcon, CheckCircleIcon, CheckIcon, WarningIcon } from '../shared/Icons';
 import SchedulingSuggestions from './SchedulingSuggestions';
 import TaskProgressCard from './TaskProgressCard';
+import RunStatusCard from './RunStatusCard';
+import ChatPlanProposalCard from './ChatPlanProposalCard';
 import { translateUi } from '../../i18n';
 interface ActionCardProps {
   metadata: Record<string, unknown>;
+  suppressTaskProgress?: boolean;
 }
-export default function ActionCard({ metadata }: ActionCardProps) {
+export default function ActionCard({ metadata, suppressTaskProgress = false }: ActionCardProps) {
   const navigate = useNavigate();
   const actionType = metadata.action_type as string;
   const eventStartTime =
@@ -123,11 +126,41 @@ export default function ActionCard({ metadata }: ActionCardProps) {
       </div>
     );
   }
+  // Planner started for a task; the proposal arrives on the task and in Review
+  if (actionType === 'plan_started') {
+    return <ChatPlanProposalCard metadata={metadata} />;
+  }
+  // Delegation refused because the thread's task already has a run going
+  if (actionType === 'task_run_active' && typeof metadata.run_id === 'string') {
+    return (
+      <div className="cc-action-card cc-action-card--warning">
+        <div className="cc-action-card__icon cc-action-card__icon--warning">
+          <WarningIcon size={14} />
+        </div>
+        <div className="cc-action-card__content">
+          <span className="cc-action-card__label">{translateUi('Run in progress')}</span>
+        </div>
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-action-card__view-btn"
+          onClick={() => navigate(`/runs?run_id=${metadata.run_id}`)}
+        >
+          {translateUi('Open run')}
+        </button>
+      </div>
+    );
+  }
+  // A run reporting into its thread (written by the server, not by chat)
+  if (actionType === 'run_update') {
+    return <RunStatusCard metadata={metadata} />;
+  }
   // Task delegated (Phase 4)
   if (actionType === 'task_delegated') {
+    if (suppressTaskProgress) return null;
     return (
       <TaskProgressCard
         taskId={metadata.task_id as string}
+        runId={typeof metadata.run_id === 'string' ? metadata.run_id : undefined}
         isMultiAgent={metadata.is_multi_agent as boolean}
       />
     );

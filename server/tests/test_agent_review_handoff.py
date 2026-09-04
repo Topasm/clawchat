@@ -209,6 +209,15 @@ async def test_agent_approval_returns_typed_handoff_and_releases_ready_task_once
     assert nodes[still_blocked.id].direct_blocker_ids == ["todo_other_blocker"]
     await db_session.commit()
 
+    replay = await client.post(
+        f"/api/reviews/{review.id}/decision",
+        headers=auth_headers,
+        json={"decision": "approved", "note": "Adopt and continue"},
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["review"]["status"] == "approved"
+    assert replay.json()["outcome"] == {}
+
     duplicate = await client.post(
         f"/api/reviews/{review.id}/decision",
         headers=auth_headers,
@@ -287,9 +296,15 @@ async def test_concurrent_review_decisions_have_one_cas_winner(
         async def decide(decision):
             async with session_factory() as db:
                 try:
-                    await agent_run_service.require_run(db, run.id)
+                    loaded_run = await agent_run_service.require_run(db, run.id)
+                    expected_status = AgentRunStatus(loaded_run.status)
                     await barrier.wait()
-                    await agent_run_service.decide_run(db, run.id, decision)
+                    await agent_run_service.decide_run(
+                        db,
+                        run.id,
+                        decision,
+                        expected_status=expected_status,
+                    )
                     await db.commit()
                     return decision.value
                 except ConflictError:

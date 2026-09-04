@@ -1,23 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_today_title">Today</string>
-    <string name="widget_add_task">Add a task</string>
+    <string name="widget_add_task">Add to Inbox</string>
     <string name="widget_refresh">Refresh</string>
-    <string name="widget_login_required">Sign in to use this widget</string>
+    <string name="widget_login_required">Set up ClawChat to use this widget</string>
     <string name="widget_loading">Loading…</string>
     <string name="widget_load_error">Couldn’t load tasks</string>
-    <string name="widget_empty">No tasks due today</string>
-    <string name="widget_overdue">Overdue</string>
+    <string name="widget_empty">No deadlines ahead</string>
     <string name="widget_mark_done">Mark %1$s complete</string>
     <string name="widget_inbox">Inbox</string>
     <string name="widget_add_to_inbox">Add to inbox…</string>
-
-    <string name="quick_add_today_title">Add to Today</string>
     <string name="quick_add_inbox_title">Add to Inbox</string>
     <string name="quick_add_hint">What needs to be done?</string>
+    <string name="quick_add_title_required">Add a task title, not only tags.</string>
     <string name="quick_add_cancel">Cancel</string>
     <string name="quick_add_add">Add</string>
-    <string name="quick_add_today_success">Added to Today</string>
     <string name="quick_add_inbox_success">Added to Inbox</string>
     <string name="quick_add_failed">Couldn’t add task. Try again.</string>
+    <string name="widget_config_title">Widget appearance</string>
+    <string name="widget_config_description">Choose how much of your wallpaper shows through the widget background. On supported launchers, you can change this later from the widget menu.</string>
+    <string name="widget_config_preview">Preview</string>
+    <string name="widget_config_transparency">Background transparency</string>
+    <string name="widget_config_percent">%1$d%%</string>
+    <string name="widget_config_transparency_hint" formatted="false">0% is solid. At 100%, only the widget content remains visible.</string>
+    <string name="widget_config_cancel">Cancel</string>
+    <string name="widget_config_apply">Apply</string>
+    <string name="widget_config_save_failed">Couldn’t save the widget setting. Try again.</string>
+    <string name="widget_config_tasks_preview">List deadlines as they approach and add new items to Inbox.</string>
+    <string name="widget_config_inbox_preview">Capture a new item directly into Inbox.</string>
+    <string name="widget_tasks_title">Tasks</string>
+    <string name="widget_tasks_title_with_count">Tasks · %1$d</string>
+    <string name="widget_due_today">D-DAY</string>
+    <string name="widget_days_remaining">D-%1$d</string>
+    <string name="widget_days_overdue">D+%1$d</string>
+    <string name="widget_config_horizon">Look ahead</string>
+    <string name="widget_config_horizon_days">%1$d days</string>
+    <string name="widget_config_horizon_hint">How far ahead the widget lists deadlines. Overdue work always shows.</string>
 </resources>

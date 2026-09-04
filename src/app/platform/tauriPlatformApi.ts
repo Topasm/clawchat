@@ -11,6 +11,8 @@ import type {
   ServerStatus,
   UpdateDownloadProgress,
   UpdateInfo,
+  WorkerRunResult,
+  WorkspaceContextFile,
   WorkspaceViewMode,
 } from './nativePlatformTypes';
 import { TAURI_COMMANDS, TAURI_EVENTS } from './tauriCommands';
@@ -70,6 +72,11 @@ export const tauriPlatformApi: NativePlatformApi = {
       subscribe<UpdateDownloadProgress>(TAURI_EVENTS.updateDownloadProgress, callback),
     onUpdateDownloaded: (callback) => subscribe<void>(TAURI_EVENTS.updateDownloaded, callback),
   },
+  worker: {
+    run: (request) => invoke<WorkerRunResult>(TAURI_COMMANDS.workerRun, { request }),
+    readContext: (path) =>
+      invoke<WorkspaceContextFile[]>(TAURI_COMMANDS.workerReadContext, { path }),
+  },
   server: {
     getStatus: () => invoke<ServerStatus>(TAURI_COMMANDS.serverGetStatus),
     getConfig: () => invoke<ServerConfig>(TAURI_COMMANDS.serverGetConfig),
@@ -91,6 +98,8 @@ export const tauriPlatformApi: NativePlatformApi = {
   },
   system: {
     openCameraSettings: () => invoke<void>(TAURI_COMMANDS.appOpenCameraSettings),
+    openCanonicalDocument: (target) =>
+      invoke<void>(TAURI_COMMANDS.appOpenCanonicalDocument, { target }),
   },
   appWindow: {
     setWorkspaceViewMode,

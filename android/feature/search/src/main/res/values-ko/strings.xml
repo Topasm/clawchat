@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_title">빠른 찾기</string>
+    <string name="search_cd_back">뒤로</string>
+    <string name="search_placeholder">검색하거나 바로 이동</string>
+    <string name="search_placeholder_local">작업 및 일정 검색</string>
+    <string name="search_cd_clear_query">검색어 지우기</string>
+    <string name="search_no_matches_title">검색 결과 없음</string>
+    <string name="search_no_matches_description">&quot;%1$s&quot;과(와) 일치하는 항목이 없습니다. 검색어를 줄여 보세요.</string>
+    <string name="search_initial_title">워크스페이스 검색</string>
+    <string name="search_initial_description">작업, 일정, 채팅 메시지의 전체 텍스트를 검색합니다.</string>
+    <string name="search_initial_description_local">이 기기에 저장된 작업과 일정을 검색합니다.</string>
+    <string name="search_type_tasks">작업</string>
+    <string name="search_type_events">일정</string>
+    <string name="search_type_messages">메시지</string>
+    <string name="search_quick_destinations">바로 이동</string>
+    <string name="search_destination_now">Now</string>
+    <string name="search_destination_in_progress">진행 중</string>
+    <string name="search_destination_schedule">일정</string>
+    <string name="search_destination_chat">채팅</string>
+    <string name="search_destination_settings">설정</string>
+</resources>

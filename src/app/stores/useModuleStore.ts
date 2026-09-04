@@ -13,17 +13,15 @@ interface ModuleState {
   // Kanban filters
   kanbanFilters: {
     searchQuery: string;
-    priorities: string[];
     tags: string[];
-    sortField: 'title' | 'priority' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order';
+    sortField: 'title' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order';
     sortDirection: 'asc' | 'desc';
     showSubTasks: boolean;
   };
   setKanbanSearchQuery: (query: string) => void;
-  toggleKanbanPriorityFilter: (priority: string) => void;
   toggleKanbanTagFilter: (tag: string) => void;
   setKanbanSort: (
-    field: 'title' | 'priority' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order',
+    field: 'title' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order',
     direction: 'asc' | 'desc',
   ) => void;
   clearKanbanFilters: () => void;
@@ -59,7 +57,6 @@ export const useModuleStore = create<ModuleState>()((set) => ({
   // --- Kanban filters ---
   kanbanFilters: {
     searchQuery: '',
-    priorities: [],
     tags: [],
     sortField: 'created_at' as const,
     sortDirection: 'desc' as const,
@@ -67,14 +64,6 @@ export const useModuleStore = create<ModuleState>()((set) => ({
   },
   setKanbanSearchQuery: (query) =>
     set((state) => ({ kanbanFilters: { ...state.kanbanFilters, searchQuery: query } })),
-  toggleKanbanPriorityFilter: (priority) =>
-    set((state) => {
-      const current = state.kanbanFilters.priorities;
-      const next = current.includes(priority)
-        ? current.filter((p) => p !== priority)
-        : [...current, priority];
-      return { kanbanFilters: { ...state.kanbanFilters, priorities: next } };
-    }),
   toggleKanbanTagFilter: (tag) =>
     set((state) => {
       const current = state.kanbanFilters.tags;
@@ -89,7 +78,6 @@ export const useModuleStore = create<ModuleState>()((set) => ({
     set({
       kanbanFilters: {
         searchQuery: '',
-        priorities: [],
         tags: [],
         sortField: 'created_at',
         sortDirection: 'desc',

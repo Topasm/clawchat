@@ -54,6 +54,20 @@ sealed interface SyncEvent {
 
     /** A weekly review summary from the server. */
     data class WeeklyReview(val content: String) : SyncEvent
+
+    /**
+     * An agent run moved to a new lifecycle state. `waiting_input` and
+     * `waiting_review` mean the agent has stopped for the user.
+     */
+    data class RunStateChanged(
+        val runId: String,
+        val todoId: String?,
+        val parentTaskId: String?,
+        val title: String,
+        val status: String,
+        val message: String?,
+        val error: String?,
+    ) : SyncEvent
 }
 
 /**
@@ -111,8 +125,8 @@ class WebSocketClient @Inject constructor(
     }
 
     /**
-     * Opens the WebSocket connection. Reads the current token and base URL
-     * from [SessionStore]. If either is missing the connect is skipped.
+     * Opens the WebSocket connection from one atomic active-session snapshot.
+     * Saved credentials are deliberately invisible while local mode is active.
      */
     fun connect() {
         val generation = connectionGeneration.incrementAndGet()
@@ -130,8 +144,9 @@ class WebSocketClient @Inject constructor(
         currentBackoff = INITIAL_BACKOFF_MS
 
         scope.launch {
-            val token = sessionStore.token.first()
-            val baseUrl = sessionStore.apiBaseUrl.first()
+            val session = sessionStore.activeSession.first()
+            val token = session?.token
+            val baseUrl = session?.apiBaseUrl
 
             if (!isCurrent(generation)) return@launch
             if (token.isNullOrBlank() || baseUrl.isNullOrBlank()) {
@@ -215,7 +230,7 @@ class WebSocketClient @Inject constructor(
             }
         } catch (e: Exception) {
             if (!call.isCanceled()) {
-                Log.w(TAG, "WebSocket ticket request failed: ${e.message}")
+                Log.w(TAG, "WebSocket ticket request failed (${e.javaClass.simpleName})")
             }
             TicketResult.RetryableFailure
         } finally {
@@ -238,7 +253,7 @@ class WebSocketClient @Inject constructor(
             .trimEnd('/')
 
         val url = "$wsUrl/ws?ticket=$ticket"
-        Log.d(TAG, "Connecting to $wsUrl/ws")
+        Log.d(TAG, "Connecting to realtime endpoint")
 
         val request = Request.Builder().url(url).build()
         val newWebSocket = client.newWebSocket(request, Listener(baseUrl, token, generation))
@@ -333,7 +348,7 @@ class WebSocketClient @Inject constructor(
                     val minutesUntil = data.optInt("minutes_until", 0)
                     val deliveryKey = data.optString("delivery_key")
                         .takeIf(String::isNotBlank)
-                    Log.d(TAG, "Reminder: $title ($reminderType)")
+                    Log.d(TAG, "Reminder received ($reminderType)")
                     _events.tryEmit(
                         SyncEvent.Reminder(
                             reminderType,
@@ -350,7 +365,7 @@ class WebSocketClient @Inject constructor(
                     val title = data.optString("title", "")
                     val message = data.optString("message", "")
                     val todoId: String? = if (data.has("todo_id")) data.optString("todo_id") else null
-                    Log.d(TAG, "Nudge: $title")
+                    Log.d(TAG, "Nudge received")
                     _events.tryEmit(SyncEvent.Nudge(title, message, todoId))
                 }
                 "weekly_review" -> {
@@ -359,12 +374,33 @@ class WebSocketClient @Inject constructor(
                     Log.d(TAG, "Weekly review received")
                     _events.tryEmit(SyncEvent.WeeklyReview(content))
                 }
+                "run_state_changed" -> {
+                    val data = json.optJSONObject("data") ?: return
+                    val runId = data.optString("run_id").takeIf(String::isNotBlank) ?: return
+                    val status = data.optString("status").takeIf(String::isNotBlank) ?: return
+                    Log.d(TAG, "Run state changed ($status)")
+                    _events.tryEmit(
+                        SyncEvent.RunStateChanged(
+                            runId = runId,
+                            todoId = data.optString("todo_id").takeIf(String::isNotBlank),
+                            parentTaskId = data.optString("parent_task_id")
+                                .takeIf(String::isNotBlank),
+                            title = data.optString("title", ""),
+                            status = status,
+                            message = data.optString("progress_message")
+                                .takeIf(String::isNotBlank),
+                            error = data.optString("error").takeIf(String::isNotBlank),
+                        )
+                    )
+                }
                 else -> {
                     Log.d(TAG, "Unhandled message type: $type")
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse message: $text", e)
+            // Realtime payloads can contain private task titles, notes, and
+            // reminder text. Exception messages can echo malformed input too.
+            Log.w(TAG, "Failed to parse realtime message (${e.javaClass.simpleName})")
         }
     }
 
@@ -393,13 +429,13 @@ class WebSocketClient @Inject constructor(
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-            Log.d(TAG, "Server closing: $code $reason")
+            Log.d(TAG, "Server closing: code=$code")
             webSocket.close(code, reason)
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             if (!isCurrent(generation) || this@WebSocketClient.webSocket !== webSocket) return
-            Log.d(TAG, "Closed: $code $reason")
+            Log.d(TAG, "Closed: code=$code")
             this@WebSocketClient.webSocket = null
             pingJob?.cancel()
             _events.tryEmit(SyncEvent.Disconnected)
@@ -408,7 +444,7 @@ class WebSocketClient @Inject constructor(
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             if (!isCurrent(generation) || this@WebSocketClient.webSocket !== webSocket) return
-            Log.w(TAG, "Connection failure: ${t.message}")
+            Log.w(TAG, "Connection failure (${t.javaClass.simpleName})")
             this@WebSocketClient.webSocket = null
             pingJob?.cancel()
             _events.tryEmit(SyncEvent.Disconnected)

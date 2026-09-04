@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,6 +48,21 @@ const providerState = {
   codex_model: 'gpt-5.3-codex',
 };
 
+function renderSettingsPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <ThemeProvider>
+          <SettingsPage />
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe('SettingsPage Codex provider', () => {
   beforeEach(async () => {
     await changeAppLanguage('en');
@@ -84,13 +100,7 @@ describe('SettingsPage Codex provider', () => {
       },
     });
 
-    render(
-      <MemoryRouter>
-        <ThemeProvider>
-          <SettingsPage />
-        </ThemeProvider>
-      </MemoryRouter>,
-    );
+    renderSettingsPage();
 
     expect(await screen.findByRole('button', { name: 'Codex' })).toBeInTheDocument();
     expect(screen.getByText('Not configured — add an OpenAI API key')).toBeInTheDocument();
@@ -116,13 +126,7 @@ describe('SettingsPage Codex provider', () => {
       data: { ...providerState, active_provider: 'codex_cli' },
     });
 
-    render(
-      <MemoryRouter>
-        <ThemeProvider>
-          <SettingsPage />
-        </ThemeProvider>
-      </MemoryRouter>,
-    );
+    renderSettingsPage();
 
     const codexCli = await screen.findByRole('button', { name: 'Codex CLI' });
     fireEvent.click(codexCli);
@@ -160,13 +164,7 @@ describe('SettingsPage Codex provider', () => {
       },
     });
 
-    render(
-      <MemoryRouter>
-        <ThemeProvider>
-          <SettingsPage />
-        </ThemeProvider>
-      </MemoryRouter>,
-    );
+    renderSettingsPage();
 
     expect(await screen.findByText('워크스페이스 설정')).toBeInTheDocument();
     await screen.findByRole('button', { name: 'Codex' });

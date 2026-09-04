@@ -1,6 +1,7 @@
 package com.clawchat.android.share
 
 import android.content.Context
+import com.clawchat.android.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -70,6 +71,7 @@ internal class ShareOutboxStore internal constructor(
     private val root: File,
     private val maxItems: Int,
     private val maxBytes: Long,
+    private val multipleFilesTitle: (Int) -> String = { count -> "$count shared files" },
 ) {
     @Inject
     internal constructor(
@@ -78,6 +80,13 @@ internal class ShareOutboxStore internal constructor(
         root = File(context.filesDir, OUTBOX_DIRECTORY),
         maxItems = SHARE_OUTBOX_MAX_ITEMS,
         maxBytes = SHARE_OUTBOX_MAX_BYTES,
+        multipleFilesTitle = { count ->
+            context.resources.getQuantityString(
+                R.plurals.share_multiple_files_title,
+                count,
+                count,
+            )
+        },
     )
 
     private val mutex = Mutex()
@@ -99,6 +108,7 @@ internal class ShareOutboxStore internal constructor(
             staged.subject,
             staged.text,
             staged.files.map(StagedSharedFile::displayName),
+            multipleFilesTitle,
         ) ?: return@withLock ShareOutboxEnqueueResult.Empty
         ensureRoot()
 

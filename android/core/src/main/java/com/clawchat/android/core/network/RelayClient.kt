@@ -40,6 +40,13 @@ import javax.inject.Singleton
 
 data class RelayResponse(val status: Int, val contentType: String?, val body: ByteArray)
 
+/** Relay material read atomically from one active paired-session snapshot. */
+internal data class RelayConnectionConfig(
+    val relayUrl: String,
+    val hostId: String,
+    val hostPublicKey: String,
+)
+
 @Singleton
 class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
     companion object {
@@ -59,47 +66,72 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
     @Volatile private var aesKey: ByteArray? = null
     @Volatile private var ready: CompletableDeferred<Unit>? = null
     @Volatile private var activeHostId: String? = null
+    @Volatile private var activeRelayConfig: RelayConnectionConfig? = null
 
     suspend fun ensureConnected(expectedScope: String? = null): Boolean = connectionMutex.withLock {
         val session = sessionStore.activeSession.first()
-        if (expectedScope != null && session?.connectionScope() != expectedScope) {
-            throw SessionScopeChangedException(expectedScope, session?.connectionScope())
+        val activeScope = session?.networkScope()
+        if (session == null) {
+            if (expectedScope != null) {
+                throw SessionScopeChangedException(expectedScope, null)
+            }
+            return false
+        }
+        if (expectedScope != null && activeScope != expectedScope) {
+            throw SessionScopeChangedException(expectedScope, activeScope)
         }
         // Relay pairing is host-scoped. A manual direct session can retain old
         // pairing preferences during a transition, but share work must never
         // fall back through that unrelated host.
-        if (expectedScope != null && session?.authMode != "paired") {
-            throw SessionScopeChangedException(expectedScope, session?.connectionScope())
+        if (session.authMode != "paired") {
+            if (expectedScope != null) {
+                throw SessionScopeChangedException(expectedScope, activeScope)
+            }
+            return false
         }
-        val relayUrl = sessionStore.relayUrl.first() ?: return false
-        val hostId = sessionStore.hostId.first() ?: return false
-        val hostPublicKey = sessionStore.hostPublicKey.first() ?: return false
-        if (expectedScope != null && hostId != expectedScope) {
-            throw SessionScopeChangedException(expectedScope, hostId)
+        val config = session.relayConnectionConfigOrNull() ?: return false
+        if (expectedScope != null && config.hostId != expectedScope) {
+            throw SessionScopeChangedException(expectedScope, config.hostId)
         }
         val latestSession = sessionStore.activeSession.first()
-        if (expectedScope != null && latestSession?.connectionScope() != expectedScope) {
-            throw SessionScopeChangedException(expectedScope, latestSession?.connectionScope())
+        val latestConfig = latestSession?.relayConnectionConfigOrNull()
+        if (latestConfig != config) {
+            if (expectedScope != null) {
+                throw SessionScopeChangedException(expectedScope, latestSession?.networkScope())
+            }
+            return false
         }
-        if (activeHostId == hostId && ready?.isCompleted == true && webSocket != null) return true
+        if (
+            activeRelayConfig == config &&
+            ready?.isCompleted == true &&
+            webSocket != null
+        ) {
+            return true
+        }
 
         disconnectInternal()
         val privateKey = X25519PrivateKeyParameters(SecureRandom())
         val publicKey = privateKey.generatePublicKey().encoded
         val agreement = X25519Agreement().apply { init(privateKey) }
         val sharedSecret = ByteArray(agreement.agreementSize)
-        agreement.calculateAgreement(X25519PublicKeyParameters(decode(hostPublicKey), 0), sharedSecret, 0)
+        agreement.calculateAgreement(
+            X25519PublicKeyParameters(decode(config.hostPublicKey), 0),
+            sharedSecret,
+            0,
+        )
         aesKey = ByteArray(32).also { derivedKey ->
             HKDFBytesGenerator(SHA256Digest()).apply {
-                init(HKDFParameters(sharedSecret, hostId.toByteArray(), LABEL))
+                init(HKDFParameters(sharedSecret, config.hostId.toByteArray(), LABEL))
                 generateBytes(derivedKey, 0, derivedKey.size)
             }
         }
-        activeHostId = hostId
+        activeHostId = config.hostId
+        activeRelayConfig = config
         val readySignal = CompletableDeferred<Unit>()
         ready = readySignal
-        val wsUrl = relayUrl.replaceFirst("https://", "wss://")
-            .replaceFirst("http://", "ws://").trimEnd('/') + "/v1/relay/client/$hostId"
+        val wsUrl = config.relayUrl.replaceFirst("https://", "wss://")
+            .replaceFirst("http://", "ws://")
+            .trimEnd('/') + "/v1/relay/client/${config.hostId}"
         webSocket = httpClient.newWebSocket(Request.Builder().url(wsUrl).build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 webSocket.send(JSONObject().apply {
@@ -129,7 +161,19 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
     }
 
     suspend fun subscribe(token: String): Boolean {
-        if (!ensureConnected()) return false
+        val session = sessionStore.activeSession.first() ?: return false
+        if (session.authMode != "paired" || session.token != token) return false
+        val expectedScope = session.networkScope() ?: return false
+        val expectedConfig = session.relayConnectionConfigOrNull() ?: return false
+        if (!ensureConnected(expectedScope)) return false
+        val latestSession = sessionStore.activeSession.first()
+        if (
+            latestSession?.token != token ||
+            latestSession.networkScope() != expectedScope ||
+            latestSession.relayConnectionConfigOrNull() != expectedConfig
+        ) {
+            return false
+        }
         sendEncrypted(JSONObject().put("type", "subscribe").put("token", token))
         return true
     }
@@ -142,7 +186,12 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
 
     suspend fun execute(request: Request): Response {
         val expectedScope = request.tag(ExpectedSessionScope::class.java)?.value
+            ?: request.tag(AuthenticatedRoute::class.java)?.workspaceScope
         if (!ensureConnected(expectedScope)) throw IllegalStateException("Relay is not configured")
+        val activeScope = sessionStore.activeSession.first()?.networkScope()
+        if (expectedScope != null && activeScope != expectedScope) {
+            throw SessionScopeChangedException(expectedScope, activeScope)
+        }
         val id = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<RelayResponse>()
         pending[id] = deferred
@@ -238,6 +287,7 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
         aesKey = null
         ready = null
         activeHostId = null
+        activeRelayConfig = null
         synchronized(receivedNonces) {
             receivedNonces.clear()
             nonceOrder.clear()
@@ -250,9 +300,16 @@ class RelayClient @Inject constructor(private val sessionStore: SessionStore) {
     private fun decode(value: String): ByteArray =
         Base64.decode(value, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
-    private fun ActiveSession.connectionScope(): String? = when (authMode) {
-        "paired" -> hostId
-        "manual" -> apiBaseUrl?.trimEnd('/')
-        else -> hostId ?: apiBaseUrl?.trimEnd('/')
-    }
+}
+
+internal fun ActiveSession.relayConnectionConfigOrNull(): RelayConnectionConfig? {
+    if (authMode != "paired") return null
+    val relay = relayUrl?.trim()?.trimEnd('/')?.takeIf(String::isNotEmpty) ?: return null
+    val host = hostId?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    val publicKey = hostPublicKey?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    return RelayConnectionConfig(
+        relayUrl = relay,
+        hostId = host,
+        hostPublicKey = publicKey,
+    )
 }

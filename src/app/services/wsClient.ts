@@ -192,7 +192,7 @@ class WSClient {
       socket.onerror = () => {
         // onclose will fire after this
       };
-    } catch (error) {
+    } catch {
       if (
         abortController.signal.aborted ||
         generation !== this.connectionGeneration ||

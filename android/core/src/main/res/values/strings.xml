@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_ok">OK</string>
+    <string name="common_swipe_delete">Delete</string>
+    <string name="navigation_open_menu">Open navigation menu</string>
+    <string name="error_workspace_unconfigured">Choose an on-device workspace or connect a server first.</string>
+    <string name="error_workspace_changed">The workspace changed before this action could be saved.</string>
+    <string name="error_server_feature_required">This feature requires a connected workspace.</string>
+    <string name="error_local_task_not_found">This on-device task no longer exists.</string>
+    <string name="error_invalid_local_task">This task contains an invalid date or value.</string>
+    <string name="error_local_event_not_found">This on-device event no longer exists.</string>
+    <string name="error_invalid_local_event">This event contains an invalid date or time.</string>
+    <string name="error_realtime_closed">The realtime connection is closed.</string>
+
+    <string name="task_create_title">New Task</string>
+    <string name="task_title_label">Title</string>
+    <string name="task_title_hint">What needs to be done?</string>
+    <string name="task_notes_label">Notes</string>
+    <string name="task_notes_hint">Add details…</string>
+    <string name="task_clear_due_date">Clear due date</string>
+    <string name="task_add_due_date">Add due date</string>
+    <string name="task_create_action">Create</string>
+    <string name="task_swipe_due_today">Set due today</string>
+
+    <string name="reminder_none">No reminder</string>
+    <string name="reminder_5_minutes_before">5 minutes before</string>
+    <string name="reminder_10_minutes_before">10 minutes before</string>
+    <string name="reminder_15_minutes_before">15 minutes before</string>
+    <string name="reminder_30_minutes_before">30 minutes before</string>
+    <string name="reminder_1_hour_before">1 hour before</string>
+    <string name="reminder_2_hours_before">2 hours before</string>
+    <string name="reminder_1_day_before">1 day before</string>
+    <plurals name="reminder_minutes_before">
+        <item quantity="one">%1$d minute before</item>
+        <item quantity="other">%1$d minutes before</item>
+    </plurals>
+
+    <string name="notification_reminders_channel">Reminders</string>
+    <string name="notification_reminders_channel_description">Event and task reminders</string>
+    <string name="notification_reminders_summary_title">ClawChat reminders</string>
+    <plurals name="notification_reminders_summary_count">
+        <item quantity="one">%1$d reminder needs attention</item>
+        <item quantity="other">%1$d reminders need attention</item>
+    </plurals>
+    <string name="notification_mark_done">Mark done</string>
+    <string name="notification_todo_overdue">“%1$s” is overdue.</string>
+    <string name="notification_todo_due_today">“%1$s” is due today.</string>
+    <plurals name="notification_todo_due_in_minutes">
+        <item quantity="one">“%1$s” is due in %2$d minute.</item>
+        <item quantity="other">“%1$s” is due in %2$d minutes.</item>
+    </plurals>
+    <plurals name="notification_event_started_minutes_ago">
+        <item quantity="one">“%1$s” started %2$d minute ago.</item>
+        <item quantity="other">“%1$s” started %2$d minutes ago.</item>
+    </plurals>
+    <plurals name="notification_event_starts_in_minutes">
+        <item quantity="one">“%1$s” starts in %2$d minute.</item>
+        <item quantity="other">“%1$s” starts in %2$d minutes.</item>
+    </plurals>
+
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_message">ClawChat %1$s is available. You have %2$s.</string>
+    <string name="update_install_permission">Android needs permission to install apps from ClawChat. Grant it on the screen that opens, then tap Install again.</string>
+    <string name="update_install_action">Install</string>
+    <string name="update_downloading_action">Downloading…</string>
+    <string name="update_download_action">Download</string>
+    <string name="update_skip_action">Skip</string>
+    <string name="update_later_action">Later</string>
+    <string name="update_section_title">App updates</string>
+    <string name="update_section_subtitle">Installed from GitHub releases.</string>
+    <string name="update_version_label">Version</string>
+    <string name="update_checking_action">Checking…</string>
+    <string name="update_check_now_action">Check now</string>
+    <string name="update_auto_check_title">Check automatically</string>
+    <string name="update_auto_check_subtitle">Looks for a new release at most twice a day.</string>
+    <string name="update_status_manual">This build installs updates manually.</string>
+    <string name="update_status_checking">Checking for updates…</string>
+    <string name="update_status_downloading">Downloading %1$s…</string>
+    <string name="update_status_ready">ClawChat %1$s is ready to install.</string>
+    <string name="update_status_available">ClawChat %1$s is available.</string>
+    <string name="update_status_failed">Update check failed.</string>
+    <string name="update_status_current">ClawChat is up to date.</string>
+    <string name="update_status_delivery">Updates are delivered through GitHub releases.</string>
+    <string name="update_error_unsupported_build">This build does not receive GitHub releases. Install a release build to update automatically.</string>
+    <string name="update_error_check">Could not check for updates.</string>
+    <string name="update_error_check_detail">Could not check for updates. Details: %1$s</string>
+    <string name="update_error_check_network">Could not reach the release server. Check your internet connection and try again.</string>
+    <string name="update_error_check_http">The release server rejected the update check (HTTP %1$d).</string>
+    <string name="update_error_check_http_detail">The release server rejected the update check (HTTP %1$d). Details: %2$s</string>
+    <string name="update_error_cache_unavailable">Could not prepare temporary storage for the update.</string>
+    <string name="update_error_download_http">Could not download the update (HTTP %1$d).</string>
+    <string name="update_error_checksum_http">Could not download the update verification file (HTTP %1$d).</string>
+    <string name="update_error_checksum_invalid">The update verification file is invalid.</string>
+    <string name="update_error_checksum_mismatch">The downloaded update failed its integrity check and was deleted.</string>
+    <string name="update_error_download">Could not download the update.</string>
+    <string name="update_error_download_detail">Could not download the update. Details: %1$s</string>
+    <string name="update_error_install_permission">Could not open the Android install-permission screen.</string>
+    <string name="update_error_install_permission_detail">Could not open the Android install-permission screen. Details: %1$s</string>
+    <string name="update_error_install_launch">Could not open the Android package installer.</string>
+    <string name="update_error_install_launch_detail">Could not open the Android package installer. Details: %1$s</string>
+</resources>

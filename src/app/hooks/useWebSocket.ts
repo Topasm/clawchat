@@ -120,37 +120,104 @@ export default function useWebSocket(): void {
         });
       }
     };
+    // task_completed / task_failed carry the chat card's payload (full result,
+    // error). Whether the run is done, waiting for review or waiting for input
+    // is the run's call, so the status comes from `run_status` and the user is
+    // told by `run_state_changed` -- never here, or a result that still needs
+    // approval would be announced as finished.
     const handleTaskCompleted = (data: unknown) => {
       const d = data as {
         task_id?: string;
         result?: string;
+        run_id?: string | null;
+        run_status?: string | null;
       };
-      const chatStore = useChatStore.getState();
-      chatStore.updateTaskProgress?.(d.task_id ?? '', { status: 'completed', result: d.result });
-      useToastStore.getState().addToast('success', translateUi('Background task completed'));
+      useChatStore.getState().updateTaskProgress?.(d.task_id ?? '', {
+        status: d.run_status ?? 'completed',
+        result: d.result,
+        run_id: d.run_id ?? undefined,
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
       queryClient.invalidateQueries({ queryKey: ['runs'] });
       invalidateExecutionTelemetry();
-      if (useSettingsStore.getState().notificationsEnabled) {
-        void notify('Task Complete', 'Background task finished');
-      }
     };
     const handleTaskFailed = (data: unknown) => {
       const d = data as {
         task_id?: string;
         error?: string;
+        run_id?: string | null;
       };
-      const chatStore = useChatStore.getState();
-      chatStore.updateTaskProgress?.(d.task_id ?? '', { status: 'failed', error: d.error });
-      const errorMsg = d.error ?? 'Unknown error';
+      useChatStore.getState().updateTaskProgress?.(d.task_id ?? '', {
+        status: 'failed',
+        error: d.error,
+        run_id: d.run_id ?? undefined,
+      });
       queryClient.invalidateQueries({ queryKey: ['runs'] });
       invalidateExecutionTelemetry();
-      useToastStore
-        .getState()
-        .addToast('error', translateUi('Background task failed: {{error}}', { error: errorMsg }));
-      if (useSettingsStore.getState().notificationsEnabled) {
-        void notify('Task Failed', errorMsg);
+    };
+    const handleRunStateChanged = (data: unknown) => {
+      const d = data as {
+        run_id?: string;
+        agent_task_id?: string;
+        todo_id?: string | null;
+        parent_task_id?: string | null;
+        title?: string | null;
+        status?: string;
+        progress_message?: string | null;
+        result_summary?: string | null;
+        error?: string | null;
+        review_id?: string | null;
+      };
+      if (d.agent_task_id) {
+        useChatStore.getState().updateTaskProgress?.(d.agent_task_id, {
+          status: d.status,
+          message: d.progress_message ?? undefined,
+          result: d.result_summary ?? undefined,
+          error: d.error ?? undefined,
+          run_id: d.run_id,
+          review_id: d.review_id ?? undefined,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reviews });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      invalidateExecutionTelemetry();
+      // Sub-task runs report through their parent; only top-level runs get a voice.
+      if (d.parent_task_id) return;
+      const title = d.title || translateUi('Agent run');
+      const announce = (
+        type: 'warning' | 'info' | 'error',
+        message: string,
+        heading: string,
+        duration: number,
+      ) => {
+        useToastStore.getState().addToast(type, message, { duration });
+        if (useSettingsStore.getState().notificationsEnabled) {
+          void notify(heading, message, { itemType: 'todo', itemId: d.todo_id ?? undefined });
+        }
+      };
+      if (d.status === 'waiting_input') {
+        announce(
+          'warning',
+          translateUi('Agent needs your input: {{title}}', { title }),
+          translateUi('Agent needs input'),
+          15000,
+        );
+      } else if (d.status === 'waiting_review') {
+        announce(
+          'info',
+          translateUi('Ready for your review: {{title}}', { title }),
+          translateUi('Ready for review'),
+          10000,
+        );
+      } else if (d.status === 'failed') {
+        announce(
+          'error',
+          translateUi('Agent run failed: {{error}}', { error: d.error ?? title }),
+          translateUi('Agent run failed'),
+          10000,
+        );
       }
     };
     const handleTaskProgress = (data: unknown) => {
@@ -251,7 +318,14 @@ export default function useWebSocket(): void {
       const d = data as {
         conversation_id: string;
         title?: string;
+        message_id?: string;
       };
+      if (d.message_id) {
+        // The server wrote a message on its own (an agent run reporting into
+        // its thread); the open conversation and the list order both moved.
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(d.conversation_id) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      }
       if (d.title) {
         // Update conversation title in query cache
         queryClient.setQueryData<ConversationResponse[]>(queryKeys.conversations, (old) =>
@@ -332,6 +406,7 @@ export default function useWebSocket(): void {
     wsClient.on('task_completed', handleTaskCompleted);
     wsClient.on('task_failed', handleTaskFailed);
     wsClient.on('task_progress', handleTaskProgress);
+    wsClient.on('run_state_changed', handleRunStateChanged);
     wsClient.on('stream_start', handleStreamStart);
     wsClient.on('stream_chunk', handleStreamChunk);
     wsClient.on('stream_end', handleStreamEnd);
@@ -353,6 +428,7 @@ export default function useWebSocket(): void {
       wsClient.off('task_completed', handleTaskCompleted);
       wsClient.off('task_failed', handleTaskFailed);
       wsClient.off('task_progress', handleTaskProgress);
+      wsClient.off('run_state_changed', handleRunStateChanged);
       wsClient.off('stream_start', handleStreamStart);
       wsClient.off('stream_chunk', handleStreamChunk);
       wsClient.off('stream_end', handleStreamEnd);

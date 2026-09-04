@@ -43,9 +43,10 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.clawchat.android.widget.R
-import com.clawchat.android.widget.common.WidgetUpdater
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import java.util.UUID
@@ -56,15 +57,23 @@ class QuickAddActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val target = QuickAddTarget.fromWireValue(intent.getStringExtra(EXTRA_TARGET))
         val entryPoint = EntryPointAccessors.fromApplication(
             applicationContext,
             WidgetEntryPoint::class.java,
         )
         val todoRepository = entryPoint.todoRepository()
+        val sessionStore = entryPoint.sessionStore()
 
         setContent {
-            MaterialTheme {
+            val themeMode by sessionStore.themeMode.collectAsStateWithLifecycle(initialValue = "light")
+            val accentColor by sessionStore.accentColor.collectAsStateWithLifecycle(initialValue = "system")
+            val runtimeState by sessionStore.runtimeState.collectAsStateWithLifecycle(
+                initialValue = null,
+            )
+            ClawChatTheme(
+                themeModeKey = themeMode,
+                accentColorKey = accentColor,
+            ) {
                 var text by rememberSaveable { mutableStateOf("") }
                 var idempotencyKey by rememberSaveable {
                     mutableStateOf(UUID.randomUUID().toString())
@@ -75,31 +84,32 @@ class QuickAddActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val focusRequester = remember { FocusRequester() }
                 val keyboardController = LocalSoftwareKeyboardController.current
-
-                val submitTask: () -> Unit = {
-                    val request = QuickAddRequestFactory.create(
+                val request = remember(text, idempotencyKey) {
+                    QuickAddRequestFactory.create(
                         title = text,
-                        target = target,
                         idempotencyKey = idempotencyKey,
                     )
-                    if (!isSubmitting && request != null) {
+                }
+                val hasInvalidDraft = text.isNotBlank() && request == null
+
+                val submitTask: () -> Unit = {
+                    val expectedWorkspaceKey = runtimeState?.workspaceKey
+                    if (!isSubmitting && request != null && expectedWorkspaceKey != null) {
                         isSubmitting = true
                         scope.launch {
-                            when (val result = todoRepository.createTodo(request)) {
+                            when (
+                                val result = todoRepository.createTodo(
+                                    request,
+                                    expectedWorkspaceKey,
+                                )
+                            ) {
                                 is ApiResult.Success -> {
                                     keyboardController?.hide()
                                     Toast.makeText(
                                         this@QuickAddActivity,
-                                        getString(
-                                            if (target == QuickAddTarget.TODAY) {
-                                                R.string.quick_add_today_success
-                                            } else {
-                                                R.string.quick_add_inbox_success
-                                            }
-                                        ),
+                                        getString(R.string.quick_add_inbox_success),
                                         Toast.LENGTH_SHORT,
                                     ).show()
-                                    WidgetUpdater.updateAll(this@QuickAddActivity)
                                     finish()
                                 }
                                 is ApiResult.Error -> {
@@ -124,27 +134,21 @@ class QuickAddActivity : ComponentActivity() {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
-                        shape = RoundedCornerShape(20.dp),
+                            .padding(horizontal = 12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface,
                         ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = stringResource(
-                                    if (target == QuickAddTarget.TODAY) {
-                                        R.string.quick_add_today_title
-                                    } else {
-                                        R.string.quick_add_inbox_title
-                                    }
-                                ),
+                                text = stringResource(R.string.quick_add_inbox_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
 
                             OutlinedTextField(
                                 value = text,
@@ -163,15 +167,21 @@ class QuickAddActivity : ComponentActivity() {
                                 placeholder = { Text(stringResource(R.string.quick_add_hint)) },
                                 singleLine = true,
                                 enabled = !isSubmitting,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 keyboardOptions = KeyboardOptions(
                                     capitalization = KeyboardCapitalization.Sentences,
                                     imeAction = ImeAction.Done,
                                 ),
                                 keyboardActions = KeyboardActions(onDone = { submitTask() }),
+                                isError = hasInvalidDraft,
+                                supportingText = if (hasInvalidDraft) {
+                                    { Text(stringResource(R.string.quick_add_title_required)) }
+                                } else {
+                                    null
+                                },
                             )
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -187,7 +197,10 @@ class QuickAddActivity : ComponentActivity() {
                                 Spacer(Modifier.width(8.dp))
                                 FilledTonalButton(
                                     onClick = submitTask,
-                                    enabled = text.isNotBlank() && !isSubmitting,
+                                    enabled = request != null &&
+                                        !isSubmitting &&
+                                        runtimeState?.workspaceKey != null,
+                                    shape = RoundedCornerShape(6.dp),
                                 ) {
                                     Text(stringResource(R.string.quick_add_add))
                                 }
@@ -205,17 +218,13 @@ class QuickAddActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val EXTRA_TARGET = "com.clawchat.android.widget.quickadd.TARGET"
-
-        fun createIntent(context: Context, target: QuickAddTarget): Intent =
+        fun createIntent(context: Context): Intent =
             Intent(context, QuickAddActivity::class.java)
-                .putExtra(EXTRA_TARGET, target.wireValue)
-                // Distinct data prevents launchers from reusing an Inbox pending intent for Today.
                 .setData(
                     Uri.Builder()
                         .scheme("clawchat")
                         .authority("quick-add")
-                        .appendPath(target.wireValue)
+                        .appendPath("inbox")
                         .build()
                 )
     }

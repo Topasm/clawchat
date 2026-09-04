@@ -1,7 +1,7 @@
 """Calendar events, including recurring-series expansion and deletion."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 
@@ -241,3 +241,42 @@ async def test_project_filter_applies_to_expanded_occurrences(db_session):
 
     titles = {r["title"] if isinstance(r, dict) else r.title for r in rows}
     assert titles == {"Work daily"}
+
+
+# --- iCalendar export -----------------------------------------------------
+
+
+async def _todo(db, **overrides):
+    from services.tasks import todo_service
+
+    defaults = dict(title="File the report", due_date=datetime(2026, 8, 30, 23, 59, tzinfo=UTC))
+    defaults.update(overrides)
+    todo = await todo_service.create_todo(db, **defaults)
+    await db.commit()
+    return todo
+
+
+async def test_export_carries_events_and_task_deadlines(db_session):
+    await _event(db_session)
+    await _todo(db_session)
+
+    ics = await calendar_service.export_events_ical(db_session)
+
+    assert "SUMMARY:Standup" in ics
+    # A deadline lands as an all-day entry on the day it is due, so every
+    # subscription reader renders it.
+    assert "SUMMARY:File the report" in ics
+    assert "DTSTART;VALUE=DATE:20260830" in ics
+    assert "CATEGORIES:TASK" in ics
+
+
+async def test_export_leaves_out_finished_and_undated_tasks(db_session):
+    await _todo(db_session, title="Already done", status="completed")
+    await _todo(db_session, title="Abandoned", status="cancelled")
+    await _todo(db_session, title="No deadline", due_date=None)
+
+    ics = await calendar_service.export_events_ical(db_session)
+
+    assert "Already done" not in ics
+    assert "Abandoned" not in ics
+    assert "No deadline" not in ics

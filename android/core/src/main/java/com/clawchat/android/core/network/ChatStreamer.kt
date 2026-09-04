@@ -27,8 +27,11 @@ class ChatStreamerImpl @Inject constructor(
 ) : ChatStreamer {
 
     override fun stream(conversationId: String, content: String): Flow<SseEvent> = flow {
-        val baseUrl = sessionStore.apiBaseUrl.first()
-        val token = sessionStore.token.first()
+        // The URL and bearer token must come from one active-session snapshot.
+        // In local mode activeSession is null even when a server is remembered.
+        val session = sessionStore.activeSession.first()
+        val baseUrl = session?.apiBaseUrl
+        val token = session?.token
         if (baseUrl.isNullOrBlank() || token.isNullOrBlank()) {
             // The caller has already put a streaming indicator on screen, so
             // returning quietly would leave it spinning with no way out.

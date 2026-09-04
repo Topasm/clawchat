@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_network_unavailable">연결할 수 없습니다. 네트워크와 서버를 확인한 뒤 다시 시도하세요.</string>
+    <string name="error_request_failed">서버에서 요청을 처리하지 못했습니다. 다시 시도하세요.</string>
+    <string name="error_unknown">문제가 발생했습니다. 다시 시도하세요.</string>
+</resources>

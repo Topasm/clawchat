@@ -35,7 +35,7 @@ docker compose up --build -d                    # Server only (BYO LLM)
 docker compose --profile ollama up --build -d   # Server + Ollama
 ```
 
-Server config is via environment variables (see `.env.example`). Key vars: `AI_PROVIDER` (`ollama`, `openai`, `claude_code`, or `codex`), `AI_BASE_URL`, `AI_MODEL`, `CODEX_API_KEY`/`OPENAI_API_KEY`, `CODEX_MODEL`, and `PIN`. `JWT_SECRET` auto-generates if not set. For remote access: `PUBLIC_URL` (backend, used in pairing QR codes), `VITE_DEFAULT_SERVER_URL` (frontend build-time default).
+Server config is via environment variables (see `.env.example`). Key vars: `AI_PROVIDER` (`ollama`, `openai`, `claude_code`, or `codex`), `AI_BASE_URL`, `AI_MODEL`, `CODEX_API_KEY`/`OPENAI_API_KEY`, `CODEX_MODEL`, and `PIN`. CLI providers pick their own cost tier: `CLAUDE_CODE_MODEL` (default `sonnet`, passed to `claude --model`; empty defers to the CLI default) and `CODEX_CLI_MODEL` (default `gpt-5.6-luna`; empty defers to `~/.codex/config.toml`). `JWT_SECRET` auto-generates if not set. For remote access: `PUBLIC_URL` (backend, used in pairing QR codes), `VITE_DEFAULT_SERVER_URL` (frontend build-time default).
 
 ## Architecture
 
@@ -89,5 +89,7 @@ Native Kotlin + Jetpack Compose app. Multi-module Gradle project (app, core, fea
 - Run `npm run generate:api` after a server contract change; never hand-edit generated TypeScript/Kotlin runtime enum values
 - Task status is server-owned: `pending | in_progress | completed | cancelled`; `blocked` is derived from dependencies
 - Task relationships are server-owned rows in `task_relationships`; for `depends_on`, source is the dependent task and target is its prerequisite. `todos.depends_on` is a deprecated compatibility shadow, not a client read model
+- A workspace path is meaningless without its machine: projects record a path per host in `project_host_paths` and name one `execution_host_id` to run on. Work never falls back to another host, and nothing is queued for a machine that is off: delegating to an unreachable host is refused with `EXECUTION_HOST_UNAVAILABLE`, which is distinct from the work being unconfigured. `projects.execution_workspace_path` is a compatibility shadow
+- The desktop app can act as a worker: its renderer polls for runs addressed to that machine and the Rust shell runs the CLI there, with write access confined to the project's bound path. Off by default and tied to the window — a worker exists only while its app runs
 - Relationship provenance is server-owned. Preserve retained edge IDs/metadata, validate the whole DAG, and keep the durable migration marker atomic with legacy import
 - Docker deployment: single `docker-compose.yml` with `--profile ollama` for local LLM

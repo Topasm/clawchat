@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,7 +52,7 @@ data class ClawToneColors(
 @Composable
 fun rememberClawToneColors(tone: ClawTone): ClawToneColors {
     val scheme = MaterialTheme.colorScheme
-    val baseSurface = scheme.surfaceContainerLowest
+    val baseSurface = scheme.surface
 
     fun overlay(color: Color, alpha: Float): Color = color.copy(alpha = alpha).compositeOver(baseSurface)
 
@@ -97,27 +100,6 @@ fun ClawTopBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
 )
 
 @Composable
-fun ClawTopBarTitle(
-    title: String,
-    subtitle: String? = null,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (!subtitle.isNullOrBlank()) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
 fun ClawSectionCard(
     modifier: Modifier = Modifier,
     tone: ClawTone = ClawTone.Default,
@@ -128,19 +110,64 @@ fun ClawSectionCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = MaterialTheme.shapes.extraSmall,
         color = colors.container,
         contentColor = colors.onContainer,
-        border = BorderStroke(1.dp, colors.outline),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            content = content,
-        )
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content,
+            )
+            HorizontalDivider(
+                color = colors.outline.copy(alpha = colors.outline.alpha * 0.72f),
+            )
+        }
+    }
+}
+
+/**
+ * A flat section whose heading and rows form one continuous pane. Unlike
+ * [ClawSectionCard], row content is not wrapped in a second content inset, so
+ * list dividers and touch surfaces can span the pane without nested-card
+ * spacing.
+ */
+@Composable
+fun ClawListSection(
+    modifier: Modifier = Modifier,
+    tone: ClawTone = ClawTone.Default,
+    header: @Composable ColumnScope.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = rememberClawToneColors(tone)
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp),
+        shape = MaterialTheme.shapes.extraSmall,
+        color = colors.container,
+        contentColor = colors.onContainer,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = header,
+            )
+            HorizontalDivider(
+                color = colors.outline.copy(alpha = colors.outline.alpha * 0.72f),
+            )
+            Column(content = content)
+        }
     }
 }
 
@@ -153,18 +180,25 @@ fun ClawListItemSurface(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraSmall,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            content = content,
-        )
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                content = content,
+            )
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+            )
+        }
     }
 }
 
@@ -220,21 +254,27 @@ fun ClawStatusChip(
     val colors = rememberClawToneColors(tone)
     Surface(
         modifier = modifier,
-        shape = CircleShape,
+        shape = MaterialTheme.shapes.small,
         color = colors.container,
         contentColor = colors.onContainer,
-        border = BorderStroke(1.dp, colors.outline),
+        border = BorderStroke(
+            1.dp,
+            colors.outline.copy(alpha = colors.outline.alpha * 0.8f),
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (leadingIcon != null) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .background(colors.outline.copy(alpha = 0.35f), CircleShape),
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = colors.onContainer,
                 )
             }
             Text(
@@ -254,12 +294,17 @@ fun ClawMetricPill(
 ) {
     Surface(
         modifier = modifier,
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(

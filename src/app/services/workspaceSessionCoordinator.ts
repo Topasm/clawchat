@@ -232,7 +232,7 @@ export async function updateLocalServerPolicyForSession(
     useWorkspaceStore.getState().activeWorkspaceId === LOCAL_WORKSPACE_ID;
   if (leftActiveLocalWorkspace) {
     useHostSessionStore.getState().deactivate();
-    useAuthStore.getState().logout();
+    await useAuthStore.getState().logout();
   }
   return { leftActiveLocalWorkspace };
 }
@@ -251,6 +251,6 @@ export async function resetWorkspaceConnections(): Promise<void> {
     .profiles.flatMap((profile) => (profile.credentialRef ? [profile.credentialRef] : []));
   await Promise.all(credentials.map((credential) => removeWorkspaceSession(credential)));
   useHostSessionStore.getState().deactivate();
-  useAuthStore.getState().logout();
+  await useAuthStore.getState().logout();
   useWorkspaceStore.getState().reset();
 }

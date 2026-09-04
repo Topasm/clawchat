@@ -39,9 +39,10 @@ class TaskStatusTest {
     @Test
     fun `room mapper persists canonical wire values`() {
         val todo = Todo(id = "task-1", title = "Ship", status = TaskStatus.IN_PROGRESS)
-        assertEquals("in_progress", todo.toEntity().status)
+        assertEquals("in_progress", todo.toEntity("server:url:test").status)
 
         val cached = TodoEntity(
+            workspaceKey = "server:url:test",
             id = "task-2",
             title = "Review",
             status = "cancelled",

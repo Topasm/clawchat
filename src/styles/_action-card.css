@@ -28,6 +28,34 @@
   flex-direction: column;
 }
 
+.cc-action-card--plan {
+  width: 100%;
+}
+
+.cc-action-card__plan-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cc-action-card__plan-heading > div,
+.cc-action-card__plan-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cc-action-card--plan .cc-plan-review {
+  margin-top: 10px;
+}
+
+.cc-action-card__plan-status {
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
 .cc-action-card__icon {
   display: flex;
   align-items: center;
@@ -166,6 +194,51 @@
   font-size: 12px;
   color: var(--cc-text-tertiary);
   margin-top: 4px;
+}
+
+.cc-task-progress__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cc-task-progress__actions .cc-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.cc-task-progress--attention {
+  border-color: var(--cc-warning);
+}
+
+.cc-run-status-card__reply {
+  margin-top: 8px;
+}
+
+.cc-run-status-card__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cc-run-status-card__options .cc-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.cc-run-status-card__reply textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: var(--cc-radius-md);
+  border: 1px solid var(--cc-border);
+  background: var(--cc-surface);
+  color: var(--cc-text);
 }
 
 .cc-task-progress__subtasks {

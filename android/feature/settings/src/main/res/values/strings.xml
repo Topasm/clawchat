@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_description">Choose how ClawChat looks on this device.</string>
+    <string name="settings_workspace">Workspace</string>
+    <string name="settings_workspace_description">Choose where ClawChat stores and runs your work.</string>
+    <string name="settings_workspace_this_device">This device</string>
+    <string name="settings_workspace_local_description">Local only · Not synced</string>
+    <string name="settings_workspace_connected">Connected workspace</string>
+    <string name="settings_workspace_server_description">Sync and server features are available.</string>
+    <string name="settings_workspace_not_selected">No workspace selected</string>
+    <string name="settings_workspace_not_selected_description">Use this device or connect a workspace to begin.</string>
+    <string name="settings_connect_workspace">Connect a workspace</string>
+    <string name="settings_connect_workspace_description">Sync across devices and use AI chat, agent runs, and review.</string>
+    <string name="settings_activate_saved_workspace_description">Your previous server connection is remembered.</string>
+    <string name="settings_switch_to_device_mode">Switch to this device</string>
+    <string name="settings_switch_to_device_mode_description">Stop syncing and use data stored only on this device.</string>
+    <string name="settings_switch_to_device_confirm_title">Switch to this device?</string>
+    <string name="settings_switch_to_device_confirm_message">ClawChat will stop syncing and use local data. Your server connection will be remembered so you can reconnect later.</string>
+    <string name="settings_use_this_device">Use this device</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_switching_workspace">Switching…</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_server_description">Connection and AI status.</string>
+    <string name="settings_paired_devices">Paired devices</string>
+    <string name="settings_paired_devices_description">Active mobile connections.</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_account_description">Sign out while keeping your visual preferences.</string>
+    <string name="settings_log_out">Log Out</string>
+    <string name="settings_diagnostics_copied">Diagnostics copied</string>
+
+    <string name="settings_connection_diagnostics">Connection diagnostics</string>
+    <string name="settings_connection_diagnostics_description">A credential-safe snapshot for troubleshooting this device.</string>
+    <string name="settings_no_server_configured">No server configured</string>
+    <string name="settings_server_reachable">Server reachable</string>
+    <string name="settings_server_unavailable">Server unavailable</string>
+    <string name="settings_connect_for_diagnostics">Connect a server to run diagnostics</string>
+    <string name="settings_http_check_completed">HTTP check completed in %1$dms</string>
+    <string name="settings_http_check_incomplete">HTTP check did not complete</string>
+    <string name="settings_info_server">Server</string>
+    <string name="settings_info_transport">Transport</string>
+    <string name="settings_info_authentication">Authentication</string>
+    <string name="settings_info_server_version">Server version</string>
+    <string name="settings_info_realtime">Realtime</string>
+    <string name="settings_info_last_realtime_event">Last realtime event</string>
+    <string name="settings_connected">Connected</string>
+    <string name="settings_disconnected">Disconnected</string>
+    <string name="settings_copy_diagnostics">Copy diagnostics</string>
+    <string name="settings_checking">Checking…</string>
+    <string name="settings_run_again">Run again</string>
+
+    <string name="settings_connect_server">Connect a workspace</string>
+    <string name="settings_connect_server_description">Set up your ClawChat server connection.</string>
+    <string name="settings_theme_mode">Theme mode</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_system">System</string>
+    <string name="settings_accent_color">Accent color</string>
+    <string name="settings_accent_purple">Purple</string>
+    <string name="settings_accent_blue">Blue</string>
+    <string name="settings_accent_teal">Teal</string>
+    <string name="settings_accent_green">Green</string>
+    <string name="settings_accent_orange">Orange</string>
+    <string name="settings_accent_pink">Pink</string>
+    <string name="settings_accent_red">Red</string>
+    <string name="settings_selected">Selected</string>
+
+    <string name="settings_connection_details">Connection details</string>
+    <string name="settings_info_host">Host</string>
+    <string name="settings_info_version">Version</string>
+    <string name="settings_info_ai_provider">AI Provider</string>
+    <string name="settings_info_model">Model</string>
+    <string name="settings_info_ai_status">AI Status</string>
+    <string name="settings_info_auth_mode">Auth Mode</string>
+    <string name="settings_device_last_seen">%1$s · Last seen %2$s</string>
+    <string name="settings_revoke">Revoke</string>
+
+    <!-- Internal diagnostics remain stable English tokens; these are their UI labels. -->
+    <string name="settings_value_not_configured">Not configured</string>
+    <string name="settings_value_configured">Configured</string>
+    <string name="settings_value_configured_hidden">Configured (address hidden)</string>
+    <string name="settings_value_direct">Direct</string>
+    <string name="settings_value_direct_relay">Direct with relay fallback</string>
+    <string name="settings_value_paired_device">Paired device</string>
+    <string name="settings_value_pin_session">PIN session</string>
+
+    <string name="settings_report_header">ClawChat Android connection diagnostics</string>
+    <string name="settings_report_server">Server: %1$s</string>
+    <string name="settings_report_mode">Mode: %1$s</string>
+    <string name="settings_report_authentication">Authentication: %1$s (%2$s)</string>
+    <string name="settings_report_session_present">session present</string>
+    <string name="settings_report_no_session">no session</string>
+    <string name="settings_report_http">HTTP: %1$s</string>
+    <string name="settings_report_http_latency">HTTP: %1$s (%2$dms)</string>
+    <string name="settings_report_reachable">reachable</string>
+    <string name="settings_report_unreachable">unreachable</string>
+    <string name="settings_report_server_status">Server status: %1$s</string>
+    <string name="settings_report_server_version">Server version: %1$s</string>
+    <string name="settings_report_realtime">Realtime: %1$s</string>
+    <string name="settings_report_last_realtime_event">Last realtime event: %1$s</string>
+    <string name="settings_report_last_error">Last error: %1$s</string>
+    <string name="settings_report_checked">Checked: %1$s</string>
+    <string name="settings_report_unknown">unknown</string>
+    <string name="settings_report_none">none</string>
+</resources>

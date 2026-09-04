@@ -29,7 +29,6 @@ export function buildProposalTodos(root: TodoResponse, subtasks: PlanSubtask[]):
     title: subtask.title,
     description: subtask.description,
     status: 'pending',
-    priority: subtask.priority ?? 'medium',
     due_date: subtask.due_date,
     tags: root.tags ?? [],
     parent_id: PROPOSAL_ROOT_ID,

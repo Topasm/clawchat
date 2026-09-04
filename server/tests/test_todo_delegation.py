@@ -7,7 +7,6 @@ pin the current behaviour so it can be moved out of the router safely.
 
 import json
 
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import select

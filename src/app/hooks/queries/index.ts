@@ -1,5 +1,15 @@
 export { queryKeys } from './queryKeys';
 export {
+  useExecutionHostsQuery,
+  useProjectWorkspaceQuery,
+  useSetProjectHostPath,
+  useSetProjectExecutionHost,
+  useDeleteProjectHostPath,
+  useRegisterWorkerHost,
+  useBindProjectWorkspace,
+} from './useExecutionHostQueries';
+export type { ExecutionHost, ProjectWorkspace } from './useExecutionHostQueries';
+export {
   useTodosQuery,
   useEventsQuery,
   useCreateTodo,
@@ -24,10 +34,10 @@ export {
 } from './useModuleQueries';
 export {
   useLatestPlanProposalQuery,
+  usePlanProposalQuery,
   useGeneratePlanProposal,
   useApplyPlanProposal,
   useDismissPlanProposal,
-  useRevertPlanChangeSet,
   getPlanProposalMutationError,
   isStalePlanProposalError,
 } from './usePlanProposalQueries';
@@ -42,6 +52,7 @@ export {
   useProjectQuery,
   useCreateProject,
   useUpdateProject,
+  useDeleteProject,
   useConversationsQuery,
   useMessagesQuery,
   useCreateConversation,
@@ -70,13 +81,20 @@ export type { ReviewDecisionResult } from './useReviewQueries';
 export {
   useAgentRunsQuery,
   useAgentRunEventsQuery,
+  useRunsAwaitingInputQuery,
   useCancelAgentRun,
   useRetryAgentRun,
   useReturnAgentRunToReady,
   useResumeAgentRun,
+  useResolvePaseoPermission,
 } from './useAgentRunQueries';
 export { useTaskExecutionTelemetryQuery } from './useTaskExecutionTelemetryQuery';
-export { useSkillsQuery, useStartReadyTaskExecution } from './useTaskExecutionQueries';
+export {
+  resolveExecutionSkillId,
+  useSkillsQuery,
+  useStartReadyTaskExecution,
+  useRunReadyTaskWithProjectDefaults,
+} from './useTaskExecutionQueries';
 export type { StartReadyTaskExecutionVariables } from './useTaskExecutionQueries';
 export { useExecutionProvidersQuery, useTestPaseoConnection } from './useExecutionProviderQueries';
 export {
@@ -94,12 +112,10 @@ export {
 } from './useAdminQueries';
 export { useCapabilitiesQuery } from './useCapabilitiesQuery';
 export {
-  useObsidianStatusQuery,
   useObsidianHealthQuery,
-  useObsidianProjectsQuery,
-  useObsidianSyncStatusQuery,
   useObsidianSync,
   useObsidianReindex,
   useObsidianScan,
   useObsidianFlushQueue,
+  useObsidianRetryDeadLetter,
 } from './useObsidianQueries';

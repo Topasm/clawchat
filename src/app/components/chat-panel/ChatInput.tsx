@@ -14,6 +14,8 @@ interface ChatInputProps {
   editingMessageId?: string | null;
   editingText?: string;
   onCancelEdit?: () => void;
+  modeLabel?: string;
+  onClearMode?: () => void;
 }
 export default function ChatInput({
   onSend,
@@ -24,6 +26,8 @@ export default function ChatInput({
   editingMessageId,
   editingText,
   onCancelEdit,
+  modeLabel,
+  onClearMode,
 }: ChatInputProps) {
   const storedDraft = useChatStore((state) => (draftKey ? (state.drafts[draftKey] ?? '') : ''));
   const setDraft = useChatStore((state) => state.setDraft);
@@ -116,6 +120,21 @@ export default function ChatInput({
   };
   return (
     <div className={`cc-chat-input${isEditing ? ' cc-chat-input--editing' : ''}`}>
+      {modeLabel && !isEditing && (
+        <div className="cc-chat-input__mode" role="status">
+          <span>{modeLabel}</span>
+          {onClearMode && (
+            <button
+              type="button"
+              onClick={onClearMode}
+              aria-label={translateUi('Exit agent answer mode')}
+              title={translateUi('Send as a normal chat message')}
+            >
+              <CloseIcon size={12} />
+            </button>
+          )}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         className="cc-chat-input__textarea"
@@ -126,7 +145,13 @@ export default function ChatInput({
           handleInput();
         }}
         onKeyDown={handleKeyDown}
-        placeholder={isEditing ? translateUi('Edit message...') : placeholder}
+        placeholder={
+          isEditing
+            ? translateUi('Edit message...')
+            : modeLabel
+              ? translateUi('Answer the agent...')
+              : placeholder
+        }
         rows={1}
       />
       {isStreaming ? (

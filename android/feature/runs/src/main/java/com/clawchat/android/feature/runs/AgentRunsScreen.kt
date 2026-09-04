@@ -28,7 +28,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -38,6 +37,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -49,6 +49,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,15 +68,15 @@ import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawTopBarTitle
+import com.clawchat.android.core.ui.localizedErrorMessage
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private const val ACTIVE_POLL_INTERVAL_MS = 3_000L
-private val RUN_TIME_FORMAT = DateTimeFormatter.ofPattern("MMM d · h:mm a")
 
 /**
  * Mobile control plane for agent execution.
@@ -92,6 +94,9 @@ fun AgentRunsScreen(
     initialRunId: String? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val errorMessage = state.error?.let { localizedErrorMessage(it) }
+        ?: state.errorResource?.let { stringResource(it) }
+    val noticeMessage = state.notice ?: state.noticeResource?.let { stringResource(it) }
 
     // Do not wait for the compact 100-run list: an exact navigation target
     // may be older and is loaded directly through GET /api/runs/{id}.
@@ -112,11 +117,12 @@ fun AgentRunsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = {
-                    ClawTopBarTitle(
-                        title = "Agent runs",
-                        subtitle = "Monitor progress, unblock work, and review results.",
+                    Text(
+                        text = stringResource(R.string.runs_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
@@ -124,14 +130,17 @@ fun AgentRunsScreen(
                         IconButton(onClick = onBack) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.runs_back),
                             )
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = viewModel::refresh) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh runs")
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.runs_refresh),
+                        )
                     }
                 },
                 colors = ClawTopBarColors(),
@@ -150,12 +159,12 @@ fun AgentRunsScreen(
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = 40.dp,
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 4.dp,
+                        bottom = 24.dp,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
                         RunSummaryCard(state)
@@ -168,13 +177,13 @@ fun AgentRunsScreen(
                         )
                     }
 
-                    state.error?.let { message ->
+                    errorMessage?.let { message ->
                         item {
                             ClawStatusChip(text = message, tone = ClawTone.Error)
                         }
                     }
 
-                    state.notice?.let { message ->
+                    noticeMessage?.let { message ->
                         item {
                             ClawStatusChip(text = message, tone = ClawTone.Success)
                         }
@@ -183,9 +192,9 @@ fun AgentRunsScreen(
                     if (state.visibleRuns.isEmpty()) {
                         item {
                             ClawEmptyState(
-                                title = "No runs in this view",
-                                description = "Agent attempts will appear here when work is delegated.",
-                                actionLabel = "Refresh",
+                                title = stringResource(R.string.runs_empty_title),
+                                description = stringResource(R.string.runs_empty_description),
+                                actionLabel = stringResource(R.string.runs_refresh_action),
                                 onActionClick = viewModel::refresh,
                             )
                         }
@@ -209,8 +218,8 @@ fun AgentRunsScreen(
             followUp = state.followUp,
             isLoading = state.isDetailLoading,
             pendingOperation = if (state.pendingRunId == run.id) state.pendingOperation else null,
-            error = state.error,
-            notice = state.notice,
+            error = errorMessage,
+            notice = noticeMessage,
             onFollowUpChange = viewModel::updateFollowUp,
             onCancel = { viewModel.cancelRun(run.id) },
             onRetry = { viewModel.retryRun(run.id) },
@@ -230,7 +239,7 @@ private fun RunsLoadingState() {
         ) {
             CircularProgressIndicator(modifier = Modifier.size(28.dp))
             Text(
-                text = "Loading agent runs…",
+                text = stringResource(R.string.runs_loading),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -241,11 +250,15 @@ private fun RunsLoadingState() {
 private fun RunSummaryCard(state: AgentRunsUiState) {
     ClawSectionCard(tone = if (state.attentionCount > 0) ClawTone.Warning else ClawTone.Primary) {
         ClawSectionHeader(
-            title = "Execution overview",
+            title = stringResource(R.string.runs_overview_title),
             subtitle = if (state.attentionCount > 0) {
-                "${state.attentionCount} run${if (state.attentionCount == 1) "" else "s"} need your attention."
+                pluralStringResource(
+                    R.plurals.runs_attention_summary,
+                    state.attentionCount,
+                    state.attentionCount,
+                )
             } else {
-                "Agent work is moving without blockers."
+                stringResource(R.string.runs_unblocked_summary)
             },
         )
         Row(
@@ -253,17 +266,17 @@ private fun RunSummaryCard(state: AgentRunsUiState) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ClawMetricPill(
-                label = "Active",
+                label = stringResource(R.string.runs_metric_active),
                 value = state.activeCount.toString(),
                 modifier = Modifier.weight(1f),
             )
             ClawMetricPill(
-                label = "Attention",
+                label = stringResource(R.string.runs_metric_attention),
                 value = state.attentionCount.toString(),
                 modifier = Modifier.weight(1f),
             )
             ClawMetricPill(
-                label = "Failed",
+                label = stringResource(R.string.runs_metric_failed),
                 value = state.failedCount.toString(),
                 modifier = Modifier.weight(1f),
             )
@@ -280,13 +293,13 @@ private fun RunFilters(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         AgentRunFilter.entries.forEach { filter ->
             FilterChip(
                 selected = selected == filter,
                 onClick = { onSelect(filter) },
-                label = { Text(filter.label) },
+                label = { Text(filter.localizedLabel()) },
             )
         }
     }
@@ -304,11 +317,11 @@ private fun AgentRunListItem(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ClawStatusChip(
-                text = run.status.label,
+                text = run.status.localizedLabel(),
                 tone = run.status.tone(),
             )
             Text(
-                text = "Attempt ${run.attempt}",
+                text = stringResource(R.string.runs_attempt, run.attempt),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -321,16 +334,17 @@ private fun AgentRunListItem(
         }
 
         Text(
-            text = run.displayTitle,
+            text = run.localizedDisplayTitle(),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
 
+        val unscoped = stringResource(R.string.runs_unscoped)
         Text(
             text = buildString {
-                append(run.projectTitle ?: "Unscoped")
+                append(run.projectTitle ?: unscoped)
                 append(" · ")
                 append(run.provider)
                 run.model?.takeIf { it.isNotBlank() }?.let { append(" / $it") }
@@ -349,9 +363,9 @@ private fun AgentRunListItem(
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = run.progressMessage ?: when (run.status) {
-                    AgentRunStatus.WAITING_INPUT -> "Waiting for your follow-up"
-                    AgentRunStatus.WAITING_REVIEW -> "Result is ready to review"
-                    else -> "${run.progress}% complete"
+                    AgentRunStatus.WAITING_INPUT -> stringResource(R.string.runs_waiting_follow_up)
+                    AgentRunStatus.WAITING_REVIEW -> stringResource(R.string.runs_ready_for_review)
+                    else -> stringResource(R.string.runs_progress_complete, run.progress)
                 },
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
@@ -403,32 +417,33 @@ private fun AgentRunDetailSheet(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                ClawStatusChip(text = run.status.label, tone = run.status.tone())
+                ClawStatusChip(text = run.status.localizedLabel(), tone = run.status.tone())
                 Text(
-                    text = "Attempt ${run.attempt}",
+                    text = stringResource(R.string.runs_attempt, run.attempt),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             Text(
-                text = run.displayTitle,
+                text = run.localizedDisplayTitle(),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
 
+            val unscoped = stringResource(R.string.runs_unscoped)
             Text(
                 text = buildString {
-                    append(run.projectTitle ?: "Unscoped")
+                    append(run.projectTitle ?: unscoped)
                     append(" · ")
                     append(run.provider)
                     run.model?.let { append(" / $it") }
@@ -442,22 +457,26 @@ private fun AgentRunDetailSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = run.progressMessage ?: "${run.progress}% complete",
+                text = run.progressMessage ?: stringResource(R.string.runs_progress_complete, run.progress),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (run.provider == "paseo" && listOf(run.hostId, run.workspaceId, run.externalRunId).any { it != null }) {
+            if (run.hostLabel != null || (run.provider == "paseo" && listOf(run.hostId, run.workspaceId, run.externalRunId).any { it != null })) {
                 ClawSectionCard {
-                    DetailProperty("Host", run.hostId ?: "Paseo")
-                    run.workspaceId?.let { DetailProperty("Workspace", it) }
-                    run.externalRunId?.let { DetailProperty("External run", it) }
+                    DetailProperty(stringResource(R.string.runs_property_host), run.hostLabel ?: run.hostId ?: "Paseo")
+                    run.workspaceId?.let {
+                        DetailProperty(stringResource(R.string.runs_property_workspace), it)
+                    }
+                    run.externalRunId?.let {
+                        DetailProperty(stringResource(R.string.runs_property_external_run), it)
+                    }
                 }
             }
 
             run.error?.takeIf { it.isNotBlank() }?.let { message ->
                 ClawSectionCard(tone = ClawTone.Error) {
-                    Text("Execution error", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.runs_execution_error), fontWeight = FontWeight.SemiBold)
                     Text(message, style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -465,7 +484,9 @@ private fun AgentRunDetailSheet(
             (run.result ?: run.resultSummary)?.takeIf { it.isNotBlank() }?.let { result ->
                 ClawSectionCard(tone = ClawTone.Success) {
                     Text(
-                        if (run.result != null) "Full result" else "Result summary",
+                        stringResource(
+                            if (run.result != null) R.string.runs_full_result else R.string.runs_result_summary,
+                        ),
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
@@ -487,9 +508,9 @@ private fun AgentRunDetailSheet(
                     label = {
                         Text(
                             if (run.status == AgentRunStatus.WAITING_INPUT) {
-                                "Follow-up instructions"
+                                stringResource(R.string.runs_follow_up_instructions)
                             } else {
-                                "Retry guidance (optional)"
+                                stringResource(R.string.runs_retry_guidance)
                             },
                         )
                     },
@@ -497,7 +518,7 @@ private fun AgentRunDetailSheet(
                     maxLines = 5,
                     enabled = !isPending,
                     supportingText = {
-                        Text("${followUp.length} / 10,000")
+                        Text(stringResource(R.string.runs_character_count, followUp.length, 10_000))
                     },
                 )
             }
@@ -511,7 +532,7 @@ private fun AgentRunDetailSheet(
                     if (pendingOperation == AgentRunOperation.RESUME) {
                         SmallActionProgress()
                     }
-                    Text("Resume with follow-up")
+                    Text(stringResource(R.string.runs_resume_with_follow_up))
                 }
 
                 run.canRetry -> Button(
@@ -522,7 +543,7 @@ private fun AgentRunDetailSheet(
                     if (pendingOperation == AgentRunOperation.RETRY) {
                         SmallActionProgress()
                     }
-                    Text("Retry agent run")
+                    Text(stringResource(R.string.runs_retry_agent))
                 }
 
                 run.status == AgentRunStatus.WAITING_REVIEW -> Button(
@@ -530,7 +551,7 @@ private fun AgentRunDetailSheet(
                     enabled = !isPending,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Review result")
+                    Text(stringResource(R.string.runs_review_result))
                 }
             }
 
@@ -543,14 +564,14 @@ private fun AgentRunDetailSheet(
                     if (pendingOperation == AgentRunOperation.CANCEL) {
                         SmallActionProgress()
                     }
-                    Text("Cancel run")
+                    Text(stringResource(R.string.runs_cancel_run))
                 }
             }
 
             HorizontalDivider()
             ClawSectionHeader(
-                title = "Event log",
-                subtitle = "Provider heartbeats and lifecycle changes.",
+                title = stringResource(R.string.runs_event_log),
+                subtitle = stringResource(R.string.runs_event_log_description),
                 count = events.size,
             )
 
@@ -563,7 +584,7 @@ private fun AgentRunDetailSheet(
                 }
             } else if (events.isEmpty()) {
                 Text(
-                    text = "No events recorded yet.",
+                    text = stringResource(R.string.runs_no_events),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -579,7 +600,7 @@ private fun AgentRunDetailSheet(
                 enabled = !isPending,
                 modifier = Modifier.align(Alignment.End),
             ) {
-                Text("Close")
+                Text(stringResource(R.string.runs_close))
             }
         }
     }
@@ -588,13 +609,19 @@ private fun AgentRunDetailSheet(
         val isRetry = operation == AgentRunOperation.RETRY
         AlertDialog(
             onDismissRequest = { if (!isPending) confirmation = null },
-            title = { Text(if (isRetry) "Retry agent run?" else "Cancel agent run?") },
+            title = {
+                Text(
+                    stringResource(
+                        if (isRetry) R.string.runs_retry_dialog_title else R.string.runs_cancel_dialog_title,
+                    ),
+                )
+            },
             text = {
                 Text(
                     if (isRetry) {
-                        "This starts a new execution attempt. The previous attempt remains in history."
+                        stringResource(R.string.runs_retry_dialog_message)
                     } else {
-                        "The provider will be asked to stop. Partial external changes may already exist."
+                        stringResource(R.string.runs_cancel_dialog_message)
                     },
                 )
             },
@@ -606,7 +633,9 @@ private fun AgentRunDetailSheet(
                         if (isRetry) onRetry() else onCancel()
                     },
                 ) {
-                    Text(if (isRetry) "Retry" else "Cancel run")
+                    Text(
+                        stringResource(if (isRetry) R.string.runs_retry else R.string.runs_cancel_run),
+                    )
                 }
             },
             dismissButton = {
@@ -614,7 +643,7 @@ private fun AgentRunDetailSheet(
                     enabled = !isPending,
                     onClick = { confirmation = null },
                 ) {
-                    Text("Keep run")
+                    Text(stringResource(R.string.runs_keep_run))
                 }
             },
         )
@@ -669,7 +698,7 @@ private fun AgentRunEventRow(event: AgentRunEvent) {
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = event.eventType.replace('_', ' '),
+                text = event.localizedType(),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -699,11 +728,69 @@ private fun AgentRunStatus.tone(): ClawTone = when (this) {
     -> ClawTone.Error
 }
 
+@Composable
+private fun AgentRunFilter.localizedLabel(): String = stringResource(
+    when (this) {
+        AgentRunFilter.ALL -> R.string.runs_filter_all
+        AgentRunFilter.ACTIVE -> R.string.runs_filter_active
+        AgentRunFilter.ATTENTION -> R.string.runs_filter_attention
+        AgentRunFilter.RECENT -> R.string.runs_filter_recent
+    },
+)
+
+@Composable
+private fun AgentRunStatus.localizedLabel(): String = stringResource(
+    when (this) {
+        AgentRunStatus.QUEUED -> R.string.runs_status_queued
+        AgentRunStatus.STARTING -> R.string.runs_status_starting
+        AgentRunStatus.RUNNING -> R.string.runs_status_running
+        AgentRunStatus.WAITING_INPUT -> R.string.runs_status_waiting_input
+        AgentRunStatus.WAITING_REVIEW -> R.string.runs_status_waiting_review
+        AgentRunStatus.COMPLETED -> R.string.runs_status_completed
+        AgentRunStatus.FAILED -> R.string.runs_status_failed
+        AgentRunStatus.CANCELLED -> R.string.runs_status_cancelled
+    },
+)
+
+@Composable
+private fun AgentRun.localizedDisplayTitle(): String =
+    todoTitle?.takeIf(String::isNotBlank)
+        ?: instructionSnapshot.lineSequence().firstOrNull(String::isNotBlank)
+        ?: stringResource(R.string.runs_agent_run_fallback)
+
+@Composable
+private fun AgentRunEvent.localizedType(): String {
+    val resource = when (eventType) {
+        "approved" -> R.string.runs_event_approved
+        "cancelled" -> R.string.runs_event_cancelled
+        "changes_requested" -> R.string.runs_event_changes_requested
+        "error" -> R.string.runs_event_error
+        "failed" -> R.string.runs_event_failed
+        "interrupted" -> R.string.runs_event_interrupted
+        "migrated" -> R.string.runs_event_migrated
+        "progress" -> R.string.runs_event_progress
+        "provider_started" -> R.string.runs_event_provider_started
+        "queued" -> R.string.runs_event_queued
+        "rejected" -> R.string.runs_event_rejected
+        "result" -> R.string.runs_event_result
+        "returned_to_ready" -> R.string.runs_event_returned_to_ready
+        "running" -> R.string.runs_event_running
+        "starting" -> R.string.runs_event_starting
+        "task_plan_applied" -> R.string.runs_event_task_plan_applied
+        "task_plan_reverted" -> R.string.runs_event_task_plan_reverted
+        "waiting_review" -> R.string.runs_event_waiting_review
+        "workspace_created" -> R.string.runs_event_workspace_created
+        else -> return eventType.replace('_', ' ')
+    }
+    return stringResource(resource)
+}
+
 internal fun formatRunTime(value: String): String {
     val zoned = runCatching {
         OffsetDateTime.parse(value).atZoneSameInstant(ZoneId.systemDefault())
     }.recoverCatching {
         LocalDateTime.parse(value).atZone(ZoneId.systemDefault())
     }.getOrNull()
-    return zoned?.format(RUN_TIME_FORMAT) ?: value
+    val formatter = DateTimeFormatter.ofPattern("MMM d · h:mm a", Locale.getDefault())
+    return zoned?.format(formatter) ?: value
 }

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="planner_today">Today</string>
+    <string name="planner_week">This week</string>
+    <string name="planner_month">Month</string>
+    <string name="week_title">This week</string>
+    <string name="week_cd_capture_task">Add a task for this week</string>
+    <string name="week_offline_cached">Offline — showing the last synced tasks</string>
+    <string name="week_overdue_title">Overdue</string>
+    <string name="week_overdue_subtitle">Clear these before planning the rest of the week.</string>
+    <string name="week_empty_title">This week is clear</string>
+    <string name="week_empty_description">Add a dated task when you decide what belongs in this week.</string>
+    <string name="week_empty_action">Add task</string>
+    <string name="week_loading">Loading this week…</string>
+    <string name="week_status_in_progress">In progress</string>
+    <string name="week_recurring">Recurring</string>
+    <string name="week_mark_complete">Mark %1$s complete</string>
+    <plurals name="week_active_tasks">
+        <item quantity="one">%1$d active task</item>
+        <item quantity="other">%1$d active tasks</item>
+    </plurals>
+    <plurals name="week_timeline_more">
+        <item quantity="one">+%1$d more deadline</item>
+        <item quantity="other">+%1$d more deadlines</item>
+    </plurals>
+</resources>

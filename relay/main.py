@@ -3,7 +3,6 @@ import uuid
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-
 app = FastAPI(title="ClawChat Relay", version="0.1.0")
 
 

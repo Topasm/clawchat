@@ -3,6 +3,7 @@ package com.clawchat.android.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.SessionStore
+import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.HealthResponse
 import com.clawchat.android.core.data.model.PairedDevice
 import com.clawchat.android.core.data.repository.DeviceRepository
@@ -21,6 +22,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class SettingsUiState(
+    val workspaceMode: WorkspaceMode = WorkspaceMode.UNCONFIGURED,
+    val hasSavedServerSession: Boolean = false,
     val health: HealthResponse? = null,
     val devices: List<PairedDevice> = emptyList(),
     val hostName: String = "",
@@ -28,6 +31,7 @@ data class SettingsUiState(
     val accentColor: String = "system",
     val themeMode: String = "light",
     val diagnostics: ConnectionDiagnostics? = null,
+    val isSwitchingWorkspace: Boolean = false,
     val isCheckingConnection: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -55,47 +59,96 @@ class SettingsViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-
-            val hostName = sessionStore.hostName.first() ?: ""
-            val authMode = sessionStore.authMode.first() ?: ""
-            val accentColor = sessionStore.accentColor.first()
-            val themeMode = sessionStore.themeMode.first()
-            val hasSession = !sessionStore.token.first().isNullOrBlank()
-            val hasServer = !sessionStore.apiBaseUrl.first().isNullOrBlank()
-            _uiState.update {
-                it.copy(
-                    hostName = hostName,
-                    authMode = authMode,
-                    accentColor = accentColor,
-                    themeMode = themeMode,
-                )
-            }
-
-            refreshConnectionDiagnostics()
-
-            if (hasSession && hasServer) {
-                when (val result = deviceRepository.listDevices()) {
-                    is ApiResult.Success -> _uiState.update { it.copy(devices = result.data.devices) }
-                    else -> { /* Ignore — might not have user-level auth */ }
-                }
-            }
-
-            _uiState.update { it.copy(isLoading = false) }
+            loadSettings()
         }
     }
 
-    fun checkConnection() {
-        viewModelScope.launch { refreshConnectionDiagnostics() }
+    private suspend fun loadSettings() {
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                isCheckingConnection = false,
+                error = null,
+            )
+        }
+
+        val runtimeState = sessionStore.runtimeState.first()
+        val isServer = runtimeState.mode == WorkspaceMode.SERVER && runtimeState.activeSession != null
+        val hostName = if (isServer) sessionStore.hostName.first().orEmpty() else ""
+        val authMode = runtimeState.activeSession?.authMode.orEmpty()
+        val accentColor = sessionStore.accentColor.first()
+        val themeMode = sessionStore.themeMode.first()
+        _uiState.update {
+            it.copy(
+                workspaceMode = runtimeState.mode,
+                hasSavedServerSession = runtimeState.hasSavedServerSession,
+                health = null,
+                devices = emptyList(),
+                hostName = hostName,
+                authMode = authMode,
+                accentColor = accentColor,
+                themeMode = themeMode,
+                diagnostics = null,
+                isSwitchingWorkspace = false,
+            )
+        }
+
+        if (isServer) {
+            refreshConnectionDiagnostics(runtimeState.workspaceKey)
+
+            val currentRuntimeState = sessionStore.runtimeState.first()
+            if (
+                currentRuntimeState.mode != WorkspaceMode.SERVER ||
+                currentRuntimeState.workspaceKey != runtimeState.workspaceKey
+            ) {
+                _uiState.update { it.copy(isLoading = false) }
+                return
+            }
+
+            when (val result = deviceRepository.listDevices()) {
+                is ApiResult.Success -> {
+                    val latestRuntimeState = sessionStore.runtimeState.first()
+                    _uiState.update { state ->
+                        if (
+                            state.workspaceMode == WorkspaceMode.SERVER &&
+                            latestRuntimeState.mode == WorkspaceMode.SERVER &&
+                            latestRuntimeState.workspaceKey == runtimeState.workspaceKey
+                        ) {
+                            state.copy(devices = result.data.devices)
+                        } else {
+                            state
+                        }
+                    }
+                }
+                else -> { /* Ignore — might not have user-level auth */ }
+            }
+        }
+
+        _uiState.update { it.copy(isLoading = false) }
     }
 
-    private suspend fun refreshConnectionDiagnostics() {
+    fun checkConnection() {
+        viewModelScope.launch {
+            val runtimeState = sessionStore.runtimeState.first()
+            if (runtimeState.mode == WorkspaceMode.SERVER) {
+                refreshConnectionDiagnostics(runtimeState.workspaceKey)
+            }
+        }
+    }
+
+    private suspend fun refreshConnectionDiagnostics(expectedWorkspaceKey: String?) {
         _uiState.update { it.copy(isCheckingConnection = true) }
 
-        val apiBaseUrl = sessionStore.apiBaseUrl.first()
+        val runtimeState = sessionStore.runtimeState.first()
+        val session = runtimeState.activeSession
+        if (runtimeState.mode != WorkspaceMode.SERVER || session == null) {
+            _uiState.update { it.copy(health = null, diagnostics = null, isCheckingConnection = false) }
+            return
+        }
+
+        val apiBaseUrl = session.apiBaseUrl
         val relayConfigured = !sessionStore.relayUrl.first().isNullOrBlank()
-        val authMode = sessionStore.authMode.first()
-        val hasSession = !sessionStore.token.first().isNullOrBlank()
+        val authMode = session.authMode
         var health: HealthResponse? = null
         var latencyMillis: Long? = null
         var httpError: String? = null
@@ -109,6 +162,15 @@ class SettingsViewModel @Inject constructor(
             latencyMillis = ((System.nanoTime() - startedAtNanos) / 1_000_000L).coerceAtLeast(0L)
         }
 
+        val currentRuntimeState = sessionStore.runtimeState.first()
+        if (
+            currentRuntimeState.mode != WorkspaceMode.SERVER ||
+            currentRuntimeState.workspaceKey != expectedWorkspaceKey
+        ) {
+            _uiState.update { it.copy(health = null, diagnostics = null, isCheckingConnection = false) }
+            return
+        }
+
         _uiState.update {
             it.copy(
                 health = health,
@@ -116,7 +178,7 @@ class SettingsViewModel @Inject constructor(
                     apiBaseUrl = apiBaseUrl,
                     relayConfigured = relayConfigured,
                     authMode = authMode,
-                    hasSession = hasSession,
+                    hasSession = true,
                     health = health,
                     latencyMillis = latencyMillis,
                     realtimeConnected = syncManager.isConnected.value,
@@ -164,6 +226,36 @@ class SettingsViewModel @Inject constructor(
     fun installUpdate() = updateManager.installUpdate()
 
     fun setAutoUpdateCheckEnabled(enabled: Boolean) = updateManager.setAutoCheckEnabled(enabled)
+
+    /** Use Room-backed data while retaining any remembered server credentials. */
+    fun switchToLocalMode() {
+        if (
+            _uiState.value.workspaceMode == WorkspaceMode.LOCAL ||
+            _uiState.value.isSwitchingWorkspace
+        ) {
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSwitchingWorkspace = true) }
+            sessionStore.selectLocalMode()
+            loadSettings()
+        }
+    }
+
+    /** Reopens a remembered server session without asking for its PIN again. */
+    fun activateSavedServer() {
+        if (!_uiState.value.hasSavedServerSession || _uiState.value.isSwitchingWorkspace) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSwitchingWorkspace = true) }
+            if (sessionStore.activateSavedServer()) {
+                loadSettings()
+            } else {
+                _uiState.update {
+                    it.copy(hasSavedServerSession = false, isSwitchingWorkspace = false)
+                }
+            }
+        }
+    }
 
     fun logout() {
         viewModelScope.launch {

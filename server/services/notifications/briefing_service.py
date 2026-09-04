@@ -85,11 +85,6 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
     )
     in_progress = list((await db.execute(in_progress_q)).scalars().all())
 
-    # High/urgent priority tasks due today or overdue
-    high_priority_count = sum(
-        1 for t in pending_todos + overdue_todos if t.priority in ("high", "urgent")
-    )
-
     # Inbox count (no due date, pending)
     inbox_q = select(func.count(Todo.id)).where(
         Todo.due_date == None,  # noqa: E711
@@ -108,7 +103,6 @@ async def gather_briefing_data(db: AsyncSession) -> dict:
         "upcoming_todos": upcoming_todos,
         "overdue_todos": overdue_todos,
         "in_progress": in_progress,
-        "high_priority_count": high_priority_count,
         "inbox_count": inbox_count,
         "agent_tasks": agent_tasks,
         "date": today,
@@ -129,7 +123,7 @@ def _format_briefing_prompt(data: dict) -> str:
     if data["pending_todos"]:
         lines.append("## Tasks Due Today")
         for t in data["pending_todos"]:
-            lines.append(f"- [{t.priority}] {t.title} (id: {t.id})")
+            lines.append(f"- {t.title} (id: {t.id})")
         lines.append("")
 
     if data["overdue_todos"]:
@@ -149,7 +143,7 @@ def _format_briefing_prompt(data: dict) -> str:
         lines.append("## Upcoming (next 3 days)")
         for t in data["upcoming_todos"][:5]:
             due = t.due_date.strftime("%b %d") if t.due_date else ""
-            lines.append(f"- [{t.priority}] {t.title} (due {due})")
+            lines.append(f"- {t.title} (due {due})")
         lines.append("")
 
     if data.get("upcoming_events"):
@@ -167,7 +161,7 @@ def _format_briefing_prompt(data: dict) -> str:
         lines.append(f"Background tasks: {len(data['agent_tasks'])} queued/running.")
         lines.append("")
 
-    lines.append(f"Load: {len(data['events'])} meetings + {len(data['pending_todos'])} tasks due + {len(data['overdue_todos'])} overdue. High/urgent items: {data.get('high_priority_count', 0)}.")
+    lines.append(f"Load: {len(data['events'])} meetings + {len(data['pending_todos'])} tasks due + {len(data['overdue_todos'])} overdue.")
 
     return "\n".join(lines)
 
@@ -190,7 +184,7 @@ Analyze the user's schedule and tasks, then respond with ONLY a JSON object (no 
 
 Rules:
 - "start_with": suggest the most important task to start the day with
-- "move_to_tomorrow": suggest moving a lower-priority task if the day is heavy
+- "move_to_tomorrow": suggest moving a task to tomorrow if the day is heavy
 - Only include suggestions that reference actual todo_ids from the data
 - Keep suggestions to 1-3 items max
 - load_assessment: "light" (0-3 items), "moderate" (4-7), "heavy" (8+)
@@ -207,7 +201,6 @@ async def generate_briefing(db: AsyncSession, ai_service: AIService) -> dict:
         "in_progress": len(data["in_progress"]),
         "inbox": data["inbox_count"],
         "agent_tasks": len(data["agent_tasks"]),
-        "high_priority": data.get("high_priority_count", 0),
         "upcoming_tasks": len(data.get("upcoming_todos", [])),
         "upcoming_events": len(data.get("upcoming_events", [])),
     }

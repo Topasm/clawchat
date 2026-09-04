@@ -1,6 +1,6 @@
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from models.todo import Todo
 from schemas.calendar import EventResponse
 from schemas.today import TodayResponse
 from schemas.todo import TodoResponse
+from services.ai import resolve_active_ai
 from services.notifications.briefing_service import generate_briefing
 from utils import deserialize_tags
 from utils.inbox_display import get_next_action
@@ -19,13 +20,24 @@ from utils.inbox_display import get_next_action
 router = APIRouter(tags=["today"])
 
 
-def _get_greeting() -> str:
-    hour = datetime.now().hour
+def _get_greeting(utc_offset_minutes: int = 0) -> str:
+    client_timezone = timezone(timedelta(minutes=utc_offset_minutes))
+    hour = datetime.now(client_timezone).hour
     if hour < 12:
         return "Good morning"
     if hour < 17:
         return "Good afternoon"
     return "Good evening"
+
+
+def _day_window(day: date, utc_offset_minutes: int) -> tuple[datetime, datetime]:
+    """Return the client's local day as a half-open UTC interval."""
+    client_timezone = timezone(timedelta(minutes=utc_offset_minutes))
+    local_start = datetime.combine(day, time.min, tzinfo=client_timezone)
+    return (
+        local_start.astimezone(timezone.utc),
+        (local_start + timedelta(days=1)).astimezone(timezone.utc),
+    )
 
 
 def _todo_to_response(todo: Todo) -> TodoResponse:
@@ -59,7 +71,7 @@ async def get_briefing(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     result = await generate_briefing(db, ai_service)
     return {
         "summary": result.get("summary", ""),
@@ -74,19 +86,22 @@ async def get_briefing(
 
 @router.get("", response_model=TodayResponse)
 async def get_today(
+    client_date: date | None = Query(None, alias="date"),
+    utc_offset_minutes: int = Query(0, ge=-840, le=840),
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    today = date.today()
-    today_start = datetime.combine(today, time.min, tzinfo=timezone.utc)
-    today_end = datetime.combine(today, time.max, tzinfo=timezone.utc)
+    client_timezone = timezone(timedelta(minutes=utc_offset_minutes))
+    today = client_date or datetime.now(client_timezone).date()
+    today_start, tomorrow_start = _day_window(today, utc_offset_minutes)
 
     # Today's tasks: due today and not completed/cancelled
     today_tasks_q = (
         select(Todo)
         .where(
             Todo.due_date >= today_start,
-            Todo.due_date <= today_end,
+            Todo.due_date < tomorrow_start,
+            Todo.inbox_state == "none",
             Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.created_at.asc())
@@ -96,10 +111,11 @@ async def get_today(
     # Also include in-progress tasks not due today
     in_progress_q = select(Todo).where(
         Todo.status == TaskStatus.IN_PROGRESS,
+        Todo.inbox_state == "none",
         or_(
             Todo.due_date == None,  # noqa: E711
             Todo.due_date < today_start,
-            Todo.due_date > today_end,
+            Todo.due_date >= tomorrow_start,
         ),
     )
     in_progress = (await db.execute(in_progress_q)).scalars().all()
@@ -110,31 +126,49 @@ async def get_today(
         select(Todo)
         .where(
             Todo.due_date < today_start,
+            Todo.inbox_state == "none",
             Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
         )
         .order_by(Todo.due_date.asc())
     )
     overdue_tasks = (await db.execute(overdue_q)).scalars().all()
 
+    # Pending tasks with no due date at all: not "today", not "overdue" —
+    # otherwise they never surface anywhere and effectively vanish. In
+    # progress tasks with no due date are already folded into all_today.
+    needs_date_q = (
+        select(Todo)
+        .where(
+            Todo.due_date == None,  # noqa: E711
+            Todo.inbox_state == "none",
+            Todo.status == TaskStatus.PENDING,
+        )
+        .order_by(Todo.created_at.asc())
+    )
+    needs_date_tasks = (await db.execute(needs_date_q)).scalars().all()
+
     # Today's events
     events_q = (
         select(Event)
-        .where(Event.start_time >= today_start, Event.start_time <= today_end)
+        .where(Event.start_time >= today_start, Event.start_time < tomorrow_start)
         .order_by(Event.start_time.asc())
     )
     today_events = (await db.execute(events_q)).scalars().all()
 
-    # Inbox count: no due_date, pending
+    # Inbox is a workflow state, not a synonym for every undated task.
     inbox_q = select(func.count(Todo.id)).where(
-        Todo.due_date == None,  # noqa: E711
-        Todo.status == TaskStatus.PENDING,
+        Todo.inbox_state != "none",
+        Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
     )
     inbox_count = (await db.execute(inbox_q)).scalar() or 0
 
     # Needs review: plan_ready or captured items (limit 5)
     needs_review_q = (
         select(Todo)
-        .where(Todo.inbox_state.in_(["plan_ready", "captured"]))
+        .where(
+            Todo.inbox_state.in_(["plan_ready", "captured"]),
+            Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
+        )
         .order_by(Todo.updated_at.desc())
         .limit(5)
     )
@@ -145,7 +179,8 @@ async def get_today(
         overdue_tasks=[_todo_to_response(t) for t in overdue_tasks],
         today_events=[_event_to_response(e) for e in today_events],
         needs_review=[_todo_to_response(t) for t in needs_review_todos],
+        needs_date_tasks=[_todo_to_response(t) for t in needs_date_tasks],
         inbox_count=inbox_count,
-        greeting=_get_greeting(),
+        greeting=_get_greeting(utc_offset_minutes),
         date=today,
     )

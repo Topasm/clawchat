@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
@@ -23,6 +24,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InboxViewModelTest {
@@ -114,6 +116,22 @@ class InboxViewModelTest {
     }
 
     @Test
+    fun `completed and cancelled captures are not shown as open inbox items`() = runTest {
+        val closedCaptures = listOf(
+            capturedTodo.copy(id = "done", status = TaskStatus.COMPLETED),
+            capturedTodo.copy(id = "cancelled", status = TaskStatus.CANCELLED),
+        )
+        coEvery { todoRepository.listTodos(any()) } returns ApiResult.Success(
+            PaginatedResponse(items = closedCaptures, total = closedCaptures.size),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(emptyList<Todo>(), viewModel.uiState.value.needsOrganizing)
+    }
+
+    @Test
     fun `initial load error sets error state`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Error("Network error")
@@ -168,6 +186,35 @@ class InboxViewModelTest {
         assertEquals("Failed to organize", viewModel.uiState.value.error)
         // Item should still be in needsOrganizing
         assertEquals(1, viewModel.uiState.value.needsOrganizing.size)
+    }
+
+    @Test
+    fun `move to today schedules captured item and removes it from inbox`() = runTest {
+        val today = LocalDate.now().toString()
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(capturedTodo), total = 1))
+        coEvery {
+            todoRepository.updateTodo(
+                "1",
+                TodoUpdate(dueDate = today, inboxState = "none"),
+            )
+        } returns ApiResult.Success(
+            capturedTodo.copy(dueDate = today, inboxState = "none"),
+        )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onAction(InboxAction.MoveToToday("1"))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.needsOrganizing.size)
+        coVerify(exactly = 1) {
+            todoRepository.updateTodo(
+                "1",
+                TodoUpdate(dueDate = today, inboxState = "none"),
+            )
+        }
     }
 
     @Test

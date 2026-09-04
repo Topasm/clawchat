@@ -78,6 +78,52 @@ pub fn app_open_camera_settings<R: Runtime>(app: AppHandle<R>) -> Result<(), Str
         .map_err(|error| format!("failed to open camera settings: {error}"))
 }
 
+/// Open the canonical research document named by a Project description.
+///
+/// This is deliberately narrower than a generic URL/path bridge: only
+/// Obsidian links and existing absolute Markdown files are accepted.
+#[tauri::command]
+pub fn app_open_canonical_document<R: Runtime>(
+    app: AppHandle<R>,
+    target: String,
+) -> Result<(), String> {
+    use std::path::PathBuf;
+    use tauri_plugin_opener::OpenerExt;
+
+    let target = target.trim();
+    if target.starts_with("obsidian://") {
+        let url =
+            url::Url::parse(target).map_err(|error| format!("invalid Obsidian URL: {error}"))?;
+        if url.scheme() != "obsidian" {
+            return Err("only obsidian:// URLs are allowed".to_owned());
+        }
+        return app
+            .opener()
+            .open_url(url.as_str(), None::<&str>)
+            .map_err(|error| format!("failed to open Obsidian document: {error}"));
+    }
+
+    let path = if let Some(relative) = target.strip_prefix("~/") {
+        dirs::home_dir()
+            .ok_or_else(|| "home directory is unavailable".to_owned())?
+            .join(relative)
+    } else {
+        PathBuf::from(target)
+    };
+    if !path.is_absolute() {
+        return Err("canonical document path must be absolute".to_owned());
+    }
+    if path.extension().and_then(|extension| extension.to_str()) != Some("md") {
+        return Err("canonical document must be a Markdown file".to_owned());
+    }
+    if !path.is_file() {
+        return Err("canonical document does not exist".to_owned());
+    }
+    app.opener()
+        .open_path(path.to_string_lossy().into_owned(), None::<&str>)
+        .map_err(|error| format!("failed to open canonical document: {error}"))
+}
+
 #[tauri::command]
 pub fn app_set_badge_count<R: Runtime>(app: AppHandle<R>, count: u32) -> Result<(), String> {
     let window = app

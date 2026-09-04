@@ -3,7 +3,8 @@ import stat
 
 import pytest
 
-from config import settings
+import routers.admin as admin_module
+from config import Settings, settings
 from main import app
 from services.ai.codex_api_provider import CodexAPIStatus
 from services.ai.codex_cli_provider import CodexCLIStatus
@@ -49,6 +50,10 @@ class StubCodexCLI:
 
     async def health_check(self) -> bool:
         return True
+
+
+def _explode(*_args, **_kwargs):
+    raise OSError("read-only data directory")
 
 
 def _restore_state(key: str, previous) -> None:
@@ -134,6 +139,43 @@ async def test_codex_cli_can_be_selected_as_the_active_provider(
         "model": "Codex CLI default",
         "available": True,
     }
+
+
+async def test_switching_provider_is_remembered_across_restarts(
+    client, auth_headers, ai_provider_state, tmp_path, monkeypatch
+):
+    provider_file = tmp_path / "state" / "active-ai-provider"
+    monkeypatch.setattr(settings, "ai_provider_file", str(provider_file))
+    monkeypatch.setattr(settings, "ai_provider", "ollama")
+
+    response = await client.post(
+        "/api/admin/ai/provider",
+        headers=auth_headers,
+        json={"provider": "codex_cli"},
+    )
+
+    assert response.status_code == 200
+    assert provider_file.read_text(encoding="utf-8") == "codex_cli"
+    # A restart reads the file back through the Settings validator.
+    assert Settings(ai_provider_file=str(provider_file)).ai_provider == "codex_cli"
+
+
+async def test_switching_provider_survives_an_unwritable_data_directory(
+    client, auth_headers, ai_provider_state, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        settings, "ai_provider_file", str(tmp_path / "missing-file" / "provider")
+    )
+    monkeypatch.setattr(admin_module, "save_ai_provider", _explode)
+
+    response = await client.post(
+        "/api/admin/ai/provider",
+        headers=auth_headers,
+        json={"provider": "codex_cli"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["active_provider"] == "codex_cli"
 
 
 async def test_codex_can_be_selected_as_the_active_provider(

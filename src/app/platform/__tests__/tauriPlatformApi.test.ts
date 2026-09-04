@@ -57,6 +57,17 @@ describe('tauriPlatformApi', () => {
     });
   });
 
+  it('routes canonical documents through the constrained native opener', async () => {
+    const handler = vi.fn();
+    mockIPC((command, args) => handler(command, args));
+
+    await tauriPlatformApi.system.openCanonicalDocument('/home/research/E65.md');
+
+    expect(handler).toHaveBeenCalledWith(TAURI_COMMANDS.appOpenCanonicalDocument, {
+      target: '/home/research/E65.md',
+    });
+  });
+
   it('routes secure storage operations through Rust commands', async () => {
     const calls: Array<{ command: string; args: unknown }> = [];
     mockIPC((command, args) => {

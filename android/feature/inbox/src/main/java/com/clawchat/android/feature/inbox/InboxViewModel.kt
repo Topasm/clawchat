@@ -2,7 +2,9 @@ package com.clawchat.android.feature.inbox
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
@@ -28,6 +30,7 @@ sealed interface InboxAction {
     data object Refresh : InboxAction
     data class Organize(val todoId: String) : InboxAction
     data class RetryOrganize(val todoId: String) : InboxAction
+    data class MoveToToday(val todoId: String) : InboxAction
 }
 
 @HiltViewModel
@@ -49,6 +52,7 @@ class InboxViewModel @Inject constructor(
             is InboxAction.Refresh -> doRefresh()
             is InboxAction.Organize -> doOrganize(action.todoId)
             is InboxAction.RetryOrganize -> doOrganize(action.todoId)
+            is InboxAction.MoveToToday -> doMoveToToday(action.todoId)
         }
     }
 
@@ -56,6 +60,7 @@ class InboxViewModel @Inject constructor(
     fun refresh() = onAction(InboxAction.Refresh)
     fun organize(todoId: String) = onAction(InboxAction.Organize(todoId))
     fun retryOrganize(todoId: String) = onAction(InboxAction.RetryOrganize(todoId))
+    fun moveToToday(todoId: String) = onAction(InboxAction.MoveToToday(todoId))
 
     private fun doRefresh() {
         _uiState.update { it.copy(isRefreshing = true) }
@@ -69,7 +74,10 @@ class InboxViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val inboxItems = result.data.items.filter { todo ->
                         val state = todo.inboxState
-                        state != null && state != "none"
+                        state != null &&
+                            state != "none" &&
+                            todo.status != TaskStatus.COMPLETED &&
+                            todo.status != TaskStatus.CANCELLED
                     }
                     _uiState.update {
                         it.copy(
@@ -123,6 +131,31 @@ class InboxViewModel @Inject constructor(
                 is ApiResult.Error -> {
                     _uiState.update { it.copy(error = result.message) }
                 }
+                is ApiResult.Loading -> { /* not used here */ }
+            }
+        }
+    }
+
+    private fun doMoveToToday(todoId: String) {
+        viewModelScope.launch {
+            val today = java.time.LocalDate.now().toString()
+            when (
+                val result = todoRepository.updateTodo(
+                    todoId,
+                    TodoUpdate(dueDate = today, inboxState = "none"),
+                )
+            ) {
+                is ApiResult.Success -> {
+                    _uiState.update { state ->
+                        state.copy(
+                            planningNow = state.planningNow.filter { it.id != todoId },
+                            reviewSuggestion = state.reviewSuggestion.filter { it.id != todoId },
+                            needsOrganizing = state.needsOrganizing.filter { it.id != todoId },
+                            failed = state.failed.filter { it.id != todoId },
+                        )
+                    }
+                }
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
                 is ApiResult.Loading -> { /* not used here */ }
             }
         }

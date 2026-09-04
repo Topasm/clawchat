@@ -87,7 +87,7 @@ const UI_ENTITIES: Record<string, string> = {
   '&times;': '×',
 };
 
-export function canonicalUiMessage(source: string): string {
+function canonicalUiMessage(source: string): string {
   return source
     .replace(/&(apos|mdash|middot|rarr|times);/g, (entity) => UI_ENTITIES[entity] ?? entity)
     .replace(/\s+/g, ' ')

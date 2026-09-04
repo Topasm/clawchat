@@ -17,6 +17,7 @@ from routers import calendar as calendar_router
 from routers import capabilities as capabilities_router
 from routers import change_set as change_set_router
 from routers import chat as chat_router
+from routers import execution_host as execution_host_router
 from routers import execution_provider as execution_provider_router
 from routers import notifications as notifications_router
 from routers import obsidian as obsidian_router
@@ -26,18 +27,23 @@ from routers import review as review_router
 from routers import search as search_router
 from routers import settings as settings_router
 from routers import task_relationship as task_relationship_router
+from routers import task_comment as task_comment_router
 from routers import tasks as tasks_router
 from routers import today as today_router
 from routers import todo as todo_router
 from routers import voice as voice_router
 from services.ai.ai_service import AIService
-from services.ai.claude_code_provider import (
-    ClaudeCodeProvider,
-    ClaudeCodeStatus,
-)
-from services.ai.codex_api_provider import CodexAPIProvider, CodexAPIStatus
-from services.ai.codex_cli_provider import CodexCLIProvider, CodexCLIStatus
+from services.ai.claude_code_provider import ClaudeCodeProvider
+from services.ai.codex_api_provider import CodexAPIProvider
+from services.ai.codex_cli_provider import CodexCLIProvider
 from services.chat.orchestrator import Orchestrator
+from services.lifecycle import (
+    configure_ai_state,
+    initialize_host_identity,
+    initialize_vault,
+    probe_optional_ai,
+    vault_outbox_loop,
+)
 from services.scheduler import Scheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.access_log import install_access_log_redaction
@@ -55,16 +61,8 @@ async def lifespan(app: FastAPI):
 
     await init_db()
 
-    # Expose the same durable identity through health, pairing, and login so a
-    # saved workspace cannot silently turn into a different server at the same
-    # URL.
-    from services.relay.host_identity import get_or_create_host_identity
-
-    async with async_session_factory() as identity_db:
-        identity = await get_or_create_host_identity(identity_db)
-        await identity_db.commit()
-        app.state.host_id = identity.host_id
-        app.state.host_public_key = identity.public_key
+    # Expose the same durable identity through health, pairing, and login.
+    await initialize_host_identity(app.state)
 
     # Create AI service — relays to OpenClaw
     ai_service = AIService(
@@ -88,11 +86,7 @@ async def lifespan(app: FastAPI):
 
     app.state.paseo_adapter = paseo_execution_service.adapter_from_settings()
 
-    # Run slow startup checks concurrently instead of sequentially
-    async def _check_ai() -> bool:
-        return await ai_service.health_check()
-
-    claude_code = ClaudeCodeProvider()
+    claude_code = ClaudeCodeProvider(model=settings.claude_code_model)
     codex_cli = CodexCLIProvider(model=settings.codex_cli_model)
     codex_api = CodexAPIProvider(
         api_key=settings.codex_api_key,
@@ -101,165 +95,31 @@ async def lifespan(app: FastAPI):
         reasoning_effort=settings.codex_reasoning_effort,
     )
 
-    async def _check_claude_code():
-        # check_availability() already runs the CLI probe through asyncio.to_thread
-        # and resolves _cli_path itself; calling subprocess.run here would stall the
-        # event loop for up to 10s during startup.
-        status, version = await claude_code.check_availability()
-        return status, version
-
-    async def _check_codex_api() -> tuple[CodexAPIStatus, str]:
-        # Keep the credential snapshot private, but return it so a startup
-        # result cannot overwrite a key the user configured while the other
-        # optional provider probes were still running.
-        credential_snapshot = codex_api.api_key
-        return await codex_api.check_availability(), credential_snapshot
-
-    async def _check_codex_cli():
-        return await codex_cli.check_availability()
-
-    async def _init_vault():
-        if settings.obsidian_vault_path:
-            try:
-                from services.vault.obsidian_cli_service import load_queue
-                await asyncio.to_thread(load_queue)
-                logger.info("Obsidian CLI write queue loaded")
-            except Exception:
-                logger.debug("Could not load Obsidian CLI write queue")
-            try:
-                from services.vault.obsidian_vault_indexer import refresh_index
-                idx = await asyncio.to_thread(refresh_index)
-                logger.info(
-                    "Obsidian vault index: %d projects (CLI=%s, companion=%s)",
-                    len(idx.projects),
-                    idx.cli_available,
-                    idx.companion_online,
-                )
-            except Exception:
-                logger.debug("Could not build initial vault index")
-        try:
-            from services.vault.vault_sync_service import process_pending_vault_sync_jobs
-
-            async with async_session_factory() as vault_job_db:
-                await process_pending_vault_sync_jobs(vault_job_db)
-        except Exception:
-            logger.exception("Could not resume pending Vault sync jobs")
-
     # Task and calendar storage are the core desktop product. Optional AI
     # probes can each wait on unavailable local tools for several seconds, so
     # they must not delay the health endpoint that unlocks the local workspace.
-    app.state.ai_connected = False
-    app.state.claude_code = claude_code
-    app.state.claude_code_status = "checking"
-    app.state.claude_code_version = None
-    app.state.codex_api = codex_api
-    app.state.codex_api_status = (
-        "checking" if codex_api.is_configured else CodexAPIStatus.NOT_CONFIGURED.value
+    configure_ai_state(
+        app.state,
+        ai_service=ai_service,
+        claude_code=claude_code,
+        codex_api=codex_api,
+        codex_cli=codex_cli,
     )
-    app.state.codex_cli = codex_cli
-    app.state.codex_cli_status = "checking"
-    app.state.codex_cli_version = None
-    app.state.active_ai = ai_service
-    app.state.active_ai_provider = "openclaw"
-
-    async def _probe_optional_ai() -> None:
-        try:
-            (
-                ai_connected,
-                (claude_code_status, claude_code_version),
-                (codex_api_status, codex_credential_snapshot),
-                (codex_cli_status, codex_cli_version),
-            ) = await asyncio.gather(
-                _check_ai(),
-                _check_claude_code(),
-                _check_codex_api(),
-                _check_codex_cli(),
-            )
-            app.state.ai_connected = ai_connected
-            app.state.claude_code_status = claude_code_status.value
-            app.state.claude_code_version = claude_code_version
-            app.state.codex_cli_status = codex_cli_status.value
-            app.state.codex_cli_version = codex_cli_version
-            codex_probe_is_current = (
-                codex_api.api_key == codex_credential_snapshot
-            )
-            if codex_probe_is_current:
-                app.state.codex_api_status = codex_api_status.value
-            logger.info(
-                "Claude Code status: %s, version: %s",
-                claude_code_status.value,
-                claude_code_version,
-            )
-            if codex_probe_is_current:
-                logger.info(
-                    "Codex API status: %s, model: %s",
-                    codex_api_status.value,
-                    codex_api.model,
-                )
-            else:
-                logger.info(
-                    "Discarded stale Codex API startup probe after configuration changed"
-                )
-            logger.info(
-                "Codex CLI status: %s, version: %s",
-                codex_cli_status.value,
-                codex_cli_version,
-            )
-            if (
-                settings.ai_provider == "claude_code"
-                and claude_code_status == ClaudeCodeStatus.AVAILABLE
-            ):
-                app.state.active_ai = claude_code
-                app.state.active_ai_provider = "claude_code"
-                logger.info("Active AI provider: Claude Code CLI")
-            elif settings.ai_provider == "claude_code":
-                logger.warning(
-                    "ai_provider=claude_code but CLI is %s — falling back to OpenClaw",
-                    claude_code_status.value,
-                )
-            elif (
-                settings.ai_provider == "codex_cli"
-                and codex_cli_status == CodexCLIStatus.AVAILABLE
-            ):
-                app.state.active_ai = codex_cli
-                app.state.active_ai_provider = "codex_cli"
-                logger.info("Active AI provider: Codex CLI")
-            elif settings.ai_provider == "codex_cli":
-                logger.warning(
-                    "ai_provider=codex_cli but the CLI is %s — falling back to OpenClaw",
-                    codex_cli_status.value,
-                )
-            elif (
-                settings.ai_provider in {"codex", "codex_api"}
-                and codex_probe_is_current
-                and codex_api_status == CodexAPIStatus.AVAILABLE
-            ):
-                app.state.active_ai = codex_api
-                app.state.active_ai_provider = "codex"
-                logger.info("Active AI provider: Codex API (%s)", codex_api.model)
-            elif (
-                settings.ai_provider in {"codex", "codex_api"}
-                and codex_probe_is_current
-            ):
-                logger.warning(
-                    "ai_provider=codex but the API is %s — falling back to OpenClaw",
-                    codex_api_status.value,
-                )
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            # Optional providers must never make the local task/calendar
-            # workspace noisy or unusable during startup.
-            logger.exception("Optional AI provider probe failed; continuing in local mode")
 
     app.state.ai_probe_task = asyncio.create_task(
-        _probe_optional_ai(),
+        probe_optional_ai(
+            app.state,
+            ai_service=ai_service,
+            claude_code=claude_code,
+            codex_api=codex_api,
+            codex_cli=codex_cli,
+        ),
         name="optional-ai-probe",
     )
 
     # Vault recovery remains part of durable-data startup, but it does not
     # contact an AI provider or require a remote server.
-    await _init_vault()
+    await initialize_vault()
 
     # Initialize push notification service (no-op if not configured)
     from services.notifications.push_service import PushService
@@ -288,23 +148,10 @@ async def lifespan(app: FastAPI):
     else:
         app.state.scheduler = None
 
-    async def _vault_outbox_loop() -> None:
-        from services.vault.vault_sync_service import process_pending_vault_sync_jobs
-
-        while True:
-            try:
-                async with async_session_factory() as vault_job_db:
-                    await process_pending_vault_sync_jobs(vault_job_db)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("Periodic Vault outbox delivery failed")
-            await asyncio.sleep(15)
-
     # Outbox recovery is independent of the optional feature scheduler. This
     # also resolves jobs as succeeded when no Vault is configured.
     app.state.vault_outbox_task = asyncio.create_task(
-        _vault_outbox_loop(),
+        vault_outbox_loop(),
         name="vault-outbox",
     )
 
@@ -375,6 +222,11 @@ app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
 app.include_router(project_router.router, prefix="/api/projects", tags=["projects"])
 app.include_router(
+    execution_host_router.router,
+    prefix="/api/execution-hosts",
+    tags=["execution-hosts"],
+)
+app.include_router(
     execution_provider_router.router,
     prefix="/api/execution-providers",
     tags=["execution-providers"],
@@ -390,6 +242,11 @@ app.include_router(
     task_relationship_router.router,
     prefix="/api/task-relationships",
     tags=["task-relationships"],
+)
+app.include_router(
+    task_comment_router.router,
+    prefix="/api/task-comments",
+    tags=["task-comments"],
 )
 app.include_router(calendar_router.router, prefix="/api/events", tags=["calendar"])
 app.include_router(search_router.router, prefix="/api/search", tags=["search"])
@@ -427,7 +284,7 @@ async def health(db: AsyncSession = Depends(get_db)):
     codex_cli_status = getattr(app.state, "codex_cli_status", "unknown")
     if active_provider == "claude_code":
         effective_connected = claude_code_status == "available"
-        ai_model = "claude (via CLI)"
+        ai_model = f"claude {settings.claude_code_model or 'default'} (via CLI)"
     elif active_provider == "codex":
         effective_connected = codex_api_status == "available"
         ai_model = settings.codex_model
@@ -452,6 +309,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "ai_connected": effective_connected,
         "claude_code_status": claude_code_status,
         "claude_code_version": getattr(app.state, "claude_code_version", None),
+        "claude_code_model": settings.claude_code_model,
         "codex_api_status": codex_api_status,
         "codex_model": settings.codex_model,
         "codex_cli_status": codex_cli_status,

@@ -9,6 +9,7 @@ interface InboxTriagePreviewPanelProps {
   onToggleSuggestion: (taskId: string) => void;
   onDismiss: () => void;
   onApply: () => void;
+  onApplyAndOpen: () => void;
 }
 /** The reviewable AI placement plan: proposed Workstreams, per-task suggestions, apply. */
 export default function InboxTriagePreviewPanel({
@@ -20,7 +21,14 @@ export default function InboxTriagePreviewPanel({
   onToggleSuggestion,
   onDismiss,
   onApply,
+  onApplyAndOpen,
 }: InboxTriagePreviewPanelProps) {
+  const selectedProjectIds = new Set(
+    preview.suggestions
+      .filter((suggestion) => selectedTaskIds.includes(suggestion.task_id))
+      .map((suggestion) => suggestion.project_id),
+  );
+  const canOpenOneProject = selectedProjectIds.size === 1;
   return (
     <div className="cc-inbox-triage__ai-preview" aria-live="polite">
       <div className="cc-inbox-triage__ai-preview-header">
@@ -112,16 +120,28 @@ export default function InboxTriagePreviewPanel({
           {preview.unassigned_task_ids.length === 1 ? '' : 's'}
         </p>
       )}
-      <button
-        type="button"
-        className="cc-btn cc-btn--primary"
-        disabled={selectedTaskIds.length === 0 || isApplying}
-        onClick={onApply}
-      >
-        {isApplying
-          ? translateUi('Applying\u2026')
-          : translateUi('Apply selected ({{count}})', { count: selectedTaskIds.length })}
-      </button>
+      <div className="cc-inbox-triage__ai-preview-actions">
+        <button
+          type="button"
+          className="cc-btn"
+          disabled={selectedTaskIds.length === 0 || isApplying}
+          onClick={onApply}
+        >
+          {isApplying
+            ? translateUi('Applying\u2026')
+            : translateUi('Apply selected ({{count}})', { count: selectedTaskIds.length })}
+        </button>
+        {canOpenOneProject && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            disabled={selectedTaskIds.length === 0 || isApplying}
+            onClick={onApplyAndOpen}
+          >
+            {isApplying ? translateUi('Applying\u2026') : translateUi('Apply & Open Project')}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

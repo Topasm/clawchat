@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="planner_today">오늘</string>
+    <string name="planner_week">이번 주</string>
+    <string name="planner_month">월간</string>
+    <string name="week_title">이번 주</string>
+    <string name="week_cd_capture_task">이번 주 작업 추가</string>
+    <string name="week_offline_cached">오프라인 — 마지막으로 동기화한 작업을 표시합니다</string>
+    <string name="week_overdue_title">기한 지남</string>
+    <string name="week_overdue_subtitle">이번 주를 정리하기 전에 밀린 작업부터 확인하세요.</string>
+    <string name="week_empty_title">이번 주 일정이 비어 있어요</string>
+    <string name="week_empty_description">이번 주에 처리할 날짜가 정해진 작업을 추가해 보세요.</string>
+    <string name="week_empty_action">작업 추가</string>
+    <string name="week_loading">이번 주를 불러오는 중…</string>
+    <string name="week_status_in_progress">진행 중</string>
+    <string name="week_recurring">반복</string>
+    <string name="week_mark_complete">%1$s 완료로 표시</string>
+    <plurals name="week_active_tasks">
+        <item quantity="other">활성 작업 %1$d개</item>
+    </plurals>
+    <plurals name="week_timeline_more">
+        <item quantity="other">마감 %1$d개 더</item>
+    </plurals>
+</resources>

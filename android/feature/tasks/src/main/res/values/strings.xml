@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tasks_cd_search">Quick Find</string>
+    <string name="tasks_cd_settings">Settings</string>
+    <string name="tasks_title">Tasks</string>
+    <string name="tasks_cd_new_task">New task</string>
+    <string name="tasks_loading">Loading tasks…</string>
+    <string name="tasks_empty_title">No tasks in this view</string>
+    <string name="tasks_empty_description">Create something new or switch filters to revisit completed work.</string>
+    <string name="tasks_create_task">Create task</string>
+    <string name="tasks_none_yet">No tasks yet</string>
+    <plurals name="tasks_summary_active">
+        <item quantity="one">%1$d active task</item>
+        <item quantity="other">%1$d active tasks</item>
+    </plurals>
+    <plurals name="tasks_summary_completed">
+        <item quantity="one">%1$d completed task</item>
+        <item quantity="other">%1$d completed tasks</item>
+    </plurals>
+    <plurals name="tasks_summary_total">
+        <item quantity="one">%1$d task total</item>
+        <item quantity="other">%1$d tasks total</item>
+    </plurals>
+    <string name="tasks_summary_format">%1$s · %2$s · %3$s</string>
+    <string name="tasks_filter_all">All</string>
+    <string name="tasks_completed_boundary">Completed · %1$d</string>
+
+    <string name="tasks_status_pending">Pending</string>
+    <string name="tasks_status_in_progress">In progress</string>
+    <string name="tasks_status_completed">Completed</string>
+    <string name="tasks_status_cancelled">Cancelled</string>
+    <string name="tasks_inbox_planning">Planning</string>
+    <string name="tasks_inbox_review">Review</string>
+    <string name="tasks_inbox_organize">Organize</string>
+    <string name="tasks_inbox_failed">Failed</string>
+    <string name="tasks_recurring">Recurring</string>
+
+    <string name="tasks_detail_title">Task detail</string>
+    <string name="tasks_cd_back">Back</string>
+    <string name="tasks_cd_delete">Delete task</string>
+    <string name="tasks_deleted">Task deleted</string>
+    <string name="tasks_undo">Undo</string>
+    <string name="tasks_mark_complete">Mark %1$s complete</string>
+    <string name="tasks_mark_incomplete">Mark %1$s incomplete</string>
+    <string name="tasks_experiment_completion_title">Complete experiment task</string>
+    <string name="tasks_experiment_completion_question">Did you record the verdict in the original document?</string>
+    <string name="tasks_experiment_verdict_recorded">Recorded</string>
+    <string name="tasks_experiment_verdict_later">Later</string>
+    <string name="tasks_description_title">Description</string>
+    <string name="tasks_description_subtitle">Notes and supporting detail.</string>
+    <string name="tasks_details_title">Details</string>
+    <string name="tasks_details_subtitle">Operational metadata for this task.</string>
+    <string name="tasks_discuss_with_agent">Discuss with agent</string>
+    <string name="tasks_links_title">Task links</string>
+    <string name="tasks_links_subtitle">Dependencies and related work from the shared task graph.</string>
+    <string name="tasks_links_loading">Loading task links…</string>
+    <string name="tasks_links_empty">No task links yet.</string>
+    <string name="tasks_tags_title">Tags</string>
+    <string name="tasks_tags_subtitle">Labels attached to this work item.</string>
+    <string name="tasks_fallback_title">Task %1$s</string>
+    <string name="tasks_relationship_depends_on">Depends on</string>
+    <string name="tasks_relationship_required_by">Required by</string>
+    <string name="tasks_relationship_duplicates">Duplicates</string>
+    <string name="tasks_relationship_duplicated_by">Duplicated by</string>
+    <string name="tasks_relationship_related_to">Related to</string>
+    <string name="tasks_relationship_type_depends_on">Dependency</string>
+    <string name="tasks_relationship_type_duplicate">Duplicate</string>
+    <string name="tasks_relationship_type_related">Related</string>
+</resources>

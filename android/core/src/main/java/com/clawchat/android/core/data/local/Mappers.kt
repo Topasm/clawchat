@@ -4,10 +4,12 @@ import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 
-fun Todo.toEntity(): TodoEntity = TodoEntity(
+fun Todo.toEntity(workspaceKey: String): TodoEntity = TodoEntity(
+    workspaceKey = workspaceKey,
     id = id,
     title = title,
     description = description,
+    projectId = projectId,
     status = status.wireValue,
     priority = priority,
     dueDate = dueDate,
@@ -15,7 +17,13 @@ fun Todo.toEntity(): TodoEntity = TodoEntity(
     tags = tags?.joinToString(","),
     parentId = parentId,
     sortOrder = sortOrder,
+    source = source,
+    sourceId = sourceId,
+    idempotencyKey = idempotencyKey,
+    assignee = assignee,
     inboxState = inboxState ?: "none",
+    estimatedMinutes = estimatedMinutes,
+    projectLabel = projectLabel,
     isRecurring = isRecurring,
     recurrenceRule = recurrenceRule,
     createdAt = createdAt,
@@ -26,6 +34,7 @@ fun TodoEntity.toModel(): Todo = Todo(
     id = id,
     title = title,
     description = description,
+    projectId = projectId,
     status = TaskStatus.fromWireValue(status),
     priority = priority,
     dueDate = dueDate,
@@ -33,14 +42,21 @@ fun TodoEntity.toModel(): Todo = Todo(
     tags = tags?.split(",")?.filter { it.isNotBlank() },
     parentId = parentId,
     sortOrder = sortOrder,
+    source = source,
+    sourceId = sourceId,
+    idempotencyKey = idempotencyKey,
+    assignee = assignee,
     inboxState = inboxState,
+    estimatedMinutes = estimatedMinutes,
+    projectLabel = projectLabel,
     isRecurring = isRecurring,
     recurrenceRule = recurrenceRule,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
 
-fun Event.toEntity(): EventEntity = EventEntity(
+fun Event.toEntity(workspaceKey: String): EventEntity = EventEntity(
+    workspaceKey = workspaceKey,
     id = id,
     title = title,
     description = description,

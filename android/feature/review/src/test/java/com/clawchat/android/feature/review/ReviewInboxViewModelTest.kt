@@ -90,7 +90,7 @@ class ReviewInboxViewModelTest {
         viewModel.onAction(ReviewInboxAction.Select(planReview.id))
         viewModel.onAction(ReviewInboxAction.Decide(ReviewDecision.APPROVED))
 
-        assertTrue(viewModel.uiState.value.error!!.contains("read-only"))
+        assertEquals(R.string.review_read_only_error, viewModel.uiState.value.errorResource)
         coVerify(exactly = 0) { repository.decide(any(), any(), any()) }
         coVerify(exactly = 0) { runRepository.getRun(any()) }
     }
@@ -101,7 +101,7 @@ class ReviewInboxViewModelTest {
         coEvery { runRepository.getRun("run-1") } returns ApiResult.Success(authoritativeRun())
         coEvery { runRepository.listEvents("run-1") } returns ApiResult.Success(emptyList())
         coEvery {
-            repository.decide("review-run", ReviewDecision.APPROVED, "looks good")
+            repository.decide(runReview, ReviewDecision.APPROVED, "looks good")
         } returns ApiResult.Success(
             ReviewDecisionResponse(runReview.copy(status = ReviewStatus.APPROVED)),
         )
@@ -116,7 +116,7 @@ class ReviewInboxViewModelTest {
         viewModel.onAction(ReviewInboxAction.Decide(ReviewDecision.APPROVED))
         advanceUntilIdle()
 
-        coVerify { repository.decide("review-run", ReviewDecision.APPROVED, "looks good") }
+        coVerify { repository.decide(runReview, ReviewDecision.APPROVED, "looks good") }
         assertTrue(viewModel.uiState.value.items.isEmpty())
         assertNull(viewModel.uiState.value.selected)
     }
@@ -144,7 +144,7 @@ class ReviewInboxViewModelTest {
         coEvery { runRepository.getRun("run-1") } returns ApiResult.Success(authoritativeRun())
         coEvery { runRepository.listEvents("run-1") } returns ApiResult.Success(emptyList())
         coEvery {
-            repository.decide("review-run", ReviewDecision.CHANGES_REQUESTED, null)
+            repository.decide(runReview, ReviewDecision.CHANGES_REQUESTED, null)
         } returns ApiResult.Success(
             ReviewDecisionResponse(runReview.copy(status = ReviewStatus.CHANGES_REQUESTED)),
         )
@@ -157,7 +157,10 @@ class ReviewInboxViewModelTest {
         advanceUntilIdle()
 
         assertEquals("run-1", viewModel.uiState.value.followUpRunId)
-        assertTrue(viewModel.uiState.value.notice!!.contains("follow-up"))
+        assertEquals(
+            R.string.review_changes_requested_notice,
+            viewModel.uiState.value.noticeResource,
+        )
     }
 
     @Test

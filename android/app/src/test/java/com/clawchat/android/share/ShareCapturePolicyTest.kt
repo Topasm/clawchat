@@ -140,5 +140,14 @@ class ShareCapturePolicyTest {
                 listOf("one.png", "two.pdf", "three.md"),
             ),
         )
+        assertEquals(
+            "공유 파일 3개",
+            ShareCapturePolicy.taskTitle(
+                null,
+                null,
+                listOf("one.png", "two.pdf", "three.md"),
+                multipleFilesTitle = { count -> "공유 파일 ${count}개" },
+            ),
+        )
     }
 }

@@ -2,13 +2,15 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-from sqlalchemy import select
 
 from domain.task import TaskStatus
 from models.todo import Todo
 from services.calendar.recurrence_service import generate_occurrences, parse_rrule
-from services.tasks.todo_recurrence_service import compute_next_occurrence, spawn_next_occurrence
+from services.tasks.todo_recurrence_service import (
+    compute_next_occurrence,
+    spawn_next_occurrence,
+    spawn_next_occurrences,
+)
 from utils import make_id
 
 
@@ -76,14 +78,17 @@ def test_weekday_rule_lands_on_the_next_listed_day():
 
 
 async def _recurring_todo(db, **overrides) -> Todo:
+    values = {
+        "title": "Water the plants",
+        "status": TaskStatus.COMPLETED,
+        "priority": "medium",
+        "due_date": datetime(2026, 8, 28, tzinfo=timezone.utc),
+        "recurrence_rule": "FREQ=DAILY",
+    }
+    values.update(overrides)
     todo = Todo(
         id=make_id("todo_"),
-        title="Water the plants",
-        status=TaskStatus.COMPLETED,
-        priority="medium",
-        due_date=datetime(2026, 8, 28, tzinfo=timezone.utc),
-        recurrence_rule="FREQ=DAILY",
-        **overrides,
+        **values,
     )
     db.add(todo)
     await db.flush()
@@ -131,6 +136,83 @@ async def test_non_recurring_todo_spawns_nothing(db_session):
     await db_session.flush()
 
     assert await spawn_next_occurrence(db_session, todo) is None
+
+
+async def test_spawn_next_occurrences_continues_each_recurring_series(db_session):
+    first = await _recurring_todo(db_session, title="First")
+    second = await _recurring_todo(db_session, title="Second")
+
+    spawned = await spawn_next_occurrences(db_session, [first, second])
+
+    assert [todo.title for todo in spawned] == ["First", "Second"]
+
+
+async def test_bulk_completion_spawns_next_occurrence(client, auth_headers):
+    created_response = await client.post(
+        "/api/todos",
+        json={
+            "title": "Bulk recurring task",
+            "due_date": "2026-08-28T09:00:00Z",
+            "recurrence_rule": "FREQ=DAILY",
+        },
+        headers=auth_headers,
+    )
+    assert created_response.status_code == 201
+    created = created_response.json()
+
+    completed_response = await client.patch(
+        "/api/todos/bulk",
+        json={"ids": [created["id"]], "status": TaskStatus.COMPLETED.value},
+        headers=auth_headers,
+    )
+
+    assert completed_response.status_code == 200
+    todos_response = await client.get(
+        "/api/todos",
+        params={"limit": 100},
+        headers=auth_headers,
+    )
+    occurrences = [
+        todo
+        for todo in todos_response.json()["items"]
+        if todo["recurring_source_id"] == created["id"]
+    ]
+    assert len(occurrences) == 1
+    assert occurrences[0]["status"] == TaskStatus.PENDING.value
+    assert occurrences[0]["due_date"].startswith("2026-08-29")
+
+
+async def test_recompleting_does_not_duplicate_next_occurrence(client, auth_headers):
+    created_response = await client.post(
+        "/api/todos",
+        json={
+            "title": "Idempotent recurring task",
+            "due_date": "2026-08-28T09:00:00Z",
+            "recurrence_rule": "FREQ=DAILY",
+        },
+        headers=auth_headers,
+    )
+    created = created_response.json()
+
+    for _ in range(2):
+        response = await client.patch(
+            f"/api/todos/{created['id']}",
+            json={"status": TaskStatus.COMPLETED.value},
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+
+    todos_response = await client.get(
+        "/api/todos",
+        params={"limit": 100},
+        headers=auth_headers,
+    )
+    occurrences = [
+        todo
+        for todo in todos_response.json()["items"]
+        if todo["recurring_source_id"] == created["id"]
+    ]
+    assert len(occurrences) == 1
 
 
 # --- event expansion -----------------------------------------------------

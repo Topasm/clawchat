@@ -28,6 +28,13 @@ interface UpdateDownloader {
     ): File
 }
 
+/** IOException with a stable, localizable category for updater-owned failures. */
+class UpdateDownloadException(
+    val failure: UpdateFailure,
+    message: String,
+    cause: Throwable? = null,
+) : IOException(message, cause)
+
 @Singleton
 class UpdateDownloaderImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -40,7 +47,10 @@ class UpdateDownloaderImpl @Inject constructor(
     ): File = withContext(Dispatchers.IO) {
         val directory = File(context.cacheDir, UPDATE_DIRECTORY)
         if (!directory.isDirectory && !directory.mkdirs()) {
-            throw IOException("Could not create the update cache directory")
+            throw UpdateDownloadException(
+                failure = UpdateFailure.CacheUnavailable,
+                message = "Could not create the update cache directory",
+            )
         }
         // Only one staged APK is ever useful, and a stale one wastes cache the
         // system may reclaim mid-install.
@@ -52,7 +62,10 @@ class UpdateDownloaderImpl @Inject constructor(
             val expected = fetchChecksum(update.checksumUrl)
             val actual = sha256(target)
             if (!actual.equals(expected, ignoreCase = true)) {
-                throw IOException("Update checksum mismatch: expected $expected, got $actual")
+                throw UpdateDownloadException(
+                    failure = UpdateFailure.ChecksumMismatch,
+                    message = "Update checksum mismatch: expected $expected, got $actual",
+                )
             }
         } catch (error: Throwable) {
             target.delete()
@@ -72,7 +85,10 @@ class UpdateDownloaderImpl @Inject constructor(
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("Update download failed: HTTP ${response.code}")
+                throw UpdateDownloadException(
+                    failure = UpdateFailure.DownloadHttpError(response.code),
+                    message = "Update download failed: HTTP ${response.code}",
+                )
             }
             val body = response.body
             val declared = body.contentLength()
@@ -99,10 +115,16 @@ class UpdateDownloaderImpl @Inject constructor(
         val request = Request.Builder().url(url).build()
         return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("Update checksum download failed: HTTP ${response.code}")
+                throw UpdateDownloadException(
+                    failure = UpdateFailure.ChecksumHttpError(response.code),
+                    message = "Update checksum download failed: HTTP ${response.code}",
+                )
             }
             parseChecksum(response.body.string())
-                ?: throw IOException("Update checksum payload is invalid")
+                ?: throw UpdateDownloadException(
+                    failure = UpdateFailure.InvalidChecksumPayload,
+                    message = "Update checksum payload is invalid",
+                )
         }
     }
 

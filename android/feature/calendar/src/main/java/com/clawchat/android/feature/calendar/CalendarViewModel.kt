@@ -3,10 +3,12 @@ package com.clawchat.android.feature.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.Event
-import com.clawchat.android.core.data.model.EventCreate
 import com.clawchat.android.core.data.model.EventUpdate
+import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.repository.EventRepository
 import com.clawchat.android.core.data.repository.OccurrenceDeleteMode
+import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -23,6 +26,8 @@ data class CalendarUiState(
     val visibleMonth: YearMonth = YearMonth.now(),
     val selectedDate: LocalDate = LocalDate.now(),
     val eventsByDate: Map<LocalDate, List<Event>> = emptyMap(),
+    /** Open deadlines spread across the days they run for. */
+    val tasksByDate: Map<LocalDate, List<TaskSegment>> = emptyMap(),
     val isLoading: Boolean = false,
     /** True while the month is the last cached copy rather than live data. */
     val isOffline: Boolean = false,
@@ -30,6 +35,9 @@ data class CalendarUiState(
 ) {
     val selectedEvents: List<Event>
         get() = eventsByDate[selectedDate].orEmpty()
+
+    val selectedTasks: List<TaskSegment>
+        get() = tasksByDate[selectedDate].orEmpty()
 }
 
 sealed interface CalendarAction {
@@ -38,7 +46,7 @@ sealed interface CalendarAction {
     data object ShowToday : CalendarAction
     data object Refresh : CalendarAction
     data class SelectDate(val date: LocalDate) : CalendarAction
-    data class Create(val input: EventCreate) : CalendarAction
+    data class CreateTask(val input: TodoCreate) : CalendarAction
     data class Update(val id: String, val input: EventUpdate) : CalendarAction
     data class Delete(val event: Event) : CalendarAction
 }
@@ -46,15 +54,20 @@ sealed interface CalendarAction {
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val eventRepository: EventRepository,
+    private val todoRepository: TodoRepository,
     private val syncManager: SyncManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
+    private var loadGeneration = 0L
 
     init {
         load()
+        loadTasks()
         viewModelScope.launch { syncManager.eventChanged.collect { load() } }
+        viewModelScope.launch { syncManager.todoChanged.collect { loadTasks() } }
     }
 
     fun onAction(action: CalendarAction) {
@@ -66,9 +79,12 @@ class CalendarViewModel @Inject constructor(
                 _uiState.update { it.copy(selectedDate = today) }
                 showMonth(YearMonth.from(today))
             }
-            CalendarAction.Refresh -> load()
+            CalendarAction.Refresh -> {
+                load()
+                loadTasks()
+            }
             is CalendarAction.SelectDate -> selectDate(action.date)
-            is CalendarAction.Create -> mutate { eventRepository.createEvent(action.input) }
+            is CalendarAction.CreateTask -> mutateTask { todoRepository.createTodo(action.input) }
             is CalendarAction.Update -> mutate { eventRepository.updateEvent(action.id, action.input) }
             is CalendarAction.Delete -> mutate { deleteEvent(action.event) }
         }
@@ -88,24 +104,30 @@ class CalendarViewModel @Inject constructor(
     }
 
     private fun load(month: YearMonth = _uiState.value.visibleMonth) {
-        viewModelScope.launch {
+        val generation = ++loadGeneration
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val from = month.atDay(1)
             val to = month.atEndOfMonth()
             when (val result = eventRepository.listEvents(from, to)) {
-                is ApiResult.Success -> _uiState.update {
-                    it.copy(
-                        eventsByDate = groupByDate(result.data),
-                        isLoading = false,
-                        isOffline = false,
-                        error = null,
-                    )
+                is ApiResult.Success -> {
+                    if (!isCurrentLoad(generation, month)) return@launch
+                    _uiState.update {
+                        it.copy(
+                            eventsByDate = groupByDate(result.data),
+                            isLoading = false,
+                            isOffline = false,
+                            error = null,
+                        )
+                    }
                 }
 
                 is ApiResult.Error -> {
                     // Same trade as Today: a cached month beats an empty one,
                     // minus the repeats the server expands, which are not cached.
                     val cached = eventRepository.cachedEvents(from, to)
+                    if (!isCurrentLoad(generation, month)) return@launch
                     _uiState.update {
                         if (cached.isEmpty()) {
                             it.copy(isLoading = false, isOffline = false, error = result.message)
@@ -124,6 +146,36 @@ class CalendarViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Deadlines are loaded whole rather than per month: a task's bar starts at
+     * today, so a month in view can be carrying a task that is due far outside
+     * it, and a month-windowed query would drop exactly those.
+     */
+    private fun loadTasks() {
+        viewModelScope.launch {
+            val result = todoRepository.listTodos(mapOf("limit" to TASK_PAGE_SIZE))
+            val todos: List<Todo> = when (result) {
+                is ApiResult.Success -> result.data.items
+                // Deadlines are a secondary layer on the calendar, so a failure
+                // here must not blank the month or raise an error banner.
+                else -> return@launch
+            }
+            _uiState.update { it.copy(tasksByDate = taskSegmentsByDate(todos)) }
+        }
+    }
+
+    private fun mutateTask(block: suspend () -> ApiResult<*>) {
+        viewModelScope.launch {
+            when (val result = block()) {
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                else -> loadTasks()
+            }
+        }
+    }
+
+    private fun isCurrentLoad(generation: Long, month: YearMonth): Boolean =
+        generation == loadGeneration && _uiState.value.visibleMonth == month
 
     private suspend fun deleteEvent(event: Event): ApiResult<Unit> {
         val occurrenceDate = event.occurrenceDate
@@ -152,4 +204,8 @@ class CalendarViewModel @Inject constructor(
         .mapNotNull { event -> eventDate(event.startTime)?.let { it to event } }
         .groupBy({ it.first }, { it.second })
         .mapValues { (_, dayEvents) -> dayEvents.sortedBy { it.startTime } }
+
+    private companion object {
+        const val TASK_PAGE_SIZE = "1000"
+    }
 }

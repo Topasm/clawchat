@@ -4,20 +4,36 @@ import { useTodosQuery, useToggleTodoComplete } from '../../hooks/queries';
 import useKanbanFilters from '../../hooks/useKanbanFilters';
 import { useModuleStore } from '../../stores/useModuleStore';
 import KanbanFilterBar from '../kanban/KanbanFilterBar';
-import TasksHeader, { type TasksViewMode } from '../kanban/TasksHeader';
+import TasksHeader, { type TasksStatusFilter, type TasksViewMode } from '../kanban/TasksHeader';
 import TaskListView from './TaskListView';
+import { isTaskTodo } from '../../utils/inboxState';
+import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
 
 interface TaskListPageProps {
   viewMode: TasksViewMode;
   onViewModeChange: (mode: TasksViewMode) => void;
+  statusFilter: TasksStatusFilter;
+  onStatusFilterChange: (filter: TasksStatusFilter) => void;
 }
 
-export default function TaskListPage({ viewMode, onViewModeChange }: TaskListPageProps) {
+export default function TaskListPage({
+  viewMode,
+  onViewModeChange,
+  statusFilter,
+  onStatusFilterChange,
+}: TaskListPageProps) {
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
   const filters = useModuleStore((state) => state.kanbanFilters);
-  const filteredTodos = useKanbanFilters(todos, filters);
+  const taskTodos = useMemo(() => todos.filter(isTaskTodo), [todos]);
+  const scopedTodos = useMemo(
+    () =>
+      statusFilter === 'all' ? taskTodos : taskTodos.filter((todo) => todo.status === statusFilter),
+    [statusFilter, taskTodos],
+  );
+  const filteredTodos = useKanbanFilters(scopedTodos, filters);
   const toggleTodo = useToggleTodoComplete();
+  const { requestStatusChange, confirmationDialog } = useExperimentCompletionGate();
   const orderedTodos = useMemo(() => {
     const todoById = new Map(filteredTodos.map((todo) => [todo.id, todo]));
     const childrenById = new Map<string, typeof filteredTodos>();
@@ -41,9 +57,11 @@ export default function TaskListPage({ viewMode, onViewModeChange }: TaskListPag
   return (
     <div>
       <TasksHeader
-        todos={todos}
+        todos={taskTodos}
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
+        statusFilter={statusFilter}
+        onStatusFilterChange={onStatusFilterChange}
         subtitle={`${filteredTodos.length} task${filteredTodos.length !== 1 ? 's' : ''} in a detailed list`}
       />
       <KanbanFilterBar showSubtaskToggle={false} />
@@ -52,9 +70,15 @@ export default function TaskListPage({ viewMode, onViewModeChange }: TaskListPag
         onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
         onToggleTask={(taskId) => {
           const todo = todos.find((candidate) => candidate.id === taskId);
-          if (todo) toggleTodo.mutate({ id: taskId, currentStatus: todo.status });
+          if (todo) {
+            const nextStatus = todo.status === 'completed' ? 'pending' : 'completed';
+            requestStatusChange(todo, nextStatus, () =>
+              toggleTodo.mutate({ id: taskId, currentStatus: todo.status }),
+            );
+          }
         }}
       />
+      {confirmationDialog}
     </div>
   );
 }

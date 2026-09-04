@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import shutil
 import subprocess
 import sys
@@ -99,6 +98,8 @@ def _run(
 
 class CodexCLIProvider:
     """AIService-compatible adapter around ``codex exec``."""
+
+    supports_native_tool_calling = False
 
     def __init__(self, *, model: str = "", timeout_seconds: int = 180):
         self.model = model.strip()

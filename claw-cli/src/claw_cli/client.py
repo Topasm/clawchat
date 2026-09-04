@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Any
 
 import httpx
 
 from claw_cli import config
-from claw_cli.errors import AuthError, NotFoundError, ServerError
+from claw_cli.errors import AuthError, ClawError, NotFoundError, ServerError
 
 
 def _base_url() -> str:
@@ -94,7 +95,7 @@ def _handle_response_final(resp: httpx.Response) -> Any:
     if resp.status_code >= 400:
         try:
             detail = resp.json().get("detail", resp.text)
-        except Exception:
+        except ValueError:
             detail = resp.text
         raise ServerError(f"Server error ({resp.status_code}): {detail}")
     if resp.status_code == 204:
@@ -142,10 +143,8 @@ def login(server_url: str, pin: str) -> dict:
 
 
 def logout() -> None:
-    try:
+    with suppress(ClawError):
         _request("POST", "/api/auth/logout")
-    except Exception:
-        pass  # best-effort
     config.clear_tokens()
 
 

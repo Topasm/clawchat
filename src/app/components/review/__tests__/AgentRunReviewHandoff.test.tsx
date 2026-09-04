@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import AgentRunReviewHandoff from '../AgentRunReviewHandoff';
@@ -15,7 +15,6 @@ describe('AgentRunReviewHandoff', () => {
         taskTitle="Run experiment"
         impact={{ todo_id: 'task-run', graph_revision: 17, newly_ready_tasks: readyTasks }}
         onOpenTask={vi.fn()}
-        onOpenInbox={vi.fn()}
       />,
     );
 
@@ -28,9 +27,12 @@ describe('AgentRunReviewHandoff', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('shows the applied outcome and links to newly Ready work, the completed task, and Inbox', () => {
+  it('starts one next Ready task only after the user clicks Run next', async () => {
     const onOpenTask = vi.fn();
-    const onOpenInbox = vi.fn();
+    const onRunNext = vi.fn().mockResolvedValue({ run_id: 'run-next' });
+    const onChooseAnother = vi.fn();
+    const onStop = vi.fn();
+    const onOpenRun = vi.fn();
     render(
       <AgentRunReviewHandoff
         taskTitle="Run experiment"
@@ -44,19 +46,31 @@ describe('AgentRunReviewHandoff', () => {
           adopted: true,
         }}
         onOpenTask={onOpenTask}
-        onOpenInbox={onOpenInbox}
+        onRunNext={onRunNext}
+        canRunNext
+        onChooseAnother={onChooseAnother}
+        onStop={onStop}
+        onOpenRun={onOpenRun}
       />,
     );
 
     expect(screen.getByLabelText('Agent approval outcome')).toHaveTextContent('Task completed');
     expect(screen.getByText('2 downstream tasks are now Ready.')).toBeInTheDocument();
+    expect(onRunNext).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Analyze experiment' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open completed task' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run next' }));
 
-    expect(onOpenTask).toHaveBeenNthCalledWith(1, 'task-analysis');
-    expect(onOpenTask).toHaveBeenNthCalledWith(2, 'task-run');
-    expect(onOpenInbox).toHaveBeenCalledOnce();
+    expect(onOpenTask).toHaveBeenCalledWith('task-analysis');
+    expect(onChooseAnother).toHaveBeenCalledOnce();
+    expect(onRunNext).toHaveBeenCalledWith(readyTasks[0]);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open started run' })).toBeVisible(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open started run' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onOpenRun).toHaveBeenCalledWith('run-next');
+    expect(onStop).toHaveBeenCalledOnce();
   });
 });
