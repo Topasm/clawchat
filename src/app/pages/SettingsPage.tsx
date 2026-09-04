@@ -7,6 +7,7 @@ import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import SettingsRow from '../components/shared/SettingsRow';
 import SettingsSection from '../components/shared/SettingsSection';
+import { THIS_MACHINE_SECTION_ID } from '../components/shared/WorkerStatusLine';
 import Toggle from '../components/shared/Toggle';
 import { StatusDot } from '../components/shared/WorkspacePrimitives';
 import { useExecutionHostsQuery } from '../hooks/queries';
@@ -124,6 +125,12 @@ export default function SettingsPage() {
   const setWorkerProvider = useSettingsStore((state) => state.setWorkerProvider);
   const { data: executionHosts = [] } = useExecutionHostsQuery();
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
+  // The sidebar's machine line lands here by anchor; bring that section up.
+  useEffect(() => {
+    if (!location.hash) return;
+    const target = document.getElementById(location.hash.slice(1));
+    target?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  }, [location.hash]);
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
   const [aiProviderLoadFailed, setAiProviderLoadFailed] = useState(false);
@@ -557,7 +564,10 @@ export default function SettingsPage() {
         <ObsidianStatusCard />
 
         {isDesktop && (
-          <SettingsSection title={t('workspaceSettings.sections.thisMachine')}>
+          <SettingsSection
+            id={THIS_MACHINE_SECTION_ID}
+            title={t('workspaceSettings.sections.thisMachine')}
+          >
             <SettingsRow
               label={t('workspaceSettings.thisMachine.name')}
               sublabel={t('workspaceSettings.thisMachine.nameHint')}

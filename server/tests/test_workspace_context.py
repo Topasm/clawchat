@@ -146,6 +146,7 @@ async def test_claimed_job_names_its_project(db_session):
     assert job is not None
     assert job.project_id == project.id
     assert job.cwd == "/home/me/srp_e65"
+    assert job.todo_title == "E65 experiments"
 
 
 async def test_worker_endpoints_round_trip(client, auth_headers, db_session):

@@ -31,6 +31,7 @@ interface ClaimedJob {
   cwd: string;
   model: string | null;
   project_id?: string | null;
+  todo_title?: string | null;
 }
 
 interface HostProjectPath {
@@ -157,7 +158,9 @@ export class WorkerRunner {
 
   private async execute(job: ClaimedJob): Promise<void> {
     this.running = true;
-    useWorkerStore.getState().setBusyRunId(job.run_id);
+    useWorkerStore
+      .getState()
+      .setBusy(job.run_id, job.todo_title || job.instruction.slice(0, 80) || null);
     const worker = platformApi.worker;
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     let heartbeatInFlight = false;
@@ -231,7 +234,7 @@ export class WorkerRunner {
         clearInterval(heartbeatTimer);
       }
       this.running = false;
-      useWorkerStore.getState().setBusyRunId(null);
+      useWorkerStore.getState().setBusy(null);
     }
   }
 }

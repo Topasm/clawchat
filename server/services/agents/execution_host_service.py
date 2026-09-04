@@ -399,6 +399,8 @@ class ClaimedJob:
     cwd: str
     model: str | None
     project_id: str | None = None
+    #: What the machine is working on, for its own window to say.
+    todo_title: str | None = None
 
 
 async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | None:
@@ -409,6 +411,8 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
     mid-poll -- cannot both pick up the same work.
     """
     from models.agent_run import AgentRun  # local: keeps the model graph acyclic
+    from models.agent_task import AgentTask
+    from models.todo import Todo
 
     run = (
         await db.execute(
@@ -439,10 +443,18 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
     run.host_id = host.label
     run.heartbeat_at = datetime.now(timezone.utc)
     await db.flush()
+
+    task = await db.get(AgentTask, run.agent_task_id)
+    todo_title = None
+    if task is not None and task.todo_id:
+        todo_title = (
+            await db.execute(select(Todo.title).where(Todo.id == task.todo_id))
+        ).scalar_one_or_none()
     return ClaimedJob(
         run_id=run.id,
         instruction=run.instruction_snapshot,
         cwd=cwd,
         model=run.model,
         project_id=project.id if project else None,
+        todo_title=todo_title,
     )

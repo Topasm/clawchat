@@ -62,6 +62,7 @@ import UpdateNotification from './shared/UpdateNotification';
 import { StatusDot } from './shared/WorkspacePrimitives';
 import { platformApi } from '../platform';
 import { settingsNavigationState } from '../services/settingsNavigation';
+import WorkerStatusLine from './shared/WorkerStatusLine';
 
 const SimpleMode = lazy(() => import('./SimpleMode'));
 // Keep the injected theme tokens declared in this runtime root. The design
@@ -353,6 +354,7 @@ export default function Layout() {
           )}
         </span>
       </button>
+      <WorkerStatusLine />
       {filteredPrimaryNavItems.map((item) => (
         <NavLink
           key={item.to}

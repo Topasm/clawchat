@@ -118,3 +118,5 @@ class ClaimedJobResponse(BaseModel):
     model: str | None = None
     #: The project whose folder ``cwd`` is, so the worker can refresh its snapshot.
     project_id: str | None = None
+    #: What the machine is working on, for its own window to say.
+    todo_title: str | None = None
