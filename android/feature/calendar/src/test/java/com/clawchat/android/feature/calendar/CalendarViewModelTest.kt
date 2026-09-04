@@ -1,8 +1,13 @@
 package com.clawchat.android.feature.calendar
 
 import com.clawchat.android.core.data.model.Event
+import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.TaskStatus
+import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.repository.EventRepository
 import com.clawchat.android.core.data.repository.OccurrenceDeleteMode
+import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
@@ -34,6 +39,7 @@ class CalendarViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private lateinit var eventRepository: EventRepository
+    private lateinit var todoRepository: TodoRepository
     private lateinit var syncManager: SyncManager
 
     private val month = YearMonth.now()
@@ -58,9 +64,12 @@ class CalendarViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         eventRepository = mockk()
+        todoRepository = mockk()
         syncManager = mockk(relaxed = true)
         every { syncManager.eventChanged } returns MutableSharedFlow()
+        every { syncManager.todoChanged } returns MutableSharedFlow()
         coEvery { eventRepository.cachedEvents(any(), any()) } returns emptyList()
+        coEvery { todoRepository.listTodos(any()) } returns ApiResult.Success(page(emptyList()))
     }
 
     @After
@@ -68,7 +77,82 @@ class CalendarViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel() = CalendarViewModel(eventRepository, syncManager)
+    private fun page(todos: List<Todo>) = PaginatedResponse(
+        items = todos,
+        total = todos.size,
+        page = 1,
+        limit = todos.size.coerceAtLeast(1),
+    )
+
+    private fun viewModel() = CalendarViewModel(eventRepository, todoRepository, syncManager)
+
+    @Test
+    fun `deadlines run from today through the due date`() = runTest {
+        val today = LocalDate.now()
+        coEvery { eventRepository.listEvents(any(), any()) } returns ApiResult.Success(emptyList())
+        coEvery { todoRepository.listTodos(any()) } returns ApiResult.Success(
+            page(
+                listOf(
+                    Todo(
+                        id = "todo-1",
+                        title = "Ship the release",
+                        status = TaskStatus.PENDING,
+                        dueDate = "${today.plusDays(2)}T23:59:00",
+                    ),
+                ),
+            ),
+        )
+
+        val viewModel = viewModel()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val tasksByDate = viewModel.uiState.value.tasksByDate
+        assertEquals(
+            setOf(today, today.plusDays(1), today.plusDays(2)),
+            tasksByDate.keys,
+        )
+        assertEquals(
+            TaskSegmentPosition.START,
+            tasksByDate.getValue(today).single().position,
+        )
+        assertEquals(
+            TaskSegmentPosition.END,
+            tasksByDate.getValue(today.plusDays(2)).single().position,
+        )
+    }
+
+    // Deadlines are a secondary layer: losing them must not blank the month or
+    // raise a banner over events that loaded fine.
+    @Test
+    fun `a failed deadline load leaves the month alone`() = runTest {
+        coEvery { eventRepository.listEvents(any(), any()) } returns
+            ApiResult.Success(listOf(event("a", firstDay)))
+        coEvery { todoRepository.listTodos(any()) } returns ApiResult.Error("offline")
+
+        val viewModel = viewModel()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.tasksByDate.isEmpty())
+        assertEquals(setOf(firstDay), state.eventsByDate.keys)
+        assertNull(state.error)
+    }
+
+    @Test
+    fun `creating a task reloads the deadlines`() = runTest {
+        coEvery { eventRepository.listEvents(any(), any()) } returns ApiResult.Success(emptyList())
+        val created = Todo(id = "todo-1", title = "Ship", status = TaskStatus.PENDING)
+        coEvery { todoRepository.createTodo(any(), any()) } returns ApiResult.Success(created)
+
+        val viewModel = viewModel()
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.onAction(CalendarAction.CreateTask(TodoCreate(title = "Ship")))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { todoRepository.createTodo(any(), any()) }
+        // Once at startup, once after the task landed.
+        coVerify(atLeast = 2) { todoRepository.listTodos(any()) }
+    }
 
     @Test
     fun `the visible month loads grouped by day`() = runTest {

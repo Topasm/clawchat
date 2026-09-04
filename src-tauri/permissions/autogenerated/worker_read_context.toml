@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-worker-read-context"
+description = "Enables the worker_read_context command without any pre-configured scope."
+commands.allow = ["worker_read_context"]
+
+[[permission]]
+identifier = "deny-worker-read-context"
+description = "Denies the worker_read_context command without any pre-configured scope."
+commands.deny = ["worker_read_context"]

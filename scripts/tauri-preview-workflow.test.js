@@ -46,6 +46,8 @@ test('preview and release workflows launch the packaged macOS app', () => {
     assert.match(workflow, /name: Smoke-test packaged macOS app startup/);
     assert.match(workflow, /name: Verify packaged macOS server resource/);
     assert.match(workflow, /bash scripts\/smoke-test-tauri-macos-app\.sh "\$mount_dir"/);
+    assert.match(workflow, /NSAllowsArbitraryLoadsInWebContent/);
+    assert.match(workflow, /must not disable ATS outside its webview/);
   }
   assert.match(smokeScript, /CFBundleExecutable/);
   assert.match(smokeScript, /CFBundleIdentifier/);

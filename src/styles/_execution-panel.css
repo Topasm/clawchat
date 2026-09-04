@@ -38,6 +38,13 @@
   margin-bottom: 10px;
 }
 
+.cc-exec-panel__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .cc-exec-panel__next-step {
   display: flex;
   flex-direction: column;
@@ -103,6 +110,32 @@
 .cc-exec-panel__info-value {
   font-size: 13px;
   font-weight: 500;
+  color: var(--cc-text);
+}
+
+.cc-exec-panel__due-editor {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cc-exec-panel__due-input {
+  width: auto;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.cc-exec-panel__due-clear {
+  border: none;
+  background: none;
+  color: var(--cc-text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.cc-exec-panel__due-clear:hover {
   color: var(--cc-text);
 }
 

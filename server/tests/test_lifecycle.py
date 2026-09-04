@@ -7,13 +7,20 @@ from starlette.datastructures import State
 
 
 class StubAIService:
+    def __init__(self, healthy: bool = True):
+        self.healthy = healthy
+
     async def health_check(self) -> bool:
-        return True
+        return self.healthy
 
 
 class StubClaudeCode:
+    def __init__(self, status: ClaudeCodeStatus = ClaudeCodeStatus.NOT_INSTALLED):
+        self.status = status
+
     async def check_availability(self):
-        return ClaudeCodeStatus.NOT_INSTALLED, None
+        version = "claude 1.test" if self.status == ClaudeCodeStatus.AVAILABLE else None
+        return self.status, version
 
 
 class StubCodexAPI:
@@ -35,11 +42,11 @@ class StubCodexCLI:
         return CodexCLIStatus.AVAILABLE, "codex-cli test"
 
 
-def configured_state(*, codex_api=None):
+def configured_state(*, codex_api=None, ai_service=None, claude_code=None):
     state = State()
     providers = {
-        "ai_service": StubAIService(),
-        "claude_code": StubClaudeCode(),
+        "ai_service": ai_service or StubAIService(),
+        "claude_code": claude_code or StubClaudeCode(),
         "codex_api": codex_api or StubCodexAPI(),
         "codex_cli": StubCodexCLI(),
     }
@@ -85,5 +92,47 @@ async def test_probe_does_not_apply_result_for_replaced_codex_credential(monkeyp
     await probe_optional_ai(state, **providers)
 
     assert state.codex_api_status == "checking"
+    assert state.active_ai is not providers["codex_api"]
+    assert state.active_ai_provider != "codex"
+
+
+async def test_probe_falls_back_to_a_cli_provider_when_the_relay_is_down(monkeypatch):
+    state, providers = configured_state(
+        ai_service=StubAIService(healthy=False),
+        claude_code=StubClaudeCode(ClaudeCodeStatus.AVAILABLE),
+    )
+    monkeypatch.setattr(settings, "ai_provider", "ollama")
+    monkeypatch.setattr(settings, "ai_provider_fallback", True)
+
+    await probe_optional_ai(state, **providers)
+
+    assert state.ai_connected is False
+    assert state.active_ai is providers["claude_code"]
+    assert state.active_ai_provider == "claude_code"
+
+
+async def test_fallback_can_be_disabled_to_pin_the_configured_provider(monkeypatch):
+    state, providers = configured_state(
+        ai_service=StubAIService(healthy=False),
+        claude_code=StubClaudeCode(ClaudeCodeStatus.AVAILABLE),
+    )
+    monkeypatch.setattr(settings, "ai_provider", "ollama")
+    monkeypatch.setattr(settings, "ai_provider_fallback", False)
+
+    await probe_optional_ai(state, **providers)
+
+    assert state.active_ai is providers["ai_service"]
+    assert state.active_ai_provider == "openclaw"
+
+
+async def test_a_reachable_configured_provider_is_never_replaced(monkeypatch):
+    state, providers = configured_state(
+        claude_code=StubClaudeCode(ClaudeCodeStatus.AVAILABLE)
+    )
+    monkeypatch.setattr(settings, "ai_provider", "ollama")
+    monkeypatch.setattr(settings, "ai_provider_fallback", True)
+
+    await probe_optional_ai(state, **providers)
+
     assert state.active_ai is providers["ai_service"]
     assert state.active_ai_provider == "openclaw"

@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../hooks/queries', () => ({
   queryKeys: { todos: ['todos'] },
   useTodosQuery: () => ({ data: mocks.todos }),
+  useGetOrCreateProjectConversation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useProjectsQuery: () => ({ data: mocks.projects }),
   useTaskGraphInsightsQuery: () => mocks.graphInsights,
   useTaskExecutionTelemetryQuery: () => ({ data: mocks.telemetry }),
@@ -621,6 +622,9 @@ describe('InboxPage', () => {
         latest_run_provider: 'builtin',
         latest_run_progress_message: 'Finished the draft',
         latest_run_updated_at: '2026-08-27T00:00:00Z',
+        human_wait_seconds: 180,
+        question_count: 2,
+        average_resume_seconds: 90,
         pending_review_count: 1,
         artifact_count: 2,
         latest_artifact_id: 'artifact-1',
@@ -636,6 +640,9 @@ describe('InboxPage', () => {
     const telemetry = screen.getByLabelText('Task execution activity');
     expect(within(telemetry).getByText('Finished the draft')).toBeInTheDocument();
     expect(within(telemetry).getByText('Latest artifact: Outline draft')).toBeInTheDocument();
+    expect(within(telemetry).getByText('Waiting on people: 3m')).toBeInTheDocument();
+    expect(within(telemetry).getByText('Questions: 2')).toBeInTheDocument();
+    expect(within(telemetry).getByText('Average time to resume: 2m')).toBeInTheDocument();
 
     fireEvent.click(within(telemetry).getByRole('button', { name: 'Open run' }));
     expect(mocks.navigate).toHaveBeenCalledWith('/runs?run_id=run-1');

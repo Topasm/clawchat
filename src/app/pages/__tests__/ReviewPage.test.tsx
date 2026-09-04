@@ -9,12 +9,19 @@ import ReviewPage from '../ReviewPage';
 const queryMocks = vi.hoisted(() => ({
   decide: vi.fn(),
   reviews: vi.fn(),
+  runNext: vi.fn(),
 }));
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
 vi.mock('../../hooks/queries', () => ({
   useReviewsQuery: queryMocks.reviews,
   useDecideReview: () => ({ mutate: queryMocks.decide, isPending: false }),
+  useRunReadyTaskWithProjectDefaults: () => ({
+    runTask: queryMocks.runNext,
+    canRunTask: () => true,
+    isPending: false,
+    isPreparing: false,
+  }),
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -72,6 +79,8 @@ describe('ReviewPage Agent Run handoff', () => {
   beforeEach(() => {
     queryMocks.decide.mockReset();
     queryMocks.reviews.mockReset();
+    queryMocks.runNext.mockReset();
+    queryMocks.runNext.mockResolvedValue({ run_id: 'run-next' });
     routerMocks.navigate.mockReset();
     queryMocks.reviews.mockReturnValue({ data: [reviewItem], isLoading: false });
     queryMocks.decide.mockImplementation(
@@ -104,10 +113,12 @@ describe('ReviewPage Agent Run handoff', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Analyze experiment' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open Inbox' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run next' }));
 
     expect(routerMocks.navigate).toHaveBeenNthCalledWith(1, '/tasks/task-analysis');
-    expect(routerMocks.navigate).toHaveBeenNthCalledWith(2, '/inbox');
+    expect(routerMocks.navigate).toHaveBeenNthCalledWith(2, '/projects/project-1');
+    expect(queryMocks.runNext).toHaveBeenCalledWith('task-analysis', 'project-1');
   });
 
   it('does not offer a duplicate changes request for an item already waiting on input', () => {
@@ -123,6 +134,9 @@ describe('ReviewPage Agent Run handoff', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Request changes' })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Items with a note resume automatically and move back to the run thread/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
   });

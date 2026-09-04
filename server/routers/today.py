@@ -12,6 +12,7 @@ from models.todo import Todo
 from schemas.calendar import EventResponse
 from schemas.today import TodayResponse
 from schemas.todo import TodoResponse
+from services.ai import resolve_active_ai
 from services.notifications.briefing_service import generate_briefing
 from utils import deserialize_tags
 from utils.inbox_display import get_next_action
@@ -70,7 +71,7 @@ async def get_briefing(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     result = await generate_briefing(db, ai_service)
     return {
         "summary": result.get("summary", ""),
@@ -100,6 +101,7 @@ async def get_today(
         .where(
             Todo.due_date >= today_start,
             Todo.due_date < tomorrow_start,
+            Todo.inbox_state == "none",
             Todo.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
         )
         .order_by(Todo.created_at.asc())
@@ -109,6 +111,7 @@ async def get_today(
     # Also include in-progress tasks not due today
     in_progress_q = select(Todo).where(
         Todo.status == TaskStatus.IN_PROGRESS,
+        Todo.inbox_state == "none",
         or_(
             Todo.due_date == None,  # noqa: E711
             Todo.due_date < today_start,
@@ -123,11 +126,26 @@ async def get_today(
         select(Todo)
         .where(
             Todo.due_date < today_start,
+            Todo.inbox_state == "none",
             Todo.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
         )
         .order_by(Todo.due_date.asc())
     )
     overdue_tasks = (await db.execute(overdue_q)).scalars().all()
+
+    # Pending tasks with no due date at all: not "today", not "overdue" —
+    # otherwise they never surface anywhere and effectively vanish. In
+    # progress tasks with no due date are already folded into all_today.
+    needs_date_q = (
+        select(Todo)
+        .where(
+            Todo.due_date == None,  # noqa: E711
+            Todo.inbox_state == "none",
+            Todo.status == TaskStatus.PENDING,
+        )
+        .order_by(Todo.created_at.asc())
+    )
+    needs_date_tasks = (await db.execute(needs_date_q)).scalars().all()
 
     # Today's events
     events_q = (
@@ -161,6 +179,7 @@ async def get_today(
         overdue_tasks=[_todo_to_response(t) for t in overdue_tasks],
         today_events=[_event_to_response(e) for e in today_events],
         needs_review=[_todo_to_response(t) for t in needs_review_todos],
+        needs_date_tasks=[_todo_to_response(t) for t in needs_date_tasks],
         inbox_count=inbox_count,
         greeting=_get_greeting(utc_offset_minutes),
         date=today,

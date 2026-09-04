@@ -1,22 +1,27 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from '../../i18n';
-import { SunIcon, ChatIcon, InboxIcon } from './NavIcons';
+import { InboxIcon, NavCalendarIcon, TasksIcon } from './NavIcons';
 import { useTodosQuery } from '../../hooks/queries';
+import { isInboxTodo } from '../../utils/inboxState';
 
 export const mobileTabs = [
-  { to: '/today', labelKey: 'nav.today', Icon: SunIcon, primary: true },
   { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon, primary: true, badge: true },
-  { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon, primary: true },
+  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon, primary: true },
+  { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon, primary: true },
 ];
 
-export default function BottomNav() {
+interface BottomNavProps {
+  tabs?: typeof mobileTabs;
+}
+
+export default function BottomNav({ tabs = mobileTabs }: BottomNavProps) {
   const { t } = useTranslation();
   const { data: todos = [] } = useTodosQuery();
-  const inboxCount = todos.filter((todo) => !todo.due_date && todo.status === 'pending').length;
+  const inboxCount = todos.filter(isInboxTodo).length;
 
   return (
     <nav className="cc-bottom-nav">
-      {mobileTabs.map((tab) => (
+      {tabs.map((tab) => (
         <NavLink
           key={tab.to}
           to={tab.to}

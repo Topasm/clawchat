@@ -13,6 +13,8 @@ import {
   useGeneratePlanProposal,
   useApplyPlanProposal,
   useDismissPlanProposal,
+  useGetOrCreateProjectConversation,
+  useProjectQuery,
   queryKeys,
 } from '../hooks/queries';
 import apiClient from '../services/apiClient';
@@ -24,11 +26,14 @@ import RecurrenceSelector from '../components/shared/RecurrenceSelector';
 import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
+import TaskAgentThreadSection from '../components/task-detail/TaskAgentThreadSection';
 import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 import { getTaskStatusLabel, isTerminalTaskStatus } from '../utils/taskStatus';
 import { translateUi } from '../i18n';
-const PRIORITIES: Array<TodoResponse['priority']> = ['low', 'medium', 'high', 'urgent'];
+import CanonicalDocumentButton from '../components/shared/CanonicalDocumentButton';
+import { extractCanonicalDoc } from '../utils/canonicalDoc';
+import useExperimentCompletionGate from '../hooks/useExperimentCompletionGate';
 const SKILL_OPTIONS = [
   { id: 'plan', label: 'Plan' },
   { id: 'research', label: 'Research' },
@@ -75,11 +80,14 @@ export default function TaskDetailPage() {
   const updateTodoMutation = useUpdateTodo();
   const deleteTodoMutation = useDeleteTodo();
   const toggleCompleteMutation = useToggleTodoComplete();
+  const { requestStatusChange, confirmationDialog } = useExperimentCompletionGate();
   const task = todos.find((t) => t.id === taskId);
+  const { data: project } = useProjectQuery(task?.project_id ?? undefined);
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
   const generatePlanMutation = useGeneratePlanProposal();
   const applyPlanMutation = useApplyPlanProposal();
   const dismissPlanMutation = useDismissPlanProposal();
+  const getConversation = useGetOrCreateProjectConversation();
   const childTasks = todos.filter((t) => t.parent_id === taskId);
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
   const incompleteChildren = childTasks.filter((t) => !isTerminalTaskStatus(t.status));
@@ -118,12 +126,6 @@ export default function TaskDetailPage() {
     setDescription(val);
     persistField({ description: val });
   };
-  const cyclePriority = () => {
-    if (!task) return;
-    const idx = PRIORITIES.indexOf(task.priority);
-    const next = PRIORITIES[(idx + 1) % PRIORITIES.length];
-    persistField({ priority: next });
-  };
   const handleDelete = async () => {
     if (!taskId) return;
     deleteTodoMutation.mutate(taskId);
@@ -132,9 +134,14 @@ export default function TaskDetailPage() {
   const handleToggle = useCallback(
     (id: string) => {
       const todo = todos.find((t) => t.id === id);
-      if (todo) toggleCompleteMutation.mutate({ id, currentStatus: todo.status });
+      if (todo) {
+        const nextStatus = todo.status === 'completed' ? 'pending' : 'completed';
+        requestStatusChange(todo, nextStatus, () =>
+          toggleCompleteMutation.mutate({ id, currentStatus: todo.status }),
+        );
+      }
     },
-    [todos, toggleCompleteMutation],
+    [requestStatusChange, todos, toggleCompleteMutation],
   );
   const handleApplyPlan = async (selectedIndices: number[]) => {
     if (!taskId || !plan || plan.base_graph_revision === null) return;
@@ -175,10 +182,7 @@ export default function TaskDetailPage() {
   const isPlanned = childTasks.length > 0;
   const dueInfo =
     task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
-  // Blocker info from child tasks
-  const blockedByRelationships = todos.filter(
-    (t) => t.parent_id === taskId && !isTerminalTaskStatus(t.status),
-  );
+  const canonicalDoc = extractCanonicalDoc(project?.description);
   return (
     <div className="cc-detail cc-exec-panel">
       {/* Top: Status + Quick Actions */}
@@ -193,9 +197,6 @@ export default function TaskDetailPage() {
           />
         </div>
         <div className="cc-exec-panel__badges">
-          <button type="button" className="cc-detail__field-btn" onClick={cyclePriority}>
-            <Badge variant="priority" level={task.priority || 'medium'} />
-          </button>
           {task.status !== 'pending' && (
             <Badge variant="status">{getTaskStatusLabel(task.status)}</Badge>
           )}
@@ -253,32 +254,48 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Section 2: Due / Estimate / Recurrence / Blockers */}
-      {(dueInfo ||
-        task.estimated_minutes ||
-        task.is_recurring ||
-        blockedByRelationships.length > 0) && (
-        <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-title">
-            {translateUi('Due / Estimate / Blockers')}
-          </div>
-          <div className="cc-exec-panel__info-grid">
-            {dueInfo && (
-              <div
-                className={`cc-exec-panel__info-item cc-exec-panel__info-item--${dueInfo.variant}`}
-              >
-                <span className="cc-exec-panel__info-label">{translateUi('Due')}</span>
-                <span className="cc-exec-panel__info-value">{dueInfo.label}</span>
-              </div>
-            )}
-            {task.estimated_minutes && (
-              <div className="cc-exec-panel__info-item">
-                <span className="cc-exec-panel__info-label">{translateUi('Estimate')}</span>
-                <span className="cc-exec-panel__info-value">{task.estimated_minutes}m</span>
-              </div>
-            )}
-          </div>
+      <div className="cc-exec-panel__section">
+        <div className="cc-exec-panel__section-title">
+          {translateUi('Due / Estimate / Blockers')}
         </div>
-      )}
+        <div className="cc-exec-panel__info-grid">
+          <div
+            className={`cc-exec-panel__info-item${dueInfo ? ` cc-exec-panel__info-item--${dueInfo.variant}` : ''}`}
+          >
+            <span className="cc-exec-panel__info-label">{translateUi('Due')}</span>
+            <div className="cc-exec-panel__due-editor">
+              <input
+                type="date"
+                className="cc-event-form__input cc-exec-panel__due-input"
+                value={task.due_date ? task.due_date.slice(0, 10) : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  persistField({
+                    due_date: val ? new Date(`${val}T23:59:00`).toISOString() : null,
+                  });
+                }}
+              />
+              {task.due_date && (
+                <button
+                  type="button"
+                  className="cc-exec-panel__due-clear"
+                  onClick={() => persistField({ due_date: null })}
+                  aria-label={translateUi('Clear due date')}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {dueInfo && <span className="cc-exec-panel__info-value">{dueInfo.label}</span>}
+          </div>
+          {task.estimated_minutes && (
+            <div className="cc-exec-panel__info-item">
+              <span className="cc-exec-panel__info-label">{translateUi('Estimate')}</span>
+              <span className="cc-exec-panel__info-value">{task.estimated_minutes}m</span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Section 2b: Recurrence */}
       <div className="cc-exec-panel__section">
@@ -290,9 +307,12 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Section 3: Project context */}
-      {(isProject || task.parent_id || task.assignee) && (
+      {(isProject || task.parent_id || task.assignee || project) && (
         <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-title">{translateUi('Project context')}</div>
+          <div className="cc-exec-panel__section-heading">
+            <div className="cc-exec-panel__section-title">{translateUi('Project context')}</div>
+            <CanonicalDocumentButton target={canonicalDoc} />
+          </div>
           <div className="cc-exec-panel__context">
             {isProject && (
               <div className="cc-exec-panel__context-row">
@@ -318,10 +338,28 @@ export default function TaskDetailPage() {
         </div>
       )}
 
+      <TaskAgentThreadSection taskId={task.id} />
+
       {/* Section 4: Plan / Research / Execute (action bar) */}
       <div className="cc-exec-panel__section">
         <div className="cc-exec-panel__section-title">{translateUi('Actions')}</div>
         <div className="cc-exec-panel__action-bar">
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            style={{ fontSize: 12 }}
+            disabled={getConversation.isPending}
+            onClick={async () => {
+              try {
+                const conversation = await getConversation.mutateAsync(task.id);
+                navigate(`/chats/${conversation.id}`);
+              } catch {
+                useToastStore.getState().addToast('error', translateUi('Failed'));
+              }
+            }}
+          >
+            {translateUi('Discuss with agent')}
+          </button>
           {!isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
             <button
               type="button"
@@ -511,6 +549,7 @@ export default function TaskDetailPage() {
       >
         {translateUi('\n        Delete Task\n      ')}
       </button>
+      {confirmationDialog}
     </div>
   );
 }

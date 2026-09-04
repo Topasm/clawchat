@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
@@ -46,11 +45,12 @@ internal val PLANNER_PAGE_ORDER = listOf(
 fun PlannerScreen(
     initialPage: PlannerPage = PlannerPage.TODAY,
     showAgentFeatures: Boolean = true,
-    onOpenNavigation: () -> Unit = {},
     onNavigateToInbox: () -> Unit = {},
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onOpenTask: (String) -> Unit = {},
     onPageChanged: (PlannerPage) -> Unit = {},
 ) {
     val initialIndex = PLANNER_PAGE_ORDER.indexOf(initialPage).coerceAtLeast(0)
@@ -79,14 +79,14 @@ fun PlannerScreen(
             when (PLANNER_PAGE_ORDER[page]) {
                 PlannerPage.TODAY -> TodayScreen(
                     showAgentFeatures = showAgentFeatures,
-                    onOpenNavigation = onOpenNavigation,
                     onNavigateToInbox = onNavigateToInbox,
                     onNavigateToReview = onNavigateToReview,
                     onNavigateToRuns = onNavigateToRuns,
                     onNavigateToSearch = onNavigateToSearch,
+                    onNavigateToSettings = onNavigateToSettings,
                 )
-                PlannerPage.WEEK -> WeekScreen(onOpenNavigation = onOpenNavigation)
-                PlannerPage.MONTH -> CalendarScreen(onOpenNavigation = onOpenNavigation)
+                PlannerPage.WEEK -> WeekScreen()
+                PlannerPage.MONTH -> CalendarScreen(onOpenTask = onOpenTask)
             }
         }
 
@@ -100,7 +100,6 @@ fun PlannerScreen(
             },
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .navigationBarsPadding()
                 .padding(start = 12.dp, bottom = 16.dp),
         )
     }

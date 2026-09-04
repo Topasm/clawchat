@@ -11,12 +11,15 @@ class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     goal: str | None = None
     description: str | None = None
+    execution_instructions: str | None = None
     status: ProjectStatus = ProjectStatus.ACTIVE
     deadline: datetime | None = None
     default_execution_provider: str | None = None
     default_execution_model: str | None = None
     execution_workspace_path: str | None = None
-    execution_workspace_isolation: str = Field(default="local", pattern="^(local|worktree)$")
+    execution_workspace_isolation: str = Field(
+        default="local", pattern="^(local|worktree)$"
+    )
     execution_base_branch: str | None = None
 
 
@@ -24,12 +27,15 @@ class ProjectUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     goal: str | None = None
     description: str | None = None
+    execution_instructions: str | None = None
     status: ProjectStatus | None = None
     deadline: datetime | None = None
     default_execution_provider: str | None = None
     default_execution_model: str | None = None
     execution_workspace_path: str | None = None
-    execution_workspace_isolation: str | None = Field(default=None, pattern="^(local|worktree)$")
+    execution_workspace_isolation: str | None = Field(
+        default=None, pattern="^(local|worktree)$"
+    )
     execution_base_branch: str | None = None
 
 
@@ -38,6 +44,7 @@ class ProjectResponse(BaseModel):
     title: str
     goal: str | None = None
     description: str | None = None
+    execution_instructions: str | None = None
     status: ProjectStatus
     deadline: datetime | None = None
     root_task_id: str | None = None
@@ -52,6 +59,11 @@ class ProjectResponse(BaseModel):
     task_count: int = Field(default=0, ge=0)
     completed_task_count: int = Field(default=0, ge=0)
     conversation_id: str | None = None
+    #: Where this project's work runs: the chosen execution host, its label,
+    #: and whether that machine is reachable right now (None when unset).
+    execution_host_id: str | None = None
+    execution_host_label: str | None = None
+    execution_host_online: bool | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

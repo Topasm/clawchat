@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -61,7 +62,6 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
@@ -81,22 +81,23 @@ import java.time.format.FormatStyle
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     showAgentFeatures: Boolean = true,
-    onOpenNavigation: () -> Unit = {},
     onNavigateToInbox: () -> Unit = {},
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showQuickAdd by remember { mutableStateOf(false) }
 
-    val totalTasks = state.todayTodos.size + state.overdueTodos.size
-    val completedTasks = (state.todayTodos + state.overdueTodos).count {
+    val totalTasks = state.todayTodos.size + state.overdueTodos.size + state.needsDateTodos.size
+    val completedTasks = (state.todayTodos + state.overdueTodos + state.needsDateTodos).count {
         it.status == TaskStatus.COMPLETED
     }
     val hasContent = (showAgentFeatures && state.briefing != null) ||
         state.overdueTodos.isNotEmpty() ||
         state.todayTodos.isNotEmpty() ||
+        state.needsDateTodos.isNotEmpty() ||
         state.todayEvents.isNotEmpty() ||
         (showAgentFeatures && state.inboxPreview.isNotEmpty())
 
@@ -111,14 +112,17 @@ fun TodayScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
-                },
                 actions = {
                     IconButton(onClick = onNavigateToSearch) {
                         Icon(
                             Icons.Default.Search,
                             contentDescription = stringResource(R.string.today_cd_search),
+                        )
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.today_cd_settings),
                         )
                     }
                 },
@@ -215,6 +219,20 @@ fun TodayScreen(
                             subtitle = stringResource(R.string.today_focus_subtitle),
                             todos = state.todayTodos,
                             tone = ClawTone.Primary,
+                            onToggle = viewModel::toggleComplete,
+                            onDelete = viewModel::deleteTask,
+                            onSetDueToday = viewModel::setDueToday,
+                        )
+                    }
+                }
+
+                if (state.needsDateTodos.isNotEmpty()) {
+                    item {
+                        TodoSectionCard(
+                            title = stringResource(R.string.today_needs_date_title),
+                            subtitle = stringResource(R.string.today_needs_date_subtitle),
+                            todos = state.needsDateTodos,
+                            tone = ClawTone.Warning,
                             onToggle = viewModel::toggleComplete,
                             onDelete = viewModel::deleteTask,
                             onSetDueToday = viewModel::setDueToday,
@@ -532,7 +550,6 @@ private fun TodoRow(
                             tone = taskStatusTone(todo.status),
                         )
                     }
-                    PriorityChip(todo.priority)
                     todo.dueDate?.let {
                         ClawStatusChip(
                             text = localizedDateLabel(it),
@@ -621,14 +638,6 @@ private fun EventRow(event: Event) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                val location = event.location
-                if (!location.isNullOrBlank()) {
-                    Text(
-                        text = location,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
             event.reminderMinutes?.let { minutes ->
                 ClawStatusChip(
@@ -825,28 +834,6 @@ private fun SuggestionActionCard(suggestion: BriefingSuggestion) {
             )
         }
     }
-}
-
-@Composable
-private fun PriorityChip(priority: String) {
-    val tone = when (priority.lowercase()) {
-        "high", "urgent" -> ClawTone.Error
-        "medium" -> ClawTone.Warning
-        else -> ClawTone.Default
-    }
-    ClawStatusChip(
-        text = priorityLabel(priority),
-        tone = tone,
-    )
-}
-
-@Composable
-private fun priorityLabel(priority: String): String = when (priority.lowercase()) {
-    "low" -> stringResource(R.string.today_priority_low)
-    "medium" -> stringResource(R.string.today_priority_medium)
-    "high" -> stringResource(R.string.today_priority_high)
-    "urgent" -> stringResource(R.string.today_priority_urgent)
-    else -> priority
 }
 
 @Composable

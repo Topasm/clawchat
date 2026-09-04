@@ -10,6 +10,8 @@ import { SparkleIcon } from '../shared/Icons';
 import {
   augmentTaskGraphTodos,
   buildTaskGraphElements,
+  collectDefaultCollapsedTaskIds,
+  collectTaskSubtreeIds,
   expandTaskGraphContext,
   mergeExecutionRelationships,
 } from './taskGraphAdapter';
@@ -30,6 +32,9 @@ interface TaskGraphProps {
   metadataTodos?: TodoResponse[];
   relationships?: GraphRelationshipLike[];
   hasExternalFilter?: boolean;
+  fixedProjectId?: string;
+  showPlanningAction?: boolean;
+  initialMode?: TaskGraphMode;
 }
 const GRAPH_MODE_OPTIONS = [
   { label: 'Structure', value: 'structure' },
@@ -40,32 +45,33 @@ export default function TaskGraph({
   metadataTodos = todos,
   relationships = [],
   hasExternalFilter = false,
+  fixedProjectId,
+  showPlanningAction = true,
+  initialMode = 'structure',
 }: TaskGraphProps) {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
   const serverUrl = useAuthStore((state) => state.serverUrl);
-  const [mode, setMode] = useState<TaskGraphMode>('structure');
+  const [mode, setMode] = useState<TaskGraphMode>(initialMode);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
   const [hideCompleted, setHideCompleted] = useState(true);
-  const [projectId, setProjectId] = useState('all');
+  const [projectId, setProjectId] = useState(fixedProjectId ?? 'all');
   const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
   const [proposalOpen, setProposalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [layoutResetVersion, setLayoutResetVersion] = useState(0);
   const projectsQuery = useProjectsQuery();
-  const insightsQuery = useTaskGraphInsightsQuery(
-    projectId === 'all' ? null : projectId,
-    mode === 'execution' || selectedTaskId !== null,
-  );
-  const childIdsByParent = useMemo(() => {
-    const map = new Map<string, string[]>();
-    metadataTodos.forEach((todo) => {
-      if (!todo.parent_id) return;
-      map.set(todo.parent_id, [...(map.get(todo.parent_id) ?? []), todo.id]);
-    });
-    return map;
-  }, [metadataTodos]);
   const projectOptions = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
+  const selectedProject = useMemo(
+    () => projectOptions.find((project) => project.id === projectId),
+    [projectId, projectOptions],
+  );
+  const projectRootTaskId = selectedProject?.root_task_id ?? null;
+  const insightsQuery = useTaskGraphInsightsQuery(
+    projectId === 'all' ? null : projectRootTaskId,
+    (projectId === 'all' || projectRootTaskId !== null) &&
+      (mode === 'execution' || selectedTaskId !== null),
+  );
   const layoutScope = useMemo(() => createTaskGraphLayoutScope(projectId, mode), [mode, projectId]);
   const planningTargets = useMemo(
     () =>
@@ -77,24 +83,38 @@ export default function TaskGraph({
     [metadataTodos],
   );
   useEffect(() => {
-    if (projectId !== 'all' && !projectOptions.some((project) => project.id === projectId)) {
+    if (fixedProjectId) {
+      setProjectId(fixedProjectId);
+      return;
+    }
+    if (
+      !projectsQuery.isLoading &&
+      projectId !== 'all' &&
+      !projectOptions.some((project) => project.id === projectId)
+    ) {
       setProjectId('all');
     }
-  }, [projectId, projectOptions]);
+  }, [fixedProjectId, projectId, projectOptions, projectsQuery.isLoading]);
   useEffect(() => {
-    setCollapsedIds(new Set(loadTaskGraphLayout(layoutScope).collapsedIds));
-  }, [layoutScope]);
+    const saved = loadTaskGraphLayout(layoutScope);
+    if (saved.initialized) {
+      setCollapsedIds(new Set(saved.collapsedIds));
+      return;
+    }
+    if (metadataTodos.length === 0 || projectsQuery.isLoading) {
+      setCollapsedIds(new Set());
+      return;
+    }
+    const defaults = collectDefaultCollapsedTaskIds(metadataTodos, projectRootTaskId);
+    setCollapsedIds(defaults);
+    updateTaskGraphLayout(layoutScope, { collapsedIds: [...defaults] });
+  }, [layoutScope, metadataTodos, projectRootTaskId, projectsQuery.isLoading]);
   const projectIds = useMemo(() => {
     if (projectId === 'all') return null;
-    const ids = new Set<string>();
-    const visit = (id: string) => {
-      if (ids.has(id)) return;
-      ids.add(id);
-      childIdsByParent.get(id)?.forEach(visit);
-    };
-    visit(projectId);
-    return ids;
-  }, [childIdsByParent, projectId]);
+    return projectRootTaskId
+      ? collectTaskSubtreeIds(projectRootTaskId, metadataTodos)
+      : new Set<string>();
+  }, [metadataTodos, projectId, projectRootTaskId]);
   const graphRelationships = useMemo(
     () =>
       mode === 'execution' && insightsQuery.data
@@ -141,7 +161,9 @@ export default function TaskGraph({
   };
   const resetLayout = () => {
     resetTaskGraphLayout(layoutScope);
-    setCollapsedIds(new Set());
+    const defaults = collectDefaultCollapsedTaskIds(metadataTodos, projectRootTaskId);
+    setCollapsedIds(defaults);
+    updateTaskGraphLayout(layoutScope, { collapsedIds: [...defaults] });
     setLayoutResetVersion((version) => version + 1);
   };
   const elements = useMemo(
@@ -197,21 +219,23 @@ export default function TaskGraph({
         />
 
         <div className="cc-task-flow__filters">
-          <button
-            type="button"
-            className="cc-btn cc-btn--primary cc-task-flow__ai-plan"
-            onClick={() => setProposalOpen(true)}
-            disabled={!serverUrl || planningTargets.length === 0}
-            title={
-              !serverUrl
-                ? translateUi('Connect to a server to use AI planning')
-                : translateUi('Generate a task graph proposal')
-            }
-          >
-            <SparkleIcon size={14} />
-            {translateUi(' AI plan\n          ')}
-          </button>
-          {projectOptions.length > 0 && (
+          {showPlanningAction && (
+            <button
+              type="button"
+              className="cc-btn cc-btn--primary cc-task-flow__ai-plan"
+              onClick={() => setProposalOpen(true)}
+              disabled={!serverUrl || planningTargets.length === 0}
+              title={
+                !serverUrl
+                  ? translateUi('Connect to a server to use AI planning')
+                  : translateUi('Generate a task graph proposal')
+              }
+            >
+              <SparkleIcon size={14} />
+              {translateUi(' AI plan\n          ')}
+            </button>
+          )}
+          {!fixedProjectId && projectOptions.length > 0 && (
             <select
               value={projectId}
               onChange={(event) => setProjectId(event.target.value)}
@@ -306,7 +330,11 @@ export default function TaskGraph({
       {proposalOpen && (
         <TaskGraphProposalDialog
           targets={planningTargets}
-          initialTargetId={projectId === 'all' ? undefined : projectId}
+          initialTargetId={
+            projectRootTaskId && planningTargets.some((todo) => todo.id === projectRootTaskId)
+              ? projectRootTaskId
+              : undefined
+          }
           onOpenChange={setProposalOpen}
         />
       )}

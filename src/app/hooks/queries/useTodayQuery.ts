@@ -7,16 +7,26 @@ import { getGreeting } from '../../utils/formatters';
 import type { TodoResponse, EventResponse } from '../../types/api';
 import { queryKeys } from './queryKeys';
 import { isTerminalTaskStatus } from '../../utils/taskStatus';
+import { isInboxTodo } from '../../utils/inboxState';
 
 interface TodayData {
   todayTasks: TodoResponse[];
   overdueTasks: TodoResponse[];
   todayEvents: EventResponse[];
+  needsDateTasks: TodoResponse[];
   inboxCount: number;
   greeting: string;
   todayDate: string;
   isLoading: boolean;
   refresh: () => void;
+}
+
+/**
+ * Pending tasks with no due date at all. Neither "today" nor "overdue"
+ * claims them, so without this bucket they never surface anywhere.
+ */
+function findTasksNeedingADate(todos: TodoResponse[]): TodoResponse[] {
+  return todos.filter((t) => !isInboxTodo(t) && t.status === 'pending' && !t.due_date);
 }
 
 /**
@@ -33,13 +43,13 @@ function deriveTodayFromCache(
   todayEnd.setDate(todayEnd.getDate() + 1);
 
   const todayTasks = todos.filter((t) => {
-    if (!t.due_date) return false;
+    if (isInboxTodo(t) || !t.due_date) return false;
     const d = new Date(t.due_date);
     return d >= todayStart && d < todayEnd && !isTerminalTaskStatus(t.status);
   });
 
   const overdueTasks = todos.filter((t) => {
-    if (!t.due_date) return false;
+    if (isInboxTodo(t) || !t.due_date) return false;
     return new Date(t.due_date) < todayStart && !isTerminalTaskStatus(t.status);
   });
 
@@ -48,12 +58,13 @@ function deriveTodayFromCache(
     return d >= todayStart && d < todayEnd;
   });
 
-  const inboxCount = todos.filter((t) => !t.due_date && t.status === 'pending').length;
+  const inboxCount = todos.filter(isInboxTodo).length;
 
   return {
     todayTasks,
     overdueTasks,
     todayEvents,
+    needsDateTasks: findTasksNeedingADate(todos),
     inboxCount,
     greeting: getGreeting(),
     todayDate: now.toISOString().split('T')[0],
@@ -64,6 +75,7 @@ interface TodayQueryResult {
   todayTasks: TodoResponse[];
   overdueTasks: TodoResponse[];
   todayEvents: EventResponse[];
+  needsDateTasks: TodoResponse[];
   inboxCount: number;
   greeting: string;
   todayDate: string;
@@ -83,6 +95,7 @@ export default function useTodayData(): TodayData {
           todayTasks: data.today_tasks,
           overdueTasks: data.overdue_tasks,
           todayEvents: data.today_events,
+          needsDateTasks: data.needs_date_tasks,
           inboxCount: data.inbox_count,
           greeting: data.greeting,
           todayDate: data.date,
@@ -107,19 +120,20 @@ export default function useTodayData(): TodayData {
 
         return {
           todayTasks: todos.filter((t) => {
-            if (!t.due_date) return false;
+            if (isInboxTodo(t) || !t.due_date) return false;
             const d = new Date(t.due_date);
             return d >= todayStart && d < todayEnd && !isTerminalTaskStatus(t.status);
           }),
           overdueTasks: todos.filter((t) => {
-            if (!t.due_date) return false;
+            if (isInboxTodo(t) || !t.due_date) return false;
             return new Date(t.due_date) < todayStart && !isTerminalTaskStatus(t.status);
           }),
           todayEvents: events.filter((e) => {
             const d = new Date(e.start_time);
             return d >= todayStart && d < todayEnd;
           }),
-          inboxCount: todos.filter((t) => !t.due_date && t.status === 'pending').length,
+          needsDateTasks: findTasksNeedingADate(todos),
+          inboxCount: todos.filter(isInboxTodo).length,
           greeting: getGreeting(),
           todayDate: now.toISOString().split('T')[0],
         };

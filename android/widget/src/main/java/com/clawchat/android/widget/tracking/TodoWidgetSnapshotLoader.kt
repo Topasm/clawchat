@@ -2,8 +2,8 @@ package com.clawchat.android.widget.tracking
 
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.WorkspaceMode
-import com.clawchat.android.core.data.model.TodayResponse
-import com.clawchat.android.core.data.repository.CachedToday
+import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.common.WidgetState
 import kotlinx.coroutines.CancellationException
@@ -19,9 +19,10 @@ internal data class TodoWidgetSnapshot(
  * never be rendered with actions scoped to workspace B.
  */
 internal suspend fun loadTodoWidgetSnapshot(
+    horizonDays: Int,
     runtimeState: suspend () -> AppRuntimeState,
-    loadToday: suspend () -> ApiResult<TodayResponse>,
-    loadCachedToday: suspend () -> CachedToday = { CachedToday() },
+    loadDeadlines: suspend () -> ApiResult<PaginatedResponse<Todo>>,
+    loadCachedTodos: suspend () -> List<Todo> = { emptyList() },
 ): TodoWidgetSnapshot {
     val initial = runtimeState()
     val initialWorkspaceKey = initial.workspaceKey?.takeIf(String::isNotBlank)
@@ -29,30 +30,24 @@ internal suspend fun loadTodoWidgetSnapshot(
         return TodoWidgetSnapshot(WidgetState.NotLoggedIn, initialWorkspaceKey)
     }
 
-    val result = loadToday()
+    val result = loadDeadlines()
     val state = if (result is ApiResult.Error) {
         val cached = try {
-            loadCachedToday()
+            loadCachedTodos()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            CachedToday()
+            emptyList()
         }
-        if (cached.isEmpty) {
+        if (cached.isEmpty()) {
             WidgetState.Error(result.message)
         } else {
-            WidgetState.Success(
-                TodoWidgetUiModel.from(
-                    TodayResponse(
-                        todayTodos = cached.todayTodos,
-                        overdueTodos = cached.overdueTodos,
-                        todayEvents = cached.todayEvents,
-                    )
-                )
-            )
+            // The cache holds whatever was last synced, not the horizon slice,
+            // so the projection applies the same window to it.
+            WidgetState.Success(TodoWidgetUiModel.from(cached, horizonDays))
         }
     } else {
-        result.toWidgetState()
+        result.toWidgetState(horizonDays)
     }
     val current = runtimeState()
     val currentWorkspaceKey = current.workspaceKey?.takeIf(String::isNotBlank)
@@ -73,8 +68,10 @@ internal suspend fun loadTodoWidgetSnapshot(
     return TodoWidgetSnapshot(state, initialWorkspaceKey)
 }
 
-private fun ApiResult<TodayResponse>.toWidgetState(): WidgetState<TodoWidgetUiModel> = when (this) {
-    is ApiResult.Success -> WidgetState.Success(TodoWidgetUiModel.from(data))
+private fun ApiResult<PaginatedResponse<Todo>>.toWidgetState(
+    horizonDays: Int,
+): WidgetState<TodoWidgetUiModel> = when (this) {
+    is ApiResult.Success -> WidgetState.Success(TodoWidgetUiModel.from(data.items, horizonDays))
     is ApiResult.Error -> WidgetState.Error(message)
     is ApiResult.Loading -> WidgetState.Loading
 }

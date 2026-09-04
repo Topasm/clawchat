@@ -8,6 +8,9 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import com.clawchat.android.core.R
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Helper object for creating and showing reminder notifications.
@@ -22,8 +25,11 @@ object ReminderNotificationHelper {
     const val EXTRA_REMINDER_TYPE = "reminder_type"
     const val EXTRA_ITEM_ID = "item_id"
     const val EXTRA_WORKSPACE_KEY = "workspace_key"
+    const val EXTRA_NOTIFICATION_ID = "notification_id"
 
     private const val CHANNEL_ID = "clawchat_reminders"
+    private const val GROUP_KEY = "clawchat_reminders_group"
+    private const val SUMMARY_NOTIFICATION_ID = 0x0C1A7
 
     /**
      * Creates the "Reminders" notification channel.
@@ -38,6 +44,7 @@ object ReminderNotificationHelper {
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             description = context.getString(R.string.notification_reminders_channel_description)
+            setShowBadge(true)
         }
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
@@ -107,10 +114,17 @@ object ReminderNotificationHelper {
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)
+            .setDeleteIntent(buildDismissPendingIntent(context, notificationId))
+            .setGroup(GROUP_KEY)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setExtras(Bundle().apply { putString(EXTRA_WORKSPACE_KEY, workspaceKey) })
 
         // Add "Mark Done" action for todo reminders
-        if (reminderType == "todo" || reminderType == "todo_overdue") {
+        if (
+            reminderType == "todo" ||
+            reminderType == "todo_due_today" ||
+            reminderType == "todo_overdue"
+        ) {
             val doneIntent = Intent(context, ReminderActionReceiver::class.java).apply {
                 action = ReminderActionReceiver.ACTION_MARK_DONE
                 putExtra("item_id", itemId)
@@ -132,6 +146,7 @@ object ReminderNotificationHelper {
 
         return try {
             manager.notify(notificationId, builder.build())
+            refreshReminderSummary(context)
             true
         } catch (error: RuntimeException) {
             ledger?.release(claimKey, claimedAt)
@@ -161,6 +176,7 @@ object ReminderNotificationHelper {
             putExtra(EXTRA_REMINDER_TYPE, reminderType)
             putExtra(EXTRA_ITEM_ID, itemId)
             putExtra(EXTRA_WORKSPACE_KEY, workspaceKey)
+            putExtra(EXTRA_NOTIFICATION_ID, notificationId(workspaceKey, itemId))
         }
         return PendingIntent.getActivity(
             context,
@@ -173,6 +189,70 @@ object ReminderNotificationHelper {
     private fun notificationId(workspaceKey: String, itemId: String): Int =
         "$workspaceKey:$itemId".hashCode()
 
+    private fun buildDismissPendingIntent(context: Context, notificationId: Int): PendingIntent {
+        val intent = Intent(context, ReminderDismissReceiver::class.java)
+            .putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+        return PendingIntent.getBroadcast(
+            context,
+            notificationId xor SUMMARY_NOTIFICATION_ID,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+    }
+
+    /** Cancels one reminder and keeps the launcher/group badge in sync. */
+    fun dismissReminderNotification(context: Context, notificationId: Int) {
+        context.getSystemService(NotificationManager::class.java).cancel(notificationId)
+        refreshReminderSummary(context)
+    }
+
+    fun dismissTodoReminder(context: Context, workspaceKey: String, todoId: String) {
+        if (workspaceKey.isBlank() || todoId.isBlank()) return
+        dismissReminderNotification(context, notificationId(workspaceKey, todoId))
+    }
+
+    /** Rebuilds the silent group summary used as the launcher's numeric badge hint. */
+    fun refreshReminderSummary(context: Context) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val reminderCount = manager.activeNotifications.count { active ->
+            active.id != SUMMARY_NOTIFICATION_ID &&
+                active.notification.channelId == CHANNEL_ID &&
+                active.notification.group == GROUP_KEY
+        }
+        if (!shouldShowReminderSummary(reminderCount)) {
+            manager.cancel(SUMMARY_NOTIFICATION_ID)
+            return
+        }
+
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?: Intent(Intent.ACTION_MAIN).setPackage(context.packageName)
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            SUMMARY_NOTIFICATION_ID,
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val summary = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_clawchat)
+            .setContentTitle(context.getString(R.string.notification_reminders_summary_title))
+            .setContentText(
+                context.resources.getQuantityString(
+                    R.plurals.notification_reminders_summary_count,
+                    reminderCount,
+                    reminderCount,
+                ),
+            )
+            .setContentIntent(contentIntent)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setGroup(GROUP_KEY)
+            .setGroupSummary(true)
+            .setNumber(reminderCount)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .build()
+        manager.notify(SUMMARY_NOTIFICATION_ID, summary)
+    }
+
     /** Removes stale reminder actions without touching update/share channels. */
     fun cancelOtherWorkspaceNotifications(context: Context, workspaceKey: String?) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -183,6 +263,22 @@ object ReminderNotificationHelper {
                 it.notification.extras.getString(EXTRA_WORKSPACE_KEY) != workspaceKey
             }
             .forEach { manager.cancel(it.id) }
+        refreshReminderSummary(context)
+    }
+}
+
+internal fun shouldShowReminderSummary(reminderCount: Int): Boolean = reminderCount > 1
+
+@Singleton
+class ReminderNotificationController @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    fun dismissTodo(workspaceKey: String?, todoId: String) {
+        ReminderNotificationHelper.dismissTodoReminder(
+            context,
+            workspaceKey.orEmpty(),
+            todoId,
+        )
     }
 }
 

@@ -13,14 +13,13 @@ const root: TodoResponse = {
   id: 'real-root',
   title: 'Ship MVP',
   status: 'pending',
-  priority: 'high',
   tags: ['product'],
   created_at: '2026-08-26T00:00:00Z',
   updated_at: '2026-08-26T00:00:00Z',
 };
 
 const subtasks: PlanSubtask[] = [
-  { title: 'Research', priority: 'high', depends_on_indices: [] },
+  { title: 'Research', depends_on_indices: [] },
   { title: 'Build', depends_on_indices: [0] },
   { title: 'Review', depends_on_indices: [1] },
   { title: 'Announce', depends_on_indices: [2] },
@@ -34,7 +33,6 @@ describe('task graph proposal adapter', () => {
     expect(todos[1]).toMatchObject({
       id: proposalNodeId(0),
       parent_id: PROPOSAL_ROOT_ID,
-      priority: 'high',
     });
     expect(root.id).toBe('real-root');
   });

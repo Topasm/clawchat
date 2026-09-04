@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.text.format.DateFormat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -29,11 +30,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
@@ -46,6 +51,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,9 +68,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
+import com.clawchat.android.core.data.model.RunUpdate
+import com.clawchat.android.core.data.model.TaskDelegation
 import com.clawchat.android.core.ui.ClawEmptyState
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawTopBarColors
+import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.icons.ClawIcons
 import java.time.Duration
 import java.time.LocalDateTime
@@ -129,11 +137,24 @@ internal fun parseDisplayDateTime(
 
 @Composable
 fun ChatScreen(
-    onOpenNavigation: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    initialConversationId: String? = null,
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val newConversationTitle = stringResource(R.string.chat_new_conversation_default_title)
+    // Arriving from a task: open its thread once, then behave like the tab.
+    var initialSelectionConsumed by rememberSaveable(initialConversationId) { mutableStateOf(false) }
+    LaunchedEffect(initialConversationId) {
+        if (initialSelectionConsumed || initialConversationId == null) return@LaunchedEffect
+        initialSelectionConsumed = true
+        viewModel.selectConversation(initialConversationId)
+    }
+
+    BackHandler(enabled = state.selectedConversationId != null) {
+        viewModel.clearSelection()
+    }
 
     if (state.selectedConversationId != null) {
         ChatDetailView(
@@ -143,15 +164,20 @@ fun ChatScreen(
             isLoadingMessages = state.isLoadingMessages,
             onSend = viewModel::sendMessage,
             onStop = viewModel::stopStreaming,
+            onResumeRun = viewModel::resumeRun,
+            onResolvePermission = viewModel::resolvePermission,
+            onDecideReview = viewModel::decideReview,
             onBack = viewModel::clearSelection,
         )
     } else {
         ConversationListView(
             conversations = state.conversations,
             isLoading = state.isLoadingConversations,
-            onOpenNavigation = onOpenNavigation,
+            onOpenSearch = onOpenSearch,
+            onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectConversation,
             onCreate = { viewModel.createConversation(newConversationTitle) },
+            onDelete = viewModel::deleteConversation,
         )
     }
 }
@@ -161,10 +187,23 @@ fun ChatScreen(
 private fun ConversationListView(
     conversations: List<Conversation>,
     isLoading: Boolean,
-    onOpenNavigation: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSelect: (String) -> Unit,
     onCreate: () -> Unit,
+    onDelete: (String) -> Unit,
 ) {
+    // Threads about a task or project sit in their own group; the flat list
+    // keeps only unscoped chats, as on the web.
+    val regularConversations = remember(conversations) {
+        conversations.filter { !it.isAgentRun && it.projectTodoId == null }
+    }
+    val taskThreadConversations = remember(conversations) {
+        conversations.filter { !it.isAgentRun && it.projectTodoId != null }
+    }
+    val agentRunConversations = remember(conversations) {
+        conversations.filter(Conversation::isAgentRun)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -175,8 +214,19 @@ private fun ConversationListView(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
+                actions = {
+                    IconButton(onClick = onOpenSearch) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = stringResource(R.string.chat_search),
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.chat_settings),
+                        )
+                    }
                 },
                 colors = ClawTopBarColors(),
             )
@@ -240,11 +290,49 @@ private fun ConversationListView(
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 72.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                items(conversations, key = { it.id }) { convo ->
-                    ConversationCard(
-                        conversation = convo,
-                        onClick = { onSelect(convo.id) },
-                    )
+                items(regularConversations, key = { it.id }) { convo ->
+                    SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                        ConversationCard(
+                            conversation = convo,
+                            onClick = { onSelect(convo.id) },
+                        )
+                    }
+                }
+                if (taskThreadConversations.isNotEmpty()) {
+                    item(key = "task-thread-conversations-heading") {
+                        Text(
+                            text = stringResource(R.string.chat_task_threads),
+                            modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    items(taskThreadConversations, key = { "thread-${it.id}" }) { convo ->
+                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                            ConversationCard(
+                                conversation = convo,
+                                onClick = { onSelect(convo.id) },
+                            )
+                        }
+                    }
+                }
+                if (agentRunConversations.isNotEmpty()) {
+                    item(key = "agent-run-conversations-heading") {
+                        Text(
+                            text = stringResource(R.string.chat_agent_run_conversations),
+                            modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    items(agentRunConversations, key = { "agent-${it.id}" }) { convo ->
+                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                            ConversationCard(
+                                conversation = convo,
+                                onClick = { onSelect(convo.id) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -319,6 +407,9 @@ private fun ChatDetailView(
     isLoadingMessages: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    onResumeRun: (String, String) -> Unit,
+    onResolvePermission: (String, Boolean) -> Unit,
+    onDecideReview: (String, Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -450,7 +541,12 @@ private fun ChatDetailView(
                 }
 
                 itemsIndexed(messages, key = { _, message -> message.id }) { _, message ->
-                    MessageBubble(message = message)
+                    MessageBubble(
+                        message = message,
+                        onResumeRun = onResumeRun,
+                        onResolvePermission = onResolvePermission,
+                        onDecideReview = onDecideReview,
+                    )
                 }
 
                 if (streamingText.isNotBlank()) {
@@ -462,6 +558,9 @@ private fun ChatDetailView(
                                 role = "assistant",
                             ),
                             streaming = true,
+                            onResumeRun = onResumeRun,
+                            onResolvePermission = onResolvePermission,
+                            onDecideReview = onDecideReview,
                         )
                     }
                 }
@@ -594,6 +693,9 @@ private fun ChatComposer(
 private fun MessageBubble(
     message: Message,
     streaming: Boolean = false,
+    onResumeRun: (String, String) -> Unit,
+    onResolvePermission: (String, Boolean) -> Unit,
+    onDecideReview: (String, Boolean) -> Unit,
 ) {
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
@@ -662,6 +764,171 @@ private fun MessageBubble(
                     .padding(horizontal = 2.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+            message.runUpdate?.let { update ->
+                RunUpdateCard(
+                    update = update,
+                    onResume = onResumeRun,
+                    onResolvePermission = onResolvePermission,
+                    onDecideReview = onDecideReview,
+                )
+            }
+            message.taskDelegation?.let { delegation -> TaskDelegationCard(delegation) }
+        }
+    }
+}
+
+/**
+ * An agent run reporting into its thread. The message above already says what
+ * happened; this names the state and, when the run is waiting on the user,
+ * where to act; active cards expose their answer, permission, and review actions inline.
+ */
+@Composable
+private fun RunUpdateCard(
+    update: RunUpdate,
+    onResume: (String, String) -> Unit,
+    onResolvePermission: (String, Boolean) -> Unit,
+    onDecideReview: (String, Boolean) -> Unit,
+) {
+    var answer by remember(update.runId) { mutableStateOf("") }
+    val actionableRunId = update.runId
+    val actionableReviewId = update.reviewId
+    val statusLabel = stringResource(
+        when (update.status) {
+            "waiting_input" -> R.string.chat_run_status_waiting_input
+            "waiting_review" -> R.string.chat_run_status_waiting_review
+            "completed" -> R.string.chat_run_status_completed
+            "cancelled" -> R.string.chat_run_status_cancelled
+            "failed" -> R.string.chat_run_status_failed
+            else -> R.string.chat_run_status_running
+        },
+    )
+    val accent = when {
+        update.status == "failed" -> MaterialTheme.colorScheme.error
+        update.needsUser -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.4f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.chat_run_update_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = accent,
+                )
+            }
+            if (update.needsUser) {
+                Text(
+                    text = stringResource(R.string.chat_run_needs_you_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (update.status == "waiting_input" && actionableRunId != null) {
+                if (update.inputOptions.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        update.inputOptions.forEach { option ->
+                            OutlinedButton(onClick = { onResume(actionableRunId, option) }) {
+                                Text(option)
+                            }
+                        }
+                    }
+                }
+                if (update.hasPendingPermissions) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(onClick = { onResolvePermission(actionableRunId, true) }) {
+                            Text(stringResource(R.string.chat_permission_allow))
+                        }
+                        OutlinedButton(onClick = { onResolvePermission(actionableRunId, false) }) {
+                            Text(stringResource(R.string.chat_permission_deny))
+                        }
+                    }
+                } else {
+                    TextField(
+                        value = answer,
+                        onValueChange = { answer = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(stringResource(R.string.chat_agent_answer_placeholder)) },
+                        maxLines = 3,
+                    )
+                    Button(
+                        enabled = answer.isNotBlank(),
+                        onClick = {
+                            onResume(actionableRunId, answer)
+                            answer = ""
+                        },
+                    ) {
+                        Text(stringResource(R.string.chat_agent_send_answer))
+                    }
+                }
+            }
+            if (update.status == "waiting_review" && actionableReviewId != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(onClick = { onDecideReview(actionableReviewId, true) }) {
+                        Text(stringResource(R.string.chat_review_approve))
+                    }
+                    OutlinedButton(onClick = { onDecideReview(actionableReviewId, false) }) {
+                        Text(stringResource(R.string.chat_review_reject))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskDelegationCard(delegation: TaskDelegation) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(
+                    if (delegation.isMultiAgent) {
+                        R.string.chat_multi_agent_task
+                    } else {
+                        R.string.chat_background_task
+                    },
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = stringResource(R.string.chat_task_queued),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

@@ -12,6 +12,7 @@ import {
   useDismissPlanProposal,
   useGeneratePlanProposal,
   useLatestPlanProposalQuery,
+  usePlanProposalQuery,
 } from '../usePlanProposalQueries';
 
 const apiMocks = vi.hoisted(() => ({
@@ -111,6 +112,16 @@ describe('versioned plan proposal queries', () => {
 
     expect(apiMocks.get).toHaveBeenCalledWith('/todos/task-1/plan/latest');
     expect(queryClient.getQueryData(queryKeys.latestPlanProposal('task-1'))).toEqual(proposal);
+  });
+
+  it('loads one exact proposal for a chat action card', async () => {
+    apiMocks.get.mockResolvedValueOnce({ data: proposal });
+    const { wrapper } = createHarness();
+    const { result } = renderHook(() => usePlanProposalQuery('task-1', 'proposal-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.data).toEqual(proposal));
+
+    expect(apiMocks.get).toHaveBeenCalledWith('/todos/task-1/plan/proposals/proposal-1');
   });
 
   it('opts generation out of the offline queue and stores both proposal cache paths', async () => {

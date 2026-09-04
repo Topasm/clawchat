@@ -2,6 +2,7 @@
 <resources>
     <string name="common_cancel">Cancel</string>
     <string name="common_ok">OK</string>
+    <string name="common_swipe_delete">Delete</string>
     <string name="navigation_open_menu">Open navigation menu</string>
     <string name="error_workspace_unconfigured">Choose an on-device workspace or connect a server first.</string>
     <string name="error_workspace_changed">The workspace changed before this action could be saved.</string>
@@ -17,14 +18,9 @@
     <string name="task_title_hint">What needs to be done?</string>
     <string name="task_notes_label">Notes</string>
     <string name="task_notes_hint">Add details…</string>
-    <string name="task_priority_label">Priority</string>
-    <string name="task_priority_low">Low</string>
-    <string name="task_priority_medium">Medium</string>
-    <string name="task_priority_high">High</string>
     <string name="task_clear_due_date">Clear due date</string>
     <string name="task_add_due_date">Add due date</string>
     <string name="task_create_action">Create</string>
-    <string name="task_swipe_delete">Delete task</string>
     <string name="task_swipe_due_today">Set due today</string>
 
     <string name="reminder_none">No reminder</string>
@@ -42,8 +38,14 @@
 
     <string name="notification_reminders_channel">Reminders</string>
     <string name="notification_reminders_channel_description">Event and task reminders</string>
+    <string name="notification_reminders_summary_title">ClawChat reminders</string>
+    <plurals name="notification_reminders_summary_count">
+        <item quantity="one">%1$d reminder needs attention</item>
+        <item quantity="other">%1$d reminders need attention</item>
+    </plurals>
     <string name="notification_mark_done">Mark done</string>
     <string name="notification_todo_overdue">“%1$s” is overdue.</string>
+    <string name="notification_todo_due_today">“%1$s” is due today.</string>
     <plurals name="notification_todo_due_in_minutes">
         <item quantity="one">“%1$s” is due in %2$d minute.</item>
         <item quantity="other">“%1$s” is due in %2$d minutes.</item>

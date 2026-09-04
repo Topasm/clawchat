@@ -1,6 +1,5 @@
 package com.clawchat.android.core.notification
 
-import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -51,10 +50,10 @@ class ReminderActionReceiver : BroadcastReceiver() {
                         result is com.clawchat.android.core.network.ApiResult.Success &&
                         sessionStore.runtimeState.first().workspaceKey == expectedWorkspaceKey
                     ) {
-                        val nm = context.getSystemService(
-                            Context.NOTIFICATION_SERVICE,
-                        ) as NotificationManager
-                        nm.cancel(notificationId)
+                        ReminderNotificationHelper.dismissReminderNotification(
+                            context,
+                            notificationId,
+                        )
                     }
                 } catch (_: Exception) {
                     // Keep the notification visible so the action can be retried.

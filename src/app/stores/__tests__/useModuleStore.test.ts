@@ -30,17 +30,15 @@ describe('useModuleStore', () => {
   });
 
   describe('kanban filters', () => {
-    it('updates search, priority, tag, sort, and subtask filters', () => {
+    it('updates search, tag, sort, and subtask filters', () => {
       const store = useModuleStore.getState();
       store.setKanbanSearchQuery('graph');
-      store.toggleKanbanPriorityFilter('high');
       store.toggleKanbanTagFilter('frontend');
       store.setKanbanSort('due_date', 'asc');
       store.toggleShowSubTasks();
 
       expect(useModuleStore.getState().kanbanFilters).toEqual({
         searchQuery: 'graph',
-        priorities: ['high'],
         tags: ['frontend'],
         sortField: 'due_date',
         sortDirection: 'asc',
@@ -48,21 +46,17 @@ describe('useModuleStore', () => {
       });
     });
 
-    it('toggles priority and tag filters off', () => {
+    it('toggles tag filters off', () => {
       const store = useModuleStore.getState();
-      store.toggleKanbanPriorityFilter('high');
-      store.toggleKanbanPriorityFilter('high');
       store.toggleKanbanTagFilter('frontend');
       store.toggleKanbanTagFilter('frontend');
 
-      expect(useModuleStore.getState().kanbanFilters.priorities).toEqual([]);
       expect(useModuleStore.getState().kanbanFilters.tags).toEqual([]);
     });
 
     it('clears all filters', () => {
       const store = useModuleStore.getState();
       store.setKanbanSearchQuery('graph');
-      store.toggleKanbanPriorityFilter('urgent');
       store.toggleKanbanTagFilter('backend');
       store.setKanbanSort('title', 'asc');
       store.toggleShowSubTasks();
@@ -71,7 +65,6 @@ describe('useModuleStore', () => {
 
       expect(useModuleStore.getState().kanbanFilters).toEqual({
         searchQuery: '',
-        priorities: [],
         tags: [],
         sortField: 'created_at',
         sortDirection: 'desc',

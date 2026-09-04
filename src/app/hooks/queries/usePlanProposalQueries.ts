@@ -109,6 +109,18 @@ export function useLatestPlanProposalQuery(todoId?: string, enabled = true) {
     retry: false,
   });
 }
+export function usePlanProposalQuery(todoId?: string, proposalId?: string, enabled = true) {
+  const serverUrl = useAuthStore((state) => state.serverUrl);
+  return useQuery({
+    queryKey: queryKeys.planProposal(proposalId ?? ''),
+    queryFn: async (): Promise<PlanProposalResponse> => {
+      const response = await apiClient.get(`/todos/${todoId}/plan/proposals/${proposalId}`);
+      return PlanProposalResponseSchema.parse(response.data);
+    },
+    enabled: Boolean(serverUrl && todoId && proposalId && enabled),
+    retry: false,
+  });
+}
 export function useGeneratePlanProposal() {
   const queryClient = useQueryClient();
   return useMutation({

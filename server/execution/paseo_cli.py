@@ -301,6 +301,13 @@ class PaseoCLIAdapter:
     async def send_follow_up(self, agent_id: str, prompt: str) -> None:
         await self._invoke("send", agent_id, "--prompt", prompt, "--no-wait")
 
+    async def resolve_permissions(self, agent_id: str, *, allow: bool) -> None:
+        """Resolve the pending permission requests for one Paseo agent."""
+        args = ["permit", "allow" if allow else "deny", agent_id]
+        if not allow:
+            args.append("--all")
+        await self._invoke(*args)
+
     async def stop_agent(self, agent_id: str) -> None:
         await self._invoke("stop", agent_id)
 

@@ -6,6 +6,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import android.graphics.Color
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +27,7 @@ import com.clawchat.android.core.update.AppUpdateManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.clawchat.android.navigation.ClawChatNavGraph
 import com.clawchat.android.navigation.reminderRoute
+import com.clawchat.android.notification.AttentionNotificationCoordinator
 import com.clawchat.android.share.ShareCaptureCoordinator
 import com.clawchat.android.share.ShareCaptureEvent
 import com.clawchat.android.share.ShareIntentParseResult
@@ -39,6 +42,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var syncManager: SyncManager
     @Inject lateinit var updateManager: AppUpdateManager
     @Inject lateinit var shareCaptureCoordinator: ShareCaptureCoordinator
+    @Inject lateinit var attentionNotifications: AttentionNotificationCoordinator
 
     private data class PendingReminderNavigation(
         val route: String,
@@ -50,7 +54,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Both bars stay fully transparent in either polarity: the default
+        // styles paint a scrim chosen from the device's dark-mode setting,
+        // which is not necessarily the theme this app resolved. ClawChatTheme
+        // owns the icon polarity to match.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         handleShareIntent(intent)
         handleReminderIntent(intent)
 
@@ -73,6 +84,7 @@ class MainActivity : ComponentActivity() {
             val shareFailedMessage = stringResource(R.string.share_failed)
             val updateState by updateManager.state.collectAsStateWithLifecycle()
             val reminderNavigation by pendingReminderRoute.collectAsStateWithLifecycle()
+            val attentionBadge by attentionNotifications.badgeState.collectAsStateWithLifecycle()
             val notificationPermissionRequested by sessionStore
                 .notificationPermissionRequested
                 .collectAsStateWithLifecycle(initialValue = true)
@@ -164,6 +176,9 @@ class MainActivity : ComponentActivity() {
                                 ?.takeIf { it.workspaceKey == state.workspaceKey }
                                 ?.route,
                             onDeepLinkHandled = { pendingReminderRoute.value = null },
+                            attentionCount = attentionBadge.count.takeIf {
+                                attentionBadge.workspaceKey == state.workspaceKey
+                            } ?: 0,
                         )
                     }
                 }
@@ -195,9 +210,17 @@ class MainActivity : ComponentActivity() {
         val workspaceKey = intent.getStringExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY)
             ?: return
         val route = reminderRoute(reminderType) ?: return
+        if (intent.hasExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID)) {
+            val notificationId = intent.getIntExtra(
+                ReminderNotificationHelper.EXTRA_NOTIFICATION_ID,
+                0,
+            )
+            ReminderNotificationHelper.dismissReminderNotification(this, notificationId)
+        }
         intent.removeExtra(ReminderNotificationHelper.EXTRA_REMINDER_TYPE)
         intent.removeExtra(ReminderNotificationHelper.EXTRA_ITEM_ID)
         intent.removeExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY)
+        intent.removeExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID)
         pendingReminderRoute.value = PendingReminderNavigation(
             route = route,
             workspaceKey = workspaceKey,

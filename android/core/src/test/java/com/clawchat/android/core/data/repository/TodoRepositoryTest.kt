@@ -10,11 +10,18 @@ import com.clawchat.android.core.data.local.LocalTodoDao
 import com.clawchat.android.core.data.local.LocalTodoEntity
 import com.clawchat.android.core.data.local.LocalTodoPage
 import com.clawchat.android.core.data.local.TodoDao
+import com.clawchat.android.core.data.local.toEntity
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.model.TodoQuestionAnswersRequest
+import com.clawchat.android.core.data.model.TodoWorkflowResponse
+import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.notification.ReminderNotificationController
+import com.clawchat.android.core.sync.PendingTodoUpdate
+import com.clawchat.android.core.sync.PendingTodoUpdateStore
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -43,6 +50,12 @@ class TodoRepositoryTest {
         every { current() } returns ZoneId.of("Asia/Seoul")
     }
     private val syncManager = mockk<SyncManager>(relaxed = true)
+    private val pendingUpdates = mockk<PendingTodoUpdateStore>(relaxed = true) {
+        coEvery { allForWorkspace(any()) } returns emptyList()
+        coEvery { forWorkspace(any()) } returns emptyList()
+        coEvery { forTodo(any(), any()) } returns emptyList()
+    }
+    private val reminderNotifications = mockk<ReminderNotificationController>(relaxed = true)
     private val repository = TodoRepositoryImpl(
         api,
         todoDao,
@@ -50,6 +63,8 @@ class TodoRepositoryTest {
         sessionStore,
         deviceZoneProvider,
         syncManager,
+        pendingUpdates,
+        reminderNotifications,
     )
 
     @Test
@@ -78,7 +93,13 @@ class TodoRepositoryTest {
     @Test
     fun `successful completion replaces the cached task`() = runTest {
         val request = TodoUpdate(status = TaskStatus.COMPLETED)
-        coEvery { api.updateTodo("todo-1", request, any()) } returns
+        coEvery {
+            api.updateTodo(
+                "todo-1",
+                match { it.status == TaskStatus.COMPLETED && it.clientUpdatedAt != null },
+                any(),
+            )
+        } returns
             todo("todo-1", "Ship widget", TaskStatus.COMPLETED)
 
         val result = repository.updateTodo("todo-1", request)
@@ -90,6 +111,9 @@ class TodoRepositoryTest {
                     rows.single().workspaceKey == "server:url:test"
             })
         }
+        io.mockk.verify(exactly = 1) {
+            reminderNotifications.dismissTodo("server:url:test", "todo-1")
+        }
     }
 
     @Test
@@ -100,21 +124,160 @@ class TodoRepositoryTest {
 
         assertTrue(result is ApiResult.Success)
         coVerify(exactly = 1) { todoDao.deleteById("server:url:test", "todo-1") }
+        io.mockk.verify(exactly = 1) {
+            reminderNotifications.dismissTodo("server:url:test", "todo-1")
+        }
     }
 
     @Test
-    fun `failed mutation leaves Room unchanged`() = runTest {
+    fun `offline create is queued with a stable id and cached immediately`() = runTest {
+        val operationId = "00000000-0000-0000-0000-000000000099"
+        val request = TodoCreate(
+            title = "Captured offline",
+            inboxState = "captured",
+            idempotencyKey = operationId,
+        )
+        coEvery { api.createTodo(request, any()) } throws IOException("offline")
+
+        val result = repository.createTodo(request)
+
+        assertTrue(result is ApiResult.Success)
+        val optimistic = (result as ApiResult.Success).data
+        assertEquals(operationId, optimistic.id)
+        assertEquals("pending", optimistic.syncStatus)
+        coVerify(exactly = 1) {
+            pendingUpdates.enqueueCreate(
+                "server:url:test",
+                operationId,
+                request,
+                any(),
+            )
+        }
+        coVerify(exactly = 1) {
+            todoDao.upsertAll(match { it.single().id == operationId })
+        }
+    }
+
+    @Test
+    fun `offline delete hides the task and queues a tombstone`() = runTest {
+        coEvery { api.deleteTodo("todo-1", any()) } throws IOException("offline")
+
+        val result = repository.deleteTodo("todo-1")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) {
+            pendingUpdates.enqueueDelete("server:url:test", "todo-1", any())
+        }
+        coVerify(exactly = 1) { todoDao.deleteById("server:url:test", "todo-1") }
+        io.mockk.verify(exactly = 1) { syncManager.notifyTodoChanged() }
+    }
+
+    @Test
+    fun `deleting an offline create never calls delete with its local id`() = runTest {
+        coEvery { pendingUpdates.hasPendingCreate("server:url:test", "local-1") } returns true
+
+        val result = repository.deleteTodo("local-1")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 0) { api.deleteTodo(any(), any()) }
+        coVerify(exactly = 1) {
+            pendingUpdates.enqueueDelete("server:url:test", "local-1", any())
+        }
+    }
+
+    @Test
+    fun `offline mutation is queued and applied optimistically to Room`() = runTest {
         coEvery { api.updateTodo(any(), any(), any()) } throws IOException("offline")
+        coEvery { todoDao.getById("server:url:test", "todo-1") } returns
+            todo("todo-1", "Offline task").toEntity("server:url:test")
 
         val result = repository.updateTodo(
             "todo-1",
             TodoUpdate(status = TaskStatus.COMPLETED),
         )
 
-        assertTrue(result is ApiResult.Error)
-        coVerify(exactly = 0) { todoDao.upsertAll(any()) }
+        assertTrue(result is ApiResult.Success)
+        assertEquals(TaskStatus.COMPLETED, (result as ApiResult.Success).data.status)
+        coVerify(exactly = 1) {
+            pendingUpdates.enqueue(
+                "server:url:test",
+                "todo-1",
+                TodoUpdate(status = TaskStatus.COMPLETED),
+                any(),
+            )
+        }
+        coVerify(exactly = 1) {
+            todoDao.upsertAll(match { it.single().status == TaskStatus.COMPLETED.wireValue })
+        }
         coVerify(exactly = 0) { todoDao.deleteById(any(), any()) }
-        io.mockk.verify(exactly = 0) { syncManager.notifyTodoChanged() }
+        io.mockk.verify(exactly = 1) {
+            reminderNotifications.dismissTodo("server:url:test", "todo-1")
+        }
+        io.mockk.verify(exactly = 1) { syncManager.notifyTodoChanged() }
+    }
+
+    @Test
+    fun `server refresh keeps a pending phone edit visible`() = runTest {
+        val serverTodo = todo("todo-1", "Server title")
+        coEvery { api.listTodos(emptyMap(), any()) } returns PaginatedResponse(
+            items = listOf(serverTodo),
+            total = 1,
+            page = 1,
+            limit = 50,
+        )
+        coEvery { pendingUpdates.allForWorkspace("server:url:test") } returns listOf(
+            PendingTodoUpdate(
+                operationId = "operation-1",
+                todoId = "todo-1",
+                update = TodoUpdate(title = "Phone title"),
+                changedAt = "2026-09-01T01:00:00Z",
+            ),
+        )
+
+        val result = repository.listTodos()
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals("Phone title", (result as ApiResult.Success).data.items.single().title)
+        assertEquals("pending", result.data.items.single().syncStatus)
+        coVerify(exactly = 1) {
+            todoDao.upsertAll(match { rows ->
+                rows.singleOrNull()?.title == "Phone title"
+            })
+        }
+    }
+
+    @Test
+    fun `offline project list stays scoped and preserves project root identity`() = runTest {
+        val params = mapOf("project_id" to "project-a")
+        coEvery { api.listTodos(params, any()) } throws IOException("offline")
+        coEvery { todoDao.getAll("server:url:test") } returns listOf(
+            Todo(
+                id = "project-root-a",
+                title = "P0-R Semantic referent binding",
+                projectId = "project-a",
+                source = "project_root",
+                projectLabel = "P0-R Semantic referent binding",
+                createdAt = "2026-09-04T00:00:00Z",
+                updatedAt = "2026-09-04T00:00:00Z",
+            ).toEntity("server:url:test"),
+            Todo(
+                id = "step-b",
+                title = "E72b Other branch",
+                projectId = "project-b",
+                source = "obsidian",
+                createdAt = "2026-09-04T00:00:00Z",
+                updatedAt = "2026-09-04T00:00:00Z",
+            ).toEntity("server:url:test"),
+        )
+
+        val result = repository.listTodos(params)
+
+        assertTrue(result is ApiResult.Success)
+        val cached = (result as ApiResult.Success).data.items.single()
+        assertEquals("project-root-a", cached.id)
+        assertEquals("project-a", cached.projectId)
+        assertEquals("project_root", cached.source)
+        assertEquals("P0-R Semantic referent binding", cached.projectLabel)
     }
 
     @Test
@@ -141,6 +304,67 @@ class TodoRepositoryTest {
     }
 
     @Test
+    fun `answer questions trims values and starts planning`() = runTest {
+        coEvery {
+            api.answerTodoQuestions(
+                "todo-1",
+                TodoQuestionAnswersRequest(mapOf("0" to "Friday", "1" to "Email")),
+                any(),
+            )
+        } returns TodoWorkflowResponse(status = "processing", todoId = "todo-1")
+
+        val result = repository.answerTodoQuestions(
+            "todo-1",
+            mapOf("0" to "  Friday  ", "1" to "Email"),
+        )
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) {
+            api.answerTodoQuestions(
+                "todo-1",
+                TodoQuestionAnswersRequest(mapOf("0" to "Friday", "1" to "Email")),
+                any(),
+            )
+        }
+    }
+
+    @Test
+    fun `answer questions rejects incomplete answers before network`() = runTest {
+        val result = repository.answerTodoQuestions(
+            "todo-1",
+            mapOf("0" to "Friday", "1" to "   "),
+        )
+
+        assertTrue(result is ApiResult.Error)
+        coVerify(exactly = 0) { api.answerTodoQuestions(any(), any(), any()) }
+    }
+
+    @Test
+    fun `skip questions starts planning`() = runTest {
+        coEvery { api.skipTodoQuestions("todo-1", any()) } returns
+            TodoWorkflowResponse(status = "processing", todoId = "todo-1")
+
+        val result = repository.skipTodoQuestions("todo-1")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { api.skipTodoQuestions("todo-1", any()) }
+    }
+
+    @Test
+    fun `stale question response is reported as conflict`() = runTest {
+        coEvery { api.skipTodoQuestions("todo-1", any()) } returns TodoWorkflowResponse(
+            status = "invalid_state",
+            todoId = "todo-1",
+            inboxState = "plan_ready",
+        )
+
+        val result = repository.skipTodoQuestions("todo-1")
+
+        assertTrue(result is ApiResult.Error)
+        assertEquals(409, (result as ApiResult.Error).code)
+    }
+
+    @Test
     fun `response that finishes after a switch stays in its original workspace cache`() = runTest {
         val states = MutableStateFlow(
             appRuntimeState(
@@ -159,8 +383,13 @@ class TodoRepositoryTest {
             switchingSessionStore,
             deviceZoneProvider,
             syncManager,
+            pendingUpdates,
+            reminderNotifications,
         )
-        val request = TodoCreate(title = "Old workspace result")
+        val request = TodoCreate(
+            title = "Old workspace result",
+            idempotencyKey = "00000000-0000-0000-0000-000000000042",
+        )
         coEvery { api.createTodo(request, any()) } answers {
             states.value = appRuntimeState(
                 mode = WorkspaceMode.SERVER,
@@ -201,6 +430,8 @@ class TodoRepositoryTest {
             scopedSessionStore,
             deviceZoneProvider,
             syncManager,
+            pendingUpdates,
+            reminderNotifications,
         )
 
         scopedRepository.getCachedTodosFlow().first()
@@ -220,6 +451,8 @@ class TodoRepositoryTest {
             localSessionStore,
             deviceZoneProvider,
             syncManager,
+            pendingUpdates,
+            reminderNotifications,
         )
         val stored = LocalTodoEntity(
             id = "local-id",
@@ -231,7 +464,6 @@ class TodoRepositoryTest {
         coEvery {
             localTodoDao.loadPage(
                 "pending",
-                null,
                 null,
                 false,
                 null,
@@ -297,11 +529,12 @@ class TodoRepositoryTest {
             localSessionStore,
             deviceZoneProvider,
             syncManager,
+            pendingUpdates,
+            reminderNotifications,
         )
         coEvery {
             localTodoDao.loadPage(
                 "in_progress",
-                null,
                 null,
                 false,
                 null,
@@ -328,7 +561,7 @@ class TodoRepositoryTest {
         val page = (result as ApiResult.Success).data
         assertEquals(1_201, page.total)
         assertEquals(2, page.page)
-        coVerify(exactly = 1) { localTodoDao.loadPage(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 1) { localTodoDao.loadPage(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -343,6 +576,8 @@ class TodoRepositoryTest {
             localSessionStore,
             deviceZoneProvider,
             syncManager,
+            pendingUpdates,
+            reminderNotifications,
         )
 
         val result = localRepository.createTodo(
@@ -368,6 +603,8 @@ class TodoRepositoryTest {
             localSessionStore,
             deviceZoneProvider,
             syncManager,
+            pendingUpdates,
+            reminderNotifications,
         )
         val insertedIds = mutableListOf<String>()
         coEvery { localTodoDao.insertOrGet(any()) } answers {
@@ -383,6 +620,32 @@ class TodoRepositoryTest {
 
         assertEquals(2, insertedIds.size)
         assertEquals(insertedIds.first(), insertedIds.last())
+    }
+
+    @Test
+    fun `local mode rejects project task creation`() = runTest {
+        val localSessionStore = mockk<SessionStore> {
+            every { runtimeState } returns flowOf(appRuntimeState(WorkspaceMode.LOCAL))
+        }
+        val localRepository = TodoRepositoryImpl(
+            api,
+            todoDao,
+            localTodoDao,
+            localSessionStore,
+            deviceZoneProvider,
+            syncManager,
+            pendingUpdates,
+            reminderNotifications,
+        )
+
+        val result = localRepository.createTodo(
+            TodoCreate(title = "E65a Run baseline", projectId = "project-p0-r"),
+        )
+
+        assertTrue(result is ApiResult.Error)
+        assertEquals(422, (result as ApiResult.Error).code)
+        coVerify(exactly = 0) { localTodoDao.insertOrGet(any()) }
+        coVerify(exactly = 0) { api.createTodo(any(), any()) }
     }
 
     private fun todo(

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app_version import APP_VERSION
 from auth.dependencies import get_current_user
-from config import save_codex_api_key, settings
+from config import AI_PROVIDERS, save_ai_provider, save_codex_api_key, settings
 from database import get_db
 from exceptions import ValidationError
 from schemas.admin import (
@@ -52,9 +52,11 @@ def _active_provider_summary(request: Request) -> tuple[str, str, str, bool]:
     state = request.app.state
     active_provider = getattr(state, "active_ai_provider", "openclaw")
     if active_provider == "claude_code":
+        claude_code = getattr(state, "claude_code", None)
+        claude_model = getattr(claude_code, "model", settings.claude_code_model)
         return (
             active_provider,
-            "claude (via CLI)",
+            f"claude {claude_model or 'default'} (via CLI)",
             "local CLI",
             getattr(state, "claude_code_status", "") == "available",
         )
@@ -80,6 +82,22 @@ def _active_provider_summary(request: Request) -> tuple[str, str, str, bool]:
         settings.ai_base_url,
         getattr(state, "ai_connected", False),
     )
+
+
+def _remember_provider(provider: str) -> None:
+    """Keep an in-app provider switch across restarts.
+
+    The switch itself has already taken effect, so a workspace whose data
+    directory is read-only stays on the new provider for this session rather
+    than failing the request.
+    """
+    settings.ai_provider = provider
+    if not settings.ai_provider_file:
+        return
+    try:
+        save_ai_provider(settings.ai_provider_file, provider)
+    except (OSError, ValueError):
+        logger.exception("Could not persist the active AI provider")
 
 
 def _provider_response(request: Request) -> AIProviderResponse:
@@ -273,7 +291,7 @@ async def get_server_config(
     elif configured_provider == "claude_code":
         ai_backend = "claude_code"
         ai_base_url = "local CLI"
-        ai_model = "claude (via CLI)"
+        ai_model = f"claude {settings.claude_code_model or 'default'} (via CLI)"
     elif configured_provider == "codex_cli":
         ai_backend = "codex_cli"
         ai_base_url = "local CLI"
@@ -370,7 +388,7 @@ async def switch_ai_provider(
     _user: str = Depends(get_current_user),
 ):
     """Switch between AI providers at runtime."""
-    if body.provider not in ("openclaw", "claude_code", "codex_cli", "codex"):
+    if body.provider not in AI_PROVIDERS:
         raise ValidationError(
             f"Invalid provider: {body.provider}. "
             "Use 'openclaw', 'claude_code', 'codex_cli', or 'codex'.",
@@ -450,6 +468,7 @@ async def switch_ai_provider(
         request.app.state.active_ai_provider = "openclaw"
         logger.info("Switched active AI provider to OpenClaw")
 
+    _remember_provider(body.provider)
     return _provider_response(request)
 
 
@@ -509,6 +528,7 @@ async def configure_codex_api(
     request.app.state.codex_api_status = CodexAPIStatus.AVAILABLE.value
     request.app.state.active_ai = codex_api
     request.app.state.active_ai_provider = "codex"
+    _remember_provider("codex")
     logger.info(
         "Configured and activated Codex API (%s, persistent=%s)",
         codex_api.model,
@@ -602,7 +622,7 @@ async def recheck_claude_code(
     claude_code = getattr(request.app.state, "claude_code", None)
     if not claude_code:
         from services.ai.claude_code_provider import ClaudeCodeProvider
-        claude_code = ClaudeCodeProvider()
+        claude_code = ClaudeCodeProvider(model=settings.claude_code_model)
         request.app.state.claude_code = claude_code
 
     status, version = await claude_code.check_availability()

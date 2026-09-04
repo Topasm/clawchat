@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="inbox_back">Back</string>
     <string name="inbox_title">Inbox</string>
     <string name="inbox_loading">Loading inbox…</string>
     <string name="inbox_planning_title">Planning now</string>

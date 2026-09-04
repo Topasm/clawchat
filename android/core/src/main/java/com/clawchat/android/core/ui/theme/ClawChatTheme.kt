@@ -1,12 +1,19 @@
 package com.clawchat.android.core.ui.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
+import android.view.Window
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -213,10 +220,33 @@ fun ClawChatTheme(
         }
     }
 
+    // The clock and system icons in the status bar are painted by the system,
+    // not by Compose. Left alone they follow the device's dark-mode setting
+    // while the app paints its own choice behind them, so a light app on a
+    // dark-mode device (or the reverse) hides them entirely. They have to be
+    // told which way this theme actually resolved.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = view.context.findActivityWindow() ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
+            }
+        }
+    }
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = ClawTypography,
         shapes = ClawShapes,
         content = content,
     )
+}
+
+/** Compose sees a themed wrapper, so the activity is found by unwrapping it. */
+private tailrec fun Context.findActivityWindow(): Window? = when (this) {
+    is Activity -> window
+    is ContextWrapper -> baseContext.findActivityWindow()
+    else -> null
 }

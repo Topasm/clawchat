@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="chat_search">Quick Find</string>
+    <string name="chat_settings">Settings</string>
     <string name="chat_title">Chat</string>
     <string name="chat_new_chat">New chat</string>
     <string name="chat_new_conversation_default_title">New conversation</string>
@@ -22,6 +24,25 @@
     <string name="chat_streaming">Streaming</string>
     <string name="chat_you">You</string>
     <string name="chat_assistant">Assistant</string>
+    <string name="chat_run_update_label">Agent run</string>
+    <string name="chat_run_status_waiting_input">Needs your input</string>
+    <string name="chat_run_status_waiting_review">Waiting for review</string>
+    <string name="chat_run_status_completed">Complete</string>
+    <string name="chat_run_status_cancelled">Cancelled</string>
+    <string name="chat_run_status_failed">Failed</string>
+    <string name="chat_run_status_running">Running</string>
+    <string name="chat_run_needs_you_hint">Answer or review it from the Progress tab.</string>
+    <string name="chat_agent_answer_placeholder">Answer the agent…</string>
+    <string name="chat_agent_send_answer">Send answer</string>
+    <string name="chat_permission_allow">Allow</string>
+    <string name="chat_permission_deny">Deny</string>
+    <string name="chat_review_approve">Approve</string>
+    <string name="chat_review_reject">Reject</string>
+    <string name="chat_background_task">Background task</string>
+    <string name="chat_multi_agent_task">Multi-agent task</string>
+    <string name="chat_task_queued">Queued</string>
+    <string name="chat_agent_run_conversations">Agent run conversations</string>
+    <string name="chat_task_threads">Task and project threads</string>
     <string name="chat_just_now">Just now</string>
     <plurals name="chat_minutes_ago">
         <item quantity="one">%1$d minute ago</item>

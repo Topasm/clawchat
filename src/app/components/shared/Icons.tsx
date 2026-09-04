@@ -475,20 +475,3 @@ export function GraphIcon({ size = ICON_SIZE.feature, className, label, style }:
     </IconBase>
   );
 }
-
-export function PriorityIcon({
-  level,
-  size = ICON_SIZE.feature,
-  className,
-  label,
-  style,
-}: IconProps & { level: 'urgent' | 'high' | 'medium' | 'low' }) {
-  return (
-    <IconBase size={size} className={className} label={label} style={style}>
-      {level === 'urgent' && <path d="M9 14V4M5 7l4-4 4 4M5 11l4-4 4 4" />}
-      {level === 'high' && <path d="M9 14V4M5 7l4-4 4 4" />}
-      {level === 'medium' && <path d="M3 9h12" />}
-      {level === 'low' && <path d="M9 4v10M5 11l4 4 4-4" />}
-    </IconBase>
-  );
-}

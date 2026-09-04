@@ -10,3 +10,14 @@ other domain depend on it freely.  The chat loop that *uses* a provider lives
 in ``services.chat`` -- keeping the two apart is what makes the service
 package graph acyclic.
 """
+
+
+def resolve_active_ai(state):
+    """Return the provider the workspace is currently using.
+
+    Routers must not read ``state.ai_service`` directly: that attribute is the
+    OpenClaw relay, so doing so bypasses a CLI provider the workspace selected
+    and fails outright on hosts that never run OpenClaw. Returns ``None`` when
+    the workspace is running without any provider at all.
+    """
+    return getattr(state, "active_ai", None) or getattr(state, "ai_service", None)

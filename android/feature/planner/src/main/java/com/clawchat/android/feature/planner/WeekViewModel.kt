@@ -27,6 +27,7 @@ data class WeekUiState(
     val range: WeekRange? = null,
     val overdue: List<Todo> = emptyList(),
     val tasksByDate: Map<LocalDate, List<Todo>> = emptyMap(),
+    val spans: List<WeekTaskSpan> = emptyList(),
     val isLoading: Boolean = false,
     val isOffline: Boolean = false,
     val error: String? = null,
@@ -118,6 +119,7 @@ class WeekViewModel @Inject constructor(
                             it.copy(
                                 overdue = groups.overdue,
                                 tasksByDate = groups.byDate,
+                                spans = groups.spans,
                                 isLoading = false,
                                 isOffline = true,
                                 error = null,
@@ -206,6 +208,7 @@ class WeekViewModel @Inject constructor(
                 range = range,
                 overdue = groups.overdue,
                 tasksByDate = groups.byDate,
+                spans = groups.spans,
                 isLoading = false,
                 isOffline = false,
                 error = null,

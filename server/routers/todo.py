@@ -50,6 +50,7 @@ from schemas.todo import (
 from services.agents import (
     task_delegation_service,
 )
+from services.ai import resolve_active_ai
 from services.planning import (
     inbox_pipeline_service,
     inbox_triage_service,
@@ -60,6 +61,7 @@ from services.tasks import (
     task_placement_service,
     task_execution_telemetry_service,
     task_relationship_service,
+    todo_recurrence_service,
     todo_service,
 )
 from services.vault import (
@@ -352,6 +354,7 @@ async def bulk_update_todos(
     deleted = 0
     deleted_ids: list[str] = []
     updated_todos: list[Todo] = []
+    newly_completed_todos: list[Todo] = []
     errors: list[str] = []
     todo_rows = await db.execute(select(Todo).where(Todo.id.in_(body.ids)))
     todos_by_id = {todo.id: todo for todo in todo_rows.scalars().all()}
@@ -371,11 +374,17 @@ async def bulk_update_todos(
             deleted += 1
         else:
             if body.status is not None:
+                became_completed = (
+                    body.status == TaskStatus.COMPLETED
+                    and todo.status != TaskStatus.COMPLETED
+                )
                 todo.status = body.status
                 if body.status == TaskStatus.COMPLETED and not todo.completed_at:
                     todo.completed_at = datetime.now(timezone.utc)
                 elif body.status != TaskStatus.COMPLETED:
                     todo.completed_at = None
+                if became_completed:
+                    newly_completed_todos.append(todo)
             if body.priority is not None:
                 todo.priority = body.priority
             if body.tags is not None:
@@ -388,6 +397,7 @@ async def bulk_update_todos(
         db,
         dependent_source_ids,
     )
+    await todo_recurrence_service.spawn_next_occurrences(db, newly_completed_todos)
     await db.commit()
 
     if settings.obsidian_vault_path:
@@ -396,20 +406,17 @@ async def bulk_update_todos(
             settings.obsidian_vault_path,
             set(deleted_ids) | {todo.id for todo in updated_todos},
         )
-        parent_ids = {todo.parent_id for todo in updated_todos if todo.parent_id}
-        parent_titles = {}
-        if parent_ids:
-            parent_rows = await db.execute(
-                select(Todo.id, Todo.title).where(Todo.id.in_(parent_ids))
-            )
-            parent_titles = dict(parent_rows.all())
+        project_names = {
+            todo.id: await todo_service.vault_project_name(db, todo)
+            for todo in updated_todos
+        }
         await asyncio.to_thread(
             export_todos_batch,
             settings.obsidian_vault_path,
             [
                 (
                     snapshot_todo(todo),
-                    parent_titles.get(todo.parent_id) if todo.parent_id else None,
+                    project_names[todo.id],
                 )
                 for todo in updated_todos
             ],
@@ -477,12 +484,14 @@ async def create_todo(
 
     # Trigger inbox pipeline for quick-capture root todos
     if todo.inbox_state == "classifying" and not todo.parent_id:
-        ai_service = request.app.state.ai_service
+        ai_service = resolve_active_ai(request.app.state)
         session_factory = request.app.state.session_factory
 
         async def _run_pipeline():
             async with session_factory() as pipeline_db:
-                await inbox_pipeline_service.process_todo(pipeline_db, ai_service, todo.id)
+                await inbox_pipeline_service.process_todo(
+                    pipeline_db, ai_service, todo.id
+                )
 
         background_tasks.add_task(_run_pipeline)
 
@@ -508,22 +517,30 @@ async def update_todo(
     _user: str = Depends(get_current_user),
 ):
     data = body.model_dump(exclude_unset=True)
+    client_updated_at = data.pop("client_updated_at", None)
+    is_completion = "status" in data and data["status"] == TaskStatus.COMPLETED
+    current = None
+    if client_updated_at is not None or is_completion:
+        current = await todo_service.get_todo(db, todo_id)
+    if client_updated_at is not None and current is not None:
+        server_updated_at = current.updated_at
+        if server_updated_at.tzinfo is None:
+            server_updated_at = server_updated_at.replace(tzinfo=timezone.utc)
+        if client_updated_at.tzinfo is None:
+            client_updated_at = client_updated_at.replace(tzinfo=timezone.utc)
+        if server_updated_at > client_updated_at:
+            # Another device wrote later while this client was offline. Return
+            # the winning row so every client converges without a retry loop.
+            return await _enrich_todo_response(current, db)
+    was_completed = current is not None and current.status == TaskStatus.COMPLETED
     todo = await todo_service.update_todo(db, todo_id, **data)
+    spawned = await todo_recurrence_service.spawn_next_occurrences(
+        db,
+        [todo] if is_completion and not was_completed else [],
+    )
+    next_todo_id = spawned[0].id if spawned else None
     await db.commit()
     await db.refresh(todo)
-
-    # Spawn next occurrence for recurring tasks on completion
-    next_todo_id = None
-    if (
-        "status" in data
-        and data["status"] == TaskStatus.COMPLETED
-        and todo.recurrence_rule
-    ):
-        from services.tasks.todo_recurrence_service import spawn_next_occurrence
-        next_todo = await spawn_next_occurrence(db, todo)
-        if next_todo:
-            next_todo_id = next_todo.id
-            await db.commit()
 
     await notify_module_data_changed("todos")
     resp = await _enrich_todo_response(todo, db)
@@ -540,7 +557,12 @@ async def place_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo, change, affected_ids, insights_delta = await task_placement_service.place_task(
+    (
+        todo,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.place_task(
         db,
         todo_id=todo_id,
         **body.model_dump(),
@@ -563,12 +585,15 @@ async def place_todos_batch(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todos, change, affected_ids, insights_delta = (
-        await task_placement_service.place_tasks(
-            db,
-            todo_ids=body.todo_ids,
-            **body.model_dump(exclude={"todo_ids"}),
-        )
+    (
+        todos,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.place_tasks(
+        db,
+        todo_ids=body.todo_ids,
+        **body.model_dump(exclude={"todo_ids"}),
     )
     await db.commit()
     for todo in todos:
@@ -600,11 +625,7 @@ async def preview_inbox_triage(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    ai_service = getattr(request.app.state, "active_ai", None) or getattr(
-        request.app.state,
-        "ai_service",
-        None,
-    )
+    ai_service = resolve_active_ai(request.app.state)
     if ai_service is None:
         raise AppError(
             code="AI_UNAVAILABLE",
@@ -636,12 +657,16 @@ async def place_todo_groups(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todos, created_todos, change, affected_ids, insights_delta = (
-        await task_placement_service.place_task_groups(
-            db,
-            groups=body.groups,
-            expected_graph_revision=body.expected_graph_revision,
-        )
+    (
+        todos,
+        created_todos,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.place_task_groups(
+        db,
+        groups=body.groups,
+        expected_graph_revision=body.expected_graph_revision,
     )
     await db.commit()
     for todo in todos:
@@ -651,9 +676,7 @@ async def place_todo_groups(
     await notify_module_data_changed("todos")
     return TaskBatchPlacementResponse(
         todos=[await _enrich_todo_response(todo, db) for todo in todos],
-        created_todos=[
-            await _enrich_todo_response(todo, db) for todo in created_todos
-        ],
+        created_todos=[await _enrich_todo_response(todo, db) for todo in created_todos],
         graph_revision=change.applied_graph_revision,
         affected_task_ids=affected_ids,
         insights_delta=insights_delta,
@@ -670,7 +693,12 @@ async def undo_todo_placement(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo, change, affected_ids, insights_delta = await task_placement_service.undo_placement(
+    (
+        todo,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.undo_placement(
         db,
         change_set_id,
     )
@@ -710,7 +738,7 @@ async def organize_todo(
     todo = await db.get(Todo, todo_id)
     if not todo:
         raise NotFoundError("Todo not found")
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
 
     async def _run_organize():
@@ -736,7 +764,11 @@ async def answer_questions(
         raise NotFoundError("Todo not found")
 
     if todo.inbox_state != "questioning":
-        return {"status": "invalid_state", "todo_id": todo_id, "inbox_state": todo.inbox_state}
+        return {
+            "status": "invalid_state",
+            "todo_id": todo_id,
+            "inbox_state": todo.inbox_state,
+        }
 
     # Save answers
     todo.clarification_answers = json.dumps(body.answers)
@@ -745,12 +777,14 @@ async def answer_questions(
     await notify_module_data_changed("todos")
 
     # Trigger planning in background with Q&A context
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
 
     async def _run_planning():
         async with session_factory() as pipeline_db:
-            await inbox_pipeline_service.resume_after_answers(pipeline_db, ai_service, todo_id)
+            await inbox_pipeline_service.resume_after_answers(
+                pipeline_db, ai_service, todo_id
+            )
 
     background_tasks.add_task(_run_planning)
     return {"status": "processing", "todo_id": todo_id}
@@ -770,19 +804,25 @@ async def skip_questions(
         raise NotFoundError("Todo not found")
 
     if todo.inbox_state != "questioning":
-        return {"status": "invalid_state", "todo_id": todo_id, "inbox_state": todo.inbox_state}
+        return {
+            "status": "invalid_state",
+            "todo_id": todo_id,
+            "inbox_state": todo.inbox_state,
+        }
 
     todo.inbox_state = "planning"
     await db.commit()
     await notify_module_data_changed("todos")
 
     # Trigger planning in background without Q&A context
-    ai_service = request.app.state.ai_service
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
 
     async def _run_planning():
         async with session_factory() as pipeline_db:
-            await inbox_pipeline_service.resume_after_answers(pipeline_db, ai_service, todo_id)
+            await inbox_pipeline_service.resume_after_answers(
+                pipeline_db, ai_service, todo_id
+            )
 
     background_tasks.add_task(_run_planning)
     return {"status": "processing", "todo_id": todo_id}
@@ -799,6 +839,21 @@ async def get_latest_plan(
     _user: str = Depends(get_current_user),
 ):
     proposal = await plan_proposal_service.get_latest_proposal(db, todo_id)
+    return await plan_proposal_service.build_plan_response(db, proposal)
+
+
+@router.get(
+    "/{todo_id}/plan/proposals/{proposal_id}",
+    response_model=PlanResponse,
+    responses={404: {"model": ErrorResponse}},
+)
+async def get_plan_proposal(
+    todo_id: str,
+    proposal_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    proposal = await plan_proposal_service.get_proposal(db, todo_id, proposal_id)
     return await plan_proposal_service.build_plan_response(db, proposal)
 
 
@@ -819,9 +874,7 @@ async def generate_graph_plan(
 ):
     """Generate and persist a proposal without creating any child todos."""
     try:
-        ai_service = getattr(request.app.state, "active_ai", None)
-        if ai_service is None:
-            ai_service = request.app.state.ai_service
+        ai_service = resolve_active_ai(request.app.state)
         result = await plan_proposal_service.generate_proposal(
             db,
             ai_service,
@@ -921,7 +974,7 @@ async def delegate_todo(
     state = request.app.state
     runtime = task_delegation_service.DelegationRuntime(
         session_factory=getattr(state, "session_factory", None),
-        active_ai=getattr(state, "active_ai", None) or getattr(state, "ai_service", None),
+        active_ai=resolve_active_ai(state),
         active_ai_provider=getattr(state, "active_ai_provider", "openclaw"),
         paseo_adapter=getattr(state, "paseo_adapter", None),
     )

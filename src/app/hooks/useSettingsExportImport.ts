@@ -74,11 +74,10 @@ export default function useSettingsExportImport() {
     let errors = 0;
     for (const todo of todos) {
       try {
-        const { title, description, priority, due_date, tags } = todo as Record<string, unknown>;
+        const { title, description, due_date, tags } = todo as Record<string, unknown>;
         await apiClient.post('/todos', {
           title: String(title ?? ''),
           description: description != null ? String(description) : undefined,
-          priority: priority as 'urgent' | 'high' | 'medium' | 'low' | undefined,
           due_date: due_date != null ? String(due_date) : undefined,
           tags: Array.isArray(tags) ? tags : undefined,
         });

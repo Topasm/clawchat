@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from domain.task import TaskStatus
-from exceptions import NotFoundError, ValidationError
+from exceptions import AppError, NotFoundError, ValidationError
 from models.project import Project
 from models.todo import Todo
 from services.vault.obsidian_export_service import (
@@ -33,6 +33,23 @@ _ORDER_COLUMNS = {
     "priority": Todo.priority,
     "due_date": Todo.due_date,
 }
+
+
+async def vault_project_name(db: AsyncSession, todo: Todo) -> str | None:
+    """Resolve the stable export folder label for a Todo.
+
+    First-class Project identity owns the folder. Parent titles are retained
+    only for legacy, non-project Todo hierarchies.
+    """
+    if todo.project_id:
+        project = await db.get(Project, todo.project_id)
+        if project is not None:
+            return project.title
+    if todo.parent_id:
+        parent = await db.get(Todo, todo.parent_id)
+        if parent is not None:
+            return parent.title
+    return None
 
 
 async def get_todos(
@@ -155,11 +172,7 @@ async def create_todo(
         )
 
     if settings.obsidian_vault_path:
-        project_name = None
-        if todo.parent_id:
-            parent = await db.get(Todo, todo.parent_id)
-            if parent:
-                project_name = parent.title
+        project_name = await vault_project_name(db, todo)
         # Snapshot on the event loop thread.  ``export_todo`` runs on a worker
         # thread with no greenlet context, so it must never be handed a
         # session-bound ORM instance: one expired attribute there would raise
@@ -177,9 +190,7 @@ async def create_todo(
 async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
     todo = await get_todo(db, todo_id)
     dependency_ids = (
-        updates.pop("depends_on")
-        if "depends_on" in updates
-        else _DEPENDENCIES_UNSET
+        updates.pop("depends_on") if "depends_on" in updates else _DEPENDENCIES_UNSET
     )
     proposed_parent_id = updates.get("parent_id", todo.parent_id)
     proposed_project_id = updates.get("project_id", todo.project_id)
@@ -188,9 +199,26 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
         if proposed_project_id is not None and proposed_project_id != parent.project_id:
             raise ValidationError("A child task must belong to its parent's project")
         updates["project_id"] = parent.project_id
-    elif proposed_project_id is not None and await db.get(Project, proposed_project_id) is None:
+    elif (
+        proposed_project_id is not None
+        and await db.get(Project, proposed_project_id) is None
+    ):
         raise NotFoundError(f"Project {proposed_project_id} not found")
     apply_model_updates(todo, updates)
+
+    # A project's root is the project as seen from task views; a rename there
+    # is a rename of the project, the same way the project page renames the root.
+    if "title" in updates or "description" in updates:
+        owning_project = (
+            await db.execute(
+                select(Project).where(Project.root_task_id == todo.id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if owning_project is not None:
+            if "title" in updates and updates["title"]:
+                owning_project.title = updates["title"]
+            if "description" in updates:
+                owning_project.description = updates["description"]
 
     if "status" in updates:
         if updates["status"] == TaskStatus.COMPLETED and not todo.completed_at:
@@ -208,11 +236,7 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
     await db.flush()
 
     if settings.obsidian_vault_path:
-        project_name = None
-        if todo.parent_id:
-            parent = await db.get(Todo, todo.parent_id)
-            if parent:
-                project_name = parent.title
+        project_name = await vault_project_name(db, todo)
         # Snapshot on the event loop thread.  ``export_todo`` runs on a worker
         # thread with no greenlet context, so it must never be handed a
         # session-bound ORM instance: one expired attribute there would raise
@@ -229,6 +253,20 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
 
 async def delete_todo(db: AsyncSession, todo_id: str) -> None:
     todo = await get_todo(db, todo_id)
+    # A project's root looks like any other task in a list, but deleting it
+    # leaves the project with no root and no way back into its context.
+    owning_project = (
+        await db.execute(
+            select(Project.id).where(Project.root_task_id == todo.id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if owning_project is not None:
+        raise AppError(
+            code="PROJECT_ROOT_TASK",
+            message="This task is a project's root; delete the project instead",
+            status_code=409,
+            details={"project_id": owning_project, "todo_id": todo.id},
+        )
     deleted_id = todo.id
     dependent_source_ids = await task_relationship_service.dependent_source_ids(
         db,

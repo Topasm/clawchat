@@ -74,6 +74,7 @@ class FakePaseoAdapter:
         )
         self.stop_agent = AsyncMock()
         self.send_follow_up = AsyncMock()
+        self.resolve_permissions = AsyncMock()
         self.logs = AsyncMock(return_value="Agent changed 3 files and all tests pass.")
 
     async def inspect_agent(self, _agent_id):
@@ -163,20 +164,24 @@ async def test_paseo_execution_creates_workspace_artifact_and_review(db_session)
     assert adapter.start_agent.await_args.kwargs["provider_model"] == "codex/gpt-5.5"
 
     assert (
-        await db_session.execute(
-            select(Artifact).where(Artifact.created_by == run_id)
-        )
+        await db_session.execute(select(Artifact).where(Artifact.created_by == run_id))
     ).scalar_one_or_none() is None
     await agent_run_service.decide_run(db_session, run_id, ReviewStatus.APPROVED)
     await db_session.commit()
-    artifact = (
-        await db_session.execute(
-            select(Artifact).where(Artifact.created_by == run_id)
+    artifacts = list(
+        (
+            await db_session.execute(
+                select(Artifact).where(Artifact.created_by == run_id)
+            )
         )
-    ).scalar_one()
-    assert artifact.project_id == project_id
-    assert artifact.type == "code_diff"
-    assert "paseo-agent-1" in artifact.content
+        .scalars()
+        .all()
+    )
+    code_diff = next(artifact for artifact in artifacts if artifact.type == "code_diff")
+    report = next(artifact for artifact in artifacts if artifact.type == "report")
+    assert code_diff.project_id == project_id
+    assert "paseo-agent-1" in code_diff.content
+    assert "all tests pass" in report.content
     review = (
         await db_session.execute(
             select(ReviewItem).where(ReviewItem.subject_id == run_id)
@@ -207,9 +212,7 @@ async def test_paseo_cancel_endpoint_stops_external_agent(
     previous = getattr(app.state, "paseo_adapter", None)
     app.state.paseo_adapter = adapter
     try:
-        response = await client.post(
-            f"/api/runs/{run.id}/cancel", headers=auth_headers
-        )
+        response = await client.post(f"/api/runs/{run.id}/cancel", headers=auth_headers)
         assert response.status_code == 200, response.text
         assert response.json()["status"] == "cancelled"
         adapter.stop_agent.assert_awaited_once_with("paseo-agent-1")
@@ -289,6 +292,57 @@ async def test_paseo_waiting_input_resumes_same_external_agent(db_session):
     )
     adapter.create_workspace.assert_awaited_once()
     adapter.start_agent.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_pending_paseo_permission_can_be_allowed_from_the_run(
+    client, auth_headers, db_session, monkeypatch
+):
+    _project, _todo, _task, run = await _project_run(
+        db_session, status="waiting_input", external_run_id="paseo-agent-1"
+    )
+    adapter = FakePaseoAdapter()
+
+    async def no_op_execution(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(paseo_execution_service, "execute_run", no_op_execution)
+    state_names = ("paseo_adapter", "session_factory")
+    previous = {
+        name: getattr(app.state, name)
+        for name in state_names
+        if hasattr(app.state, name)
+    }
+    try:
+        app.state.paseo_adapter = adapter
+        app.state.session_factory = async_sessionmaker(
+            db_session.bind, class_=AsyncSession, expire_on_commit=False
+        )
+        response = await client.post(
+            f"/api/runs/{run.id}/permission",
+            headers=auth_headers,
+            json={"decision": "allow"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "running"
+        adapter.resolve_permissions.assert_awaited_once_with(
+            "paseo-agent-1", allow=True
+        )
+        event = (
+            await db_session.execute(
+                select(AgentRunEvent)
+                .where(AgentRunEvent.run_id == run.id)
+                .order_by(AgentRunEvent.sequence.desc())
+                .limit(1)
+            )
+        ).scalar_one()
+        assert event.event_type == "permission_allowed"
+    finally:
+        for name in state_names:
+            if name in previous:
+                setattr(app.state, name, previous[name])
+            elif hasattr(app.state, name):
+                delattr(app.state, name)
 
 
 @pytest.mark.asyncio
@@ -384,7 +438,9 @@ async def test_project_default_routes_todo_delegation_to_paseo(
     monkeypatch.setattr(paseo_execution_service, "execute_run", no_op_execution)
     state_names = ("paseo_adapter", "session_factory")
     previous = {
-        name: getattr(app.state, name) for name in state_names if hasattr(app.state, name)
+        name: getattr(app.state, name)
+        for name in state_names
+        if hasattr(app.state, name)
     }
     app.state.paseo_adapter = FakePaseoAdapter()
     app.state.session_factory = async_sessionmaker(

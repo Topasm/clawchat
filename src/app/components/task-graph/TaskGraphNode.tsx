@@ -17,7 +17,6 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
     proposalSelection,
     onToggleCollapse,
   } = data;
-  const priority = todo.priority ?? 'medium';
   const contextLabel = todo.project_label || todo.tags?.[0];
   const dueLabel = todo.due_date ? formatDueDate(todo.due_date) : null;
   const isAtRisk =
@@ -46,7 +45,6 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
       aria-label={`${todo.title}, ${status.replace('_', ' ')}${insightLabels.length ? `, ${insightLabels.join(', ')}` : ''}`}
     >
       <Handle type="target" position={Position.Left} className="cc-task-flow-node__handle" />
-      <span className={`cc-task-flow-node__priority cc-task-flow-node__priority--${priority}`} />
       <div className="cc-task-flow-node__topline">
         <span className={`cc-task-flow-node__status cc-task-flow-node__status--${status}`}>
           {status === 'in_progress'
@@ -133,18 +131,12 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
             {translateUi(' dependencies')}
           </span>
         )}
-        {childCount === 0 && !dueLabel && dependencyCount === 0 && (
-          <span>
-            {priority}
-            {translateUi(' priority')}
-          </span>
-        )}
       </div>
 
       {hasVisibleChildren && !proposalSelection && (
         <button
           type="button"
-          className="cc-task-flow-node__collapse nodrag nopan"
+          className={`cc-task-flow-node__collapse nodrag nopan${isCollapsed ? ' cc-task-flow-node__collapse--collapsed' : ''}`}
           onClick={(event) => {
             event.stopPropagation();
             onToggleCollapse(id);
@@ -157,6 +149,7 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
             size={16}
             style={{ transform: isCollapsed ? undefined : 'rotate(90deg)' }}
           />
+          {isCollapsed && <span>{childCount}</span>}
         </button>
       )}
       <Handle type="source" position={Position.Right} className="cc-task-flow-node__handle" />

@@ -84,12 +84,15 @@ class QuickAddActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val focusRequester = remember { FocusRequester() }
                 val keyboardController = LocalSoftwareKeyboardController.current
-
-                val submitTask: () -> Unit = {
-                    val request = QuickAddRequestFactory.create(
+                val request = remember(text, idempotencyKey) {
+                    QuickAddRequestFactory.create(
                         title = text,
                         idempotencyKey = idempotencyKey,
                     )
+                }
+                val hasInvalidDraft = text.isNotBlank() && request == null
+
+                val submitTask: () -> Unit = {
                     val expectedWorkspaceKey = runtimeState?.workspaceKey
                     if (!isSubmitting && request != null && expectedWorkspaceKey != null) {
                         isSubmitting = true
@@ -170,6 +173,12 @@ class QuickAddActivity : ComponentActivity() {
                                     imeAction = ImeAction.Done,
                                 ),
                                 keyboardActions = KeyboardActions(onDone = { submitTask() }),
+                                isError = hasInvalidDraft,
+                                supportingText = if (hasInvalidDraft) {
+                                    { Text(stringResource(R.string.quick_add_title_required)) }
+                                } else {
+                                    null
+                                },
                             )
 
                             Spacer(Modifier.height(8.dp))
@@ -188,7 +197,7 @@ class QuickAddActivity : ComponentActivity() {
                                 Spacer(Modifier.width(8.dp))
                                 FilledTonalButton(
                                     onClick = submitTask,
-                                    enabled = text.isNotBlank() &&
+                                    enabled = request != null &&
                                         !isSubmitting &&
                                         runtimeState?.workspaceKey != null,
                                     shape = RoundedCornerShape(6.dp),

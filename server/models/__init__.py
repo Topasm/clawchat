@@ -1,5 +1,6 @@
 from models.conversation import Conversation  # noqa: F401
 from models.project import Project  # noqa: F401
+from models.execution_host import ExecutionHost, ProjectHostPath  # noqa: F401
 from models.review_item import ReviewItem  # noqa: F401
 from models.artifact import Artifact, ArtifactRevision  # noqa: F401
 from models.message import Message  # noqa: F401
@@ -16,6 +17,7 @@ from models.agent_run import AgentRun, AgentRunEvent  # noqa: F401
 from models.task_placement_change import TaskPlacementChange  # noqa: F401
 from models.user_settings import UserSettings  # noqa: F401
 from models.attachment import Attachment  # noqa: F401
+from models.task_comment import TaskComment  # noqa: F401
 from models.paired_device import PairedDevice, PairingSession  # noqa: F401
 from models.host_identity import HostIdentity  # noqa: F401
 from models.refresh_session import RefreshSession  # noqa: F401

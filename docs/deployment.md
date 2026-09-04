@@ -97,8 +97,8 @@ To reuse an existing local Codex login without storing an API key in ClawChat:
 ```bash
 codex login
 AI_PROVIDER=codex_cli
-# Optional; empty uses ~/.codex/config.toml
-CODEX_CLI_MODEL=
+# Defaults to the cheaper Luna tier; empty uses ~/.codex/config.toml
+CODEX_CLI_MODEL=gpt-5.6-luna
 ```
 
 ClawChat runs `codex exec` non-interactively with a read-only sandbox, disabled
@@ -121,12 +121,15 @@ is not included in the Docker image.
 | `AI_BASE_URL` | `http://localhost:11434` | AI provider API base URL |
 | `AI_API_KEY` | *(empty)* | Optional bearer token for the OpenAI-compatible gateway |
 | `AI_MODEL` | `llama3.2` | Model name to use |
+| `AI_PROVIDER_FALLBACK` | `true` | Activate another ready provider when the configured one is unreachable |
+| `AI_PROVIDER_FILE` | *(empty)* | File remembering the provider picked in the app; overrides `AI_PROVIDER` |
 | `CODEX_API_BASE_URL` | `https://api.openai.com/v1` | OpenAI Responses API base URL |
 | `CODEX_API_KEY` | *(empty)* | OpenAI API key for Codex; falls back to `OPENAI_API_KEY` |
 | `CODEX_API_KEY_FILE` | *(empty)* | Optional owner-only file used to persist the Codex API key |
 | `CODEX_MODEL` | `gpt-5.3-codex` | Codex model used for chat, planning, and tool calls |
 | `CODEX_REASONING_EFFORT` | `medium` | Codex reasoning effort: `low`, `medium`, `high`, or `xhigh` |
-| `CODEX_CLI_MODEL` | *(empty)* | Optional Codex CLI model; empty uses the CLI config default |
+| `CODEX_CLI_MODEL` | `gpt-5.6-luna` | Codex CLI model; empty uses the CLI config default |
+| `CLAUDE_CODE_MODEL` | `sonnet` | Model alias passed to `claude --model`; empty uses the CLI default |
 | `PASEO_ENABLED` | `false` | Enable the optional Paseo execution adapter |
 | `PASEO_CLI_COMMAND` | `paseo` | Official Paseo CLI command available to the server process |
 | `PASEO_HOST` | *(empty)* | Optional daemon target; supports host:port or an E2EE offer URL |

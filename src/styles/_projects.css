@@ -45,6 +45,41 @@
   justify-content: flex-end;
 }
 
+/* Folder + machine: a path input beside its picker, and a machine chooser. */
+.cc-project-form__field select {
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 400;
+}
+.cc-project-form__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cc-project-form__row input {
+  flex: 1;
+  min-width: 0;
+}
+.cc-project-form__hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--cc-text-tertiary);
+}
+.cc-project-form__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--cc-text);
+}
+
 .cc-projects-grid {
   display: flex;
   flex-direction: column;
@@ -52,6 +87,81 @@
   margin-bottom: 24px;
   border-top: 1px solid var(--cc-border-subtle);
   border-bottom: 1px solid var(--cc-border-subtle);
+}
+
+/* Which machine a project's work runs on, and whether it is reachable now. */
+.cc-project-card__host {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--cc-text-secondary);
+}
+.cc-project-card__host-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cc-text-tertiary);
+}
+.cc-project-card__host--online .cc-project-card__host-dot,
+.cc-project-workspace__machine--online .cc-project-card__host-dot {
+  background: var(--cc-success);
+}
+.cc-project-card__host--offline .cc-project-card__host-dot,
+.cc-project-workspace__machine--offline .cc-project-card__host-dot {
+  background: var(--cc-text-tertiary);
+}
+.cc-project-workspace__identity-column {
+  flex: 1;
+  min-width: 0;
+}
+.cc-project-workspace__machine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--cc-text-secondary);
+}
+.cc-project-workspace__machine--unset {
+  color: var(--cc-text-tertiary);
+}
+.cc-project-workspace__machine-action {
+  margin-left: 2px;
+  font-size: 11px;
+}
+
+/* The card is a button; its delete control must sit beside it, not inside. */
+.cc-project-card-wrap {
+  position: relative;
+}
+
+.cc-project-card__delete {
+  position: absolute;
+  top: 12px;
+  right: 34px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  background: transparent;
+  color: var(--cc-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.cc-project-card-wrap:hover .cc-project-card__delete,
+.cc-project-card-wrap:focus-within .cc-project-card__delete {
+  opacity: 1;
+}
+
+.cc-project-card__delete:hover {
+  color: var(--cc-error);
+  background: color-mix(in srgb, var(--cc-error) 10%, transparent);
 }
 
 .cc-project-card {
@@ -183,6 +293,42 @@
   color: var(--cc-text-secondary);
   font-size: 13px;
 }
+.cc-project-workspace__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cc-project-workspace__title-row .cc-icon-button {
+  opacity: 0.5;
+}
+.cc-project-workspace__title-row:hover .cc-icon-button,
+.cc-project-workspace__title-row .cc-icon-button:focus-visible {
+  opacity: 1;
+}
+.cc-project-identity-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cc-project-identity-form__title,
+.cc-project-identity-form__goal {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+}
+.cc-project-identity-form__title {
+  font-size: 20px;
+  font-weight: 600;
+}
+.cc-project-identity-form__actions {
+  display: flex;
+  gap: 6px;
+}
 .cc-project-workspace__status {
   color: var(--cc-primary);
   font-size: 10px;
@@ -213,6 +359,211 @@
   font-weight: 600;
 }
 
+.cc-project-ready,
+.cc-project-settings-disclosure {
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
+}
+
+.cc-project-ready__list,
+.cc-project-activity__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.cc-project-ready__item,
+.cc-project-activity__list > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  background: transparent;
+  color: var(--cc-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-project-ready__item:last-child,
+.cc-project-activity__list > button:last-child {
+  border-bottom: 0;
+}
+
+.cc-project-ready__item:hover,
+.cc-project-activity__list > button:hover {
+  background: var(--cc-surface-secondary);
+}
+
+.cc-project-ready__item > span:last-child,
+.cc-project-activity__list > button > span:last-child {
+  color: var(--cc-primary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cc-project-ready__empty {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
+.cc-project-outline {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.cc-project-outline__row {
+  display: flex;
+  align-items: stretch;
+}
+
+.cc-project-outline__row--selected {
+  background: var(--cc-primary-light);
+}
+
+.cc-project-outline__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--cc-text-tertiary);
+  cursor: pointer;
+}
+
+.cc-project-outline__toggle:disabled {
+  cursor: default;
+}
+
+.cc-project-outline__task {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 16px 9px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  background: transparent;
+  color: var(--cc-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-project-outline__copy,
+.cc-project-activity__list > button > span:first-child {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-project-outline__copy strong,
+.cc-project-activity__list strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-project-outline__copy small,
+.cc-project-activity__list small {
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+}
+
+.cc-project-outline__badge {
+  color: var(--cc-success);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cc-project-outline__badge--blocked {
+  color: var(--cc-warning);
+}
+
+.cc-project-task-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cc-border);
+  background: var(--cc-surface-secondary);
+}
+
+.cc-project-task-actions > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-project-task-actions small {
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.cc-project-task-actions strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-project-task-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cc-project-plan .cc-task-flow {
+  border: 0;
+  border-radius: 0;
+}
+
+.cc-project-plan__view-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cc-project-plan__empty {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+}
+
+.cc-project-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cc-project-settings-disclosure > summary {
+  padding: 12px 16px;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cc-project-settings-disclosure > *:not(summary) {
+  margin: 0 16px 16px;
+}
+
 /* --- Mobile ----------------------------------------------- */
 
 @media (max-width: 768px) {
@@ -227,6 +578,15 @@
   .cc-project-workspace__header .cc-btn {
     font-size: 0;
     padding: 9px;
+  }
+
+  .cc-project-task-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cc-project-task-actions__buttons {
+    width: 100%;
   }
 
   .cc-project-card {

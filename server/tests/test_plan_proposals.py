@@ -87,6 +87,44 @@ def _apply_body(proposal: PlanProposal, **updates) -> dict:
 
 
 @pytest.mark.asyncio
+async def test_gets_exact_proposal_only_from_its_task(client, auth_headers, db_session):
+    root = await _create_root(db_session)
+    proposal = await _create_proposal(
+        db_session,
+        root,
+        {"summary": "Exact", "subtasks": [{"title": "One step"}]},
+    )
+    other = Todo(id="todo_other", title="Other task")
+    generating = PlanProposal(
+        id="proposal_generating",
+        root_task_id=root.id,
+        base_graph_revision=proposal.base_graph_revision,
+        status=PlanProposalStatus.GENERATING,
+    )
+    db_session.add_all([other, generating])
+    await db_session.commit()
+
+    response = await client.get(
+        f"/api/todos/{root.id}/plan/proposals/{proposal.id}",
+        headers=auth_headers,
+    )
+    wrong_task = await client.get(
+        f"/api/todos/{other.id}/plan/proposals/{proposal.id}",
+        headers=auth_headers,
+    )
+    in_progress = await client.get(
+        f"/api/todos/{root.id}/plan/proposals/{generating.id}",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["proposal_id"] == proposal.id
+    assert wrong_task.status_code == 404
+    assert in_progress.status_code == 200
+    assert in_progress.json()["status"] == "generating"
+
+
+@pytest.mark.asyncio
 async def test_apply_uses_exact_proposal_instead_of_latest(
     client, auth_headers, db_session
 ):

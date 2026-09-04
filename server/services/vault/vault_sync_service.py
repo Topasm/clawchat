@@ -14,6 +14,7 @@ from domain.plan_proposal import (
 )
 from models.change_set import ChangeSet
 from models.task_graph_state import TaskGraphState
+from models.project import Project
 from models.todo import Todo
 from models.vault_sync_job import VaultSyncJob
 from sqlalchemy import and_, or_, select, update
@@ -191,15 +192,29 @@ async def _load_reconciliation_snapshot(
         else []
     )
     parent_by_id = {todo.id: todo for todo in parent_rows}
+    project_ids = {todo.project_id for todo in todo_rows if todo.project_id}
+    project_rows = (
+        (
+            await db.execute(
+                select(Project.id, Project.title).where(Project.id.in_(project_ids))
+            )
+        ).all()
+        if project_ids
+        else []
+    )
+    project_names = dict(project_rows)
     items = [
         (
             todo,
-            (
-                parent_by_id[todo.parent_id].source_id
-                or parent_by_id[todo.parent_id].title
-            )
-            if todo.parent_id in parent_by_id
-            else None,
+            project_names.get(todo.project_id)
+            or (
+                (
+                    parent_by_id[todo.parent_id].source_id
+                    or parent_by_id[todo.parent_id].title
+                )
+                if todo.parent_id in parent_by_id
+                else None
+            ),
         )
         for todo in todo_rows
     ]

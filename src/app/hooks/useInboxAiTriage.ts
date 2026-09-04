@@ -18,7 +18,7 @@ export interface InboxAiTriage {
   isSuggesting: boolean;
   isApplying: boolean;
   requestPreview: () => Promise<void>;
-  applyPreview: () => Promise<void>;
+  applyPreview: () => Promise<string | null>;
   toggleSuggestion: (taskId: string) => void;
   dismissPreview: () => void;
 }
@@ -87,15 +87,17 @@ export default function useInboxAiTriage({
     }
   };
   const applyPreview = async () => {
-    if (!triagePreview) return;
+    if (!triagePreview) return null;
     const selected = new Set(selectedTriageTaskIds);
     const suggestions = triagePreview.suggestions.filter((suggestion) =>
       selected.has(suggestion.task_id),
     );
     if (suggestions.length === 0) {
       addToast('warning', translateUi('Select at least one suggestion to apply'));
-      return;
+      return null;
     }
+    const projectIds = new Set(suggestions.map((suggestion) => suggestion.project_id));
+    const singleProjectId = projectIds.size === 1 ? [...projectIds][0] : null;
     let groups;
     try {
       groups = buildInboxTriagePlacementGroups(triagePreview, selectedTriageTaskIds);
@@ -104,7 +106,7 @@ export default function useInboxAiTriage({
         'error',
         error instanceof Error ? error.message : translateUi('The placement preview is invalid'),
       );
-      return;
+      return null;
     }
     try {
       const result = await placeGroupsMutation.mutateAsync({
@@ -140,6 +142,7 @@ export default function useInboxAiTriage({
           },
         },
       );
+      return singleProjectId;
     } catch (error) {
       addToast(
         'error',
@@ -150,6 +153,7 @@ export default function useInboxAiTriage({
         setSelectedTriageTaskIds([]);
         await refreshPlacementRevision();
       }
+      return null;
     }
   };
   return {

@@ -142,6 +142,7 @@ pub fn run() {
             commands::app::app_show_notification,
             commands::app::app_set_badge_count,
             commands::app::app_open_camera_settings,
+            commands::app::app_open_canonical_document,
             commands::app::app_set_workspace_view_mode,
             commands::app::secure_storage_get,
             commands::app::secure_storage_set,
@@ -149,6 +150,8 @@ pub fn run() {
             commands::app::updater_check,
             commands::app::updater_download,
             commands::app::updater_install,
+            commands::worker::worker_run,
+            commands::worker::worker_read_context,
         ])
         .build(tauri::generate_context!());
 

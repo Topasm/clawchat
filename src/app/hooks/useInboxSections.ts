@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import type { TodoResponse } from '../types/api';
+import { isInboxTodo } from '../utils/inboxState';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
 
 export interface InboxSections {
@@ -45,13 +46,7 @@ export default function useInboxSections(todos: TodoResponse[]): InboxSections {
         planReady.push(todo);
       } else if (todo.inbox_state === 'error') {
         errors.push(todo);
-      } else if (
-        todo.inbox_state === 'captured' ||
-        ((!todo.inbox_state || todo.inbox_state === 'none') &&
-          !todo.project_id &&
-          !todo.due_date &&
-          !todo.parent_id)
-      ) {
+      } else if (todo.inbox_state === 'captured' || isInboxTodo(todo)) {
         needsOrganising.push(todo);
       }
     }

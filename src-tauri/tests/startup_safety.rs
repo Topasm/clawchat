@@ -7,6 +7,7 @@ const NATIVE_TRAY_SOURCE: &str = include_str!("../src/native/tray.rs");
 const NATIVE_WINDOW_SOURCE: &str = include_str!("../src/native/window.rs");
 const APP_COMMAND_SOURCE: &str = include_str!("../src/commands/app.rs");
 const SERVER_COMMAND_SOURCE: &str = include_str!("../src/commands/server.rs");
+const INFO_PLIST: &str = include_str!("../Info.plist");
 
 #[test]
 fn optional_native_integrations_do_not_fail_application_setup() {
@@ -127,4 +128,11 @@ fn macos_menu_and_tray_expose_recovery_safe_application_commands() {
     assert!(NATIVE_COMMAND_SOURCE.contains("pub(super) enum AppMenuCommand"));
     assert!(NATIVE_COMMAND_SOURCE.contains("pub(super) enum TrayMenuCommand"));
     assert!(NATIVE_TRAY_SOURCE.contains("TrayMenuCommand::Settings"));
+}
+
+#[test]
+fn macos_webview_can_connect_to_user_configured_http_workspaces() {
+    assert!(INFO_PLIST.contains("<key>NSAppTransportSecurity</key>"));
+    assert!(INFO_PLIST.contains("<key>NSAllowsArbitraryLoadsInWebContent</key>"));
+    assert!(!INFO_PLIST.contains("<key>NSAllowsArbitraryLoads</key>"));
 }

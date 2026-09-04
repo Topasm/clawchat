@@ -7,10 +7,11 @@ from unittest.mock import AsyncMock
 import pytest
 
 from database import _backfill_agent_runs
-from domain.review import ReviewSubjectType
+from domain.review import ReviewStatus, ReviewSubjectType
 from main import app
 from models.agent_run import AgentRun, AgentRunEvent
 from models.agent_task import AgentTask
+from models.artifact import Artifact
 from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
@@ -72,16 +73,33 @@ async def test_execution_creates_reviewable_run_and_approval_adopts_it(
     assert run.status == "waiting_review"
     assert run.result == "Result for Research the execution model"
     assert run.project_id == project.id
-    events = list((await db_session.execute(select(AgentRunEvent).where(
-        AgentRunEvent.run_id == run.id
-    ).order_by(AgentRunEvent.sequence))).scalars().all())
+    events = list(
+        (
+            await db_session.execute(
+                select(AgentRunEvent)
+                .where(AgentRunEvent.run_id == run.id)
+                .order_by(AgentRunEvent.sequence)
+            )
+        )
+        .scalars()
+        .all()
+    )
     assert [event.event_type for event in events] == [
-        "queued", "starting", "running", "progress", "progress", "waiting_review"
+        "queued",
+        "starting",
+        "running",
+        "progress",
+        "progress",
+        "waiting_review",
     ]
-    review = (await db_session.execute(select(ReviewItem).where(
-        ReviewItem.subject_type == ReviewSubjectType.AGENT_RUN,
-        ReviewItem.subject_id == run.id,
-    ))).scalar_one()
+    review = (
+        await db_session.execute(
+            select(ReviewItem).where(
+                ReviewItem.subject_type == ReviewSubjectType.AGENT_RUN,
+                ReviewItem.subject_id == run.id,
+            )
+        )
+    ).scalar_one()
     assert review.status == "pending"
 
     response = await client.post(
@@ -96,6 +114,51 @@ async def test_execution_creates_reviewable_run_and_approval_adopts_it(
     todo = await db_session.get(Todo, task.todo_id)
     await db_session.refresh(todo)
     assert todo.status == "completed"
+    report = (
+        await db_session.execute(
+            select(Artifact).where(
+                Artifact.created_by == run.id,
+                Artifact.type == "report",
+            )
+        )
+    ).scalar_one()
+    assert report.task_id == todo.id
+    assert report.content == run.result
+
+
+@pytest.mark.asyncio
+async def test_experiment_run_approval_seals_report_without_completing_todo(db_session):
+    project, todo, task = await create_project_task(db_session)
+    todo.tags = '["exp/E65a", "repo/srp"]'
+    todo.status = "in_progress"
+    run = await agent_run_service.create_run(
+        db_session,
+        task,
+        provider="openclaw",
+        model="fake-model",
+    )
+    run.status = "waiting_review"
+    run.result = "E65a observed result"
+    await db_session.flush()
+
+    outcome = await agent_run_service.decide_run(
+        db_session,
+        run.id,
+        ReviewStatus.APPROVED,
+    )
+
+    await db_session.refresh(todo)
+    assert todo.status == "in_progress"
+    assert outcome.todo_status == "in_progress"
+    report = (
+        await db_session.execute(
+            select(Artifact).where(
+                Artifact.created_by == run.id,
+                Artifact.type == "report",
+            )
+        )
+    ).scalar_one()
+    assert report.content == "E65a observed result"
 
 
 @pytest.mark.asyncio
@@ -171,9 +234,7 @@ async def test_cancel_endpoint_stops_registered_execution(
             cancelled.set()
 
     agent_run_service.launch_execution(run.id, worker())
-    response = await client.post(
-        f"/api/runs/{run.id}/cancel", headers=auth_headers
-    )
+    response = await client.post(f"/api/runs/{run.id}/cancel", headers=auth_headers)
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "cancelled"
     await asyncio.wait_for(cancelled.wait(), timeout=1)
@@ -199,9 +260,15 @@ async def test_legacy_agent_run_backfill_is_idempotent(db_session):
     await _backfill_agent_runs(db_session)
     await db_session.commit()
 
-    runs = list((await db_session.execute(select(AgentRun).where(
-        AgentRun.agent_task_id == task.id
-    ))).scalars().all())
+    runs = list(
+        (
+            await db_session.execute(
+                select(AgentRun).where(AgentRun.agent_task_id == task.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
     assert len(runs) == 1
     assert runs[0].provider == "legacy"
     assert runs[0].is_adopted is True
@@ -222,7 +289,9 @@ async def test_retry_endpoint_creates_and_executes_next_attempt(
     await db_session.commit()
     state_names = ("active_ai", "active_ai_provider", "session_factory")
     previous = {
-        name: getattr(app.state, name) for name in state_names if hasattr(app.state, name)
+        name: getattr(app.state, name)
+        for name in state_names
+        if hasattr(app.state, name)
     }
     try:
         app.state.active_ai = FakeAI()

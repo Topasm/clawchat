@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -39,7 +41,6 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
@@ -52,7 +53,7 @@ import com.clawchat.android.core.ui.localizedErrorMessage
 fun InboxScreen(
     viewModel: InboxViewModel = hiltViewModel(),
     onTaskClick: (String) -> Unit = {},
-    onOpenNavigation: () -> Unit = {},
+    onBack: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
@@ -69,7 +70,12 @@ fun InboxScreen(
                     )
                 },
                 navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.inbox_back),
+                        )
+                    }
                 },
                 colors = ClawTopBarColors(),
             )

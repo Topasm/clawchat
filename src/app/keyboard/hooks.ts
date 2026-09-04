@@ -63,7 +63,7 @@ export function useNavigationShortcuts() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useHotkeys('g+t', () => navigate('/today'), { enableOnFormTags: false });
+  useHotkeys('g+t', () => navigate('/schedule/today'), { enableOnFormTags: false });
   useHotkeys('g+i', () => navigate('/inbox'), { enableOnFormTags: false });
   useHotkeys('g+c', () => navigate('/chats'), { enableOnFormTags: false });
   useHotkeys('g+a', () => navigate('/tasks'), { enableOnFormTags: false });

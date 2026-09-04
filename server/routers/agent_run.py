@@ -5,17 +5,19 @@ from datetime import datetime, timezone
 from auth.dependencies import get_current_user
 from database import get_db
 from domain.agent_run import AgentRunStatus
-from domain.review import ReviewStatus, ReviewSubjectType
 from exceptions import ConflictError, NotFoundError
 from fastapi import APIRouter, Depends, Query, Request
 from models.agent_run import AgentRun
 from models.agent_task import AgentTask
+from models.execution_host import ExecutionHost
 from schemas.agent_run import (
     AgentRunDetailResponse,
     AgentRunEventResponse,
     AgentRunHeartbeatRequest,
+    AgentRunPermissionRequest,
     AgentRunRecoveryResponse,
     AgentRunResponse,
+    AgentRunResultRequest,
     AgentRunResumeRequest,
     AgentRunRetryRequest,
     AgentRunTransitionRequest,
@@ -23,11 +25,10 @@ from schemas.agent_run import (
 from services.agents import (
     agent_run_service,
     agent_task_service,
+    execution_host_service,
     paseo_execution_service,
+    run_resume_service,
     task_execution_recovery_service,
-)
-from services.review import (
-    review_item_service,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from ws.manager import ws_manager
@@ -74,13 +75,7 @@ async def get_run_events(
 
 
 def _active_provider(request: Request) -> tuple[str, object, str | None]:
-    provider = getattr(request.app.state, "active_ai_provider", "openclaw")
-    ai = getattr(request.app.state, "active_ai", None) or getattr(
-        request.app.state, "ai_service", None
-    )
-    if ai is None:
-        raise ConflictError("No execution provider is available")
-    return provider, ai, getattr(ai, "model", None)
+    return run_resume_service.active_provider(request.app.state)
 
 
 @router.post("/{run_id}/retry", response_model=AgentRunResponse, status_code=201)
@@ -108,7 +103,6 @@ async def retry_run(
         instruction = (
             f"{instruction}\n\nFollow-up instruction:\n{body.follow_up_instruction.strip()}"
         )
-        task.instruction = instruction
     if provider == "paseo":
         paseo_adapter = getattr(request.app.state, "paseo_adapter", None) or (
             paseo_execution_service.adapter_from_settings()
@@ -196,86 +190,72 @@ async def resume_run(
     user_id: str = Depends(get_current_user),
 ):
     run = await agent_run_service.require_run(db, run_id)
-    if run.status != AgentRunStatus.WAITING_INPUT:
-        raise ConflictError(f"Agent run cannot be resumed from {run.status}")
     task = await db.get(AgentTask, run.agent_task_id)
     if task is None:
         raise NotFoundError("Agent task not found")
-    follow_up = body.follow_up_instruction.strip()
-    run.instruction_snapshot = (
-        f"{run.instruction_snapshot}\n\nFollow-up instruction:\n{follow_up}"
-    )
-    run.status = AgentRunStatus.STARTING
-    run.progress = 0
-    run.progress_message = "Resuming with follow-up instruction"
-    run.result = None
-    run.result_summary = None
-    run.error = None
-    run.completed_at = None
-    run.heartbeat_at = datetime.now(timezone.utc)
-    task.instruction = run.instruction_snapshot
-    task.status = "queued"
-    task.result = None
-    task.error = None
-    task.progress = 0
-    task.completed_at = None
-    await review_item_service.set_subject_review_status(
+    await run_resume_service.resume_with_follow_up(
         db,
-        ReviewSubjectType.AGENT_RUN,
-        run.id,
-        ReviewStatus.EXPIRED,
+        request.app.state,
+        run,
+        task,
+        body.follow_up_instruction,
+        user_id=user_id,
     )
-    await agent_run_service.record_event(
-        db, run, "resuming", "Resuming with follow-up instruction", progress=0
-    )
-    await db.commit()
-    session_factory = request.app.state.session_factory
-
-    if run.provider == "paseo":
-        paseo_adapter = getattr(request.app.state, "paseo_adapter", None) or (
-            paseo_execution_service.adapter_from_settings()
-        )
-        agent_run_service.launch_execution(
-            run.id,
-            paseo_execution_service.resume_external_run(
-                session_factory,
-                run.id,
-                follow_up,
-                user_id=user_id,
-                adapter=paseo_adapter,
-            ),
-        )
-        await notify_module_data_changed("runs")
-        await notify_module_data_changed("reviews")
-        return await agent_run_service.build_run_response(db, run)
-
-    provider, ai_service, model = _active_provider(request)
-    if run.provider != provider:
-        raise ConflictError(
-            f"Run provider {run.provider!r} is unavailable; active provider is {provider!r}"
-        )
-
-    async def execute() -> None:
-        async with session_factory() as run_db:
-            persisted_task = await run_db.get(AgentTask, task.id)
-            persisted_run = await run_db.get(AgentRun, run.id)
-            if persisted_task is None or persisted_run is None:
-                return
-            await agent_task_service.execute_task(
-                run_db,
-                persisted_task,
-                ai_service,
-                ws_manager,
-                user_id,
-                session_factory=session_factory,
-                run=persisted_run,
-                provider=provider,
-                model=model,
-            )
-
-    agent_run_service.launch_execution(run.id, execute())
     await notify_module_data_changed("runs")
     await notify_module_data_changed("reviews")
+    return await agent_run_service.build_run_response(db, run)
+
+
+@router.post("/{run_id}/permission", response_model=AgentRunResponse)
+async def resolve_run_permission(
+    run_id: str,
+    body: AgentRunPermissionRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """Allow or deny the permissions blocking a Paseo-backed run."""
+    run = await agent_run_service.require_run_for_update(db, run_id)
+    if (
+        run.provider != "paseo"
+        or run.status != AgentRunStatus.WAITING_INPUT
+        or not run.external_run_id
+    ):
+        raise ConflictError("This run has no pending Paseo permission")
+    adapter = getattr(request.app.state, "paseo_adapter", None) or (
+        paseo_execution_service.adapter_from_settings()
+    )
+    await adapter.resolve_permissions(
+        run.external_run_id, allow=body.decision == "allow"
+    )
+    task = await db.get(AgentTask, run.agent_task_id)
+    if task is None:
+        raise NotFoundError("Agent task not found")
+    decision_past = "allowed" if body.decision == "allow" else "denied"
+    run.status = AgentRunStatus.RUNNING
+    run.progress_message = f"Paseo permission {decision_past}"
+    run.heartbeat_at = datetime.now(timezone.utc)
+    task.status = "running"
+    task.progress_message = run.progress_message
+    await agent_run_service.record_event(
+        db,
+        run,
+        f"permission_{decision_past}",
+        run.progress_message,
+        progress=run.progress,
+    )
+    await agent_run_service.notify_run_state(db, run, task, user_id=user_id)
+    await db.commit()
+    agent_run_service.launch_execution(
+        run.id,
+        paseo_execution_service.execute_run(
+            request.app.state.session_factory,
+            run.id,
+            user_id=user_id,
+            adapter=adapter,
+        ),
+    )
+    await notify_module_data_changed("runs")
     return await agent_run_service.build_run_response(db, run)
 
 
@@ -325,6 +305,43 @@ async def return_run_task_to_ready(
     return result
 
 
+@router.post("/{run_id}/result", response_model=AgentRunResponse)
+async def report_run_result(
+    run_id: str,
+    body: AgentRunResultRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Finish a run executed elsewhere.
+
+    A worker runs the CLI on its own machine and reports the outcome here, so
+    the result lands in the same review flow as work the server ran itself.
+    """
+    run = await agent_run_service.require_run_for_update(db, run_id)
+    if run.status not in {AgentRunStatus.STARTING, AgentRunStatus.RUNNING}:
+        raise ConflictError(f"Agent run cannot report a result from {run.status}")
+    task = await db.get(AgentTask, run.agent_task_id)
+    if task is None:
+        raise NotFoundError("Agent task not found")
+    if body.error:
+        task.status = "failed"
+        task.result = None
+        task.error = body.error
+        task.completed_at = datetime.now(timezone.utc)
+        await agent_run_service.mark_failed(db, run, body.error)
+    else:
+        task.status = "completed"
+        task.result = body.result or ""
+        task.error = None
+        task.progress = 100
+        task.completed_at = datetime.now(timezone.utc)
+        await agent_run_service.mark_waiting_review(db, run, task, body.result or "")
+    await db.commit()
+    await notify_module_data_changed("runs")
+    await notify_module_data_changed("todos")
+    return await agent_run_service.build_run_response(db, run)
+
+
 @router.post("/{run_id}/transition", response_model=AgentRunResponse)
 async def transition_run(
     run_id: str,
@@ -332,7 +349,7 @@ async def transition_run(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    run = await agent_run_service.require_run(db, run_id)
+    run = await agent_run_service.require_run_for_update(db, run_id)
     await agent_run_service.transition_run(db, run, body.status, body.message)
     await db.commit()
     await notify_module_data_changed("runs")
@@ -346,7 +363,7 @@ async def heartbeat_run(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    run = await agent_run_service.require_run(db, run_id)
+    run = await agent_run_service.require_run_for_update(db, run_id)
     if run.status not in {
         AgentRunStatus.STARTING,
         AgentRunStatus.RUNNING,
@@ -354,6 +371,10 @@ async def heartbeat_run(
     }:
         raise ConflictError(f"Agent run cannot heartbeat from {run.status}")
     run.heartbeat_at = datetime.now(timezone.utc)
+    if run.execution_host_id:
+        host = await db.get(ExecutionHost, run.execution_host_id)
+        if host is not None:
+            await execution_host_service.record_heartbeat(db, host)
     if body.progress is not None:
         run.progress = body.progress
     if body.message is not None:

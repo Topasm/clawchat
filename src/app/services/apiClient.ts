@@ -9,7 +9,7 @@ declare module 'axios' {
   // `apiClient.post` accept the ClawChat-specific transport option.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
   interface AxiosRequestConfig<D = any, P = any> {
-    /** Set to false for mutations that must fail closed while offline. */
+    /** Opt in only for JSON mutations that are safe to replay after reconnecting. */
     queueOfflineMutation?: boolean;
   }
 }
@@ -94,9 +94,11 @@ apiClient.interceptors.response.use(
         }
       }
       const method = (originalRequest.method ?? 'get').toUpperCase();
-      // For mutations: enqueue and return a stub so optimistic state stays
+      // Offline replay is deliberately opt-in. Command endpoints, destructive
+      // admin actions, and binary bodies must fail while disconnected instead
+      // of executing later without fresh user intent.
       if (method !== 'GET') {
-        if (originalRequest.queueOfflineMutation === false) {
+        if (originalRequest.queueOfflineMutation !== true) {
           return Promise.reject(error);
         }
         let body = originalRequest.data;
