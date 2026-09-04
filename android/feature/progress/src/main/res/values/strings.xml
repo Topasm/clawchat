@@ -31,8 +31,11 @@
     <string name="progress_processing">%1$d processing</string>
     <string name="progress_active_title">In progress</string>
     <string name="progress_active_description">Agent executions and work currently moving.</string>
-    <string name="progress_recent_title">Recently finished</string>
-    <string name="progress_recent_description">Latest completed tasks and terminal agent runs.</string>
+    <string name="progress_threads_title">Updates</string>
+    <string name="progress_threads_description">Leave a note on what\'s in progress.</string>
+    <string name="progress_threads_empty">No updates yet</string>
+    <string name="progress_threads_hint">Add an update…</string>
+    <string name="progress_threads_send">Post update</string>
 
     <string name="progress_task_state">Task state</string>
     <string name="progress_task_sync_pending">Sync waiting</string>

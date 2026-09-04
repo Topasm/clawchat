@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -58,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.ReviewRiskLevel
+import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.QuickCaptureParser
 import com.clawchat.android.core.ui.ClawEmptyState
@@ -68,6 +70,11 @@ import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.localizedErrorMessage
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.delay
 
 private const val ACTIVE_POLL_INTERVAL_MS = 3_000L
@@ -117,6 +124,13 @@ fun ProgressScreen(
                 viewModel.undoCapture(captured)
             }
         }
+    }
+
+    val localizedCommentError = state.commentError?.let { localizedErrorMessage(it) }
+    LaunchedEffect(localizedCommentError) {
+        val message = localizedCommentError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearCommentError()
     }
 
     Scaffold(
@@ -177,6 +191,7 @@ fun ProgressScreen(
                     captureText = captureText,
                     onCaptureTextChange = { captureText = it },
                     onCapture = { viewModel.captureToInbox(captureText) },
+                    onSubmitComment = viewModel::addComment,
                 )
             }
         }
@@ -213,6 +228,7 @@ private fun ProgressContent(
     captureText: String,
     onCaptureTextChange: (String) -> Unit,
     onCapture: () -> Unit,
+    onSubmitComment: (todoId: String, text: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -349,18 +365,20 @@ private fun ProgressContent(
             }
         }
 
-        if (state.recentlyFinishedRuns.isNotEmpty() || state.recentlyCompletedTasks.isNotEmpty()) {
-            item(key = "recent_header") {
+        if (state.inProgressTasks.isNotEmpty()) {
+            item(key = "threads_header") {
                 ClawSectionHeader(
-                    title = stringResource(R.string.progress_recent_title),
-                    subtitle = stringResource(R.string.progress_recent_description),
+                    title = stringResource(R.string.progress_threads_title),
+                    subtitle = stringResource(R.string.progress_threads_description),
                 )
             }
-            items(state.recentlyFinishedRuns, key = { "recent-run:${it.id}" }) { run ->
-                AgentRunProgressRow(run = run, onClick = { onOpenRun(run.id) })
-            }
-            items(state.recentlyCompletedTasks, key = { "recent-task:${it.id}" }) { task ->
-                TaskProgressRow(task = task, onClick = { onOpenTask(task.id) })
+            items(state.inProgressTasks, key = { "thread:${it.id}" }) { task ->
+                TaskThreadCard(
+                    task = task,
+                    comments = state.commentsByTodoId[task.id].orEmpty(),
+                    onOpenTask = { onOpenTask(task.id) },
+                    onSubmitComment = { text -> onSubmitComment(task.id, text) },
+                )
             }
         }
     }
@@ -765,6 +783,107 @@ private fun TaskProgressRow(task: Todo, onClick: () -> Unit) {
             )
         }
     }
+}
+
+@Composable
+private fun TaskThreadCard(
+    task: Todo,
+    comments: List<TaskComment>,
+    onOpenTask: () -> Unit,
+    onSubmitComment: (String) -> Unit,
+) {
+    var draft by remember(task.id) { mutableStateOf("") }
+    ClawSectionCard {
+        ClawListItemSurface(onClick = onOpenTask) {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (comments.isEmpty()) {
+            Text(
+                text = stringResource(R.string.progress_threads_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                comments.forEach { comment -> CommentBubbleRow(comment) }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(stringResource(R.string.progress_threads_hint)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Send,
+                ),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (draft.isNotBlank()) {
+                            onSubmitComment(draft)
+                            draft = ""
+                        }
+                    },
+                ),
+            )
+            IconButton(
+                onClick = {
+                    if (draft.isNotBlank()) {
+                        onSubmitComment(draft)
+                        draft = ""
+                    }
+                },
+                enabled = draft.isNotBlank(),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = stringResource(R.string.progress_threads_send),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentBubbleRow(comment: TaskComment) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = formatCommentTime(comment.createdAt),
+            modifier = Modifier.width(88.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = comment.content,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+private fun formatCommentTime(value: String): String {
+    val zoned = runCatching {
+        OffsetDateTime.parse(value).atZoneSameInstant(ZoneId.systemDefault())
+    }.recoverCatching {
+        LocalDateTime.parse(value).atZone(ZoneId.systemDefault())
+    }.getOrNull()
+    val formatter = DateTimeFormatter.ofPattern("MMM d · h:mm a", Locale.getDefault())
+    return zoned?.format(formatter) ?: value
 }
 
 @Composable

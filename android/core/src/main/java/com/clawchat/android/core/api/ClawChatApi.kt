@@ -88,6 +88,26 @@ interface ClawChatApi {
         @Tag expectedScope: ExpectedSessionScope? = null,
     ): List<TaskRelationship>
 
+    // --- Task comments ---
+
+    @GET("api/task-comments")
+    suspend fun listTaskComments(
+        @Query("todo_ids") todoIds: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): List<TaskComment>
+
+    @POST("api/task-comments")
+    suspend fun createTaskComment(
+        @Body body: TaskCommentCreateRequest,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TaskComment
+
+    @DELETE("api/task-comments/{id}")
+    suspend fun deleteTaskComment(
+        @Path("id") id: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    )
+
     // --- Events ---
 
     @GET("api/events")

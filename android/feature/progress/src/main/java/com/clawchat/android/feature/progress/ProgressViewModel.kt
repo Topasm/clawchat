@@ -6,12 +6,14 @@ import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.ReviewItem
 import com.clawchat.android.core.data.model.QuickCaptureParser
+import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.ReviewRepository
+import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
@@ -45,6 +47,7 @@ data class ProgressUiState(
     val runs: List<AgentRun> = emptyList(),
     val reviews: List<ReviewItem> = emptyList(),
     val tasks: List<Todo> = emptyList(),
+    val commentsByTodoId: Map<String, List<TaskComment>> = emptyMap(),
     val isConnected: Boolean = false,
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -56,6 +59,7 @@ data class ProgressUiState(
     val actionError: String? = null,
     val isCapturing: Boolean = false,
     val captureError: String? = null,
+    val commentError: String? = null,
 ) {
     private val computedNowContent by lazy(LazyThreadSafetyMode.NONE) {
         buildNowContent(tasks, reviews, runs)
@@ -79,22 +83,6 @@ data class ProgressUiState(
             .filter { it.status == TaskStatus.IN_PROGRESS }
             .sortedWith(compareBy<Todo> { it.sortOrder }.thenByDescending { it.updatedAt })
 
-    val recentlyCompletedTasks: List<Todo>
-        get() = taskCandidates
-            .filter { it.status == TaskStatus.COMPLETED }
-            .sortedByDescending { it.completedAt ?: it.updatedAt }
-            .take(RECENT_LIMIT)
-
-    val recentlyFinishedRuns: List<AgentRun>
-        get() = runs
-            .filter { run ->
-                run.status.isTerminal && attentionItems.none {
-                    it.source == NowSource.AGENT_RUN && it.sourceId == run.id
-                }
-            }
-            .sortedByDescending(AgentRun::updatedAt)
-            .take(RECENT_LIMIT)
-
     val attentionCount: Int
         get() = nowContent.attentionItems.size
 
@@ -106,14 +94,12 @@ data class ProgressUiState(
 
     val hasAnyContent: Boolean
         get() = attentionCount > 0 || activeCount > 0 ||
-            recentlyCompletedTasks.isNotEmpty() || recentlyFinishedRuns.isNotEmpty() ||
             processingCount > 0 || pendingSyncCount > 0
 
     private val taskCandidates: List<Todo>
         get() = tasks.filter { it.inboxState == null || it.inboxState == "none" }
 
     private companion object {
-        const val RECENT_LIMIT = 5
         const val ATTENTION_LIMIT = 10
     }
 }
@@ -124,6 +110,7 @@ class ProgressViewModel @Inject constructor(
     private val agentRunRepository: AgentRunRepository,
     private val reviewRepository: ReviewRepository,
     private val todoRepository: TodoRepository,
+    private val taskCommentRepository: TaskCommentRepository,
     private val syncManager: SyncManager,
     private val sessionStore: SessionStore,
     private val pendingTodos: PendingTodoUpdateStore,
@@ -252,6 +239,30 @@ class ProgressViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun addComment(todoId: String, content: String) {
+        val trimmed = content.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            when (val result = taskCommentRepository.addComment(todoId, trimmed)) {
+                is ApiResult.Success -> {
+                    _uiState.update { state ->
+                        state.copy(
+                            commentsByTodoId = state.commentsByTodoId +
+                                (todoId to (state.commentsByTodoId[todoId].orEmpty() + result.data)),
+                            commentError = null,
+                        )
+                    }
+                }
+                is ApiResult.Error -> _uiState.update { it.copy(commentError = result.message) }
+                ApiResult.Loading -> _uiState.update { it.copy(commentError = ACTION_INCOMPLETE_ERROR) }
+            }
+        }
+    }
+
+    fun clearCommentError() {
+        _uiState.update { it.copy(commentError = null) }
     }
 
     fun fileTodo(item: NowItem, dueToday: Boolean) {
@@ -428,16 +439,30 @@ class ProgressViewModel @Inject constructor(
                     Triple(runs.await(), reviews.await(), tasks.await())
                 }
 
+                val tasks = (tasksResult as? ApiResult.Success)?.data?.items
+                    ?: _uiState.value.tasks
+                val inProgressIds = tasks
+                    .filter {
+                        it.status == TaskStatus.IN_PROGRESS &&
+                            (it.inboxState == null || it.inboxState == "none")
+                    }
+                    .map(Todo::id)
+                val commentsResult = taskCommentRepository.listForTodos(inProgressIds)
+
                 _uiState.update { state ->
                     val errors = buildList {
                         if (runsResult is ApiResult.Error) add(runsResult.message)
                         if (reviewsResult is ApiResult.Error) add(reviewsResult.message)
                         if (tasksResult is ApiResult.Error) add(tasksResult.message)
+                        if (commentsResult is ApiResult.Error) add(commentsResult.message)
                     }.distinct()
                     state.copy(
                         runs = (runsResult as? ApiResult.Success)?.data ?: state.runs,
                         reviews = (reviewsResult as? ApiResult.Success)?.data ?: state.reviews,
-                        tasks = (tasksResult as? ApiResult.Success)?.data?.items ?: state.tasks,
+                        tasks = tasks,
+                        commentsByTodoId = (commentsResult as? ApiResult.Success)?.data
+                            ?.groupBy(TaskComment::todoId)
+                            ?: state.commentsByTodoId,
                         isLoading = false,
                         isRefreshing = false,
                         errors = errors,
