@@ -54,6 +54,44 @@
   border-bottom: 1px solid var(--cc-border-subtle);
 }
 
+/* Which machine a project's work runs on, and whether it is reachable now. */
+.cc-project-card__host {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--cc-text-secondary);
+}
+.cc-project-card__host-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cc-text-tertiary);
+}
+.cc-project-card__host--online .cc-project-card__host-dot,
+.cc-project-workspace__machine--online .cc-project-card__host-dot {
+  background: var(--cc-success);
+}
+.cc-project-card__host--offline .cc-project-card__host-dot,
+.cc-project-workspace__machine--offline .cc-project-card__host-dot {
+  background: var(--cc-text-tertiary);
+}
+.cc-project-workspace__identity-column {
+  flex: 1;
+  min-width: 0;
+}
+.cc-project-workspace__machine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--cc-text-secondary);
+}
+.cc-project-workspace__machine--unset {
+  color: var(--cc-text-tertiary);
+}
+
 /* The card is a button; its delete control must sit beside it, not inside. */
 .cc-project-card-wrap {
   position: relative;

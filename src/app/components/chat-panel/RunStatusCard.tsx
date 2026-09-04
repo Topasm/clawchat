@@ -46,6 +46,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
   const status = text(metadata.status);
   const runId = text(metadata.run_id);
   const error = text(metadata.error);
+  const hostLabel = text(metadata.host_label);
   const needsReview = status === 'waiting_review';
   const needsInput = status === 'waiting_input';
   const isFailed = status === 'failed';
@@ -85,7 +86,10 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
       data-run-status={status}
     >
       <div className="cc-task-progress__header">
-        <span className="cc-task-progress__label">{translateUi('Agent run')}</span>
+        <span className="cc-task-progress__label">
+          {translateUi('Agent run')}
+          {hostLabel ? ` · ${translateUi('on {{host}}', { host: hostLabel })}` : ''}
+        </span>
         <span className="cc-task-progress__percent">
           {needsUser && !live && settledLabel ? settledLabel : runStatusLabel(status)}
         </span>

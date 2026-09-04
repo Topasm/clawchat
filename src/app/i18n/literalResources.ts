@@ -1523,6 +1523,13 @@ Object.assign(koreanUiTranslations, {
   ' · {{count}} threads': ' · 스레드 {{count}}개',
   'Run in progress': '실행 진행 중',
   Planning: '계획 중',
+  'on {{host}}': '{{host}}에서',
+  'Runs on {{host}}': '{{host}}에서 실행',
+  Online: '온라인',
+  'Machine offline — runs are refused until it is back':
+    '머신 오프라인 — 돌아올 때까지 실행이 거부됩니다',
+  'No machine chosen — set one under "Where this runs".':
+    '실행 머신이 없습니다 — "Where this runs"에서 지정하세요.',
   'Steps live under this task; ask the agent to add, plan, or run them.':
     '이 작업 아래에 단계가 쌓입니다. 에이전트에게 추가·계획·실행을 요청하세요.',
 });

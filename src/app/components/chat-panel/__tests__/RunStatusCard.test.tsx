@@ -191,8 +191,10 @@ describe('RunStatusCard', () => {
       status: 'failed',
       run_id: 'run_1',
       error: 'Provider timeout',
+      host_label: 'ubuntu-lab',
     });
     expect(screen.getByText('Provider timeout')).toBeInTheDocument();
+    expect(screen.getByText(/on ubuntu-lab/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open run' })).toBeInTheDocument();
     unmount();
 

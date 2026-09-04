@@ -187,6 +187,14 @@ export default function ChatPage() {
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>{getProjectIcon(project.id)}</span>
           <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{project.title}</span>
+          {project.execution_host_label && (
+            <span
+              className={`cc-project-card__host cc-project-card__host--${project.execution_host_online ? 'online' : 'offline'}`}
+            >
+              <span className="cc-project-card__host-dot" aria-hidden="true" />
+              {translateUi('on {{host}}', { host: project.execution_host_label })}
+            </span>
+          )}
           {project.task_count > 0 && (
             <span style={{ color: 'var(--cc-text-tertiary)', marginLeft: 'auto' }}>
               {project.completed_task_count}/{project.task_count}

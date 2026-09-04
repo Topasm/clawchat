@@ -13,6 +13,7 @@ from models.agent_run import AgentRun
 from domain.agent_run import AGENT_RUN_EXECUTING_STATUSES
 from models.todo import Todo
 from schemas.project import ProjectOverviewResponse, ProjectResponse
+from services.agents import execution_host_service
 from services.tasks import graph_insights_service
 from sqlalchemy import case, func, select
 from domain.review import ReviewStatus
@@ -219,28 +220,35 @@ async def list_projects(
     if not include_archived:
         query = query.where(Project.status != ProjectStatus.ARCHIVED)
     rows = (await db.execute(query)).all()
-    return [
-        ProjectResponse.model_validate(project).model_copy(
-            update={
-                "task_count": max(
-                    0,
-                    task_count - (1 if project.root_task_id else 0),
-                ),
-                "completed_task_count": max(
-                    0,
-                    completed_task_count
-                    - (
-                        1
-                        if project.root_task_id
-                        and project.status == ProjectStatus.COMPLETED
-                        else 0
-                    ),
-                ),
-                "conversation_id": conversation_id,
-            }
+    responses = []
+    for project, task_count, completed_task_count, conversation_id in rows:
+        host_label, host_online = await execution_host_service.project_host_state(
+            db, project.execution_host_id
         )
-        for project, task_count, completed_task_count, conversation_id in rows
-    ]
+        responses.append(
+            ProjectResponse.model_validate(project).model_copy(
+                update={
+                    "task_count": max(
+                        0,
+                        task_count - (1 if project.root_task_id else 0),
+                    ),
+                    "completed_task_count": max(
+                        0,
+                        completed_task_count
+                        - (
+                            1
+                            if project.root_task_id
+                            and project.status == ProjectStatus.COMPLETED
+                            else 0
+                        ),
+                    ),
+                    "conversation_id": conversation_id,
+                    "execution_host_label": host_label,
+                    "execution_host_online": host_online,
+                }
+            )
+        )
+    return responses
 
 
 async def build_project_response(

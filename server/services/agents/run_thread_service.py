@@ -19,6 +19,7 @@ from models.conversation import Conversation
 from models.message import Message
 from models.project import Project
 from models.todo import Todo
+from services.agents import execution_host_service
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import make_id
@@ -152,6 +153,7 @@ async def post_run_update(
             {
                 "action_type": "run_update",
                 "run_id": run.id,
+                "host_label": await execution_host_service.run_host_label(db, run),
                 "agent_task_id": task.id,
                 "todo_id": task.todo_id,
                 "title": title,

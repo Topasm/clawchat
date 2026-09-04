@@ -59,6 +59,11 @@ class ProjectResponse(BaseModel):
     task_count: int = Field(default=0, ge=0)
     completed_task_count: int = Field(default=0, ge=0)
     conversation_id: str | None = None
+    #: Where this project's work runs: the chosen execution host, its label,
+    #: and whether that machine is reachable right now (None when unset).
+    execution_host_id: str | None = None
+    execution_host_label: str | None = None
+    execution_host_online: bool | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

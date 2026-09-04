@@ -24,7 +24,7 @@ from models.project import Project
 from models.todo import Todo
 from schemas.agent_run import AgentRunEventResponse, AgentRunResponse
 from schemas.review import AgentRunReviewOutcome
-from services.agents import run_thread_service
+from services.agents import execution_host_service, run_thread_service
 from services.review import (
     agent_review_handoff_service,
     artifact_service,
@@ -104,7 +104,9 @@ async def notify_run_state(
         await db.get(Todo, task.todo_id) if task is not None and task.todo_id else None
     )
     title = todo.title if todo is not None else run.instruction_snapshot[:120]
+    host_label = await execution_host_service.run_host_label(db, run)
     payload = {
+        "host_label": host_label,
         "run_id": run.id,
         "agent_task_id": run.agent_task_id,
         "todo_id": task.todo_id if task is not None else None,
@@ -654,6 +656,7 @@ async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunRespons
             )
         },
         project_title=project.title if project else None,
+        host_label=await execution_host_service.run_host_label(db, run),
         todo_id=task.todo_id,
         conversation_id=task.conversation_id,
         todo_title=todo.title if todo else None,

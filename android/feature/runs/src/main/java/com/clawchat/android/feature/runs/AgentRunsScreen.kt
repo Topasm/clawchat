@@ -462,9 +462,9 @@ private fun AgentRunDetailSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (run.provider == "paseo" && listOf(run.hostId, run.workspaceId, run.externalRunId).any { it != null }) {
+            if (run.hostLabel != null || (run.provider == "paseo" && listOf(run.hostId, run.workspaceId, run.externalRunId).any { it != null })) {
                 ClawSectionCard {
-                    DetailProperty(stringResource(R.string.runs_property_host), run.hostId ?: "Paseo")
+                    DetailProperty(stringResource(R.string.runs_property_host), run.hostLabel ?: run.hostId ?: "Paseo")
                     run.workspaceId?.let {
                         DetailProperty(stringResource(R.string.runs_property_workspace), it)
                     }

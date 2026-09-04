@@ -82,6 +82,36 @@ def host_is_available(
     return False
 
 
+async def run_host_label(db: AsyncSession, run) -> str | None:
+    """The machine a run executes on, as the user named it.
+
+    Worker runs carry the host id; Paseo runs carry the daemon's label in
+    ``host_id``; built-in runs execute on the server itself.
+    """
+    if run.execution_host_id:
+        host = await db.get(ExecutionHost, run.execution_host_id)
+        if host is not None:
+            return host.label
+    if run.host_id:
+        return run.host_id
+    return None
+
+
+async def project_host_state(
+    db: AsyncSession, execution_host_id: str | None
+) -> tuple[str | None, bool | None]:
+    """``(label, online)`` for a project's execution host; ``(None, None)`` when unset."""
+    if not execution_host_id:
+        return None, None
+    host = await db.get(ExecutionHost, execution_host_id)
+    if host is None:
+        return None, None
+    online = host.is_enabled and (
+        host.kind != "worker" or host_checked_in_recently(host)
+    )
+    return host.label, online
+
+
 def host_checked_in_recently(
     host: ExecutionHost, *, now: datetime | None = None
 ) -> bool:

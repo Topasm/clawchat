@@ -138,7 +138,10 @@ export default function ProjectWorkspacePage() {
         >
           <ChevronLeftIcon size={18} />
         </button>
-        <ProjectIdentity project={project} />
+        <div className="cc-project-workspace__identity-column">
+          <ProjectIdentity project={project} />
+          <ProjectMachineLine project={project} />
+        </div>
         <button
           type="button"
           className="cc-btn cc-btn--primary"
@@ -324,6 +327,31 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
       {(project.goal || project.description) && <p>{project.goal || project.description}</p>}
       <CanonicalDocumentButton target={extractCanonicalDoc(project.description)} />
     </div>
+  );
+}
+
+/** Where this project's work runs, at a glance: machine, reachability, path. */
+function ProjectMachineLine({ project }: { project: ProjectOverviewResponse }) {
+  if (!project.execution_host_label) {
+    return (
+      <p className="cc-project-workspace__machine cc-project-workspace__machine--unset">
+        {translateUi('No machine chosen — set one under "Where this runs".')}
+      </p>
+    );
+  }
+  const online = project.execution_host_online;
+  return (
+    <p
+      className={`cc-project-workspace__machine cc-project-workspace__machine--${online ? 'online' : 'offline'}`}
+    >
+      <span className="cc-project-card__host-dot" aria-hidden="true" />
+      {translateUi('Runs on {{host}}', { host: project.execution_host_label })}
+      {' · '}
+      {online
+        ? translateUi('Online')
+        : translateUi('Machine offline — runs are refused until it is back')}
+      {project.execution_workspace_path ? ` · ${project.execution_workspace_path}` : ''}
+    </p>
   );
 }
 

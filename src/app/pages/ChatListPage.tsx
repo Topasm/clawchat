@@ -247,6 +247,19 @@ export default function ChatListPage() {
                     )}
                     {meta?.nextDue && <Badge variant="due" dueDate={meta.nextDue} />}
                     <span className="cc-project-card__status">{project.status}</span>
+                    {project.execution_host_label && (
+                      <span
+                        className={`cc-project-card__host cc-project-card__host--${project.execution_host_online ? 'online' : 'offline'}`}
+                        title={
+                          project.execution_host_online
+                            ? translateUi('Online')
+                            : translateUi('Machine offline — runs are refused until it is back')
+                        }
+                      >
+                        <span className="cc-project-card__host-dot" aria-hidden="true" />
+                        {project.execution_host_label}
+                      </span>
+                    )}
                   </div>
 
                   {totalCount > 0 && (

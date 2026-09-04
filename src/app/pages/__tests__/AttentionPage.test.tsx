@@ -130,6 +130,7 @@ describe('AttentionPage', () => {
       todo_title: 'Sync the vault',
       error: 'No heartbeat for 10 minutes',
       conversation_id: 'conv-3',
+      host_label: 'ubuntu-lab',
     });
     queryMocks.awaitingInput.mockReturnValue({ data: [waiting], isLoading: false });
     queryMocks.reviews.mockReturnValue({ data: [reviewItem], isLoading: false });
@@ -144,6 +145,10 @@ describe('AttentionPage', () => {
     );
     expect(screen.getByRole('region', { name: 'Needs a decision' })).toHaveTextContent(
       'Sync the vault',
+    );
+    // Where it ran is part of deciding what to do about it.
+    expect(screen.getByRole('region', { name: 'Needs a decision' })).toHaveTextContent(
+      'on ubuntu-lab',
     );
 
     fireEvent.change(screen.getByLabelText('Answer the agent'), {

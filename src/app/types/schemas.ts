@@ -276,6 +276,9 @@ export const ProjectResponseSchema = z.object({
   task_count: z.number().int().nonnegative(),
   completed_task_count: z.number().int().nonnegative(),
   conversation_id: z.string().nullable().optional(),
+  execution_host_id: z.string().nullable().optional(),
+  execution_host_label: z.string().nullable().optional(),
+  execution_host_online: z.boolean().nullable().optional(),
 });
 
 export const ProjectOverviewResponseSchema = ProjectResponseSchema.extend({
@@ -1040,6 +1043,7 @@ export const AgentRunResponseSchema = z.object({
   provider: z.string(),
   model: z.string().nullable(),
   host_id: z.string().nullable(),
+  host_label: z.string().nullable().optional(),
   workspace_id: z.string().nullable(),
   external_run_id: z.string().nullable(),
   status: AgentRunStatusSchema,

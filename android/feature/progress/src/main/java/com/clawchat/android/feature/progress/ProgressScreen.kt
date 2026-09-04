@@ -780,8 +780,11 @@ private fun AgentRunProgressRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = run.progressMessage?.takeIf(String::isNotBlank)
-                        ?: agentRunStatusLabel(run.status),
+                    text = listOfNotNull(
+                        run.hostLabel?.takeIf(String::isNotBlank),
+                        run.progressMessage?.takeIf(String::isNotBlank)
+                            ?: agentRunStatusLabel(run.status),
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

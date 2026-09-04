@@ -336,6 +336,17 @@
             ],
             "title": "Host Id"
           },
+          "host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Label"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -783,6 +794,17 @@
               }
             ],
             "title": "Host Id"
+          },
+          "host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Label"
           },
           "id": {
             "title": "Id",
@@ -5344,6 +5366,39 @@
             ],
             "title": "Execution Base Branch"
           },
+          "execution_host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Id"
+          },
+          "execution_host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Label"
+          },
+          "execution_host_online": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Online"
+          },
           "execution_instructions": {
             "anyOf": [
               {
@@ -5529,6 +5584,39 @@
               }
             ],
             "title": "Execution Base Branch"
+          },
+          "execution_host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Id"
+          },
+          "execution_host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Label"
+          },
+          "execution_host_online": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Online"
           },
           "execution_instructions": {
             "anyOf": [
