@@ -43,6 +43,7 @@
     <string name="tasks_description_subtitle">메모와 참고할 세부 내용입니다.</string>
     <string name="tasks_details_title">세부 정보</string>
     <string name="tasks_details_subtitle">이 작업의 운영 정보입니다.</string>
+    <string name="tasks_discuss_with_agent">에이전트와 논의</string>
     <string name="tasks_links_title">작업 연결</string>
     <string name="tasks_links_subtitle">공유 작업 그래프의 의존성과 관련 작업입니다.</string>
     <string name="tasks_links_loading">작업 연결 불러오는 중…</string>

@@ -15,6 +15,8 @@ interface ConversationRepository {
     suspend fun getConversation(id: String): ApiResult<Conversation>
     suspend fun getMessages(conversationId: String): ApiResult<PaginatedResponse<Message>>
     suspend fun deleteConversation(id: String): ApiResult<Unit>
+    /** The thread about one task (or a project's root), created if it does not exist yet. */
+    suspend fun getOrCreateForTodo(todoId: String): ApiResult<Conversation>
 }
 
 @Singleton
@@ -36,4 +38,7 @@ class ConversationRepositoryImpl @Inject constructor(
 
     override suspend fun deleteConversation(id: String): ApiResult<Unit> =
         apiCall { api.deleteConversation(id) }
+
+    override suspend fun getOrCreateForTodo(todoId: String): ApiResult<Conversation> =
+        apiCall { api.getOrCreateTodoConversation(todoId) }
 }

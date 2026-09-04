@@ -46,6 +46,7 @@
     <string name="tasks_description_subtitle">Notes and supporting detail.</string>
     <string name="tasks_details_title">Details</string>
     <string name="tasks_details_subtitle">Operational metadata for this task.</string>
+    <string name="tasks_discuss_with_agent">Discuss with agent</string>
     <string name="tasks_links_title">Task links</string>
     <string name="tasks_links_subtitle">Dependencies and related work from the shared task graph.</string>
     <string name="tasks_links_loading">Loading task links…</string>

@@ -51,6 +51,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -138,10 +139,18 @@ internal fun parseDisplayDateTime(
 fun ChatScreen(
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    initialConversationId: String? = null,
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val newConversationTitle = stringResource(R.string.chat_new_conversation_default_title)
+    // Arriving from a task: open its thread once, then behave like the tab.
+    var initialSelectionConsumed by rememberSaveable(initialConversationId) { mutableStateOf(false) }
+    LaunchedEffect(initialConversationId) {
+        if (initialSelectionConsumed || initialConversationId == null) return@LaunchedEffect
+        initialSelectionConsumed = true
+        viewModel.selectConversation(initialConversationId)
+    }
 
     BackHandler(enabled = state.selectedConversationId != null) {
         viewModel.clearSelection()
@@ -184,8 +193,13 @@ private fun ConversationListView(
     onCreate: () -> Unit,
     onDelete: (String) -> Unit,
 ) {
+    // Threads about a task or project sit in their own group; the flat list
+    // keeps only unscoped chats, as on the web.
     val regularConversations = remember(conversations) {
-        conversations.filterNot(Conversation::isAgentRun)
+        conversations.filter { !it.isAgentRun && it.projectTodoId == null }
+    }
+    val taskThreadConversations = remember(conversations) {
+        conversations.filter { !it.isAgentRun && it.projectTodoId != null }
     }
     val agentRunConversations = remember(conversations) {
         conversations.filter(Conversation::isAgentRun)
@@ -282,6 +296,24 @@ private fun ConversationListView(
                             conversation = convo,
                             onClick = { onSelect(convo.id) },
                         )
+                    }
+                }
+                if (taskThreadConversations.isNotEmpty()) {
+                    item(key = "task-thread-conversations-heading") {
+                        Text(
+                            text = stringResource(R.string.chat_task_threads),
+                            modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    items(taskThreadConversations, key = { "thread-${it.id}" }) { convo ->
+                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                            ConversationCard(
+                                conversation = convo,
+                                onClick = { onSelect(convo.id) },
+                            )
+                        }
                     }
                 }
                 if (agentRunConversations.isNotEmpty()) {

@@ -8,14 +8,17 @@ import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.repository.ConversationRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.util.optimistic
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
@@ -62,10 +65,29 @@ class TasksViewModel @Inject constructor(
     private val todoRepository: TodoRepository,
     private val syncManager: SyncManager,
     private val relationshipRepository: TaskRelationshipRepository,
+    private val conversationRepository: ConversationRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TasksUiState())
     val uiState: StateFlow<TasksUiState> = _uiState.asStateFlow()
+
+    /** Conversation ids to open: the thread scoped to a task the user asked to discuss. */
+    private val _openThreadEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val openThreadEvents = _openThreadEvents.asSharedFlow()
+
+    /**
+     * Open (creating if needed) the thread about this task, where what the
+     * agent creates becomes steps of the task and delegated work runs it.
+     */
+    fun openTaskThread(todoId: String) {
+        viewModelScope.launch {
+            when (val result = conversationRepository.getOrCreateForTodo(todoId)) {
+                is ApiResult.Success -> _openThreadEvents.tryEmit(result.data.id)
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                ApiResult.Loading -> Unit
+            }
+        }
+    }
 
     private var taskRequestGeneration = 0L
     private var relationshipRequestGeneration = 0L

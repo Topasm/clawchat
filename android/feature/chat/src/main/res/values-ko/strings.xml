@@ -42,6 +42,7 @@
     <string name="chat_multi_agent_task">멀티 에이전트 작업</string>
     <string name="chat_task_queued">대기 중</string>
     <string name="chat_agent_run_conversations">에이전트 실행 대화</string>
+    <string name="chat_task_threads">작업·프로젝트 스레드</string>
     <string name="chat_just_now">방금 전</string>
     <plurals name="chat_minutes_ago">
         <item quantity="other">%1$d분 전</item>

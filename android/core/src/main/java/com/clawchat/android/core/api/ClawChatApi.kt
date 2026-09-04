@@ -159,6 +159,10 @@ interface ClawChatApi {
     @POST("api/chat/conversations")
     suspend fun createConversation(@Body body: Map<String, String>): Conversation
 
+    /** The thread scoped to a task or project root; created on first use. */
+    @GET("api/chat/conversations/by-project/{todoId}")
+    suspend fun getOrCreateTodoConversation(@Path("todoId") todoId: String): Conversation
+
     @GET("api/chat/conversations/{id}")
     suspend fun getConversation(@Path("id") id: String): Conversation
 

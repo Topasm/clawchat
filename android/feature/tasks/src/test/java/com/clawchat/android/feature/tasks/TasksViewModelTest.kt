@@ -7,6 +7,8 @@ import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.model.Conversation
+import com.clawchat.android.core.data.repository.ConversationRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
@@ -34,6 +36,7 @@ class TasksViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var todoRepository: TodoRepository
     private lateinit var relationshipRepository: TaskRelationshipRepository
+    private lateinit var conversationRepository: ConversationRepository
     private lateinit var syncManager: SyncManager
     private lateinit var todoChanged: MutableSharedFlow<Unit>
     private lateinit var viewModel: TasksViewModel
@@ -54,6 +57,7 @@ class TasksViewModelTest {
         Dispatchers.setMain(testDispatcher)
         todoRepository = mockk()
         relationshipRepository = mockk()
+        conversationRepository = mockk()
         syncManager = mockk(relaxed = true)
         todoChanged = MutableSharedFlow(extraBufferCapacity = 1)
         every { syncManager.todoChanged } returns todoChanged
@@ -66,7 +70,7 @@ class TasksViewModelTest {
     }
 
     private fun createViewModel(): TasksViewModel {
-        return TasksViewModel(todoRepository, syncManager, relationshipRepository)
+        return TasksViewModel(todoRepository, syncManager, relationshipRepository, conversationRepository)
     }
 
     @Test
@@ -100,6 +104,36 @@ class TasksViewModelTest {
 
         assertEquals(listOf(pending, inProgress), sections.active)
         assertEquals(listOf(completed), sections.completed)
+    }
+
+    @Test
+    fun `discussing a task opens the thread scoped to it`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { conversationRepository.getOrCreateForTodo("1") } returns
+            ApiResult.Success(Conversation(id = "conv-1", title = "Test task", projectTodoId = "1"))
+        viewModel = createViewModel()
+
+        viewModel.openThreadEvents.test {
+            viewModel.openTaskThread("1")
+            assertEquals("conv-1", awaitItem())
+        }
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a thread that cannot be opened reports the error and opens nothing`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { conversationRepository.getOrCreateForTodo("1") } returns ApiResult.Error("offline")
+        viewModel = createViewModel()
+
+        viewModel.openThreadEvents.test {
+            viewModel.openTaskThread("1")
+            testDispatcher.scheduler.advanceUntilIdle()
+            expectNoEvents()
+        }
+        assertEquals("offline", viewModel.uiState.value.error)
     }
 
     @Test

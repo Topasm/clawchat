@@ -115,8 +115,12 @@ fun TasksScreen(
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     initialTodoId: String? = null,
+    onOpenConversation: (String) -> Unit = {},
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
+    LaunchedEffect(viewModel) {
+        viewModel.openThreadEvents.collect(onOpenConversation)
+    }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var initialSelectionConsumed by rememberSaveable(initialTodoId) { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -169,6 +173,7 @@ fun TasksScreen(
                 }
             },
             onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
+            onDiscuss = { viewModel.openTaskThread(state.selectedTask!!.id) },
         )
     } else {
         TaskListView(
@@ -730,6 +735,7 @@ private fun TaskDetailView(
     onSetStatus: (TaskStatus) -> Unit,
     onSetDueDate: (String) -> Unit,
     onDelete: () -> Unit,
+    onDiscuss: () -> Unit = {},
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     var showDatePicker by remember { mutableStateOf(false) }
@@ -859,6 +865,10 @@ private fun TaskDetailView(
                         inboxStateLabel(task.inboxState)?.let {
                             ClawStatusChip(text = it, tone = ClawTone.Default)
                         }
+                    }
+                    // The thread about this task: steps and delegated runs start there.
+                    TextButton(onClick = onDiscuss) {
+                        Text(stringResource(R.string.tasks_discuss_with_agent))
                     }
                 }
             }

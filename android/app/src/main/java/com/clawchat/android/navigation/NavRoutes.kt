@@ -7,7 +7,14 @@ sealed class NavRoute(val route: String) {
     data object Onboarding : NavRoute("onboarding")
     data object Today : NavRoute("today")
     data object Calendar : NavRoute("calendar")
-    data object Chat : NavRoute("chat")
+    data object Chat : NavRoute("chat") {
+        const val ARG_CONVERSATION_ID = "conversation_id"
+        val routePattern = "$route?$ARG_CONVERSATION_ID={$ARG_CONVERSATION_ID}"
+
+        /** Opens the chat tab on one conversation, e.g. the thread scoped to a task. */
+        fun destination(conversationId: String? = null): String =
+            conversationId?.let { "$route?$ARG_CONVERSATION_ID=${Uri.encode(it)}" } ?: route
+    }
     data object Inbox : NavRoute("inbox")
     data object Progress : NavRoute("progress")
     data object Tasks : NavRoute("tasks") {

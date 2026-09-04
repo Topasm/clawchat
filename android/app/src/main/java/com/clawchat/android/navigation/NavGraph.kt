@@ -325,7 +325,16 @@ fun ClawChatNavGraph(
                     InboxScreen(onBack = { navController.popBackStack() })
                 }
             }
-            composable(NavRoute.Chat.route) {
+            composable(
+                route = NavRoute.Chat.routePattern,
+                arguments = listOf(
+                    navArgument(NavRoute.Chat.ARG_CONVERSATION_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
                 ServerOnlyDestination(
                     workspaceMode = workspaceMode,
                     onConnectWorkspace = openConnectionSetup,
@@ -333,6 +342,9 @@ fun ClawChatNavGraph(
                     ChatScreen(
                         onOpenSearch = navigateToSearch,
                         onOpenSettings = navigateToSettings,
+                        initialConversationId = entry.arguments?.getString(
+                            NavRoute.Chat.ARG_CONVERSATION_ID,
+                        ),
                     )
                 }
             }
@@ -372,6 +384,13 @@ fun ClawChatNavGraph(
                     onOpenSearch = navigateToSearch,
                     onOpenSettings = navigateToSettings,
                     initialTodoId = entry.arguments?.getString(NavRoute.Tasks.ARG_TODO_ID),
+                    onOpenConversation = { conversationId ->
+                        if (NavigationCapabilities.canOpen(workspaceMode, NavRoute.Chat.route)) {
+                            navController.navigate(NavRoute.Chat.destination(conversationId)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                 )
             }
             composable(
