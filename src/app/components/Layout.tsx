@@ -126,7 +126,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const chatPanel = useChatPanel();
   const commandPalette = useCommandPalette();
-  const { isDesktop, isMobile, isMac } = usePlatform();
+  const { isDesktop, isMobile } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarPanelRef = usePanelRef();
@@ -160,10 +160,6 @@ export default function Layout() {
         ? mobileTabs.filter((item) => item.to !== '/inbox')
         : mobileTabs,
     [capabilities, serverUrl],
-  );
-  const filteredUtilityNavItems = useMemo(
-    () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings/app')),
-    [isMac],
   );
   // Widget deep-link navigation
   useEffect(() => {
@@ -382,7 +378,7 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />
-      {filteredUtilityNavItems.map((item) => (
+      {utilityNavItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
