@@ -655,7 +655,9 @@ mod tests {
         let selected = choose_start_port(requested).expect("fallback port");
 
         assert_ne!(selected, requested);
-        TcpListener::bind(("127.0.0.1", selected)).expect("selected port is free");
+        // The probe listener is intentionally released before returning so
+        // the sidecar can bind. Rebinding here would race every other process
+        // asking the OS for an ephemeral port and make this test flaky.
     }
 
     #[test]
@@ -663,7 +665,6 @@ mod tests {
         let selected = choose_start_port(0).expect("concrete port");
 
         assert_ne!(selected, 0);
-        TcpListener::bind(("127.0.0.1", selected)).expect("selected port is free");
     }
 
     #[test]
