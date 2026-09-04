@@ -90,7 +90,7 @@ fn matching(dir: &Path, prefix: &str, stem: &str) -> Vec<(String, PathBuf)> {
         .filter_map(|entry| {
             let name = entry.file_name().to_string_lossy().into_owned();
             let upper = name.to_ascii_uppercase();
-            if !(upper.starts_with(stem) && upper.ends_with(".MD")) {
+            if !upper.starts_with(stem) || !upper.ends_with(".MD") {
                 return None;
             }
             let path = entry.path();
@@ -118,7 +118,7 @@ fn read_bounded(root: &Path, path: &Path) -> Option<String> {
     if !resolved.starts_with(root) {
         return None;
     }
-    let bytes = fs::read(&resolved).ok()?;
+    let bytes = fs::read(resolved).ok()?;
     let text = String::from_utf8_lossy(&bytes);
     Some(truncate(text.trim(), MAX_FILE_BYTES))
 }
@@ -198,8 +198,11 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let outside = tempfile::tempdir().expect("outside");
         write(outside.path(), "secret.md", "not for the server");
-        std::os::unix::fs::symlink(outside.path().join("secret.md"), dir.path().join("README.md"))
-            .expect("symlink");
+        std::os::unix::fs::symlink(
+            outside.path().join("secret.md"),
+            dir.path().join("README.md"),
+        )
+        .expect("symlink");
 
         let files = read_context(dir.path().to_str().unwrap()).expect("context");
 
