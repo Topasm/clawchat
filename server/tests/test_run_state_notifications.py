@@ -184,14 +184,27 @@ async def test_changes_requested_note_resumes_the_run(
         assert response.status_code == 200, response.text
         assert response.json()["outcome"]["auto_resumed"] is True
 
+        pushed = []
         for _ in range(100):
             await asyncio.sleep(0.01)
             db_session.expire_all()
             resumed = await db_session.get(AgentRun, run_id)
-            if resumed and resumed.status == "waiting_review":
+            pushed = [
+                event["status"]
+                for event in run_state_events()
+                if event["run_id"] == run_id
+            ]
+            if (
+                resumed
+                and resumed.status == "waiting_review"
+                and pushed
+                and pushed[-1] == "waiting_review"
+            ):
                 break
         else:
-            pytest.fail("run did not come back for review after the note")
+            pytest.fail(
+                "run and its notification did not come back for review after the note"
+            )
 
         assert "Follow-up instruction:\nTighten the scope" in resumed.instruction_snapshot
         assert resumed.attempt == 1
@@ -208,7 +221,6 @@ async def test_changes_requested_note_resumes_the_run(
         # A fresh review round opened for the resumed attempt.
         review = await review_item_for(db_session, run_id)
         assert review.status == "pending"
-        pushed = [event["status"] for event in run_state_events() if event["run_id"] == run_id]
         assert "waiting_input" in pushed
         assert pushed[-1] == "waiting_review"
     finally:
