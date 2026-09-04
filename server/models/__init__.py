@@ -17,6 +17,7 @@ from models.agent_run import AgentRun, AgentRunEvent  # noqa: F401
 from models.task_placement_change import TaskPlacementChange  # noqa: F401
 from models.user_settings import UserSettings  # noqa: F401
 from models.attachment import Attachment  # noqa: F401
+from models.task_comment import TaskComment  # noqa: F401
 from models.paired_device import PairedDevice, PairingSession  # noqa: F401
 from models.host_identity import HostIdentity  # noqa: F401
 from models.refresh_session import RefreshSession  # noqa: F401

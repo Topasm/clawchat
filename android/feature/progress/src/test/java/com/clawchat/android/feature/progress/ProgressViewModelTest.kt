@@ -7,11 +7,13 @@ import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.ReviewRepository
+import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.PendingReviewDecisionStore
@@ -46,6 +48,7 @@ class ProgressViewModelTest {
     private lateinit var runs: AgentRunRepository
     private lateinit var reviews: ReviewRepository
     private lateinit var todos: TodoRepository
+    private lateinit var comments: TaskCommentRepository
     private lateinit var syncManager: SyncManager
     private lateinit var sessionStore: SessionStore
     private lateinit var pendingTodos: PendingTodoUpdateStore
@@ -58,6 +61,7 @@ class ProgressViewModelTest {
         runs = mockk()
         reviews = mockk()
         todos = mockk()
+        comments = mockk()
         syncManager = mockk()
         sessionStore = mockk()
         pendingTodos = mockk()
@@ -79,6 +83,7 @@ class ProgressViewModelTest {
         every { pendingTodos.observeStatus("local") } returns flowOf(PendingSyncStatus())
         every { pendingReviews.observeStatus("local") } returns flowOf(PendingSyncStatus())
         coEvery { reviews.listPending() } returns ApiResult.Success(emptyList())
+        coEvery { comments.listForTodos(any()) } returns ApiResult.Success(emptyList())
     }
 
     @After
@@ -235,6 +240,44 @@ class ProgressViewModelTest {
         coVerify(exactly = 1) { todos.deleteTodo(captured.id) }
     }
 
+    @Test
+    fun `loading in-progress tasks fetches their comment threads`() = runTest {
+        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
+        stubInitial(todos = listOf(active))
+        val note = comment(active.id, "Halfway there")
+        coEvery { comments.listForTodos(listOf(active.id)) } returns ApiResult.Success(listOf(note))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf(note), viewModel.uiState.value.commentsByTodoId[active.id])
+    }
+
+    @Test
+    fun `addComment appends the posted comment to its thread`() = runTest {
+        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
+        stubInitial(todos = listOf(active))
+        val posted = comment(active.id, "Shipping now")
+        coEvery { comments.addComment(active.id, "Shipping now") } returns ApiResult.Success(posted)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.addComment(active.id, "  Shipping now  ")
+        advanceUntilIdle()
+
+        assertEquals(listOf(posted), viewModel.uiState.value.commentsByTodoId[active.id])
+        assertNull(viewModel.uiState.value.commentError)
+        coVerify(exactly = 1) { comments.addComment(active.id, "Shipping now") }
+    }
+
+    private fun comment(todoId: String, content: String, id: String = "cmt-$content") = TaskComment(
+        id = id,
+        todoId = todoId,
+        content = content,
+        createdBy = "user",
+        createdAt = "2026-09-01T00:00:00Z",
+        updatedAt = "2026-09-01T00:00:00Z",
+    )
+
     private fun stubInitial(
         todos: List<Todo> = emptyList(),
         runs: List<AgentRun> = emptyList(),
@@ -253,6 +296,7 @@ class ProgressViewModelTest {
         agentRunRepository = runs,
         reviewRepository = reviews,
         todoRepository = todos,
+        taskCommentRepository = comments,
         syncManager = syncManager,
         sessionStore = sessionStore,
         pendingTodos = pendingTodos,

@@ -30,8 +30,11 @@
     <string name="progress_processing">%1$d개 처리 중</string>
     <string name="progress_active_title">진행 중</string>
     <string name="progress_active_description">현재 실행 중인 에이전트와 진행 중 작업입니다.</string>
-    <string name="progress_recent_title">최근 완료</string>
-    <string name="progress_recent_description">최근 완료한 작업과 종료된 에이전트 실행입니다.</string>
+    <string name="progress_threads_title">업데이트</string>
+    <string name="progress_threads_description">진행 중인 작업에 메모를 남겨보세요.</string>
+    <string name="progress_threads_empty">아직 업데이트가 없습니다</string>
+    <string name="progress_threads_hint">업데이트 추가…</string>
+    <string name="progress_threads_send">업데이트 등록</string>
 
     <string name="progress_task_state">작업 상태</string>
     <string name="progress_task_sync_pending">동기화 대기</string>

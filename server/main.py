@@ -27,6 +27,7 @@ from routers import review as review_router
 from routers import search as search_router
 from routers import settings as settings_router
 from routers import task_relationship as task_relationship_router
+from routers import task_comment as task_comment_router
 from routers import tasks as tasks_router
 from routers import today as today_router
 from routers import todo as todo_router
@@ -241,6 +242,11 @@ app.include_router(
     task_relationship_router.router,
     prefix="/api/task-relationships",
     tags=["task-relationships"],
+)
+app.include_router(
+    task_comment_router.router,
+    prefix="/api/task-comments",
+    tags=["task-comments"],
 )
 app.include_router(calendar_router.router, prefix="/api/events", tags=["calendar"])
 app.include_router(search_router.router, prefix="/api/search", tags=["search"])
