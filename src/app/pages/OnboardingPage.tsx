@@ -9,6 +9,7 @@ import QRScanner from '../components/shared/QRScanner';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
 import { verifyClawChatHealth } from '../services/workspaceHealth';
+import { claimPairingSession, parsePairingQrPayload } from '../services/pairingClaim';
 import { translateUi } from '../i18n';
 type Step = 'welcome' | 'role' | 'server' | 'claude' | 'pairing' | 'ready';
 type ServerStatus = 'checking' | 'online' | 'offline' | 'error';
@@ -198,44 +199,37 @@ export default function OnboardingPage() {
     setShowScanner(false);
     try {
       const parsed = JSON.parse(data);
-      if (parsed.type === 'clawchat_pair' && parsed.server_url && parsed.code) {
-        const pairUrl = parsed.server_url.replace(/\/+$/, '');
+      const pairingPayload = parsePairingQrPayload(parsed);
+      if (pairingPayload) {
+        const pairUrl = pairingPayload.server_url.replace(/\/+$/, '');
         setManualServerUrl(pairUrl);
         setServerStatus('checking');
         try {
-          const res = await fetch(`${pairUrl}/api/pairing/claim`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code: parsed.code,
-              device_name: IS_DESKTOP ? 'Desktop Client' : 'Device',
-              device_type: IS_DESKTOP ? 'web' : 'android',
-            }),
+          const session = await claimPairingSession(pairingPayload, {
+            name: IS_DESKTOP ? 'Desktop Client' : 'Device',
+            type: IS_DESKTOP ? 'web' : 'android',
           });
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData?.detail || 'Pairing failed');
-          }
-          const result = await res.json();
-          const resolvedUrl = result.api_base_url || pairUrl;
-          if (parsed.host_id && result.host_id !== parsed.host_id) {
-            throw new Error('Host ID did not match the scanned QR code');
-          }
-          if (parsed.host_public_key && result.host_public_key !== parsed.host_public_key) {
-            throw new Error('Host identity did not match the scanned QR code');
-          }
           // Store device token
           useAuthStore.setState({
-            token: result.device_token,
+            token: session.token,
             refreshToken: null,
-            serverUrl: resolvedUrl,
+            serverUrl: session.serverUrl,
+            hostId: session.hostId,
+            hostPublicKey: session.hostPublicKey,
+            relayUrl: session.relayUrl,
             isLoading: false,
           });
-          upsertRemote('Remote workspace', resolvedUrl, {
-            hostId: result.host_id ?? parsed.host_id,
-            hostPublicKey: result.host_public_key ?? parsed.host_public_key,
-            apiVersion: '1',
-          });
+          upsertRemote(
+            'Remote workspace',
+            session.serverUrl,
+            session.hostId
+              ? {
+                  hostId: session.hostId,
+                  hostPublicKey: session.hostPublicKey,
+                  apiVersion: '1',
+                }
+              : undefined,
+          );
           setServerStatus('online');
         } catch (err) {
           console.error('QR pairing failed:', err);

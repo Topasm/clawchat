@@ -3,14 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../config/ThemeContext';
 import { useAuthStore } from '../stores/useAuthStore';
 import { IS_DESKTOP } from '../types/platform';
-import { relayClient } from '../services/relayClient';
-interface PairingClaimResult {
-  device_token: string;
-  api_base_url?: string;
-  host_id?: string;
-  host_public_key?: string;
-  relay_url?: string;
-}
+import { claimPairingSession, parsePairingQrPayload } from '../services/pairingClaim';
 import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
 import QRScanner from '../components/shared/QRScanner';
 import { logger } from '../services/logger';
@@ -158,82 +151,40 @@ export default function LoginPage() {
     setShowScanner(false);
     try {
       const parsed = JSON.parse(data);
-      if (parsed.type === 'clawchat_pair' && parsed.server_url && parsed.code) {
+      const pairingPayload = parsePairingQrPayload(parsed);
+      if (pairingPayload) {
         // Unified pairing flow: claim the pairing code for a device token
-        const pairUrl = parsed.server_url.replace(/\/+$/, '');
+        const pairUrl = pairingPayload.server_url.replace(/\/+$/, '');
         setServerUrl(pairUrl);
         setLoading(true);
         setError('');
         try {
-          const claimBody = JSON.stringify({
-            code: parsed.code,
-            device_name: navigator.userAgent.includes('iPhone') ? 'iPhone' : 'Mobile Device',
-            device_type: navigator.userAgent.includes('iPhone') ? 'ios' : 'android',
+          const isIPhone = navigator.userAgent.includes('iPhone');
+          const session = await claimPairingSession(pairingPayload, {
+            name: isIPhone ? 'iPhone' : 'Mobile Device',
+            type: isIPhone ? 'ios' : 'android',
           });
-          let result: PairingClaimResult;
-          try {
-            const directController = new AbortController();
-            const directTimeout = setTimeout(() => directController.abort(), 4000);
-            let res: Response;
-            try {
-              res = await fetch(`${pairUrl}/api/pairing/claim`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: claimBody,
-                signal: directController.signal,
-              });
-            } finally {
-              clearTimeout(directTimeout);
-            }
-            if (!res.ok) {
-              const errData = await res.json().catch(() => ({}));
-              throw new Error(errData?.detail || 'Pairing failed');
-            }
-            result = (await res.json()) as PairingClaimResult;
-          } catch (directError) {
-            const relayConfig = {
-              relayUrl: parsed.relay_url,
-              hostId: parsed.host_id,
-              hostPublicKey: parsed.host_public_key,
-            };
-            if (!relayClient.isConfigured(relayConfig)) throw directError;
-            const relayResponse = await relayClient.request(relayConfig, {
-              method: 'POST',
-              path: '/api/pairing/claim',
-              headers: { 'content-type': 'application/json' },
-              body: claimBody,
-            });
-            if (relayResponse.status >= 400) {
-              const detail = (
-                relayResponse.data as {
-                  detail?: string;
-                } | null
-              )?.detail;
-              throw new Error(detail || 'Pairing failed through relay', { cause: directError });
-            }
-            result = relayResponse.data as PairingClaimResult;
-          }
-          if (parsed.host_public_key && result.host_public_key !== parsed.host_public_key) {
-            throw new Error('Host identity did not match the scanned QR code');
-          }
-          if (parsed.host_id && result.host_id !== parsed.host_id) {
-            throw new Error('Host ID did not match the scanned QR code');
-          }
           // Store device token as access token and set server URL
           useAuthStore.setState({
-            token: result.device_token,
+            token: session.token,
             refreshToken: null,
-            serverUrl: result.api_base_url || pairUrl,
-            hostId: result.host_id ?? parsed.host_id ?? null,
-            hostPublicKey: result.host_public_key ?? parsed.host_public_key ?? null,
-            relayUrl: result.relay_url ?? parsed.relay_url ?? null,
+            serverUrl: session.serverUrl,
+            hostId: session.hostId,
+            hostPublicKey: session.hostPublicKey,
+            relayUrl: session.relayUrl,
             isLoading: false,
           });
-          upsertRemote('Remote workspace', result.api_base_url || pairUrl, {
-            hostId: result.host_id ?? parsed.host_id,
-            hostPublicKey: result.host_public_key ?? parsed.host_public_key,
-            apiVersion: '1',
-          });
+          upsertRemote(
+            'Remote workspace',
+            session.serverUrl,
+            session.hostId
+              ? {
+                  hostId: session.hostId,
+                  hostPublicKey: session.hostPublicKey,
+                  apiVersion: '1',
+                }
+              : undefined,
+          );
           navigate('/');
         } catch (err) {
           setError((err as Error).message);
