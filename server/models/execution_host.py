@@ -41,6 +41,9 @@ class ExecutionHost(Base):
         default=lambda: make_id("host_"),
     )
     label: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Stable identity reported by a desktop worker. Labels are display names
+    #: and may be changed; they must never decide which machine receives work.
+    device_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     kind: Mapped[str] = mapped_column(
         String,
         nullable=False,
@@ -85,6 +88,11 @@ class ExecutionHost(Base):
             name="ck_execution_hosts_kind_valid",
         ),
         UniqueConstraint("label", name="uq_execution_hosts_label"),
+        Index(
+            "uq_execution_hosts_device_id",
+            "device_id",
+            unique=True,
+        ),
         Index("idx_execution_hosts_is_enabled", "is_enabled"),
     )
 

@@ -56,6 +56,10 @@ async def test_snapshot_is_bounded_per_file_and_in_total(db_session):
     # and is dropped whole, so the file list only names what the text contains.
     assert row.context_text.count("…(truncated)") == 2
     assert len(row.context_text) <= execution_host_service.MAX_CONTEXT_TOTAL_CHARS
+    for block in row.context_text.split("\n\n"):
+        if "…(truncated)" in block:
+            body = block.split("\n", 1)[1]
+            assert len(body) <= execution_host_service.MAX_CONTEXT_FILE_CHARS
     assert execution_host_service.context_file_names(row) == [
         "README.md",
         "docs/INDEX.md",

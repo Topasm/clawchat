@@ -8,6 +8,7 @@ import { queryKeys } from './queryKeys';
 export const ExecutionHostSchema = z.object({
   id: z.string(),
   label: z.string(),
+  device_id: z.string().nullable().optional(),
   kind: z.string(),
   target: z.string().nullable().optional(),
   platform: z.string().nullable().optional(),
@@ -111,7 +112,7 @@ export function useDeleteProjectHostPath(projectId: string) {
 export function useRegisterWorkerHost() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { label: string; platform: string }) => {
+    mutationFn: async (body: { label: string; device_id: string; platform: string }) => {
       const res = await apiClient.post('/execution-hosts/register', body);
       return ExecutionHostSchema.parse(res.data);
     },

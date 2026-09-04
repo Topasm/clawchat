@@ -1,14 +1,17 @@
 """Choosing the machine a project's work runs on."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from config import settings
+from database import Base
 from exceptions import ValidationError
 from models.execution_host import ExecutionHost, ProjectHostPath
 from models.project import Project
 from services.agents import execution_host_service
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 UTC = timezone.utc
 
@@ -206,6 +209,70 @@ async def test_a_worker_registers_once_and_checks_back_in(db_session):
     assert second.last_seen_at >= seen_first
 
 
+async def test_a_worker_keeps_its_identity_when_renamed(db_session):
+    from uuid import UUID
+
+    device_id = UUID("00000000-0000-0000-0000-000000000001")
+    first = await execution_host_service.register_worker(
+        db_session,
+        label="My Linux machine",
+        device_id=device_id,
+        platform="linux",
+    )
+
+    renamed = await execution_host_service.register_worker(
+        db_session,
+        label="ubuntu-lab",
+        device_id=device_id,
+        platform="linux",
+    )
+
+    assert renamed.id == first.id
+    assert renamed.label == "ubuntu-lab"
+    assert renamed.device_id == str(device_id)
+
+
+async def test_two_devices_cannot_share_one_worker_label(db_session):
+    from uuid import UUID
+
+    await execution_host_service.register_worker(
+        db_session,
+        label="My Linux machine",
+        device_id=UUID("00000000-0000-0000-0000-000000000001"),
+    )
+
+    with pytest.raises(ValidationError, match="different machine"):
+        await execution_host_service.register_worker(
+            db_session,
+            label="My Linux machine",
+            device_id=UUID("00000000-0000-0000-0000-000000000002"),
+        )
+    with pytest.raises(ValidationError, match="needs a device id"):
+        await execution_host_service.register_worker(
+            db_session,
+            label="My Linux machine",
+        )
+
+
+async def test_device_identity_adopts_a_legacy_worker(db_session):
+    from uuid import UUID
+
+    legacy = await execution_host_service.register_worker(
+        db_session,
+        label="MacBook",
+    )
+    device_id = UUID("00000000-0000-0000-0000-000000000003")
+
+    adopted = await execution_host_service.register_worker(
+        db_session,
+        label="MacBook",
+        device_id=device_id,
+    )
+
+    assert adopted.id == legacy.id
+    assert adopted.device_id == str(device_id)
+
+
 async def test_registering_over_another_kind_of_host_is_refused(db_session):
     await _host(db_session, label="Workstation", kind="local")
 
@@ -296,6 +363,41 @@ async def test_a_claimed_run_is_not_handed_out_twice(db_session, tmp_path):
 
     assert first is not None
     assert second is None
+
+
+async def test_concurrent_sqlite_claims_hand_out_one_run_once(tmp_path):
+    engine = create_async_engine(
+        f"sqlite+aiosqlite:///{tmp_path / 'concurrent-worker-claim.db'}",
+        pool_size=2,
+        max_overflow=0,
+    )
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as seed_db:
+            project = await _project(seed_db)
+            worker = await _host(seed_db, label="MacBook", kind="worker")
+            await _bind(seed_db, project, worker, str(tmp_path))
+            run = await _queued_run(seed_db, project, worker)
+            await seed_db.commit()
+            worker_id = worker.id
+            run_id = run.id
+
+        async def claim():
+            async with sessions() as db:
+                host = await db.get(ExecutionHost, worker_id)
+                assert host is not None
+                job = await execution_host_service.claim_next_job(db, host)
+                await db.commit()
+                return job
+
+        claims = await asyncio.gather(claim(), claim())
+
+        assert sum(job is not None for job in claims) == 1
+        assert {job.run_id for job in claims if job is not None} == {run_id}
+    finally:
+        await engine.dispose()
 
 
 async def test_a_worker_is_not_handed_another_machines_work(db_session, tmp_path):

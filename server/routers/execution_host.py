@@ -145,6 +145,7 @@ async def register_worker_host(
     host = await execution_host_service.register_worker(
         db,
         label=body.label,
+        device_id=body.device_id,
         platform=body.platform,
     )
     await db.commit()

@@ -54,20 +54,32 @@ describe('WorkerRunner', () => {
 
   it('registers this machine before asking for work', async () => {
     respondTo('/jobs/claim', null);
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
 
     await runner.start();
     runner.stop();
 
     const [path, body] = apiMocks.post.mock.calls[0];
     expect(path).toBe('/execution-hosts/register');
-    expect(body).toEqual({ label: 'MacBook', platform: 'darwin' });
+    expect(body).toEqual({
+      label: 'MacBook',
+      device_id: '00000000-0000-0000-0000-000000000001',
+      platform: 'darwin',
+    });
   });
 
   it('runs a claimed job here and reports the result', async () => {
     respondTo('/jobs/claim', job);
     workerMocks.run.mockResolvedValue({ output: 'Done' });
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
 
     await runner.start();
     await vi.advanceTimersByTimeAsync(0);
@@ -100,7 +112,11 @@ describe('WorkerRunner', () => {
         finish = resolve;
       }),
     );
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
 
     await runner.start();
     await vi.advanceTimersByTimeAsync(0);
@@ -125,7 +141,11 @@ describe('WorkerRunner', () => {
   it('reports a failure rather than leaving the run started', async () => {
     respondTo('/jobs/claim', job);
     workerMocks.run.mockRejectedValue(new Error('claude is not installed on this machine'));
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
 
     await runner.start();
     await vi.advanceTimersByTimeAsync(0);
@@ -139,7 +159,11 @@ describe('WorkerRunner', () => {
   it('does not run anything on a surface with no shell', async () => {
     respondTo('/jobs/claim', job);
     workerMocks.worker = null;
-    const runner = new WorkerRunner({ label: 'Browser', provider: 'claude' });
+    const runner = new WorkerRunner({
+      label: 'Browser',
+      deviceId: '00000000-0000-0000-0000-000000000002',
+      provider: 'claude',
+    });
 
     await runner.start();
     await vi.advanceTimersByTimeAsync(0);
@@ -156,7 +180,12 @@ describe('WorkerRunner', () => {
       if (url.includes('/register')) return { data: { id: 'host-1' } };
       throw new Error('offline');
     });
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude', pollIntervalMs: 100 });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+      pollIntervalMs: 100,
+    });
 
     await runner.start();
     await vi.advanceTimersByTimeAsync(0);
@@ -165,6 +194,33 @@ describe('WorkerRunner', () => {
     runner.stop();
 
     expect(apiMocks.post.mock.calls.length).toBeGreaterThan(afterFirst);
+  });
+
+  it('retries when the initial registration fails', async () => {
+    let registrations = 0;
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url.includes('/register')) {
+        registrations += 1;
+        if (registrations === 1) throw new Error('server starting');
+        return { data: { id: 'host-1' } };
+      }
+      if (url.includes('/jobs/claim')) return { data: null };
+      return { data: null };
+    });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+      pollIntervalMs: 100,
+    });
+
+    await expect(runner.start()).rejects.toThrow('server starting');
+    expect(useWorkerStore.getState().hostId).toBeNull();
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(registrations).toBe(2);
+    expect(useWorkerStore.getState().hostId).toBe('host-1');
+    runner.stop();
   });
 
   // The server never reads this disk, so checking in is when it first hears
@@ -178,7 +234,11 @@ describe('WorkerRunner', () => {
       ],
     });
     workerMocks.readContext.mockResolvedValue([{ path: 'README.md', text: '# Papers' }]);
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
 
     await runner.start();
     runner.stop();
@@ -198,7 +258,11 @@ describe('WorkerRunner', () => {
   it('re-describes the folder before running work in it, and exposes itself to the UI', async () => {
     respondTo('/jobs/claim', { ...job, project_id: 'project-1' });
     workerMocks.run.mockResolvedValue({ output: 'Done' });
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
 
     await runner.start();
     expect(useWorkerStore.getState().hostId).toBe('host-1');
@@ -216,7 +280,12 @@ describe('WorkerRunner', () => {
 
   it('stops asking once it is stopped', async () => {
     respondTo('/jobs/claim', null);
-    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude', pollIntervalMs: 100 });
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+      pollIntervalMs: 100,
+    });
 
     await runner.start();
     runner.stop();

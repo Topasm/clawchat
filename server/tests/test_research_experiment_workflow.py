@@ -66,7 +66,16 @@ async def test_research_experiment_moves_from_project_rules_to_work_vault(
         "is_available": True,
         "is_offline": False,
         "is_unconfigured": False,
-        "paths": [{"host_id": local_host.id, "path": str(workspace_path)}],
+        "paths": [
+            {
+                "host_id": local_host.id,
+                "path": str(workspace_path),
+                "context_updated_at": None,
+                "context_files": [],
+            }
+        ],
+        "context_updated_at": None,
+        "context_files": [],
     }
     await db_session.refresh(project)
 

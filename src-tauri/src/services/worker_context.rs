@@ -8,6 +8,7 @@
 //! reach, not the contents of the folder.
 
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -118,20 +119,26 @@ fn read_bounded(root: &Path, path: &Path) -> Option<String> {
     if !resolved.starts_with(root) {
         return None;
     }
-    let bytes = fs::read(resolved).ok()?;
+    let file = fs::File::open(resolved).ok()?;
+    let mut bytes = Vec::with_capacity(MAX_FILE_BYTES + 1);
+    file.take((MAX_FILE_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    let source_was_cut = bytes.len() > MAX_FILE_BYTES;
     let text = String::from_utf8_lossy(&bytes);
-    Some(truncate(text.trim(), MAX_FILE_BYTES))
+    Some(truncate(text.trim(), MAX_FILE_BYTES, source_was_cut))
 }
 
-fn truncate(text: &str, max_bytes: usize) -> String {
-    if text.len() <= max_bytes {
+fn truncate(text: &str, max_bytes: usize, source_was_cut: bool) -> String {
+    const MARKER: &str = "\n…(truncated)";
+    if !source_was_cut && text.len() <= max_bytes {
         return text.to_owned();
     }
-    let mut end = max_bytes;
+    let mut end = text.len().min(max_bytes.saturating_sub(MARKER.len()));
     while !text.is_char_boundary(end) {
         end -= 1;
     }
-    format!("{}\n…(truncated)", text[..end].trim_end())
+    format!("{}{MARKER}", text[..end].trim_end())
 }
 
 #[cfg(test)]
@@ -186,11 +193,10 @@ mod tests {
         let files = read_context(dir.path().to_str().unwrap()).expect("context");
 
         assert!(files.iter().all(|file| file.text.ends_with("…(truncated)")));
+        assert!(files.iter().all(|file| file.text.len() <= MAX_FILE_BYTES));
         let total: usize = files.iter().map(|file| file.text.len()).sum();
         assert!(total <= MAX_TOTAL_BYTES);
-        // A cut file is the ceiling plus its marker, so two fit; the third
-        // would cross the total and is dropped whole, as is everything after.
-        assert_eq!(files.len(), 2);
+        assert_eq!(files.len(), 3);
     }
 
     #[cfg(unix)]

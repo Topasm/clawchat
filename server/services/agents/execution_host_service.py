@@ -19,6 +19,7 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,7 @@ HOST_HEARTBEAT_GRACE = timedelta(minutes=5)
 #: push a prompt-sized blob into every run and chat turn.
 MAX_CONTEXT_FILE_CHARS = 8_000
 MAX_CONTEXT_TOTAL_CHARS = 24_000
+CONTEXT_TRUNCATION_MARKER = "\n…(truncated)"
 
 
 @dataclass(frozen=True)
@@ -226,7 +228,8 @@ async def store_workspace_context(
         if not body:
             continue
         if len(body) > MAX_CONTEXT_FILE_CHARS:
-            body = body[:MAX_CONTEXT_FILE_CHARS].rstrip() + "\n…(truncated)"
+            body_limit = MAX_CONTEXT_FILE_CHARS - len(CONTEXT_TRUNCATION_MARKER)
+            body = body[:body_limit].rstrip() + CONTEXT_TRUNCATION_MARKER
         block = f"--- {name} ---\n{body}"
         if len(block) > budget:
             break
@@ -258,7 +261,8 @@ async def workspace_context_block(
     if not text:
         return header
     if max_chars is not None and len(text) > max_chars:
-        text = text[:max_chars].rstrip() + "\n…(truncated)"
+        text_limit = max_chars - len(CONTEXT_TRUNCATION_MARKER)
+        text = text[:text_limit].rstrip() + CONTEXT_TRUNCATION_MARKER
     return f"{header}\n{text}"
 
 
@@ -344,19 +348,53 @@ async def register_worker(
     db: AsyncSession,
     *,
     label: str,
+    device_id: UUID | None = None,
     platform: str | None = None,
 ) -> ExecutionHost:
     """Record that a desktop app on some machine is available to run work.
 
-    Identity is the label the app reports, so reopening the app on the same
-    machine checks the same host back in rather than growing a new one on
-    every launch.
+    New clients report a stable device id, so renaming a machine cannot change
+    its identity and two machines with the same default label cannot share
+    work. Label matching remains only for adopting hosts created by an older
+    client that did not have a device id yet.
     """
-    host = (
+    normalized_label = label.strip()
+    normalized_device_id = str(device_id) if device_id is not None else None
+    host = None
+    if normalized_device_id is not None:
+        host = (
+            await db.execute(
+                select(ExecutionHost).where(
+                    ExecutionHost.device_id == normalized_device_id
+                )
+            )
+        ).scalar_one_or_none()
+
+    label_host = (
         await db.execute(
-            select(ExecutionHost).where(ExecutionHost.label == label.strip())
+            select(ExecutionHost).where(ExecutionHost.label == normalized_label)
         )
     ).scalar_one_or_none()
+    if host is not None and label_host is not None and label_host.id != host.id:
+        raise ValidationError(
+            "That name already belongs to a different machine.",
+            details={"reason": "label_device_conflict"},
+        )
+    if host is None and label_host is not None:
+        if normalized_device_id is None and label_host.device_id is not None:
+            raise ValidationError(
+                "This machine registration needs a device id.",
+                details={"reason": "device_id_required"},
+            )
+        if (
+            normalized_device_id is not None
+            and label_host.device_id not in {None, normalized_device_id}
+        ):
+            raise ValidationError(
+                "That name already belongs to a different machine.",
+                details={"reason": "label_device_conflict"},
+            )
+        host = label_host
     if host is not None and host.kind != "worker":
         # Refuse before touching the row: the label belongs to a machine that
         # is reached a different way, and checking it in would misreport it.
@@ -367,7 +405,8 @@ async def register_worker(
     now = datetime.now(timezone.utc)
     if host is None:
         host = ExecutionHost(
-            label=label.strip(),
+            label=normalized_label,
+            device_id=normalized_device_id,
             kind="worker",
             platform=platform,
             last_seen_at=now,
@@ -376,6 +415,9 @@ async def register_worker(
         await db.flush()
         return host
 
+    if normalized_device_id is not None:
+        host.device_id = normalized_device_id
+        host.label = normalized_label
     host.last_seen_at = now
     if platform:
         host.platform = platform
@@ -414,19 +456,39 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
     from models.agent_task import AgentTask
     from models.todo import Todo
 
-    run = (
+    # SQLite, the default database, ignores SELECT FOR UPDATE. Select and move
+    # the oldest queued row in one conditional UPDATE so two pollers cannot
+    # both receive it. A loser simply asks again on its next poll.
+    candidate_id = (
+        select(AgentRun.id)
+        .where(
+            AgentRun.execution_host_id == host.id,
+            AgentRun.status == AgentRunStatus.QUEUED,
+        )
+        .order_by(AgentRun.created_at.asc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    now = datetime.now(timezone.utc)
+    claimed_id = (
         await db.execute(
-            select(AgentRun)
+            update(AgentRun)
             .where(
-                AgentRun.execution_host_id == host.id,
+                AgentRun.id == candidate_id,
                 AgentRun.status == AgentRunStatus.QUEUED,
             )
-            .order_by(AgentRun.created_at.asc())
-            .limit(1)
-            .with_for_update()
+            .values(
+                status=AgentRunStatus.STARTING,
+                host_id=host.label,
+                heartbeat_at=now,
+            )
+            .returning(AgentRun.id)
         )
     ).scalar_one_or_none()
-    if run is None:
+    if claimed_id is None:
+        return None
+    run = await db.get(AgentRun, claimed_id)
+    if run is None:  # Defensive: RETURNING named a row in this transaction.
         return None
 
     project = await db.get(Project, run.project_id) if run.project_id else None
@@ -438,11 +500,6 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
         run.error = "This project no longer has a path on that machine."
         await db.flush()
         return None
-
-    run.status = AgentRunStatus.STARTING
-    run.host_id = host.label
-    run.heartbeat_at = datetime.now(timezone.utc)
-    await db.flush()
 
     task = await db.get(AgentTask, run.agent_task_id)
     todo_title = None

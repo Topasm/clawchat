@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { platformApi } from '../platform';
 import { logger } from '../services/logger';
 import { WorkerRunner } from '../services/workerRunner';
+import { getWorkerDeviceId } from '../services/workerIdentity';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 
@@ -26,7 +27,11 @@ export default function useWorkerRunner(): void {
     const label = workerLabel.trim();
     if (!workerEnabled || !platformApi.worker || !token || !label) return;
 
-    const runner = new WorkerRunner({ label, provider: workerProvider });
+    const runner = new WorkerRunner({
+      label,
+      deviceId: getWorkerDeviceId(),
+      provider: workerProvider,
+    });
     void runner.start().catch((error) => {
       logger.warn('Could not start the worker on this machine', error);
     });

@@ -9,6 +9,8 @@ import {
 import usePlatform from '../../hooks/usePlatform';
 import { platformApi } from '../../platform';
 import { logger } from '../../services/logger';
+import { uploadProjectContext } from '../../services/workerRunner';
+import { getWorkerDeviceId } from '../../services/workerIdentity';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useToastStore } from '../../stores/useToastStore';
 import Dialog from '../shared/Dialog';
@@ -61,13 +63,18 @@ export default function ProjectCreateDialog({ open, onOpenChange }: ProjectCreat
   const [registerHere, setRegisterHere] = useState(false);
   const [machineLabel, setMachineLabel] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const deviceId = useMemo(getWorkerDeviceId, []);
 
   // This machine, if it is already known to the server under its worker name.
   const thisMachine = useMemo(() => {
     if (!isDesktop || !workerEnabled) return undefined;
     const label = workerLabel.trim();
-    return hosts.find((host) => host.kind === 'worker' && host.label === label);
-  }, [hosts, isDesktop, workerEnabled, workerLabel]);
+    return hosts.find(
+      (host) =>
+        host.kind === 'worker' &&
+        (host.device_id === deviceId || (!host.device_id && host.label === label)),
+    );
+  }, [deviceId, hosts, isDesktop, workerEnabled, workerLabel]);
   const canRegisterHere = isDesktop && !thisMachine;
 
   useEffect(() => {
@@ -106,7 +113,11 @@ export default function ProjectCreateDialog({ open, onOpenChange }: ProjectCreat
       if (trimmedPath && registerHere) {
         // Register before creating anything, so a failure leaves no half-bound project.
         const label = machineLabel.trim();
-        const host = await registerHost.mutateAsync({ label, platform: platformApi.runtime.os });
+        const host = await registerHost.mutateAsync({
+          label,
+          device_id: deviceId,
+          platform: platformApi.runtime.os,
+        });
         setWorkerLabel(label);
         setWorkerEnabled(true);
         targetHostId = host.id;
@@ -122,6 +133,15 @@ export default function ProjectCreateDialog({ open, onOpenChange }: ProjectCreat
             hostId: targetHostId,
             path: trimmedPath,
           });
+          if (isDesktop && (registerHere || thisMachine?.id === targetHostId)) {
+            try {
+              // The worker may have registered before this project existed.
+              // Publish the first snapshot now so the first chat/run sees it.
+              await uploadProjectContext(targetHostId, project.id, trimmedPath);
+            } catch (error) {
+              logger.warn('Could not send the initial folder context', error);
+            }
+          }
         } catch (error) {
           logger.warn('Could not bind the project folder', error);
           useToastStore

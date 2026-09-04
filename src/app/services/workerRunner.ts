@@ -19,6 +19,8 @@ import { logger } from './logger';
 export interface WorkerRunnerOptions {
   /** How this machine is named to the server. */
   label: string;
+  /** Stable identity; unlike the label, this never changes. */
+  deviceId: string;
   /** "claude" or "codex". */
   provider: string;
   /** Milliseconds between polls while idle. */
@@ -43,6 +45,21 @@ interface HostProjectPath {
 const DEFAULT_POLL_INTERVAL_MS = 4000;
 const RUN_HEARTBEAT_INTERVAL_MS = 60_000;
 
+/** Read one local project folder and publish its bounded description. */
+export async function uploadProjectContext(
+  hostId: string,
+  projectId: string,
+  path: string,
+): Promise<void> {
+  const worker = platformApi.worker;
+  if (!worker) return;
+  const files = await worker.readContext(path);
+  await apiClient.put(`/projects/${projectId}/workspace/context`, {
+    host_id: hostId,
+    files,
+  });
+}
+
 export class WorkerRunner {
   private hostId: string | null = null;
   private stopped = false;
@@ -61,8 +78,14 @@ export class WorkerRunner {
     useWorkerStore
       .getState()
       .setRefreshProjectContext((projectId, path) => this.refreshProjectContext(projectId, path));
-    await this.register();
-    this.scheduleNextPoll(0);
+    const interval = this.options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    try {
+      await this.register();
+    } finally {
+      // Registration can fail while the server is starting or the network is
+      // moving. Keep the loop alive so "Connecting…" can recover on its own.
+      this.scheduleNextPoll(this.hostId === null ? interval : 0);
+    }
   }
 
   stop(): void {
@@ -77,6 +100,7 @@ export class WorkerRunner {
   private async register(): Promise<void> {
     const response = await apiClient.post('/execution-hosts/register', {
       label: this.options.label,
+      device_id: this.options.deviceId,
       platform: platformApi.runtime.os,
     });
     this.hostId = response.data?.id ?? null;
@@ -94,13 +118,8 @@ export class WorkerRunner {
    * prompts learn what the folder is for.
    */
   async refreshProjectContext(projectId: string, path: string): Promise<void> {
-    const worker = platformApi.worker;
-    if (!worker || this.hostId === null) return;
-    const files = await worker.readContext(path);
-    await apiClient.put(`/projects/${projectId}/workspace/context`, {
-      host_id: this.hostId,
-      files,
-    });
+    if (this.hostId === null) return;
+    await uploadProjectContext(this.hostId, projectId, path);
   }
 
   private async refreshAllContexts(): Promise<void> {

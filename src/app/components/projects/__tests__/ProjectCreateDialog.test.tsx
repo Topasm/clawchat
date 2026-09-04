@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   bindWorkspace: vi.fn(),
   navigate: vi.fn(),
   selectFolder: vi.fn(),
+  readContext: vi.fn(),
+  put: vi.fn(),
   hosts: [] as Array<Record<string, unknown>>,
   isDesktop: false,
 }));
@@ -27,7 +29,14 @@ vi.mock('../../../platform', () => ({
   platformApi: {
     runtime: { os: 'linux' },
     server: { selectFolder: mocks.selectFolder },
+    worker: { readContext: mocks.readContext },
   },
+}));
+vi.mock('../../../services/apiClient', () => ({
+  default: { put: mocks.put },
+}));
+vi.mock('../../../services/workerIdentity', () => ({
+  getWorkerDeviceId: () => '00000000-0000-0000-0000-000000000001',
 }));
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -35,7 +44,13 @@ vi.mock('react-router-dom', async () => {
 });
 
 const serverHost = { id: 'host-server', label: 'Workstation', kind: 'local', is_enabled: true };
-const macHost = { id: 'host-mac', label: 'MacBook', kind: 'worker', is_enabled: true };
+const macHost = {
+  id: 'host-mac',
+  label: 'MacBook',
+  device_id: '00000000-0000-0000-0000-000000000001',
+  kind: 'worker',
+  is_enabled: true,
+};
 
 function renderDialog() {
   return render(
@@ -60,6 +75,8 @@ describe('ProjectCreateDialog', () => {
     mocks.bindWorkspace.mockReset().mockResolvedValue(undefined);
     mocks.navigate.mockReset();
     mocks.selectFolder.mockReset();
+    mocks.readContext.mockReset().mockResolvedValue([{ path: 'README.md', text: '# Lab' }]);
+    mocks.put.mockReset().mockResolvedValue({ data: {} });
     mocks.hosts = [serverHost, macHost];
     mocks.isDesktop = false;
     useSettingsStore.setState({ workerEnabled: false, workerLabel: '' });
@@ -125,12 +142,18 @@ describe('ProjectCreateDialog', () => {
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/projects/project-new'));
     expect(mocks.registerHost).toHaveBeenCalledWith({
       label: 'My Linux machine',
+      device_id: '00000000-0000-0000-0000-000000000001',
       platform: 'linux',
     });
     expect(mocks.bindWorkspace).toHaveBeenCalledWith({
       projectId: 'project-new',
       hostId: 'host-here',
       path: '/home/me/lab',
+    });
+    expect(mocks.readContext).toHaveBeenCalledWith('/home/me/lab');
+    expect(mocks.put).toHaveBeenCalledWith('/projects/project-new/workspace/context', {
+      host_id: 'host-here',
+      files: [{ path: 'README.md', text: '# Lab' }],
     });
     // The settings toggle and this dialog write the same store.
     expect(useSettingsStore.getState().workerEnabled).toBe(true);

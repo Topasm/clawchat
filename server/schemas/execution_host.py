@@ -1,6 +1,7 @@
 """API contracts for execution hosts and the paths projects have on them."""
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,6 +30,7 @@ class ExecutionHostUpdate(BaseModel):
 class ExecutionHostResponse(BaseModel):
     id: str
     label: str
+    device_id: UUID | None = None
     kind: str
     target: str | None = None
     platform: str | None = None
@@ -44,6 +46,7 @@ class WorkerRegistration(BaseModel):
     """A desktop app announcing the machine it runs on."""
 
     label: str = Field(min_length=1, max_length=200)
+    device_id: UUID | None = None
     platform: str | None = Field(default=None, max_length=50)
 
 
