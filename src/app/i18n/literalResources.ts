@@ -1452,6 +1452,7 @@ Object.assign(koreanUiTranslations, {
   'Goal (optional)': '목표 (선택)',
   'Discuss with agent': '에이전트와 논의',
   'Task thread': '작업 스레드',
+  ' · {{count}} threads': ' · 스레드 {{count}}개',
   'Steps live under this task; ask the agent to add, plan, or run them.':
     '이 작업 아래에 단계가 쌓입니다. 에이전트에게 추가·계획·실행을 요청하세요.',
 });

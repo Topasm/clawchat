@@ -38,11 +38,52 @@ export default function ChatListPage() {
   const [projectTitle, setProjectTitle] = useState('');
   const [projectGoal, setProjectGoal] = useState('');
   const loading = convsLoading || projsLoading;
-  // Quick chats = conversations without a project_todo_id
-  const agentChats = conversations.filter((c) => c.metadata?.origin === 'agent_run');
-  const quickChats = conversations.filter(
-    (c) => !c.project_id && !c.project_todo_id && c.metadata?.origin !== 'agent_run',
+  // Every conversation that belongs to a project -- its context chat, threads
+  // scoped to its tasks, and agent runs on them -- is listed under the
+  // project. Only unscoped chats and unscoped runs stay in the flat groups.
+  const projectOfConversation = useMemo(() => {
+    const todoProject = new Map(todos.map((todo) => [todo.id, todo.project_id ?? null]));
+    const rootProject = new Map(
+      projects.flatMap((project) =>
+        project.root_task_id ? [[project.root_task_id, project.id] as const] : [],
+      ),
+    );
+    const byConversation = new Map<string, string>();
+    for (const conversation of conversations) {
+      const projectId =
+        conversation.project_id ??
+        (conversation.project_todo_id
+          ? (rootProject.get(conversation.project_todo_id) ??
+            todoProject.get(conversation.project_todo_id) ??
+            null)
+          : null);
+      if (projectId) byConversation.set(conversation.id, projectId);
+    }
+    return byConversation;
+  }, [conversations, projects, todos]);
+  const projectChats = useMemo(() => {
+    const groups = new Map<string, typeof conversations>();
+    for (const conversation of conversations) {
+      const projectId = projectOfConversation.get(conversation.id);
+      if (!projectId) continue;
+      groups.set(projectId, [...(groups.get(projectId) ?? []), conversation]);
+    }
+    return groups;
+  }, [conversations, projectOfConversation]);
+  const agentChats = conversations.filter(
+    (c) => c.metadata?.origin === 'agent_run' && !projectOfConversation.has(c.id),
   );
+  const quickChats = conversations.filter(
+    (c) => !projectOfConversation.has(c.id) && c.metadata?.origin !== 'agent_run',
+  );
+  const [openProjectChats, setOpenProjectChats] = useState<Set<string>>(new Set());
+  const toggleProjectChats = (projectId: string) =>
+    setOpenProjectChats((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
   // Compute per-project metadata
   const projectMeta = useMemo(() => {
     const accumulators = new Map<
@@ -232,6 +273,44 @@ export default function ChatListPage() {
           })}
         </div>
       )}
+
+      {/* Project threads: context chat, task threads and agent runs, per project */}
+      {projects
+        .filter((project) => (projectChats.get(project.id)?.length ?? 0) > 0)
+        .map((project) => {
+          const threads = projectChats.get(project.id) ?? [];
+          const open = openProjectChats.has(project.id);
+          return (
+            <div key={project.id} className="cc-quick-chats" data-project-threads={project.id}>
+              <button
+                type="button"
+                className="cc-quick-chats__toggle"
+                onClick={() => toggleProjectChats(project.id)}
+                aria-expanded={open}
+              >
+                <ChevronRightIcon
+                  size={12}
+                  className={`cc-quick-chats__chevron${open ? ' cc-quick-chats__chevron--open' : ''}`}
+                />
+                <span style={{ marginRight: 6 }}>{getProjectIcon(project.id)}</span>
+                {project.title}
+                {translateUi(' · {{count}} threads', { count: threads.length })}
+              </button>
+              {open && (
+                <div className="cc-quick-chats__list">
+                  {threads.map((convo) => (
+                    <ConversationItem
+                      key={convo.id}
+                      conversation={convo}
+                      onClick={() => navigate(`/chats/${convo.id}`)}
+                      onDelete={() => setDeleteTarget(convo.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
       {/* Quick Conversations Section */}
       {!loading && projects.length === 0 && quickChats.length === 0 ? (
