@@ -80,6 +80,45 @@ async def create_project(
     return project
 
 
+async def delete_project(db: AsyncSession, project_id: str) -> list[str]:
+    """Remove a project and its root; hand its tasks back to the Inbox.
+
+    The tasks are the user's work and outlive the container: they lose the
+    project, tasks that hung directly off the root become roots of their own,
+    and open ones go back to ``captured`` so the Inbox offers them a new home.
+    Returns the ids of the tasks that were handed back. Caller commits.
+    """
+    from services.tasks.graph_command_service import (
+        current_graph_revision,
+        ensure_graph_revision_advanced,
+    )
+
+    project = await get_project(db, project_id)
+    previous_revision = await current_graph_revision(db)
+    tasks = list(
+        (
+            await db.execute(select(Todo).where(Todo.project_id == project.id))
+        ).scalars().all()
+    )
+    root = next((task for task in tasks if task.id == project.root_task_id), None)
+    released: list[str] = []
+    for task in tasks:
+        if task is root:
+            continue
+        task.project_id = None
+        if root is not None and task.parent_id == root.id:
+            task.parent_id = None
+        if task.status not in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
+            task.inbox_state = "captured"
+        released.append(task.id)
+    if root is not None:
+        await db.delete(root)
+    await db.delete(project)
+    await db.flush()
+    await ensure_graph_revision_advanced(db, previous_revision)
+    return released
+
+
 async def update_project(
     db: AsyncSession,
     project_id: str,

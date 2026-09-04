@@ -54,6 +54,19 @@ async def create_project(
     return await project_service.build_project_response(db, project)
 
 
+@router.delete("/{project_id}", status_code=204)
+async def delete_project(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Delete a project; its tasks return to the Inbox rather than disappearing."""
+    await project_service.delete_project(db, project_id)
+    await db.commit()
+    await notify_module_data_changed("projects")
+    await notify_module_data_changed("todos")
+
+
 @router.get("/{project_id}", response_model=ProjectOverviewResponse)
 async def get_project(
     project_id: str,

@@ -117,6 +117,31 @@ export function useUpdateProject(projectId: string) {
     },
   });
 }
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      await apiClient.delete(`/projects/${projectId}`);
+      return projectId;
+    },
+    onSuccess: (projectId) => {
+      queryClient.setQueryData<ProjectResponse[]>(queryKeys.projects, (current) =>
+        current?.filter((item) => item.id !== projectId),
+      );
+      queryClient.removeQueries({ queryKey: queryKeys.project(projectId) });
+      // Its tasks are back in the Inbox; every task view moved.
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskGraphInsights });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      useToastStore
+        .getState()
+        .addToast('success', translateUi('Project deleted. Its tasks are back in the Inbox.'));
+    },
+    onError: () => {
+      useToastStore.getState().addToast('error', translateUi('Could not delete project'));
+    },
+  });
+}
 export function useConversationsQuery() {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({

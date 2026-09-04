@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useCapabilitiesQuery } from '../hooks/queries/useCapabilitiesQuery';
 import { useAuthStore } from '../stores/useAuthStore';
+import { translateUi } from '../i18n';
 
 /** Pick the first useful workspace surface while retaining old-server support. */
 export default function WorkspaceStartRedirect() {
@@ -20,7 +21,7 @@ export default function WorkspaceStartRedirect() {
           color: 'var(--cc-text-secondary)',
         }}
       >
-        Loading...
+        {translateUi('Loading…')}
       </div>
     );
   }

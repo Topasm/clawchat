@@ -22,6 +22,8 @@ export interface WorkerRunnerOptions {
   provider: string;
   /** Milliseconds between polls while idle. */
   pollIntervalMs?: number;
+  /** Milliseconds between heartbeats while a job runs. */
+  heartbeatIntervalMs?: number;
 }
 
 interface ClaimedJob {
@@ -32,6 +34,9 @@ interface ClaimedJob {
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 4000;
+// Well inside the server's heartbeat timeout (RUN_HEARTBEAT_TIMEOUT_MINUTES,
+// ten minutes by default), with room for a couple of missed posts.
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 60_000;
 
 export class WorkerRunner {
   private hostId: string | null = null;
@@ -121,12 +126,26 @@ export class WorkerRunner {
         message: 'Running on this machine',
       });
 
-      const result = await worker.run({
-        provider: this.options.provider,
-        prompt: job.instruction,
-        cwd: job.cwd,
-        model: job.model,
-      });
+      // The server fails a run whose heartbeat lapses, on the reading that
+      // the machine behind it is gone. A CLI run can take much longer than
+      // that timeout, so keep saying we are here until it returns.
+      const heartbeatMs = this.options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+      const heartbeat = setInterval(() => {
+        apiClient
+          .post(`/runs/${job.run_id}/heartbeat`, { message: 'Still running on this machine' })
+          .catch((error: unknown) => logger.warn('Worker heartbeat failed', error));
+      }, heartbeatMs);
+      let result;
+      try {
+        result = await worker.run({
+          provider: this.options.provider,
+          prompt: job.instruction,
+          cwd: job.cwd,
+          model: job.model,
+        });
+      } finally {
+        clearInterval(heartbeat);
+      }
       await apiClient.post(`/runs/${job.run_id}/result`, {
         result: result.output || '(no output)',
       });

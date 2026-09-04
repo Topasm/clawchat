@@ -1417,4 +1417,15 @@ Object.assign(koreanUiTranslations, {
   'Needs your review': '검토 필요',
   'Needs a decision': '결정 필요',
   '{{count}} runs in progress.': '실행 중 {{count}}개.',
+  'Delete project': '프로젝트 삭제',
+  'Delete “{{title}}”? Its tasks go back to the Inbox.':
+    '“{{title}}”을(를) 삭제할까요? 작업은 받은 작업으로 돌아갑니다.',
+  'Project deleted. Its tasks are back in the Inbox.':
+    '프로젝트를 삭제했습니다. 작업은 받은 작업으로 돌아갔습니다.',
+  'Could not delete project': '프로젝트를 삭제하지 못했습니다',
+  'Clear due date': '마감일 지우기',
+  'No project': '프로젝트 없음',
+  'Tasks that belong to no project. Drag one onto a project, or place it from the Inbox.':
+    '프로젝트에 속하지 않은 작업입니다. 프로젝트로 드래그하거나 받은 작업에서 배치하세요.',
+  'Open project {{title}}': '프로젝트 {{title}} 열기',
 });

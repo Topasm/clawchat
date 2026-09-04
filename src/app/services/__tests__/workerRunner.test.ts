@@ -119,6 +119,44 @@ describe('WorkerRunner', () => {
     expect(apiMocks.post.mock.calls.length).toBeGreaterThan(afterFirst);
   });
 
+  // The server fails a run whose heartbeat lapses; a long CLI run must not
+  // look dead while it is still working.
+  it('keeps heartbeating while a long job runs, and stops when it ends', async () => {
+    // One job, then nothing: the poll after the run must not start it again.
+    let claims = 0;
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url.includes('/jobs/claim')) return { data: claims++ === 0 ? job : null };
+      if (url.includes('/register')) return { data: { id: 'host-1' } };
+      return { data: null };
+    });
+    let finish: (value: { output: string }) => void = () => {};
+    workerMocks.run.mockImplementation(
+      () => new Promise<{ output: string }>((resolve) => (finish = resolve)),
+    );
+    const runner = new WorkerRunner({
+      label: 'MacBook',
+      provider: 'claude',
+      heartbeatIntervalMs: 1000,
+    });
+
+    await runner.start();
+    await vi.advanceTimersByTimeAsync(0);
+    const heartbeats = () =>
+      apiMocks.post.mock.calls.filter(([url]) => url === '/runs/run-1/heartbeat').length;
+    expect(heartbeats()).toBe(1);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(heartbeats()).toBe(4);
+
+    finish({ output: 'Done' });
+    await vi.advanceTimersByTimeAsync(0);
+    runner.stop();
+    const afterFinish = heartbeats();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/runs/run-1/result', { result: 'Done' });
+    expect(heartbeats()).toBe(afterFinish);
+  });
+
   it('stops asking once it is stopped', async () => {
     respondTo('/jobs/claim', null);
     const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude', pollIntervalMs: 100 });

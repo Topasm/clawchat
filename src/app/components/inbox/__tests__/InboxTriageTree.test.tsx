@@ -265,4 +265,65 @@ describe('InboxTriageTree', () => {
     expect(onPlaceBatch).toHaveBeenCalledWith(['inbox-1', 'inbox-2'], project.id, null);
     expect(onPlace).not.toHaveBeenCalled();
   });
+
+  // A task with no project and no Inbox state used to appear nowhere on this
+  // page; the tree now shows it so it can be selected and dragged home.
+  it('lists tasks that belong to no project, but not captures or finished work', () => {
+    const loose: TodoResponse = {
+      ...task,
+      id: 'loose-1',
+      title: 'Prepare the meeting',
+      project_id: undefined,
+      parent_id: undefined,
+    };
+    const captured: TodoResponse = {
+      ...loose,
+      id: 'inbox-9',
+      title: 'Captured',
+      inbox_state: 'captured',
+    };
+    const done: TodoResponse = { ...loose, id: 'done-9', title: 'Finished', status: 'completed' };
+    const onSelectTask = vi.fn();
+    render(
+      <InboxTriageTree
+        projects={[project]}
+        todos={[task, loose, captured, done]}
+        selectedTaskId={null}
+        batchTaskIds={[]}
+        disabled={false}
+        onSelectTask={onSelectTask}
+        onPlace={vi.fn()}
+        onPlaceBatch={vi.fn()}
+        onPreviewDependency={vi.fn()}
+      />,
+    );
+
+    const group = screen.getByLabelText('No project');
+    expect(group).toHaveTextContent('Prepare the meeting');
+    expect(group).not.toHaveTextContent('Captured');
+    expect(group).not.toHaveTextContent('Finished');
+    fireEvent.click(screen.getByRole('button', { name: /Prepare the meeting/ }));
+    expect(onSelectTask).toHaveBeenCalledWith('loose-1');
+  });
+
+  it('opens the project from its heading', () => {
+    const onOpenProject = vi.fn();
+    render(
+      <InboxTriageTree
+        projects={[project]}
+        todos={[task]}
+        selectedTaskId={null}
+        batchTaskIds={[]}
+        disabled={false}
+        onSelectTask={vi.fn()}
+        onPlace={vi.fn()}
+        onPlaceBatch={vi.fn()}
+        onPreviewDependency={vi.fn()}
+        onOpenProject={onOpenProject}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open project Paper' }));
+    expect(onOpenProject).toHaveBeenCalledWith('project-1');
+  });
 });
