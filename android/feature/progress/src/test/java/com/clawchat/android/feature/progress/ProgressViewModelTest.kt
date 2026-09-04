@@ -269,6 +269,107 @@ class ProgressViewModelTest {
         coVerify(exactly = 1) { comments.addComment(active.id, "Shipping now") }
     }
 
+    @Test
+    fun `start now creates the task and puts it under In progress`() = runTest {
+        stubInitial()
+        val created = todo(id = "new-1", inboxState = "none")
+        coEvery { todos.createTodo(match { it.title == "Write the abstract" && it.inboxState == "none" }) } returns
+            ApiResult.Success(created)
+        coEvery {
+            todos.updateTodo("new-1", TodoUpdate(status = TaskStatus.IN_PROGRESS))
+        } returns ApiResult.Success(created.copy(status = TaskStatus.IN_PROGRESS))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.startTaskNow("Write the abstract")
+        advanceUntilIdle()
+
+        assertEquals(listOf("new-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
+        assertNull(viewModel.uiState.value.captureError)
+        coVerify(exactly = 1) { todos.updateTodo("new-1", TodoUpdate(status = TaskStatus.IN_PROGRESS)) }
+    }
+
+    @Test
+    fun `steps are added, ticked off and removed on the work card`() = runTest {
+        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
+        stubInitial(todos = listOf(active))
+        val step = todo(id = "step-1", inboxState = "none").copy(parentId = active.id, title = "Outline")
+        coEvery { todos.createTodo(match { it.parentId == active.id && it.title == "Outline" }) } returns
+            ApiResult.Success(step)
+        coEvery {
+            todos.updateTodo("step-1", TodoUpdate(status = TaskStatus.COMPLETED))
+        } returns ApiResult.Success(step.copy(status = TaskStatus.COMPLETED))
+        coEvery { todos.deleteTodo("step-1") } returns ApiResult.Success(Unit)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.addStep(active.id, "  Outline ")
+        advanceUntilIdle()
+        assertEquals(listOf("step-1"), viewModel.uiState.value.stepsFor(active.id).map(Todo::id))
+        // A step is part of its card, not a second card.
+        assertEquals(listOf("active-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
+
+        viewModel.setStepDone("step-1", done = true)
+        advanceUntilIdle()
+        assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.stepsFor(active.id).single().status)
+
+        viewModel.removeStep("step-1")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.stepsFor(active.id).isEmpty())
+        assertNull(viewModel.uiState.value.workError)
+    }
+
+    @Test
+    fun `finishing a task removes it from In progress`() = runTest {
+        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
+        stubInitial(todos = listOf(active))
+        coEvery {
+            todos.updateTodo(active.id, TodoUpdate(status = TaskStatus.COMPLETED))
+        } returns ApiResult.Success(active.copy(status = TaskStatus.COMPLETED))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.completeTask(active.id)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.inProgressTasks.isEmpty())
+        assertTrue(viewModel.uiState.value.pendingWorkIds.isEmpty())
+    }
+
+    @Test
+    fun `a failed work action keeps the task and surfaces the error`() = runTest {
+        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
+        stubInitial(todos = listOf(active))
+        coEvery {
+            todos.updateTodo(active.id, TodoUpdate(status = TaskStatus.PENDING))
+        } returns ApiResult.Error("offline")
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.pauseTask(active.id)
+        advanceUntilIdle()
+
+        assertEquals(listOf("active-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
+        assertEquals("offline", viewModel.uiState.value.workError)
+        assertTrue(viewModel.uiState.value.pendingWorkIds.isEmpty())
+    }
+
+    @Test
+    fun `cancelling a run replaces it with the cancelled attempt`() = runTest {
+        val running = run("run-1", AgentRunStatus.RUNNING)
+        stubInitial(runs = listOf(running))
+        coEvery { runs.cancelRun("run-1") } returns
+            ApiResult.Success(running.copy(status = AgentRunStatus.CANCELLED))
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.cancelRun("run-1")
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.executingRuns.isEmpty())
+        coVerify(exactly = 1) { runs.cancelRun("run-1") }
+    }
+
     private fun comment(todoId: String, content: String, id: String = "cmt-$content") = TaskComment(
         id = id,
         todoId = todoId,

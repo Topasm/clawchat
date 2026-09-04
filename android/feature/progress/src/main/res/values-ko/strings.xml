@@ -57,6 +57,14 @@
     <string name="progress_run_running">실행 중</string>
     <string name="progress_run_waiting_input">입력 필요</string>
     <string name="progress_run_waiting_review">검토 준비됨</string>
+    <string name="progress_start_now">바로 시작</string>
+    <string name="progress_work_done">완료</string>
+    <string name="progress_work_pause">잠시 보류</string>
+    <string name="progress_steps_progress">단계 %1$d/%2$d</string>
+    <string name="progress_step_hint">단계 추가…</string>
+    <string name="progress_step_add">단계 추가</string>
+    <string name="progress_step_remove">단계 제거</string>
+    <string name="progress_run_cancel">실행 취소</string>
     <string name="progress_run_completed">완료</string>
     <string name="progress_run_failed">실패</string>
     <string name="progress_run_cancelled">취소됨</string>

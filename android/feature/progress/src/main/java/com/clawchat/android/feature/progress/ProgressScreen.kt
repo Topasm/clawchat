@@ -19,9 +19,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,6 +57,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -61,6 +66,7 @@ import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.ReviewRiskLevel
 import com.clawchat.android.core.data.model.TaskComment
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.QuickCaptureParser
 import com.clawchat.android.core.ui.ClawEmptyState
@@ -134,6 +140,17 @@ fun ProgressScreen(
         viewModel.clearCommentError()
     }
 
+    val localizedWorkError = state.workError?.let { localizedErrorMessage(it) }
+    LaunchedEffect(localizedWorkError) {
+        val message = localizedWorkError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearWorkError()
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.startEvents.collect { captureText = "" }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -192,7 +209,14 @@ fun ProgressScreen(
                     captureText = captureText,
                     onCaptureTextChange = { captureText = it },
                     onCapture = { viewModel.captureToInbox(captureText) },
+                    onStartNow = { viewModel.startTaskNow(captureText) },
                     onSubmitComment = viewModel::addComment,
+                    onCompleteTask = viewModel::completeTask,
+                    onPauseTask = viewModel::pauseTask,
+                    onAddStep = viewModel::addStep,
+                    onToggleStep = viewModel::setStepDone,
+                    onRemoveStep = viewModel::removeStep,
+                    onCancelRun = viewModel::cancelRun,
                 )
             }
         }
@@ -229,7 +253,14 @@ private fun ProgressContent(
     captureText: String,
     onCaptureTextChange: (String) -> Unit,
     onCapture: () -> Unit,
+    onStartNow: () -> Unit,
     onSubmitComment: (todoId: String, text: String) -> Unit,
+    onCompleteTask: (todoId: String) -> Unit,
+    onPauseTask: (todoId: String) -> Unit,
+    onAddStep: (parentId: String, title: String) -> Unit,
+    onToggleStep: (stepId: String, done: Boolean) -> Unit,
+    onRemoveStep: (stepId: String) -> Unit,
+    onCancelRun: (runId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -248,6 +279,7 @@ private fun ProgressContent(
                 error = state.captureError,
                 onTextChange = onCaptureTextChange,
                 onSubmit = onCapture,
+                onStartNow = onStartNow,
             )
         }
 
@@ -359,25 +391,25 @@ private fun ProgressContent(
                 )
             }
             items(state.executingRuns, key = { "run:${it.id}" }) { run ->
-                AgentRunProgressRow(run = run, onClick = { onOpenRun(run.id) })
-            }
-            items(state.inProgressTasks, key = { "task:${it.id}" }) { task ->
-                TaskProgressRow(task = task, onClick = { onOpenTask(task.id) })
-            }
-        }
-
-        if (state.inProgressTasks.isNotEmpty()) {
-            item(key = "threads_header") {
-                ClawSectionHeader(
-                    title = stringResource(R.string.progress_threads_title),
-                    subtitle = stringResource(R.string.progress_threads_description),
+                AgentRunProgressRow(
+                    run = run,
+                    isPending = run.id in state.pendingWorkIds,
+                    onClick = { onOpenRun(run.id) },
+                    onCancel = { onCancelRun(run.id) },
                 )
             }
-            items(state.inProgressTasks, key = { "thread:${it.id}" }) { task ->
-                TaskThreadCard(
+            items(state.inProgressTasks, key = { "task:${it.id}" }) { task ->
+                WorkCard(
                     task = task,
+                    steps = state.stepsFor(task.id),
                     comments = state.commentsByTodoId[task.id].orEmpty(),
+                    pendingWorkIds = state.pendingWorkIds,
                     onOpenTask = { onOpenTask(task.id) },
+                    onComplete = { onCompleteTask(task.id) },
+                    onPause = { onPauseTask(task.id) },
+                    onAddStep = { title -> onAddStep(task.id, title) },
+                    onToggleStep = onToggleStep,
+                    onRemoveStep = onRemoveStep,
                     onSubmitComment = { text -> onSubmitComment(task.id, text) },
                 )
             }
@@ -392,6 +424,7 @@ private fun QuickCaptureCard(
     error: String?,
     onTextChange: (String) -> Unit,
     onSubmit: () -> Unit,
+    onStartNow: () -> Unit,
 ) {
     val parsed = remember(text) { QuickCaptureParser.parse(text) }
     ClawSectionCard(tone = ClawTone.Primary) {
@@ -441,11 +474,26 @@ private fun QuickCaptureCard(
         error?.let {
             ClawStatusChip(text = localizedErrorMessage(it), tone = ClawTone.Error)
         }
-        Text(
-            text = stringResource(R.string.progress_capture_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.progress_capture_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            // Capture is for later; this is for the thing you are doing right now.
+            TextButton(
+                onClick = onStartNow,
+                enabled = parsed != null && !isSubmitting,
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Text(stringResource(R.string.progress_start_now))
+            }
+        }
     }
 }
 
@@ -711,7 +759,12 @@ private fun nowActionTone(item: NowItem): ClawTone = when (item.action) {
 }
 
 @Composable
-private fun AgentRunProgressRow(run: AgentRun, onClick: () -> Unit) {
+private fun AgentRunProgressRow(
+    run: AgentRun,
+    isPending: Boolean,
+    onClick: () -> Unit,
+    onCancel: () -> Unit,
+) {
     ClawListItemSurface(onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -746,64 +799,166 @@ private fun AgentRunProgressRow(run: AgentRun, onClick: () -> Unit) {
                 tone = agentRunTone(run.status),
             )
         }
+        if (run.canCancel) {
+            TextButton(onClick = onCancel, enabled = !isPending) {
+                Text(stringResource(R.string.progress_run_cancel))
+            }
+        }
     }
 }
 
+/**
+ * One piece of work in progress, with everything you do to it while working:
+ * tick off or add steps, leave a note, finish it, or set it aside.
+ *
+ * "In progress" used to be a list of titles that opened the task page; every
+ * change meant leaving this tab and coming back.
+ */
 @Composable
-private fun TaskProgressRow(task: Todo, onClick: () -> Unit) {
-    ClawListItemSurface(onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+private fun WorkCard(
+    task: Todo,
+    steps: List<Todo>,
+    comments: List<TaskComment>,
+    pendingWorkIds: Set<String>,
+    onOpenTask: () -> Unit,
+    onComplete: () -> Unit,
+    onPause: () -> Unit,
+    onAddStep: (String) -> Unit,
+    onToggleStep: (stepId: String, done: Boolean) -> Unit,
+    onRemoveStep: (stepId: String) -> Unit,
+    onSubmitComment: (String) -> Unit,
+) {
+    var stepDraft by remember(task.id) { mutableStateOf("") }
+    var draft by remember(task.id) { mutableStateOf("") }
+    val taskPending = task.id in pendingWorkIds
+    val doneSteps = steps.count { it.status == TaskStatus.COMPLETED }
+    ClawSectionCard {
+        ClawListItemSurface(onClick = onOpenTask) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = task.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    task.nextAction?.takeIf(String::isNotBlank)?.let { nextAction ->
+                        Text(
+                            text = nextAction,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                ClawStatusChip(
+                    text = if (task.syncStatus == "pending") {
+                        stringResource(R.string.progress_task_sync_pending)
+                    } else if (steps.isNotEmpty()) {
+                        stringResource(R.string.progress_steps_progress, doneSteps, steps.size)
+                    } else {
+                        stringResource(R.string.progress_task_state)
+                    },
+                    tone = if (task.syncStatus == "pending") ClawTone.Warning else ClawTone.Primary,
+                )
+            }
+        }
+
+        steps.forEach { step ->
+            val done = step.status == TaskStatus.COMPLETED
+            val stepPending = step.id in pendingWorkIds
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = done,
+                    enabled = !stepPending,
+                    onCheckedChange = { checked -> onToggleStep(step.id, checked) },
+                )
                 Text(
-                    text = task.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
+                    text = step.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textDecoration = if (done) TextDecoration.LineThrough else null,
+                    color = if (done) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                task.nextAction?.takeIf(String::isNotBlank)?.let { nextAction ->
-                    Text(
-                        text = nextAction,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                IconButton(onClick = { onRemoveStep(step.id) }, enabled = !stepPending) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.progress_step_remove),
                     )
                 }
             }
-            ClawStatusChip(
-                text = stringResource(
-                    if (task.syncStatus == "pending") R.string.progress_task_sync_pending
-                    else R.string.progress_task_state,
-                ),
-                tone = if (task.syncStatus == "pending") ClawTone.Warning else ClawTone.Primary,
-            )
         }
-    }
-}
+        OutlinedTextField(
+            value = stepDraft,
+            onValueChange = { stepDraft = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(stringResource(R.string.progress_step_hint)) },
+            singleLine = true,
+            enabled = !taskPending,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (stepDraft.isNotBlank()) {
+                        onAddStep(stepDraft)
+                        stepDraft = ""
+                    }
+                },
+            ),
+            trailingIcon = {
+                IconButton(
+                    onClick = {
+                        if (stepDraft.isNotBlank()) {
+                            onAddStep(stepDraft)
+                            stepDraft = ""
+                        }
+                    },
+                    enabled = stepDraft.isNotBlank() && !taskPending,
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.progress_step_add),
+                    )
+                }
+            },
+        )
 
-@Composable
-private fun TaskThreadCard(
-    task: Todo,
-    comments: List<TaskComment>,
-    onOpenTask: () -> Unit,
-    onSubmitComment: (String) -> Unit,
-) {
-    var draft by remember(task.id) { mutableStateOf("") }
-    ClawSectionCard {
-        ClawListItemSurface(onClick = onOpenTask) {
-            Text(
-                text = task.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onComplete, enabled = !taskPending) {
+                Icon(Icons.Default.Check, contentDescription = null)
+                Text(stringResource(R.string.progress_work_done))
+            }
+            TextButton(onClick = onPause, enabled = !taskPending) {
+                Text(stringResource(R.string.progress_work_pause))
+            }
         }
+
+        Text(
+            text = stringResource(R.string.progress_threads_title),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (comments.isEmpty()) {
             Text(
                 text = stringResource(R.string.progress_threads_empty),

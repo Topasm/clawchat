@@ -58,6 +58,14 @@
     <string name="progress_run_running">Running</string>
     <string name="progress_run_waiting_input">Needs input</string>
     <string name="progress_run_waiting_review">Ready to review</string>
+    <string name="progress_start_now">Start now</string>
+    <string name="progress_work_done">Done</string>
+    <string name="progress_work_pause">Set aside</string>
+    <string name="progress_steps_progress">%1$d/%2$d steps</string>
+    <string name="progress_step_hint">Add a step…</string>
+    <string name="progress_step_add">Add step</string>
+    <string name="progress_step_remove">Remove step</string>
+    <string name="progress_run_cancel">Cancel run</string>
     <string name="progress_run_completed">Completed</string>
     <string name="progress_run_failed">Failed</string>
     <string name="progress_run_cancelled">Cancelled</string>

@@ -9,6 +9,7 @@ import com.clawchat.android.core.data.model.QuickCaptureParser
 import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.repository.AgentRunRepository
@@ -60,6 +61,9 @@ data class ProgressUiState(
     val isCapturing: Boolean = false,
     val captureError: String? = null,
     val commentError: String? = null,
+    /** Tasks, steps and runs with a work action in flight; their controls are held. */
+    val pendingWorkIds: Set<String> = emptySet(),
+    val workError: String? = null,
 ) {
     private val computedNowContent by lazy(LazyThreadSafetyMode.NONE) {
         buildNowContent(tasks, reviews, runs)
@@ -79,9 +83,19 @@ data class ProgressUiState(
 
     /** This is Todo workflow state, not proof that an agent process is running. */
     val inProgressTasks: List<Todo>
-        get() = taskCandidates
-            .filter { it.status == TaskStatus.IN_PROGRESS }
-            .sortedWith(compareBy<Todo> { it.sortOrder }.thenByDescending { it.updatedAt })
+        get() {
+            val active = taskCandidates.filter { it.status == TaskStatus.IN_PROGRESS }
+            val activeIds = active.map(Todo::id).toSet()
+            // A step of a task already shown is part of that card, not a card of its own.
+            return active
+                .filter { it.parentId == null || it.parentId !in activeIds }
+                .sortedWith(compareBy<Todo> { it.sortOrder }.thenByDescending { it.updatedAt })
+        }
+
+    /** The steps under a task: its open and finished subtasks, in order. */
+    fun stepsFor(taskId: String): List<Todo> = tasks
+        .filter { it.parentId == taskId && it.status != TaskStatus.CANCELLED }
+        .sortedWith(compareBy<Todo> { it.sortOrder }.thenBy { it.createdAt })
 
     val attentionCount: Int
         get() = nowContent.attentionItems.size
@@ -123,6 +137,10 @@ class ProgressViewModel @Inject constructor(
     val uiState: StateFlow<ProgressUiState> = _uiState.asStateFlow()
     private val _captureEvents = MutableSharedFlow<Todo>(extraBufferCapacity = 1)
     val captureEvents = _captureEvents.asSharedFlow()
+
+    /** Fired when a task was created straight into "In progress"; clears the field. */
+    private val _startEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val startEvents = _startEvents.asSharedFlow()
 
     private var loadJob: Job? = null
     private var reloadQueued = false
@@ -263,6 +281,135 @@ class ProgressViewModel @Inject constructor(
 
     fun clearCommentError() {
         _uiState.update { it.copy(commentError = null) }
+    }
+
+    /**
+     * Create a task and put it straight under "In progress".
+     *
+     * Capture files things for later; this is for the thing you are doing now.
+     * The server creates tasks pending, so the start is a second call -- if
+     * that one fails the task still exists, just not started, and says so.
+     */
+    fun startTaskNow(raw: String) {
+        if (_uiState.value.isCapturing) return
+        val draft = QuickCaptureParser.parse(raw) ?: return
+        val request = draft
+            .toTodoCreate(source = "android_app", idempotencyKey = java.util.UUID.randomUUID().toString())
+            .copy(inboxState = "none")
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCapturing = true, captureError = null) }
+            val created = when (val result = todoRepository.createTodo(request)) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(isCapturing = false, captureError = result.message) }
+                    return@launch
+                }
+                ApiResult.Loading -> {
+                    _uiState.update { it.copy(isCapturing = false, captureError = ACTION_INCOMPLETE_ERROR) }
+                    return@launch
+                }
+            }
+            val startResult = todoRepository.updateTodo(
+                created.id,
+                TodoUpdate(status = TaskStatus.IN_PROGRESS),
+            )
+            _uiState.update { state ->
+                val task = (startResult as? ApiResult.Success)?.data ?: created
+                state.copy(
+                    tasks = listOf(task) + state.tasks.filterNot { it.id == task.id },
+                    isCapturing = false,
+                    captureError = (startResult as? ApiResult.Error)?.message,
+                )
+            }
+            _startEvents.tryEmit(Unit)
+        }
+    }
+
+    fun completeTask(todoId: String) = setTaskStatus(todoId, TaskStatus.COMPLETED)
+
+    fun pauseTask(todoId: String) = setTaskStatus(todoId, TaskStatus.PENDING)
+
+    fun setStepDone(stepId: String, done: Boolean) =
+        setTaskStatus(stepId, if (done) TaskStatus.COMPLETED else TaskStatus.PENDING)
+
+    fun addStep(parentId: String, title: String) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty() || parentId in _uiState.value.pendingWorkIds) return
+        val request = TodoCreate(
+            title = trimmed,
+            parentId = parentId,
+            source = "android_app",
+            inboxState = "none",
+            idempotencyKey = java.util.UUID.randomUUID().toString(),
+        )
+        viewModelScope.launch {
+            beginWork(parentId)
+            when (val result = todoRepository.createTodo(request)) {
+                is ApiResult.Success -> finishWork(parentId) { state ->
+                    state.copy(tasks = state.tasks.filterNot { it.id == result.data.id } + result.data)
+                }
+                is ApiResult.Error -> failWork(parentId, result.message)
+                ApiResult.Loading -> failWork(parentId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    fun removeStep(stepId: String) {
+        if (stepId in _uiState.value.pendingWorkIds) return
+        viewModelScope.launch {
+            beginWork(stepId)
+            when (val result = todoRepository.deleteTodo(stepId)) {
+                is ApiResult.Success -> finishWork(stepId) { state ->
+                    state.copy(tasks = state.tasks.filterNot { it.id == stepId })
+                }
+                is ApiResult.Error -> failWork(stepId, result.message)
+                ApiResult.Loading -> failWork(stepId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    fun cancelRun(runId: String) {
+        if (runId in _uiState.value.pendingWorkIds) return
+        viewModelScope.launch {
+            beginWork(runId)
+            when (val result = agentRunRepository.cancelRun(runId)) {
+                is ApiResult.Success -> finishWork(runId) { state ->
+                    state.copy(runs = state.runs.map { if (it.id == runId) result.data else it })
+                }
+                is ApiResult.Error -> failWork(runId, result.message)
+                ApiResult.Loading -> failWork(runId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    fun clearWorkError() {
+        _uiState.update { it.copy(workError = null) }
+    }
+
+    private fun setTaskStatus(todoId: String, status: TaskStatus) {
+        if (todoId in _uiState.value.pendingWorkIds) return
+        viewModelScope.launch {
+            beginWork(todoId)
+            when (val result = todoRepository.updateTodo(todoId, TodoUpdate(status = status))) {
+                is ApiResult.Success -> finishWork(todoId) { state ->
+                    state.copy(tasks = state.tasks.replaceTodo(result.data))
+                }
+                is ApiResult.Error -> failWork(todoId, result.message)
+                ApiResult.Loading -> failWork(todoId, ACTION_INCOMPLETE_ERROR)
+            }
+        }
+    }
+
+    private fun beginWork(id: String) {
+        _uiState.update { it.copy(pendingWorkIds = it.pendingWorkIds + id, workError = null) }
+    }
+
+    private fun finishWork(id: String, apply: (ProgressUiState) -> ProgressUiState) {
+        _uiState.update { state -> apply(state).copy(pendingWorkIds = state.pendingWorkIds - id) }
+    }
+
+    private fun failWork(id: String, message: String) {
+        _uiState.update { it.copy(pendingWorkIds = it.pendingWorkIds - id, workError = message) }
     }
 
     fun fileTodo(item: NowItem, dueToday: Boolean) {
