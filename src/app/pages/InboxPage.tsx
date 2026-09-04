@@ -6,6 +6,7 @@ import usePlatform from '../hooks/usePlatform';
 import {
   useDeleteTodo,
   useExecutionProvidersQuery,
+  useGetOrCreateProjectConversation,
   useProjectsQuery,
   useSkillsQuery,
   useStartReadyTaskExecution,
@@ -38,6 +39,7 @@ export default function InboxPage() {
   const graphInsights = useTaskGraphInsightsQuery(null);
   const { data: executionTelemetry = [] } = useTaskExecutionTelemetryQuery();
   const startReadyExecution = useStartReadyTaskExecution();
+  const getConversation = useGetOrCreateProjectConversation();
   const { isMobile } = usePlatform();
   const addToast = useToastStore((s) => s.addToast);
   const toggleMutation = useToggleTodoComplete();
@@ -220,6 +222,12 @@ export default function InboxPage() {
           }
           onReturnToInbox={(taskId) => void placement.placeTask(taskId, null, null)}
           onNavigate={(path) => navigate(path)}
+          onOpenConversation={(taskId) => {
+            void getConversation.mutateAsync(taskId).then(
+              (conversation) => navigate(`/chats/${conversation.id}`),
+              () => addToast('error', translateUi('Failed')),
+            );
+          }}
         />
       </div>
     </div>

@@ -192,6 +192,20 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
         raise NotFoundError(f"Project {proposed_project_id} not found")
     apply_model_updates(todo, updates)
 
+    # A project's root is the project as seen from task views; a rename there
+    # is a rename of the project, the same way the project page renames the root.
+    if "title" in updates or "description" in updates:
+        owning_project = (
+            await db.execute(
+                select(Project).where(Project.root_task_id == todo.id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if owning_project is not None:
+            if "title" in updates and updates["title"]:
+                owning_project.title = updates["title"]
+            if "description" in updates:
+                owning_project.description = updates["description"]
+
     if "status" in updates:
         if updates["status"] == TaskStatus.COMPLETED and not todo.completed_at:
             todo.completed_at = datetime.now(timezone.utc)

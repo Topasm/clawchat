@@ -252,6 +252,34 @@ async def test_deleting_a_project_hands_its_tasks_back_to_the_inbox(
 
 
 @pytest.mark.asyncio
+async def test_renaming_the_root_task_renames_the_project(client, auth_headers, db_session):
+    created = await _create_project(client, auth_headers, "Old name")
+
+    response = await client.patch(
+        f"/api/todos/{created['root_task_id']}",
+        headers=auth_headers,
+        json={"title": "New name", "description": "Why it matters"},
+    )
+    assert response.status_code == 200, response.text
+
+    project = await db_session.get(Project, created["id"])
+    await db_session.refresh(project)
+    assert project.title == "New name"
+    assert project.description == "Why it matters"
+
+    # And the project page's own rename still reaches the root task.
+    response = await client.patch(
+        f"/api/projects/{created['id']}",
+        headers=auth_headers,
+        json={"title": "Final name", "goal": "Ship it"},
+    )
+    assert response.status_code == 200, response.text
+    root = await db_session.get(Todo, created["root_task_id"])
+    await db_session.refresh(root)
+    assert root.title == "Final name"
+
+
+@pytest.mark.asyncio
 async def test_a_project_root_cannot_be_deleted_as_a_task(client, auth_headers, db_session):
     created = await _create_project(client, auth_headers, "Keep me")
 

@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../hooks/queries', () => ({
   queryKeys: { todos: ['todos'] },
   useTodosQuery: () => ({ data: mocks.todos }),
+  useGetOrCreateProjectConversation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useProjectsQuery: () => ({ data: mocks.projects }),
   useTaskGraphInsightsQuery: () => mocks.graphInsights,
   useTaskExecutionTelemetryQuery: () => ({ data: mocks.telemetry }),

@@ -110,7 +110,7 @@ export function useUpdateProject(projectId: string) {
         current?.map((item) => (item.id === project.id ? project : item)),
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.project(project.id) });
-      useToastStore.getState().addToast('success', translateUi('Project execution settings saved'));
+      useToastStore.getState().addToast('success', translateUi('Project saved'));
     },
     onError: () => {
       useToastStore.getState().addToast('error', translateUi('Could not save project settings'));

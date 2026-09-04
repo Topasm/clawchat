@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../hooks/queries', () => ({
+  useTodosQuery: () => ({ data: [] }),
   useMessagesQuery: () => ({
     data: [],
     fetchNextPage: vi.fn(),

@@ -13,6 +13,7 @@ import {
   useGeneratePlanProposal,
   useApplyPlanProposal,
   useDismissPlanProposal,
+  useGetOrCreateProjectConversation,
   queryKeys,
 } from '../hooks/queries';
 import apiClient from '../services/apiClient';
@@ -80,6 +81,7 @@ export default function TaskDetailPage() {
   const generatePlanMutation = useGeneratePlanProposal();
   const applyPlanMutation = useApplyPlanProposal();
   const dismissPlanMutation = useDismissPlanProposal();
+  const getConversation = useGetOrCreateProjectConversation();
   const childTasks = todos.filter((t) => t.parent_id === taskId);
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
   const incompleteChildren = childTasks.filter((t) => !isTerminalTaskStatus(t.status));
@@ -327,6 +329,22 @@ export default function TaskDetailPage() {
       <div className="cc-exec-panel__section">
         <div className="cc-exec-panel__section-title">{translateUi('Actions')}</div>
         <div className="cc-exec-panel__action-bar">
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            style={{ fontSize: 12 }}
+            disabled={getConversation.isPending}
+            onClick={async () => {
+              try {
+                const conversation = await getConversation.mutateAsync(task.id);
+                navigate(`/chats/${conversation.id}`);
+              } catch {
+                useToastStore.getState().addToast('error', translateUi('Failed'));
+              }
+            }}
+          >
+            {translateUi('Discuss with agent')}
+          </button>
           {!isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
             <button
               type="button"

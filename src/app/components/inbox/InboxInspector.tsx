@@ -39,6 +39,8 @@ interface InboxInspectorProps {
   }>;
   onReturnToInbox: (taskId: string) => void;
   onNavigate: (path: string) => void;
+  /** Opens (or starts) the thread scoped to this task, where the agent works with you on it. */
+  onOpenConversation?: (taskId: string) => void;
 }
 /** The right-hand panel: everything the triage user can learn or do about one task. */
 export default function InboxInspector({
@@ -60,6 +62,7 @@ export default function InboxInspector({
   onStartExecution,
   onReturnToInbox,
   onNavigate,
+  onOpenConversation,
 }: InboxInspectorProps) {
   return (
     <Pane
@@ -162,6 +165,15 @@ export default function InboxInspector({
           >
             {translateUi('\n            Open details\n          ')}
           </button>
+          {onOpenConversation && (
+            <button
+              type="button"
+              className="cc-btn cc-btn--primary"
+              onClick={() => onOpenConversation(task.id)}
+            >
+              {translateUi('Discuss with agent')}
+            </button>
+          )}
           {task.project_id && (
             <button
               type="button"

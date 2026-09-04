@@ -216,6 +216,42 @@
   color: var(--cc-text-secondary);
   font-size: 13px;
 }
+.cc-project-workspace__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cc-project-workspace__title-row .cc-icon-button {
+  opacity: 0.5;
+}
+.cc-project-workspace__title-row:hover .cc-icon-button,
+.cc-project-workspace__title-row .cc-icon-button:focus-visible {
+  opacity: 1;
+}
+.cc-project-identity-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cc-project-identity-form__title,
+.cc-project-identity-form__goal {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+}
+.cc-project-identity-form__title {
+  font-size: 20px;
+  font-weight: 600;
+}
+.cc-project-identity-form__actions {
+  display: flex;
+  gap: 6px;
+}
 .cc-project-workspace__status {
   color: var(--cc-primary);
   font-size: 10px;

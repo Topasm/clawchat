@@ -9,6 +9,7 @@ import {
   useRegenerateMessage,
   useResumeAgentRun,
   useRunsAwaitingInputQuery,
+  useTodosQuery,
 } from '../hooks/queries';
 import type { ChatMessage } from '../stores/useChatStore';
 import MessageBubble from '../components/chat-panel/MessageBubble';
@@ -50,6 +51,13 @@ export default function ChatPage() {
     (project) =>
       project.id === convo?.project_id || project.root_task_id === convo?.project_todo_id,
   );
+  // A thread scoped to a task rather than a project root: what the agent
+  // creates here becomes steps of that task.
+  const { data: todos = [] } = useTodosQuery();
+  const scopedTask =
+    !projectTodo && convo?.project_todo_id
+      ? todos.find((todo) => todo.id === convo.project_todo_id)
+      : undefined;
   const scrollRef = useRef<HTMLDivElement>(null);
   const newestMessageIdRef = useRef<string | undefined>(undefined);
   const [dismissedAnswerRunId, setDismissedAnswerRunId] = useState<string | null>(null);
@@ -181,6 +189,35 @@ export default function ChatPage() {
               {translateUi(' tasks done\n            ')}
             </span>
           )}
+        </div>
+      )}
+
+      {scopedTask && (
+        <div
+          className="cc-chat-page__scope"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 16px',
+            background: 'var(--cc-primary-light)',
+            borderBottom: '1px solid var(--cc-border)',
+            fontSize: 13,
+          }}
+        >
+          <span style={{ color: 'var(--cc-text-tertiary)' }}>{translateUi('Task thread')}</span>
+          <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{scopedTask.title}</span>
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            style={{ marginLeft: 'auto' }}
+            title={translateUi(
+              'Steps live under this task; ask the agent to add, plan, or run them.',
+            )}
+            onClick={() => navigate(`/tasks/${scopedTask.id}`)}
+          >
+            {translateUi('Open task')}
+          </button>
         </div>
       )}
 

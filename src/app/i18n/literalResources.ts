@@ -1446,4 +1446,12 @@ Object.assign(koreanUiTranslations, {
   'Add a task to {{title}}': '{{title}}에 작업 추가',
   '+ Task': '+ 작업',
   'Delete project {{title}}': '프로젝트 {{title}} 삭제',
+  'Project saved': '프로젝트를 저장했습니다',
+  'Edit project': '프로젝트 편집',
+  'Project title': '프로젝트 이름',
+  'Goal (optional)': '목표 (선택)',
+  'Discuss with agent': '에이전트와 논의',
+  'Task thread': '작업 스레드',
+  'Steps live under this task; ask the agent to add, plan, or run them.':
+    '이 작업 아래에 단계가 쌓입니다. 에이전트에게 추가·계획·실행을 요청하세요.',
 });

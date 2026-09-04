@@ -9,7 +9,12 @@ import {
   useTodosQuery,
   useUpdateProject,
 } from '../hooks/queries';
-import { ChatBubbleIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/shared/Icons';
+import {
+  ChatBubbleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EditIcon,
+} from '../components/shared/Icons';
 import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
 import type { ProjectOverviewResponse } from '../types/api';
@@ -68,15 +73,7 @@ export default function ProjectWorkspacePage() {
         >
           <ChevronLeftIcon size={18} />
         </button>
-        <div className="cc-project-workspace__identity">
-          <span
-            className={`cc-project-workspace__status cc-project-workspace__status--${project.status}`}
-          >
-            {project.status}
-          </span>
-          <h1>{project.title}</h1>
-          {(project.goal || project.description) && <p>{project.goal || project.description}</p>}
-        </div>
+        <ProjectIdentity project={project} />
         <button
           type="button"
           className="cc-btn cc-btn--primary"
@@ -245,6 +242,96 @@ export default function ProjectWorkspacePage() {
     </div>
   );
 }
+/**
+ * The project's name and goal, editable in place.
+ *
+ * Renaming used to be impossible from the UI: the API accepted it, and the
+ * root task followed, but nothing on this page asked for a new title.
+ */
+function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
+  const updateProject = useUpdateProject(project.id);
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(project.title);
+  const [goal, setGoal] = useState(project.goal ?? '');
+  useEffect(() => {
+    if (!editing) {
+      setTitle(project.title);
+      setGoal(project.goal ?? '');
+    }
+  }, [editing, project.goal, project.title]);
+  const save = (event: React.FormEvent) => {
+    event.preventDefault();
+    const nextTitle = title.trim();
+    if (!nextTitle) return;
+    updateProject.mutate(
+      { title: nextTitle, goal: goal.trim() || null },
+      { onSuccess: () => setEditing(false) },
+    );
+  };
+  if (editing) {
+    return (
+      <form className="cc-project-workspace__identity cc-project-identity-form" onSubmit={save}>
+        <input
+          type="text"
+          className="cc-project-identity-form__title"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          aria-label={translateUi('Project title')}
+          placeholder={translateUi('Project title')}
+          autoFocus
+        />
+        <input
+          type="text"
+          className="cc-project-identity-form__goal"
+          value={goal}
+          onChange={(event) => setGoal(event.target.value)}
+          aria-label={translateUi('Goal (optional)')}
+          placeholder={translateUi('Goal (optional)')}
+        />
+        <div className="cc-project-identity-form__actions">
+          <button
+            type="submit"
+            className="cc-btn cc-btn--primary"
+            disabled={!title.trim() || updateProject.isPending}
+          >
+            {translateUi('Save')}
+          </button>
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            disabled={updateProject.isPending}
+            onClick={() => setEditing(false)}
+          >
+            {translateUi('Cancel')}
+          </button>
+        </div>
+      </form>
+    );
+  }
+  return (
+    <div className="cc-project-workspace__identity">
+      <span
+        className={`cc-project-workspace__status cc-project-workspace__status--${project.status}`}
+      >
+        {project.status}
+      </span>
+      <div className="cc-project-workspace__title-row">
+        <h1>{project.title}</h1>
+        <button
+          type="button"
+          className="cc-icon-button"
+          aria-label={translateUi('Edit project')}
+          title={translateUi('Edit project')}
+          onClick={() => setEditing(true)}
+        >
+          <EditIcon size={14} />
+        </button>
+      </div>
+      {(project.goal || project.description) && <p>{project.goal || project.description}</p>}
+    </div>
+  );
+}
+
 function ProjectExecutionSettings({ project }: { project: ProjectOverviewResponse }) {
   const { data: providers = [], isLoading } = useExecutionProvidersQuery();
   const testPaseo = useTestPaseoConnection();
