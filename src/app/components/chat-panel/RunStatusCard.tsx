@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   useDecideReview,
   useResumeAgentRun,
+  useResolvePaseoPermission,
   useReviewsQuery,
   useRunsAwaitingInputQuery,
 } from '../../hooks/queries';
@@ -57,9 +58,14 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
       )
     : undefined;
   const resume = useResumeAgentRun();
+  const resolvePermission = useResolvePaseoPermission();
   const decide = useDecideReview();
   const [answer, setAnswer] = useState('');
   const [note, setNote] = useState('');
+  const inputOptions = Array.isArray(metadata.input_options)
+    ? metadata.input_options.filter((option): option is string => typeof option === 'string')
+    : [];
+  const permissions = Array.isArray(metadata.permissions) ? metadata.permissions : [];
   const settledLabel = needsInput
     ? translateUi('Already answered')
     : needsReview
@@ -84,6 +90,41 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
       )}
       {stillWaitingForInput && runId && (
         <div className="cc-run-status-card__reply">
+          {inputOptions.length > 0 && (
+            <div className="cc-run-status-card__options">
+              {inputOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className="cc-btn"
+                  disabled={resume.isPending}
+                  onClick={() => resume.mutate({ runId, followUp: option })}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
+          {permissions.length > 0 && (
+            <div className="cc-run-status-card__options">
+              <button
+                type="button"
+                className="cc-btn cc-btn--primary"
+                disabled={resolvePermission.isPending}
+                onClick={() => resolvePermission.mutate({ runId, decision: 'allow' })}
+              >
+                {translateUi('Allow')}
+              </button>
+              <button
+                type="button"
+                className="cc-btn cc-btn--danger"
+                disabled={resolvePermission.isPending}
+                onClick={() => resolvePermission.mutate({ runId, decision: 'deny' })}
+              >
+                {translateUi('Deny')}
+              </button>
+            </div>
+          )}
           <textarea
             rows={2}
             value={answer}

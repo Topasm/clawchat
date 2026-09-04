@@ -12,6 +12,7 @@ from sqlalchemy import select
 from domain.agent_run import AgentRunStatus
 from models.agent_run import AgentRunEvent
 from models.agent_task import AgentTask
+from models.execution_host import ExecutionHost
 from models.message import Message
 from models.todo import Todo
 from services.agents import agent_run_service, run_watchdog_service
@@ -106,6 +107,29 @@ async def test_a_run_this_process_is_executing_is_never_failed_by_heartbeat(db_s
     finally:
         blocked.set()
         await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_a_stale_worker_run_stays_alive_while_its_host_is_checking_in(db_session):
+    live, _ = await make_run(
+        db_session, "remote", status=AgentRunStatus.RUNNING,
+        heartbeat_age=timedelta(minutes=11),
+    )
+    host = ExecutionHost(
+        id="host_remote",
+        label="MacBook",
+        kind="worker",
+        last_seen_at=NOW - timedelta(minutes=1),
+    )
+    db_session.add(host)
+    live.execution_host_id = host.id
+    await db_session.commit()
+
+    report = await sweep(db_session)
+
+    assert report.failed_run_ids == []
+    await db_session.refresh(live)
+    assert live.status == "running"
 
 
 @pytest.mark.asyncio

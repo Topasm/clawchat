@@ -3,11 +3,15 @@ package com.clawchat.android.feature.chat
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.ReviewDecision
 import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.data.repository.AgentRunRepository
+import com.clawchat.android.core.data.repository.ReviewRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.ChatStreamer
 import com.clawchat.android.core.network.SseEvent
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +37,8 @@ class ChatViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: ConversationRepository
     private lateinit var streamer: ChatStreamer
+    private lateinit var agentRuns: AgentRunRepository
+    private lateinit var reviews: ReviewRepository
 
     private val conversation = Conversation(id = "c1", title = "First")
 
@@ -41,6 +47,8 @@ class ChatViewModelTest {
         Dispatchers.setMain(dispatcher)
         repository = mockk()
         streamer = mockk()
+        agentRuns = mockk()
+        reviews = mockk()
         coEvery { repository.listConversations() } returns
             ApiResult.Success(PaginatedResponse(items = listOf(conversation), total = 1))
     }
@@ -50,7 +58,7 @@ class ChatViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel() = ChatViewModel(repository, streamer)
+    private fun viewModel() = ChatViewModel(repository, streamer, agentRuns, reviews)
 
     private fun message(id: String, role: String, content: String) =
         Message(id = id, content = content, role = role, createdAt = "2026-08-29T09:00:00")
@@ -269,5 +277,26 @@ class ChatViewModelTest {
         assertFalse(state.isStreaming)
         assertEquals(listOf("user"), state.messages.map { it.role })
         assertNull(state.error)
+    }
+
+    @Test
+    fun `run cards route answers permissions and reviews to their repositories`() = runTest {
+        coEvery { agentRuns.resumeRun("run-1", "Use the short version") } returns
+            ApiResult.Error("resume failed")
+        coEvery { agentRuns.resolvePermission("run-1", true) } returns
+            ApiResult.Error("permission failed")
+        coEvery { reviews.decideById("review-1", ReviewDecision.APPROVED) } returns
+            ApiResult.Error("review failed")
+        val viewModel = selectedViewModel()
+
+        viewModel.resumeRun("run-1", "Use the short version")
+        viewModel.resolvePermission("run-1", true)
+        viewModel.decideReview("review-1", true)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { agentRuns.resumeRun("run-1", "Use the short version") }
+        coVerify { agentRuns.resolvePermission("run-1", true) }
+        coVerify { reviews.decideById("review-1", ReviewDecision.APPROVED) }
+        assertEquals("review failed", viewModel.uiState.value.error)
     }
 }

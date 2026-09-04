@@ -66,7 +66,9 @@ def silence_ws(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_inbox_started_run_gets_a_project_scoped_thread(db_session, silence_ws):
+async def test_inbox_started_run_gets_a_project_scoped_thread(
+    client, auth_headers, db_session, silence_ws
+):
     project, todo, task = await create_project_task(db_session)
     run = await agent_run_service.create_run(db_session, task, provider="openclaw")
     await db_session.commit()
@@ -79,6 +81,12 @@ async def test_inbox_started_run_gets_a_project_scoped_thread(db_session, silenc
     assert json.loads(conversation.metadata_json)["origin"] == "agent_run"
     response = await agent_run_service.build_run_response(db_session, run)
     assert response.conversation_id == conversation.id
+    conversations = await client.get("/api/chat/conversations", headers=auth_headers)
+    assert conversations.status_code == 200, conversations.text
+    listed = next(
+        item for item in conversations.json()["items"] if item["id"] == conversation.id
+    )
+    assert listed["metadata"]["origin"] == "agent_run"
 
 
 @pytest.mark.asyncio
@@ -157,7 +165,9 @@ async def test_failure_and_input_requests_are_written(db_session, silence_ws):
 @pytest.mark.asyncio
 async def test_thread_update_is_pushed_only_after_commit(db_session, silence_ws, monkeypatch):
     pushed = SimpleNamespace(send_json=AsyncMock())
+    run_pushed = SimpleNamespace(send_json=AsyncMock())
     monkeypatch.setattr(ws_notifications, "ws_manager", pushed)
+    monkeypatch.setattr(agent_run_service, "ws_manager", run_pushed)
     _project, _todo, task = await create_project_task(db_session)
     run = await agent_run_service.create_run(db_session, task, provider="openclaw")
     await agent_run_service.mark_starting(db_session, run)
@@ -165,10 +175,16 @@ async def test_thread_update_is_pushed_only_after_commit(db_session, silence_ws,
     await agent_run_service.mark_failed(db_session, run, "boom")
     await asyncio.sleep(0)
     assert pushed.send_json.await_count == 0
+    assert run_pushed.send_json.await_count == 0
 
     await db_session.commit()
     await asyncio.sleep(0)
     assert pushed.send_json.await_count == 1
+    assert run_pushed.send_json.await_count == 3
+    assert all(
+        call.args[1]["type"] == "run_state_changed"
+        for call in run_pushed.send_json.await_args_list
+    )
     payload = pushed.send_json.await_args.args[1]
     assert payload["type"] == "conversation_updated"
     assert payload["data"]["conversation_id"] == task.conversation_id

@@ -126,6 +126,10 @@ async def post_run_update(
     text = _compose(latest.event_type, run, title)
     if text is None:
         return None
+    try:
+        event_payload = json.loads(latest.payload_json) if latest.payload_json else {}
+    except (json.JSONDecodeError, TypeError):
+        event_payload = {}
     key = f"run:{run.id}:{latest.sequence}"
     exists = (
         await db.execute(
@@ -159,6 +163,8 @@ async def post_run_update(
                 "error": run.error,
                 "review_id": review_id,
                 "is_adopted": run.is_adopted,
+                "input_options": event_payload.get("options") or [],
+                "permissions": event_payload.get("permissions") or [],
             },
             ensure_ascii=False,
         ),

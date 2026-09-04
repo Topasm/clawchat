@@ -16,7 +16,8 @@ from datetime import datetime, timedelta, timezone
 from domain.agent_run import AgentRunStatus
 from models.agent_run import AgentRun, AgentRunEvent
 from models.agent_task import AgentTask
-from services.agents import agent_run_service
+from models.execution_host import ExecutionHost
+from services.agents import agent_run_service, execution_host_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,6 +80,12 @@ async def fail_silent_runs(
         last_seen = _aware(run.heartbeat_at) or _aware(run.started_at) or _aware(run.created_at)
         if last_seen is None or now - last_seen < heartbeat_timeout:
             continue
+        if run.execution_host_id:
+            host = await db.get(ExecutionHost, run.execution_host_id)
+            if host is not None and execution_host_service.host_checked_in_recently(
+                host, now=now
+            ):
+                continue
         minutes = int(heartbeat_timeout.total_seconds() // 60)
         error = (
             f"No heartbeat for {minutes} minutes; the machine running this work "

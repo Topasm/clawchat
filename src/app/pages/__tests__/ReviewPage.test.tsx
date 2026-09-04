@@ -123,6 +123,9 @@ describe('ReviewPage Agent Run handoff', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Request changes' })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Items with a note resume automatically and move back to the run thread/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
   });

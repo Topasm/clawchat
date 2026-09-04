@@ -640,6 +640,7 @@ export const ConversationResponseSchema = z.object({
   is_archived: z.boolean().optional(),
   project_id: z.string().nullable().optional(),
   project_todo_id: z.string().nullable().optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -1083,6 +1084,9 @@ export const TaskExecutionTelemetryResponseSchema = z.object({
   latest_run_provider: z.string().nullable(),
   latest_run_progress_message: z.string().nullable(),
   latest_run_updated_at: z.string().nullable(),
+  human_wait_seconds: z.number().int().nonnegative(),
+  question_count: z.number().int().nonnegative(),
+  average_resume_seconds: z.number().int().nonnegative().nullable(),
   pending_review_count: z.number().int().nonnegative(),
   artifact_count: z.number().int().nonnegative(),
   latest_artifact_id: z.string().nullable(),

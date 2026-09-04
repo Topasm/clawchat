@@ -98,6 +98,8 @@ class ClaudeCodeProvider:
     Windows SelectorEventLoop incompatibility with asyncio subprocesses.
     """
 
+    supports_native_tool_calling = False
+
     def __init__(self, *, model: str = ""):
         self.model = model.strip()
         self._cli_path: Optional[str] = None

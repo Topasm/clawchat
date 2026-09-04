@@ -32,6 +32,7 @@ interface ClaimedJob {
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 4000;
+const RUN_HEARTBEAT_INTERVAL_MS = 60_000;
 
 export class WorkerRunner {
   private hostId: string | null = null;
@@ -106,6 +107,26 @@ export class WorkerRunner {
   private async execute(job: ClaimedJob): Promise<void> {
     this.running = true;
     const worker = platformApi.worker;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    let heartbeatInFlight = false;
+
+    const heartbeat = async (): Promise<void> => {
+      if (heartbeatInFlight) return;
+      heartbeatInFlight = true;
+      try {
+        await apiClient.post(`/runs/${job.run_id}/heartbeat`, {
+          progress: 10,
+          message: 'Running on this machine',
+        });
+      } catch (error) {
+        // A transient heartbeat failure must not kill the local CLI. The next
+        // tick can restore liveness, and the final result is reported once.
+        logger.warn('Could not heartbeat worker run', error);
+      } finally {
+        heartbeatInFlight = false;
+      }
+    };
+
     try {
       if (!worker) {
         // Claimed on a surface that cannot run anything. Hand it back as a
@@ -116,30 +137,37 @@ export class WorkerRunner {
         return;
       }
 
-      await apiClient.post(`/runs/${job.run_id}/heartbeat`, {
-        progress: 10,
-        message: 'Running on this machine',
-      });
+      await heartbeat();
+      heartbeatTimer = setInterval(() => {
+        void heartbeat();
+      }, RUN_HEARTBEAT_INTERVAL_MS);
 
-      const result = await worker.run({
-        provider: this.options.provider,
-        prompt: job.instruction,
-        cwd: job.cwd,
-        model: job.model,
-      });
-      await apiClient.post(`/runs/${job.run_id}/result`, {
-        result: result.output || '(no output)',
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      let outcome: { result: string } | { error: string };
       try {
-        await apiClient.post(`/runs/${job.run_id}/result`, { error: message });
-      } catch (reportError) {
-        // The run stays started on the server; its heartbeat lapsing is what
-        // the recovery path already watches for.
-        logger.warn('Could not report a failed worker run', reportError);
+        const result = await worker.run({
+          provider: this.options.provider,
+          prompt: job.instruction,
+          cwd: job.cwd,
+          model: job.model,
+        });
+        outcome = { result: result.output || '(no output)' };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        outcome = { error: message };
       }
+      try {
+        await apiClient.post(`/runs/${job.run_id}/result`, outcome);
+      } catch (reportError) {
+        // The server may already have made the run terminal (for example a
+        // cancellation or watchdog decision). Never submit a second result.
+        logger.warn('Could not report worker run result', reportError);
+      }
+    } catch (error) {
+      logger.warn('Worker execution setup failed', error);
     } finally {
+      if (heartbeatTimer !== null) {
+        clearInterval(heartbeatTimer);
+      }
       this.running = false;
     }
   }

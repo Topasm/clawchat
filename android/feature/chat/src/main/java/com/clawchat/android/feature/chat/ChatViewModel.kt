@@ -4,7 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
+import com.clawchat.android.core.data.model.ReviewDecision
+import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.data.repository.ReviewRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.ChatStreamer
 import com.clawchat.android.core.network.SseEvent
@@ -31,6 +34,8 @@ data class ChatUiState(
 class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val chatStreamer: ChatStreamer,
+    private val agentRunRepository: AgentRunRepository,
+    private val reviewRepository: ReviewRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -184,6 +189,53 @@ class ChatViewModel @Inject constructor(
             }
         } else {
             _uiState.update { it.copy(isStreaming = false, streamingText = "") }
+        }
+    }
+
+    fun resumeRun(runId: String, answer: String) {
+        if (answer.isBlank()) return
+        viewModelScope.launch {
+            when (val result = agentRunRepository.resumeRun(runId, answer)) {
+                is ApiResult.Success -> refreshSelectedMessages()
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun resolvePermission(runId: String, allow: Boolean) {
+        viewModelScope.launch {
+            when (val result = agentRunRepository.resolvePermission(runId, allow)) {
+                is ApiResult.Success -> refreshSelectedMessages()
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun decideReview(reviewId: String, approve: Boolean) {
+        viewModelScope.launch {
+            when (
+                val result = reviewRepository.decideById(
+                    reviewId,
+                    if (approve) ReviewDecision.APPROVED else ReviewDecision.REJECTED,
+                )
+            ) {
+                is ApiResult.Success -> refreshSelectedMessages()
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    private suspend fun refreshSelectedMessages() {
+        val conversationId = _uiState.value.selectedConversationId ?: return
+        when (val result = conversationRepository.getMessages(conversationId)) {
+            is ApiResult.Success -> _uiState.update {
+                it.copy(messages = result.data.items.reversed(), error = null)
+            }
+            is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+            is ApiResult.Loading -> Unit
         }
     }
 

@@ -3,7 +3,9 @@ package com.clawchat.android.core.data.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 // --- Health ---
@@ -209,7 +211,11 @@ data class Conversation(
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("updated_at") val updatedAt: String = "",
     @SerialName("project_todo_id") val projectTodoId: String? = null,
-)
+    val metadata: JsonObject? = null,
+) {
+    val isAgentRun: Boolean
+        get() = metadata?.get("origin")?.jsonPrimitive?.contentOrNull == "agent_run"
+}
 
 @Serializable
 data class Message(
@@ -221,16 +227,33 @@ data class Message(
     /** Action card payload; `action_type = "run_update"` is an agent run reporting into its thread. */
     val metadata: JsonObject? = null,
 ) {
+    private val actionType: String?
+        get() = metadata?.get("action_type")?.jsonPrimitive?.contentOrNull
+
     val runUpdate: RunUpdate?
-        get() = metadata?.takeIf { it["action_type"]?.jsonPrimitive?.contentOrNull == "run_update" }
+        get() = metadata?.takeIf { actionType == "run_update" }
             ?.let { data ->
                 RunUpdate(
                     runId = data["run_id"]?.jsonPrimitive?.contentOrNull,
                     status = data["status"]?.jsonPrimitive?.contentOrNull ?: "running",
                     title = data["title"]?.jsonPrimitive?.contentOrNull,
                     error = data["error"]?.jsonPrimitive?.contentOrNull,
+                    reviewId = data["review_id"]?.jsonPrimitive?.contentOrNull,
+                    inputOptions = data["input_options"]?.jsonArray
+                        ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                        .orEmpty(),
+                    hasPendingPermissions = data["permissions"]?.jsonArray?.isNotEmpty() == true,
                 )
             }
+
+    val taskDelegation: TaskDelegation?
+        get() = metadata?.takeIf { actionType == "task_delegated" }?.let { data ->
+            TaskDelegation(
+                taskId = data["task_id"]?.jsonPrimitive?.contentOrNull ?: return@let null,
+                runId = data["run_id"]?.jsonPrimitive?.contentOrNull,
+                isMultiAgent = data["is_multi_agent"]?.jsonPrimitive?.booleanOrNull == true,
+            )
+        }
 }
 
 /** What a `run_update` chat message says about its run. */
@@ -239,10 +262,19 @@ data class RunUpdate(
     val status: String,
     val title: String?,
     val error: String?,
+    val reviewId: String?,
+    val inputOptions: List<String>,
+    val hasPendingPermissions: Boolean,
 ) {
     val needsUser: Boolean
         get() = status == "waiting_input" || status == "waiting_review"
 }
+
+data class TaskDelegation(
+    val taskId: String,
+    val runId: String?,
+    val isMultiAgent: Boolean,
+)
 
 // --- Paginated Response ---
 

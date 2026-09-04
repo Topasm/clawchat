@@ -1,5 +1,17 @@
 /** Korean translations keyed by their canonical English UI message. */
 export const koreanUiTranslations: Record<string, string> = {
+  'Agent run conversations': '에이전트 실행 대화',
+  'Average time to resume: ': '평균 재개 시간: ',
+  'Items with a note resume automatically and move back to the run thread, so they no longer remain in this filter.':
+    '메모가 있는 항목은 자동으로 재개되어 실행 스레드로 이동하므로 이 필터에 남지 않습니다.',
+  'Questions: ': '질문: ',
+  'Waiting on people: ': '사람 응답 대기: ',
+  'Answering the agent': '에이전트에게 답하는 중',
+  'Answer the agent...': '에이전트에게 답변...',
+  'Exit agent answer mode': '에이전트 답변 모드 종료',
+  'Permission response sent': '권한 응답을 보냈습니다',
+  'Could not resolve permission': '권한 요청을 처리하지 못했습니다',
+  'Send as a normal chat message': '일반 채팅 메시지로 보내기',
   ' (disabled on server)': '(서버에서는 비활성화됨)',
   ' (unavailable)': '(없는)',
   ' / Project root': '/ 프로젝트 루트',
@@ -66,6 +78,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'All prerequisites are complete.': '모든 전제 조건이 완료되었습니다.',
   'All projects': '모든 프로젝트',
   'All statuses': '모든 상태',
+  Allow: '허용',
   'Allow local network access': '로컬 네트워크 액세스 허용',
   Analytics: '해석학',
   'Answer questions': '질문에 답하기',
@@ -216,6 +229,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Delete attachment': '첨부파일 삭제',
   'Delete conversation': '대화 삭제',
   'Delete Conversation': '대화 삭제',
+  Deny: '거부',
   'Delete Event': '이벤트 삭제',
   'Delete message': '메시지 삭제',
   'Delete Task': '작업 삭제',

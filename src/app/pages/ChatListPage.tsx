@@ -31,12 +31,16 @@ export default function ChatListPage() {
   const { isMobile } = usePlatform();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [quickChatsOpen, setQuickChatsOpen] = useState(true);
+  const [agentChatsOpen, setAgentChatsOpen] = useState(false);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [projectTitle, setProjectTitle] = useState('');
   const [projectGoal, setProjectGoal] = useState('');
   const loading = convsLoading || projsLoading;
   // Quick chats = conversations without a project_todo_id
-  const quickChats = conversations.filter((c) => !c.project_id && !c.project_todo_id);
+  const agentChats = conversations.filter((c) => c.metadata?.origin === 'agent_run');
+  const quickChats = conversations.filter(
+    (c) => !c.project_id && !c.project_todo_id && c.metadata?.origin !== 'agent_run',
+  );
   // Compute per-project metadata
   const projectMeta = useMemo(() => {
     const accumulators = new Map<
@@ -245,6 +249,35 @@ export default function ChatListPage() {
           )}
         </div>
       ) : null}
+
+      {agentChats.length > 0 && (
+        <div className="cc-quick-chats">
+          <button
+            type="button"
+            className="cc-quick-chats__toggle"
+            onClick={() => setAgentChatsOpen(!agentChatsOpen)}
+            aria-expanded={agentChatsOpen}
+          >
+            <ChevronRightIcon
+              size={12}
+              className={`cc-quick-chats__chevron${agentChatsOpen ? ' cc-quick-chats__chevron--open' : ''}`}
+            />
+            {translateUi('Agent run conversations')} ({agentChats.length})
+          </button>
+          {agentChatsOpen && (
+            <div className="cc-quick-chats__list">
+              {agentChats.map((convo) => (
+                <ConversationItem
+                  key={convo.id}
+                  conversation={convo}
+                  onClick={() => navigate(`/chats/${convo.id}`)}
+                  onDelete={() => setDeleteTarget(convo.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <ConfirmDialog
         open={!!deleteTarget}

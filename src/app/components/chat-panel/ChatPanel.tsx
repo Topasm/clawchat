@@ -9,6 +9,8 @@ import {
   useEditMessage,
   useDeleteMessage,
   useRegenerateMessage,
+  useResumeAgentRun,
+  useRunsAwaitingInputQuery,
 } from '../../hooks/queries';
 import ChatPanelMessages from './ChatPanelMessages';
 import ChatInput from './ChatInput';
@@ -44,6 +46,8 @@ export default function ChatPanel({
   const editMessageMutation = useEditMessage();
   const deleteMessageMutation = useDeleteMessage();
   const regenerateMutation = useRegenerateMessage();
+  const resumeMutation = useResumeAgentRun();
+  const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
   const {
     data: queryMessages = [],
     fetchNextPage,
@@ -64,6 +68,9 @@ export default function ChatPanel({
   }, [conversationId, queryMessages, streamingMessages, workspaceScope]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [dismissedAnswerRunId, setDismissedAnswerRunId] = useState<string | null>(null);
+  const waitingRun = runsAwaitingInput.find((run) => run.conversation_id === conversationId);
+  const answerRun = waitingRun?.id === dismissedAnswerRunId ? undefined : waitingRun;
   useEffect(() => {
     setCurrentConversationId(conversationId);
   }, [conversationId, setCurrentConversationId]);
@@ -96,6 +103,10 @@ export default function ChatPanel({
         });
         setEditingMessageId(null);
         setEditingText('');
+        return;
+      }
+      if (answerRun) {
+        await resumeMutation.mutateAsync({ runId: answerRun.id, followUp: text });
         return;
       }
       let cid = conversationId;
@@ -132,6 +143,8 @@ export default function ChatPanel({
       addStreamingMessage,
       sendMessageStreaming,
       editMessageMutation,
+      answerRun,
+      resumeMutation,
       setCurrentConversationId,
     ],
   );
@@ -210,6 +223,8 @@ export default function ChatPanel({
         editingMessageId={editingMessageId}
         editingText={editingText}
         onCancelEdit={handleCancelEdit}
+        modeLabel={answerRun ? translateUi('Answering the agent') : undefined}
+        onClearMode={answerRun ? () => setDismissedAnswerRunId(answerRun.id) : undefined}
       />
     </>
   );

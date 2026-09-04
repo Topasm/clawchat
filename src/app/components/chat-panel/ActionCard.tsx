@@ -6,8 +6,9 @@ import RunStatusCard from './RunStatusCard';
 import { translateUi } from '../../i18n';
 interface ActionCardProps {
   metadata: Record<string, unknown>;
+  suppressTaskProgress?: boolean;
 }
-export default function ActionCard({ metadata }: ActionCardProps) {
+export default function ActionCard({ metadata, suppressTaskProgress = false }: ActionCardProps) {
   const navigate = useNavigate();
   const actionType = metadata.action_type as string;
   const eventStartTime =
@@ -130,6 +131,7 @@ export default function ActionCard({ metadata }: ActionCardProps) {
   }
   // Task delegated (Phase 4)
   if (actionType === 'task_delegated') {
+    if (suppressTaskProgress) return null;
     return (
       <TaskProgressCard
         taskId={metadata.task_id as string}

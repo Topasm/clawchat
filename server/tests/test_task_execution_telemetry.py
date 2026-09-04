@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from models.agent_run import AgentRun
+from models.agent_run import AgentRun, AgentRunEvent
 from models.agent_task import AgentTask
 from models.artifact import Artifact, ArtifactRevision
 from models.project import Project
@@ -88,6 +88,52 @@ async def test_execution_telemetry_aggregates_latest_run_reviews_and_artifacts(
     )
     db_session.add_all([old_run, latest_run, artifact_old, artifact_latest])
     await db_session.flush()
+    db_session.add_all(
+        [
+            AgentRunEvent(
+                id="event_question",
+                run_id=latest_run.id,
+                sequence=1,
+                event_type="waiting_input",
+                created_at=now - timedelta(minutes=10),
+            ),
+            AgentRunEvent(
+                id="event_resuming",
+                run_id=latest_run.id,
+                sequence=2,
+                event_type="resuming",
+                created_at=now - timedelta(minutes=8),
+            ),
+            AgentRunEvent(
+                id="event_permission",
+                run_id=latest_run.id,
+                sequence=3,
+                event_type="waiting_permission",
+                created_at=now - timedelta(minutes=5),
+            ),
+            AgentRunEvent(
+                id="event_allowed",
+                run_id=latest_run.id,
+                sequence=4,
+                event_type="permission_allowed",
+                created_at=now - timedelta(minutes=4),
+            ),
+            AgentRunEvent(
+                id="event_review",
+                run_id=latest_run.id,
+                sequence=5,
+                event_type="waiting_review",
+                created_at=now - timedelta(minutes=3),
+            ),
+            AgentRunEvent(
+                id="event_approved",
+                run_id=latest_run.id,
+                sequence=6,
+                event_type="approved",
+                created_at=now - timedelta(minutes=1),
+            ),
+        ]
+    )
     revision = ArtifactRevision(
         id="revision_pending",
         artifact_id=artifact_latest.id,
@@ -138,6 +184,9 @@ async def test_execution_telemetry_aggregates_latest_run_reviews_and_artifacts(
             "latest_run_progress": 100,
             "latest_run_provider": "openclaw",
             "latest_run_progress_message": "Draft ready",
+            "human_wait_seconds": 300,
+            "question_count": 2,
+            "average_resume_seconds": 90,
             "pending_review_count": 2,
             "artifact_count": 2,
             "latest_artifact_id": artifact_latest.id,

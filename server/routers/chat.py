@@ -142,6 +142,9 @@ async def list_conversations(
                 last_message=preview,
                 project_id=conv.project_id,
                 project_todo_id=conv.project_todo_id,
+                metadata=(
+                    json.loads(conv.metadata_json) if conv.metadata_json else None
+                ),
             )
         )
 
@@ -182,6 +185,7 @@ async def create_conversation(
         is_archived=conv.is_archived,
         project_id=conv.project_id,
         project_todo_id=conv.project_todo_id,
+        metadata=json.loads(conv.metadata_json) if conv.metadata_json else None,
     )
 
 
@@ -222,6 +226,7 @@ async def get_or_create_project_conversation(
         is_archived=conv.is_archived,
         project_id=conv.project_id,
         project_todo_id=conv.project_todo_id,
+        metadata=json.loads(conv.metadata_json) if conv.metadata_json else None,
     )
 
 

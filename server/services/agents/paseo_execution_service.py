@@ -23,6 +23,7 @@ from services.agents import (
     agent_task_service,
     execution_host_service,
 )
+from services.agents.run_context_service import build_execution_instruction
 from services.review import artifact_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -294,7 +295,9 @@ async def execute_run(
                 agent = await adapter.start_agent(
                     workspace_id=run.workspace_id,
                     provider_model=run.model or settings.paseo_default_provider,
-                    prompt=run.instruction_snapshot,
+                    prompt=await build_execution_instruction(
+                        db, task, run.instruction_snapshot
+                    ),
                     title=todo.title if todo else task.task_type,
                     labels={"clawchat.run_id": run.id, "clawchat.project_id": project.id},
                 )

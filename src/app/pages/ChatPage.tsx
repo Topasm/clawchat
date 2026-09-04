@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import {
@@ -7,6 +7,8 @@ import {
   useProjectsQuery,
   useDeleteMessage,
   useRegenerateMessage,
+  useResumeAgentRun,
+  useRunsAwaitingInputQuery,
 } from '../hooks/queries';
 import type { ChatMessage } from '../stores/useChatStore';
 import MessageBubble from '../components/chat-panel/MessageBubble';
@@ -39,6 +41,8 @@ export default function ChatPage() {
   const updateStreamingMessageId = useChatStore((s) => s.updateStreamingMessageId);
   const deleteMessageMutation = useDeleteMessage();
   const regenerateMutation = useRegenerateMessage();
+  const resumeMutation = useResumeAgentRun();
+  const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
   const { data: conversations = [] } = useConversationsQuery();
   const { data: projects = [] } = useProjectsQuery();
   const convo = conversations.find((c) => c.id === conversationId);
@@ -48,6 +52,9 @@ export default function ChatPage() {
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const newestMessageIdRef = useRef<string | undefined>(undefined);
+  const [dismissedAnswerRunId, setDismissedAnswerRunId] = useState<string | null>(null);
+  const waitingRun = runsAwaitingInput.find((run) => run.conversation_id === conversationId);
+  const answerRun = waitingRun?.id === dismissedAnswerRunId ? undefined : waitingRun;
   // Merge query messages with streaming messages
   // Streaming messages are newest-first, query messages are newest-first
   const messages: ChatMessage[] = useMemo(() => {
@@ -61,6 +68,18 @@ export default function ChatPage() {
     );
     return [...onlyStreaming, ...queryMessages];
   }, [conversationId, queryMessages, streamingMessages, workspaceScope]);
+  const durableRunReferences = useMemo(() => {
+    const runIds = new Set<string>();
+    const taskIds = new Set<string>();
+    for (const message of messages) {
+      if (message.metadata?.action_type !== 'run_update') continue;
+      if (typeof message.metadata.run_id === 'string') runIds.add(message.metadata.run_id);
+      if (typeof message.metadata.agent_task_id === 'string') {
+        taskIds.add(message.metadata.agent_task_id);
+      }
+    }
+    return { runIds, taskIds };
+  }, [messages]);
   useEffect(() => {
     if (!conversationId) return;
     setCurrentConversationId(conversationId);
@@ -72,6 +91,10 @@ export default function ChatPage() {
   const handleSend = useCallback(
     async (text: string) => {
       if (!conversationId) return;
+      if (answerRun) {
+        await resumeMutation.mutateAsync({ runId: answerRun.id, followUp: text });
+        return;
+      }
       const optimisticMessageId = crypto.randomUUID();
       const idempotencyKey = crypto.randomUUID();
       addStreamingMessage({
@@ -90,7 +113,7 @@ export default function ChatPage() {
         // handled in store
       }
     },
-    [conversationId, addStreamingMessage, sendMessageStreaming],
+    [conversationId, addStreamingMessage, sendMessageStreaming, answerRun, resumeMutation],
   );
   const handleRegenerate = useCallback(
     async (assistantMessageId: string) => {
@@ -202,6 +225,13 @@ export default function ChatPage() {
                   }
                 : undefined
             }
+            suppressTaskProgress={
+              msg.metadata?.action_type === 'task_delegated' &&
+              ((typeof msg.metadata.run_id === 'string' &&
+                durableRunReferences.runIds.has(msg.metadata.run_id)) ||
+                (typeof msg.metadata.task_id === 'string' &&
+                  durableRunReferences.taskIds.has(msg.metadata.task_id)))
+            }
           />
         ))}
         {isStreaming && messages[0]?.text === '' && <StreamingIndicator />}
@@ -213,6 +243,8 @@ export default function ChatPage() {
         onStop={stopGeneration}
         draftKey={getChatDraftKey(conversationId)}
         placeholder={translateUi('Type a message...')}
+        modeLabel={answerRun ? translateUi('Answering the agent') : undefined}
+        onClearMode={answerRun ? () => setDismissedAnswerRunId(answerRun.id) : undefined}
       />
     </div>
   );

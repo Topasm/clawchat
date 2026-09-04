@@ -72,6 +72,43 @@ describe('WorkerRunner', () => {
     expect(apiMocks.post).toHaveBeenCalledWith('/runs/run-1/result', { result: 'Done' });
   });
 
+  it('heartbeats every minute while a claimed job is still running', async () => {
+    let claimed = false;
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url.includes('/register')) return { data: { id: 'host-1' } };
+      if (url.includes('/jobs/claim')) {
+        if (claimed) return { data: null };
+        claimed = true;
+        return { data: job };
+      }
+      return { data: null };
+    });
+    let finish!: (value: { output: string }) => void;
+    workerMocks.run.mockReturnValue(
+      new Promise<{ output: string }>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+
+    await runner.start();
+    await vi.advanceTimersByTimeAsync(0);
+    const heartbeatCalls = () =>
+      apiMocks.post.mock.calls.filter(([url]) => url === '/runs/run-1/heartbeat').length;
+
+    expect(heartbeatCalls()).toBe(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(heartbeatCalls()).toBe(2);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(heartbeatCalls()).toBe(3);
+
+    finish({ output: 'Done' });
+    await vi.advanceTimersByTimeAsync(0);
+    runner.stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(heartbeatCalls()).toBe(3);
+  });
+
   // A failed run has to come back as a failure: leaving it started and silent
   // would strand it until the server's recovery path noticed.
   it('reports a failure rather than leaving the run started', async () => {

@@ -15,6 +15,7 @@ from domain.review import ReviewStatus, ReviewSubjectType
 from exceptions import ConflictError
 from models.agent_run import AgentRun
 from models.agent_task import AgentTask
+from models.message import Message
 from services.agents import (
     agent_run_service,
     agent_task_service,
@@ -22,6 +23,7 @@ from services.agents import (
 )
 from services.review import review_item_service
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils import make_id
 from ws.manager import ws_manager
 
 
@@ -89,6 +91,16 @@ async def resume_with_follow_up(
     task.error = None
     task.progress = 0
     task.completed_at = None
+    if task.conversation_id:
+        db.add(
+            Message(
+                id=make_id("msg_"),
+                conversation_id=task.conversation_id,
+                role="user",
+                content=follow_up,
+                message_type="text",
+            )
+        )
     # This review round is over: the follow-up supersedes it. A fresh review
     # item is published when the resumed run finishes again.
     await review_item_service.set_subject_review_status(

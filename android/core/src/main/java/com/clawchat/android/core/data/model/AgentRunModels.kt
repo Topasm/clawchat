@@ -135,3 +135,8 @@ data class AgentRunRetryRequest(
 data class AgentRunResumeRequest(
     @SerialName("follow_up_instruction") val followUpInstruction: String,
 )
+
+@Serializable
+data class AgentRunPermissionRequest(
+    val decision: String,
+)

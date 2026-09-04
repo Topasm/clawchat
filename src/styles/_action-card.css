@@ -188,6 +188,18 @@
   margin-top: 8px;
 }
 
+.cc-run-status-card__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cc-run-status-card__options .cc-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
 .cc-run-status-card__reply textarea {
   width: 100%;
   box-sizing: border-box;

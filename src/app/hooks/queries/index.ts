@@ -82,6 +82,7 @@ export {
   useRetryAgentRun,
   useReturnAgentRunToReady,
   useResumeAgentRun,
+  useResolvePaseoPermission,
 } from './useAgentRunQueries';
 export { useTaskExecutionTelemetryQuery } from './useTaskExecutionTelemetryQuery';
 export { useSkillsQuery, useStartReadyTaskExecution } from './useTaskExecutionQueries';

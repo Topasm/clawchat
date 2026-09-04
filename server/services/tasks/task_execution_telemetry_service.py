@@ -1,15 +1,90 @@
 """Build the task execution overlay without duplicating state on Todo rows."""
 
+from collections import defaultdict
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.review import ReviewStatus, ReviewSubjectType
-from models.agent_run import AgentRun
+from models.agent_run import AgentRun, AgentRunEvent
 from models.agent_task import AgentTask
 from models.artifact import Artifact, ArtifactRevision
 from models.review_item import ReviewItem
 from models.todo import Todo
 from schemas.task_execution_telemetry import TaskExecutionTelemetryResponse
+
+_HUMAN_WAIT_STARTED = {
+    "waiting_input",
+    "waiting_permission",
+    "waiting_review",
+    "changes_requested",
+}
+_HUMAN_WAIT_ENDED = {
+    "resuming",
+    "follow_up_sent",
+    "permission_allowed",
+    "permission_denied",
+    "approved",
+    "rejected",
+    "cancelled",
+    "failed",
+    "running",
+}
+_QUESTION_STARTED = {"waiting_input", "waiting_permission"}
+_QUESTION_ANSWERED = {
+    "resuming",
+    "follow_up_sent",
+    "permission_allowed",
+    "permission_denied",
+    "running",
+}
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def _collaboration_metrics(rows, *, now: datetime) -> dict[str, dict[str, int | None]]:
+    """Fold ordered run events into task-level human handoff metrics."""
+    by_task: dict[str, list] = defaultdict(list)
+    for row in rows:
+        by_task[row.task_id].append(row)
+
+    metrics: dict[str, dict[str, int | None]] = {}
+    for task_id, events in by_task.items():
+        wait_started: dict[str, datetime] = {}
+        question_started: dict[str, datetime] = {}
+        human_wait_seconds = 0
+        resume_durations: list[int] = []
+        question_count = 0
+        for event in events:
+            occurred_at = _aware(event.created_at)
+            if event.event_type in _HUMAN_WAIT_STARTED:
+                wait_started.setdefault(event.run_id, occurred_at)
+            if event.event_type in _QUESTION_STARTED:
+                question_count += 1
+                question_started[event.run_id] = occurred_at
+            if event.event_type in _QUESTION_ANSWERED:
+                started = question_started.pop(event.run_id, None)
+                if started is not None:
+                    resume_durations.append(max(0, int((occurred_at - started).total_seconds())))
+            if event.event_type in _HUMAN_WAIT_ENDED:
+                started = wait_started.pop(event.run_id, None)
+                if started is not None:
+                    human_wait_seconds += max(0, int((occurred_at - started).total_seconds()))
+        for started in wait_started.values():
+            human_wait_seconds += max(0, int((now - started).total_seconds()))
+        metrics[task_id] = {
+            "human_wait_seconds": human_wait_seconds,
+            "question_count": question_count,
+            "average_resume_seconds": (
+                round(sum(resume_durations) / len(resume_durations))
+                if resume_durations
+                else None
+            ),
+        }
+    return metrics
 
 
 async def list_task_execution_telemetry(
@@ -53,6 +128,27 @@ async def list_task_execution_telemetry(
             await db.execute(select(run_ranked).where(run_ranked.c.row_number == 1))
         ).mappings()
     }
+
+    event_query = (
+        select(
+            AgentTask.todo_id.label("task_id"),
+            AgentRunEvent.run_id,
+            AgentRunEvent.event_type,
+            AgentRunEvent.created_at,
+        )
+        .join(AgentRun, AgentRun.id == AgentRunEvent.run_id)
+        .join(AgentTask, AgentTask.id == AgentRun.agent_task_id)
+        .where(AgentTask.todo_id.is_not(None))
+        .order_by(AgentRunEvent.run_id, AgentRunEvent.sequence)
+    )
+    if project_id is not None:
+        event_query = event_query.join(Todo, Todo.id == AgentTask.todo_id).where(
+            Todo.project_id == project_id
+        )
+    collaboration = _collaboration_metrics(
+        (await db.execute(event_query)).mappings(),
+        now=datetime.now(timezone.utc),
+    )
 
     artifact_ranked_query = (
         select(
@@ -135,11 +231,14 @@ async def list_task_execution_telemetry(
             pending_reviews.get(row.task_id, 0) + row.review_count
         )
 
-    task_ids = sorted(set(latest_runs) | set(latest_artifacts) | set(pending_reviews))
+    task_ids = sorted(
+        set(latest_runs) | set(latest_artifacts) | set(pending_reviews) | set(collaboration)
+    )
     response: list[TaskExecutionTelemetryResponse] = []
     for task_id in task_ids:
         run = latest_runs.get(task_id)
         artifact = latest_artifacts.get(task_id)
+        collaboration_metrics = collaboration.get(task_id, {})
         response.append(
             TaskExecutionTelemetryResponse(
                 task_id=task_id,
@@ -149,6 +248,13 @@ async def list_task_execution_telemetry(
                 latest_run_provider=run.run_provider if run else None,
                 latest_run_progress_message=run.run_progress_message if run else None,
                 latest_run_updated_at=run.run_updated_at if run else None,
+                human_wait_seconds=int(
+                    collaboration_metrics.get("human_wait_seconds") or 0
+                ),
+                question_count=int(collaboration_metrics.get("question_count") or 0),
+                average_resume_seconds=collaboration_metrics.get(
+                    "average_resume_seconds"
+                ),
                 pending_review_count=pending_reviews.get(task_id, 0),
                 artifact_count=artifact.artifact_count if artifact else 0,
                 latest_artifact_id=artifact.artifact_id if artifact else None,

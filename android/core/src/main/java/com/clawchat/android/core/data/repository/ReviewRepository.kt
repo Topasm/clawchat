@@ -27,6 +27,12 @@ interface ReviewRepository {
         decision: ReviewDecision,
         note: String? = null,
     ): ApiResult<ReviewDecisionResponse>
+
+    suspend fun decideById(
+        reviewId: String,
+        decision: ReviewDecision,
+        note: String? = null,
+    ): ApiResult<ReviewDecisionResponse>
 }
 
 @Singleton
@@ -79,6 +85,23 @@ class ReviewRepositoryImpl @Inject constructor(
             )
         }
         return result
+    }
+
+    override suspend fun decideById(
+        reviewId: String,
+        decision: ReviewDecision,
+        note: String?,
+    ): ApiResult<ReviewDecisionResponse> {
+        val state = sessionStore.runtimeState.first()
+        if (state.mode != WorkspaceMode.SERVER) return workspaceNotConfigured()
+        val scope = state.activeServerRequestScope() ?: return workspaceNotConfigured()
+        return apiCall {
+            api.decideReview(
+                reviewId = reviewId,
+                body = ReviewDecisionRequest(decision = decision, note = note),
+                expectedScope = scope,
+            )
+        }
     }
 }
 

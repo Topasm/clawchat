@@ -105,6 +105,14 @@ export default function ReviewPage() {
         ))}
       </div>
 
+      {filter === 'changes_requested' && (
+        <p className="cc-review-page__filter-note">
+          {translateUi(
+            'Items with a note resume automatically and move back to the run thread, so they no longer remain in this filter.',
+          )}
+        </p>
+      )}
+
       {isLoading ? (
         <div className="cc-project-workspace__loading">{translateUi('Loading reviews…')}</div>
       ) : visibleItems.length === 0 ? (

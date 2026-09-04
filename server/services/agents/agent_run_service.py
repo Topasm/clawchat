@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from collections.abc import Coroutine
 from datetime import datetime, timezone
 from typing import Any
@@ -31,8 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import make_id
 from ws.manager import ws_manager
-
-logger = logging.getLogger(__name__)
+from ws.notifications import notify_after_commit
 
 # Single-user server: every client session authenticates as this subject.
 DEFAULT_USER_ID = "user"
@@ -79,11 +77,12 @@ async def notify_run_state(
         "is_adopted": run.is_adopted,
         "review_id": review_id,
     }
-    try:
-        await ws_manager.send_json(user_id, {"type": "run_state_changed", "data": payload})
-    except Exception:
-        # A notification must never take the execution down with it.
-        logger.warning("Could not push run state for %s", run.id, exc_info=True)
+    notify_after_commit(
+        db,
+        {"type": "run_state_changed", "data": payload},
+        user_id,
+        send_json=ws_manager.send_json,
+    )
     if task is not None:
         await run_thread_service.post_run_update(
             db, run, task, review_id=review_id, user_id=user_id
@@ -138,6 +137,12 @@ async def create_run(
             )
         )
     ).scalar_one_or_none() or 0
+    if task.skill_chain:
+        # A retry is a new attempt and starts from skill zero. Resuming a
+        # waiting run does not come through create_run and keeps its checkpoint.
+        from skills.executor import reset_skill_chain_checkpoint
+
+        reset_skill_chain_checkpoint(task)
     run = AgentRun(
         id=make_id("run_"),
         agent_task_id=task.id,
@@ -190,6 +195,18 @@ async def current_run_for_task(
 
 async def require_run(db: AsyncSession, run_id: str) -> AgentRun:
     run = await db.get(AgentRun, run_id)
+    if run is None:
+        raise NotFoundError("Agent run not found")
+    return run
+
+
+async def require_run_for_update(db: AsyncSession, run_id: str) -> AgentRun:
+    """Load and lock a run whose lifecycle is about to be changed."""
+    run = (
+        await db.execute(
+            select(AgentRun).where(AgentRun.id == run_id).with_for_update()
+        )
+    ).scalar_one_or_none()
     if run is None:
         raise NotFoundError("Agent run not found")
     return run
@@ -275,6 +292,7 @@ async def mark_waiting_review(
     run.progress_message = "Waiting for review"
     run.result = result
     run.result_summary = result[:500]
+    run.error = None
     run.heartbeat_at = now
     run.completed_at = now
     await record_event(db, run, "waiting_review", "Result is ready for review", progress=100)
@@ -347,6 +365,8 @@ async def transition_run(
     run: AgentRun,
     status: AgentRunStatus,
     message: str | None,
+    *,
+    payload: dict[str, Any] | None = None,
 ) -> AgentRun:
     allowed = {
         AgentRunStatus.STARTING: {AgentRunStatus.RUNNING},
@@ -362,7 +382,9 @@ async def transition_run(
     run.heartbeat_at = datetime.now(timezone.utc)
     if message:
         run.progress_message = message
-    await record_event(db, run, status.value, message, progress=run.progress)
+    await record_event(
+        db, run, status.value, message, progress=run.progress, payload=payload
+    )
     await notify_run_state(db, run)
     return run
 

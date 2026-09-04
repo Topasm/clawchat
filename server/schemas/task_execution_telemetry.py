@@ -16,6 +16,9 @@ class TaskExecutionTelemetryResponse(BaseModel):
     latest_run_provider: str | None = None
     latest_run_progress_message: str | None = None
     latest_run_updated_at: datetime | None = None
+    human_wait_seconds: int = Field(default=0, ge=0)
+    question_count: int = Field(default=0, ge=0)
+    average_resume_seconds: int | None = Field(default=None, ge=0)
     pending_review_count: int = Field(default=0, ge=0)
     artifact_count: int = Field(default=0, ge=0)
     latest_artifact_id: str | None = None

@@ -52,6 +52,12 @@
   overflow-x: auto;
   border-bottom: 1px solid var(--cc-border);
 }
+
+.cc-review-page__filter-note {
+  margin: 0 0 var(--cc-space-4);
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+}
 .cc-review-filter {
   padding: 8px 12px;
   border: 0;

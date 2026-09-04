@@ -9,6 +9,7 @@ const queryMocks = vi.hoisted(() => ({
   reviews: vi.fn(),
   resume: vi.fn(),
   decide: vi.fn(),
+  permission: vi.fn(),
 }));
 
 vi.mock('../../../hooks/queries', () => ({
@@ -16,6 +17,7 @@ vi.mock('../../../hooks/queries', () => ({
   useReviewsQuery: queryMocks.reviews,
   useResumeAgentRun: () => ({ mutate: queryMocks.resume, isPending: false }),
   useDecideReview: () => ({ mutate: queryMocks.decide, isPending: false }),
+  useResolvePaseoPermission: () => ({ mutate: queryMocks.permission, isPending: false }),
 }));
 
 const waitingRun = { id: 'run_1', status: 'waiting_input' } as AgentRunResponse;
@@ -32,7 +34,7 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderCard(metadata: Record<string, unknown>) {
+function renderCard(metadata: Record<string, unknown>, suppressTaskProgress = false) {
   return render(
     <MemoryRouter initialEntries={['/chats/conv_1']}>
       <Routes>
@@ -40,7 +42,7 @@ function renderCard(metadata: Record<string, unknown>) {
           path="*"
           element={
             <>
-              <ActionCard metadata={metadata} />
+              <ActionCard metadata={metadata} suppressTaskProgress={suppressTaskProgress} />
               <LocationProbe />
             </>
           }
@@ -56,6 +58,25 @@ describe('RunStatusCard', () => {
     queryMocks.reviews.mockReturnValue({ data: [] });
     queryMocks.resume.mockReset();
     queryMocks.decide.mockReset();
+    queryMocks.permission.mockReset();
+  });
+
+  it('renders structured choices and Paseo permission actions inline', () => {
+    queryMocks.awaitingInput.mockReturnValue({ data: [waitingRun] });
+    renderCard({
+      action_type: 'run_update',
+      status: 'waiting_input',
+      run_id: 'run_1',
+      input_options: ['Formal', 'Casual'],
+      permissions: [{ id: 'permission-1', tool: 'shell' }],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Casual' }));
+    expect(queryMocks.resume).toHaveBeenCalledWith({ runId: 'run_1', followUp: 'Casual' });
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    expect(queryMocks.permission).toHaveBeenCalledWith({ runId: 'run_1', decision: 'allow' });
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
+    expect(queryMocks.permission).toHaveBeenCalledWith({ runId: 'run_1', decision: 'deny' });
   });
 
   it('takes the answer in the thread while the run is still waiting for input', () => {
@@ -121,5 +142,13 @@ describe('RunStatusCard', () => {
     renderCard({ action_type: 'run_update', status: 'completed', run_id: 'run_1' });
     expect(screen.getByText('Complete')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('folds the live delegation card after a durable run card exists', () => {
+    const { container } = renderCard(
+      { action_type: 'task_delegated', task_id: 'task_1', run_id: 'run_1' },
+      true,
+    );
+    expect(container.querySelector('.cc-task-progress')).not.toBeInTheDocument();
   });
 });

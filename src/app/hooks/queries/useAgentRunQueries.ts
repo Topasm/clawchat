@@ -141,3 +141,19 @@ export function useResumeAgentRun() {
       useToastStore.getState().addToast('error', translateUi('Could not resume agent run')),
   });
 }
+
+export function useResolvePaseoPermission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ runId, decision }: { runId: string; decision: 'allow' | 'deny' }) => {
+      const response = await apiClient.post(`/runs/${runId}/permission`, { decision });
+      return AgentRunResponseSchema.parse(response.data);
+    },
+    onSuccess: () => {
+      invalidateRuns(queryClient);
+      useToastStore.getState().addToast('success', translateUi('Permission response sent'));
+    },
+    onError: () =>
+      useToastStore.getState().addToast('error', translateUi('Could not resolve permission')),
+  });
+}

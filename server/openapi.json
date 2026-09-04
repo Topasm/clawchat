@@ -627,6 +627,23 @@
         "title": "AgentRunHeartbeatRequest",
         "type": "object"
       },
+      "AgentRunPermissionRequest": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "title": "Decision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "AgentRunPermissionRequest",
+        "type": "object"
+      },
       "AgentRunRecoveryResponse": {
         "properties": {
           "direct_blocker_ids": {
@@ -2231,6 +2248,18 @@
               }
             ],
             "title": "Last Message"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
           },
           "project_id": {
             "anyOf": [
@@ -7294,6 +7323,24 @@
             "title": "Artifact Count",
             "type": "integer"
           },
+          "average_resume_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Resume Seconds"
+          },
+          "human_wait_seconds": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Human Wait Seconds",
+            "type": "integer"
+          },
           "latest_artifact_id": {
             "anyOf": [
               {
@@ -7410,6 +7457,12 @@
             "default": 0,
             "minimum": 0.0,
             "title": "Pending Review Count",
+            "type": "integer"
+          },
+          "question_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Question Count",
             "type": "integer"
           },
           "task_id": {
@@ -12939,6 +12992,64 @@
           }
         ],
         "summary": "Heartbeat Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/permission": {
+      "post": {
+        "description": "Allow or deny the permissions blocking a Paseo-backed run.",
+        "operationId": "resolve_run_permission_api_runs__run_id__permission_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunPermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Run Permission",
         "tags": [
           "runs"
         ]

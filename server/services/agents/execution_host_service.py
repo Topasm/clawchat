@@ -73,16 +73,19 @@ def host_is_available(
             # Never probed. The adapter reports a real failure on first use,
             # which is more informative than refusing to try.
             return True
-        return _checked_in_recently(host, now=now)
+        return host_checked_in_recently(host, now=now)
     if host.kind == "worker":
         # A worker only exists while its app is running, so silence means the
         # machine is asleep or the app is closed. Never having checked in is
         # the same as gone: there is nothing to send work to.
-        return host.last_seen_at is not None and _checked_in_recently(host, now=now)
+        return host.last_seen_at is not None and host_checked_in_recently(host, now=now)
     return False
 
 
-def _checked_in_recently(host: ExecutionHost, *, now: datetime | None = None) -> bool:
+def host_checked_in_recently(
+    host: ExecutionHost, *, now: datetime | None = None
+) -> bool:
+    """Whether a remote execution host checked in within the shared grace."""
     if host.last_seen_at is None:
         return False
     reference = now or datetime.now(timezone.utc)
@@ -293,9 +296,18 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
     run.host_id = host.label
     run.heartbeat_at = datetime.now(timezone.utc)
     await db.flush()
+    from models.agent_task import AgentTask
+    from services.agents.run_context_service import build_execution_instruction
+
+    task = await db.get(AgentTask, run.agent_task_id)
+    instruction = (
+        await build_execution_instruction(db, task, run.instruction_snapshot)
+        if task is not None
+        else run.instruction_snapshot
+    )
     return ClaimedJob(
         run_id=run.id,
-        instruction=run.instruction_snapshot,
+        instruction=instruction,
         cwd=cwd,
         model=run.model,
     )

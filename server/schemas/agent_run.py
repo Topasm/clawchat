@@ -1,7 +1,7 @@
 """API contracts for durable agent execution attempts."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -18,6 +18,10 @@ class AgentRunRetryRequest(BaseModel):
 
 class AgentRunResumeRequest(BaseModel):
     follow_up_instruction: str = Field(min_length=1, max_length=10_000)
+
+
+class AgentRunPermissionRequest(BaseModel):
+    decision: Literal["allow", "deny"]
 
 
 class AgentRunResultRequest(BaseModel):

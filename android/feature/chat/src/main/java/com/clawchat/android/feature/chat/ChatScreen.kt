@@ -33,10 +33,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
@@ -66,6 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.model.RunUpdate
+import com.clawchat.android.core.data.model.TaskDelegation
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.SwipeToDismissCard
@@ -152,6 +155,9 @@ fun ChatScreen(
             isLoadingMessages = state.isLoadingMessages,
             onSend = viewModel::sendMessage,
             onStop = viewModel::stopStreaming,
+            onResumeRun = viewModel::resumeRun,
+            onResolvePermission = viewModel::resolvePermission,
+            onDecideReview = viewModel::decideReview,
             onBack = viewModel::clearSelection,
         )
     } else {
@@ -178,6 +184,12 @@ private fun ConversationListView(
     onCreate: () -> Unit,
     onDelete: (String) -> Unit,
 ) {
+    val regularConversations = remember(conversations) {
+        conversations.filterNot(Conversation::isAgentRun)
+    }
+    val agentRunConversations = remember(conversations) {
+        conversations.filter(Conversation::isAgentRun)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -264,12 +276,30 @@ private fun ConversationListView(
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 72.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                items(conversations, key = { it.id }) { convo ->
+                items(regularConversations, key = { it.id }) { convo ->
                     SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
                         ConversationCard(
                             conversation = convo,
                             onClick = { onSelect(convo.id) },
                         )
+                    }
+                }
+                if (agentRunConversations.isNotEmpty()) {
+                    item(key = "agent-run-conversations-heading") {
+                        Text(
+                            text = stringResource(R.string.chat_agent_run_conversations),
+                            modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    items(agentRunConversations, key = { "agent-${it.id}" }) { convo ->
+                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                            ConversationCard(
+                                conversation = convo,
+                                onClick = { onSelect(convo.id) },
+                            )
+                        }
                     }
                 }
             }
@@ -345,6 +375,9 @@ private fun ChatDetailView(
     isLoadingMessages: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    onResumeRun: (String, String) -> Unit,
+    onResolvePermission: (String, Boolean) -> Unit,
+    onDecideReview: (String, Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -476,7 +509,12 @@ private fun ChatDetailView(
                 }
 
                 itemsIndexed(messages, key = { _, message -> message.id }) { _, message ->
-                    MessageBubble(message = message)
+                    MessageBubble(
+                        message = message,
+                        onResumeRun = onResumeRun,
+                        onResolvePermission = onResolvePermission,
+                        onDecideReview = onDecideReview,
+                    )
                 }
 
                 if (streamingText.isNotBlank()) {
@@ -488,6 +526,9 @@ private fun ChatDetailView(
                                 role = "assistant",
                             ),
                             streaming = true,
+                            onResumeRun = onResumeRun,
+                            onResolvePermission = onResolvePermission,
+                            onDecideReview = onDecideReview,
                         )
                     }
                 }
@@ -620,6 +661,9 @@ private fun ChatComposer(
 private fun MessageBubble(
     message: Message,
     streaming: Boolean = false,
+    onResumeRun: (String, String) -> Unit,
+    onResolvePermission: (String, Boolean) -> Unit,
+    onDecideReview: (String, Boolean) -> Unit,
 ) {
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
@@ -689,7 +733,15 @@ private fun MessageBubble(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            message.runUpdate?.let { update -> RunUpdateCard(update) }
+            message.runUpdate?.let { update ->
+                RunUpdateCard(
+                    update = update,
+                    onResume = onResumeRun,
+                    onResolvePermission = onResolvePermission,
+                    onDecideReview = onDecideReview,
+                )
+            }
+            message.taskDelegation?.let { delegation -> TaskDelegationCard(delegation) }
         }
     }
 }
@@ -697,10 +749,18 @@ private fun MessageBubble(
 /**
  * An agent run reporting into its thread. The message above already says what
  * happened; this names the state and, when the run is waiting on the user,
- * where to act -- answering and reviewing live on the Progress tab here.
+ * where to act; active cards expose their answer, permission, and review actions inline.
  */
 @Composable
-private fun RunUpdateCard(update: RunUpdate) {
+private fun RunUpdateCard(
+    update: RunUpdate,
+    onResume: (String, String) -> Unit,
+    onResolvePermission: (String, Boolean) -> Unit,
+    onDecideReview: (String, Boolean) -> Unit,
+) {
+    var answer by remember(update.runId) { mutableStateOf("") }
+    val actionableRunId = update.runId
+    val actionableReviewId = update.reviewId
     val statusLabel = stringResource(
         when (update.status) {
             "waiting_input" -> R.string.chat_run_status_waiting_input
@@ -752,6 +812,92 @@ private fun RunUpdateCard(update: RunUpdate) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (update.status == "waiting_input" && actionableRunId != null) {
+                if (update.inputOptions.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        update.inputOptions.forEach { option ->
+                            OutlinedButton(onClick = { onResume(actionableRunId, option) }) {
+                                Text(option)
+                            }
+                        }
+                    }
+                }
+                if (update.hasPendingPermissions) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(onClick = { onResolvePermission(actionableRunId, true) }) {
+                            Text(stringResource(R.string.chat_permission_allow))
+                        }
+                        OutlinedButton(onClick = { onResolvePermission(actionableRunId, false) }) {
+                            Text(stringResource(R.string.chat_permission_deny))
+                        }
+                    }
+                } else {
+                    TextField(
+                        value = answer,
+                        onValueChange = { answer = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(stringResource(R.string.chat_agent_answer_placeholder)) },
+                        maxLines = 3,
+                    )
+                    Button(
+                        enabled = answer.isNotBlank(),
+                        onClick = {
+                            onResume(actionableRunId, answer)
+                            answer = ""
+                        },
+                    ) {
+                        Text(stringResource(R.string.chat_agent_send_answer))
+                    }
+                }
+            }
+            if (update.status == "waiting_review" && actionableReviewId != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Button(onClick = { onDecideReview(actionableReviewId, true) }) {
+                        Text(stringResource(R.string.chat_review_approve))
+                    }
+                    OutlinedButton(onClick = { onDecideReview(actionableReviewId, false) }) {
+                        Text(stringResource(R.string.chat_review_reject))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskDelegationCard(delegation: TaskDelegation) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(
+                    if (delegation.isMultiAgent) {
+                        R.string.chat_multi_agent_task
+                    } else {
+                        R.string.chat_background_task
+                    },
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = stringResource(R.string.chat_task_queued),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
