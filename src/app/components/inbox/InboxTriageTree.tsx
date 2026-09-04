@@ -34,6 +34,8 @@ interface InboxTriageTreeProps {
   onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
   /** Opens the project's own page; the tree header is the natural way there. */
   onOpenProject?: (projectId: string) => void;
+  /** Starts a new task inside the project, so the tree is not only a drop target. */
+  onAddTask?: (projectId: string, rootTaskId: string | null) => void;
 }
 function sorted(items: TodoResponse[]) {
   return [...items].sort(
@@ -53,6 +55,7 @@ export default function InboxTriageTree({
   onPlaceBatch,
   onPreviewDependency,
   onOpenProject,
+  onAddTask,
 }: InboxTriageTreeProps) {
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
   // Open tasks that live in no project and are not in the Inbox queue either.
@@ -135,6 +138,17 @@ export default function InboxTriageTree({
                   {project.task_count}
                   {translateUi(' tasks')}
                 </span>
+                {onAddTask && project.root_task_id && (
+                  <button
+                    type="button"
+                    className="cc-inbox-tree__add-task"
+                    aria-label={translateUi('Add a task to {{title}}', { title: project.title })}
+                    disabled={disabled}
+                    onClick={() => onAddTask(project.id, project.root_task_id ?? null)}
+                  >
+                    {translateUi('+ Task')}
+                  </button>
+                )}
                 {(selectedTaskId || batchTaskIds.length > 1) && (
                   <button
                     type="button"

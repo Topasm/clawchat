@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   useConversationsQuery,
   useCreateProject,
+  useDeleteProject,
   useProjectsQuery,
   useTodosQuery,
   useCreateConversation,
@@ -12,7 +13,7 @@ import {
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
 import Badge from '../components/shared/Badge';
-import { ChatBubbleIcon, CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
+import { ChatBubbleIcon, CheckIcon, ChevronRightIcon, TrashIcon } from '../components/shared/Icons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import Dialog from '../components/shared/Dialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
@@ -27,6 +28,7 @@ export default function ChatListPage() {
   const { data: todos = [] } = useTodosQuery();
   const createConversationMutation = useCreateConversation();
   const createProjectMutation = useCreateProject();
+  const deleteProjectMutation = useDeleteProject();
   const deleteConversationMutation = useDeleteConversation();
   const { isMobile } = usePlatform();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -159,51 +161,73 @@ export default function ChatListPage() {
             const completedCount = project.completed_task_count ?? 0;
             const totalCount = meta?.totalCount ?? 0;
             return (
-              <ListRow
-                as="button"
-                key={project.id}
-                type="button"
-                className="cc-project-card"
-                onClick={() => handleProjectClick(project.id)}
-              >
-                <div className="cc-project-card__header">
-                  <div className="cc-project-card__icon">{getProjectIcon(project.id)}</div>
-                  <div className="cc-project-card__title-area">
-                    <div className="cc-project-card__title">{project.title}</div>
-                    {(project.goal || project.description) && (
-                      <div className="cc-project-card__desc">
-                        {(project.goal || project.description || '').slice(0, 80)}
-                        {(project.goal || project.description || '').length > 80 ? '...' : ''}
-                      </div>
+              <div key={project.id} className="cc-project-card-wrap">
+                <button
+                  type="button"
+                  className="cc-project-card__delete"
+                  aria-label={translateUi('Delete project {{title}}', { title: project.title })}
+                  title={translateUi('Delete project')}
+                  disabled={deleteProjectMutation.isPending}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (
+                      window.confirm(
+                        translateUi('Delete “{{title}}”? Its tasks go back to the Inbox.', {
+                          title: project.title,
+                        }),
+                      )
+                    ) {
+                      deleteProjectMutation.mutate(project.id);
+                    }
+                  }}
+                >
+                  <TrashIcon size={14} />
+                </button>
+                <ListRow
+                  as="button"
+                  type="button"
+                  className="cc-project-card"
+                  onClick={() => handleProjectClick(project.id)}
+                >
+                  <div className="cc-project-card__header">
+                    <div className="cc-project-card__icon">{getProjectIcon(project.id)}</div>
+                    <div className="cc-project-card__title-area">
+                      <div className="cc-project-card__title">{project.title}</div>
+                      {(project.goal || project.description) && (
+                        <div className="cc-project-card__desc">
+                          {(project.goal || project.description || '').slice(0, 80)}
+                          {(project.goal || project.description || '').length > 80 ? '...' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="cc-project-card__meta">
+                    {totalCount > 0 && (
+                      <span className="cc-project-card__tasks">
+                        <CheckIcon size={14} />
+                        {meta?.openCount ?? 0}/{totalCount}
+                        {translateUi(' tasks\n                    ')}
+                      </span>
                     )}
+                    {meta?.nextDue && <Badge variant="due" dueDate={meta.nextDue} />}
+                    <span className="cc-project-card__status">{project.status}</span>
                   </div>
-                </div>
 
-                <div className="cc-project-card__meta">
                   {totalCount > 0 && (
-                    <span className="cc-project-card__tasks">
-                      <CheckIcon size={14} />
-                      {meta?.openCount ?? 0}/{totalCount}
-                      {translateUi(' tasks\n                    ')}
-                    </span>
+                    <div className="cc-project-card__progress-track">
+                      <div
+                        className="cc-project-card__progress-bar"
+                        style={{
+                          width: `${totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
                   )}
-                  {meta?.nextDue && <Badge variant="due" dueDate={meta.nextDue} />}
-                  <span className="cc-project-card__status">{project.status}</span>
-                </div>
 
-                {totalCount > 0 && (
-                  <div className="cc-project-card__progress-track">
-                    <div
-                      className="cc-project-card__progress-bar"
-                      style={{
-                        width: `${totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}%`,
-                      }}
-                    />
-                  </div>
-                )}
-
-                <ChevronRightIcon className="cc-project-card__chevron" size={16} />
-              </ListRow>
+                  <ChevronRightIcon className="cc-project-card__chevron" size={16} />
+                </ListRow>
+              </div>
             );
           })}
         </div>

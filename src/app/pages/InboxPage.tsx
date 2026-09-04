@@ -134,6 +134,11 @@ export default function InboxPage() {
     onPlaceBatch: placement.placeTaskBatch,
     onPreviewDependency: dependency.requestPreview,
     onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
+    // Captured under the project's root, the task lands in this project's
+    // branch of the tree and skips the Inbox queue.
+    onAddTask: (_projectId: string, rootTaskId: string | null) => {
+      if (rootTaskId) useQuickCaptureStore.getState().open({ defaultParentId: rootTaskId });
+    },
   };
   const treeBusy =
     placementRevision == null ||

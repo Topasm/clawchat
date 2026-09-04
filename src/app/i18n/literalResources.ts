@@ -1443,4 +1443,7 @@ Object.assign(koreanUiTranslations, {
   'Tasks that belong to no project. Drag one onto a project, or place it from the Inbox.':
     '프로젝트에 속하지 않은 작업입니다. 프로젝트로 드래그하거나 받은 작업에서 배치하세요.',
   'Open project {{title}}': '프로젝트 {{title}} 열기',
+  'Add a task to {{title}}': '{{title}}에 작업 추가',
+  '+ Task': '+ 작업',
+  'Delete project {{title}}': '프로젝트 {{title}} 삭제',
 });

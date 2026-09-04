@@ -54,6 +54,39 @@
   border-bottom: 1px solid var(--cc-border-subtle);
 }
 
+/* The card is a button; its delete control must sit beside it, not inside. */
+.cc-project-card-wrap {
+  position: relative;
+}
+
+.cc-project-card__delete {
+  position: absolute;
+  top: 12px;
+  right: 34px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--cc-radius-sm);
+  background: transparent;
+  color: var(--cc-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.cc-project-card-wrap:hover .cc-project-card__delete,
+.cc-project-card-wrap:focus-within .cc-project-card__delete {
+  opacity: 1;
+}
+
+.cc-project-card__delete:hover {
+  color: var(--cc-error);
+  background: color-mix(in srgb, var(--cc-error) 10%, transparent);
+}
+
 .cc-project-card {
   position: relative;
   display: flex;

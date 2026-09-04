@@ -95,6 +95,22 @@
   cursor: pointer;
 }
 
+.cc-inbox-tree__add-task {
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  padding: 3px 7px;
+  background: transparent;
+  color: var(--cc-text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cc-inbox-tree__add-task:hover:not(:disabled) {
+  border-color: var(--cc-primary);
+  color: var(--cc-primary);
+}
+
 .cc-inbox-tree__placement-actions {
   display: flex;
   gap: 3px;

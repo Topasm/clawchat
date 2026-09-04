@@ -329,4 +329,25 @@ describe('InboxTriageTree', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open project Paper' }));
     expect(onOpenProject).toHaveBeenCalledWith('project-1');
   });
+
+  it('starts a new task inside a project from the tree', () => {
+    const onAddTask = vi.fn();
+    render(
+      <InboxTriageTree
+        projects={[project]}
+        todos={[task]}
+        selectedTaskId={null}
+        batchTaskIds={[]}
+        disabled={false}
+        onSelectTask={vi.fn()}
+        onPlace={vi.fn()}
+        onPlaceBatch={vi.fn()}
+        onPreviewDependency={vi.fn()}
+        onAddTask={onAddTask}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a task to Paper' }));
+    expect(onAddTask).toHaveBeenCalledWith('project-1', 'root-1');
+  });
 });
