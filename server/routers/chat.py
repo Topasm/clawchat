@@ -201,12 +201,17 @@ async def get_or_create_project_conversation(
     if not project:
         raise NotFoundError("Project todo not found")
 
-    # Look for existing conversation
+    # A run thread may share the project's root todo id, but it carries
+    # metadata (origin=agent_run).  The root conversation without metadata is
+    # the stable Project Agent thread; never let a run thread take its place.
     q = select(Conversation).where(
         Conversation.project_todo_id == todo_id,
         Conversation.is_archived == False,  # noqa: E712
+        Conversation.metadata_json.is_(None),
     )
-    conv = (await db.execute(q)).scalars().first()
+    # Project overviews use the same deterministic id ordering when more than
+    # one legacy root conversation exists.
+    conv = (await db.execute(q.order_by(Conversation.id.asc()))).scalars().first()
 
     if not conv:
         conv = Conversation(

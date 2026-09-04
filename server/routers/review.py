@@ -9,7 +9,11 @@ from exceptions import AppError, ConflictError
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from models.agent_task import AgentTask
 from models.plan_proposal import PlanProposal
-from schemas.review import ReviewDecisionRequest, ReviewDecisionResponse, ReviewItemResponse
+from schemas.review import (
+    ReviewDecisionRequest,
+    ReviewDecisionResponse,
+    ReviewItemResponse,
+)
 from schemas.task import PlanApplyRequest
 from services.agents import (
     agent_run_service,
@@ -85,7 +89,9 @@ async def _resume_after_changes_requested(
             db, request.app.state, run, task, note, user_id=user_id
         )
     except AppError as exc:
-        logger.warning("Run %s could not resume after changes requested: %s", run_id, exc)
+        logger.warning(
+            "Run %s could not resume after changes requested: %s", run_id, exc
+        )
         await db.rollback()
         return False
     return True
@@ -135,8 +141,11 @@ async def decide_review(
             )
         else:
             await review_item_service.set_subject_review_status(
-                db, ReviewSubjectType.PLAN_PROPOSAL, proposal.id,
-                ReviewStatus.CHANGES_REQUESTED, note=body.note,
+                db,
+                ReviewSubjectType.PLAN_PROPOSAL,
+                proposal.id,
+                ReviewStatus.CHANGES_REQUESTED,
+                note=body.note,
             )
             await db.commit()
     elif item.subject_type == ReviewSubjectType.ARTIFACT_REVISION:
@@ -144,14 +153,15 @@ async def decide_review(
             db, item.subject_id, body.decision
         )
         await review_item_service.set_subject_review_status(
-            db, ReviewSubjectType.ARTIFACT_REVISION, item.subject_id,
-            body.decision, note=body.note,
+            db,
+            ReviewSubjectType.ARTIFACT_REVISION,
+            item.subject_id,
+            body.decision,
+            note=body.note,
         )
         await db.commit()
     elif item.subject_type == ReviewSubjectType.AGENT_RUN:
-        outcome = await agent_run_service.decide_run(
-            db, item.subject_id, body.decision
-        )
+        outcome = await agent_run_service.decide_run(db, item.subject_id, body.decision)
         await review_item_service.set_subject_review_status(
             db,
             ReviewSubjectType.AGENT_RUN,
@@ -160,7 +170,10 @@ async def decide_review(
             note=body.note,
         )
         await db.commit()
-        if body.decision == ReviewStatus.CHANGES_REQUESTED and (body.note or "").strip():
+        if (
+            body.decision == ReviewStatus.CHANGES_REQUESTED
+            and (body.note or "").strip()
+        ):
             # The note *is* the follow-up. Resume right away instead of
             # parking the run in waiting_input for the reviewer to retype it.
             outcome = {
@@ -186,4 +199,5 @@ async def decide_review(
     else:
         await notify_module_data_changed("runs")
         await notify_module_data_changed("todos")
+        await notify_module_data_changed("artifacts")
     return ReviewDecisionResponse(review=response, outcome=outcome)

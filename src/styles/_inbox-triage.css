@@ -115,6 +115,13 @@
   gap: 8px;
 }
 
+.cc-inbox-triage__ai-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .cc-inbox-triage__ai-preview-header > div,
 .cc-inbox-triage__ai-suggestion > span {
   display: grid;

@@ -213,7 +213,9 @@ async def register_worker(
     every launch.
     """
     host = (
-        await db.execute(select(ExecutionHost).where(ExecutionHost.label == label.strip()))
+        await db.execute(
+            select(ExecutionHost).where(ExecutionHost.label == label.strip())
+        )
     ).scalar_one_or_none()
     if host is not None and host.kind != "worker":
         # Refuse before touching the row: the label belongs to a machine that
@@ -296,18 +298,9 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
     run.host_id = host.label
     run.heartbeat_at = datetime.now(timezone.utc)
     await db.flush()
-    from models.agent_task import AgentTask
-    from services.agents.run_context_service import build_execution_instruction
-
-    task = await db.get(AgentTask, run.agent_task_id)
-    instruction = (
-        await build_execution_instruction(db, task, run.instruction_snapshot)
-        if task is not None
-        else run.instruction_snapshot
-    )
     return ClaimedJob(
         run_id=run.id,
-        instruction=instruction,
+        instruction=run.instruction_snapshot,
         cwd=cwd,
         model=run.model,
     )

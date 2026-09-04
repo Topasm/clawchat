@@ -21,6 +21,8 @@ interface ChatPanelProps {
   conversationId: string | null;
   onToggle: () => void;
   onSetConversationId: (id: string | null) => void;
+  title?: string;
+  subtitle?: string;
   /** "bottom" (default, mobile) renders with motion height animation; "side" renders as a full-height side panel */
   variant?: 'bottom' | 'side';
 }
@@ -29,6 +31,8 @@ export default function ChatPanel({
   conversationId,
   onToggle,
   onSetConversationId,
+  title = 'Quick Chat',
+  subtitle,
   variant = 'bottom',
 }: ChatPanelProps) {
   const navigate = useNavigate();
@@ -158,7 +162,10 @@ export default function ChatPanel({
   const openContent = (
     <>
       <div className="cc-chat-panel__header">
-        <span className="cc-chat-panel__header-title">{translateUi('Quick Chat')}</span>
+        <span className="cc-chat-panel__header-copy">
+          <span className="cc-chat-panel__header-title">{translateUi(title)}</span>
+          {subtitle && <small>{subtitle}</small>}
+        </span>
         <button
           type="button"
           className="cc-chat-panel__header-btn"
@@ -175,8 +182,8 @@ export default function ChatPanel({
           title={variant === 'side' ? translateUi('Close') : translateUi('Minimize')}
           aria-label={
             variant === 'side'
-              ? translateUi('Close quick chat')
-              : translateUi('Minimize quick chat')
+              ? translateUi('Close agent panel')
+              : translateUi('Minimize agent panel')
           }
         >
           {variant === 'side' ? <CloseIcon size={14} /> : <MinusIcon size={14} />}

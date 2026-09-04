@@ -95,6 +95,8 @@ export const tauriPlatformApi: NativePlatformApi = {
   },
   system: {
     openCameraSettings: () => invoke<void>(TAURI_COMMANDS.appOpenCameraSettings),
+    openCanonicalDocument: (target) =>
+      invoke<void>(TAURI_COMMANDS.appOpenCanonicalDocument, { target }),
   },
   appWindow: {
     setWorkspaceViewMode,

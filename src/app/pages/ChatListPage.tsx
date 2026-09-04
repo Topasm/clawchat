@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import usePlatform from '../hooks/usePlatform';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   useConversationsQuery,
   useCreateProject,
@@ -23,6 +23,8 @@ import { ListRow } from '../components/shared/WorkspacePrimitives';
 import { translateUi } from '../i18n';
 export default function ChatListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const projectsOnly = location.pathname.replace(/\/+$/, '') === '/projects';
   const { data: conversations = [], isLoading: convsLoading } = useConversationsQuery();
   const { data: projects = [], isLoading: projsLoading } = useProjectsQuery();
   const { data: todos = [] } = useTodosQuery();
@@ -61,31 +63,17 @@ export default function ChatListPage() {
     }
     return byConversation;
   }, [conversations, projects, todos]);
-  const projectChats = useMemo(() => {
-    const groups = new Map<string, typeof conversations>();
-    for (const conversation of conversations) {
-      const projectId = projectOfConversation.get(conversation.id);
-      if (!projectId) continue;
-      groups.set(projectId, [...(groups.get(projectId) ?? []), conversation]);
-    }
-    return groups;
-  }, [conversations, projectOfConversation]);
   const agentChats = conversations.filter(
     (c) => c.metadata?.origin === 'agent_run' && !projectOfConversation.has(c.id),
   );
   const quickChats = conversations.filter(
     (c) => !projectOfConversation.has(c.id) && c.metadata?.origin !== 'agent_run',
   );
-  const [openProjectChats, setOpenProjectChats] = useState<Set<string>>(new Set());
-  const toggleProjectChats = (projectId: string) =>
-    setOpenProjectChats((current) => {
-      const next = new Set(current);
-      if (next.has(projectId)) next.delete(projectId);
-      else next.add(projectId);
-      return next;
-    });
   // Compute per-project metadata
   const projectMeta = useMemo(() => {
+    const rootTaskByProject = new Map(
+      projects.map((project) => [project.id, project.root_task_id] as const),
+    );
     const accumulators = new Map<
       string,
       {
@@ -105,10 +93,8 @@ export default function ChatListPage() {
     }
     for (const todo of todos) {
       if (!todo.project_id) continue;
-      const project = projects.find((candidate) => candidate.id === todo.project_id);
-      if (!project || todo.id === project.root_task_id) continue;
       const accumulator = accumulators.get(todo.project_id);
-      if (!accumulator) continue;
+      if (!accumulator || todo.id === rootTaskByProject.get(todo.project_id)) continue;
       accumulator.childCount += 1;
       if (!isTerminalTaskStatus(todo.status)) {
         accumulator.openCount += 1;
@@ -171,31 +157,39 @@ export default function ChatListPage() {
     <div>
       <div className="cc-projects-header">
         <div className="cc-page-header cc-page-header--flush">
-          <div className="cc-page-header__title">{translateUi('Projects')}</div>
+          <div className="cc-page-header__title">
+            {translateUi(projectsOnly ? 'Projects' : 'Chats')}
+          </div>
           {!isMobile && (
-            <div className="cc-page-header__subtitle">{translateUi('Your project workspaces')}</div>
+            <div className="cc-page-header__subtitle">
+              {translateUi(
+                projectsOnly ? 'Your project workspaces' : 'Conversations outside projects',
+              )}
+            </div>
           )}
         </div>
         <div className="cc-projects-header__actions">
-          {!isMobile && (
+          {!projectsOnly && !isMobile && (
             <button type="button" className="cc-btn" onClick={handleNewChat}>
               {translateUi('\n              + Quick Chat\n            ')}
             </button>
           )}
-          <button
-            type="button"
-            className="cc-btn cc-btn--primary"
-            onClick={() => setCreateProjectOpen(true)}
-          >
-            {translateUi('\n            + Project\n          ')}
-          </button>
+          {projectsOnly && (
+            <button
+              type="button"
+              className="cc-btn cc-btn--primary"
+              onClick={() => setCreateProjectOpen(true)}
+            >
+              {translateUi('\n            + Project\n          ')}
+            </button>
+          )}
         </div>
       </div>
 
       {loading && projects.length === 0 && conversations.length === 0 && <ChatListSkeleton />}
 
       {/* Projects Section */}
-      {projects.length > 0 && (
+      {projectsOnly && projects.length > 0 && (
         <div className="cc-projects-grid">
           {projects.map((project) => {
             const meta = projectMeta[project.id];
@@ -274,57 +268,18 @@ export default function ChatListPage() {
         </div>
       )}
 
-      {/* Project threads: context chat, task threads and agent runs, per project */}
-      {projects
-        .filter((project) => (projectChats.get(project.id)?.length ?? 0) > 0)
-        .map((project) => {
-          const threads = projectChats.get(project.id) ?? [];
-          const open = openProjectChats.has(project.id);
-          return (
-            <div key={project.id} className="cc-quick-chats" data-project-threads={project.id}>
-              <button
-                type="button"
-                className="cc-quick-chats__toggle"
-                onClick={() => toggleProjectChats(project.id)}
-                aria-expanded={open}
-              >
-                <ChevronRightIcon
-                  size={12}
-                  className={`cc-quick-chats__chevron${open ? ' cc-quick-chats__chevron--open' : ''}`}
-                />
-                <span style={{ marginRight: 6 }}>{getProjectIcon(project.id)}</span>
-                {project.title}
-                {translateUi(' · {{count}} threads', { count: threads.length })}
-              </button>
-              {open && (
-                <div className="cc-quick-chats__list">
-                  {threads.map((convo) => (
-                    <ConversationItem
-                      key={convo.id}
-                      conversation={convo}
-                      onClick={() => navigate(`/chats/${convo.id}`)}
-                      onDelete={() => setDeleteTarget(convo.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
       {/* Quick Conversations Section */}
-      {!loading && projects.length === 0 && quickChats.length === 0 ? (
+      {!loading && projectsOnly && projects.length === 0 ? (
         <EmptyState
           icon={<ChatBubbleIcon size={20} />}
-          message={
-            isMobile
-              ? translateUi('No projects yet.')
-              : translateUi(
-                  'No projects or conversations yet. Create a project to start a workspace.',
-                )
-          }
+          message={translateUi('No projects yet. Create one to start a workspace.')}
         />
-      ) : quickChats.length > 0 ? (
+      ) : !projectsOnly && !loading && quickChats.length === 0 && agentChats.length === 0 ? (
+        <EmptyState
+          icon={<ChatBubbleIcon size={20} />}
+          message={translateUi('No conversations outside projects yet.')}
+        />
+      ) : !projectsOnly && quickChats.length > 0 ? (
         <div className="cc-quick-chats">
           <button
             type="button"
@@ -353,7 +308,7 @@ export default function ChatListPage() {
         </div>
       ) : null}
 
-      {agentChats.length > 0 && (
+      {!projectsOnly && agentChats.length > 0 && (
         <div className="cc-quick-chats">
           <button
             type="button"

@@ -7,6 +7,7 @@ import KanbanFilterBar from '../kanban/KanbanFilterBar';
 import TasksHeader, { type TasksStatusFilter, type TasksViewMode } from '../kanban/TasksHeader';
 import TaskListView from './TaskListView';
 import { isTaskTodo } from '../../utils/inboxState';
+import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
 
 interface TaskListPageProps {
   viewMode: TasksViewMode;
@@ -32,6 +33,7 @@ export default function TaskListPage({
   );
   const filteredTodos = useKanbanFilters(scopedTodos, filters);
   const toggleTodo = useToggleTodoComplete();
+  const { requestStatusChange, confirmationDialog } = useExperimentCompletionGate();
   const orderedTodos = useMemo(() => {
     const todoById = new Map(filteredTodos.map((todo) => [todo.id, todo]));
     const childrenById = new Map<string, typeof filteredTodos>();
@@ -68,9 +70,15 @@ export default function TaskListPage({
         onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
         onToggleTask={(taskId) => {
           const todo = todos.find((candidate) => candidate.id === taskId);
-          if (todo) toggleTodo.mutate({ id: taskId, currentStatus: todo.status });
+          if (todo) {
+            const nextStatus = todo.status === 'completed' ? 'pending' : 'completed';
+            requestStatusChange(todo, nextStatus, () =>
+              toggleTodo.mutate({ id: taskId, currentStatus: todo.status }),
+            );
+          }
         }}
       />
+      {confirmationDialog}
     </div>
   );
 }

@@ -47,17 +47,21 @@ export default function ChatPage() {
   const { data: conversations = [] } = useConversationsQuery();
   const { data: projects = [] } = useProjectsQuery();
   const convo = conversations.find((c) => c.id === conversationId);
-  const projectTodo = projects.find(
+  const project = projects.find(
     (project) =>
       project.id === convo?.project_id || project.root_task_id === convo?.project_todo_id,
   );
   // A thread scoped to a task rather than a project root: what the agent
   // creates here becomes steps of that task.
   const { data: todos = [] } = useTodosQuery();
-  const scopedTask =
-    !projectTodo && convo?.project_todo_id
-      ? todos.find((todo) => todo.id === convo.project_todo_id)
-      : undefined;
+  const metadataTodoId =
+    typeof convo?.metadata?.todo_id === 'string' ? convo.metadata.todo_id : undefined;
+  const scopedTaskId =
+    metadataTodoId ??
+    (convo?.project_todo_id && convo.project_todo_id !== project?.root_task_id
+      ? convo.project_todo_id
+      : undefined);
+  const scopedTask = scopedTaskId ? todos.find((todo) => todo.id === scopedTaskId) : undefined;
   const scrollRef = useRef<HTMLDivElement>(null);
   const newestMessageIdRef = useRef<string | undefined>(undefined);
   const [dismissedAnswerRunId, setDismissedAnswerRunId] = useState<string | null>(null);
@@ -158,18 +162,18 @@ export default function ChatPage() {
         <button
           type="button"
           className="cc-chat-page__back"
-          onClick={() => navigate('/chats')}
-          aria-label={translateUi('Back to chats')}
+          onClick={() => navigate(project ? `/projects/${project.id}` : '/chats')}
+          aria-label={translateUi(project ? 'Back to project' : 'Back to chats')}
         >
           <ChevronLeftIcon size={16} />
         </button>
-        {projectTodo && (
-          <span style={{ fontSize: 18, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>
+        {project && (
+          <span style={{ fontSize: 18, lineHeight: 1 }}>{getProjectIcon(project.id)}</span>
         )}
         <span className="cc-chat-page__title">{convo?.title || translateUi('Chat')}</span>
       </div>
 
-      {projectTodo && (
+      {project && (
         <div
           style={{
             display: 'flex',
@@ -181,11 +185,11 @@ export default function ChatPage() {
             fontSize: 13,
           }}
         >
-          <span style={{ fontSize: 16, lineHeight: 1 }}>{getProjectIcon(projectTodo.id)}</span>
-          <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{projectTodo.title}</span>
-          {projectTodo.task_count > 0 && (
+          <span style={{ fontSize: 16, lineHeight: 1 }}>{getProjectIcon(project.id)}</span>
+          <span style={{ fontWeight: 500, color: 'var(--cc-text)' }}>{project.title}</span>
+          {project.task_count > 0 && (
             <span style={{ color: 'var(--cc-text-tertiary)', marginLeft: 'auto' }}>
-              {projectTodo.completed_task_count}/{projectTodo.task_count}
+              {project.completed_task_count}/{project.task_count}
               {translateUi(' tasks done\n            ')}
             </span>
           )}
@@ -238,7 +242,7 @@ export default function ChatPage() {
           <MessageBubble
             key={msg._id}
             message={msg}
-            projectIcon={projectTodo ? getProjectIcon(projectTodo.id) : undefined}
+            projectIcon={project ? getProjectIcon(project.id) : undefined}
             onDelete={
               !msg.deliveryStatus
                 ? () =>

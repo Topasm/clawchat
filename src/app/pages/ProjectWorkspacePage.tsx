@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   useDeleteProject,
@@ -9,35 +9,50 @@ import {
   useTodosQuery,
   useUpdateProject,
 } from '../hooks/queries';
-import {
-  ChatBubbleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  EditIcon,
-} from '../components/shared/Icons';
+import { ChatBubbleIcon, ChevronLeftIcon, EditIcon, TrashIcon } from '../components/shared/Icons';
 import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
+import ProjectActivity from '../components/projects/ProjectActivity';
+import ProjectPlan from '../components/projects/ProjectPlan';
 import type { ProjectOverviewResponse } from '../types/api';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
+import { useChatPanelController } from '../components/chat-panel/ChatPanelControllerContext';
+import usePlatform from '../hooks/usePlatform';
+import { useToastStore } from '../stores/useToastStore';
 import { translateUi } from '../i18n';
-function formatMinutes(minutes: number | null | undefined) {
-  if (minutes == null) return translateUi('Unknown');
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
-}
+import CanonicalDocumentButton from '../components/shared/CanonicalDocumentButton';
+import { extractCanonicalDoc } from '../utils/canonicalDoc';
+
+type ProjectSection = 'plan' | 'activity' | 'files';
+
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams<{
     projectId: string;
   }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const section = searchParams.get('section') === 'artifacts' ? 'artifacts' : 'overview';
+  const requestedSection = searchParams.get('section');
+  const section: ProjectSection =
+    requestedSection === 'activity'
+      ? 'activity'
+      : requestedSection === 'files' || requestedSection === 'artifacts'
+        ? 'files'
+        : 'plan';
   const { data: project, isLoading, isError } = useProjectQuery(projectId);
   const { data: todos = [] } = useTodosQuery();
-  const getConversation = useGetOrCreateProjectConversation();
+  const { mutateAsync: getOrCreateConversation, isPending: isOpeningConversation } =
+    useGetOrCreateProjectConversation();
   const deleteProject = useDeleteProject();
+  const {
+    open: openChatPanel,
+    reset: resetChatPanel,
+    presentation: panelPresentation,
+    setPresentation: setPanelPresentation,
+  } = useChatPanelController();
+  const { isMobile } = usePlatform();
+  const addToast = useToastStore((state) => state.addToast);
+  const autoOpenedProjectId = useRef<string | null>(null);
+  const lifecycleGeneration = useRef(0);
   const projectTasks = useMemo(
     () =>
       todos
@@ -45,11 +60,61 @@ export default function ProjectWorkspacePage() {
         .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0)),
     [project?.root_task_id, projectId, todos],
   );
-  const openConversation = async () => {
+  useEffect(() => {
+    const generation = ++lifecycleGeneration.current;
+    return () => {
+      if (lifecycleGeneration.current === generation) lifecycleGeneration.current += 1;
+      autoOpenedProjectId.current = null;
+      resetChatPanel();
+    };
+  }, [projectId, resetChatPanel]);
+  const openProjectAgent = useCallback(async () => {
     if (!project?.root_task_id) return;
-    const conversation = await getConversation.mutateAsync(project.root_task_id);
-    navigate(`/chats/${conversation.id}`);
-  };
+    const generation = lifecycleGeneration.current;
+    try {
+      const conversation = await getOrCreateConversation(project.root_task_id);
+      if (lifecycleGeneration.current !== generation) return;
+      openChatPanel(conversation.id, {
+        kind: 'project',
+        title: 'Project Agent',
+        subtitle: project.title,
+      });
+    } catch {
+      if (lifecycleGeneration.current === generation) {
+        addToast('error', translateUi('Could not open the agent conversation.'));
+      }
+    }
+  }, [addToast, getOrCreateConversation, openChatPanel, project]);
+  const openTaskAgent = useCallback(
+    async (task: (typeof projectTasks)[number], breadcrumb: string) => {
+      if (!project) return;
+      const generation = lifecycleGeneration.current;
+      try {
+        const conversation = await getOrCreateConversation(task.id);
+        if (lifecycleGeneration.current !== generation) return;
+        openChatPanel(conversation.id, {
+          kind: 'task',
+          title: 'Task Agent',
+          subtitle: `${project.title} › ${breadcrumb}`,
+        });
+      } catch {
+        if (lifecycleGeneration.current === generation) {
+          addToast('error', translateUi('Could not open the agent conversation.'));
+        }
+      }
+    },
+    [addToast, getOrCreateConversation, openChatPanel, project],
+  );
+  useEffect(() => {
+    if (!project || isMobile || autoOpenedProjectId.current === project.id) return;
+    autoOpenedProjectId.current = project.id;
+    void openProjectAgent();
+  }, [isMobile, openProjectAgent, project]);
+  useEffect(() => {
+    if (!project || panelPresentation.kind !== 'project') return;
+    if (panelPresentation.subtitle === project.title) return;
+    setPanelPresentation({ kind: 'project', title: 'Project Agent', subtitle: project.title });
+  }, [panelPresentation.kind, panelPresentation.subtitle, project, setPanelPresentation]);
   if (isLoading)
     return (
       <div className="cc-project-workspace__loading">{translateUi('Loading project\u2026')}</div>
@@ -77,11 +142,11 @@ export default function ProjectWorkspacePage() {
         <button
           type="button"
           className="cc-btn cc-btn--primary"
-          onClick={openConversation}
-          disabled={!project.root_task_id || getConversation.isPending}
+          onClick={() => void openProjectAgent()}
+          disabled={!project.root_task_id || isOpeningConversation}
         >
           <ChatBubbleIcon size={15} />
-          {translateUi(' Context chat\n        ')}
+          {translateUi(' Project Agent')}
         </button>
         <button
           type="button"
@@ -99,6 +164,7 @@ export default function ProjectWorkspacePage() {
             }
           }}
         >
+          <TrashIcon size={15} />
           {translateUi('Delete project')}
         </button>
       </header>
@@ -109,46 +175,34 @@ export default function ProjectWorkspacePage() {
       >
         <button
           type="button"
-          className={`cc-project-workspace__tab${section === 'overview' ? ' cc-project-workspace__tab--active' : ''}`}
+          className={`cc-project-workspace__tab${section === 'plan' ? ' cc-project-workspace__tab--active' : ''}`}
           onClick={() => setSearchParams({})}
         >
-          {translateUi('\n          Overview\n        ')}
+          {translateUi('Plan')}
         </button>
         <button
           type="button"
-          className="cc-project-workspace__tab"
-          onClick={() => setSearchParams({})}
+          className={`cc-project-workspace__tab${section === 'activity' ? ' cc-project-workspace__tab--active' : ''}`}
+          onClick={() => setSearchParams({ section: 'activity' })}
         >
-          {translateUi('\n          Plan\n        ')}
+          {translateUi('Activity')}
+          {project.running_agent_count + project.pending_review_count > 0
+            ? ` (${project.running_agent_count + project.pending_review_count})`
+            : ''}
         </button>
         <button
           type="button"
-          className="cc-project-workspace__tab"
-          onClick={() => navigate(`/runs?project_id=${project.id}`)}
+          className={`cc-project-workspace__tab${section === 'files' ? ' cc-project-workspace__tab--active' : ''}`}
+          onClick={() => setSearchParams({ section: 'files' })}
         >
-          {translateUi('\n          Runs')}
-          {project.running_agent_count > 0 ? ` (${project.running_agent_count})` : ''}
+          {translateUi('Files')}
         </button>
-        <button
-          type="button"
-          className="cc-project-workspace__tab"
-          onClick={() => navigate(`/review?project_id=${project.id}`)}
-        >
-          {translateUi('\n          Review')}
-          {project.pending_review_count > 0 ? ` (${project.pending_review_count})` : ''}
-        </button>
-        <button
-          type="button"
-          className={`cc-project-workspace__tab${section === 'artifacts' ? ' cc-project-workspace__tab--active' : ''}`}
-          onClick={() => setSearchParams({ section: 'artifacts' })}
-        >
-          {translateUi('\n          Artifacts\n        ')}
-        </button>
-        <span className="cc-project-workspace__tab">{translateUi('Schedule')}</span>
       </div>
 
-      {section === 'artifacts' ? (
+      {section === 'files' ? (
         <ProjectArtifacts projectId={project.id} />
+      ) : section === 'activity' ? (
+        <ProjectActivity project={project} todos={projectTasks} />
       ) : (
         <>
           <section className="cc-project-metrics" aria-label={translateUi('Project overview')}>
@@ -161,16 +215,8 @@ export default function ProjectWorkspacePage() {
               <strong>{project.blocked_count}</strong>
             </div>
             <div className="cc-project-metric">
-              <span>{translateUi('At risk')}</span>
-              <strong>{project.at_risk_count}</strong>
-            </div>
-            <div className="cc-project-metric">
               <span>{translateUi('Running agents')}</span>
               <strong>{project.running_agent_count}</strong>
-            </div>
-            <div className="cc-project-metric">
-              <span>{translateUi('Critical path')}</span>
-              <strong>{formatMinutes(project.critical_path_minutes)}</strong>
             </div>
             <div className="cc-project-metric">
               <span>{translateUi('Waiting review')}</span>
@@ -178,65 +224,13 @@ export default function ProjectWorkspacePage() {
             </div>
           </section>
 
-          <ProjectWorkspaceHosts projectId={project.id} />
+          <ProjectPlan project={project} todos={projectTasks} onDiscussTask={openTaskAgent} />
 
-          <ProjectExecutionSettings project={project} />
-
-          <section className="cc-project-workspace__section">
-            <div className="cc-project-workspace__section-header">
-              <div>
-                <h2>{translateUi('Plan')}</h2>
-                <p>
-                  {project.completed_task_count}
-                  {translateUi(' of ')}
-                  {project.task_count}
-                  {translateUi(' tasks completed\n                ')}
-                </p>
-              </div>
-              {project.root_task_id && (
-                <button
-                  type="button"
-                  className="cc-btn"
-                  onClick={() => navigate(`/tasks/${project.root_task_id}`)}
-                >
-                  {translateUi('\n                  Open project root\n                ')}
-                </button>
-              )}
-            </div>
-            {projectTasks.length === 0 ? (
-              <EmptyState
-                icon={<span>✓</span>}
-                message={translateUi(
-                  'No execution tasks yet. Use context chat or open the project root to build a plan.',
-                )}
-              />
-            ) : (
-              <div className="cc-project-task-list">
-                {projectTasks.map((task) => (
-                  <button
-                    type="button"
-                    key={task.id}
-                    className="cc-project-task-row"
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                  >
-                    <span
-                      className={`cc-project-task-row__state cc-project-task-row__state--${task.status}`}
-                    />
-                    <span className="cc-project-task-row__body">
-                      <strong>{task.title}</strong>
-                      <small>{task.status.replace('_', ' ')}</small>
-                    </span>
-                    {task.due_date && (
-                      <time dateTime={task.due_date}>
-                        {new Date(task.due_date).toLocaleDateString()}
-                      </time>
-                    )}
-                    <ChevronRightIcon size={15} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
+          <details className="cc-project-settings-disclosure">
+            <summary>{translateUi('Execution settings')}</summary>
+            <ProjectWorkspaceHosts projectId={project.id} />
+            <ProjectExecutionSettings project={project} />
+          </details>
         </>
       )}
     </div>
@@ -328,6 +322,7 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
         </button>
       </div>
       {(project.goal || project.description) && <p>{project.goal || project.description}</p>}
+      <CanonicalDocumentButton target={extractCanonicalDoc(project.description)} />
     </div>
   );
 }
@@ -335,18 +330,22 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
 function ProjectExecutionSettings({ project }: { project: ProjectOverviewResponse }) {
   const { data: providers = [], isLoading } = useExecutionProvidersQuery();
   const testPaseo = useTestPaseoConnection();
-  const updateProject = useUpdateProject(project.id);
+  const updateProject = useUpdateProject(project.id, 'Execution settings saved');
   const [provider, setProvider] = useState(project.default_execution_provider || 'builtin');
   const [model, setModel] = useState(project.default_execution_model || 'codex');
   const [isolation, setIsolation] = useState<'local' | 'worktree'>(
     project.execution_workspace_isolation || 'local',
   );
   const [baseBranch, setBaseBranch] = useState(project.execution_base_branch || '');
+  const [executionInstructions, setExecutionInstructions] = useState(
+    project.execution_instructions || '',
+  );
   useEffect(() => {
     setProvider(project.default_execution_provider || 'builtin');
     setModel(project.default_execution_model || 'codex');
     setIsolation(project.execution_workspace_isolation || 'local');
     setBaseBranch(project.execution_base_branch || '');
+    setExecutionInstructions(project.execution_instructions || '');
   }, [project]);
   const paseo = providers.find((item) => item.id === 'paseo');
   const paseoModels = (paseo?.providers ?? [])
@@ -359,6 +358,7 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
       default_execution_model: provider === 'paseo' ? model.trim() || 'codex' : null,
       execution_workspace_isolation: isolation,
       execution_base_branch: isolation === 'worktree' ? baseBranch.trim() || null : null,
+      execution_instructions: executionInstructions.trim() || null,
     });
   };
   return (
@@ -394,6 +394,17 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
         </div>
       </div>
       <form className="cc-project-execution-form" onSubmit={save}>
+        <label className="cc-project-execution-form__rules">
+          <span>{translateUi('Agent execution rules')}</span>
+          <textarea
+            value={executionInstructions}
+            onChange={(event) => setExecutionInstructions(event.target.value)}
+            placeholder={translateUi(
+              'Rules added to the beginning of every agent run in this project',
+            )}
+            rows={7}
+          />
+        </label>
         <label>
           <span>{translateUi('Provider')}</span>
           <select value={provider} onChange={(event) => setProvider(event.target.value)}>

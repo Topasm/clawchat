@@ -2,7 +2,15 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from database import Base
@@ -25,6 +33,7 @@ class Project(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     goal: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    execution_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String,
         nullable=False,

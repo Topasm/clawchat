@@ -14,6 +14,7 @@ import {
   useApplyPlanProposal,
   useDismissPlanProposal,
   useGetOrCreateProjectConversation,
+  useProjectQuery,
   queryKeys,
 } from '../hooks/queries';
 import apiClient from '../services/apiClient';
@@ -30,6 +31,9 @@ import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 import { getTaskStatusLabel, isTerminalTaskStatus } from '../utils/taskStatus';
 import { translateUi } from '../i18n';
+import CanonicalDocumentButton from '../components/shared/CanonicalDocumentButton';
+import { extractCanonicalDoc } from '../utils/canonicalDoc';
+import useExperimentCompletionGate from '../hooks/useExperimentCompletionGate';
 const SKILL_OPTIONS = [
   { id: 'plan', label: 'Plan' },
   { id: 'research', label: 'Research' },
@@ -76,7 +80,9 @@ export default function TaskDetailPage() {
   const updateTodoMutation = useUpdateTodo();
   const deleteTodoMutation = useDeleteTodo();
   const toggleCompleteMutation = useToggleTodoComplete();
+  const { requestStatusChange, confirmationDialog } = useExperimentCompletionGate();
   const task = todos.find((t) => t.id === taskId);
+  const { data: project } = useProjectQuery(task?.project_id ?? undefined);
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
   const generatePlanMutation = useGeneratePlanProposal();
   const applyPlanMutation = useApplyPlanProposal();
@@ -128,9 +134,14 @@ export default function TaskDetailPage() {
   const handleToggle = useCallback(
     (id: string) => {
       const todo = todos.find((t) => t.id === id);
-      if (todo) toggleCompleteMutation.mutate({ id, currentStatus: todo.status });
+      if (todo) {
+        const nextStatus = todo.status === 'completed' ? 'pending' : 'completed';
+        requestStatusChange(todo, nextStatus, () =>
+          toggleCompleteMutation.mutate({ id, currentStatus: todo.status }),
+        );
+      }
     },
-    [todos, toggleCompleteMutation],
+    [requestStatusChange, todos, toggleCompleteMutation],
   );
   const handleApplyPlan = async (selectedIndices: number[]) => {
     if (!taskId || !plan || plan.base_graph_revision === null) return;
@@ -171,6 +182,7 @@ export default function TaskDetailPage() {
   const isPlanned = childTasks.length > 0;
   const dueInfo =
     task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
+  const canonicalDoc = extractCanonicalDoc(project?.description);
   return (
     <div className="cc-detail cc-exec-panel">
       {/* Top: Status + Quick Actions */}
@@ -295,9 +307,12 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Section 3: Project context */}
-      {(isProject || task.parent_id || task.assignee) && (
+      {(isProject || task.parent_id || task.assignee || project) && (
         <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-title">{translateUi('Project context')}</div>
+          <div className="cc-exec-panel__section-heading">
+            <div className="cc-exec-panel__section-title">{translateUi('Project context')}</div>
+            <CanonicalDocumentButton target={canonicalDoc} />
+          </div>
           <div className="cc-exec-panel__context">
             {isProject && (
               <div className="cc-exec-panel__context-row">
@@ -534,6 +549,7 @@ export default function TaskDetailPage() {
       >
         {translateUi('\n        Delete Task\n      ')}
       </button>
+      {confirmationDialog}
     </div>
   );
 }

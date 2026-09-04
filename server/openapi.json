@@ -5132,6 +5132,17 @@
             ],
             "title": "Execution Base Branch"
           },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
+          },
           "execution_workspace_isolation": {
             "default": "local",
             "pattern": "^(local|worktree)$",
@@ -5333,6 +5344,17 @@
             ],
             "title": "Execution Base Branch"
           },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
+          },
           "execution_workspace_isolation": {
             "default": "local",
             "title": "Execution Workspace Isolation",
@@ -5507,6 +5529,17 @@
               }
             ],
             "title": "Execution Base Branch"
+          },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
           },
           "execution_workspace_isolation": {
             "default": "local",
@@ -5879,6 +5912,17 @@
               }
             ],
             "title": "Execution Base Branch"
+          },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
           },
           "execution_workspace_isolation": {
             "anyOf": [
@@ -15795,6 +15839,72 @@
           }
         ],
         "summary": "Get Latest Plan",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/{todo_id}/plan/proposals/{proposal_id}": {
+      "get": {
+        "operationId": "get_plan_proposal_api_todos__todo_id__plan_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "todo_id",
+            "required": true,
+            "schema": {
+              "title": "Todo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Plan Proposal",
         "tags": [
           "todos"
         ]

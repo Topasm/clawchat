@@ -21,7 +21,8 @@
 }
 
 .cc-project-execution-form input,
-.cc-project-execution-form select {
+.cc-project-execution-form select,
+.cc-project-execution-form textarea {
   min-height: 38px;
   padding: 8px 10px;
   border: 1px solid var(--cc-border);
@@ -32,6 +33,11 @@
   font-weight: 400;
 }
 
+.cc-project-execution-form textarea {
+  resize: vertical;
+}
+
+.cc-project-execution-form__rules,
 .cc-project-execution-form__path,
 .cc-project-execution-form__actions {
   grid-column: 1 / -1;
@@ -67,6 +73,7 @@
     grid-template-columns: 1fr;
   }
 
+  .cc-project-execution-form__rules,
   .cc-project-execution-form__path,
   .cc-project-execution-form__actions {
     grid-column: auto;

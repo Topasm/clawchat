@@ -38,6 +38,13 @@
   margin-bottom: 10px;
 }
 
+.cc-exec-panel__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .cc-exec-panel__next-step {
   display: flex;
   flex-direction: column;

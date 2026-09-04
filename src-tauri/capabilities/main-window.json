@@ -27,6 +27,7 @@
     "allow-app-show-notification",
     "allow-app-set-badge-count",
     "allow-app-open-camera-settings",
+    "allow-app-open-canonical-document",
     "allow-app-set-workspace-view-mode",
     "allow-secure-storage-get",
     "allow-secure-storage-set",

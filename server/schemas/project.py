@@ -11,12 +11,15 @@ class ProjectCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     goal: str | None = None
     description: str | None = None
+    execution_instructions: str | None = None
     status: ProjectStatus = ProjectStatus.ACTIVE
     deadline: datetime | None = None
     default_execution_provider: str | None = None
     default_execution_model: str | None = None
     execution_workspace_path: str | None = None
-    execution_workspace_isolation: str = Field(default="local", pattern="^(local|worktree)$")
+    execution_workspace_isolation: str = Field(
+        default="local", pattern="^(local|worktree)$"
+    )
     execution_base_branch: str | None = None
 
 
@@ -24,12 +27,15 @@ class ProjectUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     goal: str | None = None
     description: str | None = None
+    execution_instructions: str | None = None
     status: ProjectStatus | None = None
     deadline: datetime | None = None
     default_execution_provider: str | None = None
     default_execution_model: str | None = None
     execution_workspace_path: str | None = None
-    execution_workspace_isolation: str | None = Field(default=None, pattern="^(local|worktree)$")
+    execution_workspace_isolation: str | None = Field(
+        default=None, pattern="^(local|worktree)$"
+    )
     execution_base_branch: str | None = None
 
 
@@ -38,6 +44,7 @@ class ProjectResponse(BaseModel):
     title: str
     goal: str | None = None
     description: str | None = None
+    execution_instructions: str | None = None
     status: ProjectStatus
     deadline: datetime | None = None
     root_task_id: str | None = None

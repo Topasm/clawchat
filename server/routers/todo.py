@@ -406,20 +406,17 @@ async def bulk_update_todos(
             settings.obsidian_vault_path,
             set(deleted_ids) | {todo.id for todo in updated_todos},
         )
-        parent_ids = {todo.parent_id for todo in updated_todos if todo.parent_id}
-        parent_titles = {}
-        if parent_ids:
-            parent_rows = await db.execute(
-                select(Todo.id, Todo.title).where(Todo.id.in_(parent_ids))
-            )
-            parent_titles = dict(parent_rows.all())
+        project_names = {
+            todo.id: await todo_service.vault_project_name(db, todo)
+            for todo in updated_todos
+        }
         await asyncio.to_thread(
             export_todos_batch,
             settings.obsidian_vault_path,
             [
                 (
                     snapshot_todo(todo),
-                    parent_titles.get(todo.parent_id) if todo.parent_id else None,
+                    project_names[todo.id],
                 )
                 for todo in updated_todos
             ],
@@ -492,7 +489,9 @@ async def create_todo(
 
         async def _run_pipeline():
             async with session_factory() as pipeline_db:
-                await inbox_pipeline_service.process_todo(pipeline_db, ai_service, todo.id)
+                await inbox_pipeline_service.process_todo(
+                    pipeline_db, ai_service, todo.id
+                )
 
         background_tasks.add_task(_run_pipeline)
 
@@ -519,9 +518,7 @@ async def update_todo(
 ):
     data = body.model_dump(exclude_unset=True)
     client_updated_at = data.pop("client_updated_at", None)
-    is_completion = (
-        "status" in data and data["status"] == TaskStatus.COMPLETED
-    )
+    is_completion = "status" in data and data["status"] == TaskStatus.COMPLETED
     current = None
     if client_updated_at is not None or is_completion:
         current = await todo_service.get_todo(db, todo_id)
@@ -560,7 +557,12 @@ async def place_todo(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo, change, affected_ids, insights_delta = await task_placement_service.place_task(
+    (
+        todo,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.place_task(
         db,
         todo_id=todo_id,
         **body.model_dump(),
@@ -583,12 +585,15 @@ async def place_todos_batch(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todos, change, affected_ids, insights_delta = (
-        await task_placement_service.place_tasks(
-            db,
-            todo_ids=body.todo_ids,
-            **body.model_dump(exclude={"todo_ids"}),
-        )
+    (
+        todos,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.place_tasks(
+        db,
+        todo_ids=body.todo_ids,
+        **body.model_dump(exclude={"todo_ids"}),
     )
     await db.commit()
     for todo in todos:
@@ -652,12 +657,16 @@ async def place_todo_groups(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todos, created_todos, change, affected_ids, insights_delta = (
-        await task_placement_service.place_task_groups(
-            db,
-            groups=body.groups,
-            expected_graph_revision=body.expected_graph_revision,
-        )
+    (
+        todos,
+        created_todos,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.place_task_groups(
+        db,
+        groups=body.groups,
+        expected_graph_revision=body.expected_graph_revision,
     )
     await db.commit()
     for todo in todos:
@@ -667,9 +676,7 @@ async def place_todo_groups(
     await notify_module_data_changed("todos")
     return TaskBatchPlacementResponse(
         todos=[await _enrich_todo_response(todo, db) for todo in todos],
-        created_todos=[
-            await _enrich_todo_response(todo, db) for todo in created_todos
-        ],
+        created_todos=[await _enrich_todo_response(todo, db) for todo in created_todos],
         graph_revision=change.applied_graph_revision,
         affected_task_ids=affected_ids,
         insights_delta=insights_delta,
@@ -686,7 +693,12 @@ async def undo_todo_placement(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    todo, change, affected_ids, insights_delta = await task_placement_service.undo_placement(
+    (
+        todo,
+        change,
+        affected_ids,
+        insights_delta,
+    ) = await task_placement_service.undo_placement(
         db,
         change_set_id,
     )
@@ -752,7 +764,11 @@ async def answer_questions(
         raise NotFoundError("Todo not found")
 
     if todo.inbox_state != "questioning":
-        return {"status": "invalid_state", "todo_id": todo_id, "inbox_state": todo.inbox_state}
+        return {
+            "status": "invalid_state",
+            "todo_id": todo_id,
+            "inbox_state": todo.inbox_state,
+        }
 
     # Save answers
     todo.clarification_answers = json.dumps(body.answers)
@@ -766,7 +782,9 @@ async def answer_questions(
 
     async def _run_planning():
         async with session_factory() as pipeline_db:
-            await inbox_pipeline_service.resume_after_answers(pipeline_db, ai_service, todo_id)
+            await inbox_pipeline_service.resume_after_answers(
+                pipeline_db, ai_service, todo_id
+            )
 
     background_tasks.add_task(_run_planning)
     return {"status": "processing", "todo_id": todo_id}
@@ -786,7 +804,11 @@ async def skip_questions(
         raise NotFoundError("Todo not found")
 
     if todo.inbox_state != "questioning":
-        return {"status": "invalid_state", "todo_id": todo_id, "inbox_state": todo.inbox_state}
+        return {
+            "status": "invalid_state",
+            "todo_id": todo_id,
+            "inbox_state": todo.inbox_state,
+        }
 
     todo.inbox_state = "planning"
     await db.commit()
@@ -798,7 +820,9 @@ async def skip_questions(
 
     async def _run_planning():
         async with session_factory() as pipeline_db:
-            await inbox_pipeline_service.resume_after_answers(pipeline_db, ai_service, todo_id)
+            await inbox_pipeline_service.resume_after_answers(
+                pipeline_db, ai_service, todo_id
+            )
 
     background_tasks.add_task(_run_planning)
     return {"status": "processing", "todo_id": todo_id}
@@ -815,6 +839,21 @@ async def get_latest_plan(
     _user: str = Depends(get_current_user),
 ):
     proposal = await plan_proposal_service.get_latest_proposal(db, todo_id)
+    return await plan_proposal_service.build_plan_response(db, proposal)
+
+
+@router.get(
+    "/{todo_id}/plan/proposals/{proposal_id}",
+    response_model=PlanResponse,
+    responses={404: {"model": ErrorResponse}},
+)
+async def get_plan_proposal(
+    todo_id: str,
+    proposal_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    proposal = await plan_proposal_service.get_proposal(db, todo_id, proposal_id)
     return await plan_proposal_service.build_plan_response(db, proposal)
 
 

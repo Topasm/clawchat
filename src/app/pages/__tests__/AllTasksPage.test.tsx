@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AllTasksPage from '../AllTasksPage';
 import { TASK_STATUS_FILTERS, type TasksStatusFilter } from '../../components/kanban/TasksHeader';
@@ -19,9 +20,17 @@ vi.mock('../../components/task-graph/TaskGraphPage', () => ({
 
 beforeEach(() => localStorage.clear());
 
+function renderPage(entry = '/tasks') {
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <AllTasksPage />
+    </MemoryRouter>,
+  );
+}
+
 describe('AllTasksPage status flow', () => {
   it('starts with in-progress work and keeps All last', () => {
-    render(<AllTasksPage />);
+    renderPage();
 
     expect(screen.getByTestId('active-task-filter')).toHaveTextContent('in_progress');
     expect(TASK_STATUS_FILTERS).toEqual([
@@ -34,7 +43,7 @@ describe('AllTasksPage status flow', () => {
   });
 
   it('moves through task statuses with horizontal swipes', () => {
-    const { container } = render(<AllTasksPage />);
+    const { container } = renderPage();
     const page = container.querySelector('.cc-tasks-page');
     expect(page).not.toBeNull();
 
@@ -42,5 +51,11 @@ describe('AllTasksPage status flow', () => {
     fireEvent.touchEnd(page!, { changedTouches: [{ clientX: 120, clientY: 105 }] });
 
     expect(screen.getByTestId('active-task-filter')).toHaveTextContent('pending');
+  });
+
+  it('opens the graph requested by a project deep link', () => {
+    renderPage('/tasks?view=graph&project_id=project-1');
+
+    expect(screen.getByText('Graph')).toBeInTheDocument();
   });
 });

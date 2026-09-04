@@ -32,6 +32,7 @@ export {
 } from './useModuleQueries';
 export {
   useLatestPlanProposalQuery,
+  usePlanProposalQuery,
   useGeneratePlanProposal,
   useApplyPlanProposal,
   useDismissPlanProposal,
@@ -86,7 +87,12 @@ export {
   useResolvePaseoPermission,
 } from './useAgentRunQueries';
 export { useTaskExecutionTelemetryQuery } from './useTaskExecutionTelemetryQuery';
-export { useSkillsQuery, useStartReadyTaskExecution } from './useTaskExecutionQueries';
+export {
+  resolveExecutionSkillId,
+  useSkillsQuery,
+  useStartReadyTaskExecution,
+  useRunReadyTaskWithProjectDefaults,
+} from './useTaskExecutionQueries';
 export type { StartReadyTaskExecutionVariables } from './useTaskExecutionQueries';
 export { useExecutionProvidersQuery, useTestPaseoConnection } from './useExecutionProviderQueries';
 export {

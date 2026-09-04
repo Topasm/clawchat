@@ -11,6 +11,7 @@ const queryMocks = vi.hoisted(() => ({
   decide: vi.fn(),
   resume: vi.fn(),
   retry: vi.fn(),
+  runNext: vi.fn(),
 }));
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
@@ -24,6 +25,12 @@ vi.mock('../../hooks/queries', () => ({
   useCancelAgentRun: () => ({ mutate: vi.fn(), isPending: false }),
   useReturnAgentRunToReady: () => ({ mutate: vi.fn(), isPending: false }),
   useAgentRunEventsQuery: () => ({ data: [], isLoading: false }),
+  useRunReadyTaskWithProjectDefaults: () => ({
+    runTask: queryMocks.runNext,
+    canRunTask: () => true,
+    isPending: false,
+    isPreparing: false,
+  }),
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -97,6 +104,7 @@ describe('AttentionPage', () => {
   beforeEach(() => {
     queryMocks.decide.mockReset();
     queryMocks.resume.mockReset();
+    queryMocks.runNext.mockReset();
     routerMocks.navigate.mockReset();
     queryMocks.awaitingInput.mockReturnValue({ data: [], isLoading: false });
     queryMocks.reviews.mockReturnValue({ data: [], isLoading: false });

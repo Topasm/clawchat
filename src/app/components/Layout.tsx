@@ -12,6 +12,7 @@ import { useTheme } from '../config/ThemeContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import apiClient from '../services/apiClient';
 import ChatPanel from './chat-panel/ChatPanel';
+import { ChatPanelControllerProvider } from './chat-panel/ChatPanelControllerContext';
 import ErrorBoundary from './shared/ErrorBoundary';
 import useChatPanel from '../hooks/useChatPanel';
 import usePlatform from '../hooks/usePlatform';
@@ -481,102 +482,112 @@ export default function Layout() {
           conversationId={chatPanel.conversationId}
           onToggle={chatPanel.toggle}
           onSetConversationId={chatPanel.setConversationId}
+          title={chatPanel.presentation.title}
+          subtitle={chatPanel.presentation.subtitle}
         />
       )}
     </>
   );
   return (
-    <div
-      className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}${isDesktop && simpleMode ? ' cc-root--simple' : ''}`}
-      style={cssVars(colors, fontSize)}
-    >
-      <UpdateNotification />
-      <ToastContainer />
-      <OfflineIndicator />
-      <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
-      <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
-      <QuickCaptureModal
-        isOpen={quickCapture.isOpen}
-        onClose={quickCapture.close}
-        placeholder={quickCapture.placeholder || undefined}
-        defaultParentId={quickCapture.defaultParentId}
-      />
+    <ChatPanelControllerProvider controller={chatPanel}>
+      <div
+        className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}${isDesktop && simpleMode ? ' cc-root--simple' : ''}`}
+        style={cssVars(colors, fontSize)}
+      >
+        <UpdateNotification />
+        <ToastContainer />
+        <OfflineIndicator />
+        <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
+        <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
+        <QuickCaptureModal
+          isOpen={quickCapture.isOpen}
+          onClose={quickCapture.close}
+          placeholder={quickCapture.placeholder || undefined}
+          defaultParentId={quickCapture.defaultParentId}
+        />
 
-      {isDesktop && simpleMode ? (
-        <Suspense fallback={null}>
-          <SimpleMode />
-        </Suspense>
-      ) : isMobile ? (
-        <>
-          {connectionStatus !== 'connected' && (
-            <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
-              <span className="cc-mobile-status-bar__dot" />
-              <span>
-                {isFlushing ? t('connection.syncing') : t(CONNECTION_LABEL_KEYS[connectionStatus])}
-              </span>
-              {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
-            </div>
-          )}
-          <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {mobileMainContent}
-          </div>
-          <FloatingActionButton />
-          <BottomNav tabs={availableMobileTabs} />
-        </>
-      ) : (
-        <PanelGroup orientation="horizontal" id="cc-layout">
-          <Panel
-            id="sidebar"
-            panelRef={sidebarPanelRef}
-            defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
-            minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
-            maxSize="250px"
-            collapsible
-            collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
-            onResize={handleSidebarResize}
-          >
-            {sidebar}
-          </Panel>
-          <PanelResizeHandle className="cc-resize-handle" />
-          <Panel id="content" minSize="30%">
-            <div className="cc-main">
-              <div className="cc-content" ref={contentRef}>
-                <ErrorBoundary name="PageContent">
-                  <AnimatedOutlet />
-                </ErrorBoundary>
+        {isDesktop && simpleMode ? (
+          <Suspense fallback={null}>
+            <SimpleMode />
+          </Suspense>
+        ) : isMobile ? (
+          <>
+            {connectionStatus !== 'connected' && (
+              <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
+                <span className="cc-mobile-status-bar__dot" />
+                <span>
+                  {isFlushing
+                    ? t('connection.syncing')
+                    : t(CONNECTION_LABEL_KEYS[connectionStatus])}
+                </span>
+                {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
               </div>
-              {!onChatPage && !chatPanel.isOpen && (
-                <ChatPanel
-                  isOpen={false}
-                  conversationId={chatPanel.conversationId}
-                  onToggle={chatPanel.toggle}
-                  onSetConversationId={chatPanel.setConversationId}
-                />
-              )}
+            )}
+            <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+              {mobileMainContent}
             </div>
-          </Panel>
-          {showChatPanel && (
-            <>
-              <PanelResizeHandle className="cc-resize-handle" />
-              <Panel
-                id="chat-panel"
-                defaultSize={`${chatPanelSize}%`}
-                minSize="250px"
-                maxSize="450px"
-                onResize={handleChatPanelResize}
-              >
-                <ChatPanel
-                  isOpen={true}
-                  conversationId={chatPanel.conversationId}
-                  onToggle={chatPanel.toggle}
-                  onSetConversationId={chatPanel.setConversationId}
-                  variant="side"
-                />
-              </Panel>
-            </>
-          )}
-        </PanelGroup>
-      )}
-    </div>
+            <FloatingActionButton />
+            <BottomNav tabs={availableMobileTabs} />
+          </>
+        ) : (
+          <PanelGroup orientation="horizontal" id="cc-layout">
+            <Panel
+              id="sidebar"
+              panelRef={sidebarPanelRef}
+              defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
+              minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
+              maxSize="250px"
+              collapsible
+              collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
+              onResize={handleSidebarResize}
+            >
+              {sidebar}
+            </Panel>
+            <PanelResizeHandle className="cc-resize-handle" />
+            <Panel id="content" minSize="30%">
+              <div className="cc-main">
+                <div className="cc-content" ref={contentRef}>
+                  <ErrorBoundary name="PageContent">
+                    <AnimatedOutlet />
+                  </ErrorBoundary>
+                </div>
+                {!onChatPage && !chatPanel.isOpen && (
+                  <ChatPanel
+                    isOpen={false}
+                    conversationId={chatPanel.conversationId}
+                    onToggle={chatPanel.toggle}
+                    onSetConversationId={chatPanel.setConversationId}
+                    title={chatPanel.presentation.title}
+                    subtitle={chatPanel.presentation.subtitle}
+                  />
+                )}
+              </div>
+            </Panel>
+            {showChatPanel && (
+              <>
+                <PanelResizeHandle className="cc-resize-handle" />
+                <Panel
+                  id="chat-panel"
+                  defaultSize={`${chatPanelSize}%`}
+                  minSize="250px"
+                  maxSize="450px"
+                  onResize={handleChatPanelResize}
+                >
+                  <ChatPanel
+                    isOpen={true}
+                    conversationId={chatPanel.conversationId}
+                    onToggle={chatPanel.toggle}
+                    onSetConversationId={chatPanel.setConversationId}
+                    title={chatPanel.presentation.title}
+                    subtitle={chatPanel.presentation.subtitle}
+                    variant="side"
+                  />
+                </Panel>
+              </>
+            )}
+          </PanelGroup>
+        )}
+      </div>
+    </ChatPanelControllerProvider>
   );
 }

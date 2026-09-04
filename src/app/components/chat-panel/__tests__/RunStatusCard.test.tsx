@@ -10,6 +10,7 @@ const queryMocks = vi.hoisted(() => ({
   resume: vi.fn(),
   decide: vi.fn(),
   permission: vi.fn(),
+  runNext: vi.fn(),
 }));
 
 vi.mock('../../../hooks/queries', () => ({
@@ -18,6 +19,12 @@ vi.mock('../../../hooks/queries', () => ({
   useResumeAgentRun: () => ({ mutate: queryMocks.resume, isPending: false }),
   useDecideReview: () => ({ mutate: queryMocks.decide, isPending: false }),
   useResolvePaseoPermission: () => ({ mutate: queryMocks.permission, isPending: false }),
+  useRunReadyTaskWithProjectDefaults: () => ({
+    runTask: queryMocks.runNext,
+    canRunTask: () => true,
+    isPending: false,
+    isPreparing: false,
+  }),
 }));
 
 const waitingRun = { id: 'run_1', status: 'waiting_input' } as AgentRunResponse;
@@ -59,6 +66,7 @@ describe('RunStatusCard', () => {
     queryMocks.resume.mockReset();
     queryMocks.decide.mockReset();
     queryMocks.permission.mockReset();
+    queryMocks.runNext.mockReset();
   });
 
   it('renders structured choices and Paseo permission actions inline', () => {
@@ -121,11 +129,60 @@ describe('RunStatusCard', () => {
       note: 'Shorter please',
     });
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    expect(queryMocks.decide).toHaveBeenLastCalledWith({
-      reviewId: 'review_1',
-      decision: 'approved',
-      note: 'Shorter please',
+    expect(queryMocks.decide).toHaveBeenLastCalledWith(
+      {
+        reviewId: 'review_1',
+        decision: 'approved',
+        note: 'Shorter please',
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it('offers one explicit next run after approval in the task thread', () => {
+    queryMocks.reviews.mockReturnValue({
+      data: [{ ...pendingReview, project_id: 'project-1', subject_title: 'Write draft' }],
     });
+    queryMocks.runNext.mockResolvedValue({ run_id: 'run-next' });
+    queryMocks.decide.mockImplementation(
+      (
+        _variables: unknown,
+        options?: {
+          onSuccess?: (result: {
+            review: ReviewItemResponse;
+            agentRunOutcome: {
+              todo_id: string;
+              todo_status: 'completed';
+              graph_revision: number;
+              newly_ready_tasks: Array<{ id: string; title: string }>;
+            };
+          }) => void;
+        },
+      ) =>
+        options?.onSuccess?.({
+          review: {
+            ...pendingReview,
+            project_id: 'project-1',
+            subject_title: 'Write draft',
+          },
+          agentRunOutcome: {
+            todo_id: 'task-1',
+            todo_status: 'completed',
+            graph_revision: 8,
+            newly_ready_tasks: [{ id: 'task-next', title: 'Publish draft' }],
+          },
+        }),
+    );
+
+    renderCard({ action_type: 'run_update', status: 'waiting_review', run_id: 'run_1' });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+    expect(screen.getByLabelText('Agent approval outcome')).toHaveTextContent(
+      '1 downstream task is now Ready.',
+    );
+    expect(queryMocks.runNext).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Run next' }));
+    expect(queryMocks.runNext).toHaveBeenCalledWith('task-next', 'project-1');
   });
 
   it('shows the failure and a way to the run, and nothing to click for settled states', () => {

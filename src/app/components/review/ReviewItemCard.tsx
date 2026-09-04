@@ -1,10 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import AgentRunReviewHandoff from './AgentRunReviewHandoff';
 import type { ReviewItemResponse } from '../../types/api';
-import { AgentRunApprovalImpactSchema } from '../../types/schemas';
+import { agentRunApprovalImpact, type ReviewDecision } from '../../utils/agentRunReview';
 import { translateUi } from '../../i18n';
-
-export type ReviewDecision = 'approved' | 'changes_requested' | 'rejected';
 
 export function subjectLabel(item: ReviewItemResponse): string {
   const labels: Record<string, string> = {
@@ -13,12 +11,6 @@ export function subjectLabel(item: ReviewItemResponse): string {
     agent_run: translateUi('Agent run'),
   };
   return labels[item.subject_type] ?? item.subject_type.replaceAll('_', ' ');
-}
-
-export function approvalImpact(item: ReviewItemResponse) {
-  if (item.subject_type !== 'agent_run') return null;
-  const parsed = AgentRunApprovalImpactSchema.safeParse(item.metadata.approval_impact);
-  return parsed.success ? parsed.data : null;
 }
 
 interface ReviewItemCardProps {
@@ -32,8 +24,8 @@ interface ReviewItemCardProps {
 /**
  * One item in the human review queue, wherever that queue is shown.
  *
- * Decisions are the caller's: the Review page keeps its approval handoff
- * state, the Attention page just refreshes. The card only reports intent.
+ * Decisions are the caller's. The card only reports intent; the shared
+ * review-decision hook owns mutation and any post-approval handoff.
  */
 export default function ReviewItemCard({
   item,
@@ -43,7 +35,7 @@ export default function ReviewItemCard({
   isDeciding,
 }: ReviewItemCardProps) {
   const navigate = useNavigate();
-  const impact = approvalImpact(item);
+  const impact = agentRunApprovalImpact(item);
   const open = item.status === 'pending' || item.status === 'changes_requested';
   return (
     <article className="cc-review-card">
@@ -75,7 +67,6 @@ export default function ReviewItemCard({
           taskTitle={item.subject_title}
           impact={impact}
           onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
-          onOpenInbox={() => navigate('/inbox')}
         />
       )}
       {open && (

@@ -3,6 +3,7 @@ import { CalendarIcon, CheckCircleIcon, CheckIcon, WarningIcon } from '../shared
 import SchedulingSuggestions from './SchedulingSuggestions';
 import TaskProgressCard from './TaskProgressCard';
 import RunStatusCard from './RunStatusCard';
+import ChatPlanProposalCard from './ChatPlanProposalCard';
 import { translateUi } from '../../i18n';
 interface ActionCardProps {
   metadata: Record<string, unknown>;
@@ -127,24 +128,7 @@ export default function ActionCard({ metadata, suppressTaskProgress = false }: A
   }
   // Planner started for a task; the proposal arrives on the task and in Review
   if (actionType === 'plan_started') {
-    return (
-      <div className="cc-action-card">
-        <div className="cc-action-card__icon cc-action-card__icon--todo">
-          <CheckIcon size={14} />
-        </div>
-        <div className="cc-action-card__content">
-          <span className="cc-action-card__label">{translateUi('Planning')}</span>
-          <span className="cc-action-card__title">{metadata.todo_title as string}</span>
-        </div>
-        <button
-          type="button"
-          className="cc-btn cc-btn--ghost cc-action-card__view-btn"
-          onClick={() => navigate(`/tasks/${metadata.todo_id}`)}
-        >
-          {translateUi('Open task')}
-        </button>
-      </div>
-    );
+    return <ChatPlanProposalCard metadata={metadata} />;
   }
   // Delegation refused because the thread's task already has a run going
   if (actionType === 'task_run_active' && typeof metadata.run_id === 'string') {

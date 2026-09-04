@@ -28,6 +28,34 @@
   flex-direction: column;
 }
 
+.cc-action-card--plan {
+  width: 100%;
+}
+
+.cc-action-card__plan-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cc-action-card__plan-heading > div,
+.cc-action-card__plan-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cc-action-card--plan .cc-plan-review {
+  margin-top: 10px;
+}
+
+.cc-action-card__plan-status {
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
 .cc-action-card__icon {
   display: flex;
   align-items: center;

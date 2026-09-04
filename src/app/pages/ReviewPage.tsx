@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import AgentRunReviewHandoff from '../components/review/AgentRunReviewHandoff';
-import ReviewItemCard, { approvalImpact } from '../components/review/ReviewItemCard';
+import AgentRunReviewOutcomeHandoff from '../components/review/AgentRunReviewOutcomeHandoff';
+import ReviewItemCard from '../components/review/ReviewItemCard';
 import EmptyState from '../components/shared/EmptyState';
 import { CheckCircleIcon, ClipboardIcon } from '../components/shared/Icons';
-import { useDecideReview, useReviewsQuery } from '../hooks/queries';
-import type { AgentRunReviewOutcome, ReviewItemResponse, ReviewStatus } from '../types/api';
+import { useReviewsQuery } from '../hooks/queries';
+import useReviewDecisionHandoff from '../hooks/useReviewDecisionHandoff';
+import type { ReviewStatus } from '../types/api';
 import { translateUi } from '../i18n';
 const FILTERS: Array<{
   value: ReviewStatus;
@@ -16,47 +17,19 @@ const FILTERS: Array<{
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
 ];
-interface ApprovedAgentRunHandoff {
-  reviewId: string;
-  taskTitle: string | null;
-  outcome: AgentRunReviewOutcome;
-}
 export default function ReviewPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = (searchParams.get('status') as ReviewStatus | null) ?? 'pending';
   const projectId = searchParams.get('project_id');
   const { data: items = [], isLoading } = useReviewsQuery(filter, projectId);
-  const decide = useDecideReview();
+  const { approvedAgentRun, decide, decideItem, dismissApprovedAgentRun } =
+    useReviewDecisionHandoff();
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [approvedAgentRun, setApprovedAgentRun] = useState<ApprovedAgentRunHandoff | null>(null);
   const visibleItems =
     approvedAgentRun && (filter === 'pending' || filter === 'changes_requested')
       ? items.filter((item) => item.id !== approvedAgentRun.reviewId)
       : items;
-  const decideItem = (
-    item: ReviewItemResponse,
-    decision: 'approved' | 'changes_requested' | 'rejected',
-  ) => {
-    decide.mutate(
-      { reviewId: item.id, decision, note: notes[item.id]?.trim() || undefined },
-      {
-        onSuccess: (result) => {
-          if (decision !== 'approved' || item.subject_type !== 'agent_run') return;
-          const impact = approvalImpact(item);
-          setApprovedAgentRun({
-            reviewId: item.id,
-            taskTitle: item.subject_title,
-            outcome: {
-              ...(result.agentRunOutcome ?? {}),
-              todo_id: result.agentRunOutcome?.todo_id ?? impact?.todo_id,
-              graph_revision: result.agentRunOutcome?.graph_revision ?? impact?.graph_revision,
-            },
-          });
-        },
-      },
-    );
-  };
   return (
     <div className="cc-review-page">
       <header className="cc-page-header cc-review-page__header">
@@ -80,11 +53,11 @@ export default function ReviewPage() {
       </header>
 
       {approvedAgentRun && (
-        <AgentRunReviewHandoff
+        <AgentRunReviewOutcomeHandoff
+          projectId={approvedAgentRun.projectId}
           taskTitle={approvedAgentRun.taskTitle}
           outcome={approvedAgentRun.outcome}
-          onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
-          onOpenInbox={() => navigate('/inbox')}
+          onDismiss={dismissApprovedAgentRun}
         />
       )}
 
@@ -132,7 +105,7 @@ export default function ReviewPage() {
               item={item}
               note={notes[item.id] ?? item.review_note ?? ''}
               onNoteChange={(note) => setNotes((current) => ({ ...current, [item.id]: note }))}
-              onDecide={(decision) => decideItem(item, decision)}
+              onDecide={(decision) => decideItem(item, decision, notes[item.id])}
               isDeciding={decide.isPending}
             />
           ))}

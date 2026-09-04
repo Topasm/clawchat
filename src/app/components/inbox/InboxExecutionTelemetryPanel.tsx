@@ -79,7 +79,7 @@ export default function InboxExecutionTelemetryPanel({
           <button
             type="button"
             className="cc-btn cc-btn--ghost"
-            onClick={() => onNavigate(`/projects/${projectId}?section=artifacts`)}
+            onClick={() => onNavigate(`/projects/${projectId}?section=files`)}
           >
             {translateUi('\n            Artifacts\n          ')}
           </button>

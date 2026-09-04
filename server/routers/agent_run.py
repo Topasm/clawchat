@@ -103,7 +103,6 @@ async def retry_run(
         instruction = (
             f"{instruction}\n\nFollow-up instruction:\n{body.follow_up_instruction.strip()}"
         )
-        task.instruction = instruction
     if provider == "paseo":
         paseo_adapter = getattr(request.app.state, "paseo_adapter", None) or (
             paseo_execution_service.adapter_from_settings()

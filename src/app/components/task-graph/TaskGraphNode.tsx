@@ -136,7 +136,7 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
       {hasVisibleChildren && !proposalSelection && (
         <button
           type="button"
-          className="cc-task-flow-node__collapse nodrag nopan"
+          className={`cc-task-flow-node__collapse nodrag nopan${isCollapsed ? ' cc-task-flow-node__collapse--collapsed' : ''}`}
           onClick={(event) => {
             event.stopPropagation();
             onToggleCollapse(id);
@@ -149,6 +149,7 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
             size={16}
             style={{ transform: isCollapsed ? undefined : 'rotate(90deg)' }}
           />
+          {isCollapsed && <span>{childCount}</span>}
         </button>
       )}
       <Handle type="source" position={Position.Right} className="cc-task-flow-node__handle" />

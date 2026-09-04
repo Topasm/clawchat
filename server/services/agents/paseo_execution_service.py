@@ -23,7 +23,6 @@ from services.agents import (
     agent_task_service,
     execution_host_service,
 )
-from services.agents.run_context_service import build_execution_instruction
 from services.review import artifact_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -81,6 +80,7 @@ async def publish_adopted_output(
             select(Artifact).where(
                 Artifact.project_id == run.project_id,
                 Artifact.created_by == run.id,
+                Artifact.type == ArtifactType.CODE_DIFF,
             )
         )
     ).scalar_one_or_none()
@@ -219,7 +219,6 @@ async def _monitor_agent(
             result = await adapter.logs(snapshot.id)
             if not result.strip():
                 result = "Paseo agent completed without a transcript."
-            run._active_agent_run = run
             task._active_agent_run = run
             await agent_task_service.mark_completed(db, task, result)
             run.result_summary = result[-500:]
@@ -295,11 +294,12 @@ async def execute_run(
                 agent = await adapter.start_agent(
                     workspace_id=run.workspace_id,
                     provider_model=run.model or settings.paseo_default_provider,
-                    prompt=await build_execution_instruction(
-                        db, task, run.instruction_snapshot
-                    ),
+                    prompt=run.instruction_snapshot,
                     title=todo.title if todo else task.task_type,
-                    labels={"clawchat.run_id": run.id, "clawchat.project_id": project.id},
+                    labels={
+                        "clawchat.run_id": run.id,
+                        "clawchat.project_id": project.id,
+                    },
                 )
                 run.external_run_id = agent.id
                 run.host_id = adapter.host_label
@@ -341,7 +341,9 @@ async def execute_run(
                     await db.commit()
                     await _notify_run_state(user_id)
             except Exception:
-                logger.exception("Could not persist Paseo AgentRun failure for %s", run_id)
+                logger.exception(
+                    "Could not persist Paseo AgentRun failure for %s", run_id
+                )
 
 
 async def cancel_external_run(
@@ -411,7 +413,9 @@ async def recover_active_runs(
                         AgentRun.status.in_(AGENT_RUN_EXECUTING_STATUSES),
                     )
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
     for run_id in run_ids:
         agent_run_service.launch_execution(

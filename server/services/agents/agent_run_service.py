@@ -13,22 +13,27 @@ from domain.agent_run import (
     AGENT_RUN_EXECUTING_STATUSES,
     AgentRunStatus,
 )
-from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
+from domain.review import ArtifactType, ReviewRiskLevel, ReviewStatus, ReviewSubjectType
 from domain.task import TaskStatus
 from exceptions import ConflictError, NotFoundError
 from models.agent_run import AgentRun, AgentRunEvent
 from models.agent_task import AgentTask
+from models.artifact import Artifact
 from models.conversation import Conversation
 from models.project import Project
 from models.todo import Todo
 from schemas.agent_run import AgentRunEventResponse, AgentRunResponse
 from schemas.review import AgentRunReviewOutcome
 from services.agents import run_thread_service
-from services.review import agent_review_handoff_service, review_item_service
+from services.review import (
+    agent_review_handoff_service,
+    artifact_service,
+    review_item_service,
+)
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils import make_id
+from utils import deserialize_tags, make_id
 from ws.manager import ws_manager
 from ws.notifications import notify_after_commit
 
@@ -36,6 +41,44 @@ from ws.notifications import notify_after_commit
 DEFAULT_USER_ID = "user"
 
 _execution_tasks: dict[str, asyncio.Task] = {}
+
+
+def _is_experiment_todo(todo: Todo) -> bool:
+    return any(
+        tag.removeprefix("#").startswith("exp/") for tag in deserialize_tags(todo.tags)
+    )
+
+
+async def _publish_approved_report(
+    db: AsyncSession,
+    *,
+    run: AgentRun,
+    task: AgentTask,
+    todo: Todo | None,
+) -> None:
+    if not run.project_id:
+        return
+    existing = (
+        await db.execute(
+            select(Artifact.id).where(
+                Artifact.project_id == run.project_id,
+                Artifact.created_by == run.id,
+                Artifact.type == ArtifactType.REPORT,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return
+    await artifact_service.create_artifact(
+        db,
+        project_id=run.project_id,
+        task_id=task.todo_id,
+        type=ArtifactType.REPORT,
+        title=f"Run report · {todo.title if todo else task.task_type}",
+        content=run.result or run.result_summary or "",
+        source=f"agent_run:{run.provider}",
+        created_by=run.id,
+    )
 
 
 async def notify_run_state(
@@ -57,7 +100,9 @@ async def notify_run_state(
     """
     if task is None:
         task = await db.get(AgentTask, run.agent_task_id)
-    todo = await db.get(Todo, task.todo_id) if task is not None and task.todo_id else None
+    todo = (
+        await db.get(Todo, task.todo_id) if task is not None and task.todo_id else None
+    )
     title = todo.title if todo is not None else run.instruction_snapshot[:120]
     payload = {
         "run_id": run.id,
@@ -92,9 +137,7 @@ async def notify_run_state(
 async def infer_project_id(db: AsyncSession, task: AgentTask) -> str | None:
     if task.todo_id:
         project_id = (
-            await db.execute(
-                select(Todo.project_id).where(Todo.id == task.todo_id)
-            )
+            await db.execute(select(Todo.project_id).where(Todo.id == task.todo_id))
         ).scalar_one_or_none()
         if project_id:
             return project_id
@@ -120,6 +163,8 @@ async def create_run(
     instruction_snapshot: str | None = None,
     update_todo_status: bool = True,
 ) -> AgentRun:
+    from services.agents.run_context_service import build_execution_instruction
+
     active = (
         await db.execute(
             select(AgentRun.id).where(
@@ -132,9 +177,7 @@ async def create_run(
         raise ConflictError("This agent task already has an active run")
     last_attempt = (
         await db.execute(
-            select(func.max(AgentRun.attempt)).where(
-                AgentRun.agent_task_id == task.id
-            )
+            select(func.max(AgentRun.attempt)).where(AgentRun.agent_task_id == task.id)
         )
     ).scalar_one_or_none() or 0
     if task.skill_chain:
@@ -143,12 +186,19 @@ async def create_run(
         from skills.executor import reset_skill_chain_checkpoint
 
         reset_skill_chain_checkpoint(task)
+    # A supplied snapshot belongs to an earlier attempt and is already fully
+    # assembled. Only a brand-new run freezes project and conversation context.
+    frozen_instruction = (
+        instruction_snapshot
+        if instruction_snapshot is not None
+        else await build_execution_instruction(db, task)
+    )
     run = AgentRun(
         id=make_id("run_"),
         agent_task_id=task.id,
         project_id=await infer_project_id(db, task),
         attempt=last_attempt + 1,
-        instruction_snapshot=instruction_snapshot or task.instruction,
+        instruction_snapshot=frozen_instruction,
         provider=provider,
         model=model,
         host_id=host_id,
@@ -172,7 +222,9 @@ async def create_run(
         await db.flush()
     except IntegrityError as exc:
         await db.rollback()
-        raise ConflictError("Another agent run attempt was created concurrently") from exc
+        raise ConflictError(
+            "Another agent run attempt was created concurrently"
+        ) from exc
     # Work started outside chat gets a thread of its own here, so the run has
     # somewhere to report from its first transition on.
     await run_thread_service.ensure_thread(db, run, task)
@@ -180,9 +232,7 @@ async def create_run(
     return run
 
 
-async def current_run_for_task(
-    db: AsyncSession, task_id: str
-) -> AgentRun | None:
+async def current_run_for_task(db: AsyncSession, task_id: str) -> AgentRun | None:
     return (
         await db.execute(
             select(AgentRun)
@@ -295,7 +345,9 @@ async def mark_waiting_review(
     run.error = None
     run.heartbeat_at = now
     run.completed_at = now
-    await record_event(db, run, "waiting_review", "Result is ready for review", progress=100)
+    await record_event(
+        db, run, "waiting_review", "Result is ready for review", progress=100
+    )
     review_id = None
     if task.parent_task_id is None:
         review_item = await review_item_service.ensure_review_item(
@@ -318,9 +370,7 @@ async def mark_waiting_review(
     await notify_run_state(db, run, task, review_id=review_id)
 
 
-async def mark_failed(
-    db: AsyncSession, run: AgentRun, error: str
-) -> None:
+async def mark_failed(db: AsyncSession, run: AgentRun, error: str) -> None:
     await db.flush()
     await db.refresh(run)
     if run.status == AgentRunStatus.CANCELLED:
@@ -377,7 +427,9 @@ async def transition_run(
         AgentRunStatus.WAITING_INPUT: {AgentRunStatus.RUNNING},
     }
     if status not in allowed.get(AgentRunStatus(run.status), set()):
-        raise ConflictError(f"Cannot transition agent run from {run.status} to {status}")
+        raise ConflictError(
+            f"Cannot transition agent run from {run.status} to {status}"
+        )
     run.status = status
     run.heartbeat_at = datetime.now(timezone.utc)
     if message:
@@ -437,9 +489,10 @@ async def decide_run(
         task.status = "completed"
         task.result = run.result
         task.error = None
-        if todo is not None:
+        if todo is not None and not _is_experiment_todo(todo):
             todo.status = TaskStatus.COMPLETED
             todo.completed_at = datetime.now(timezone.utc)
+        await _publish_approved_report(db, run=run, task=task, todo=todo)
         if run.provider == "paseo":
             from services.agents.paseo_execution_service import publish_adopted_output
 
@@ -451,11 +504,9 @@ async def decide_run(
                 await agent_review_handoff_service.load_todo_graph_insights(db, todo)
             )
             graph_revision = after_insights.graph_revision
-            newly_ready_tasks = (
-                agent_review_handoff_service.newly_ready_after_approval(
-                    before_insights,
-                    after_insights,
-                )
+            newly_ready_tasks = agent_review_handoff_service.newly_ready_after_approval(
+                before_insights,
+                after_insights,
             )
         else:
             from services.tasks.graph_command_service import current_graph_revision
@@ -492,7 +543,9 @@ async def decide_run(
         run.status = AgentRunStatus.WAITING_INPUT
         run.progress_message = "Changes requested"
         task.status = "running"
-        await record_event(db, run, "changes_requested", "Changes requested", progress=100)
+        await record_event(
+            db, run, "changes_requested", "Changes requested", progress=100
+        )
         await notify_run_state(db, run, task)
     elif decision == ReviewStatus.REJECTED:
         claimed = (
@@ -560,9 +613,7 @@ async def list_runs(
     return [await build_run_response(db, run) for run in runs]
 
 
-async def build_run_response(
-    db: AsyncSession, run: AgentRun
-) -> AgentRunResponse:
+async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunResponse:
     task = await db.get(AgentTask, run.agent_task_id)
     if task is None:
         raise NotFoundError("Agent task not found")
@@ -578,12 +629,28 @@ async def build_run_response(
         **{
             column: getattr(run, column)
             for column in (
-                "id", "agent_task_id", "project_id", "attempt", "provider",
+                "id",
+                "agent_task_id",
+                "project_id",
+                "attempt",
+                "provider",
                 "instruction_snapshot",
-                "model", "host_id", "workspace_id", "external_run_id", "status", "progress",
-                "progress_message", "result_summary", "error", "is_adopted",
-                "created_at", "started_at", "heartbeat_at", "completed_at",
-                "cancel_requested_at", "updated_at",
+                "model",
+                "host_id",
+                "workspace_id",
+                "external_run_id",
+                "status",
+                "progress",
+                "progress_message",
+                "result_summary",
+                "error",
+                "is_adopted",
+                "created_at",
+                "started_at",
+                "heartbeat_at",
+                "completed_at",
+                "cancel_requested_at",
+                "updated_at",
             )
         },
         project_title=project.title if project else None,
@@ -597,9 +664,7 @@ async def build_run_response(
     )
 
 
-async def list_events(
-    db: AsyncSession, run_id: str
-) -> list[AgentRunEventResponse]:
+async def list_events(db: AsyncSession, run_id: str) -> list[AgentRunEventResponse]:
     await require_run(db, run_id)
     events = list(
         (
@@ -608,7 +673,9 @@ async def list_events(
                 .where(AgentRunEvent.run_id == run_id)
                 .order_by(AgentRunEvent.sequence.asc())
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     responses = []
     for event in events:
@@ -641,7 +708,9 @@ async def reconcile_interrupted_runs(db: AsyncSession) -> int:
                     AgentRun.status.in_(AGENT_RUN_EXECUTING_STATUSES)
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     now = datetime.now(timezone.utc)
     reconciled = 0

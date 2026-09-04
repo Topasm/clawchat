@@ -25,8 +25,13 @@ describe('task graph persistence', () => {
       positions: { task: { x: 12, y: 34 } },
       viewport: { x: 1, y: 2, zoom: 0.75 },
       collapsedIds: ['parent'],
+      initialized: true,
     });
-    expect(loadTaskGraphLayout(execution)).toEqual({ positions: {}, collapsedIds: [] });
+    expect(loadTaskGraphLayout(execution)).toEqual({
+      positions: {},
+      collapsedIds: [],
+      initialized: false,
+    });
   });
 
   it('merges partial updates without discarding other layout state', () => {
@@ -41,6 +46,7 @@ describe('task graph persistence', () => {
       positions: { first: { x: 10, y: 20 } },
       viewport: { x: 30, y: 40, zoom: 1.2 },
       collapsedIds: ['first'],
+      initialized: true,
     });
   });
 
@@ -62,6 +68,7 @@ describe('task graph persistence', () => {
     expect(loadTaskGraphLayout('scope')).toEqual({
       positions: { valid: { x: 1, y: 2 } },
       collapsedIds: ['one'],
+      initialized: true,
     });
   });
 
@@ -74,6 +81,7 @@ describe('task graph persistence', () => {
     resetTaskGraphLayout(first);
 
     expect(loadTaskGraphLayout(first).collapsedIds).toEqual([]);
+    expect(loadTaskGraphLayout(first).initialized).toBe(false);
     expect(loadTaskGraphLayout(second).collapsedIds).toEqual(['b']);
   });
 });

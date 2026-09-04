@@ -26,7 +26,7 @@ from services.agents.agent_task_service import (
     request_input,
     update_progress,
 )
-from services.agents.run_context_service import build_execution_instruction
+from services.agents.run_context_service import active_execution_instruction
 from skills import SKILL_REGISTRY, get_skill
 from ws.manager import ConnectionManager
 
@@ -111,7 +111,7 @@ async def execute_skill_chain(
 
     start_index, outputs = _load_skill_chain_checkpoint(task, chain)
     previous_result = outputs[-1] if outputs else None
-    execution_instruction = await build_execution_instruction(db, task)
+    execution_instruction = await active_execution_instruction(db, task)
 
     try:
         for i in range(start_index, len(chain)):

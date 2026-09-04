@@ -173,10 +173,25 @@
 }
 
 .cc-chat-panel__header-title {
-  flex: 1;
   font-size: 13px;
   font-weight: 600;
   color: var(--cc-text);
+}
+
+.cc-chat-panel__header-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cc-chat-panel__header-copy small {
+  overflow: hidden;
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cc-chat-panel__header-btn {

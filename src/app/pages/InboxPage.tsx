@@ -190,6 +190,11 @@ export default function InboxPage() {
           onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
           onOrganize={handleOrganize}
           onRetry={handleRetry}
+          onApplyTriageAndOpen={() => {
+            void triage.applyPreview().then((targetProjectId) => {
+              if (targetProjectId) navigate(`/projects/${targetProjectId}`);
+            });
+          }}
         />
         {!isMobile && (
           <InboxTriageTree

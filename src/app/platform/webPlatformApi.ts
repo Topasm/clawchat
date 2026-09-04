@@ -44,6 +44,7 @@ export const webPlatformApi: NativePlatformApi = {
   },
   system: {
     openCameraSettings: () => unavailable('Camera settings'),
+    openCanonicalDocument: () => unavailable('Canonical document opener'),
   },
   appWindow: {
     setWorkspaceViewMode: async () => {},

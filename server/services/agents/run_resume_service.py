@@ -85,7 +85,6 @@ async def resume_with_follow_up(
     run.error = None
     run.completed_at = None
     run.heartbeat_at = datetime.now(timezone.utc)
-    task.instruction = run.instruction_snapshot
     task.status = "queued"
     task.result = None
     task.error = None

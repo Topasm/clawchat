@@ -137,6 +137,8 @@ export interface NativeSystemApi {
    * on-screen instructions.
    */
   openCameraSettings: () => Promise<void>;
+  /** Open a validated Markdown path or obsidian:// document target. */
+  openCanonicalDocument: (target: string) => Promise<void>;
 }
 
 export interface NativeAppWindowApi {

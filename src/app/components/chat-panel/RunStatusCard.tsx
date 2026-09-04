@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  useDecideReview,
   useResumeAgentRun,
   useResolvePaseoPermission,
   useReviewsQuery,
   useRunsAwaitingInputQuery,
 } from '../../hooks/queries';
+import useReviewDecisionHandoff from '../../hooks/useReviewDecisionHandoff';
 import { translateUi } from '../../i18n';
+import AgentRunReviewOutcomeHandoff from '../review/AgentRunReviewOutcomeHandoff';
 
 /**
  * A persisted moment in an agent run's life, written into its thread by the
@@ -20,6 +21,7 @@ import { translateUi } from '../../i18n';
 interface RunStatusCardProps {
   metadata: Record<string, unknown>;
 }
+
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
@@ -59,7 +61,12 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
     : undefined;
   const resume = useResumeAgentRun();
   const resolvePermission = useResolvePaseoPermission();
-  const decide = useDecideReview();
+  const {
+    approvedAgentRun: approvedRun,
+    decide,
+    decideItem,
+    dismissApprovedAgentRun,
+  } = useReviewDecisionHandoff();
   const [answer, setAnswer] = useState('');
   const [note, setNote] = useState('');
   const inputOptions = Array.isArray(metadata.input_options)
@@ -71,7 +78,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
     : needsReview
       ? translateUi('Already reviewed')
       : null;
-  const live = stillWaitingForInput || Boolean(pendingReview);
+  const live = stillWaitingForInput || Boolean(pendingReview && !approvedRun);
   return (
     <div
       className={`cc-task-progress cc-run-status-card${live ? ' cc-task-progress--attention' : ''}`}
@@ -153,7 +160,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
           </div>
         </div>
       )}
-      {pendingReview && (
+      {pendingReview && !approvedRun && (
         <div className="cc-run-status-card__reply">
           <textarea
             rows={2}
@@ -167,13 +174,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
               type="button"
               className="cc-btn cc-btn--primary"
               disabled={decide.isPending}
-              onClick={() =>
-                decide.mutate({
-                  reviewId: pendingReview.id,
-                  decision: 'approved',
-                  note: note.trim() || undefined,
-                })
-              }
+              onClick={() => decideItem(pendingReview, 'approved', note)}
             >
               {translateUi('Approve')}
             </button>
@@ -182,13 +183,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
               className="cc-btn"
               disabled={decide.isPending || !note.trim()}
               title={translateUi('Your note becomes the follow-up instruction')}
-              onClick={() =>
-                decide.mutate({
-                  reviewId: pendingReview.id,
-                  decision: 'changes_requested',
-                  note: note.trim(),
-                })
-              }
+              onClick={() => decideItem(pendingReview, 'changes_requested', note)}
             >
               {translateUi('Request changes')}
             </button>
@@ -196,13 +191,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
               type="button"
               className="cc-btn cc-btn--danger"
               disabled={decide.isPending}
-              onClick={() =>
-                decide.mutate({
-                  reviewId: pendingReview.id,
-                  decision: 'rejected',
-                  note: note.trim() || undefined,
-                })
-              }
+              onClick={() => decideItem(pendingReview, 'rejected', note)}
             >
               {translateUi('Reject')}
             </button>
@@ -215,6 +204,14 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
             </button>
           </div>
         </div>
+      )}
+      {approvedRun && (
+        <AgentRunReviewOutcomeHandoff
+          projectId={approvedRun.projectId}
+          taskTitle={approvedRun.taskTitle}
+          outcome={approvedRun.outcome}
+          onDismiss={dismissApprovedAgentRun}
+        />
       )}
       {!live && (needsUser || isFailed) && runId && (
         <div className="cc-task-progress__actions">

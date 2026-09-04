@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import KanbanBoard from '../components/kanban/KanbanBoard';
 import {
   TASK_STATUS_FILTERS,
@@ -11,10 +12,15 @@ import TaskGraphPage from '../components/task-graph/TaskGraphPage';
 const TASKS_VIEW_STORAGE_KEY = 'clawchat.tasksView';
 
 export default function AllTasksPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<TasksStatusFilter>('in_progress');
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const [viewMode, setViewMode] = useState<TasksViewMode>(() => {
+    const requested = searchParams.get('view');
+    if (requested === 'graph' || requested === 'list' || requested === 'kanban') {
+      return requested;
+    }
     try {
       const stored = localStorage.getItem(TASKS_VIEW_STORAGE_KEY);
       if (stored === 'graph' || stored === 'list') return stored;
@@ -24,8 +30,21 @@ export default function AllTasksPage() {
     }
   });
 
+  useEffect(() => {
+    const requested = searchParams.get('view');
+    if (
+      (requested === 'graph' || requested === 'list' || requested === 'kanban') &&
+      requested !== viewMode
+    ) {
+      setViewMode(requested);
+    }
+  }, [searchParams, viewMode]);
+
   const handleViewModeChange = (mode: TasksViewMode) => {
     setViewMode(mode);
+    const next = new URLSearchParams(searchParams);
+    next.set('view', mode);
+    setSearchParams(next);
     try {
       localStorage.setItem(TASKS_VIEW_STORAGE_KEY, mode);
     } catch {

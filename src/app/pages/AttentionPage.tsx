@@ -1,26 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import AgentRunReviewHandoff from '../components/review/AgentRunReviewHandoff';
-import ReviewItemCard, { approvalImpact } from '../components/review/ReviewItemCard';
+import AgentRunReviewOutcomeHandoff from '../components/review/AgentRunReviewOutcomeHandoff';
+import ReviewItemCard from '../components/review/ReviewItemCard';
 import RunCard, { needsRecoveryDecision } from '../components/runs/RunCard';
 import EmptyState from '../components/shared/EmptyState';
 import { CheckCircleIcon } from '../components/shared/Icons';
-import {
-  useAgentRunsQuery,
-  useDecideReview,
-  useReviewsQuery,
-  useRunsAwaitingInputQuery,
-} from '../hooks/queries';
-import type { AgentRunReviewOutcome, ReviewItemResponse } from '../types/api';
+import { useAgentRunsQuery, useReviewsQuery, useRunsAwaitingInputQuery } from '../hooks/queries';
+import useReviewDecisionHandoff from '../hooks/useReviewDecisionHandoff';
 import { translateUi } from '../i18n';
 
 const EXECUTING = new Set(['queued', 'starting', 'running']);
-
-interface ApprovedAgentRunHandoff {
-  reviewId: string;
-  taskTitle: string | null;
-  outcome: AgentRunReviewOutcome;
-}
 
 /**
  * Everything that has stopped for the user, in one place.
@@ -38,10 +27,10 @@ export default function AttentionPage() {
   const { data: awaitingInput = [], isLoading: loadingInput } = useRunsAwaitingInputQuery();
   const { data: reviews = [], isLoading: loadingReviews } = useReviewsQuery('pending', projectId);
   const { data: runs = [], isLoading: loadingRuns } = useAgentRunsQuery(projectId);
-  const decide = useDecideReview();
+  const { approvedAgentRun, decide, decideItem, dismissApprovedAgentRun } =
+    useReviewDecisionHandoff();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
-  const [approvedAgentRun, setApprovedAgentRun] = useState<ApprovedAgentRunHandoff | null>(null);
 
   const questions = useMemo(
     () => awaitingInput.filter((run) => !projectId || run.project_id === projectId),
@@ -59,29 +48,6 @@ export default function AttentionPage() {
   const isLoading = loadingInput || loadingReviews || loadingRuns;
   const total = questions.length + pendingReviews.length + decisions.length;
 
-  const decideItem = (
-    item: ReviewItemResponse,
-    decision: 'approved' | 'changes_requested' | 'rejected',
-  ) => {
-    decide.mutate(
-      { reviewId: item.id, decision, note: notes[item.id]?.trim() || undefined },
-      {
-        onSuccess: (result) => {
-          if (decision !== 'approved' || item.subject_type !== 'agent_run') return;
-          const impact = approvalImpact(item);
-          setApprovedAgentRun({
-            reviewId: item.id,
-            taskTitle: item.subject_title,
-            outcome: {
-              ...(result.agentRunOutcome ?? {}),
-              todo_id: result.agentRunOutcome?.todo_id ?? impact?.todo_id,
-              graph_revision: result.agentRunOutcome?.graph_revision ?? impact?.graph_revision,
-            },
-          });
-        },
-      },
-    );
-  };
   const toggleRun = (runId: string) =>
     setExpandedRun((current) => (current === runId ? null : runId));
   const projectQuery = projectId ? `?project_id=${projectId}` : '';
@@ -123,11 +89,11 @@ export default function AttentionPage() {
       </header>
 
       {approvedAgentRun && (
-        <AgentRunReviewHandoff
+        <AgentRunReviewOutcomeHandoff
+          projectId={approvedAgentRun.projectId}
           taskTitle={approvedAgentRun.taskTitle}
           outcome={approvedAgentRun.outcome}
-          onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
-          onOpenInbox={() => navigate('/inbox')}
+          onDismiss={dismissApprovedAgentRun}
         />
       )}
 
@@ -180,7 +146,7 @@ export default function AttentionPage() {
                     onNoteChange={(note) =>
                       setNotes((current) => ({ ...current, [item.id]: note }))
                     }
-                    onDecide={(decision) => decideItem(item, decision)}
+                    onDecide={(decision) => decideItem(item, decision, notes[item.id])}
                     isDeciding={decide.isPending}
                   />
                 ))}

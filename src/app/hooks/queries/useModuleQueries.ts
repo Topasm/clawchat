@@ -46,7 +46,7 @@ function timestampTodoUpdate(data: TodoUpdate): TodoUpdate {
 // ---------------------------------------------------------------------------
 // Query hooks — fetch + validate, data lives in TanStack Query cache
 // ---------------------------------------------------------------------------
-export function useTodosQuery() {
+export function useTodosQuery(enabled = true) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
     queryKey: queryKeys.todos,
@@ -55,7 +55,7 @@ export function useTodosQuery() {
       const raw = res.data?.items ?? res.data ?? [];
       return z.array(TodoResponseSchema).parse(raw);
     },
-    enabled: !!serverUrl,
+    enabled: !!serverUrl && enabled,
   });
 }
 export function useEventsQuery() {

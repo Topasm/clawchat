@@ -33,6 +33,7 @@ async def create_project(
     title: str,
     goal: str | None = None,
     description: str | None = None,
+    execution_instructions: str | None = None,
     status: ProjectStatus = ProjectStatus.ACTIVE,
     deadline: datetime | None = None,
     default_execution_provider: str | None = None,
@@ -46,6 +47,7 @@ async def create_project(
         title=title,
         goal=goal,
         description=description,
+        execution_instructions=execution_instructions,
         status=status,
         deadline=deadline,
         default_execution_provider=default_execution_provider,
@@ -96,9 +98,9 @@ async def delete_project(db: AsyncSession, project_id: str) -> list[str]:
     project = await get_project(db, project_id)
     previous_revision = await current_graph_revision(db)
     tasks = list(
-        (
-            await db.execute(select(Todo).where(Todo.project_id == project.id))
-        ).scalars().all()
+        (await db.execute(select(Todo).where(Todo.project_id == project.id)))
+        .scalars()
+        .all()
     )
     root = next((task for task in tasks if task.id == project.root_task_id), None)
     released: list[str] = []
@@ -141,6 +143,24 @@ async def update_project(
             elif root.status == TaskStatus.COMPLETED:
                 root.status = TaskStatus.PENDING
                 root.completed_at = None
+        if "title" in updates:
+            # Root-scoped conversations without metadata are the canonical
+            # Project Agent threads. Agent-run threads keep their task titles.
+            conversations = list(
+                (
+                    await db.execute(
+                        select(Conversation).where(
+                            Conversation.project_id == project.id,
+                            Conversation.project_todo_id == root.id,
+                            Conversation.metadata_json.is_(None),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for conversation in conversations:
+                conversation.title = project.title
     await db.flush()
     return project
 
@@ -150,9 +170,9 @@ async def _project_counts(db: AsyncSession):
         select(
             Todo.project_id.label("project_id"),
             func.count(Todo.id).label("task_count"),
-            func.sum(
-                case((Todo.status == TaskStatus.COMPLETED, 1), else_=0)
-            ).label("completed_task_count"),
+            func.sum(case((Todo.status == TaskStatus.COMPLETED, 1), else_=0)).label(
+                "completed_task_count"
+            ),
         )
         .where(Todo.project_id.is_not(None))
         .group_by(Todo.project_id)
@@ -163,9 +183,15 @@ async def _project_counts(db: AsyncSession):
             Conversation.project_id.label("project_id"),
             func.min(Conversation.id).label("conversation_id"),
         )
+        .join(
+            Project,
+            (Project.id == Conversation.project_id)
+            & (Project.root_task_id == Conversation.project_todo_id),
+        )
         .where(
             Conversation.project_id.is_not(None),
             Conversation.is_archived.is_(False),
+            Conversation.metadata_json.is_(None),
         )
         .group_by(Conversation.project_id)
         .subquery()

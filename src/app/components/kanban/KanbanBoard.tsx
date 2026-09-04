@@ -22,6 +22,7 @@ import type { TasksStatusFilter, TasksViewMode } from './TasksHeader';
 import { ClipboardIcon, SpinArrowsIcon, CheckCircleIcon, CloseIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
 import { isTaskTodo } from '../../utils/inboxState';
+import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
 interface KanbanBoardProps {
   viewMode: TasksViewMode;
   onViewModeChange: (mode: TasksViewMode) => void;
@@ -42,6 +43,7 @@ export default function KanbanBoard({
   const toggleTodoSelection = useModuleStore((s) => s.toggleTodoSelection);
   const clearTodoSelection = useModuleStore((s) => s.clearTodoSelection);
   const toggleMutation = useToggleTodoComplete();
+  const { requestStatusChange, confirmationDialog } = useExperimentCompletionGate();
   const deleteMutation = useDeleteTodo();
   const setTaskStatusMutation = useSetTaskStatus();
   const reorderMutation = useReorderTodos();
@@ -88,9 +90,14 @@ export default function KanbanBoard({
   const handleToggle = useCallback(
     (id: string) => {
       const todo = todos.find((t) => t.id === id);
-      if (todo) toggleMutation.mutate({ id, currentStatus: todo.status });
+      if (todo) {
+        const nextStatus = todo.status === 'completed' ? 'pending' : 'completed';
+        requestStatusChange(todo, nextStatus, () =>
+          toggleMutation.mutate({ id, currentStatus: todo.status }),
+        );
+      }
     },
-    [todos, toggleMutation],
+    [requestStatusChange, todos, toggleMutation],
   );
   const handleDelete = useCallback(
     (id: string) => {
@@ -105,9 +112,11 @@ export default function KanbanBoard({
   });
   const handleSetTaskStatus = useCallback(
     (id: string, status: TaskStatus) => {
-      setTaskStatusMutation.mutate({ id, status });
+      const todo = todos.find((candidate) => candidate.id === id);
+      if (!todo) return;
+      requestStatusChange(todo, status, () => setTaskStatusMutation.mutate({ id, status }));
     },
-    [setTaskStatusMutation],
+    [requestStatusChange, setTaskStatusMutation, todos],
   );
   const handleReorder = useCallback(
     (todoId: string, newIndex: number, columnStatus: TaskStatus) => {
@@ -188,26 +197,29 @@ export default function KanbanBoard({
     },
   ].filter((column) => statusFilter === 'all' || column.status === statusFilter);
   return (
-    <KanbanBoardView
-      todos={taskTodos}
-      viewMode={viewMode}
-      onViewModeChange={onViewModeChange}
-      statusFilter={statusFilter}
-      onStatusFilterChange={onStatusFilterChange}
-      columnDefs={columnDefs}
-      showSubTasks={kanbanFilters.showSubTasks}
-      isMobile={isMobile}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onToggle={handleToggle}
-      onClickTask={handleClickTask}
-      focusedTaskId={focusedTaskId}
-      onFocusTask={setFocusedTaskId}
-      selectedIds={selectedTodoIds}
-      onSelect={toggleTodoSelection}
-      isMultiSelectMode={isMultiSelectMode}
-      onMove={handleMove}
-      onDelete={handleDelete}
-    />
+    <>
+      <KanbanBoardView
+        todos={taskTodos}
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        statusFilter={statusFilter}
+        onStatusFilterChange={onStatusFilterChange}
+        columnDefs={columnDefs}
+        showSubTasks={kanbanFilters.showSubTasks}
+        isMobile={isMobile}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onToggle={handleToggle}
+        onClickTask={handleClickTask}
+        focusedTaskId={focusedTaskId}
+        onFocusTask={setFocusedTaskId}
+        selectedIds={selectedTodoIds}
+        onSelect={toggleTodoSelection}
+        isMultiSelectMode={isMultiSelectMode}
+        onMove={handleMove}
+        onDelete={handleDelete}
+      />
+      {confirmationDialog}
+    </>
   );
 }

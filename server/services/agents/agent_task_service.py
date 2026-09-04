@@ -13,7 +13,7 @@ from domain.agent_run import AgentRunStatus
 from models.agent_task import AgentTask
 from models.agent_run import AgentRun
 from services.agents import agent_run_service
-from services.agents.run_context_service import build_execution_instruction
+from services.agents.run_context_service import active_execution_instruction
 from services.ai.ai_service import AIService
 from utils import make_id, strip_markdown_fences
 from ws.manager import ConnectionManager
@@ -348,7 +348,7 @@ async def execute_task(
     await db.commit()
 
     system_prompt = AGENT_PROMPTS.get(task.agent_type, AGENT_PROMPTS["general"])
-    execution_instruction = await build_execution_instruction(db, task)
+    execution_instruction = run.instruction_snapshot
 
     try:
         # Send initial progress
@@ -430,7 +430,7 @@ async def _execute_coordinator(
         # Use AI to decompose the task
         response = await ai_service.generate_completion(
             system_prompt=AGENT_PROMPTS["coordinator"],
-            user_message=await build_execution_instruction(db, task),
+            user_message=await active_execution_instruction(db, task),
         )
 
         # Parse sub-task definitions
