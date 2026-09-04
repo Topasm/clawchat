@@ -35,6 +35,18 @@ describe('offlineQueue', () => {
     expect(offlineQueue.getItems(null)).toEqual([]);
   });
 
+  it('refuses payloads that cannot survive JSON persistence', () => {
+    const scope = getOfflineQueueScope({
+      serverUrl: 'https://host.example',
+      token: createToken('user'),
+    });
+    const formData = new FormData();
+    formData.append('file', new Blob(['contents']), 'note.txt');
+
+    expect(offlineQueue.enqueue(scope, 'post', '/attachments', formData)).toBe(false);
+    expect(offlineQueue.getCount(scope)).toBe(0);
+  });
+
   it('flushes only the current server and principal scope', async () => {
     const scopeA = getOfflineQueueScope({
       serverUrl: 'https://a.example',

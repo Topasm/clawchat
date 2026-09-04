@@ -4,7 +4,6 @@ import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
-import { logger } from '../../services/logger';
 import {
   TodoResponseSchema,
   EventResponseSchema,
@@ -35,10 +34,15 @@ import { queryKeys } from './queryKeys';
 import { getTaskStatusLabel } from '../../utils/taskStatus';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 import { translateUi } from '../../i18n';
-// ---------------------------------------------------------------------------
-// Pending delete timers (for undo-on-delete pattern)
-// ---------------------------------------------------------------------------
-const pendingDeletes = new Map<string, ReturnType<typeof setTimeout>>();
+import { deferredDeleteQueue } from '../../services/deferredDeleteQueue';
+import { getOfflineQueueScope } from '../../services/offlineQueue';
+
+function timestampTodoUpdate(data: TodoUpdate): TodoUpdate {
+  return {
+    ...data,
+    client_updated_at: data.client_updated_at ?? new Date().toISOString(),
+  };
+}
 // ---------------------------------------------------------------------------
 // Query hooks — fetch + validate, data lives in TanStack Query cache
 // ---------------------------------------------------------------------------
@@ -73,7 +77,11 @@ export function useCreateTodo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: TodoCreate) => {
-      const response = await apiClient.post('/todos', data);
+      const payload = {
+        ...data,
+        idempotency_key: data.idempotency_key ?? crypto.randomUUID(),
+      };
+      const response = await apiClient.post('/todos', payload, { queueOfflineMutation: true });
       return response.data as TodoResponse;
     },
     onMutate: async (newTodo) => {
@@ -121,7 +129,9 @@ export function useUpdateTodo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: TodoUpdate }) => {
-      await apiClient.patch(`/todos/${id}`, data);
+      await apiClient.patch(`/todos/${id}`, timestampTodoUpdate(data), {
+        queueOfflineMutation: true,
+      });
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
@@ -299,28 +309,10 @@ export function useDeleteTodo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      // The actual server delete is deferred by 5 seconds for undo support.
-      // We return a promise that resolves immediately; the server call happens
-      // after the undo window.
-      return new Promise<void>((resolve) => {
-        const timeoutId = setTimeout(async () => {
-          pendingDeletes.delete(id);
-          try {
-            await apiClient.delete(`/todos/${id}`);
-            queryClient.invalidateQueries({ queryKey: queryKeys.taskRelationships });
-            void invalidateTaskDerivedQueries(queryClient);
-          } catch (err) {
-            logger.warn('Failed to delete todo on server:', err);
-            // Rollback: refetch to restore
-            queryClient.invalidateQueries({ queryKey: queryKeys.todos });
-            useToastStore
-              .getState()
-              .addToast('error', translateUi('Failed to delete task on server'));
-          }
-        }, 5000);
-        pendingDeletes.set(id, timeoutId);
-        resolve();
-      });
+      const scope = getOfflineQueueScope(useAuthStore.getState());
+      if (!deferredDeleteQueue.enqueue(scope, 'todo', id)) {
+        throw new Error('Unable to persist pending task deletion');
+      }
     },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
@@ -337,12 +329,7 @@ export function useDeleteTodo() {
         action: {
           label: translateUi('Undo'),
           onClick: () => {
-            // Cancel the pending server delete
-            const timer = pendingDeletes.get(id);
-            if (timer) {
-              clearTimeout(timer);
-              pendingDeletes.delete(id);
-            }
+            deferredDeleteQueue.cancel(getOfflineQueueScope(useAuthStore.getState()), 'todo', id);
             // Restore the todo in the cache
             if (context?.deleted) {
               queryClient.setQueryData<TodoResponse[]>(queryKeys.todos, (old) => [
@@ -353,6 +340,10 @@ export function useDeleteTodo() {
           },
         },
       });
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.todos, context.previous);
+      useToastStore.getState().addToast('error', translateUi('Failed to delete task on server'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
@@ -367,7 +358,9 @@ export function useToggleTodoComplete() {
   const mutation = useMutation({
     mutationFn: async ({ id, currentStatus }: { id: string; currentStatus: TaskStatus }) => {
       const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-      await apiClient.patch(`/todos/${id}`, { status: newStatus });
+      await apiClient.patch(`/todos/${id}`, timestampTodoUpdate({ status: newStatus }), {
+        queueOfflineMutation: true,
+      });
       return newStatus;
     },
     onMutate: async ({ id, currentStatus }) => {
@@ -416,7 +409,9 @@ export function useSetTaskStatus() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: TaskStatus }) => {
-      await apiClient.patch(`/todos/${id}`, { status });
+      await apiClient.patch(`/todos/${id}`, timestampTodoUpdate({ status }), {
+        queueOfflineMutation: true,
+      });
     },
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.todos });
@@ -453,7 +448,9 @@ export function useReorderTodos() {
     mutationFn: async ({ updates }: { updates: Record<string, number> }) => {
       await Promise.all(
         Object.entries(updates).map(([id, order]) =>
-          apiClient.patch(`/todos/${id}`, { sort_order: order }),
+          apiClient.patch(`/todos/${id}`, timestampTodoUpdate({ sort_order: order }), {
+            queueOfflineMutation: true,
+          }),
         ),
       );
     },
@@ -531,22 +528,10 @@ export function useDeleteEvent() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      return new Promise<void>((resolve) => {
-        const timeoutId = setTimeout(async () => {
-          pendingDeletes.delete(id);
-          try {
-            await apiClient.delete(`/events/${id}`);
-          } catch (err) {
-            logger.warn('Failed to delete event on server:', err);
-            queryClient.invalidateQueries({ queryKey: queryKeys.events });
-            useToastStore
-              .getState()
-              .addToast('error', translateUi('Failed to delete event on server'));
-          }
-        }, 5000);
-        pendingDeletes.set(id, timeoutId);
-        resolve();
-      });
+      const scope = getOfflineQueueScope(useAuthStore.getState());
+      if (!deferredDeleteQueue.enqueue(scope, 'event', id)) {
+        throw new Error('Unable to persist pending event deletion');
+      }
     },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.events });
@@ -563,11 +548,7 @@ export function useDeleteEvent() {
         action: {
           label: translateUi('Undo'),
           onClick: () => {
-            const timer = pendingDeletes.get(id);
-            if (timer) {
-              clearTimeout(timer);
-              pendingDeletes.delete(id);
-            }
+            deferredDeleteQueue.cancel(getOfflineQueueScope(useAuthStore.getState()), 'event', id);
             if (context?.deleted) {
               queryClient.setQueryData<EventResponse[]>(queryKeys.events, (old) => [
                 context.deleted!,
@@ -577,6 +558,10 @@ export function useDeleteEvent() {
           },
         },
       });
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.events, context.previous);
+      useToastStore.getState().addToast('error', translateUi('Failed to delete event on server'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
@@ -653,6 +638,8 @@ export function useBulkUpdateTodos() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: BulkTodoUpdate) => {
+      // Bulk updates have no per-item client timestamp. Failing closed while
+      // offline prevents an old batch from overwriting newer edits.
       await apiClient.patch('/todos/bulk', data);
     },
     onSuccess: () => {
