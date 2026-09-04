@@ -67,6 +67,19 @@ interface ClawChatApi {
         @Tag expectedScope: ExpectedSessionScope? = null,
     ): Response<Unit>
 
+    @POST("api/todos/{todoId}/answer-questions")
+    suspend fun answerTodoQuestions(
+        @Path("todoId") todoId: String,
+        @Body body: TodoQuestionAnswersRequest,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodoWorkflowResponse
+
+    @POST("api/todos/{todoId}/skip-questions")
+    suspend fun skipTodoQuestions(
+        @Path("todoId") todoId: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodoWorkflowResponse
+
     // --- Task relationships ---
 
     @GET("api/task-relationships")
@@ -74,6 +87,26 @@ interface ClawChatApi {
         @Query("task_id") taskId: String,
         @Tag expectedScope: ExpectedSessionScope? = null,
     ): List<TaskRelationship>
+
+    // --- Task comments ---
+
+    @GET("api/task-comments")
+    suspend fun listTaskComments(
+        @Query("todo_ids") todoIds: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): List<TaskComment>
+
+    @POST("api/task-comments")
+    suspend fun createTaskComment(
+        @Body body: TaskCommentCreateRequest,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TaskComment
+
+    @DELETE("api/task-comments/{id}")
+    suspend fun deleteTaskComment(
+        @Path("id") id: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    )
 
     // --- Events ---
 
@@ -125,6 +158,10 @@ interface ClawChatApi {
 
     @POST("api/chat/conversations")
     suspend fun createConversation(@Body body: Map<String, String>): Conversation
+
+    /** The thread scoped to a task or project root; created on first use. */
+    @GET("api/chat/conversations/by-project/{todoId}")
+    suspend fun getOrCreateTodoConversation(@Path("todoId") todoId: String): Conversation
 
     @GET("api/chat/conversations/{id}")
     suspend fun getConversation(@Path("id") id: String): Conversation

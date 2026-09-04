@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import asyncio
+import logging
+from datetime import datetime, timezone
 
 from domain.task import TaskStatus
 from models.conversation import Conversation
+from models.todo import Todo
 from services.tasks import todo_recurrence_service, todo_service
+from utils import make_id
+from ws.notifications import notify_module_data_changed
 from services.chat.intent_handlers import (
     IntentContext,
     IntentHandlerDef,
@@ -14,6 +19,8 @@ from services.chat.intent_handlers import (
     find_by_title,
     register_intent_handler,
 )
+
+logger = logging.getLogger(__name__)
 
 _NO_TITLE = {
     "complete": "Which task would you like to complete? Please mention the task name.",
@@ -48,12 +55,35 @@ def _parse_due_date(raw: object) -> datetime | None:
     return datetime.fromisoformat(str(raw))
 
 
+async def _conversation_scope(
+    ctx: IntentContext,
+) -> tuple[Conversation | None, str | None]:
+    conversation = (
+        await ctx.db.get(Conversation, ctx.conversation_id)
+        if ctx.conversation_id
+        else None
+    )
+    if conversation is None:
+        return None, None
+    if conversation.project_id:
+        return conversation, conversation.project_id
+    if conversation.project_todo_id:
+        todo = await ctx.db.get(Todo, conversation.project_todo_id)
+        return conversation, todo.project_id if todo else None
+    return conversation, None
+
+
 async def _resolve_target(ctx: IntentContext, action: str):
     """Return ``(todo, error_reply)`` — exactly one of the two is set."""
     title = ctx.params.get("title", "")
     if not title:
         return None, (_NO_TITLE[action], None)
-    todos, _ = await todo_service.get_todos(ctx.db, limit=100)
+    _conversation, project_id = await _conversation_scope(ctx)
+    todos, _ = await todo_service.get_todos(
+        ctx.db,
+        project_id=project_id,
+        limit=100,
+    )
     todo = find_by_title(todos, title)
     if not todo:
         return None, (_not_found(title), None)
@@ -61,33 +91,161 @@ async def _resolve_target(ctx: IntentContext, action: str):
 
 
 async def create_todo(ctx: IntentContext) -> IntentReply:
-    # Auto-associate with project if conversation is linked to one
+    # A named parent wins ("add a step under X"); otherwise a thread scoped to
+    # a task or project puts the new task under it.
+    conversation, project_id = await _conversation_scope(ctx)
     parent_id = ctx.params.get("parent_id")
-    project_id = None
-    if not parent_id and ctx.conversation_id:
-        conv = await ctx.db.get(Conversation, ctx.conversation_id)
-        if conv and conv.project_todo_id:
-            parent_id = conv.project_todo_id
-        if conv:
-            project_id = conv.project_id
+    parent_title = (ctx.params.get("parent_title") or "").strip()
+    if not parent_id and parent_title:
+        todos, _ = await todo_service.get_todos(
+            ctx.db,
+            project_id=project_id,
+            limit=100,
+        )
+        parent = find_by_title(todos, parent_title)
+        if parent is None:
+            return _not_found(parent_title), None
+        parent_id = parent.id
+    if not parent_id and conversation and conversation.project_todo_id:
+        parent_id = conversation.project_todo_id
+    parent = await ctx.db.get(Todo, parent_id) if parent_id else None
+    if parent_id and (parent is None or (project_id and parent.project_id != project_id)):
+        return _not_found(parent_title or str(parent_id)), None
+
+    due_date = _parse_due_date(ctx.params.get("due_date"))
+    if (
+        conversation
+        and conversation.project_todo_id
+        and parent_id
+        and not ctx.params.get("recurrence_rule")
+    ):
+        from services.planning import plan_proposal_service
+
+        proposal = await plan_proposal_service.create_add_task_proposal(
+            ctx.db,
+            parent_id,
+            title=ctx.params.get("title", "Untitled task"),
+            description=ctx.params.get("description"),
+            due_date=due_date.date() if due_date else None,
+        )
+        parent_label = parent.title if parent is not None else "the selected task"
+        return (
+            f"Proposed '{proposal.subtasks[0].title}' as a step under "
+            f"'{parent_label}'. Apply the graph change to add it.",
+            {
+                "action_type": "plan_started",
+                "module": "todos",
+                "todo_id": parent_id,
+                "todo_title": parent_label,
+                "plan_proposal_id": proposal.proposal_id,
+                "plan_requested_at": proposal.created_at.isoformat(),
+                "proposal_kind": "add_task",
+            },
+        )
+
     todo = await todo_service.create_todo(
         ctx.db,
         title=ctx.params.get("title", "Untitled task"),
         description=ctx.params.get("description"),
-        priority=ctx.params.get("priority", "medium"),
         parent_id=parent_id,
         project_id=project_id,
-        due_date=_parse_due_date(ctx.params.get("due_date")),
+        due_date=due_date,
         recurrence_rule=ctx.params.get("recurrence_rule"),
     )
+    text = (
+        f"Added '{todo.title}' as a step under '{parent.title}'."
+        if parent is not None
+        else f"Created task: '{todo.title}'."
+    )
     return (
-        f"Created task: '{todo.title}' with {todo.priority} priority.",
-        {"action_type": "todo_created", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
+        text,
+        {
+            "action_type": "todo_created",
+            "module": "todos",
+            "todo_id": todo.id,
+            "todo_title": todo.title,
+            "parent_id": parent_id,
+        },
+    )
+
+
+async def plan_task(ctx: IntentContext) -> IntentReply:
+    """Break a task into steps with the planner; the plan comes back for review.
+
+    Targets the named task, else the task this thread is scoped to. The
+    planner is the same pipeline the task page's "Plan this task" runs, and
+    it runs in the background: the reply confirms, the proposal arrives as a
+    review item and as a plan on the task.
+    """
+    title = (ctx.params.get("title") or "").strip()
+    conversation, project_id = await _conversation_scope(ctx)
+    todo = None
+    if title:
+        todos, _ = await todo_service.get_todos(
+            ctx.db,
+            project_id=project_id,
+            limit=100,
+        )
+        todo = find_by_title(todos, title)
+        if todo is None:
+            return _not_found(title), None
+    elif conversation and conversation.project_todo_id:
+        todo = await ctx.db.get(Todo, conversation.project_todo_id)
+    if todo is None:
+        return (
+            "Which task should I plan? Name it, or ask from that task's thread.",
+            None,
+        )
+
+    from services.planning import plan_proposal_service
+
+    todo_id, ai = todo.id, ctx.ai
+    requested_at = datetime.now(timezone.utc).isoformat()
+    proposal_id = make_id("proposal_")
+    if ctx.session_factory is not None:
+        session_factory = ctx.session_factory
+
+        async def _plan() -> None:
+            try:
+                async with session_factory() as plan_db:
+                    await plan_proposal_service.generate_proposal(
+                        plan_db,
+                        ai,
+                        todo_id,
+                        proposal_id=proposal_id,
+                    )
+                    await notify_module_data_changed("todos")
+                    await notify_module_data_changed("reviews")
+            except Exception:
+                logger.exception("Planning from chat failed for todo %s", todo_id)
+
+        asyncio.create_task(_plan())
+    else:
+        await plan_proposal_service.generate_proposal(
+            ctx.db,
+            ai,
+            todo_id,
+            proposal_id=proposal_id,
+        )
+    return (
+        f"Planning '{todo.title}'. I'll propose steps for you to review; they become "
+        "sub-tasks once you apply them.",
+        {
+            "action_type": "plan_started",
+            "module": "todos",
+            "todo_id": todo.id,
+            "todo_title": todo.title,
+            "plan_proposal_id": proposal_id,
+            # Lets the chat card ignore an older proposal while this request is
+            # still being generated in the background.
+            "plan_requested_at": requested_at,
+        },
     )
 
 
 async def query_todos(ctx: IntentContext) -> IntentReply:
-    todos, total = await todo_service.get_todos(ctx.db)
+    _conversation, project_id = await _conversation_scope(ctx)
+    todos, total = await todo_service.get_todos(ctx.db, project_id=project_id)
     if not todos:
         return "You don't have any tasks yet.", None
     lines = [f"You have {total} task(s):"]
@@ -102,6 +260,7 @@ async def complete_todo(ctx: IntentContext) -> IntentReply:
     todo, error = await _resolve_target(ctx, "complete")
     if error is not None:
         return error
+    was_completed = todo.status == TaskStatus.COMPLETED
     todo = await todo_service.update_todo(
         ctx.db,
         todo.id,
@@ -117,14 +276,15 @@ async def complete_todo(ctx: IntentContext) -> IntentReply:
         "todo_id": todo.id,
         "todo_title": todo.title,
     }
-    if todo.recurrence_rule:
-        next_todo = await todo_recurrence_service.spawn_next_occurrence(ctx.db, todo)
-        if next_todo is not None:
-            metadata["next_todo_id"] = next_todo.id
-            if next_todo.due_date:
-                message += (
-                    f" Next one is due {next_todo.due_date.date().isoformat()}."
-                )
+    spawned = await todo_recurrence_service.spawn_next_occurrences(
+        ctx.db,
+        [todo] if not was_completed else [],
+    )
+    if spawned:
+        next_todo = spawned[0]
+        metadata["next_todo_id"] = next_todo.id
+        if next_todo.due_date:
+            message += f" Next one is due {next_todo.due_date.date().isoformat()}."
     return message, metadata
 
 
@@ -136,18 +296,24 @@ async def update_todo(ctx: IntentContext) -> IntentReply:
     updates = {}
     if params.get("description"):
         updates["description"] = params["description"]
-    if params.get("priority"):
-        updates["priority"] = params["priority"]
     if params.get("due_date"):
         updates["due_date"] = _parse_due_date(params["due_date"])
     if params.get("status"):
         updates["status"] = params["status"]
     if not updates:
-        return f"I found '{todo.title}', but I'm not sure what to change. What would you like to update?", None
+        return (
+            f"I found '{todo.title}', but I'm not sure what to change. What would you like to update?",
+            None,
+        )
     todo = await todo_service.update_todo(ctx.db, todo.id, **updates)
     return (
         f"Updated task '{todo.title}'.",
-        {"action_type": "todo_updated", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
+        {
+            "action_type": "todo_updated",
+            "module": "todos",
+            "todo_id": todo.id,
+            "todo_title": todo.title,
+        },
     )
 
 
@@ -160,7 +326,12 @@ async def delete_todo(ctx: IntentContext) -> IntentReply:
     await todo_service.delete_todo(ctx.db, todo.id)
     return (
         f"Deleted task '{deleted_title}'.",
-        {"action_type": "todo_deleted", "module": "todos", "todo_id": deleted_id, "todo_title": deleted_title},
+        {
+            "action_type": "todo_deleted",
+            "module": "todos",
+            "todo_id": deleted_id,
+            "todo_title": deleted_title,
+        },
     )
 
 
@@ -171,6 +342,7 @@ def register() -> None:
         ("complete_todo", complete_todo),
         ("update_todo", update_todo),
         ("delete_todo", delete_todo),
+        ("plan_task", plan_task),
     ):
         register_intent_handler(
             IntentHandlerDef(intent=intent, handle=handler, module_intent=True)

@@ -77,6 +77,12 @@ class SyncManager internal constructor(
     val weeklyReview: SharedFlow<WorkspaceSyncEvent<SyncEvent.WeeklyReview>> =
         _weeklyReview.asSharedFlow()
 
+    private val _runState = MutableSharedFlow<WorkspaceSyncEvent<SyncEvent.RunStateChanged>>(
+        extraBufferCapacity = 16,
+    )
+    val runState: SharedFlow<WorkspaceSyncEvent<SyncEvent.RunStateChanged>> =
+        _runState.asSharedFlow()
+
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
@@ -91,6 +97,11 @@ class SyncManager internal constructor(
     /** Publish a mutation completed by this process without waiting for WebSocket echo. */
     fun notifyTodoChanged() {
         _todoChanged.tryEmit(Unit)
+    }
+
+    /** Publish a review mutation completed locally or by reconnect replay. */
+    fun notifyReviewChanged() {
+        _reviewChanged.tryEmit(Unit)
     }
 
     /**
@@ -167,7 +178,7 @@ class SyncManager internal constructor(
                     when (event.module) {
                         "todos" -> notifyTodoChanged()
                         "events" -> _eventChanged.tryEmit(Unit)
-                        "reviews" -> _reviewChanged.tryEmit(Unit)
+                        "reviews" -> notifyReviewChanged()
                         "runs" -> _runChanged.tryEmit(Unit)
                     }
                 }
@@ -183,6 +194,15 @@ class SyncManager internal constructor(
                     _lastEventAtEpochMillis.value = System.currentTimeMillis()
                     _weeklyReview.tryEmit(WorkspaceSyncEvent(workspaceKey, event))
                 }
+                is SyncEvent.RunStateChanged -> {
+                    _lastEventAtEpochMillis.value = System.currentTimeMillis()
+                    // The run list and, once a result is up for review, the
+                    // review inbox both changed under this event. That is what
+                    // feeds the "needs attention" notification and badge.
+                    _runChanged.tryEmit(Unit)
+                    if (event.status == "waiting_review") notifyReviewChanged()
+                    _runState.tryEmit(WorkspaceSyncEvent(workspaceKey, event))
+                }
                 is SyncEvent.Connected -> {
                     _isConnected.value = true
                     _lastEventAtEpochMillis.value = System.currentTimeMillis()
@@ -191,7 +211,7 @@ class SyncManager internal constructor(
                     // direct or relay reconnect to recover missed events.
                     notifyTodoChanged()
                     _eventChanged.tryEmit(Unit)
-                    _reviewChanged.tryEmit(Unit)
+                    notifyReviewChanged()
                     _runChanged.tryEmit(Unit)
                 }
                 is SyncEvent.Disconnected -> {

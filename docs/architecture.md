@@ -266,6 +266,57 @@ Successful top-level attempts enter the unified Review Inbox; only approval
 adopts the result and completes the linked Todo. See
 [ADR 009](./adr/009-agent-task-run-separation.md).
 
+Every run transition also pushes a `run_state_changed` WebSocket event
+(`run_id`, `agent_task_id`, `todo_id`, `conversation_id`, `title`, `status`,
+`progress_message`, `result_summary`, `error`, `review_id`). Unlike
+`module_data_changed`, which only asks clients to refetch, this is the
+user-facing signal: the chat's delegation card, toasts, OS notifications, the
+Runs nav badge and the Android notification all read from it, so a run that
+stops in `waiting_input` or `waiting_review` reaches the user wherever they
+are. `task_completed` carries `run_status` for the same reason -- a result
+that still awaits review is never announced as finished. A review decision of
+*changes requested* with a note resumes the run with that note as the
+follow-up (`run_resume_service`); without a note, or when the provider is
+unavailable, the run waits in `waiting_input` for a manual resume.
+
+Every run also has a conversation thread. `create_run` reuses the delegating
+chat or creates a project-scoped conversation for work started from the Inbox
+(`run_thread_service.ensure_thread`), and the moments that need a person --
+input requested, result ready for review, resumed, approved, rejected,
+completed, failed, cancelled -- are written into it as `run_update` assistant
+messages, once per run event. Review items, run cards and the task page link
+to that thread first. See [ADR 019](./adr/019-agent-run-thread.md).
+
+The thread is also where the user acts: the `run_update` card takes the
+answer to a waiting run (`POST /runs/{id}/resume`) and the review decision
+(`POST /reviews/{id}/decision`) inline while the run is still waiting, and
+keeps the record afterwards. Built-in skills can ask instead of guessing: a
+reply that starts with `NEEDS_INPUT:` (`agent_task_service.parse_needs_input`)
+parks the run in `waiting_input` with the question; the follow-up resumes the
+same attempt with the answer appended to its instruction, restarting the skill
+chain from its first skill. Delegation works on both transports --
+`Orchestrator.resolve_intent_response` creates and launches the run for the
+SSE stream as well, so Android can delegate by chatting.
+
+The chat also knows where the agent is. `build_conversation_context` appends
+an `[Agent activity]` block -- active runs with what each needs, and the
+count of results waiting for review, scoped to the thread's project or to
+the thread's own run -- to every chat prompt, and the `query_runs` intent
+answers "how is the research going?" from the same data. A scheduler
+watchdog (`run_watchdog_service`, every `RUN_WATCHDOG_INTERVAL_SECONDS`)
+fails a started run that nothing in this process is executing once its
+heartbeat is older than `RUN_HEARTBEAT_TIMEOUT_MINUTES` -- a dead desktop
+worker no longer leaves a run `running` forever -- and, once per wait, asks
+again in the thread for a run left in `waiting_input` longer than
+`RUN_INPUT_REMINDER_MINUTES`.
+
+On the web the nav offers one place for all of this: the Attention page
+(`/attention`) lists runs waiting for input, pending review items of every
+subject type, and unsuccessful runs that still need a retry or a return to
+the queue, each acted on in place through the shared `RunCard` and
+`ReviewItemCard` and linked to its thread. The Runs log (`/runs`) and the
+review history (`/review`) remain as the full record behind it.
+
 ### Paseo execution provider
 
 Projects can select `paseo` as their default execution provider and bind a

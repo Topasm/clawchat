@@ -99,6 +99,8 @@ def _run(
 class CodexCLIProvider:
     """AIService-compatible adapter around ``codex exec``."""
 
+    supports_native_tool_calling = False
+
     def __init__(self, *, model: str = "", timeout_seconds: int = 180):
         self.model = model.strip()
         self.timeout_seconds = timeout_seconds

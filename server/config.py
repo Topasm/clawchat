@@ -84,6 +84,51 @@ def save_codex_api_key(path_value: str, api_key: str) -> None:
         temporary_path.unlink(missing_ok=True)
 
 
+# Providers that may be stored as an in-app choice. The relay is recorded
+# under its own name so the stored value stays readable regardless of which
+# OpenAI-compatible gateway AI_BASE_URL points at.
+AI_PROVIDERS = ("openclaw", "claude_code", "codex_cli", "codex")
+
+
+def _read_ai_provider(path_value: str) -> str:
+    """Return the provider persisted from an in-app switch, if any."""
+    path = Path(path_value).expanduser()
+    try:
+        stored = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return ""
+    except OSError as error:
+        logger.warning("Could not read the stored AI provider %s: %s", path, error)
+        return ""
+    if stored not in AI_PROVIDERS:
+        if stored:
+            logger.warning("Ignoring unknown stored AI provider %r", stored)
+        return ""
+    return stored
+
+
+def save_ai_provider(path_value: str, provider: str) -> None:
+    """Atomically persist the provider chosen in the app."""
+    if provider not in AI_PROVIDERS:
+        raise ValueError(f"Unknown AI provider: {provider}")
+    path = Path(path_value).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        dir=path.parent,
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as provider_file:
+            provider_file.write(provider)
+            provider_file.flush()
+            os.fsync(provider_file.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
 class Settings(BaseSettings):
     # Server
     host: str = "127.0.0.1"
@@ -119,6 +164,13 @@ class Settings(BaseSettings):
 
     # AI Provider — OpenClaw/OpenAI-compatible, local CLIs, or Codex API
     ai_provider: str = "ollama"
+    # Remembers the provider picked in the app's settings screen so a restart
+    # keeps it. Empty disables persistence, leaving AI_PROVIDER authoritative.
+    ai_provider_file: str = ""
+    # When the configured provider is unreachable at startup, activate any
+    # other provider that is ready instead of leaving chat dead. Set false to
+    # keep a deployment pinned to its configured backend.
+    ai_provider_fallback: bool = True
     ai_base_url: str = "http://localhost:11434"
     ai_api_key: str = ""
     ai_model: str = "llama3.2"
@@ -133,7 +185,12 @@ class Settings(BaseSettings):
     codex_reasoning_effort: str = "medium"
 
     # Local Codex CLI. Empty uses the model selected in ~/.codex/config.toml.
-    codex_cli_model: str = ""
+    # Defaults to the cheaper Luna tier so background agent runs stay affordable.
+    codex_cli_model: str = "gpt-5.6-luna"
+
+    # Local Claude Code CLI. Empty uses the model the CLI itself defaults to;
+    # "sonnet" keeps ClawChat's own calls off the pricier flagship tier.
+    claude_code_model: str = "sonnet"
 
     # Optional Paseo execution daemon. The CLI owns daemon authentication and
     # supports local, TCP, unix-socket, and E2EE offer URL targets.
@@ -176,6 +233,12 @@ class Settings(BaseSettings):
     enable_scheduler: bool = False
     briefing_time: str = "08:00"
     reminder_check_interval: int = 5
+
+    # Agent run watchdog: a run whose heartbeat stops is failed so it can be
+    # retried, and a run left waiting for input is brought up again.
+    run_watchdog_interval_seconds: int = 60
+    run_heartbeat_timeout_minutes: int = 10
+    run_input_reminder_minutes: int = 30
 
     # Proactive nudges
     enable_nudges: bool = False
@@ -221,6 +284,16 @@ class Settings(BaseSettings):
             self.codex_api_key = conventional_key
         elif self.codex_api_key_file:
             self.codex_api_key = _read_codex_api_key(self.codex_api_key_file)
+        return self
+
+    @model_validator(mode="after")
+    def resolve_ai_provider(self):
+        # A switch made in the app is the most recent expression of intent, so
+        # it outranks the AI_PROVIDER default this process started with.
+        if self.ai_provider_file:
+            stored = _read_ai_provider(self.ai_provider_file)
+            if stored:
+                self.ai_provider = stored
         return self
 
     @model_validator(mode="after")

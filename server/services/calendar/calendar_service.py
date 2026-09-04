@@ -7,9 +7,11 @@ from icalendar import Alarm, Calendar, Event as ICalEvent
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.task import TaskStatus
 from exceptions import NotFoundError
 from models.event import Event
 from models.project import Project
+from models.todo import Todo
 from services.calendar.recurrence_service import generate_occurrences
 from utils import apply_model_updates, make_id, serialize_tags
 
@@ -178,7 +180,7 @@ async def delete_event_occurrence(
 
 
 async def export_events_ical(db: AsyncSession) -> str:
-    """Export all events as an iCalendar (.ics) string."""
+    """Export the calendar -- events and task deadlines -- as an iCalendar string."""
     q = select(Event).order_by(Event.start_time.asc())
     rows = (await db.execute(q)).scalars().all()
 
@@ -247,4 +249,45 @@ async def export_events_ical(db: AsyncSession) -> str:
 
         cal.add_component(vevent)
 
+    for todo in await _open_deadlines(db):
+        cal.add_component(_deadline_vevent(todo))
+
     return cal.to_ical().decode("utf-8")
+
+
+async def _open_deadlines(db: AsyncSession) -> list[Todo]:
+    """Tasks a subscriber still has to finish, oldest deadline first."""
+    q = (
+        select(Todo)
+        .where(
+            Todo.due_date.is_not(None),
+            Todo.status.not_in([TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]),
+        )
+        .order_by(Todo.due_date.asc())
+    )
+    return list((await db.execute(q)).scalars().all())
+
+
+def _deadline_vevent(todo: Todo) -> ICalEvent:
+    """A deadline as an all-day entry on the day it is due.
+
+    Task-oriented workspaces still want deadlines to show up in whatever
+    calendar the person actually looks at, and every client renders an all-day
+    VEVENT. VTODO would be more literal, but Google and most subscription
+    readers drop it, so the deadline would silently vanish.
+
+    The entry sits on the due date rather than spanning from today, because a
+    subscription is re-read for months and a span computed now would be wrong
+    tomorrow.
+    """
+    vevent = ICalEvent()
+    vevent.add("uid", todo.id)
+    vevent.add("summary", todo.title)
+    vevent.add("dtstamp", datetime.now(timezone.utc))
+    vevent.add("dtstart", todo.due_date.date())
+    vevent.add("categories", ["TASK"])
+    if todo.description:
+        vevent.add("description", todo.description)
+    vevent.add("created", todo.created_at)
+    vevent.add("last-modified", todo.updated_at)
+    return vevent

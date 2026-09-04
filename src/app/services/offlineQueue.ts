@@ -81,6 +81,22 @@ function writeQueue(items: QueuedAction[]): boolean {
   }
 }
 
+function isQueueableJson(value: unknown, seen = new Set<object>()): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || seen.has(value)) return false;
+
+  seen.add(value);
+  const queueable = Array.isArray(value)
+    ? value.every((item) => isQueueableJson(item, seen))
+    : (Object.getPrototypeOf(value) === Object.prototype ||
+        Object.getPrototypeOf(value) === null) &&
+      Object.values(value).every((item) => isQueueableJson(item, seen));
+  seen.delete(value);
+  return queueable;
+}
+
 /** Prune entries older than 24 hours. */
 function pruneStale(items: QueuedAction[]): QueuedAction[] {
   const cutoff = Date.now() - MAX_AGE_MS;
@@ -137,6 +153,10 @@ export const offlineQueue = {
         method,
         url,
       });
+      return false;
+    }
+    if (!isQueueableJson(data)) {
+      logger.warn('Offline queue: mutation payload is not safely serializable', { method, url });
       return false;
     }
 

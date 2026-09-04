@@ -13,6 +13,7 @@ fun TodoCreate.toLocalEntity(id: String, now: String, zoneId: ZoneId): LocalTodo
     id = id,
     title = title,
     description = description,
+    status = status.wireValue,
     priority = priority,
     dueDate = dueDate?.toStoredDueDate(zoneId),
     tags = tags?.joinToString(","),

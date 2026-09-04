@@ -9,6 +9,8 @@ import {
   useEditMessage,
   useDeleteMessage,
   useRegenerateMessage,
+  useResumeAgentRun,
+  useRunsAwaitingInputQuery,
 } from '../../hooks/queries';
 import ChatPanelMessages from './ChatPanelMessages';
 import ChatInput from './ChatInput';
@@ -19,6 +21,8 @@ interface ChatPanelProps {
   conversationId: string | null;
   onToggle: () => void;
   onSetConversationId: (id: string | null) => void;
+  title?: string;
+  subtitle?: string;
   /** "bottom" (default, mobile) renders with motion height animation; "side" renders as a full-height side panel */
   variant?: 'bottom' | 'side';
 }
@@ -27,6 +31,8 @@ export default function ChatPanel({
   conversationId,
   onToggle,
   onSetConversationId,
+  title = 'Quick Chat',
+  subtitle,
   variant = 'bottom',
 }: ChatPanelProps) {
   const navigate = useNavigate();
@@ -44,6 +50,8 @@ export default function ChatPanel({
   const editMessageMutation = useEditMessage();
   const deleteMessageMutation = useDeleteMessage();
   const regenerateMutation = useRegenerateMessage();
+  const resumeMutation = useResumeAgentRun();
+  const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
   const {
     data: queryMessages = [],
     fetchNextPage,
@@ -64,6 +72,9 @@ export default function ChatPanel({
   }, [conversationId, queryMessages, streamingMessages, workspaceScope]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [dismissedAnswerRunId, setDismissedAnswerRunId] = useState<string | null>(null);
+  const waitingRun = runsAwaitingInput.find((run) => run.conversation_id === conversationId);
+  const answerRun = waitingRun?.id === dismissedAnswerRunId ? undefined : waitingRun;
   useEffect(() => {
     setCurrentConversationId(conversationId);
   }, [conversationId, setCurrentConversationId]);
@@ -96,6 +107,10 @@ export default function ChatPanel({
         });
         setEditingMessageId(null);
         setEditingText('');
+        return;
+      }
+      if (answerRun) {
+        await resumeMutation.mutateAsync({ runId: answerRun.id, followUp: text });
         return;
       }
       let cid = conversationId;
@@ -132,6 +147,8 @@ export default function ChatPanel({
       addStreamingMessage,
       sendMessageStreaming,
       editMessageMutation,
+      answerRun,
+      resumeMutation,
       setCurrentConversationId,
     ],
   );
@@ -145,7 +162,10 @@ export default function ChatPanel({
   const openContent = (
     <>
       <div className="cc-chat-panel__header">
-        <span className="cc-chat-panel__header-title">{translateUi('Quick Chat')}</span>
+        <span className="cc-chat-panel__header-copy">
+          <span className="cc-chat-panel__header-title">{translateUi(title)}</span>
+          {subtitle && <small>{subtitle}</small>}
+        </span>
         <button
           type="button"
           className="cc-chat-panel__header-btn"
@@ -162,8 +182,8 @@ export default function ChatPanel({
           title={variant === 'side' ? translateUi('Close') : translateUi('Minimize')}
           aria-label={
             variant === 'side'
-              ? translateUi('Close quick chat')
-              : translateUi('Minimize quick chat')
+              ? translateUi('Close agent panel')
+              : translateUi('Minimize agent panel')
           }
         >
           {variant === 'side' ? <CloseIcon size={14} /> : <MinusIcon size={14} />}
@@ -210,6 +230,8 @@ export default function ChatPanel({
         editingMessageId={editingMessageId}
         editingText={editingText}
         onCancelEdit={handleCancelEdit}
+        modeLabel={answerRun ? translateUi('Answering the agent') : undefined}
+        onClearMode={answerRun ? () => setDismissedAnswerRunId(answerRun.id) : undefined}
       />
     </>
   );

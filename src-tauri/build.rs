@@ -14,6 +14,7 @@ fn main() {
         "app_show_notification",
         "app_set_badge_count",
         "app_open_camera_settings",
+        "app_open_canonical_document",
         "app_set_workspace_view_mode",
         "secure_storage_get",
         "secure_storage_set",
@@ -21,6 +22,8 @@ fn main() {
         "updater_check",
         "updater_download",
         "updater_install",
+        "worker_run",
+        "worker_read_context",
     ];
 
     tauri_build::try_build(

@@ -94,4 +94,5 @@
     <string name="review_approved_notice">검토를 승인했습니다</string>
     <string name="review_changes_requested_notice">변경을 요청했습니다. 실행을 열어 후속 지시를 보내고 재개하세요.</string>
     <string name="review_rejected_notice">검토를 거부했습니다</string>
+    <string name="review_decision_queued_notice">결정을 저장했습니다. Workspace에 다시 연결되면 동기화합니다.</string>
 </resources>

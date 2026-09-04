@@ -132,6 +132,13 @@ jobs:
           cleanup() { hdiutil detach "$mount_dir" >/dev/null 2>&1 || true; rmdir "$mount_dir" || true; }
           trap cleanup EXIT
           hdiutil attach "$dmg" -readonly -nobrowse -mountpoint "$mount_dir"
+          plist="$(find "$mount_dir" -path '*.app/Contents/Info.plist' -type f -print -quit)"
+          test -n "$plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsArbitraryLoadsInWebContent' "$plist")" = "true"
+          if /usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsArbitraryLoads' "$plist" >/dev/null 2>&1; then
+            echo 'The packaged app must not disable ATS outside its webview' >&2
+            exit 1
+          fi
           node scripts/verify-tauri-package.js "$mount_dir" --run-server
 
       - name: Verify packaged Windows server resource

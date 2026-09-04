@@ -30,6 +30,7 @@ interface TodayViewProps {
   todayTasks: TodoResponse[];
   overdueTasks: TodoResponse[];
   todayEvents: EventResponse[];
+  needsDateTasks: TodoResponse[];
   inboxCount: number;
   isLoading: boolean;
   progress: {
@@ -49,6 +50,7 @@ export default function TodayView({
   todayTasks,
   overdueTasks,
   todayEvents,
+  needsDateTasks,
   inboxCount,
   isLoading,
   progress,
@@ -64,14 +66,18 @@ export default function TodayView({
   const toggleTodoComplete = useCallback(
     (id: string) => {
       // Find the task status from the props to determine the toggle direction
-      const task = [...todayTasks, ...overdueTasks].find((t) => t.id === id);
+      const task = [...todayTasks, ...overdueTasks, ...needsDateTasks].find((t) => t.id === id);
       if (task) toggleMutation.mutate({ id, currentStatus: task.status });
     },
-    [todayTasks, overdueTasks, toggleMutation],
+    [todayTasks, overdueTasks, needsDateTasks, toggleMutation],
   );
   const [briefingOpen, setBriefingOpen] = useState(false);
   const totalTasks = todayTasks.length + overdueTasks.length;
-  const hasAnything = totalTasks > 0 || todayEvents.length > 0 || needsReviewItems.length > 0;
+  const hasAnything =
+    totalTasks > 0 ||
+    todayEvents.length > 0 ||
+    needsReviewItems.length > 0 ||
+    needsDateTasks.length > 0;
   const visibleOverdueTasks = isMobile ? overdueTasks.slice(0, 3) : overdueTasks;
   const visibleTodayTasks = isMobile ? todayTasks.slice(0, 4) : todayTasks;
   return (
@@ -93,7 +99,7 @@ export default function TodayView({
             className="cc-btn cc-btn--ghost cc-btn--icon-touch"
             onClick={() =>
               navigate('/settings/app', {
-                state: settingsNavigationState('/today'),
+                state: settingsNavigationState('/schedule/today'),
               })
             }
             aria-label={translateUi('Open settings')}
@@ -197,6 +203,24 @@ export default function TodayView({
               {translateUi('\n              See all tasks\n            ')}
             </button>
           )}
+        </SectionHeader>
+      )}
+
+      {/* Section 2.5: Tasks with no due date yet — otherwise they never surface anywhere */}
+      {needsDateTasks.length > 0 && (
+        <SectionHeader
+          title={translateUi('Needs a date')}
+          count={needsDateTasks.length}
+          defaultOpen
+        >
+          {needsDateTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onToggle={() => toggleTodoComplete(task.id)}
+              onClick={() => navigate(`/tasks/${task.id}`)}
+            />
+          ))}
         </SectionHeader>
       )}
 

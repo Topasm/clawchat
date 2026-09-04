@@ -13,6 +13,7 @@ export const TAURI_COMMANDS = {
   appShowNotification: 'app_show_notification',
   appSetBadgeCount: 'app_set_badge_count',
   appOpenCameraSettings: 'app_open_camera_settings',
+  appOpenCanonicalDocument: 'app_open_canonical_document',
   appSetWorkspaceViewMode: 'app_set_workspace_view_mode',
   secureStorageGet: 'secure_storage_get',
   secureStorageSet: 'secure_storage_set',
@@ -20,6 +21,8 @@ export const TAURI_COMMANDS = {
   updaterCheck: 'updater_check',
   updaterDownload: 'updater_download',
   updaterInstall: 'updater_install',
+  workerRun: 'worker_run',
+  workerReadContext: 'worker_read_context',
 } as const;
 
 export const TAURI_EVENTS = {

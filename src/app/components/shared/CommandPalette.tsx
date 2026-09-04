@@ -4,7 +4,7 @@ import * as RadixDialog from '@radix-ui/react-dialog';
 import { useTodosQuery } from '../../hooks/queries';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { CheckCircleIcon, MagnifyingGlassIcon, PinIcon, ThemeIcon } from './Icons';
-import { ChatIcon, GearIcon, InboxIcon, SunIcon, TasksIcon } from './NavIcons';
+import { ChatIcon, GearIcon, InboxIcon, NavCalendarIcon, TasksIcon } from './NavIcons';
 import { translateUi } from '../../i18n';
 interface CommandPaletteProps {
   open: boolean;
@@ -42,9 +42,12 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
               </Command.Empty>
 
               <Command.Group heading="Navigation" className="cc-cmd-palette__group">
-                <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/today')}>
-                  <SunIcon className="cc-cmd-palette__item-icon" />
-                  {translateUi(' Today\n                  ')}
+                <Command.Item
+                  className="cc-cmd-palette__item"
+                  onSelect={() => go('/schedule/today')}
+                >
+                  <NavCalendarIcon className="cc-cmd-palette__item-icon" />
+                  {translateUi(' Schedule\n                  ')}
                   <kbd className="cc-cmd-palette__kbd">G T</kbd>
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/inbox')}>

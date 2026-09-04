@@ -7,6 +7,8 @@ export interface TaskGraphLayoutSnapshot {
   positions: Record<string, XYPosition>;
   viewport?: Viewport;
   collapsedIds: string[];
+  /** False only when this scope has never been saved. */
+  initialized: boolean;
 }
 
 type StoredLayouts = Record<string, TaskGraphLayoutSnapshot>;
@@ -14,6 +16,7 @@ type StoredLayouts = Record<string, TaskGraphLayoutSnapshot>;
 const emptySnapshot = (): TaskGraphLayoutSnapshot => ({
   positions: {},
   collapsedIds: [],
+  initialized: false,
 });
 
 function isFiniteNumber(value: unknown): value is number {
@@ -58,6 +61,9 @@ function parseSnapshot(value: unknown): TaskGraphLayoutSnapshot | null {
     collapsedIds: Array.isArray(snapshot.collapsedIds)
       ? [...new Set(snapshot.collapsedIds.filter((id): id is string => typeof id === 'string'))]
       : [],
+    // Layouts written before this flag existed are user state and must not be
+    // replaced by the new default-collapse seed.
+    initialized: snapshot.initialized !== false,
   };
 }
 
@@ -105,6 +111,7 @@ export function updateTaskGraphLayout(
     positions: patch.positions ?? current.positions,
     viewport: patch.viewport ?? current.viewport,
     collapsedIds: patch.collapsedIds ?? current.collapsedIds,
+    initialized: true,
   };
   writeLayouts(layouts);
 }

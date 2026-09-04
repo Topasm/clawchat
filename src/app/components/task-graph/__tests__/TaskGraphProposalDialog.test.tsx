@@ -56,8 +56,8 @@ const proposal: PlanProposalResponse = {
   suggested_skills: null,
   suggested_project_title: null,
   subtasks: [
-    { title: 'Research', priority: 'high', depends_on_indices: [] },
-    { title: 'Build', priority: 'medium', depends_on_indices: [0] },
+    { title: 'Research', depends_on_indices: [] },
+    { title: 'Build', depends_on_indices: [0] },
   ],
   subtask_count: 2,
   suggested_due_summary: null,

@@ -64,6 +64,91 @@ class WeekModelsTest {
         assertEquals(3, groups.byDate.values.sumOf(List<Todo>::size))
     }
 
+
+    // The strip draws the same span the month grid does, so a deadline reads
+    // the same way in both places.
+    @Test
+    fun `a span runs from today through the deadline`() {
+        val range = WeekRange(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 9, 6))
+
+        val spans = weekTaskSpans(
+            listOf(todo("thursday", "2026-09-03")),
+            range = range,
+            today = LocalDate.of(2026, 9, 1),
+            zoneId = ZoneId.of("Asia/Seoul"),
+        )
+
+        val span = spans.single()
+        assertEquals(1, span.startIndex)
+        assertEquals(3, span.endIndex)
+        assertFalse(span.isOverdue)
+    }
+
+    @Test
+    fun `an overdue deadline inside the week occupies its own day only`() {
+        val range = WeekRange(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 9, 6))
+
+        val span = weekTaskSpans(
+            listOf(todo("missed", "2026-09-01")),
+            range = range,
+            today = LocalDate.of(2026, 9, 3),
+            zoneId = ZoneId.of("Asia/Seoul"),
+        ).single()
+
+        assertEquals(1, span.startIndex)
+        assertEquals(1, span.endIndex)
+        assertTrue(span.isOverdue)
+    }
+
+    @Test
+    fun `a deadline beyond the week keeps its bar to the week edge`() {
+        val range = WeekRange(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 9, 6))
+
+        val span = weekTaskSpans(
+            listOf(todo("next-week", "2026-09-10")),
+            range = range,
+            today = LocalDate.of(2026, 9, 4),
+            zoneId = ZoneId.of("Asia/Seoul"),
+        ).single()
+
+        assertEquals(4, span.startIndex)
+        assertEquals(6, span.endIndex)
+    }
+
+    @Test
+    fun `a future week starts its bars at the first column`() {
+        val range = WeekRange(LocalDate.of(2026, 9, 7), LocalDate.of(2026, 9, 13))
+
+        val span = weekTaskSpans(
+            listOf(todo("later", "2026-09-09")),
+            range = range,
+            today = LocalDate.of(2026, 9, 3),
+            zoneId = ZoneId.of("Asia/Seoul"),
+        ).single()
+
+        assertEquals(0, span.startIndex)
+        assertEquals(2, span.endIndex)
+    }
+
+    @Test
+    fun `deadlines outside the week and inactive work draw nothing`() {
+        val range = WeekRange(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 9, 6))
+
+        val spans = weekTaskSpans(
+            listOf(
+                todo("last-week", "2026-08-25"),
+                todo("done", "2026-09-02", status = TaskStatus.COMPLETED),
+                todo("inbox", "2026-09-02", inboxState = "captured"),
+                todo("undated", null),
+            ),
+            range = range,
+            today = LocalDate.of(2026, 9, 3),
+            zoneId = ZoneId.of("Asia/Seoul"),
+        )
+
+        assertTrue(spans.isEmpty())
+    }
+
     private fun todo(
         id: String,
         dueDate: String?,

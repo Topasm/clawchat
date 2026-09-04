@@ -3,7 +3,6 @@ interface ParsedInput {
   type: 'task' | 'event' | 'note';
   dueDate: Date | null;
   startTime: Date | null;
-  priority: 'urgent' | 'high' | 'low' | null;
   recurrenceRule: string | null;
 }
 
@@ -13,7 +12,6 @@ export function parseNaturalInput(text: string): ParsedInput {
     type: 'task',
     dueDate: null,
     startTime: null,
-    priority: null,
     recurrenceRule: null,
   };
   let cleanTitle = text.trim();
@@ -33,8 +31,13 @@ export function parseNaturalInput(text: string): ParsedInput {
   const monthlyMatch = cleanTitle.match(/\b(monthly)\b/i);
 
   const dayToRRule: Record<string, string> = {
-    monday: 'MO', tuesday: 'TU', wednesday: 'WE', thursday: 'TH',
-    friday: 'FR', saturday: 'SA', sunday: 'SU',
+    monday: 'MO',
+    tuesday: 'TU',
+    wednesday: 'WE',
+    thursday: 'TH',
+    friday: 'FR',
+    saturday: 'SA',
+    sunday: 'SU',
   };
 
   if (everyDayMatch) {
@@ -87,9 +90,7 @@ export function parseNaturalInput(text: string): ParsedInput {
     result.dueDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     cleanTitle = cleanTitle.replace(tomorrowMatch[0], '').trim();
   } else if (nextDayMatch) {
-    const dayNames = [
-      'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
-    ];
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const targetDay = dayNames.indexOf(nextDayMatch[1].toLowerCase());
     const d = new Date(now);
     const diff = (targetDay - d.getDay() + 7) % 7 || 7;
@@ -103,8 +104,18 @@ export function parseNaturalInput(text: string): ParsedInput {
     cleanTitle = cleanTitle.replace(inDaysMatch[0], '').trim();
   } else if (monthDayMatch) {
     const months: Record<string, number> = {
-      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
     };
     const month = months[monthDayMatch[1].toLowerCase()];
     const day = parseInt(monthDayMatch[2], 10);
@@ -124,7 +135,13 @@ export function parseNaturalInput(text: string): ParsedInput {
     if (ampm === 'pm' && hours < 12) hours += 12;
     if (ampm === 'am' && hours === 12) hours = 0;
     const base = result.dueDate || new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    result.startTime = new Date(base.getFullYear(), base.getMonth(), base.getDate(), hours, minutes);
+    result.startTime = new Date(
+      base.getFullYear(),
+      base.getMonth(),
+      base.getDate(),
+      hours,
+      minutes,
+    );
     if (!result.dueDate) {
       result.dueDate = new Date(base.getFullYear(), base.getMonth(), base.getDate());
     }
@@ -136,18 +153,6 @@ export function parseNaturalInput(text: string): ParsedInput {
     result.type = 'event';
   } else if (/\b(note|remember that|fyi)\b/i.test(cleanTitle)) {
     result.type = 'note';
-  }
-
-  // Priority detection
-  if (/\b(urgent|asap)\b/i.test(cleanTitle)) {
-    result.priority = 'urgent';
-    cleanTitle = cleanTitle.replace(/\b(urgent|asap)\b/i, '').trim();
-  } else if (/\b(important|high priority)\b/i.test(cleanTitle)) {
-    result.priority = 'high';
-    cleanTitle = cleanTitle.replace(/\b(important|high priority)\b/i, '').trim();
-  } else if (/\b(low priority)\b/i.test(cleanTitle)) {
-    result.priority = 'low';
-    cleanTitle = cleanTitle.replace(/\b(low priority)\b/i, '').trim();
   }
 
   result.title = cleanTitle.replace(/\s+/g, ' ').trim();

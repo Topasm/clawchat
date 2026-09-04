@@ -7,12 +7,17 @@ import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.model.Conversation
+import com.clawchat.android.core.data.model.TaskComment
+import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,7 +29,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -34,6 +41,8 @@ class TasksViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var todoRepository: TodoRepository
     private lateinit var relationshipRepository: TaskRelationshipRepository
+    private lateinit var conversationRepository: ConversationRepository
+    private lateinit var taskCommentRepository: TaskCommentRepository
     private lateinit var syncManager: SyncManager
     private lateinit var todoChanged: MutableSharedFlow<Unit>
     private lateinit var viewModel: TasksViewModel
@@ -54,6 +63,8 @@ class TasksViewModelTest {
         Dispatchers.setMain(testDispatcher)
         todoRepository = mockk()
         relationshipRepository = mockk()
+        conversationRepository = mockk()
+        taskCommentRepository = mockk()
         syncManager = mockk(relaxed = true)
         todoChanged = MutableSharedFlow(extraBufferCapacity = 1)
         every { syncManager.todoChanged } returns todoChanged
@@ -66,7 +77,89 @@ class TasksViewModelTest {
     }
 
     private fun createViewModel(): TasksViewModel {
-        return TasksViewModel(todoRepository, syncManager, relationshipRepository)
+        return TasksViewModel(
+            todoRepository,
+            syncManager,
+            relationshipRepository,
+            conversationRepository,
+            taskCommentRepository,
+        )
+    }
+
+    @Test
+    fun `only unfinished experiment tasks require verdict confirmation`() {
+        val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
+        val hashedExperiment = sampleTodo.copy(tags = listOf("#exp/E65b"))
+
+        assertTrue(requiresVerdictConfirmation(experiment, TaskStatus.COMPLETED))
+        assertTrue(requiresVerdictConfirmation(hashedExperiment, TaskStatus.COMPLETED))
+        assertFalse(requiresVerdictConfirmation(sampleTodo, TaskStatus.COMPLETED))
+        assertFalse(requiresVerdictConfirmation(experiment, TaskStatus.IN_PROGRESS))
+        assertFalse(
+            requiresVerdictConfirmation(
+                experiment.copy(status = TaskStatus.COMPLETED),
+                TaskStatus.COMPLETED,
+            ),
+        )
+    }
+
+    @Test
+    fun `completing an experiment later durably records missing verdict before completion`() = runTest {
+        val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
+        val completed = experiment.copy(status = TaskStatus.COMPLETED)
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(experiment), total = 1))
+        coEvery { todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED)) } returns
+            ApiResult.Success(completed)
+        coEvery {
+            taskCommentRepository.addComment("1", "판정 미기록", missingVerdictOperationId("1"))
+        } returns
+            ApiResult.Success(
+                TaskComment(
+                    id = "comment-1",
+                    todoId = "1",
+                    content = "판정 미기록",
+                    createdBy = "user",
+                    createdAt = "2026-09-04T00:00:00Z",
+                    updatedAt = "2026-09-04T00:00:00Z",
+                ),
+            )
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.completeExperiment("1", verdictRecorded = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.tasks.single().status)
+        coVerifyOrder {
+            taskCommentRepository.addComment(
+                "1",
+                "판정 미기록",
+                missingVerdictOperationId("1"),
+            )
+            todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED))
+        }
+    }
+
+    @Test
+    fun `hard comment failure rolls back experiment completion`() = runTest {
+        val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(experiment), total = 1))
+        coEvery {
+            taskCommentRepository.addComment("1", "판정 미기록", missingVerdictOperationId("1"))
+        } returns ApiResult.Error("Comment rejected", code = 422)
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.completeExperiment("1", verdictRecorded = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(TaskStatus.PENDING, viewModel.uiState.value.tasks.single().status)
+        assertEquals("Comment rejected", viewModel.uiState.value.error)
+        coVerify(exactly = 0) {
+            todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED))
+        }
     }
 
     @Test
@@ -81,6 +174,66 @@ class TasksViewModelTest {
             ),
             TASK_STATUS_FILTER_ORDER,
         )
+    }
+
+    @Test
+    fun `all page keeps completed tasks in a separate bottom section`() {
+        val pending = Todo(id = "pending", title = "Pending", status = TaskStatus.PENDING)
+        val completed = Todo(id = "completed", title = "Completed", status = TaskStatus.COMPLETED)
+        val inProgress = Todo(
+            id = "in-progress",
+            title = "In progress",
+            status = TaskStatus.IN_PROGRESS,
+        )
+
+        val sections = splitTasksForAllView(
+            tasks = listOf(completed, pending, inProgress),
+            separateCompleted = true,
+        )
+
+        assertEquals(listOf(pending, inProgress), sections.active)
+        assertEquals(listOf(completed), sections.completed)
+    }
+
+    @Test
+    fun `a project's root todo is not listed as a task`() = runTest {
+        val root = Todo(id = "root", title = "Paper", status = TaskStatus.PENDING, source = "project_root")
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos + root, total = 3))
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("1", "2"), viewModel.uiState.value.tasks.map(Todo::id))
+    }
+
+    @Test
+    fun `discussing a task opens the thread scoped to it`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { conversationRepository.getOrCreateForTodo("1") } returns
+            ApiResult.Success(Conversation(id = "conv-1", title = "Test task", projectTodoId = "1"))
+        viewModel = createViewModel()
+
+        viewModel.openThreadEvents.test {
+            viewModel.openTaskThread("1")
+            assertEquals("conv-1", awaitItem())
+        }
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `a thread that cannot be opened reports the error and opens nothing`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { conversationRepository.getOrCreateForTodo("1") } returns ApiResult.Error("offline")
+        viewModel = createViewModel()
+
+        viewModel.openThreadEvents.test {
+            viewModel.openTaskThread("1")
+            testDispatcher.scheduler.advanceUntilIdle()
+            expectNoEvents()
+        }
+        assertEquals("offline", viewModel.uiState.value.error)
     }
 
     @Test
@@ -168,6 +321,8 @@ class TasksViewModelTest {
             // Rollback
             val rolledBack = awaitItem()
             assertEquals(TaskStatus.PENDING, rolledBack.tasks.first().status)
+            val reported = awaitItem()
+            assertEquals("Server error", reported.error)
         }
     }
 
@@ -198,7 +353,6 @@ class TasksViewModelTest {
         val input = TodoCreate(
             title = "New task",
             description = "Notes",
-            priority = "high",
             dueDate = "2026-03-23",
             source = "quick_capture",
             inboxState = "classifying",
@@ -259,7 +413,7 @@ class TasksViewModelTest {
     }
 
     @Test
-    fun `deleteTask removes task from list`() = runTest {
+    fun `deleteTask hides task until deletion is committed`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
         coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Success(Unit)
@@ -268,10 +422,91 @@ class TasksViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         viewModel.onAction(TasksAction.Delete("1"))
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         assertEquals(1, viewModel.uiState.value.tasks.size)
         assertEquals("2", viewModel.uiState.value.tasks.first().id)
+        assertEquals("1", viewModel.uiState.value.pendingDeletion?.task?.id)
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
+
+        viewModel.commitDelete(viewModel.uiState.value.pendingDeletion!!.token)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.pendingDeletion)
+        coVerify(exactly = 1) { todoRepository.deleteTodo("1") }
+    }
+
+    @Test
+    fun `deleteTask commits after undo window without screen involvement`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Success(Unit)
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        testDispatcher.scheduler.runCurrent()
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
+
+        testDispatcher.scheduler.advanceTimeBy(10_000L)
+        testDispatcher.scheduler.runCurrent()
+
+        assertNull(viewModel.uiState.value.pendingDeletion)
+        coVerify(exactly = 1) { todoRepository.deleteTodo("1") }
+    }
+
+    @Test
+    fun `undoDelete restores task at its original position without deleting`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        val token = viewModel.uiState.value.pendingDeletion!!.token
+        viewModel.undoDelete(token)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(sampleTodos, viewModel.uiState.value.tasks)
+        assertNull(viewModel.uiState.value.pendingDeletion)
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
+    }
+
+    @Test
+    fun `failed committed deletion restores task`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Error("Delete failed")
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        viewModel.commitDelete(viewModel.uiState.value.pendingDeletion!!.token)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(sampleTodos, viewModel.uiState.value.tasks)
+        assertEquals("Delete failed", viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `pending deletion stays hidden during realtime refresh`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Success(Unit)
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.deleteTask("1")
+        todoChanged.emit(Unit)
+        testDispatcher.scheduler.runCurrent()
+
+        assertEquals(listOf("2"), viewModel.uiState.value.tasks.map(Todo::id))
+        assertEquals("1", viewModel.uiState.value.pendingDeletion?.task?.id)
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any()) }
     }
 
     @Test

@@ -17,6 +17,10 @@ import {
   useUpdateTodo,
 } from '../useModuleQueries';
 import { queryKeys } from '../queryKeys';
+import { useToastStore } from '../../../stores/useToastStore';
+import { useAuthStore } from '../../../stores/useAuthStore';
+import { deferredDeleteQueue } from '../../../services/deferredDeleteQueue';
+import { getOfflineQueueScope } from '../../../services/offlineQueue';
 
 const apiMocks = vi.hoisted(() => ({
   patch: vi.fn(),
@@ -40,6 +44,12 @@ const todo: TodoResponse = {
   updated_at: '2026-08-27T00:00:00Z',
 };
 
+function createToken(subject: string): string {
+  const encode = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `${encode({ alg: 'none' })}.${encode({ sub: subject })}.signature`;
+}
+
 function createHarness() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -62,6 +72,11 @@ function createHarness() {
 
 describe('todo mutations', () => {
   beforeEach(() => {
+    localStorage.clear();
+    useAuthStore.setState({
+      serverUrl: 'https://host.example',
+      token: createToken('user-1'),
+    });
     apiMocks.patch.mockReset();
     apiMocks.patch.mockResolvedValue({ data: undefined });
     apiMocks.post.mockReset();
@@ -87,31 +102,20 @@ describe('todo mutations', () => {
     expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
   });
 
-  it('invalidates relationships after the deferred task delete reaches the server', async () => {
-    vi.useFakeTimers();
-    apiMocks.delete.mockResolvedValueOnce({ data: undefined });
-    try {
-      const { queryClient, wrapper } = createHarness();
-      const { result } = renderHook(() => useDeleteTodo(), { wrapper });
+  it('persists a task delete for the runtime to execute after the undo window', async () => {
+    const { queryClient, wrapper } = createHarness();
+    const { result } = renderHook(() => useDeleteTodo(), { wrapper });
 
-      await act(async () => {
-        await result.current.mutateAsync('task-1');
-      });
-      expect(queryClient.getQueryState(queryKeys.taskRelationships)?.isInvalidated).toBe(false);
+    await act(async () => {
+      await result.current.mutateAsync('task-1');
+    });
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(5000);
-      });
-
-      expect(apiMocks.delete).toHaveBeenCalledWith('/todos/task-1');
-      expect(queryClient.getQueryState(queryKeys.taskRelationships)?.isInvalidated).toBe(true);
-      expect(queryClient.getQueryState(queryKeys.taskGraphInsightScope(null))?.isInvalidated).toBe(
-        true,
-      );
-      expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
+    const scope = getOfflineQueueScope(useAuthStore.getState());
+    expect(deferredDeleteQueue.getItems(scope)).toEqual([
+      expect.objectContaining({ kind: 'todo', resourceId: 'task-1' }),
+    ]);
+    expect(apiMocks.delete).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData<TodoResponse[]>(queryKeys.todos)).toEqual([]);
   });
 
   it('persists in_progress without mapping it back to pending', async () => {
@@ -122,7 +126,14 @@ describe('todo mutations', () => {
       await result.current.mutateAsync({ id: todo.id, status: 'in_progress' });
     });
 
-    expect(apiMocks.patch).toHaveBeenCalledWith('/todos/task-1', { status: 'in_progress' });
+    expect(apiMocks.patch).toHaveBeenCalledWith(
+      '/todos/task-1',
+      expect.objectContaining({
+        status: 'in_progress',
+        client_updated_at: expect.any(String),
+      }),
+      { queueOfflineMutation: true },
+    );
     expect(queryClient.getQueryData<TodoResponse[]>(queryKeys.todos)?.[0].status).toBe(
       'in_progress',
     );
@@ -158,6 +169,14 @@ describe('todo mutations', () => {
       await result.current.mutateAsync({ title: 'Created task' });
     });
 
+    expect(apiMocks.post).toHaveBeenCalledWith(
+      '/todos',
+      expect.objectContaining({
+        title: 'Created task',
+        idempotency_key: expect.any(String),
+      }),
+      { queueOfflineMutation: true },
+    );
     expect(queryClient.getQueryState(queryKeys.taskGraphInsightScope(null))?.isInvalidated).toBe(
       true,
     );
@@ -172,6 +191,14 @@ describe('todo mutations', () => {
       await result.current.mutateAsync({ id: todo.id, data: { title: 'Updated task' } });
     });
 
+    expect(apiMocks.patch).toHaveBeenCalledWith(
+      '/todos/task-1',
+      expect.objectContaining({
+        title: 'Updated task',
+        client_updated_at: expect.any(String),
+      }),
+      { queueOfflineMutation: true },
+    );
     expect(queryClient.getQueryState(queryKeys.taskGraphInsightScope(null))?.isInvalidated).toBe(
       true,
     );
@@ -190,6 +217,48 @@ describe('todo mutations', () => {
       true,
     );
     expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
+  });
+
+  // Completing a task can hide it from the current view (e.g. Today), so the
+  // toast itself has to be the way back — not just a status flip on the row.
+  it('offers to undo a completed task, and undoing reopens it', async () => {
+    apiMocks.patch.mockResolvedValue({ data: {} });
+    const { queryClient, wrapper } = createHarness();
+    const { result } = renderHook(() => useToggleTodoComplete(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: todo.id, currentStatus: 'pending' });
+    });
+
+    const toast = useToastStore.getState().toasts.at(-1);
+    expect(toast?.message).toBe('Task completed');
+    expect(toast?.action?.label).toBe('Undo');
+    expect(apiMocks.patch).toHaveBeenLastCalledWith(
+      `/todos/${todo.id}`,
+      expect.objectContaining({
+        status: 'completed',
+        client_updated_at: expect.any(String),
+      }),
+      { queueOfflineMutation: true },
+    );
+
+    await act(async () => {
+      toast?.action?.onClick();
+      await waitFor(() => expect(apiMocks.patch).toHaveBeenCalledTimes(2));
+    });
+
+    expect(apiMocks.patch).toHaveBeenLastCalledWith(
+      `/todos/${todo.id}`,
+      expect.objectContaining({
+        status: 'pending',
+        client_updated_at: expect.any(String),
+      }),
+      { queueOfflineMutation: true },
+    );
+    expect(
+      queryClient.getQueryData<TodoResponse[]>(queryKeys.todos)?.find((t) => t.id === todo.id)
+        ?.status,
+    ).toBe('pending');
   });
 
   it('invalidates derived graph data after reordering tasks', async () => {

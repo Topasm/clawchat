@@ -12,12 +12,14 @@ import { useTheme } from '../config/ThemeContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import apiClient from '../services/apiClient';
 import ChatPanel from './chat-panel/ChatPanel';
+import { ChatPanelControllerProvider } from './chat-panel/ChatPanelControllerContext';
 import ErrorBoundary from './shared/ErrorBoundary';
 import useChatPanel from '../hooks/useChatPanel';
 import usePlatform from '../hooks/usePlatform';
 import useDataSync from '../hooks/useDataSync';
 import useWebSocket from '../hooks/useWebSocket';
 import useNetworkStatus from '../hooks/useNetworkStatus';
+import useWorkerRunner from '../hooks/useWorkerRunner';
 import { useAuthStore } from '../stores/useAuthStore';
 import type { ConnectionStatus } from '../stores/useAuthStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
@@ -31,7 +33,12 @@ import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
 import { ChevronLeftIcon, ChevronRightIcon, CollapseIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
-import { useCapabilitiesQuery, useReviewsQuery, useTodosQuery } from '../hooks/queries';
+import {
+  useCapabilitiesQuery,
+  useReviewsQuery,
+  useRunsAwaitingInputQuery,
+  useTodosQuery,
+} from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
@@ -39,7 +46,6 @@ import type { HealthResponse } from '../types/api';
 import type { ColorPalette } from '../config/theme';
 // --- SVG icon components ---
 import {
-  SunIcon,
   InboxIcon,
   ChatIcon,
   TasksIcon,
@@ -48,13 +54,15 @@ import {
   AdminIcon,
   NavCalendarIcon,
   ReviewIcon,
-  RunsIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
+import { isTaskTodo } from '../utils/inboxState';
+import { getAttentionBadgeCounts } from '../utils/attentionBadge';
 import UpdateNotification from './shared/UpdateNotification';
 import { StatusDot } from './shared/WorkspacePrimitives';
 import { platformApi } from '../platform';
 import { settingsNavigationState } from '../services/settingsNavigation';
+import WorkerStatusLine from './shared/WorkerStatusLine';
 
 const SimpleMode = lazy(() => import('./SimpleMode'));
 // Keep the injected theme tokens declared in this runtime root. The design
@@ -84,10 +92,6 @@ function cssVars(colors: ColorPalette, fontSize: number): React.CSSProperties {
     '--cc-inbox-yellow': colors.inboxYellow,
     '--cc-completed-green': colors.completedGreen,
     '--cc-overdue-red': colors.overdueRed,
-    '--cc-priority-urgent': colors.priorityUrgent,
-    '--cc-priority-high': colors.priorityHigh,
-    '--cc-priority-medium': colors.priorityMedium,
-    '--cc-priority-low': colors.priorityLow,
     '--cc-shadow': colors.shadow,
     '--cc-delete-bg': colors.deleteBackground,
     '--cc-meta-tag-bg': colors.metaTagBackground,
@@ -100,16 +104,14 @@ const CONNECTION_LABEL_KEYS: Record<ConnectionStatus, string> = {
   reconnecting: 'connection.reconnecting',
 };
 const primaryNavItems = [
-  { to: '/today', labelKey: 'nav.today', Icon: SunIcon },
   { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
+  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
+  { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
   { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
-const secondaryNavItems = [
-  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
-  { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
-  { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
-  { to: '/calendar', labelKey: 'nav.calendar', Icon: NavCalendarIcon },
-];
+// Runs and Review stay reachable as the log and the history; the nav offers
+// the one place that lists what has stopped for the user.
+const secondaryNavItems = [{ to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon }];
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
@@ -129,7 +131,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const chatPanel = useChatPanel();
   const commandPalette = useCommandPalette();
-  const { isDesktop, isMobile, isMac } = usePlatform();
+  const { isDesktop, isMobile } = usePlatform();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebarPanelRef = usePanelRef();
@@ -137,9 +139,11 @@ export default function Layout() {
   const touchStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const quickCapture = useQuickCaptureStore();
+  const serverUrl = useAuthStore((state) => state.serverUrl);
   const { data: capabilities } = useCapabilitiesQuery();
   const { data: todos = [] } = useTodosQuery();
   const { data: pendingReviews = [] } = useReviewsQuery();
+  const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
   useEffect(() => {
     if (!isDesktop) return;
     void platformApi.appWindow
@@ -148,16 +152,20 @@ export default function Layout() {
   }, [isDesktop, simpleMode]);
   // Conditionally filter nav items based on server capabilities
   const filteredPrimaryNavItems = useMemo(() => {
+    if (!serverUrl) return primaryNavItems.filter((item) => item.to !== '/inbox');
     if (!capabilities) return primaryNavItems;
     return primaryNavItems.filter((item) => {
       if (item.to === '/inbox' && !capabilities.features.inbox_pipeline) return false;
       return true;
     });
-  }, [capabilities]);
+  }, [capabilities, serverUrl]);
   const filteredSecondaryNavItems = secondaryNavItems;
-  const filteredUtilityNavItems = useMemo(
-    () => utilityNavItems.filter((item) => !(isMac && item.to === '/settings/app')),
-    [isMac],
+  const availableMobileTabs = useMemo(
+    () =>
+      !serverUrl || capabilities?.features.inbox_pipeline === false
+        ? mobileTabs.filter((item) => item.to !== '/inbox')
+        : mobileTabs,
+    [capabilities, serverUrl],
   );
   // Widget deep-link navigation
   useEffect(() => {
@@ -186,7 +194,6 @@ export default function Layout() {
   // Offline queue: monitor network status and flush on reconnect
   const { isFlushing, pendingCount } = useNetworkStatus(refresh);
   // Health check polling
-  const serverUrl = useAuthStore((s) => s.serverUrl);
   const setHealthOK = useAuthStore((s) => s.setHealthOK);
   const [healthData, setHealthData] = useState<HealthResponse | null>(null);
   useEffect(() => {
@@ -225,6 +232,8 @@ export default function Layout() {
     onShowHelp: () => setShowShortcuts(true),
   });
   useNavigationShortcuts();
+  // Collects the work addressed to this machine while the app is open.
+  useWorkerRunner();
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
   const activeWorkspaceName = useWorkspaceStore(
     (state) =>
@@ -235,46 +244,42 @@ export default function Layout() {
     ? t('connection.syncing')
     : t(CONNECTION_LABEL_KEYS[connectionStatus]);
   // Badge counts
-  const inboxCount = useMemo(
-    () => todos.filter((todo) => !todo.due_date && todo.status === 'pending').length,
-    [todos],
-  );
-  // Tasks that are due now or already late — what "needs attention today" means.
-  const dueCount = useMemo(() => {
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
-    return todos.filter((todo) => {
-      if (todo.status !== 'pending' || !todo.due_date) return false;
-      const due = new Date(todo.due_date);
-      return !Number.isNaN(due.getTime()) && due <= endOfToday;
-    }).length;
-  }, [todos]);
+  const {
+    inboxCount,
+    dueCount,
+    total: attentionBadgeCount,
+  } = useMemo(() => getAttentionBadgeCounts(todos), [todos]);
   const openTaskCount = useMemo(
-    () => todos.filter((todo) => todo.status === 'pending' || todo.status === 'in_progress').length,
+    () =>
+      todos.filter(
+        (todo) => isTaskTodo(todo) && (todo.status === 'pending' || todo.status === 'in_progress'),
+      ).length,
     [todos],
   );
   const navBadgeCounts = useMemo<Record<string, number>>(
     () => ({
-      '/today': dueCount,
+      '/schedule': dueCount,
       '/inbox': inboxCount,
       '/tasks': openTaskCount,
-      '/review': pendingReviews.length,
+      '/attention': pendingReviews.length + runsAwaitingInput.length,
     }),
-    [dueCount, inboxCount, openTaskCount, pendingReviews.length],
+    [dueCount, inboxCount, openTaskCount, pendingReviews.length, runsAwaitingInput.length],
   );
-  // The OS icon badge stands for "needs you now", so it counts unfiled work
-  // plus anything due or overdue -- not the whole open backlog.
+  // The OS icon badge stands for "needs you now": unfiled work, anything due
+  // or overdue, and every agent that has stopped for your input or review --
+  // not the whole open backlog.
+  const agentAttentionCount = runsAwaitingInput.length + pendingReviews.length;
   useEffect(() => {
-    void setAppBadge(inboxCount + dueCount);
-  }, [inboxCount, dueCount]);
+    void setAppBadge(attentionBadgeCount + agentAttentionCount);
+  }, [attentionBadgeCount, agentAttentionCount]);
   // Hide ChatPanel when on full ChatPage
   const onChatPage = location.pathname.startsWith('/chats/') && location.pathname !== '/chats';
   const activeMobileTabIndex = useMemo(
     () =>
-      mobileTabs.findIndex(
+      availableMobileTabs.findIndex(
         (tab) => location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`),
       ),
-    [location.pathname],
+    [availableMobileTabs, location.pathname],
   );
   const canSwipeTabs = isMobile && !onChatPage && activeMobileTabIndex >= 0;
   const isDetailPage =
@@ -349,6 +354,7 @@ export default function Layout() {
           )}
         </span>
       </button>
+      <WorkerStatusLine />
       {filteredPrimaryNavItems.map((item) => (
         <NavLink
           key={item.to}
@@ -381,7 +387,7 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />
-      {filteredUtilityNavItems.map((item) => (
+      {utilityNavItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -435,10 +441,10 @@ export default function Layout() {
       return;
     }
     if (!canSwipeTabs) return;
-    if (dx < 0 && activeMobileTabIndex < mobileTabs.length - 1) {
-      navigate(mobileTabs[activeMobileTabIndex + 1].to);
+    if (dx < 0 && activeMobileTabIndex < availableMobileTabs.length - 1) {
+      navigate(availableMobileTabs[activeMobileTabIndex + 1].to);
     } else if (dx > 0 && activeMobileTabIndex > 0) {
-      navigate(mobileTabs[activeMobileTabIndex - 1].to);
+      navigate(availableMobileTabs[activeMobileTabIndex - 1].to);
     }
   };
   const handleRefresh = useCallback(() => {
@@ -478,102 +484,112 @@ export default function Layout() {
           conversationId={chatPanel.conversationId}
           onToggle={chatPanel.toggle}
           onSetConversationId={chatPanel.setConversationId}
+          title={chatPanel.presentation.title}
+          subtitle={chatPanel.presentation.subtitle}
         />
       )}
     </>
   );
   return (
-    <div
-      className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}${isDesktop && simpleMode ? ' cc-root--simple' : ''}`}
-      style={cssVars(colors, fontSize)}
-    >
-      <UpdateNotification />
-      <ToastContainer />
-      <OfflineIndicator />
-      <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
-      <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
-      <QuickCaptureModal
-        isOpen={quickCapture.isOpen}
-        onClose={quickCapture.close}
-        placeholder={quickCapture.placeholder || undefined}
-        defaultParentId={quickCapture.defaultParentId}
-      />
+    <ChatPanelControllerProvider controller={chatPanel}>
+      <div
+        className={`cc-root${isMobile ? ' cc-root--mobile' : ''}${isDark ? ' cc-root--dark' : ''}${compactMode && !isMobile ? ' cc-root--compact' : ''}${isDesktop && simpleMode ? ' cc-root--simple' : ''}`}
+        style={cssVars(colors, fontSize)}
+      >
+        <UpdateNotification />
+        <ToastContainer />
+        <OfflineIndicator />
+        <CommandPalette open={commandPalette.isOpen} onOpenChange={commandPalette.setIsOpen} />
+        <ShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
+        <QuickCaptureModal
+          isOpen={quickCapture.isOpen}
+          onClose={quickCapture.close}
+          placeholder={quickCapture.placeholder || undefined}
+          defaultParentId={quickCapture.defaultParentId}
+        />
 
-      {isDesktop && simpleMode ? (
-        <Suspense fallback={null}>
-          <SimpleMode />
-        </Suspense>
-      ) : isMobile ? (
-        <>
-          {connectionStatus !== 'connected' && (
-            <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
-              <span className="cc-mobile-status-bar__dot" />
-              <span>
-                {isFlushing ? t('connection.syncing') : t(CONNECTION_LABEL_KEYS[connectionStatus])}
-              </span>
-              {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
-            </div>
-          )}
-          <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {mobileMainContent}
-          </div>
-          <FloatingActionButton />
-          <BottomNav />
-        </>
-      ) : (
-        <PanelGroup orientation="horizontal" id="cc-layout">
-          <Panel
-            id="sidebar"
-            panelRef={sidebarPanelRef}
-            defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
-            minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
-            maxSize="250px"
-            collapsible
-            collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
-            onResize={handleSidebarResize}
-          >
-            {sidebar}
-          </Panel>
-          <PanelResizeHandle className="cc-resize-handle" />
-          <Panel id="content" minSize="30%">
-            <div className="cc-main">
-              <div className="cc-content" ref={contentRef}>
-                <ErrorBoundary name="PageContent">
-                  <AnimatedOutlet />
-                </ErrorBoundary>
+        {isDesktop && simpleMode ? (
+          <Suspense fallback={null}>
+            <SimpleMode />
+          </Suspense>
+        ) : isMobile ? (
+          <>
+            {connectionStatus !== 'connected' && (
+              <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
+                <span className="cc-mobile-status-bar__dot" />
+                <span>
+                  {isFlushing
+                    ? t('connection.syncing')
+                    : t(CONNECTION_LABEL_KEYS[connectionStatus])}
+                </span>
+                {pendingCount > 0 && <span className="cc-offline-badge">{pendingCount}</span>}
               </div>
-              {!onChatPage && !chatPanel.isOpen && (
-                <ChatPanel
-                  isOpen={false}
-                  conversationId={chatPanel.conversationId}
-                  onToggle={chatPanel.toggle}
-                  onSetConversationId={chatPanel.setConversationId}
-                />
-              )}
+            )}
+            <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+              {mobileMainContent}
             </div>
-          </Panel>
-          {showChatPanel && (
-            <>
-              <PanelResizeHandle className="cc-resize-handle" />
-              <Panel
-                id="chat-panel"
-                defaultSize={`${chatPanelSize}%`}
-                minSize="250px"
-                maxSize="450px"
-                onResize={handleChatPanelResize}
-              >
-                <ChatPanel
-                  isOpen={true}
-                  conversationId={chatPanel.conversationId}
-                  onToggle={chatPanel.toggle}
-                  onSetConversationId={chatPanel.setConversationId}
-                  variant="side"
-                />
-              </Panel>
-            </>
-          )}
-        </PanelGroup>
-      )}
-    </div>
+            <FloatingActionButton />
+            <BottomNav tabs={availableMobileTabs} />
+          </>
+        ) : (
+          <PanelGroup orientation="horizontal" id="cc-layout">
+            <Panel
+              id="sidebar"
+              panelRef={sidebarPanelRef}
+              defaultSize={`${sidebarSize <= 4 ? DEFAULT_SIDEBAR_SIZE : sidebarSize}%`}
+              minSize={`${SIDEBAR_EXPANDED_MIN_WIDTH}px`}
+              maxSize="250px"
+              collapsible
+              collapsedSize={`${SIDEBAR_RAIL_WIDTH}px`}
+              onResize={handleSidebarResize}
+            >
+              {sidebar}
+            </Panel>
+            <PanelResizeHandle className="cc-resize-handle" />
+            <Panel id="content" minSize="30%">
+              <div className="cc-main">
+                <div className="cc-content" ref={contentRef}>
+                  <ErrorBoundary name="PageContent">
+                    <AnimatedOutlet />
+                  </ErrorBoundary>
+                </div>
+                {!onChatPage && !chatPanel.isOpen && (
+                  <ChatPanel
+                    isOpen={false}
+                    conversationId={chatPanel.conversationId}
+                    onToggle={chatPanel.toggle}
+                    onSetConversationId={chatPanel.setConversationId}
+                    title={chatPanel.presentation.title}
+                    subtitle={chatPanel.presentation.subtitle}
+                  />
+                )}
+              </div>
+            </Panel>
+            {showChatPanel && (
+              <>
+                <PanelResizeHandle className="cc-resize-handle" />
+                <Panel
+                  id="chat-panel"
+                  defaultSize={`${chatPanelSize}%`}
+                  minSize="250px"
+                  maxSize="450px"
+                  onResize={handleChatPanelResize}
+                >
+                  <ChatPanel
+                    isOpen={true}
+                    conversationId={chatPanel.conversationId}
+                    onToggle={chatPanel.toggle}
+                    onSetConversationId={chatPanel.setConversationId}
+                    title={chatPanel.presentation.title}
+                    subtitle={chatPanel.presentation.subtitle}
+                    variant="side"
+                  />
+                </Panel>
+              </>
+            )}
+          </PanelGroup>
+        )}
+      </div>
+    </ChatPanelControllerProvider>
   );
 }

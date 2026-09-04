@@ -13,10 +13,10 @@ const mocks = vi.hoisted(() => ({
       id: 'open-task',
       title: 'Write release notes',
       status: 'pending',
-      priority: 'medium',
       tags: [],
       parent_id: null,
       project_id: null,
+      inbox_state: 'none',
       sort_order: 0,
       created_at: '2026-08-30T10:00:00.000Z',
       updated_at: '2026-08-30T10:00:00.000Z',
@@ -25,13 +25,25 @@ const mocks = vi.hoisted(() => ({
       id: 'done-task',
       title: 'Ship desktop build',
       status: 'completed',
-      priority: 'medium',
       tags: [],
       parent_id: null,
       project_id: null,
+      inbox_state: 'none',
       sort_order: 0,
       created_at: '2026-08-29T10:00:00.000Z',
       updated_at: '2026-08-30T09:00:00.000Z',
+    },
+    {
+      id: 'inbox-task',
+      title: 'Classifying capture',
+      status: 'pending',
+      tags: [],
+      parent_id: null,
+      project_id: null,
+      inbox_state: 'classifying',
+      sort_order: 0,
+      created_at: '2026-08-31T10:00:00.000Z',
+      updated_at: '2026-08-31T10:00:00.000Z',
     },
   ],
 }));
@@ -91,6 +103,7 @@ describe('SimpleMode', () => {
 
     expect(screen.getByText('Write release notes')).toBeInTheDocument();
     expect(screen.queryByText('Ship desktop build')).not.toBeInTheDocument();
+    expect(screen.queryByText('Classifying capture')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Task title' }), {
       target: { value: 'Plan tomorrow' },
@@ -100,7 +113,6 @@ describe('SimpleMode', () => {
     expect(mocks.create).toHaveBeenCalledWith({
       title: 'Plan tomorrow',
       status: 'pending',
-      priority: 'medium',
       tags: [],
       source: 'quick_capture',
       inbox_state: 'classifying',

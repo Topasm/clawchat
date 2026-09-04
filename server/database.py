@@ -772,6 +772,12 @@ async def _run_data_migrations(
     await session.commit()
 
 
+#: Root-todo sources that denote a workspace in their own right. ``project_root``
+#: roots already belong to a Project; they are listed so a Project whose row
+#: was lost regains one instead of leaving its tasks orphaned.
+LEGACY_PROJECT_ROOT_SOURCES = frozenset({"obsidian_project", "project_root"})
+
+
 async def _backfill_first_class_projects(session: AsyncSession) -> None:
     """Promote legacy root-Todo workspaces without changing task identity."""
     from collections import defaultdict, deque
@@ -812,7 +818,16 @@ async def _backfill_first_class_projects(session: AsyncSession) -> None:
     for root in sorted(todos, key=lambda item: (item.created_at, item.id)):
         if root.parent_id is not None:
             continue
-        qualifies = bool(children.get(root.id)) or root.id in linked_root_ids or bool(root.source)
+        # Only a legacy workspace becomes a Project: a root with subtasks, one a
+        # chat is scoped to, or an Obsidian project note. Any other source is
+        # provenance, not structure -- every quick capture carries one, and
+        # this runs on each startup, so matching them turned every capture
+        # into an empty Project overnight.
+        qualifies = (
+            bool(children.get(root.id))
+            or root.id in linked_root_ids
+            or root.source in LEGACY_PROJECT_ROOT_SOURCES
+        )
         if not qualifies:
             continue
         project = project_by_root_id.get(root.id)

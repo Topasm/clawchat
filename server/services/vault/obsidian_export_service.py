@@ -60,8 +60,10 @@ class TodoSnapshot:
     tags: str | None
     enabled_skills: str | None
     assignee: str | None
-    source_id: str | None
-    parent_id: str | None
+    project_id: str | None = None
+    source: str | None = None
+    source_id: str | None = None
+    parent_id: str | None = None
 
 
 def snapshot_todo(todo: "Todo | TodoSnapshot") -> TodoSnapshot:
@@ -82,6 +84,8 @@ def snapshot_todo(todo: "Todo | TodoSnapshot") -> TodoSnapshot:
         tags=todo.tags,
         enabled_skills=todo.enabled_skills,
         assignee=todo.assignee,
+        project_id=getattr(todo, "project_id", None),
+        source=getattr(todo, "source", None),
         source_id=todo.source_id,
         parent_id=todo.parent_id,
     )
@@ -116,13 +120,17 @@ def remove_todo_from_vault(vault_path: str, todo_id: str) -> None:
             for fname in filenames:
                 if not fname.endswith(".md"):
                     continue
-                relative_path = os.path.relpath(os.path.join(dirpath, fname), vault_path)
+                relative_path = os.path.relpath(
+                    os.path.join(dirpath, fname), vault_path
+                )
                 try:
                     abs_path = resolve_vault_path(
                         vault_path, relative_path, must_exist=True
                     )
                 except VaultPathError:
-                    logger.warning("Skipping markdown path outside vault: %s", relative_path)
+                    logger.warning(
+                        "Skipping markdown path outside vault: %s", relative_path
+                    )
                     continue
                 if _remove_line(abs_path, todo_id):
                     return
@@ -145,8 +153,14 @@ def export_all_todos(vault_path: str, todos: list[Todo | TodoSnapshot]) -> Expor
     file.  Existing ``<!-- claw:... -->`` lines are replaced; new ones are
     appended under a ``## ClawChat`` section header.
     """
-    # Build a parent-id → title lookup.
+    # Build project and legacy parent title lookups before hiding compatibility
+    # project roots from the exported task list.
     todos = [snapshot_todo(todo) for todo in todos]
+    project_titles = {
+        todo.project_id: todo.title
+        for todo in todos
+        if todo.project_id and todo.source == "project_root"
+    }
     parent_titles: dict[str, str] = {}
     for t in todos:
         if t.parent_id is None:
@@ -157,9 +171,11 @@ def export_all_todos(vault_path: str, todos: list[Todo | TodoSnapshot]) -> Expor
             todo,
             None
             if todo.source_id
-            else parent_titles.get(todo.parent_id) if todo.parent_id else None,
+            else project_titles.get(todo.project_id)
+            or (parent_titles.get(todo.parent_id) if todo.parent_id else None),
         )
         for todo in todos
+        if todo.source != "project_root"
     ]
     return export_todos_batch(vault_path, items)
 
@@ -250,9 +266,7 @@ def _get_file_path(
     if source_id:
         return resolve_vault_path(vault_path, f"{source_id}/TODO.md")
     if project_name:
-        return resolve_vault_path(
-            vault_path, f"{_sanitize_name(project_name)}/TODO.md"
-        )
+        return resolve_vault_path(vault_path, f"{_sanitize_name(project_name)}/TODO.md")
     return resolve_vault_path(vault_path, "00_Inbox/TODO.md")
 
 
@@ -276,6 +290,7 @@ def _todo_to_md_line(todo: TodoSnapshot) -> str:
     # Skill-based export (preferred) or legacy agent export.
     if todo.enabled_skills:
         import json as _json
+
         try:
             skills_list = (
                 _json.loads(todo.enabled_skills)
@@ -335,7 +350,9 @@ def _remove_markers_from_vault(vault_path: str, todo_ids: set[str]) -> None:
                     vault_path, relative_path, must_exist=True
                 )
             except VaultPathError:
-                logger.warning("Skipping markdown path outside vault: %s", relative_path)
+                logger.warning(
+                    "Skipping markdown path outside vault: %s", relative_path
+                )
                 continue
             with synchronized_path(abs_path):
                 lines = _read_lines(abs_path)
@@ -411,7 +428,9 @@ def _create_file_via_cli_or_fs(vault_path: str, abs_path: str) -> None:
         from services.vault import obsidian_cli_service as cli_svc
 
         rel_path = os.path.relpath(abs_path, vault_path)
-        if cli_svc.create_document(rel_path, f"{_SECTION_HEADER}\n", queue_on_fail=False):
+        if cli_svc.create_document(
+            rel_path, f"{_SECTION_HEADER}\n", queue_on_fail=False
+        ):
             return
     except ImportError:
         pass

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="chat_search">빠른 찾기</string>
+    <string name="chat_settings">설정</string>
     <string name="chat_title">채팅</string>
     <string name="chat_new_chat">새 채팅</string>
     <string name="chat_new_conversation_default_title">새 대화</string>
@@ -22,6 +24,25 @@
     <string name="chat_streaming">답변 중</string>
     <string name="chat_you">나</string>
     <string name="chat_assistant">어시스턴트</string>
+    <string name="chat_run_update_label">에이전트 실행</string>
+    <string name="chat_run_status_waiting_input">입력 필요</string>
+    <string name="chat_run_status_waiting_review">검토 대기 중</string>
+    <string name="chat_run_status_completed">완료</string>
+    <string name="chat_run_status_cancelled">취소됨</string>
+    <string name="chat_run_status_failed">실패</string>
+    <string name="chat_run_status_running">실행 중</string>
+    <string name="chat_run_needs_you_hint">진행 탭에서 답하거나 검토할 수 있습니다.</string>
+    <string name="chat_agent_answer_placeholder">에이전트에게 답변…</string>
+    <string name="chat_agent_send_answer">답변 보내기</string>
+    <string name="chat_permission_allow">허용</string>
+    <string name="chat_permission_deny">거부</string>
+    <string name="chat_review_approve">승인</string>
+    <string name="chat_review_reject">거절</string>
+    <string name="chat_background_task">백그라운드 작업</string>
+    <string name="chat_multi_agent_task">멀티 에이전트 작업</string>
+    <string name="chat_task_queued">대기 중</string>
+    <string name="chat_agent_run_conversations">에이전트 실행 대화</string>
+    <string name="chat_task_threads">작업·프로젝트 스레드</string>
     <string name="chat_just_now">방금 전</string>
     <plurals name="chat_minutes_ago">
         <item quantity="other">%1$d분 전</item>

@@ -18,11 +18,45 @@
   color: var(--cc-text-secondary);
   font-size: 13px;
 }
+.cc-page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Attention page: sections of what has stopped for the user */
+.cc-attention-section {
+  margin-top: 16px;
+}
+
+.cc-attention-section__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cc-text);
+}
+
+.cc-attention-page__footnote {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
+}
+
 .cc-review-filters {
   display: flex;
   gap: 0;
   overflow-x: auto;
   border-bottom: 1px solid var(--cc-border);
+}
+
+.cc-review-page__filter-note {
+  margin: 0 0 var(--cc-space-4);
+  color: var(--cc-text-secondary);
+  font-size: 12px;
 }
 .cc-review-filter {
   padding: 8px 12px;

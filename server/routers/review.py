@@ -4,14 +4,21 @@ import logging
 
 from auth.dependencies import get_current_user
 from database import get_db
+from domain.agent_run import AgentRunStatus
 from domain.review import ReviewStatus, ReviewSubjectType
-from exceptions import ConflictError
+from exceptions import AppError, ConflictError
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from models.agent_task import AgentTask
 from models.plan_proposal import PlanProposal
-from schemas.review import ReviewDecisionRequest, ReviewDecisionResponse, ReviewItemResponse
+from schemas.review import (
+    ReviewDecisionRequest,
+    ReviewDecisionResponse,
+    ReviewItemResponse,
+)
 from schemas.task import PlanApplyRequest
 from services.agents import (
     agent_run_service,
+    run_resume_service,
 )
 from services.planning import (
     plan_proposal_service,
@@ -60,6 +67,37 @@ def _schedule_vault_job(
     background_tasks.add_task(process)
 
 
+async def _resume_after_changes_requested(
+    db: AsyncSession,
+    request: Request,
+    run_id: str,
+    note: str,
+    user_id: str,
+) -> bool:
+    """Start the run again with the review note; False leaves it waiting.
+
+    The decision itself is already committed. If the run cannot resume now --
+    its provider went away, say -- it stays in ``waiting_input`` with the note
+    on the review item, exactly where a manual resume from the Runs page can
+    pick it up. That is worth a warning, not a failed decision.
+    """
+    run = await agent_run_service.require_run(db, run_id)
+    task = await db.get(AgentTask, run.agent_task_id)
+    if task is None:
+        return False
+    try:
+        await run_resume_service.resume_with_follow_up(
+            db, request.app.state, run, task, note, user_id=user_id
+        )
+    except AppError as exc:
+        logger.warning(
+            "Run %s could not resume after changes requested: %s", run_id, exc
+        )
+        await db.rollback()
+        return False
+    return True
+
+
 @router.post("/{review_id}/decision", response_model=ReviewDecisionResponse)
 async def decide_review(
     review_id: str,
@@ -67,9 +105,15 @@ async def decide_review(
     request: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user_id: str = Depends(get_current_user),
 ):
     item = await review_item_service.get_review_item(db, review_id)
+    # Mobile/relay transports can lose a committed response. Replaying the
+    # exact confirmed decision is a read-only success; a different decision
+    # still conflicts below and can never overwrite another client.
+    if item.status == body.decision:
+        response = await review_item_service.build_review_response(db, item)
+        return ReviewDecisionResponse(review=response, outcome={})
     if item.status not in {ReviewStatus.PENDING, ReviewStatus.CHANGES_REQUESTED}:
         raise ConflictError(f"Review item cannot be decided from {item.status}")
     item.review_note = body.note
@@ -98,8 +142,11 @@ async def decide_review(
             )
         else:
             await review_item_service.set_subject_review_status(
-                db, ReviewSubjectType.PLAN_PROPOSAL, proposal.id,
-                ReviewStatus.CHANGES_REQUESTED, note=body.note,
+                db,
+                ReviewSubjectType.PLAN_PROPOSAL,
+                proposal.id,
+                ReviewStatus.CHANGES_REQUESTED,
+                note=body.note,
             )
             await db.commit()
     elif item.subject_type == ReviewSubjectType.ARTIFACT_REVISION:
@@ -107,13 +154,24 @@ async def decide_review(
             db, item.subject_id, body.decision
         )
         await review_item_service.set_subject_review_status(
-            db, ReviewSubjectType.ARTIFACT_REVISION, item.subject_id,
-            body.decision, note=body.note,
+            db,
+            ReviewSubjectType.ARTIFACT_REVISION,
+            item.subject_id,
+            body.decision,
+            note=body.note,
         )
         await db.commit()
     elif item.subject_type == ReviewSubjectType.AGENT_RUN:
+        expected_run_status = (
+            AgentRunStatus.WAITING_REVIEW
+            if item.status == ReviewStatus.PENDING
+            else AgentRunStatus.WAITING_INPUT
+        )
         outcome = await agent_run_service.decide_run(
-            db, item.subject_id, body.decision
+            db,
+            item.subject_id,
+            body.decision,
+            expected_status=expected_run_status,
         )
         await review_item_service.set_subject_review_status(
             db,
@@ -123,6 +181,18 @@ async def decide_review(
             note=body.note,
         )
         await db.commit()
+        if (
+            body.decision == ReviewStatus.CHANGES_REQUESTED
+            and (body.note or "").strip()
+        ):
+            # The note *is* the follow-up. Resume right away instead of
+            # parking the run in waiting_input for the reviewer to retype it.
+            outcome = {
+                **outcome,
+                "auto_resumed": await _resume_after_changes_requested(
+                    db, request, item.subject_id, body.note, user_id
+                ),
+            }
     else:
         raise ConflictError(
             f"Review decisions for {item.subject_type} are not supported yet"
@@ -140,4 +210,5 @@ async def decide_review(
     else:
         await notify_module_data_changed("runs")
         await notify_module_data_changed("todos")
+        await notify_module_data_changed("artifacts")
     return ReviewDecisionResponse(review=response, outcome=outcome)

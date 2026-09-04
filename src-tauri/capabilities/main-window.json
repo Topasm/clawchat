@@ -2,8 +2,14 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-window",
   "description": "Minimal native permissions for the ClawChat main window",
-  "windows": ["main"],
-  "platforms": ["linux", "macOS", "windows"],
+  "windows": [
+    "main"
+  ],
+  "platforms": [
+    "linux",
+    "macOS",
+    "windows"
+  ],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
@@ -21,12 +27,15 @@
     "allow-app-show-notification",
     "allow-app-set-badge-count",
     "allow-app-open-camera-settings",
+    "allow-app-open-canonical-document",
     "allow-app-set-workspace-view-mode",
     "allow-secure-storage-get",
     "allow-secure-storage-set",
     "allow-secure-storage-remove",
     "allow-updater-check",
     "allow-updater-download",
-    "allow-updater-install"
+    "allow-updater-install",
+    "allow-worker-run",
+    "allow-worker-read-context"
   ]
 }

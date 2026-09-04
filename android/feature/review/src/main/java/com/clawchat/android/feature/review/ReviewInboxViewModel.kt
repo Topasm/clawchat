@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 data class ReviewInboxUiState(
@@ -289,9 +291,12 @@ class ReviewInboxViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            when (val result = repository.decide(item.id, decision, note)) {
+            when (val result = repository.decide(item, decision, note)) {
                 is ApiResult.Success -> {
                     if (!isCurrentDecision(generation, item.id)) return@launch
+                    val isQueued = result.data.outcome["sync_status"]
+                        ?.jsonPrimitive
+                        ?.contentOrNull == "pending"
                     _uiState.update { current ->
                         current.copy(
                             items = current.items.filterNot { it.id == item.id },
@@ -304,8 +309,14 @@ class ReviewInboxViewModel @Inject constructor(
                             detailError = null,
                             notice = null,
                             errorResource = null,
-                            noticeResource = decision.confirmationMessageResource,
-                            followUpRunId = if (decision == ReviewDecision.CHANGES_REQUESTED) {
+                            noticeResource = if (isQueued) {
+                                R.string.review_decision_queued_notice
+                            } else {
+                                decision.confirmationMessageResource
+                            },
+                            followUpRunId = if (
+                                !isQueued && decision == ReviewDecision.CHANGES_REQUESTED
+                            ) {
                                 item.subjectId
                             } else {
                                 null

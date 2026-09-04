@@ -11,14 +11,16 @@ import { isWorkspaceSessionReady } from './app/services/nativeRoutePolicy';
 
 // ── Lazy-loaded pages ────────────────────────────────────────────────
 const Layout = lazy(() => import('./app/components/Layout'));
+const WorkspaceStartRedirect = lazy(() => import('./app/pages/WorkspaceStartRedirect'));
 const LoginPage = lazy(() => import('./app/pages/LoginPage'));
 const OnboardingPage = lazy(() => import('./app/pages/OnboardingPage'));
-const TodayPage = lazy(() => import('./app/pages/TodayPage'));
+const SchedulePage = lazy(() => import('./app/pages/SchedulePage'));
 const InboxPage = lazy(() => import('./app/pages/InboxPage'));
 const ChatListPage = lazy(() => import('./app/pages/ChatListPage'));
 const ProjectWorkspacePage = lazy(() => import('./app/pages/ProjectWorkspacePage'));
 const ReviewPage = lazy(() => import('./app/pages/ReviewPage'));
 const RunsPage = lazy(() => import('./app/pages/RunsPage'));
+const AttentionPage = lazy(() => import('./app/pages/AttentionPage'));
 const ChatPage = lazy(() => import('./app/pages/ChatPage'));
 const AllTasksPage = lazy(() => import('./app/pages/AllTasksPage'));
 const TaskDetailPage = lazy(() => import('./app/pages/TaskDetailPage'));
@@ -26,7 +28,6 @@ const EventDetailPage = lazy(() => import('./app/pages/EventDetailPage'));
 const SettingsPage = lazy(() => import('./app/pages/SettingsPage'));
 const SystemPromptPage = lazy(() => import('./app/pages/SystemPromptPage'));
 const SearchPage = lazy(() => import('./app/pages/SearchPage'));
-const CalendarPage = lazy(() => import('./app/pages/CalendarPage'));
 const AdminPage = lazy(() => import('./app/pages/AdminPage'));
 const ConnectionCenterPage = lazy(() => import('./app/pages/ConnectionCenterPage'));
 const DiagnosticsPage = lazy(() => import('./app/pages/DiagnosticsPage'));
@@ -216,11 +217,21 @@ export default function AppRouter() {
         }
       >
         <Route
-          path="/today"
+          path="/"
           element={
-            <ErrorBoundary name="TodayPage">
+            <LazyRoute>
+              <WorkspaceStartRedirect />
+            </LazyRoute>
+          }
+        />
+        <Route path="/today" element={<Navigate to="/schedule/today" replace />} />
+        <Route path="/schedule" element={<Navigate to="/schedule/today" replace />} />
+        <Route
+          path="/schedule/:view"
+          element={
+            <ErrorBoundary name="SchedulePage">
               <LazyRoute>
-                <TodayPage />
+                <SchedulePage />
               </LazyRoute>
             </ErrorBoundary>
           }
@@ -276,6 +287,16 @@ export default function AppRouter() {
           }
         />
         <Route
+          path="/attention"
+          element={
+            <ErrorBoundary name="AttentionPage">
+              <LazyRoute>
+                <AttentionPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
           path="/chats"
           element={
             <ErrorBoundary name="ChatListPage">
@@ -315,16 +336,7 @@ export default function AppRouter() {
             </ErrorBoundary>
           }
         />
-        <Route
-          path="/calendar"
-          element={
-            <ErrorBoundary name="CalendarPage">
-              <LazyRoute>
-                <CalendarPage />
-              </LazyRoute>
-            </ErrorBoundary>
-          }
-        />
+        <Route path="/calendar" element={<Navigate to="/schedule/month" replace />} />
         <Route
           path="/events/:eventId"
           element={
@@ -355,7 +367,7 @@ export default function AppRouter() {
             </ErrorBoundary>
           }
         />
-        <Route path="*" element={<Navigate to="/today" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

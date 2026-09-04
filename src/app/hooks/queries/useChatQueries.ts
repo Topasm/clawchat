@@ -55,7 +55,7 @@ function filterMessageHistory(
   };
 }
 
-export function useProjectsQuery() {
+export function useProjectsQuery(enabled = true) {
   const serverUrl = useAuthStore((s) => s.serverUrl);
   return useQuery({
     queryKey: queryKeys.projects,
@@ -64,7 +64,7 @@ export function useProjectsQuery() {
       const raw = res.data ?? [];
       return z.array(ProjectResponseSchema).parse(raw);
     },
-    enabled: !!serverUrl,
+    enabled: !!serverUrl && enabled,
   });
 }
 export function useProjectQuery(projectId: string | undefined) {
@@ -98,7 +98,7 @@ export function useCreateProject() {
     },
   });
 }
-export function useUpdateProject(projectId: string) {
+export function useUpdateProject(projectId: string, successMessage = 'Project updated') {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (updates: ProjectUpdate) => {
@@ -110,10 +110,37 @@ export function useUpdateProject(projectId: string) {
         current?.map((item) => (item.id === project.id ? project : item)),
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.project(project.id) });
-      useToastStore.getState().addToast('success', translateUi('Project execution settings saved'));
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      useToastStore.getState().addToast('success', translateUi(successMessage));
     },
     onError: () => {
       useToastStore.getState().addToast('error', translateUi('Could not save project settings'));
+    },
+  });
+}
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      await apiClient.delete(`/projects/${projectId}`);
+      return projectId;
+    },
+    onSuccess: (projectId) => {
+      queryClient.setQueryData<ProjectResponse[]>(queryKeys.projects, (current) =>
+        current?.filter((item) => item.id !== projectId),
+      );
+      queryClient.removeQueries({ queryKey: queryKeys.project(projectId) });
+      // Its tasks are back in the Inbox; every task view moved.
+      queryClient.invalidateQueries({ queryKey: queryKeys.todos });
+      queryClient.invalidateQueries({ queryKey: queryKeys.taskGraphInsights });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      useToastStore
+        .getState()
+        .addToast('success', translateUi('Project deleted. Its tasks are back in the Inbox.'));
+    },
+    onError: () => {
+      useToastStore.getState().addToast('error', translateUi('Could not delete project'));
     },
   });
 }

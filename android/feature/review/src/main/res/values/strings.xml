@@ -95,4 +95,5 @@
     <string name="review_approved_notice">Review approved</string>
     <string name="review_changes_requested_notice">Changes requested. Open the run to send follow-up instructions and resume it.</string>
     <string name="review_rejected_notice">Review rejected</string>
+    <string name="review_decision_queued_notice">Decision saved. It will sync when the workspace reconnects.</string>
 </resources>

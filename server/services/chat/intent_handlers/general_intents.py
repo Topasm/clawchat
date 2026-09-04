@@ -53,10 +53,46 @@ async def weekly_review(ctx: IntentContext) -> IntentReply:
     return await weekly_review_service.generate_weekly_review(ctx.db, ctx.ai), None
 
 
+async def query_runs(ctx: IntentContext) -> IntentReply:
+    """Where the agent is with delegated work, and what it needs from the user.
+
+    Scoped to the thread's project when it has one, otherwise to the whole
+    workspace: "is anything waiting on me?" in an unscoped chat means anywhere.
+    """
+    from models.conversation import Conversation
+    from services.chat.conversation_context import collect_agent_activity, describe_run
+
+    project_id = None
+    if ctx.conversation_id:
+        conversation = await ctx.db.get(Conversation, ctx.conversation_id)
+        project_id = conversation.project_id if conversation else None
+    activity, reviews = await collect_agent_activity(ctx.db, project_id=project_id)
+    if not activity and not reviews:
+        return (
+            "No agent work is running right now, and nothing is waiting for your review.",
+            None,
+        )
+    lines = []
+    waiting = [row for row in activity if row[0].status == "waiting_input"]
+    for run, task, todo in activity:
+        lines.append(f"- {describe_run(run, task, todo)}")
+    summary = f"Agent work ({len(activity)} run{'s' if len(activity) != 1 else ''}):\n"
+    summary += "\n".join(lines)
+    needs = []
+    if waiting:
+        needs.append(f"{len(waiting)} waiting for your answer")
+    if reviews:
+        needs.append(f"{len(reviews)} waiting for your review")
+    if needs:
+        summary += "\n\nNeeds you: " + ", ".join(needs) + "."
+    return summary, None
+
+
 def register() -> None:
     for intent, handler in (
         ("search", search),
         ("daily_briefing", daily_briefing),
         ("weekly_review", weekly_review),
+        ("query_runs", query_runs),
     ):
         register_intent_handler(IntentHandlerDef(intent=intent, handle=handler))

@@ -54,6 +54,20 @@ sealed interface SyncEvent {
 
     /** A weekly review summary from the server. */
     data class WeeklyReview(val content: String) : SyncEvent
+
+    /**
+     * An agent run moved to a new lifecycle state. `waiting_input` and
+     * `waiting_review` mean the agent has stopped for the user.
+     */
+    data class RunStateChanged(
+        val runId: String,
+        val todoId: String?,
+        val parentTaskId: String?,
+        val title: String,
+        val status: String,
+        val message: String?,
+        val error: String?,
+    ) : SyncEvent
 }
 
 /**
@@ -359,6 +373,25 @@ class WebSocketClient @Inject constructor(
                     val content = data.optString("content", "")
                     Log.d(TAG, "Weekly review received")
                     _events.tryEmit(SyncEvent.WeeklyReview(content))
+                }
+                "run_state_changed" -> {
+                    val data = json.optJSONObject("data") ?: return
+                    val runId = data.optString("run_id").takeIf(String::isNotBlank) ?: return
+                    val status = data.optString("status").takeIf(String::isNotBlank) ?: return
+                    Log.d(TAG, "Run state changed ($status)")
+                    _events.tryEmit(
+                        SyncEvent.RunStateChanged(
+                            runId = runId,
+                            todoId = data.optString("todo_id").takeIf(String::isNotBlank),
+                            parentTaskId = data.optString("parent_task_id")
+                                .takeIf(String::isNotBlank),
+                            title = data.optString("title", ""),
+                            status = status,
+                            message = data.optString("progress_message")
+                                .takeIf(String::isNotBlank),
+                            error = data.optString("error").takeIf(String::isNotBlank),
+                        )
+                    )
                 }
                 else -> {
                     Log.d(TAG, "Unhandled message type: $type")

@@ -19,8 +19,37 @@ class ConversationResponse(BaseModel):
     last_message: str | None = None
     project_id: str | None = None
     project_todo_id: str | None = None
+    metadata: dict | None = None
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_metadata_json(cls, values):
+        raw = (
+            values.metadata_json
+            if hasattr(values, "metadata_json")
+            else (
+                values.get("metadata_json", values.get("metadata"))
+                if isinstance(values, dict)
+                else None
+            )
+        )
+        parsed = _json.loads(raw) if isinstance(raw, str) else raw
+        if hasattr(values, "__dict__"):
+            return {
+                "id": values.id,
+                "title": values.title,
+                "created_at": values.created_at,
+                "updated_at": values.updated_at,
+                "is_archived": values.is_archived,
+                "project_id": values.project_id,
+                "project_todo_id": values.project_todo_id,
+                "metadata": parsed,
+            }
+        if isinstance(values, dict):
+            return {**values, "metadata": parsed}
+        return values
 
 
 class MessageResponse(BaseModel):

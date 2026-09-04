@@ -47,7 +47,6 @@ describe('Zod schemas', () => {
       const full = {
         ...validTodo,
         description: 'desc',
-        priority: 'high',
         due_date: now,
         tags: ['a'],
       };
@@ -61,12 +60,6 @@ describe('Zod schemas', () => {
 
     it('rejects invalid status', () => {
       expect(() => TodoResponseSchema.parse({ ...validTodo, status: 'unknown' })).toThrow(ZodError);
-    });
-
-    it('rejects invalid priority', () => {
-      expect(() => TodoResponseSchema.parse({ ...validTodo, priority: 'extreme' })).toThrow(
-        ZodError,
-      );
     });
   });
 
@@ -291,6 +284,7 @@ describe('Zod schemas', () => {
         overdue_tasks: [],
         today_events: [],
         needs_review: [],
+        needs_date_tasks: [],
         inbox_count: 5,
         greeting: 'Good morning',
         date: '2026-02-22',
@@ -375,11 +369,6 @@ describe('Zod schemas', () => {
     it('accepts delete flag', () => {
       const data = { ids: ['1'], delete: true };
       expect(BulkTodoUpdateSchema.parse(data).delete).toBe(true);
-    });
-
-    it('accepts priority in bulk update', () => {
-      const data = { ids: ['1'], priority: 'high' as const };
-      expect(BulkTodoUpdateSchema.parse(data).priority).toBe('high');
     });
   });
 

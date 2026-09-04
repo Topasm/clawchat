@@ -8,6 +8,7 @@ package com.clawchat.android.navigation
  * null so the app simply opens where it was.
  */
 fun reminderRoute(reminderType: String?): String? = when (reminderType) {
+    "attention" -> NavRoute.Progress.route
     "todo", "todo_overdue", "nudge" -> NavRoute.Tasks.route
     "event", "weekly_review" -> NavRoute.Today.route
     "inbox" -> NavRoute.Inbox.route

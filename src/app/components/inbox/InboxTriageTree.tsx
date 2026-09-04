@@ -4,6 +4,8 @@ import type {
   TodoResponse,
 } from '../../types/api';
 import { getTaskExecutionBadges } from '../../utils/taskExecutionTelemetry';
+import { isInboxTodo } from '../../utils/inboxState';
+import { isTerminalTaskStatus } from '../../utils/taskStatus';
 import { InsertionTarget, Pane } from '../shared/WorkspacePrimitives';
 import {
   acceptsPlacementDrag,
@@ -30,6 +32,10 @@ interface InboxTriageTreeProps {
     beforeId?: string,
   ) => void;
   onPreviewDependency: (dependentTaskId: string, prerequisiteTaskId: string) => void;
+  /** Opens the project's own page; the tree header is the natural way there. */
+  onOpenProject?: (projectId: string) => void;
+  /** Starts a new task inside the project, so the tree is not only a drop target. */
+  onAddTask?: (projectId: string, rootTaskId: string | null) => void;
 }
 function sorted(items: TodoResponse[]) {
   return [...items].sort(
@@ -48,8 +54,23 @@ export default function InboxTriageTree({
   onPlace,
   onPlaceBatch,
   onPreviewDependency,
+  onOpenProject,
+  onAddTask,
 }: InboxTriageTreeProps) {
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
+  // Open tasks that live in no project and are not in the Inbox queue either.
+  // Without this group they were invisible on this page: not captured, so not
+  // in the queue; not placed, so not in any project branch.
+  const unfiled = sorted(
+    todos.filter(
+      (todo) =>
+        !todo.project_id &&
+        !todo.parent_id &&
+        !projectRoots.has(todo.id) &&
+        !isInboxTodo(todo) &&
+        !isTerminalTaskStatus(todo.status),
+    ),
+  );
   return (
     <Pane as="section" className="cc-inbox-tree" aria-label={translateUi('Project work tree')}>
       <header className="cc-inbox-tree__header">
@@ -101,11 +122,33 @@ export default function InboxTriageTree({
                   }
                 }}
               >
-                <strong>{project.title}</strong>
+                {onOpenProject ? (
+                  <button
+                    type="button"
+                    className="cc-inbox-tree__project-link"
+                    aria-label={translateUi('Open project {{title}}', { title: project.title })}
+                    onClick={() => onOpenProject(project.id)}
+                  >
+                    <strong>{project.title}</strong>
+                  </button>
+                ) : (
+                  <strong>{project.title}</strong>
+                )}
                 <span>
                   {project.task_count}
                   {translateUi(' tasks')}
                 </span>
+                {onAddTask && project.root_task_id && (
+                  <button
+                    type="button"
+                    className="cc-inbox-tree__add-task"
+                    aria-label={translateUi('Add a task to {{title}}', { title: project.title })}
+                    disabled={disabled}
+                    onClick={() => onAddTask(project.id, project.root_task_id ?? null)}
+                  >
+                    {translateUi('+ Task')}
+                  </button>
+                )}
                 {(selectedTaskId || batchTaskIds.length > 1) && (
                   <button
                     type="button"
@@ -163,6 +206,46 @@ export default function InboxTriageTree({
         {projects.length === 0 && (
           <div className="cc-inbox-tree__empty">
             {translateUi('Create a project before placing Inbox tasks.')}
+          </div>
+        )}
+        {unfiled.length > 0 && (
+          <div
+            className="cc-inbox-tree__project cc-inbox-tree__project--unfiled"
+            aria-label={translateUi('No project')}
+          >
+            <div className="cc-inbox-tree__project-target">
+              <strong>{translateUi('No project')}</strong>
+              <span>
+                {unfiled.length}
+                {translateUi(' tasks')}
+              </span>
+            </div>
+            <p className="cc-inbox-tree__hint">
+              {translateUi(
+                'Tasks that belong to no project. Drag one onto a project, or place it from the Inbox.',
+              )}
+            </p>
+            <div className="cc-inbox-tree__nodes">
+              {unfiled.map((task) => (
+                <div
+                  key={task.id}
+                  className={`cc-inbox-tree__node${selectedTaskId === task.id ? ' cc-inbox-tree__node--selected' : ''}`}
+                  draggable={!disabled}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(INBOX_TASK_DRAG_TYPE, task.id);
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                >
+                  <button type="button" onClick={() => onSelectTask(task.id)}>
+                    <span>•</span>
+                    <span className="cc-inbox-tree__identity">
+                      <strong>{task.title}</strong>
+                    </span>
+                    <small>{task.status.replace('_', ' ')}</small>
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

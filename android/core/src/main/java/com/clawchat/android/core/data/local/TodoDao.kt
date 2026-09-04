@@ -9,6 +9,12 @@ interface TodoDao {
         "SELECT * FROM todos WHERE workspaceKey = :workspaceKey " +
             "ORDER BY sortOrder ASC, createdAt DESC, id ASC",
     )
+    suspend fun getAll(workspaceKey: String): List<TodoEntity>
+
+    @Query(
+        "SELECT * FROM todos WHERE workspaceKey = :workspaceKey " +
+            "ORDER BY sortOrder ASC, createdAt DESC, id ASC",
+    )
     fun getAllFlow(workspaceKey: String): Flow<List<TodoEntity>>
 
     @Query(

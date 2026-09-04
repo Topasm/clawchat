@@ -7,7 +7,10 @@ import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
 import SettingsRow from '../components/shared/SettingsRow';
 import SettingsSection from '../components/shared/SettingsSection';
+import { THIS_MACHINE_SECTION_ID } from '../components/shared/WorkerStatusLine';
+import Toggle from '../components/shared/Toggle';
 import { StatusDot } from '../components/shared/WorkspacePrimitives';
+import { useExecutionHostsQuery } from '../hooks/queries';
 import useSettingsExportImport from '../hooks/useSettingsExportImport';
 import usePlatform from '../hooks/usePlatform';
 import { useTranslation, translateUi } from '../i18n';
@@ -15,6 +18,7 @@ import { platformApi } from '../platform';
 import apiClient from '../services/apiClient';
 import { settingsNavigationState } from '../services/settingsNavigation';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import { useToastStore } from '../stores/useToastStore';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { openObsidianVault } from '../utils/openObsidian';
@@ -113,7 +117,20 @@ export default function SettingsPage() {
   const logout = useAuthStore((state) => state.logout);
   const addToast = useToastStore((state) => state.addToast);
   const isHost = useWorkspaceStore((state) => state.activeWorkspaceId === LOCAL_WORKSPACE_ID);
+  const workerEnabled = useSettingsStore((state) => state.workerEnabled);
+  const setWorkerEnabled = useSettingsStore((state) => state.setWorkerEnabled);
+  const workerLabel = useSettingsStore((state) => state.workerLabel);
+  const setWorkerLabel = useSettingsStore((state) => state.setWorkerLabel);
+  const workerProvider = useSettingsStore((state) => state.workerProvider);
+  const setWorkerProvider = useSettingsStore((state) => state.setWorkerProvider);
+  const { data: executionHosts = [] } = useExecutionHostsQuery();
   const { fileInputRef, handleExport, onFileSelected } = useSettingsExportImport();
+  // The sidebar's machine line lands here by anchor; bring that section up.
+  useEffect(() => {
+    if (!location.hash) return;
+    const target = document.getElementById(location.hash.slice(1));
+    target?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  }, [location.hash]);
   const [obsidianVaultPath, setObsidianVaultPath] = useState('');
   const [aiProvider, setAiProvider] = useState<AIProviderState | null>(null);
   const [aiProviderLoadFailed, setAiProviderLoadFailed] = useState(false);
@@ -502,7 +519,7 @@ export default function SettingsPage() {
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
-              onClick={() => navigate('/calendar')}
+              onClick={() => navigate('/schedule/month')}
             >
               {t('workspaceSettings.actions.open')}
             </button>
@@ -545,6 +562,70 @@ export default function SettingsPage() {
 
         <CalendarSubscriptionCard />
         <ObsidianStatusCard />
+
+        {isDesktop && (
+          <SettingsSection
+            id={THIS_MACHINE_SECTION_ID}
+            title={t('workspaceSettings.sections.thisMachine')}
+          >
+            <SettingsRow
+              label={t('workspaceSettings.thisMachine.name')}
+              sublabel={t('workspaceSettings.thisMachine.nameHint')}
+            >
+              <input
+                className="cc-settings-input"
+                type="text"
+                value={workerLabel}
+                onChange={(event) => setWorkerLabel(event.target.value)}
+                placeholder={t('workspaceSettings.thisMachine.namePlaceholder')}
+              />
+            </SettingsRow>
+            <SettingsRow label={t('workspaceSettings.thisMachine.cli')}>
+              <SegmentedControl
+                ariaLabel={t('workspaceSettings.thisMachine.cli')}
+                options={[
+                  { label: translateUi('Claude Code'), value: 'claude' },
+                  { label: translateUi('Codex'), value: 'codex' },
+                ]}
+                value={workerProvider}
+                onChange={setWorkerProvider}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={t('workspaceSettings.thisMachine.runWork')}
+              sublabel={
+                workerLabel.trim()
+                  ? t('workspaceSettings.thisMachine.runWorkHint')
+                  : t('workspaceSettings.thisMachine.nameRequired')
+              }
+            >
+              <Toggle
+                checked={workerEnabled && workerLabel.trim().length > 0}
+                onChange={setWorkerEnabled}
+              />
+            </SettingsRow>
+          </SettingsSection>
+        )}
+
+        {executionHosts.length > 0 && (
+          <SettingsSection title={t('workspaceSettings.sections.machines')}>
+            {executionHosts.map((host) => (
+              <SettingsRow
+                key={host.id}
+                label={host.label}
+                sublabel={
+                  host.kind === 'local'
+                    ? t('workspaceSettings.machines.thisServer')
+                    : host.kind === 'worker'
+                      ? t('workspaceSettings.machines.desktopApp')
+                      : host.target || host.kind
+                }
+              >
+                <StatusDot tone={host.is_enabled ? 'success' : 'neutral'} />
+              </SettingsRow>
+            ))}
+          </SettingsSection>
+        )}
 
         {isDesktop && isHost && (
           <SettingsSection title={t('workspaceSettings.sections.obsidianDesktop')}>

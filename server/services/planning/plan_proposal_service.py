@@ -77,6 +77,7 @@ async def generate_proposal(
     *,
     additional_instructions: str | None = None,
     model_provider: str | None = None,
+    proposal_id: str | None = None,
 ) -> PlanResponse:
     """Generate one immutable proposal without holding a DB transaction over I/O."""
     todo = await db.get(Todo, todo_id)
@@ -100,7 +101,7 @@ async def generate_proposal(
         started_at=datetime.now(timezone.utc),
     )
     proposal = PlanProposal(
-        id=make_id("proposal_"),
+        id=proposal_id or make_id("proposal_"),
         root_task_id=todo.id,
         project_id=todo.project_id,
         agent_task_id=agent_task.id,
@@ -289,6 +290,79 @@ async def generate_proposal(
     return await build_plan_response(db, proposal)
 
 
+async def create_add_task_proposal(
+    db: AsyncSession,
+    parent_id: str,
+    *,
+    title: str,
+    description: str | None = None,
+    due_date: date | None = None,
+    proposal_id: str | None = None,
+) -> PlanResponse:
+    """Create one revision-bound add-child proposal without an AI round trip.
+
+    A task or Project Agent thread already supplies the parent context and the
+    user supplies the child. Persisting that request as the same proposal used
+    by AI planning gives it preview, CAS application and Undo without inventing
+    a second graph-operation system.
+    """
+    parent = await db.get(Todo, parent_id)
+    if parent is None:
+        raise NotFoundError("Parent todo not found")
+
+    payload = PlanPayload(
+        summary=f"Add '{title}' under '{parent.title}'.",
+        subtasks=[
+            PlanSubtask(
+                title=title,
+                description=description,
+                due_date=due_date,
+            )
+        ],
+    )
+    existing_children = list(
+        (
+            await db.execute(
+                select(Todo)
+                .where(Todo.parent_id == parent.id)
+                .order_by(Todo.sort_order)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    validation = require_valid_plan(
+        payload,
+        existing_child_titles=[child.title for child in existing_children],
+        allowed_skills=SKILL_REGISTRY,
+        effective_root_due_date=(parent.due_date.date() if parent.due_date else None),
+    )
+    proposal = PlanProposal(
+        id=proposal_id or make_id("proposal_"),
+        root_task_id=parent.id,
+        project_id=parent.project_id,
+        base_graph_revision=await _current_graph_revision(db, parent.project_id),
+        prompt_version="chat-add-task-v1",
+        payload_json=_json_dump(payload.model_dump(mode="json")),
+        validation_json=_json_dump(validation.model_dump(mode="json")),
+        status=PlanProposalStatus.DRAFT,
+        is_revertible=True,
+    )
+    db.add(proposal)
+    parent.inbox_state = "plan_ready"
+    parent.automation_error = None
+    await review_item_service.ensure_review_item(
+        db,
+        subject_type=ReviewSubjectType.PLAN_PROPOSAL,
+        subject_id=proposal.id,
+        project_id=proposal.project_id,
+        summary=payload.summary,
+        risk_level=ReviewRiskLevel.LOW,
+    )
+    await db.commit()
+    return await build_plan_response(db, proposal)
+
+
 async def get_latest_proposal(db: AsyncSession, todo_id: str) -> PlanProposal:
     proposal = (
         await db.execute(
@@ -304,6 +378,17 @@ async def get_latest_proposal(db: AsyncSession, todo_id: str) -> PlanProposal:
         )
     ).scalar_one_or_none()
     if proposal is None:
+        raise NotFoundError("No plan found")
+    return proposal
+
+
+async def get_proposal(
+    db: AsyncSession,
+    todo_id: str,
+    proposal_id: str,
+) -> PlanProposal:
+    proposal = await db.get(PlanProposal, proposal_id)
+    if proposal is None or proposal.root_task_id != todo_id:
         raise NotFoundError("No plan found")
     return proposal
 

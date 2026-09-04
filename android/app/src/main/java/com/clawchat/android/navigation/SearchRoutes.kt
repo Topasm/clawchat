@@ -8,8 +8,8 @@ package com.clawchat.android.navigation
  * screens on mobile yet, so a hit opens the screen that lists its kind, and an
  * unknown type leaves the user where they are.
  */
-fun searchHitRoute(hitType: String?): String? = when (hitType) {
-    "todo" -> NavRoute.Tasks.route
+fun searchHitRoute(hitType: String?, hitId: String? = null): String? = when (hitType) {
+    "todo" -> NavRoute.Tasks.destination(hitId)
     "event" -> NavRoute.Calendar.route
     "message" -> NavRoute.Chat.route
     else -> null

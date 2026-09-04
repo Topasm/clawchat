@@ -50,7 +50,6 @@ import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawListSection
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
@@ -66,7 +65,6 @@ import java.time.temporal.WeekFields
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeekScreen(
-    onOpenNavigation: () -> Unit = {},
     viewModel: WeekViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,7 +89,6 @@ fun WeekScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                 },
-                navigationIcon = { ClawNavigationMenuButton(onClick = onOpenNavigation) },
                 colors = ClawTopBarColors(),
             )
         },
@@ -192,6 +189,15 @@ private fun WeekContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (state.spans.isNotEmpty()) {
+                        WeekTimeline(
+                            range = it,
+                            spans = state.spans,
+                            today = LocalDate.now(),
+                            locale = locale,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
             }
         }
@@ -319,10 +325,6 @@ private fun WeekTaskRow(task: Todo, onToggle: () -> Unit) {
                             tone = ClawTone.Primary,
                         )
                     }
-                    ClawStatusChip(
-                        text = priorityLabel(task.priority),
-                        tone = priorityTone(task.priority),
-                    )
                     if (task.isRecurring) {
                         ClawStatusChip(
                             text = stringResource(R.string.week_recurring),
@@ -335,17 +337,3 @@ private fun WeekTaskRow(task: Todo, onToggle: () -> Unit) {
     }
 }
 
-@Composable
-private fun priorityLabel(priority: String): String = when (priority.lowercase()) {
-    "low" -> stringResource(R.string.week_priority_low)
-    "medium" -> stringResource(R.string.week_priority_medium)
-    "high" -> stringResource(R.string.week_priority_high)
-    "urgent" -> stringResource(R.string.week_priority_urgent)
-    else -> priority
-}
-
-private fun priorityTone(priority: String): ClawTone = when (priority.lowercase()) {
-    "high", "urgent" -> ClawTone.Error
-    "medium" -> ClawTone.Warning
-    else -> ClawTone.Default
-}

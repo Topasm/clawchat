@@ -25,6 +25,50 @@ async def initialize_host_identity(state: State) -> None:
         state.host_public_key = identity.public_key
 
 
+# Aliases for the OpenAI-compatible relay, which is configured by base URL
+# rather than by a provider of its own.
+_OPENCLAW_ALIASES = {"ollama", "openai", "openclaw"}
+
+# Tried in order when the configured provider is unreachable. The local relay
+# comes before the Codex API so a self-hosted workspace is never pushed onto a
+# metered backend while a working local one exists.
+_FALLBACK_ORDER = ("claude_code", "codex_cli", "openclaw", "codex")
+
+
+def select_active_provider(
+    *,
+    preferred: str,
+    allow_fallback: bool,
+    candidates: dict[str, tuple[object, bool]],
+) -> tuple[str, object, bool]:
+    """Pick the provider to serve chat, as ``(name, provider, fell_back)``.
+
+    The configured provider always wins when it is reachable. Otherwise any
+    other ready provider is used, so a host with only a CLI backend still has
+    a working workspace instead of an unreachable OpenClaw relay.
+    """
+    name = preferred.strip().lower()
+    if name in _OPENCLAW_ALIASES:
+        name = "openclaw"
+    elif name == "codex_api":
+        name = "codex"
+    if name not in candidates:
+        name = "openclaw"
+
+    provider, ready = candidates[name]
+    if ready or not allow_fallback:
+        return name, provider, False
+
+    for fallback_name in _FALLBACK_ORDER:
+        if fallback_name == name:
+            continue
+        fallback_provider, fallback_ready = candidates[fallback_name]
+        if fallback_ready:
+            return fallback_name, fallback_provider, True
+
+    return name, provider, False
+
+
 def configure_ai_state(
     state: State,
     *,
@@ -57,7 +101,7 @@ async def probe_optional_ai(
     codex_api: CodexAPIProvider,
     codex_cli: CodexCLIProvider,
 ) -> None:
-    """Probe optional providers concurrently and select the configured one."""
+    """Probe optional providers concurrently and activate a working one."""
 
     async def check_codex_api() -> tuple[CodexAPIStatus, str]:
         # A result must not overwrite a credential configured while the other
@@ -108,43 +152,36 @@ async def probe_optional_ai(
             codex_cli_version,
         )
 
-        if (
-            settings.ai_provider == "claude_code"
-            and claude_code_status == ClaudeCodeStatus.AVAILABLE
-        ):
-            state.active_ai = claude_code
-            state.active_ai_provider = "claude_code"
-            logger.info("Active AI provider: Claude Code CLI")
-        elif settings.ai_provider == "claude_code":
+        provider_name, provider, fell_back = select_active_provider(
+            preferred=settings.ai_provider,
+            allow_fallback=settings.ai_provider_fallback,
+            candidates={
+                "openclaw": (ai_service, ai_connected),
+                "claude_code": (
+                    claude_code,
+                    claude_code_status == ClaudeCodeStatus.AVAILABLE,
+                ),
+                "codex_cli": (
+                    codex_cli,
+                    codex_cli_status == CodexCLIStatus.AVAILABLE,
+                ),
+                "codex": (
+                    codex_api,
+                    codex_probe_is_current
+                    and codex_api_status == CodexAPIStatus.AVAILABLE,
+                ),
+            },
+        )
+        state.active_ai = provider
+        state.active_ai_provider = provider_name
+        if fell_back:
             logger.warning(
-                "ai_provider=claude_code but CLI is %s — falling back to OpenClaw",
-                claude_code_status.value,
+                "ai_provider=%s is unavailable — using %s instead",
+                settings.ai_provider,
+                provider_name,
             )
-        elif (
-            settings.ai_provider == "codex_cli"
-            and codex_cli_status == CodexCLIStatus.AVAILABLE
-        ):
-            state.active_ai = codex_cli
-            state.active_ai_provider = "codex_cli"
-            logger.info("Active AI provider: Codex CLI")
-        elif settings.ai_provider == "codex_cli":
-            logger.warning(
-                "ai_provider=codex_cli but the CLI is %s — falling back to OpenClaw",
-                codex_cli_status.value,
-            )
-        elif (
-            settings.ai_provider in {"codex", "codex_api"}
-            and codex_probe_is_current
-            and codex_api_status == CodexAPIStatus.AVAILABLE
-        ):
-            state.active_ai = codex_api
-            state.active_ai_provider = "codex"
-            logger.info("Active AI provider: Codex API (%s)", codex_api.model)
-        elif settings.ai_provider in {"codex", "codex_api"} and codex_probe_is_current:
-            logger.warning(
-                "ai_provider=codex but the API is %s — falling back to OpenClaw",
-                codex_api_status.value,
-            )
+        else:
+            logger.info("Active AI provider: %s", provider_name)
     except asyncio.CancelledError:
         raise
     except Exception:

@@ -1,6 +1,8 @@
 package com.clawchat.android.feature.calendar
 
 import android.text.format.DateFormat
+import com.clawchat.android.core.data.model.TaskStatus
+import com.clawchat.android.core.data.model.Todo
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -86,4 +88,59 @@ fun eventTimeLabel(
     val startLabel = start.format(timeFormatter)
     if (end == null) return startLabel
     return "$startLabel – ${end.format(timeFormatter)}"
+}
+
+/** Where a day falls within the stretch a task runs for. */
+enum class TaskSegmentPosition { START, MIDDLE, END, SINGLE }
+
+/** One day of a task's run on the calendar. */
+data class TaskSegment(
+    val todo: Todo,
+    val position: TaskSegmentPosition,
+    /** The due date has passed, so the task shows on that day alone. */
+    val isOverdue: Boolean,
+)
+
+/**
+ * Spread every open task with a due date across the days it runs for.
+ *
+ * This workspace is task-oriented: a due date is a deadline to work towards,
+ * not an appointment. So a task occupies the whole stretch left to finish it,
+ * from today through its due date. An overdue task has no stretch left and
+ * sits on the day it was due.
+ */
+fun taskSegmentsByDate(
+    todos: List<Todo>,
+    today: LocalDate = LocalDate.now(),
+    deviceZone: ZoneId = ZoneId.systemDefault(),
+): Map<LocalDate, List<TaskSegment>> {
+    val byDate = mutableMapOf<LocalDate, MutableList<TaskSegment>>()
+
+    for (todo in todos) {
+        if (todo.status == TaskStatus.COMPLETED || todo.status == TaskStatus.CANCELLED) continue
+        val due = eventDate(todo.dueDate, deviceZone) ?: continue
+
+        val isOverdue = due.isBefore(today)
+        val from = if (isOverdue) due else today
+        val days = generateSequence(from) { day ->
+            if (day.isBefore(due)) day.plusDays(1) else null
+        }.toList()
+
+        days.forEachIndexed { index, day ->
+            val position = when {
+                days.size == 1 -> TaskSegmentPosition.SINGLE
+                index == 0 -> TaskSegmentPosition.START
+                index == days.lastIndex -> TaskSegmentPosition.END
+                else -> TaskSegmentPosition.MIDDLE
+            }
+            byDate.getOrPut(day) { mutableListOf() }
+                .add(TaskSegment(todo = todo, position = position, isOverdue = isOverdue))
+        }
+    }
+
+    // Soonest deadline first, so the most urgent bar stays visible when a day
+    // holds more tasks than the cell can show.
+    return byDate.mapValues { (_, segments) ->
+        segments.sortedWith(compareBy({ eventDate(it.todo.dueDate) }, { it.todo.title }))
+    }
 }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
@@ -63,7 +64,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.PairedDevice
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.localizedErrorMessage
 import com.clawchat.android.core.ui.theme.AccentColor
 import com.clawchat.android.core.ui.update.AppUpdateSection
@@ -73,7 +73,7 @@ import com.clawchat.android.core.ui.icons.ClawIcons
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
-    onOpenNavigation: () -> Unit = {},
+    onBack: () -> Unit = {},
     onLoggedOut: () -> Unit = {},
     onSetupServer: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
@@ -97,7 +97,12 @@ fun SettingsScreen(
                     )
                 },
                 navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.settings_back),
+                        )
+                    }
                 },
                 colors = ClawTopBarColors(),
             )

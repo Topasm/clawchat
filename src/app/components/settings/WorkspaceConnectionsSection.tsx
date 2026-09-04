@@ -42,6 +42,7 @@ export default function WorkspaceConnectionsSection() {
   const [localPin, setLocalPin] = useState('');
   const [localPort, setLocalPort] = useState('0');
   const [savingLocalSecurity, setSavingLocalSecurity] = useState(false);
+  const [localSecurityError, setLocalSecurityError] = useState('');
   const [name, setName] = useState('');
   const [remoteUrl, setRemoteUrl] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
@@ -50,7 +51,8 @@ export default function WorkspaceConnectionsSection() {
   const [connectionError, setConnectionError] = useState('');
   const [serverError, setServerError] = useState('');
   const remoteFormRef = useRef<HTMLFormElement>(null);
-  const pinInputRef = useRef<HTMLInputElement>(null);
+  const remotePinInputRef = useRef<HTMLInputElement>(null);
+  const localPinInputRef = useRef<HTMLInputElement>(null);
   const remoteProfiles = useMemo(
     () => profiles.filter((profile) => profile.kind === 'remote'),
     [profiles],
@@ -113,7 +115,7 @@ export default function WorkspaceConnectionsSection() {
         setConnectionError(translateUi('Enter the PIN for this workspace to connect.'));
         requestAnimationFrame(() => {
           remoteFormRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-          pinInputRef.current?.focus();
+          remotePinInputRef.current?.focus();
         });
         return;
       }
@@ -145,28 +147,58 @@ export default function WorkspaceConnectionsSection() {
       setServerError(cause instanceof Error ? cause.message : String(cause));
     }
   };
-  const saveLocalSecurity = async (nextLanAccess = lanAccess) => {
+  const saveLocalSecurity = async (nextLanAccess = lanAccess, pinToSave = localPin) => {
     setSavingLocalSecurity(true);
     setServerError('');
+    setLocalSecurityError('');
     try {
       await updateLocalServerPolicy({
-        ...(localPin ? { pin: localPin } : {}),
+        ...(pinToSave ? { pin: pinToSave } : {}),
         lanAccess: nextLanAccess,
       });
       setLocalPin('');
       addToast(
         'success',
         translateUi(
-          nextLanAccess
+          nextLanAccess && pinToSave
             ? 'LAN access enabled with the updated PIN.'
-            : 'Local workspace security updated.',
+            : nextLanAccess
+              ? 'Local network access enabled.'
+              : 'Local workspace security updated.',
         ),
       );
     } catch (cause) {
-      setServerError(cause instanceof Error ? cause.message : String(cause));
+      setLocalSecurityError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSavingLocalSecurity(false);
     }
+  };
+  const focusLocalPin = () => {
+    requestAnimationFrame(() => {
+      localPinInputRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      localPinInputRef.current?.focus();
+    });
+  };
+  const validLocalPin = /^\d{6,32}$/.test(localPin);
+  const handleLanAccessToggle = (enabled: boolean) => {
+    setLocalSecurityError('');
+    if (!enabled) {
+      // A half-entered replacement PIN must never prevent LAN access from
+      // being disabled. Leave the draft in the field and only change policy.
+      void saveLocalSecurity(false, '');
+      return;
+    }
+    if (localPin && !validLocalPin) {
+      setLocalSecurityError('Enter a PIN containing 6 to 32 digits before enabling local access.');
+      focusLocalPin();
+      return;
+    }
+    if (runtimeConfig?.defaultPinInUse && !validLocalPin) {
+      setLocalSecurityError('Set a new 6 to 32 digit PIN before enabling local network access.');
+      focusLocalPin();
+      return;
+    }
+    void saveLocalSecurity(true, localPin);
   };
   const updateLocalLifecycle = async (updates: {
     localServerEnabled?: boolean;
@@ -316,7 +348,7 @@ export default function WorkspaceConnectionsSection() {
             <label>
               <span>{translateUi('PIN')}</span>
               <input
-                ref={pinInputRef}
+                ref={remotePinInputRef}
                 className="cc-settings-input"
                 type="password"
                 required
@@ -397,18 +429,44 @@ export default function WorkspaceConnectionsSection() {
                   '\n                Off keeps the bundled server on this device only. Turn it on to pair phones or other\n                computers on the same trusted network.\n              ',
                 )}
               </div>
+              {!runtimeConfig.localServerEnabled && (
+                <div className="cc-settings-status cc-settings-status--subtle">
+                  {translateUi('Turn on Local server before enabling local network access.')}
+                </div>
+              )}
+              {runtimeConfig.localServerEnabled &&
+                runtimeConfig.defaultPinInUse &&
+                !lanAccess &&
+                !localSecurityError && (
+                  <div className="cc-settings-status cc-settings-status--subtle">
+                    {translateUi(
+                      'Set a new 6 to 32 digit PIN before enabling local network access.',
+                    )}
+                  </div>
+                )}
+              {savingLocalSecurity && (
+                <div className="cc-settings-status cc-settings-status--subtle" role="status">
+                  {translateUi('Restarting the local server…')}
+                </div>
+              )}
+              {localSecurityError && (
+                <div className="cc-settings-status cc-settings-status--error" role="alert">
+                  {translateUi(localSecurityError)}
+                </div>
+              )}
             </div>
             <Toggle
               checked={lanAccess}
               disabled={savingLocalSecurity || !runtimeConfig.localServerEnabled}
               label={translateUi('Allow local network access')}
-              onChange={(enabled) => void saveLocalSecurity(enabled)}
+              onChange={handleLanAccessToggle}
             />
           </PropertyRow>
           <PropertyRow className="cc-workspace-preference">
             <label>
               <span className="cc-workspace-card__name">{translateUi('Local network PIN')}</span>
               <input
+                ref={localPinInputRef}
                 className="cc-settings-input"
                 type="password"
                 inputMode="numeric"
@@ -421,17 +479,19 @@ export default function WorkspaceConnectionsSection() {
                     ? translateUi('Replace the default PIN')
                     : translateUi('Enter a new PIN')
                 }
-                onChange={(event) => setLocalPin(event.target.value)}
+                onChange={(event) => {
+                  setLocalPin(event.target.value);
+                  setLocalSecurityError('');
+                }}
                 autoComplete="new-password"
+                aria-invalid={Boolean(localSecurityError)}
                 disabled={!runtimeConfig.localServerEnabled}
               />
             </label>
             <button
               type="button"
               className="cc-btn cc-btn--secondary cc-btn--compact"
-              disabled={
-                savingLocalSecurity || !runtimeConfig.localServerEnabled || localPin.length < 6
-              }
+              disabled={savingLocalSecurity || !runtimeConfig.localServerEnabled || !validLocalPin}
               onClick={() => void saveLocalSecurity()}
             >
               {savingLocalSecurity ? translateUi('Saving\u2026') : translateUi('Save PIN')}

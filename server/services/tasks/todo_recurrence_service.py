@@ -117,3 +117,21 @@ async def spawn_next_occurrence(db: AsyncSession, completed_todo: Todo) -> Todo 
         completed_todo.id,
     )
     return new_todo
+
+
+async def spawn_next_occurrences(
+    db: AsyncSession,
+    completed_todos: list[Todo],
+) -> list[Todo]:
+    """Continue every recurring series completed by one mutation.
+
+    Keeping the loop here makes single and bulk completion share the same
+    recurrence lifecycle instead of requiring each API entry point to remember
+    the side effect.
+    """
+    spawned: list[Todo] = []
+    for todo in completed_todos:
+        next_todo = await spawn_next_occurrence(db, todo)
+        if next_todo is not None:
+            spawned.append(next_todo)
+    return spawned

@@ -29,10 +29,8 @@ from schemas.chat import (
     SendMessageResponse,
 )
 from schemas.common import PaginatedResponse
-from services.chat.conversation_context import (
-    build_first_class_project_context,
-    build_project_context,
-)
+from services.ai import resolve_active_ai
+from services.chat.conversation_context import build_conversation_context
 from services.chat.intent_classifier import classify_intent
 from utils import make_id
 
@@ -144,6 +142,9 @@ async def list_conversations(
                 last_message=preview,
                 project_id=conv.project_id,
                 project_todo_id=conv.project_todo_id,
+                metadata=(
+                    json.loads(conv.metadata_json) if conv.metadata_json else None
+                ),
             )
         )
 
@@ -184,6 +185,7 @@ async def create_conversation(
         is_archived=conv.is_archived,
         project_id=conv.project_id,
         project_todo_id=conv.project_todo_id,
+        metadata=json.loads(conv.metadata_json) if conv.metadata_json else None,
     )
 
 
@@ -199,12 +201,17 @@ async def get_or_create_project_conversation(
     if not project:
         raise NotFoundError("Project todo not found")
 
-    # Look for existing conversation
+    # A run thread may share the project's root todo id, but it carries
+    # metadata (origin=agent_run).  The root conversation without metadata is
+    # the stable Project Agent thread; never let a run thread take its place.
     q = select(Conversation).where(
         Conversation.project_todo_id == todo_id,
         Conversation.is_archived == False,  # noqa: E712
+        Conversation.metadata_json.is_(None),
     )
-    conv = (await db.execute(q)).scalars().first()
+    # Project overviews use the same deterministic id ordering when more than
+    # one legacy root conversation exists.
+    conv = (await db.execute(q.order_by(Conversation.id.asc()))).scalars().first()
 
     if not conv:
         conv = Conversation(
@@ -224,6 +231,7 @@ async def get_or_create_project_conversation(
         is_archived=conv.is_archived,
         project_id=conv.project_id,
         project_todo_id=conv.project_todo_id,
+        metadata=json.loads(conv.metadata_json) if conv.metadata_json else None,
     )
 
 
@@ -276,7 +284,7 @@ async def stream_chat(
     body: SendMessageRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user_id: str = Depends(get_current_user),
 ):
     conv = await db.get(Conversation, body.conversation_id)
     if not conv:
@@ -294,17 +302,13 @@ async def stream_chat(
     rows = (await db.execute(q)).scalars().all()
     history = list(reversed(rows))
 
-    system_content = SYSTEM_PROMPT
-    if conv.project_id:
-        system_content += await build_first_class_project_context(db, conv.project_id)
-    elif conv.project_todo_id:
-        system_content += await build_project_context(db, conv.project_todo_id)
+    system_content = SYSTEM_PROMPT + await build_conversation_context(db, conv)
     messages = [{"role": "system", "content": system_content}]
     for msg in history:
         messages.append({"role": msg.role, "content": msg.content})
 
     assistant_msg_id = make_id("msg_")
-    ai_service = getattr(request.app.state, "active_ai", request.app.state.ai_service)
+    ai_service = resolve_active_ai(request.app.state)
     session_factory = request.app.state.session_factory
     orchestrator = getattr(request.app.state, "orchestrator", None)
     user_msg_id = user_msg.id
@@ -338,6 +342,8 @@ async def stream_chat(
                         intent_result.intent,
                         intent_result.params,
                         body.content,
+                        user_id=user_id,
+                        message_id=user_msg_id,
                     )
                     if resolved is not None:
                         action_text, action_metadata = resolved

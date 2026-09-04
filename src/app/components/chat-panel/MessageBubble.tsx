@@ -34,6 +34,7 @@ interface MessageBubbleProps {
   onRegenerate?: () => void;
   onEdit?: (messageId: string) => void;
   onRetry?: () => void;
+  suppressTaskProgress?: boolean;
 }
 export default function MessageBubble({
   message,
@@ -42,6 +43,7 @@ export default function MessageBubble({
   onRegenerate,
   onEdit,
   onRetry,
+  suppressTaskProgress,
 }: MessageBubbleProps) {
   const showTimestamps = useSettingsStore((s) => s.showTimestamps);
   const showAvatars = useSettingsStore((s) => s.showAvatars);
@@ -70,7 +72,9 @@ export default function MessageBubble({
       <div className={`cc-bubble cc-bubble--${role}`}>
         {!isUser && intentLabel && <div className="cc-bubble__intent">{intentLabel}</div>}
         <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{message.text}</span>
-        {message.metadata && <ActionCard metadata={message.metadata} />}
+        {message.metadata && (
+          <ActionCard metadata={message.metadata} suppressTaskProgress={suppressTaskProgress} />
+        )}
         {showTimestamps && (
           <div className="cc-bubble__time">
             {new Date(message.createdAt).toLocaleTimeString([], {

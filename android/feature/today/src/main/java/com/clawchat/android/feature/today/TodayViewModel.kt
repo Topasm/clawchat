@@ -30,6 +30,8 @@ data class TodayUiState(
     val todayTodos: List<Todo> = emptyList(),
     val overdueTodos: List<Todo> = emptyList(),
     val todayEvents: List<Event> = emptyList(),
+    /** Pending tasks with no due date — neither today's nor overdue. */
+    val needsDateTodos: List<Todo> = emptyList(),
     val inboxCount: Int = 0,
     val inboxPreview: List<Todo> = emptyList(),
     val briefing: BriefingResponse? = null,
@@ -116,6 +118,7 @@ class TodayViewModel @Inject constructor(
                             todayTodos = today.todayTodos,
                             overdueTodos = today.overdueTodos,
                             todayEvents = today.todayEvents,
+                            needsDateTodos = today.needsDateTodos,
                             inboxCount = today.inboxCount,
                             inboxPreview = inboxPreviewItems,
                             isRefreshing = false,
@@ -151,7 +154,9 @@ class TodayViewModel @Inject constructor(
 
     private fun doToggleComplete(todoId: String) {
         viewModelScope.launch {
-            val allTodos = _uiState.value.todayTodos + _uiState.value.overdueTodos
+            val allTodos = _uiState.value.todayTodos +
+                _uiState.value.overdueTodos +
+                _uiState.value.needsDateTodos
             val todo = allTodos.find { it.id == todoId } ?: return@launch
             val newStatus = if (todo.status == TaskStatus.COMPLETED) {
                 TaskStatus.PENDING
@@ -169,6 +174,9 @@ class TodayViewModel @Inject constructor(
                             overdueTodos = state.overdueTodos.map {
                                 if (it.id == todoId) it.copy(status = newStatus) else it
                             },
+                            needsDateTodos = state.needsDateTodos.map {
+                                if (it.id == todoId) it.copy(status = newStatus) else it
+                            },
                         )
                     },
                     rollback = { state ->
@@ -177,6 +185,9 @@ class TodayViewModel @Inject constructor(
                                 if (it.id == todoId) it.copy(status = todo.status) else it
                             },
                             overdueTodos = state.overdueTodos.map {
+                                if (it.id == todoId) it.copy(status = todo.status) else it
+                            },
+                            needsDateTodos = state.needsDateTodos.map {
                                 if (it.id == todoId) it.copy(status = todo.status) else it
                             },
                         )
@@ -195,16 +206,22 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             val originalToday = _uiState.value.todayTodos
             val originalOverdue = _uiState.value.overdueTodos
+            val originalNeedsDate = _uiState.value.needsDateTodos
             try {
                 _uiState.optimistic(
                     update = { state ->
                         state.copy(
                             todayTodos = state.todayTodos.filter { it.id != todoId },
                             overdueTodos = state.overdueTodos.filter { it.id != todoId },
+                            needsDateTodos = state.needsDateTodos.filter { it.id != todoId },
                         )
                     },
                     rollback = { state ->
-                        state.copy(todayTodos = originalToday, overdueTodos = originalOverdue)
+                        state.copy(
+                            todayTodos = originalToday,
+                            overdueTodos = originalOverdue,
+                            needsDateTodos = originalNeedsDate,
+                        )
                     },
                 ) {
                     val result = todoRepository.deleteTodo(todoId)
@@ -223,12 +240,14 @@ class TodayViewModel @Inject constructor(
             try {
                 _uiState.optimistic(
                     update = { state ->
-                        val overdueItem = state.overdueTodos.find { it.id == todoId }
-                        if (overdueItem != null) {
-                            val updated = overdueItem.copy(dueDate = today)
+                        val movedItem = state.overdueTodos.find { it.id == todoId }
+                            ?: state.needsDateTodos.find { it.id == todoId }
+                        if (movedItem != null) {
+                            val updated = movedItem.copy(dueDate = today)
                             state.copy(
                                 todayTodos = state.todayTodos + updated,
                                 overdueTodos = state.overdueTodos.filter { it.id != todoId },
+                                needsDateTodos = state.needsDateTodos.filter { it.id != todoId },
                             )
                         } else {
                             state.copy(
@@ -242,6 +261,7 @@ class TodayViewModel @Inject constructor(
                         originalState.copy(
                             todayTodos = originalState.todayTodos,
                             overdueTodos = originalState.overdueTodos,
+                            needsDateTodos = originalState.needsDateTodos,
                         )
                     },
                 ) {
