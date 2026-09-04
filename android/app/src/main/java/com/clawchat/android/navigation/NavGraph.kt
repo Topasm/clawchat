@@ -68,6 +68,20 @@ internal fun plannerPrimaryRoute(currentRoute: String?): String? =
         else -> currentRoute
     }
 
+/**
+ * Whether [targetRoute] is the tab that also serves as the graph's start
+ * destination (Progress in server mode, Tasks in local mode). That entry
+ * sits underneath every other tab's `popUpTo`, so it never actually gets
+ * popped by the normal save/restore dance — navigating back to it with the
+ * usual `saveState`/`restoreState` pair can then silently no-op instead of
+ * restoring it. [startDestinationRoute] is compared with its query pattern
+ * stripped, since a start destination with an optional argument (like Tasks)
+ * registers its route as `tasks?todo_id={todo_id}`, not the bare `tasks` a
+ * bottom-nav tap targets.
+ */
+internal fun isStartDestinationTarget(targetRoute: String, startDestinationRoute: String?): Boolean =
+    targetRoute == startDestinationRoute?.substringBefore('?')
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClawChatNavGraph(
@@ -132,11 +146,16 @@ fun ClawChatNavGraph(
             route != currentBaseRoute &&
             NavigationCapabilities.canOpen(workspaceMode, route)
         ) {
+            val targetIsStartDestination = isStartDestinationTarget(
+                route,
+                navController.graph.findStartDestination().route,
+            )
             navController.navigate(route) {
                 popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
+                    saveState = !targetIsStartDestination
+                    inclusive = targetIsStartDestination
                 }
-                restoreState = true
+                restoreState = !targetIsStartDestination
                 launchSingleTop = true
             }
         }
