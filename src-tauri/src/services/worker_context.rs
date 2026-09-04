@@ -188,8 +188,9 @@ mod tests {
         assert!(files.iter().all(|file| file.text.ends_with("…(truncated)")));
         let total: usize = files.iter().map(|file| file.text.len()).sum();
         assert!(total <= MAX_TOTAL_BYTES);
-        // Three cut files fit; the fourth would cross the ceiling and is dropped.
-        assert_eq!(files.len(), 3);
+        // A cut file is the ceiling plus its marker, so two fit; the third
+        // would cross the total and is dropped whole, as is everything after.
+        assert_eq!(files.len(), 2);
     }
 
     #[cfg(unix)]
