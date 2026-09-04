@@ -700,7 +700,13 @@ class PendingTodoSyncCoordinator @Inject constructor(
                         store.removeTodo(workspaceKey, storedTodoId)
                         return CommentReplayResult.TODO_GONE
                     }
-                    return CommentReplayResult.Retry(result.message)
+                    if (result.isRetryable()) {
+                        return CommentReplayResult.Retry(result.message)
+                    }
+                    // Match the immediate add-comment path: a permanent 4xx
+                    // cannot become valid on a later reconnect and must not
+                    // block newer task edits in this outbox forever.
+                    store.remove(workspaceKey, listOf(comment.operationId))
                 }
                 ApiResult.Loading -> {
                     return CommentReplayResult.Retry(REQUEST_INCOMPLETE_ERROR)

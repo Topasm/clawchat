@@ -27,8 +27,12 @@ import io.mockk.verify
 import java.io.IOException
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
 
 class PendingTodoSyncCoordinatorTest {
     private val api = mockk<ClawChatApi>()
@@ -171,6 +175,44 @@ class PendingTodoSyncCoordinatorTest {
                 any(),
             )
         }
+    }
+
+    @Test
+    fun `permanently rejected comment does not block a newer task update`() = runTest {
+        val commentOperationId = "00000000-0000-0000-0000-000000000065"
+        coEvery { store.allForWorkspace(WORKSPACE) } returns listOf(
+            PendingTodoComment(
+                operationId = commentOperationId,
+                todoId = "todo-1",
+                content = "Rejected comment",
+                changedAt = "2026-09-01T01:00:00Z",
+            ),
+            mutation(
+                "update-1",
+                "2026-09-01T02:00:00Z",
+                TodoUpdate(title = "New title"),
+            ),
+        )
+        val response = Response.error<Unit>(
+            422,
+            "invalid comment".toResponseBody("text/plain".toMediaType()),
+        )
+        coEvery { api.createTaskComment(any(), any()) } throws HttpException(response)
+        coEvery { api.getTodo("todo-1", any()) } returns
+            todo(title = "Old title", updatedAt = "2026-09-01T00:30:00Z")
+        coEvery {
+            api.updateTodo(
+                "todo-1",
+                match { it.title == "New title" },
+                any(),
+            )
+        } returns todo(title = "New title", updatedAt = "2026-09-01T02:00:01Z")
+
+        assertEquals(PendingTodoSyncResult.SUCCESS, coordinator.flush())
+
+        coVerify(exactly = 1) { store.remove(WORKSPACE, listOf(commentOperationId)) }
+        coVerify(exactly = 1) { api.updateTodo("todo-1", any(), any()) }
+        coVerify(exactly = 0) { store.recordFailure(WORKSPACE, "todo-1", any(), any()) }
     }
 
     @Test
