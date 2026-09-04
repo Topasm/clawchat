@@ -35,6 +35,7 @@
     "allow-updater-check",
     "allow-updater-download",
     "allow-updater-install",
-    "allow-worker-run"
+    "allow-worker-run",
+    "allow-worker-read-context"
   ]
 }

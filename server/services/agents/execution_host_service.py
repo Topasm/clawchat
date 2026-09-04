@@ -15,6 +15,7 @@ host and no path cannot run until someone says where it lives.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -31,6 +32,12 @@ from models.project import Project
 #: A remote host is considered gone once it stops checking in. Kept generous:
 #: a laptop that missed one heartbeat is not offline.
 HOST_HEARTBEAT_GRACE = timedelta(minutes=5)
+
+#: How much of a folder's self-description is kept. The worker already trims
+#: on its side; these are the server's own ceilings so a chatty client cannot
+#: push a prompt-sized blob into every run and chat turn.
+MAX_CONTEXT_FILE_CHARS = 8_000
+MAX_CONTEXT_TOTAL_CHARS = 24_000
 
 
 @dataclass(frozen=True)
@@ -150,6 +157,109 @@ async def list_host_paths(db: AsyncSession, project_id: str) -> list[ProjectHost
         .scalars()
         .all()
     )
+
+
+async def list_paths_for_host(db: AsyncSession, host_id: str) -> list[ProjectHostPath]:
+    """Every project folder recorded on one machine -- what its worker looks after."""
+    return list(
+        (
+            await db.execute(
+                select(ProjectHostPath)
+                .where(ProjectHostPath.host_id == host_id)
+                .order_by(ProjectHostPath.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+async def get_host_path_row(
+    db: AsyncSession, project_id: str, host_id: str
+) -> ProjectHostPath | None:
+    return (
+        await db.execute(
+            select(ProjectHostPath).where(
+                ProjectHostPath.project_id == project_id,
+                ProjectHostPath.host_id == host_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+def context_file_names(row: ProjectHostPath | None) -> list[str]:
+    """The relative paths a folder snapshot was built from."""
+    if row is None or not row.context_files:
+        return []
+    try:
+        names = json.loads(row.context_files)
+    except ValueError:
+        return []
+    return [name for name in names if isinstance(name, str)]
+
+
+async def store_workspace_context(
+    db: AsyncSession,
+    project_id: str,
+    host_id: str,
+    files: list[tuple[str, str]],
+) -> ProjectHostPath:
+    """Keep what a folder says about itself, as read by the machine holding it.
+
+    ``files`` is ``[(relative_path, text)]`` in the order the worker read them.
+    Each file is cut to ``MAX_CONTEXT_FILE_CHARS`` and the whole snapshot to
+    ``MAX_CONTEXT_TOTAL_CHARS``; a file that no longer fits is dropped rather
+    than half-included, so the file list stays an honest account of the text.
+    """
+    row = await get_host_path_row(db, project_id, host_id)
+    if row is None:
+        raise ValidationError(
+            "This project has no path on that host.",
+            details={"reason": "host_path_required"},
+        )
+
+    parts: list[str] = []
+    names: list[str] = []
+    budget = MAX_CONTEXT_TOTAL_CHARS
+    for name, text in files:
+        body = text.strip()
+        if not body:
+            continue
+        if len(body) > MAX_CONTEXT_FILE_CHARS:
+            body = body[:MAX_CONTEXT_FILE_CHARS].rstrip() + "\n…(truncated)"
+        block = f"--- {name} ---\n{body}"
+        if len(block) > budget:
+            break
+        parts.append(block)
+        names.append(name)
+        budget -= len(block) + 2
+
+    row.context_text = "\n\n".join(parts) or None
+    row.context_files = json.dumps(names)
+    row.context_updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    return row
+
+
+async def workspace_context_block(
+    db: AsyncSession,
+    project: Project,
+    *,
+    max_chars: int | None = None,
+) -> str:
+    """The ``[Workspace …]`` block for prompts: where the work lives, and what
+    that folder says about itself. Empty when the project has no folder."""
+    resolution = await resolve_workspace(db, project)
+    if resolution.host is None or not resolution.path:
+        return ""
+    header = f"[Workspace {resolution.host.label}: {resolution.path}]"
+    row = await get_host_path_row(db, project.id, resolution.host.id)
+    text = (row.context_text or "").strip() if row is not None else ""
+    if not text:
+        return header
+    if max_chars is not None and len(text) > max_chars:
+        text = text[:max_chars].rstrip() + "\n…(truncated)"
+    return f"{header}\n{text}"
 
 
 async def resolve_workspace(
@@ -288,6 +398,7 @@ class ClaimedJob:
     instruction: str
     cwd: str
     model: str | None
+    project_id: str | None = None
 
 
 async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | None:
@@ -333,4 +444,5 @@ async def claim_next_job(db: AsyncSession, host: ExecutionHost) -> ClaimedJob | 
         instruction=run.instruction_snapshot,
         cwd=cwd,
         model=run.model,
+        project_id=project.id if project else None,
     )

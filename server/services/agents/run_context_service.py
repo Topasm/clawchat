@@ -5,6 +5,7 @@ from models.conversation import Conversation
 from models.message import Message
 from models.project import Project
 from models.todo import Todo
+from services.agents import execution_host_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,12 +32,15 @@ async def build_execution_instruction(
                 )
             )
         ).scalar_one_or_none()
-    project_rules = (
-        await db.scalar(
-            select(Project.execution_instructions).where(Project.id == project_id)
-        )
-        if project_id
-        else None
+    project = await db.get(Project, project_id) if project_id else None
+    project_rules = project.execution_instructions if project else None
+    # The folder the work runs in, as its machine described it. The CLI will
+    # see the files itself, but the snapshot tells it what the folder is for
+    # before it starts looking.
+    workspace_block = (
+        await execution_host_service.workspace_context_block(db, project)
+        if project
+        else ""
     )
 
     messages = []
@@ -72,6 +76,8 @@ async def build_execution_instruction(
     blocks: list[str] = []
     if project_rules and project_rules.strip():
         blocks.append(f"[Project rules]\n{project_rules.strip()}")
+    if workspace_block:
+        blocks.append(workspace_block)
     if context:
         blocks.append(f"[Recent conversation]\n{context}")
     if not blocks:

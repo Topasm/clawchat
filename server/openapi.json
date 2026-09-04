@@ -2061,6 +2061,17 @@
             ],
             "title": "Model"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "run_id": {
             "title": "Run Id",
             "type": "string"
@@ -3815,6 +3826,37 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HostProjectPathResponse": {
+        "description": "A project this machine holds a folder for, as the worker sees it.",
+        "properties": {
+          "context_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Updated At"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "path"
+        ],
+        "title": "HostProjectPathResponse",
+        "type": "object"
+      },
       "InboxTriagePreviewRequest": {
         "properties": {
           "expected_graph_revision": {
@@ -5226,6 +5268,26 @@
       },
       "ProjectHostPathResponse": {
         "properties": {
+          "context_files": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Context Files",
+            "type": "array"
+          },
+          "context_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Updated At"
+          },
           "host_id": {
             "title": "Host Id",
             "type": "string"
@@ -6073,9 +6135,52 @@
         "title": "ProjectUpdate",
         "type": "object"
       },
+      "ProjectWorkspaceContextUpsert": {
+        "description": "What a folder says about itself, sent by the machine that holds it.",
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceContextFile"
+            },
+            "maxItems": 16,
+            "title": "Files",
+            "type": "array"
+          },
+          "host_id": {
+            "minLength": 1,
+            "title": "Host Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_id"
+        ],
+        "title": "ProjectWorkspaceContextUpsert",
+        "type": "object"
+      },
       "ProjectWorkspaceResponse": {
         "description": "Where a project's work runs, and whether it can run right now.",
         "properties": {
+          "context_files": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Context Files",
+            "type": "array"
+          },
+          "context_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Updated At"
+          },
           "host_id": {
             "anyOf": [
               {
@@ -9012,6 +9117,28 @@
         ],
         "title": "WorkerRegistration",
         "type": "object"
+      },
+      "WorkspaceContextFile": {
+        "description": "One README-like file the worker read from the bound folder.",
+        "properties": {
+          "path": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 64000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "WorkspaceContextFile",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -11515,6 +11642,58 @@
         ]
       }
     },
+    "/api/execution-hosts/{host_id}/paths": {
+      "get": {
+        "description": "The project folders recorded on this machine, for its worker to look after.",
+        "operationId": "list_host_project_paths_api_execution_hosts__host_id__paths_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HostProjectPathResponse"
+                  },
+                  "title": "Response List Host Project Paths Api Execution Hosts  Host Id  Paths Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Host Project Paths",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
     "/api/execution-providers": {
       "get": {
         "operationId": "list_execution_providers_api_execution_providers_get",
@@ -12578,6 +12757,64 @@
           }
         ],
         "summary": "Get Project Workspace",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/workspace/context": {
+      "put": {
+        "description": "Keep what the project's folder says about itself on one machine.\n\nSent by the worker on that machine -- the only place the folder can be\nread -- after it checks in, before it runs work there, and on request.",
+        "operationId": "set_project_workspace_context_api_projects__project_id__workspace_context_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkspaceContextUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Project Workspace Context",
         "tags": [
           "projects"
         ]

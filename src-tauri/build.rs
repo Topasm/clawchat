@@ -23,6 +23,7 @@ fn main() {
         "updater_download",
         "updater_install",
         "worker_run",
+        "worker_read_context",
     ];
 
     tauri_build::try_build(

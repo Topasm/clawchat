@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useWorkerStore } from '../../stores/useWorkerStore';
 import { WorkerRunner } from '../workerRunner';
 
-const apiMocks = vi.hoisted(() => ({ post: vi.fn() }));
-const workerMocks = vi.hoisted(() => ({ run: vi.fn(), worker: null as unknown }));
+const apiMocks = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), put: vi.fn() }));
+const workerMocks = vi.hoisted(() => ({
+  run: vi.fn(),
+  readContext: vi.fn(),
+  worker: null as unknown,
+}));
 
-vi.mock('../apiClient', () => ({ default: { post: apiMocks.post } }));
+vi.mock('../apiClient', () => ({
+  default: { post: apiMocks.post, get: apiMocks.get, put: apiMocks.put },
+}));
 vi.mock('../../platform', () => ({
   platformApi: {
     runtime: { os: 'darwin' },
@@ -33,8 +40,12 @@ describe('WorkerRunner', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     apiMocks.post.mockReset();
+    apiMocks.get.mockReset().mockResolvedValue({ data: [] });
+    apiMocks.put.mockReset().mockResolvedValue({ data: {} });
     workerMocks.run.mockReset();
-    workerMocks.worker = { run: workerMocks.run };
+    workerMocks.readContext.mockReset().mockResolvedValue([]);
+    workerMocks.worker = { run: workerMocks.run, readContext: workerMocks.readContext };
+    useWorkerStore.getState().reset();
   });
 
   afterEach(() => {
@@ -154,6 +165,53 @@ describe('WorkerRunner', () => {
     runner.stop();
 
     expect(apiMocks.post.mock.calls.length).toBeGreaterThan(afterFirst);
+  });
+
+  // The server never reads this disk, so checking in is when it first hears
+  // what the folders bound here look like.
+  it('describes every folder bound to this machine right after checking in', async () => {
+    respondTo('/jobs/claim', null);
+    apiMocks.get.mockResolvedValue({
+      data: [
+        { project_id: 'project-1', path: '/Users/me/papers', context_updated_at: null },
+        { project_id: 'project-2', path: '/Users/me/lab', context_updated_at: null },
+      ],
+    });
+    workerMocks.readContext.mockResolvedValue([{ path: 'README.md', text: '# Papers' }]);
+    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+
+    await runner.start();
+    runner.stop();
+
+    expect(apiMocks.get).toHaveBeenCalledWith('/execution-hosts/host-1/paths');
+    expect(workerMocks.readContext).toHaveBeenCalledWith('/Users/me/papers');
+    expect(apiMocks.put).toHaveBeenCalledWith('/projects/project-1/workspace/context', {
+      host_id: 'host-1',
+      files: [{ path: 'README.md', text: '# Papers' }],
+    });
+    expect(apiMocks.put).toHaveBeenCalledWith(
+      '/projects/project-2/workspace/context',
+      expect.anything(),
+    );
+  });
+
+  it('re-describes the folder before running work in it, and exposes itself to the UI', async () => {
+    respondTo('/jobs/claim', { ...job, project_id: 'project-1' });
+    workerMocks.run.mockResolvedValue({ output: 'Done' });
+    const runner = new WorkerRunner({ label: 'MacBook', provider: 'claude' });
+
+    await runner.start();
+    expect(useWorkerStore.getState().hostId).toBe('host-1');
+    expect(useWorkerStore.getState().refreshProjectContext).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    runner.stop();
+
+    const contextCall = apiMocks.put.mock.calls.findIndex(
+      ([url]) => url === '/projects/project-1/workspace/context',
+    );
+    expect(contextCall).toBeGreaterThanOrEqual(0);
+    expect(workerMocks.run).toHaveBeenCalledTimes(1);
+    expect(useWorkerStore.getState().hostId).toBeNull();
   });
 
   it('stops asking once it is stopped', async () => {

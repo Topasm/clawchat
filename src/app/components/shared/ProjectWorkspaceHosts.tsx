@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  queryKeys,
   useDeleteProjectHostPath,
   useExecutionHostsQuery,
   useProjectWorkspaceQuery,
   useSetProjectExecutionHost,
   useSetProjectHostPath,
 } from '../../hooks/queries';
+import { useToastStore } from '../../stores/useToastStore';
+import { useWorkerStore } from '../../stores/useWorkerStore';
+import { logger } from '../../services/logger';
 import { translateUi } from '../../i18n';
+import type { ProjectWorkspace } from '../../hooks/queries';
 
 /**
  * Where this project's work runs.
@@ -55,6 +61,10 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
           {statusLabel()}
         </span>
       </div>
+
+      {workspace?.host_id && workspace.path && (
+        <FolderContextLine projectId={projectId} workspace={workspace} />
+      )}
 
       {hostsLoading ? (
         <p className="cc-project-workspace__hint">{translateUi('Loading machines…')}</p>
@@ -127,5 +137,67 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * What the chosen machine has said about the folder, and — when this app is
+ * that machine — a way to say it again now. Any other machine's folder can
+ * only be described by that machine, so the line just says when it last was.
+ */
+function FolderContextLine({
+  projectId,
+  workspace,
+}: {
+  projectId: string;
+  workspace: ProjectWorkspace;
+}) {
+  const queryClient = useQueryClient();
+  const thisHostId = useWorkerStore((state) => state.hostId);
+  const refresh = useWorkerStore((state) => state.refreshProjectContext);
+  const [refreshing, setRefreshing] = useState(false);
+  const files = workspace.context_files ?? [];
+  const canRefresh = !!refresh && thisHostId === workspace.host_id;
+
+  const runRefresh = async () => {
+    if (!refresh || !workspace.path) return;
+    setRefreshing(true);
+    try {
+      await refresh(projectId, workspace.path);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projectWorkspace(projectId) });
+      useToastStore.getState().addToast('success', translateUi('Folder context refreshed'));
+    } catch (error) {
+      logger.warn('Could not refresh the folder context', error);
+      useToastStore
+        .getState()
+        .addToast('error', translateUi('Could not refresh the folder context'));
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <p className="cc-project-workspace__hint cc-project-host-context">
+      {files.length > 0
+        ? translateUi('Folder context: {{files}} · updated {{time}}', {
+            files: files.join(', '),
+            time: workspace.context_updated_at
+              ? new Date(workspace.context_updated_at).toLocaleString()
+              : '',
+          })
+        : translateUi(
+            'No folder context yet — the machine sends its README when it checks in or runs work here.',
+          )}
+      {canRefresh && (
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-btn--compact"
+          disabled={refreshing}
+          onClick={() => void runRefresh()}
+        >
+          {refreshing ? translateUi('Refreshing…') : translateUi('Refresh context')}
+        </button>
+      )}
+    </p>
   );
 }

@@ -1545,6 +1545,13 @@ Object.assign(koreanUiTranslations, {
     '등록된 머신이 없습니다. 폴더가 있는 머신에서 ClawChat을 열고 설정에서 켜세요.',
   'Project created, but the folder could not be attached. Set it under "Where this runs".':
     '프로젝트는 만들어졌지만 폴더를 연결하지 못했습니다. "Where this runs"에서 지정하세요.',
+  'Folder context: {{files}} · updated {{time}}': '폴더 컨텍스트: {{files}} · {{time}} 갱신',
+  'No folder context yet — the machine sends its README when it checks in or runs work here.':
+    '폴더 컨텍스트가 아직 없습니다 — 머신이 체크인하거나 여기서 작업을 실행할 때 README를 보냅니다.',
+  'Refresh context': '컨텍스트 새로고침',
+  'Refreshing…': '새로고침 중…',
+  'Folder context refreshed': '폴더 컨텍스트를 새로고침했습니다',
+  'Could not refresh the folder context': '폴더 컨텍스트를 새로고침하지 못했습니다',
   'My Mac': '내 Mac',
   'My Windows PC': '내 Windows PC',
   'My Linux machine': '내 Linux 머신',

@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { platformApi } from '../platform';
+import { useWorkerStore } from '../stores/useWorkerStore';
 import { logger } from './logger';
 
 /**
@@ -29,6 +30,13 @@ interface ClaimedJob {
   instruction: string;
   cwd: string;
   model: string | null;
+  project_id?: string | null;
+}
+
+interface HostProjectPath {
+  project_id: string;
+  path: string;
+  context_updated_at: string | null;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 4000;
@@ -49,6 +57,9 @@ export class WorkerRunner {
   /** Register this machine and begin collecting work for it. */
   async start(): Promise<void> {
     this.stopped = false;
+    useWorkerStore
+      .getState()
+      .setRefreshProjectContext((projectId, path) => this.refreshProjectContext(projectId, path));
     await this.register();
     this.scheduleNextPoll(0);
   }
@@ -59,6 +70,7 @@ export class WorkerRunner {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    useWorkerStore.getState().reset();
   }
 
   private async register(): Promise<void> {
@@ -67,6 +79,45 @@ export class WorkerRunner {
       platform: platformApi.runtime.os,
     });
     this.hostId = response.data?.id ?? null;
+    if (this.hostId === null) return;
+    useWorkerStore.getState().setRegistered(this.hostId, this.options.label);
+    // Checking in is the moment the server can first ask what the folders
+    // here look like, and the app has just been opened on them.
+    await this.refreshAllContexts();
+  }
+
+  /**
+   * Send the server what a bound folder says about itself.
+   *
+   * The server never reads this disk; this is the only way its chat and run
+   * prompts learn what the folder is for.
+   */
+  async refreshProjectContext(projectId: string, path: string): Promise<void> {
+    const worker = platformApi.worker;
+    if (!worker || this.hostId === null) return;
+    const files = await worker.readContext(path);
+    await apiClient.put(`/projects/${projectId}/workspace/context`, {
+      host_id: this.hostId,
+      files,
+    });
+  }
+
+  private async refreshAllContexts(): Promise<void> {
+    if (!platformApi.worker || this.hostId === null) return;
+    try {
+      const response = await apiClient.get(`/execution-hosts/${this.hostId}/paths`);
+      const rows: HostProjectPath[] = response.data ?? [];
+      for (const row of rows) {
+        try {
+          await this.refreshProjectContext(row.project_id, row.path);
+        } catch (error) {
+          // One unreadable folder must not stop the others being described.
+          logger.warn(`Could not send folder context for ${row.path}`, error);
+        }
+      }
+    } catch (error) {
+      logger.warn('Could not list the folders bound to this machine', error);
+    }
   }
 
   private scheduleNextPoll(delayMs: number): void {
@@ -106,6 +157,7 @@ export class WorkerRunner {
 
   private async execute(job: ClaimedJob): Promise<void> {
     this.running = true;
+    useWorkerStore.getState().setBusyRunId(job.run_id);
     const worker = platformApi.worker;
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     let heartbeatInFlight = false;
@@ -142,6 +194,16 @@ export class WorkerRunner {
         void heartbeat();
       }, RUN_HEARTBEAT_INTERVAL_MS);
 
+      if (job.project_id) {
+        // The folder may have changed since it was last described; the run's
+        // own instruction is already frozen, but the next chat turn is not.
+        try {
+          await this.refreshProjectContext(job.project_id, job.cwd);
+        } catch (error) {
+          logger.warn('Could not refresh folder context before the run', error);
+        }
+      }
+
       let outcome: { result: string } | { error: string };
       try {
         const result = await worker.run({
@@ -169,6 +231,7 @@ export class WorkerRunner {
         clearInterval(heartbeatTimer);
       }
       this.running = false;
+      useWorkerStore.getState().setBusyRunId(null);
     }
   }
 }

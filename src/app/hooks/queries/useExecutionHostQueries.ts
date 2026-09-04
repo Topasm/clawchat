@@ -25,7 +25,17 @@ export const ProjectWorkspaceSchema = z.object({
   /** Known machine, unreachable now — work aimed at it is refused, not queued. */
   is_offline: z.boolean(),
   is_unconfigured: z.boolean(),
-  paths: z.array(z.object({ host_id: z.string(), path: z.string() })),
+  paths: z.array(
+    z.object({
+      host_id: z.string(),
+      path: z.string(),
+      context_updated_at: z.string().nullable().optional(),
+      context_files: z.array(z.string()).optional(),
+    }),
+  ),
+  /** Folder snapshot on the chosen machine, if its worker has sent one. */
+  context_updated_at: z.string().nullable().optional(),
+  context_files: z.array(z.string()).optional(),
 });
 
 export type ProjectWorkspace = z.infer<typeof ProjectWorkspaceSchema>;

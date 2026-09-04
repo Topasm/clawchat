@@ -45,9 +45,18 @@ export interface WorkerRunResult {
   error?: string | null;
 }
 
+/** One README-like file read from a bound folder on this machine. */
+export interface WorkspaceContextFile {
+  /** Relative to the bound directory. */
+  path: string;
+  text: string;
+}
+
 export interface NativeWorkerApi {
   /** Runs an agent CLI here, in the project's directory on this machine. */
   run: (request: WorkerRunRequest) => Promise<WorkerRunResult>;
+  /** What a bound folder says about itself, bounded and without following links. */
+  readContext: (path: string) => Promise<WorkspaceContextFile[]>;
 }
 
 export interface NativeUpdaterApi {

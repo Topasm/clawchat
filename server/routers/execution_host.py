@@ -10,6 +10,7 @@ from schemas.execution_host import (
     ExecutionHostCreate,
     ExecutionHostResponse,
     ExecutionHostUpdate,
+    HostProjectPathResponse,
     WorkerRegistration,
 )
 from services.agents import execution_host_service
@@ -165,6 +166,27 @@ async def heartbeat(
     await db.commit()
     await db.refresh(host)
     return host
+
+
+@router.get("/{host_id}/paths", response_model=list[HostProjectPathResponse])
+async def list_host_project_paths(
+    host_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """The project folders recorded on this machine, for its worker to look after."""
+    host = await db.get(ExecutionHost, host_id)
+    if host is None:
+        raise NotFoundError("Execution host not found")
+    rows = await execution_host_service.list_paths_for_host(db, host.id)
+    return [
+        HostProjectPathResponse(
+            project_id=row.project_id,
+            path=row.path,
+            context_updated_at=row.context_updated_at,
+        )
+        for row in rows
+    ]
 
 
 @router.post("/{host_id}/jobs/claim", response_model=ClaimedJobResponse | None)

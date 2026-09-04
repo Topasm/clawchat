@@ -110,6 +110,16 @@ class ProjectHostPath(Base):
         nullable=False,
     )
     path: Mapped[str] = mapped_column(Text, nullable=False)
+    #: What the folder says about itself, as read by the worker on that host:
+    #: a bounded snapshot of its README-like files. The server never reads
+    #: another machine's disk, so this is the only view of the folder it has.
+    context_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: JSON list of the relative paths the snapshot was assembled from.
+    context_files: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

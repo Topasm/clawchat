@@ -6,3 +6,4 @@ pub mod secure_storage;
 pub mod server_supervisor;
 pub mod updater_policy;
 pub mod worker_cli;
+pub mod worker_context;

@@ -12,6 +12,7 @@ import type {
   UpdateDownloadProgress,
   UpdateInfo,
   WorkerRunResult,
+  WorkspaceContextFile,
   WorkspaceViewMode,
 } from './nativePlatformTypes';
 import { TAURI_COMMANDS, TAURI_EVENTS } from './tauriCommands';
@@ -73,6 +74,8 @@ export const tauriPlatformApi: NativePlatformApi = {
   },
   worker: {
     run: (request) => invoke<WorkerRunResult>(TAURI_COMMANDS.workerRun, { request }),
+    readContext: (path) =>
+      invoke<WorkspaceContextFile[]>(TAURI_COMMANDS.workerReadContext, { path }),
   },
   server: {
     getStatus: () => invoke<ServerStatus>(TAURI_COMMANDS.serverGetStatus),

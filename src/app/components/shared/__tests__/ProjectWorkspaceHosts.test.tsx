@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useWorkerStore } from '../../../stores/useWorkerStore';
 import ProjectWorkspaceHosts from '../ProjectWorkspaceHosts';
 
 const apiMocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), delete: vi.fn() }));
@@ -43,6 +44,7 @@ describe('ProjectWorkspaceHosts', () => {
     apiMocks.delete.mockReset();
     apiMocks.put.mockResolvedValue({ data: {} });
     apiMocks.delete.mockResolvedValue({ data: {} });
+    useWorkerStore.getState().reset();
   });
 
   it('records a path against the machine it belongs to', async () => {
@@ -122,6 +124,36 @@ describe('ProjectWorkspaceHosts', () => {
     expect(
       await screen.findByText(/Offline — work here is refused until it is back/),
     ).toBeInTheDocument();
+  });
+
+  // Only the machine holding the folder can describe it, so the refresh
+  // button exists only where this app is that machine.
+  it('shows the folder snapshot and lets this machine refresh it', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    useWorkerStore.setState({ hostId: 'host-mac', refreshProjectContext: refresh });
+    mockWorkspace({
+      host_id: 'host-mac',
+      host_label: 'MacBook',
+      path: '/Users/me/papers',
+      is_available: true,
+      is_offline: false,
+      is_unconfigured: false,
+      paths: [{ host_id: 'host-mac', path: '/Users/me/papers' }],
+      context_files: ['README.md', 'docs/INDEX.md'],
+      context_updated_at: '2026-09-04T10:00:00Z',
+    });
+    renderHosts();
+
+    expect(
+      await screen.findByText(/Folder context: README.md, docs\/INDEX.md/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh context' }));
+    await waitFor(() => expect(refresh).toHaveBeenCalledWith('project-1', '/Users/me/papers'));
+
+    useWorkerStore.setState({ hostId: 'host-ubuntu' });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Refresh context' })).toBeNull(),
+    );
   });
 
   it('points somewhere useful when no machine has registered', async () => {

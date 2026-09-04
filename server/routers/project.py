@@ -10,6 +10,7 @@ from schemas.execution_host import (
     ProjectExecutionHostSelect,
     ProjectHostPathResponse,
     ProjectHostPathUpsert,
+    ProjectWorkspaceContextUpsert,
     ProjectWorkspaceResponse,
 )
 from schemas.project import (
@@ -105,6 +106,10 @@ async def _workspace_response(
 ) -> ProjectWorkspaceResponse:
     resolution = await execution_host_service.resolve_workspace(db, project)
     paths = await execution_host_service.list_host_paths(db, project.id)
+    chosen = next(
+        (row for row in paths if resolution.host and row.host_id == resolution.host.id),
+        None,
+    )
     return ProjectWorkspaceResponse(
         host_id=resolution.host.id if resolution.host else None,
         host_label=resolution.host.label if resolution.host else None,
@@ -113,8 +118,16 @@ async def _workspace_response(
         is_offline=resolution.is_offline,
         is_unconfigured=resolution.is_unconfigured,
         paths=[
-            ProjectHostPathResponse(host_id=row.host_id, path=row.path) for row in paths
+            ProjectHostPathResponse(
+                host_id=row.host_id,
+                path=row.path,
+                context_updated_at=row.context_updated_at,
+                context_files=execution_host_service.context_file_names(row),
+            )
+            for row in paths
         ],
+        context_updated_at=chosen.context_updated_at if chosen else None,
+        context_files=execution_host_service.context_file_names(chosen),
     )
 
 
@@ -218,6 +231,30 @@ async def set_project_execution_host(
 
     project.execution_host_id = host.id
     project.execution_workspace_path = path
+    await db.commit()
+    await db.refresh(project)
+    return await _workspace_response(db, project)
+
+
+@router.put("/{project_id}/workspace/context", response_model=ProjectWorkspaceResponse)
+async def set_project_workspace_context(
+    project_id: str,
+    body: ProjectWorkspaceContextUpsert,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Keep what the project's folder says about itself on one machine.
+
+    Sent by the worker on that machine -- the only place the folder can be
+    read -- after it checks in, before it runs work there, and on request.
+    """
+    project = await _require_project(db, project_id)
+    await execution_host_service.store_workspace_context(
+        db,
+        project.id,
+        body.host_id,
+        [(item.path, item.text) for item in body.files],
+    )
     await db.commit()
     await db.refresh(project)
     return await _workspace_response(db, project)

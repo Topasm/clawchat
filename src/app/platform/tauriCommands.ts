@@ -22,6 +22,7 @@ export const TAURI_COMMANDS = {
   updaterDownload: 'updater_download',
   updaterInstall: 'updater_install',
   workerRun: 'worker_run',
+  workerReadContext: 'worker_read_context',
 } as const;
 
 export const TAURI_EVENTS = {

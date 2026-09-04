@@ -59,8 +59,34 @@ class ProjectExecutionHostSelect(BaseModel):
 class ProjectHostPathResponse(BaseModel):
     host_id: str
     path: str
+    #: When the worker on that host last sent what the folder says about itself.
+    context_updated_at: datetime | None = None
+    #: Relative paths the folder snapshot was assembled from.
+    context_files: list[str] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WorkspaceContextFile(BaseModel):
+    """One README-like file the worker read from the bound folder."""
+
+    path: str = Field(min_length=1, max_length=500)
+    text: str = Field(max_length=64_000)
+
+
+class ProjectWorkspaceContextUpsert(BaseModel):
+    """What a folder says about itself, sent by the machine that holds it."""
+
+    host_id: str = Field(min_length=1)
+    files: list[WorkspaceContextFile] = Field(default_factory=list, max_length=16)
+
+
+class HostProjectPathResponse(BaseModel):
+    """A project this machine holds a folder for, as the worker sees it."""
+
+    project_id: str
+    path: str
+    context_updated_at: datetime | None = None
 
 
 class ProjectWorkspaceResponse(BaseModel):
@@ -77,6 +103,9 @@ class ProjectWorkspaceResponse(BaseModel):
     is_unconfigured: bool = True
     #: Every machine this project has a path on.
     paths: list[ProjectHostPathResponse] = []
+    #: Folder snapshot on the chosen machine, if its worker has sent one.
+    context_updated_at: datetime | None = None
+    context_files: list[str] = []
 
 
 class ClaimedJobResponse(BaseModel):
@@ -87,3 +116,5 @@ class ClaimedJobResponse(BaseModel):
     #: Directory the CLI runs in, on the claiming machine.
     cwd: str
     model: str | None = None
+    #: The project whose folder ``cwd`` is, so the worker can refresh its snapshot.
+    project_id: str | None = None

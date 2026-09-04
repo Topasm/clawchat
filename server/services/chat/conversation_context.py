@@ -16,6 +16,11 @@ from models.conversation import Conversation
 from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
+from services.agents import execution_host_service
+
+#: The folder snapshot rides along every project chat turn, so it gets a
+#: smaller share of the prompt than an execution instruction does.
+PROJECT_CHAT_WORKSPACE_CHARS = 4_000
 
 
 async def build_conversation_context(db: AsyncSession, conversation: Conversation | None) -> str:
@@ -175,6 +180,14 @@ async def build_first_class_project_context(db: AsyncSession, project_id: str) -
         context += f"Project Notes:\n{project.description}\n"
     if project.deadline:
         context += f"Deadline: {project.deadline.isoformat()}\n"
+    # Where the project lives and what that folder says about itself, so
+    # "explain this folder" can be answered from the machine's own README.
+    # Kept shorter than the execution copy: this rides along every chat turn.
+    workspace_block = await execution_host_service.workspace_context_block(
+        db, project, max_chars=PROJECT_CHAT_WORKSPACE_CHARS
+    )
+    if workspace_block:
+        context += f"{workspace_block}\n"
     if tasks:
         context += f"Tasks ({len(tasks)}):\n"
         for task in tasks:
