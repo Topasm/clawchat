@@ -90,3 +90,46 @@ export function useDeleteProjectHostPath(projectId: string) {
     apiClient.delete(`/projects/${projectId}/workspace/paths/${hostId}`),
   );
 }
+
+/**
+ * Check this machine in as a worker by name and hand back its host row.
+ *
+ * Registration is idempotent per label, so calling it ahead of the worker
+ * loop (which registers the same label again on its own) yields the same
+ * machine — enough to bind a folder to it before the loop has started.
+ */
+export function useRegisterWorkerHost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { label: string; platform: string }) => {
+      const res = await apiClient.post('/execution-hosts/register', body);
+      return ExecutionHostSchema.parse(res.data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.executionHosts });
+    },
+  });
+}
+
+/**
+ * Record a project's folder on one machine and make that machine the one its
+ * work runs on, in one step. For a project whose id is only known after
+ * creation, the per-project hooks above cannot be mounted in time.
+ */
+export function useBindProjectWorkspace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { projectId: string; hostId: string; path: string }) => {
+      await apiClient.put(`/projects/${body.projectId}/workspace/paths`, {
+        host_id: body.hostId,
+        path: body.path,
+      });
+      await apiClient.put(`/projects/${body.projectId}/workspace/host`, { host_id: body.hostId });
+    },
+    onSettled: (_data, _error, body) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.projectWorkspace(body.projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.project(body.projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+    },
+  });
+}

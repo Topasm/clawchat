@@ -45,6 +45,41 @@
   justify-content: flex-end;
 }
 
+/* Folder + machine: a path input beside its picker, and a machine chooser. */
+.cc-project-form__field select {
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 400;
+}
+.cc-project-form__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cc-project-form__row input {
+  flex: 1;
+  min-width: 0;
+}
+.cc-project-form__hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--cc-text-tertiary);
+}
+.cc-project-form__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--cc-text);
+}
+
 .cc-projects-grid {
   display: flex;
   flex-direction: column;
@@ -90,6 +125,10 @@
 }
 .cc-project-workspace__machine--unset {
   color: var(--cc-text-tertiary);
+}
+.cc-project-workspace__machine-action {
+  margin-left: 2px;
+  font-size: 11px;
 }
 
 /* The card is a button; its delete control must sit beside it, not inside. */

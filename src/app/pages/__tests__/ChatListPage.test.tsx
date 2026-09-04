@@ -46,6 +46,9 @@ vi.mock('../../hooks/queries', () => ({
   }),
   useCreateConversation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateProject: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useExecutionHostsQuery: () => ({ data: [], isLoading: false }),
+  useRegisterWorkerHost: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useBindProjectWorkspace: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteProject: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteConversation: () => ({ mutate: vi.fn(), isPending: false }),
 }));

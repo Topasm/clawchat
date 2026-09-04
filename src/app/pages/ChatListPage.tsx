@@ -3,7 +3,6 @@ import usePlatform from '../hooks/usePlatform';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   useConversationsQuery,
-  useCreateProject,
   useDeleteProject,
   useProjectsQuery,
   useTodosQuery,
@@ -15,7 +14,7 @@ import EmptyState from '../components/shared/EmptyState';
 import Badge from '../components/shared/Badge';
 import { ChatBubbleIcon, CheckIcon, ChevronRightIcon, TrashIcon } from '../components/shared/Icons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
-import Dialog from '../components/shared/Dialog';
+import ProjectCreateDialog from '../components/projects/ProjectCreateDialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
@@ -29,7 +28,6 @@ export default function ChatListPage() {
   const { data: projects = [], isLoading: projsLoading } = useProjectsQuery();
   const { data: todos = [] } = useTodosQuery();
   const createConversationMutation = useCreateConversation();
-  const createProjectMutation = useCreateProject();
   const deleteProjectMutation = useDeleteProject();
   const deleteConversationMutation = useDeleteConversation();
   const { isMobile } = usePlatform();
@@ -37,8 +35,6 @@ export default function ChatListPage() {
   const [quickChatsOpen, setQuickChatsOpen] = useState(true);
   const [agentChatsOpen, setAgentChatsOpen] = useState(false);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
-  const [projectTitle, setProjectTitle] = useState('');
-  const [projectGoal, setProjectGoal] = useState('');
   const loading = convsLoading || projsLoading;
   // Every conversation that belongs to a project -- its context chat, threads
   // scoped to its tasks, and agent runs on them -- is listed under the
@@ -135,18 +131,6 @@ export default function ChatListPage() {
   };
   const handleProjectClick = (projectId: string) => {
     navigate(`/projects/${projectId}`);
-  };
-  const handleCreateProject = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!projectTitle.trim()) return;
-    const project = await createProjectMutation.mutateAsync({
-      title: projectTitle.trim(),
-      goal: projectGoal.trim() || null,
-    });
-    setProjectTitle('');
-    setProjectGoal('');
-    setCreateProjectOpen(false);
-    navigate(`/projects/${project.id}`);
   };
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
@@ -364,46 +348,7 @@ export default function ChatListPage() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
       />
-      <Dialog
-        open={createProjectOpen}
-        onOpenChange={setCreateProjectOpen}
-        title={translateUi('New Project')}
-      >
-        <form className="cc-project-form" onSubmit={handleCreateProject}>
-          <label className="cc-project-form__field">
-            <span>{translateUi('Title')}</span>
-            <input
-              autoFocus
-              value={projectTitle}
-              onChange={(event) => setProjectTitle(event.target.value)}
-              placeholder={translateUi('What are you working toward?')}
-            />
-          </label>
-          <label className="cc-project-form__field">
-            <span>{translateUi('Goal')}</span>
-            <textarea
-              value={projectGoal}
-              onChange={(event) => setProjectGoal(event.target.value)}
-              placeholder={translateUi('Describe the outcome that defines success')}
-              rows={3}
-            />
-          </label>
-          <div className="cc-project-form__actions">
-            <button type="button" className="cc-btn" onClick={() => setCreateProjectOpen(false)}>
-              {translateUi('\n              Cancel\n            ')}
-            </button>
-            <button
-              type="submit"
-              className="cc-btn cc-btn--primary"
-              disabled={!projectTitle.trim() || createProjectMutation.isPending}
-            >
-              {createProjectMutation.isPending
-                ? translateUi('Creating\u2026')
-                : translateUi('Create project')}
-            </button>
-          </div>
-        </form>
-      </Dialog>
+      <ProjectCreateDialog open={createProjectOpen} onOpenChange={setCreateProjectOpen} />
     </div>
   );
 }

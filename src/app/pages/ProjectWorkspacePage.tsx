@@ -127,6 +127,19 @@ export default function ProjectWorkspacePage() {
       />
     );
   }
+  // The header line is a shortcut to the full "Where this runs" section, which
+  // lives folded away under the plan. Open it and bring it into view.
+  const revealWhereItRuns = () => {
+    if (section !== 'plan') setSearchParams({});
+    const reveal = () => {
+      const details = document.getElementById(EXECUTION_SETTINGS_ID);
+      if (!(details instanceof HTMLDetailsElement)) return;
+      details.open = true;
+      details.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    };
+    if (document.getElementById(EXECUTION_SETTINGS_ID)) reveal();
+    else window.setTimeout(reveal, 0);
+  };
   return (
     <div className="cc-project-workspace">
       <header className="cc-project-workspace__header">
@@ -140,7 +153,7 @@ export default function ProjectWorkspacePage() {
         </button>
         <div className="cc-project-workspace__identity-column">
           <ProjectIdentity project={project} />
-          <ProjectMachineLine project={project} />
+          <ProjectMachineLine project={project} onChange={revealWhereItRuns} />
         </div>
         <button
           type="button"
@@ -229,7 +242,7 @@ export default function ProjectWorkspacePage() {
 
           <ProjectPlan project={project} todos={projectTasks} onDiscussTask={openTaskAgent} />
 
-          <details className="cc-project-settings-disclosure">
+          <details className="cc-project-settings-disclosure" id={EXECUTION_SETTINGS_ID}>
             <summary>{translateUi('Execution settings')}</summary>
             <ProjectWorkspaceHosts projectId={project.id} />
             <ProjectExecutionSettings project={project} />
@@ -330,12 +343,27 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
   );
 }
 
+const EXECUTION_SETTINGS_ID = 'cc-project-execution-settings';
+
 /** Where this project's work runs, at a glance: machine, reachability, path. */
-function ProjectMachineLine({ project }: { project: ProjectOverviewResponse }) {
+function ProjectMachineLine({
+  project,
+  onChange,
+}: {
+  project: ProjectOverviewResponse;
+  onChange: () => void;
+}) {
   if (!project.execution_host_label) {
     return (
       <p className="cc-project-workspace__machine cc-project-workspace__machine--unset">
-        {translateUi('No machine chosen — set one under "Where this runs".')}
+        {translateUi('No machine chosen')}
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-btn--compact cc-project-workspace__machine-action"
+          onClick={onChange}
+        >
+          {translateUi('Choose machine')}
+        </button>
       </p>
     );
   }
@@ -351,6 +379,14 @@ function ProjectMachineLine({ project }: { project: ProjectOverviewResponse }) {
         ? translateUi('Online')
         : translateUi('Machine offline — runs are refused until it is back')}
       {project.execution_workspace_path ? ` · ${project.execution_workspace_path}` : ''}
+      <button
+        type="button"
+        className="cc-btn cc-btn--ghost cc-btn--compact cc-project-workspace__machine-action"
+        onClick={onChange}
+        aria-label={translateUi('Change where this runs')}
+      >
+        {translateUi('Change')}
+      </button>
     </p>
   );
 }

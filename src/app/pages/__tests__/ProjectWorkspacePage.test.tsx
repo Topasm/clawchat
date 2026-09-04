@@ -146,6 +146,18 @@ describe('ProjectWorkspacePage', () => {
     expect(screen.getByRole('button', { name: 'Open original document' })).toBeInTheDocument();
   });
 
+  it('jumps from the header machine line to the folded "Where this runs" section', () => {
+    const { container } = renderPage();
+    const details = container.querySelector<HTMLDetailsElement>(
+      'details.cc-project-settings-disclosure',
+    );
+    expect(details?.open).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
+
+    expect(details?.open).toBe(true);
+  });
+
   it('saves project-wide agent execution rules', () => {
     renderPage();
 

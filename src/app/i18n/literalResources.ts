@@ -1528,8 +1528,26 @@ Object.assign(koreanUiTranslations, {
   Online: '온라인',
   'Machine offline — runs are refused until it is back':
     '머신 오프라인 — 돌아올 때까지 실행이 거부됩니다',
-  'No machine chosen — set one under "Where this runs".':
-    '실행 머신이 없습니다 — "Where this runs"에서 지정하세요.',
+  'No machine chosen': '실행 머신이 없습니다',
+  'Choose machine': '머신 선택',
+  'Change where this runs': '실행 위치 변경',
+  'Folder on a machine': '머신의 폴더',
+  'Path on that machine': '그 머신의 경로',
+  'Browse…': '찾아보기…',
+  'Optional. Ready tasks run in this folder on that machine.':
+    '선택 사항. Ready 작업이 그 머신의 이 폴더에서 실행됩니다.',
+  Machine: '머신',
+  'Run work on this machine': '이 머신에서 작업 실행',
+  'Name for this machine': '이 머신의 이름',
+  'This machine': '이 머신',
+  'Pick the machine that holds this folder.': '이 폴더가 있는 머신을 고르세요.',
+  'No machines registered. Open ClawChat on the machine that holds the folder and turn it on in Settings.':
+    '등록된 머신이 없습니다. 폴더가 있는 머신에서 ClawChat을 열고 설정에서 켜세요.',
+  'Project created, but the folder could not be attached. Set it under "Where this runs".':
+    '프로젝트는 만들어졌지만 폴더를 연결하지 못했습니다. "Where this runs"에서 지정하세요.',
+  'My Mac': '내 Mac',
+  'My Windows PC': '내 Windows PC',
+  'My Linux machine': '내 Linux 머신',
   'Steps live under this task; ask the agent to add, plan, or run them.':
     '이 작업 아래에 단계가 쌓입니다. 에이전트에게 추가·계획·실행을 요청하세요.',
 });

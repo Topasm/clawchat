@@ -5,6 +5,8 @@ export {
   useSetProjectHostPath,
   useSetProjectExecutionHost,
   useDeleteProjectHostPath,
+  useRegisterWorkerHost,
+  useBindProjectWorkspace,
 } from './useExecutionHostQueries';
 export type { ExecutionHost, ProjectWorkspace } from './useExecutionHostQueries';
 export {
