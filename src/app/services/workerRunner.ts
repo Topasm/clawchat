@@ -103,6 +103,9 @@ export class WorkerRunner {
       device_id: this.options.deviceId,
       platform: platformApi.runtime.os,
     });
+    // The settings or session may have changed while registration was in
+    // flight. A retired runner must not overwrite the replacement's UI state.
+    if (this.stopped) return;
     this.hostId = response.data?.id ?? null;
     if (this.hostId === null) return;
     useWorkerStore.getState().setRegistered(this.hostId, this.options.label);
@@ -253,7 +256,9 @@ export class WorkerRunner {
         clearInterval(heartbeatTimer);
       }
       this.running = false;
-      useWorkerStore.getState().setBusy(null);
+      // stop() already cleared our state. Avoid clearing a newer runner that
+      // may have registered while this command was winding down.
+      if (!this.stopped) useWorkerStore.getState().setBusy(null);
     }
   }
 }

@@ -294,4 +294,73 @@ describe('WorkerRunner', () => {
 
     expect(apiMocks.post.mock.calls.length).toBe(calls);
   });
+
+  it('ignores a registration response after this runner is stopped', async () => {
+    let finishRegistration!: (value: { data: { id: string } }) => void;
+    apiMocks.post.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRegistration = resolve;
+        }),
+    );
+    const runner = new WorkerRunner({
+      label: 'Old MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
+
+    const starting = runner.start();
+    runner.stop();
+    finishRegistration({ data: { id: 'host-old' } });
+    await starting;
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(useWorkerStore.getState().hostId).toBeNull();
+    expect(useWorkerStore.getState().refreshProjectContext).toBeNull();
+    expect(apiMocks.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear a replacement runner when stopped work finishes late', async () => {
+    let finishRun!: (value: { output: string }) => void;
+    let oldClaimed = false;
+    apiMocks.post.mockImplementation(async (url: string, body?: unknown) => {
+      if (url.includes('/register')) {
+        const label = (body as { label: string }).label;
+        return { data: { id: label === 'Old MacBook' ? 'host-old' : 'host-new' } };
+      }
+      if (url.includes('/host-old/jobs/claim') && !oldClaimed) {
+        oldClaimed = true;
+        return { data: job };
+      }
+      return { data: null };
+    });
+    workerMocks.run.mockReturnValue(
+      new Promise<{ output: string }>((resolve) => {
+        finishRun = resolve;
+      }),
+    );
+    const oldRunner = new WorkerRunner({
+      label: 'Old MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
+    await oldRunner.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useWorkerStore.getState().busyRunId).toBe('run-1');
+
+    oldRunner.stop();
+    const replacement = new WorkerRunner({
+      label: 'New MacBook',
+      deviceId: '00000000-0000-0000-0000-000000000001',
+      provider: 'claude',
+    });
+    await replacement.start();
+    expect(useWorkerStore.getState().hostId).toBe('host-new');
+
+    finishRun({ output: 'Done' });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(useWorkerStore.getState().hostId).toBe('host-new');
+    replacement.stop();
+  });
 });
