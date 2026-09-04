@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Coroutine
 from datetime import datetime, timezone
 from typing import Any
@@ -23,14 +24,70 @@ from models.project import Project
 from models.todo import Todo
 from schemas.agent_run import AgentRunEventResponse, AgentRunResponse
 from schemas.review import AgentRunReviewOutcome
+from services.agents import run_thread_service
 from services.review import agent_review_handoff_service, review_item_service
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils import make_id
+from ws.manager import ws_manager
 
+logger = logging.getLogger(__name__)
+
+# Single-user server: every client session authenticates as this subject.
+DEFAULT_USER_ID = "user"
 
 _execution_tasks: dict[str, asyncio.Task] = {}
+
+
+async def notify_run_state(
+    db: AsyncSession,
+    run: AgentRun,
+    task: AgentTask | None = None,
+    *,
+    review_id: str | None = None,
+    user_id: str = DEFAULT_USER_ID,
+) -> None:
+    """Push one ``run_state_changed`` event describing where a run is now.
+
+    ``module_data_changed`` only tells clients to refetch; it carries nothing a
+    client could show without another round trip, so a run that stops to ask
+    for input or review used to be silent unless the Runs page happened to be
+    open. This event is the user-facing signal: the chat card, toast, badge and
+    mobile notification all read from it. Sent at every lifecycle transition
+    so the whole story reaches whichever surface the user is looking at.
+    """
+    if task is None:
+        task = await db.get(AgentTask, run.agent_task_id)
+    todo = await db.get(Todo, task.todo_id) if task is not None and task.todo_id else None
+    title = todo.title if todo is not None else run.instruction_snapshot[:120]
+    payload = {
+        "run_id": run.id,
+        "agent_task_id": run.agent_task_id,
+        "todo_id": task.todo_id if task is not None else None,
+        "project_id": run.project_id,
+        "conversation_id": task.conversation_id if task is not None else None,
+        "parent_task_id": task.parent_task_id if task is not None else None,
+        "title": title,
+        "status": str(run.status),
+        "attempt": run.attempt,
+        "provider": run.provider,
+        "progress": run.progress,
+        "progress_message": run.progress_message,
+        "result_summary": run.result_summary,
+        "error": run.error,
+        "is_adopted": run.is_adopted,
+        "review_id": review_id,
+    }
+    try:
+        await ws_manager.send_json(user_id, {"type": "run_state_changed", "data": payload})
+    except Exception:
+        # A notification must never take the execution down with it.
+        logger.warning("Could not push run state for %s", run.id, exc_info=True)
+    if task is not None:
+        await run_thread_service.post_run_update(
+            db, run, task, review_id=review_id, user_id=user_id
+        )
 
 
 async def infer_project_id(db: AsyncSession, task: AgentTask) -> str | None:
@@ -111,6 +168,9 @@ async def create_run(
     except IntegrityError as exc:
         await db.rollback()
         raise ConflictError("Another agent run attempt was created concurrently") from exc
+    # Work started outside chat gets a thread of its own here, so the run has
+    # somewhere to report from its first transition on.
+    await run_thread_service.ensure_thread(db, run, task)
     await record_event(db, run, "queued", "Execution queued", progress=0)
     return run
 
@@ -170,6 +230,7 @@ async def mark_starting(db: AsyncSession, run: AgentRun) -> None:
     run.started_at = run.started_at or now
     run.heartbeat_at = now
     await record_event(db, run, "starting", "Execution is starting", progress=0)
+    await notify_run_state(db, run)
 
 
 async def mark_running(db: AsyncSession, run: AgentRun) -> None:
@@ -181,6 +242,7 @@ async def mark_running(db: AsyncSession, run: AgentRun) -> None:
     run.started_at = run.started_at or now
     run.heartbeat_at = now
     await record_event(db, run, "running", "Execution started", progress=run.progress)
+    await notify_run_state(db, run)
 
 
 async def update_progress(
@@ -216,6 +278,7 @@ async def mark_waiting_review(
     run.heartbeat_at = now
     run.completed_at = now
     await record_event(db, run, "waiting_review", "Result is ready for review", progress=100)
+    review_id = None
     if task.parent_task_id is None:
         review_item = await review_item_service.ensure_review_item(
             db,
@@ -229,9 +292,12 @@ async def mark_waiting_review(
         review_item.requested_at = now
         review_item.reviewed_at = None
         review_item.review_note = None
+        await db.flush()
+        review_id = review_item.id
     else:
         run.status = AgentRunStatus.COMPLETED
         run.is_adopted = True
+    await notify_run_state(db, run, task, review_id=review_id)
 
 
 async def mark_failed(
@@ -247,6 +313,7 @@ async def mark_failed(
     run.heartbeat_at = now
     run.completed_at = now
     await record_event(db, run, "failed", error, progress=run.progress)
+    await notify_run_state(db, run)
 
 
 async def cancel_run(db: AsyncSession, run_id: str) -> AgentRun:
@@ -267,6 +334,7 @@ async def cancel_run(db: AsyncSession, run_id: str) -> AgentRun:
         task.error = run.error
         task.completed_at = now
     await record_event(db, run, "cancelled", run.error, progress=run.progress)
+    await notify_run_state(db, run, task)
     await db.commit()
     execution = _execution_tasks.get(run.id)
     if execution is not None and not execution.done():
@@ -295,6 +363,7 @@ async def transition_run(
     if message:
         run.progress_message = message
     await record_event(db, run, status.value, message, progress=run.progress)
+    await notify_run_state(db, run)
     return run
 
 
@@ -371,6 +440,7 @@ async def decide_run(
 
             graph_revision = await current_graph_revision(db)
             newly_ready_tasks = []
+        await notify_run_state(db, run, task)
         return AgentRunReviewOutcome(
             run_id=run.id,
             agent_task_id=task.id,
@@ -398,8 +468,10 @@ async def decide_run(
         if claimed is None:
             raise ConflictError("Agent run was already reviewed or changed")
         run.status = AgentRunStatus.WAITING_INPUT
+        run.progress_message = "Changes requested"
         task.status = "running"
         await record_event(db, run, "changes_requested", "Changes requested", progress=100)
+        await notify_run_state(db, run, task)
     elif decision == ReviewStatus.REJECTED:
         claimed = (
             await db.execute(
@@ -419,6 +491,7 @@ async def decide_run(
         task.status = "failed"
         task.error = "Run result rejected"
         await record_event(db, run, "rejected", task.error, progress=100)
+        await notify_run_state(db, run, task)
     else:
         raise ConflictError("Unsupported agent run review decision")
     return {
@@ -427,6 +500,12 @@ async def decide_run(
         "attempt": run.attempt,
         "adopted": run.is_adopted,
     }
+
+
+def is_execution_registered(run_id: str) -> bool:
+    """Whether this process is running the coroutine behind ``run_id`` right now."""
+    execution = _execution_tasks.get(run_id)
+    return execution is not None and not execution.done()
 
 
 def launch_execution(run_id: str, coroutine: Coroutine[Any, Any, None]) -> None:
@@ -487,6 +566,7 @@ async def build_run_response(
         },
         project_title=project.title if project else None,
         todo_id=task.todo_id,
+        conversation_id=task.conversation_id,
         todo_title=todo.title if todo else None,
         todo_status=TaskStatus(todo.status) if todo else None,
         task_type=task.task_type,

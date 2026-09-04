@@ -18,7 +18,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.agent_task import AgentTask
 from models.todo import Todo
 from services.ai.ai_service import AIService
-from services.agents.agent_task_service import mark_completed, mark_failed, mark_running, update_progress
+from services.agents.agent_task_service import (
+    ASK_USER_INSTRUCTION,
+    mark_completed,
+    mark_failed,
+    mark_running,
+    parse_needs_input,
+    request_input,
+    update_progress,
+)
 from skills import SKILL_REGISTRY, get_skill
 from ws.manager import ConnectionManager
 
@@ -84,9 +92,18 @@ async def execute_skill_chain(
             await db.commit()
 
             result = await ai_service.generate_completion(
-                system_prompt=skill.system_prompt,
+                system_prompt=skill.system_prompt + ASK_USER_INSTRUCTION,
                 user_message=user_msg,
             )
+
+            # The skill asked instead of answering: park the run and stop. The
+            # follow-up resumes the chain from its first skill with the answer
+            # appended to the instruction; earlier outputs are not kept.
+            question = parse_needs_input(result)
+            if question is not None:
+                await request_input(db, task, question)
+                await db.commit()
+                return
 
             # Write vault document if the skill defines a template.
             if skill.vault_template and task.todo_id:
@@ -99,6 +116,7 @@ async def execute_skill_chain(
         await mark_completed(db, task, previous_result or "")
         await db.commit()
 
+        run = getattr(task, "_active_agent_run", None)
         await ws_manager.send_json(user_id, {
             "type": "task_completed",
             "data": {
@@ -108,6 +126,8 @@ async def execute_skill_chain(
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
                 "skill_chain": chain,
+                "run_id": run.id if run is not None else None,
+                "run_status": str(run.status) if run is not None else None,
             },
         })
 
@@ -117,6 +137,7 @@ async def execute_skill_chain(
         await mark_failed(db, task, error_msg)
         await db.commit()
 
+        run = getattr(task, "_active_agent_run", None)
         await ws_manager.send_json(user_id, {
             "type": "task_failed",
             "data": {
@@ -125,6 +146,8 @@ async def execute_skill_chain(
                 "error": error_msg,
                 "conversation_id": task.conversation_id,
                 "parent_task_id": task.parent_task_id,
+                "run_id": run.id if run is not None else None,
+                "run_status": str(run.status) if run is not None else None,
             },
         })
 

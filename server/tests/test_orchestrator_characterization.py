@@ -759,9 +759,24 @@ async def test_briefing_failures_propagate_to_the_caller(
 # --- intents with no self-contained answer --------------------------------
 
 
-@pytest.mark.parametrize("intent", ["general_chat", "delegate_task", "unknown_intent"])
+@pytest.mark.parametrize("intent", ["general_chat", "unknown_intent"])
 async def test_intents_without_a_one_shot_answer(orchestrator, db_session, intent):
     assert await resolve(orchestrator, db_session, intent) is None
+
+
+async def test_delegate_task_has_a_one_shot_answer(orchestrator, db_session, monkeypatch):
+    """The reply confirms the delegation; the run's own states follow later
+    through its thread, so SSE clients are not left out."""
+    from services.agents import agent_run_service
+
+    monkeypatch.setattr(
+        agent_run_service, "launch_execution", lambda run_id, coroutine: coroutine.close()
+    )
+    text, metadata = await resolve(
+        orchestrator, db_session, "delegate_task", {"instruction": "Research suppliers"}
+    )
+    assert "Got it" in text
+    assert metadata["action_type"] == "task_delegated"
 
 
 # --- handle_message: routing, messaging, ws events ------------------------

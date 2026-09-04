@@ -71,6 +71,8 @@ class AgentRunResponse(BaseModel):
     todo_id: str | None = None
     todo_title: str | None = None
     todo_status: TaskStatus | None = None
+    #: The thread this run reports into; every run has one once it is created.
+    conversation_id: str | None = None
     task_type: str
     instruction: str
     instruction_snapshot: str

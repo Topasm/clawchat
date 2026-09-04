@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { CalendarIcon, CheckCircleIcon, CheckIcon, WarningIcon } from '../shared/Icons';
 import SchedulingSuggestions from './SchedulingSuggestions';
 import TaskProgressCard from './TaskProgressCard';
+import RunStatusCard from './RunStatusCard';
 import { translateUi } from '../../i18n';
 interface ActionCardProps {
   metadata: Record<string, unknown>;
@@ -123,11 +124,16 @@ export default function ActionCard({ metadata }: ActionCardProps) {
       </div>
     );
   }
+  // A run reporting into its thread (written by the server, not by chat)
+  if (actionType === 'run_update') {
+    return <RunStatusCard metadata={metadata} />;
+  }
   // Task delegated (Phase 4)
   if (actionType === 'task_delegated') {
     return (
       <TaskProgressCard
         taskId={metadata.task_id as string}
+        runId={typeof metadata.run_id === 'string' ? metadata.run_id : undefined}
         isMultiAgent={metadata.is_multi_agent as boolean}
       />
     );

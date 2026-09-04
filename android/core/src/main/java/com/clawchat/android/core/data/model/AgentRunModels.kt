@@ -67,6 +67,8 @@ data class AgentRun(
     @SerialName("todo_id") val todoId: String? = null,
     @SerialName("todo_title") val todoTitle: String? = null,
     @SerialName("todo_status") val todoStatus: TaskStatus? = null,
+    /** The chat thread this run reports into. */
+    @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("task_type") val taskType: String,
     val instruction: String,
     @SerialName("instruction_snapshot") val instructionSnapshot: String,

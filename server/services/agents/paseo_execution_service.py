@@ -185,11 +185,13 @@ async def _monitor_agent(
                 progress=run.progress,
                 payload={"permissions": list(snapshot.pending_permissions)},
             )
+            await agent_run_service.notify_run_state(db, run, task, user_id=user_id)
             await db.commit()
             await _notify_run_state(user_id)
             return
 
         if snapshot.status in {"running", "created", "starting"}:
+            resumed_from_input = run.status == AgentRunStatus.WAITING_INPUT
             run.status = AgentRunStatus.RUNNING
             run.progress = max(run.progress, 25)
             run.progress_message = f"Paseo agent {snapshot.status}"
@@ -206,6 +208,8 @@ async def _monitor_agent(
                     payload={"agent_id": snapshot.id, "workspace_id": run.workspace_id},
                 )
                 provider_running_recorded = True
+            if resumed_from_input:
+                await agent_run_service.notify_run_state(db, run, task, user_id=user_id)
             await db.commit()
             await asyncio.sleep(poll_interval)
             continue
@@ -383,6 +387,7 @@ async def resume_external_run(
             "Follow-up instruction sent to Paseo",
             progress=run.progress,
         )
+        await agent_run_service.notify_run_state(db, run, task, user_id=user_id)
         await db.commit()
     await execute_run(session_factory, run_id, user_id=user_id, adapter=adapter)
 

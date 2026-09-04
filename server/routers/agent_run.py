@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from auth.dependencies import get_current_user
 from database import get_db
 from domain.agent_run import AgentRunStatus
-from domain.review import ReviewStatus, ReviewSubjectType
 from exceptions import ConflictError, NotFoundError
 from fastapi import APIRouter, Depends, Query, Request
 from models.agent_run import AgentRun
@@ -25,10 +24,8 @@ from services.agents import (
     agent_run_service,
     agent_task_service,
     paseo_execution_service,
+    run_resume_service,
     task_execution_recovery_service,
-)
-from services.review import (
-    review_item_service,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from ws.manager import ws_manager
@@ -75,13 +72,7 @@ async def get_run_events(
 
 
 def _active_provider(request: Request) -> tuple[str, object, str | None]:
-    provider = getattr(request.app.state, "active_ai_provider", "openclaw")
-    ai = getattr(request.app.state, "active_ai", None) or getattr(
-        request.app.state, "ai_service", None
-    )
-    if ai is None:
-        raise ConflictError("No execution provider is available")
-    return provider, ai, getattr(ai, "model", None)
+    return run_resume_service.active_provider(request.app.state)
 
 
 @router.post("/{run_id}/retry", response_model=AgentRunResponse, status_code=201)
@@ -197,84 +188,17 @@ async def resume_run(
     user_id: str = Depends(get_current_user),
 ):
     run = await agent_run_service.require_run(db, run_id)
-    if run.status != AgentRunStatus.WAITING_INPUT:
-        raise ConflictError(f"Agent run cannot be resumed from {run.status}")
     task = await db.get(AgentTask, run.agent_task_id)
     if task is None:
         raise NotFoundError("Agent task not found")
-    follow_up = body.follow_up_instruction.strip()
-    run.instruction_snapshot = (
-        f"{run.instruction_snapshot}\n\nFollow-up instruction:\n{follow_up}"
-    )
-    run.status = AgentRunStatus.STARTING
-    run.progress = 0
-    run.progress_message = "Resuming with follow-up instruction"
-    run.result = None
-    run.result_summary = None
-    run.error = None
-    run.completed_at = None
-    run.heartbeat_at = datetime.now(timezone.utc)
-    task.instruction = run.instruction_snapshot
-    task.status = "queued"
-    task.result = None
-    task.error = None
-    task.progress = 0
-    task.completed_at = None
-    await review_item_service.set_subject_review_status(
+    await run_resume_service.resume_with_follow_up(
         db,
-        ReviewSubjectType.AGENT_RUN,
-        run.id,
-        ReviewStatus.EXPIRED,
+        request.app.state,
+        run,
+        task,
+        body.follow_up_instruction,
+        user_id=user_id,
     )
-    await agent_run_service.record_event(
-        db, run, "resuming", "Resuming with follow-up instruction", progress=0
-    )
-    await db.commit()
-    session_factory = request.app.state.session_factory
-
-    if run.provider == "paseo":
-        paseo_adapter = getattr(request.app.state, "paseo_adapter", None) or (
-            paseo_execution_service.adapter_from_settings()
-        )
-        agent_run_service.launch_execution(
-            run.id,
-            paseo_execution_service.resume_external_run(
-                session_factory,
-                run.id,
-                follow_up,
-                user_id=user_id,
-                adapter=paseo_adapter,
-            ),
-        )
-        await notify_module_data_changed("runs")
-        await notify_module_data_changed("reviews")
-        return await agent_run_service.build_run_response(db, run)
-
-    provider, ai_service, model = _active_provider(request)
-    if run.provider != provider:
-        raise ConflictError(
-            f"Run provider {run.provider!r} is unavailable; active provider is {provider!r}"
-        )
-
-    async def execute() -> None:
-        async with session_factory() as run_db:
-            persisted_task = await run_db.get(AgentTask, task.id)
-            persisted_run = await run_db.get(AgentRun, run.id)
-            if persisted_task is None or persisted_run is None:
-                return
-            await agent_task_service.execute_task(
-                run_db,
-                persisted_task,
-                ai_service,
-                ws_manager,
-                user_id,
-                session_factory=session_factory,
-                run=persisted_run,
-                provider=provider,
-                model=model,
-            )
-
-    agent_run_service.launch_execution(run.id, execute())
     await notify_module_data_changed("runs")
     await notify_module_data_changed("reviews")
     return await agent_run_service.build_run_response(db, run)

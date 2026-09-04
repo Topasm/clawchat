@@ -77,6 +77,12 @@ class SyncManager internal constructor(
     val weeklyReview: SharedFlow<WorkspaceSyncEvent<SyncEvent.WeeklyReview>> =
         _weeklyReview.asSharedFlow()
 
+    private val _runState = MutableSharedFlow<WorkspaceSyncEvent<SyncEvent.RunStateChanged>>(
+        extraBufferCapacity = 16,
+    )
+    val runState: SharedFlow<WorkspaceSyncEvent<SyncEvent.RunStateChanged>> =
+        _runState.asSharedFlow()
+
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
@@ -187,6 +193,15 @@ class SyncManager internal constructor(
                 is SyncEvent.WeeklyReview -> {
                     _lastEventAtEpochMillis.value = System.currentTimeMillis()
                     _weeklyReview.tryEmit(WorkspaceSyncEvent(workspaceKey, event))
+                }
+                is SyncEvent.RunStateChanged -> {
+                    _lastEventAtEpochMillis.value = System.currentTimeMillis()
+                    // The run list and, once a result is up for review, the
+                    // review inbox both changed under this event. That is what
+                    // feeds the "needs attention" notification and badge.
+                    _runChanged.tryEmit(Unit)
+                    if (event.status == "waiting_review") notifyReviewChanged()
+                    _runState.tryEmit(WorkspaceSyncEvent(workspaceKey, event))
                 }
                 is SyncEvent.Connected -> {
                     _isConnected.value = true

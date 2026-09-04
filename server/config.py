@@ -234,6 +234,12 @@ class Settings(BaseSettings):
     briefing_time: str = "08:00"
     reminder_check_interval: int = 5
 
+    # Agent run watchdog: a run whose heartbeat stops is failed so it can be
+    # retried, and a run left waiting for input is brought up again.
+    run_watchdog_interval_seconds: int = 60
+    run_heartbeat_timeout_minutes: int = 10
+    run_input_reminder_minutes: int = 30
+
     # Proactive nudges
     enable_nudges: bool = False
     nudge_interval_hours: int = 4

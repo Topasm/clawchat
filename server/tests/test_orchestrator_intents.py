@@ -169,10 +169,37 @@ async def test_general_chat_has_no_self_contained_answer(orchestrator, db_sessio
     assert await _resolve(orchestrator, db_session, "general_chat", {}) is None
 
 
-async def test_delegate_task_is_left_to_the_orchestrator_path(orchestrator, db_session):
-    """Delegation reports progress over its own events, so it has no
-    one-shot textual form."""
-    assert await _resolve(orchestrator, db_session, "delegate_task", {}) is None
+async def test_delegate_task_is_confirmed_and_started(orchestrator, db_session, monkeypatch):
+    """Delegation used to return None here, so the SSE transport never
+    delegated at all. Both transports now get the confirmation and the run."""
+    from models.agent_run import AgentRun
+    from models.agent_task import AgentTask
+    from services.agents import agent_run_service
+
+    launched: list[str] = []
+
+    def _record_launch(run_id, coroutine):
+        coroutine.close()
+        launched.append(run_id)
+
+    monkeypatch.setattr(agent_run_service, "launch_execution", _record_launch)
+
+    text, metadata = await _resolve(
+        orchestrator,
+        db_session,
+        "delegate_task",
+        {"instruction": "Summarize the meeting notes", "task_type": "summarize"},
+    )
+
+    task = (await db_session.execute(select(AgentTask))).scalars().one()
+    run = (await db_session.execute(select(AgentRun))).scalars().one()
+    assert task.instruction == "Summarize the meeting notes"
+    assert run.agent_task_id == task.id
+    assert launched == [run.id]
+    assert metadata["action_type"] == "task_delegated"
+    assert metadata["task_id"] == task.id
+    assert metadata["run_id"] == run.id
+    assert task.id in text
 
 
 # --- a day is a deadline, a clock time is an appointment ------------------

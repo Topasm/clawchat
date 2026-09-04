@@ -29,6 +29,26 @@ export function useAgentRunsQuery(projectId?: string | null) {
     },
   });
 }
+/**
+ * Runs stopped on a question or a permission, i.e. the agent is waiting on you.
+ *
+ * No polling: the server pushes `module_data_changed("runs")` on every
+ * transition, so this only refetches when something actually moved. Mounted
+ * app-wide (nav badge), which is why it must stay cheap.
+ */
+export function useRunsAwaitingInputQuery() {
+  const serverUrl = useAuthStore((state) => state.serverUrl);
+  return useQuery({
+    queryKey: queryKeys.runsByStatus('waiting_input'),
+    queryFn: async () => {
+      const response = await apiClient.get('/runs', {
+        params: { status: 'waiting_input', limit: 100 },
+      });
+      return z.array(AgentRunResponseSchema).parse(response.data);
+    },
+    enabled: !!serverUrl,
+  });
+}
 export function useAgentRunEventsQuery(runId: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({

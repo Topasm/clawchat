@@ -13,10 +13,7 @@ from models.conversation import Conversation
 from models.message import Message
 from services.agents import agent_task_service, agent_run_service
 from services.ai.ai_service import AIService
-from services.chat.conversation_context import (
-    build_first_class_project_context,
-    build_project_context,
-)
+from services.chat.conversation_context import build_conversation_context
 from services.chat.intent_classifier import classify_intent
 from services.chat.intent_handlers import (
     MODULE_INTENTS,
@@ -68,20 +65,34 @@ class Orchestrator:
         intent: str,
         params: dict,
         content: str,
+        *,
+        user_id: str = "user",
+        message_id: str | None = None,
     ) -> tuple[str, dict | None] | None:
         """Produce the reply for an already-classified intent, without delivering it.
 
-        Returns ``None`` when the intent has no self-contained textual answer and
-        the caller should fall back to streaming a chat completion. That covers
-        ``general_chat`` and ``delegate_task``: delegation spawns an AgentTask and
-        reports progress over its own WebSocket events, which has no meaning on a
-        one-shot SSE response.
+        Returns ``None`` only for ``general_chat`` and anything unrecognised: the
+        caller then streams a chat completion instead.
+
+        ``delegate_task`` is answered here as well. It used to be left out on the
+        grounds that a run reports over WebSocket events, so on SSE -- every
+        Android client -- asking to delegate produced prose and no work at all.
+        The run's later states reach the client through its thread and
+        ``module_data_changed`` regardless of transport, so the only thing the
+        reply has to do is confirm the delegation and start it.
 
         Splitting this out is what lets the SSE endpoint act on intents at all.
         Previously only the WebSocket path classified anything, so a client that
-        streamed over SSE -- every Android client -- silently lost task and
-        calendar actions.
+        streamed over SSE silently lost task and calendar actions.
         """
+        if intent == "delegate_task":
+            task, run, text, metadata = await self._create_delegation(
+                db, conversation_id, message_id, params, content
+            )
+            await db.commit()
+            self._launch_delegation(task, run, user_id)
+            return text, metadata
+
         definition = get_intent_handler(intent)
         if definition is None:
             if intent in MODULE_INTENTS:
@@ -206,15 +217,26 @@ class Orchestrator:
                 "data": {"module": action_metadata.get("module")},
             })
 
-    async def _handle_delegate_task(
+    @property
+    def _active_provider_name(self) -> str:
+        if self._app_state:
+            return getattr(self._app_state, "active_ai_provider", "openclaw")
+        return "openclaw"
+
+    async def _create_delegation(
         self,
         db: AsyncSession,
-        user_id: str,
         conversation_id: str,
-        message_id: str,
+        message_id: str | None,
         params: dict,
         content: str,
-    ):
+    ) -> tuple[AgentTask, AgentRun, str, dict]:
+        """Create the task and its first run; nothing executes yet.
+
+        Shared by both transports. The caller commits, delivers the reply, and
+        then launches -- in that order, so the confirmation lands in the thread
+        before anything the run itself writes there.
+        """
         instruction = params.get("instruction") or params.get("query") or content
         task_type = params.get("task_type", "research")
 
@@ -234,15 +256,10 @@ class Orchestrator:
         # Set the skill chain on the new task.
         task.skill_chain = json.dumps(skill_chain)
         await db.flush()
-        provider = (
-            getattr(self._app_state, "active_ai_provider", "openclaw")
-            if self._app_state
-            else "openclaw"
-        )
         run = await agent_run_service.create_run(
             db,
             task,
-            provider=provider,
+            provider=self._active_provider_name,
             model=getattr(self.active_ai, "model", None),
         )
 
@@ -258,41 +275,59 @@ class Orchestrator:
                 f"Got it! I've queued that as a background task (ID: {task.id}). "
                 "I'll notify you when it's done."
             )
+        metadata = {
+            "action_type": "task_delegated",
+            "task_id": task.id,
+            "run_id": run.id,
+            "agent_type": agent_type,
+            "skill_chain": skill_chain,
+            "is_multi_agent": is_multi_skill,
+        }
+        return task, run, msg, metadata
 
-        await self._send_assistant_message(
-            db,
-            user_id,
-            conversation_id,
-            "delegate_task",
-            msg,
-            metadata={
-                "action_type": "task_delegated",
-                "task_id": task.id,
-                "run_id": run.id,
-                "agent_type": agent_type,
-                "skill_chain": skill_chain,
-                "is_multi_agent": is_multi_skill,
-            },
-        )
-        # Make the task and run visible to the fresh execution session before
-        # starting the coroutine.
-        await db.commit()
+    def _launch_delegation(self, task: AgentTask, run: AgentRun, user_id: str) -> None:
+        """Start the run in the background with a session of its own.
 
-        # Fire background execution with a fresh DB session
+        The caller must have committed: the task and run have to be visible to
+        that fresh session before the coroutine looks for them.
+        """
+        task_id, run_id = task.id, run.id
+        provider = self._active_provider_name
+        active_ai = self.active_ai
+
         async def _run_task():
             async with self.session_factory() as task_db:
-                t = await task_db.get(AgentTask, task.id)
-                persisted_run = await task_db.get(AgentRun, run.id)
+                t = await task_db.get(AgentTask, task_id)
+                persisted_run = await task_db.get(AgentRun, run_id)
                 if t and persisted_run:
                     await agent_task_service.execute_task(
-                        task_db, t, self.active_ai, self.ws, user_id,
+                        task_db, t, active_ai, self.ws, user_id,
                         session_factory=self.session_factory,
                         run=persisted_run,
                         provider=provider,
-                        model=getattr(self.active_ai, "model", None),
+                        model=getattr(active_ai, "model", None),
                     )
 
-        agent_run_service.launch_execution(run.id, _run_task())
+        agent_run_service.launch_execution(run_id, _run_task())
+
+    async def _handle_delegate_task(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        conversation_id: str,
+        message_id: str,
+        params: dict,
+        content: str,
+    ):
+        task, run, msg, metadata = await self._create_delegation(
+            db, conversation_id, message_id, params, content
+        )
+        # Delivers and commits: the task and run are then visible to the fresh
+        # execution session, and the confirmation precedes the run's own updates.
+        await self._send_assistant_message(
+            db, user_id, conversation_id, "delegate_task", msg, metadata=metadata
+        )
+        self._launch_delegation(task, run, user_id)
 
     async def _handle_general_chat(
         self,
@@ -311,12 +346,8 @@ class Orchestrator:
         rows = (await db.execute(q)).scalars().all()
         history = list(reversed(rows))
 
-        system_content = SYSTEM_PROMPT
         conv = await db.get(Conversation, conversation_id)
-        if conv and conv.project_id:
-            system_content += await build_first_class_project_context(db, conv.project_id)
-        elif conv and conv.project_todo_id:
-            system_content += await build_project_context(db, conv.project_todo_id)
+        system_content = SYSTEM_PROMPT + await build_conversation_context(db, conv)
         messages = [{"role": "system", "content": system_content}]
         for msg in history:
             messages.append({"role": msg.role, "content": msg.content})
