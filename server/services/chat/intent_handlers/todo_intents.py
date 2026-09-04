@@ -101,6 +101,7 @@ async def complete_todo(ctx: IntentContext) -> IntentReply:
     todo, error = await _resolve_target(ctx, "complete")
     if error is not None:
         return error
+    was_completed = todo.status == TaskStatus.COMPLETED
     todo = await todo_service.update_todo(
         ctx.db,
         todo.id,
@@ -116,14 +117,15 @@ async def complete_todo(ctx: IntentContext) -> IntentReply:
         "todo_id": todo.id,
         "todo_title": todo.title,
     }
-    if todo.recurrence_rule:
-        next_todo = await todo_recurrence_service.spawn_next_occurrence(ctx.db, todo)
-        if next_todo is not None:
-            metadata["next_todo_id"] = next_todo.id
-            if next_todo.due_date:
-                message += (
-                    f" Next one is due {next_todo.due_date.date().isoformat()}."
-                )
+    spawned = await todo_recurrence_service.spawn_next_occurrences(
+        ctx.db,
+        [todo] if not was_completed else [],
+    )
+    if spawned:
+        next_todo = spawned[0]
+        metadata["next_todo_id"] = next_todo.id
+        if next_todo.due_date:
+            message += f" Next one is due {next_todo.due_date.date().isoformat()}."
     return message, metadata
 
 

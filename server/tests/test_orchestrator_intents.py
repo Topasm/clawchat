@@ -99,6 +99,30 @@ async def test_completing_a_recurring_task_by_chat_continues_the_series(
     assert "2026-08-29" in text
 
 
+async def test_recompleting_a_recurring_task_by_chat_does_not_duplicate_the_series(
+    orchestrator, db_session
+):
+    original = await _recurring(db_session)
+    original.status = TaskStatus.COMPLETED
+    original.completed_at = datetime.now(timezone.utc)
+    await db_session.flush()
+
+    _text, metadata = await _resolve(
+        orchestrator, db_session, "complete_todo", {"title": "Water the plants"}
+    )
+
+    assert "next_todo_id" not in metadata
+    pending = (
+        await db_session.execute(
+            select(Todo).where(
+                Todo.title == "Water the plants",
+                Todo.status == TaskStatus.PENDING,
+            )
+        )
+    ).scalars().all()
+    assert pending == []
+
+
 async def test_completing_a_non_recurring_task_spawns_nothing(orchestrator, db_session):
     todo = Todo(
         id=make_id("todo_"),

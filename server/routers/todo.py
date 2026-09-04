@@ -61,6 +61,7 @@ from services.tasks import (
     task_placement_service,
     task_execution_telemetry_service,
     task_relationship_service,
+    todo_recurrence_service,
     todo_service,
 )
 from services.vault import (
@@ -353,6 +354,7 @@ async def bulk_update_todos(
     deleted = 0
     deleted_ids: list[str] = []
     updated_todos: list[Todo] = []
+    newly_completed_todos: list[Todo] = []
     errors: list[str] = []
     todo_rows = await db.execute(select(Todo).where(Todo.id.in_(body.ids)))
     todos_by_id = {todo.id: todo for todo in todo_rows.scalars().all()}
@@ -372,11 +374,17 @@ async def bulk_update_todos(
             deleted += 1
         else:
             if body.status is not None:
+                became_completed = (
+                    body.status == TaskStatus.COMPLETED
+                    and todo.status != TaskStatus.COMPLETED
+                )
                 todo.status = body.status
                 if body.status == TaskStatus.COMPLETED and not todo.completed_at:
                     todo.completed_at = datetime.now(timezone.utc)
                 elif body.status != TaskStatus.COMPLETED:
                     todo.completed_at = None
+                if became_completed:
+                    newly_completed_todos.append(todo)
             if body.priority is not None:
                 todo.priority = body.priority
             if body.tags is not None:
@@ -389,6 +397,7 @@ async def bulk_update_todos(
         db,
         dependent_source_ids,
     )
+    await todo_recurrence_service.spawn_next_occurrences(db, newly_completed_todos)
     await db.commit()
 
     if settings.obsidian_vault_path:
@@ -510,8 +519,13 @@ async def update_todo(
 ):
     data = body.model_dump(exclude_unset=True)
     client_updated_at = data.pop("client_updated_at", None)
-    if client_updated_at is not None:
+    is_completion = (
+        "status" in data and data["status"] == TaskStatus.COMPLETED
+    )
+    current = None
+    if client_updated_at is not None or is_completion:
         current = await todo_service.get_todo(db, todo_id)
+    if client_updated_at is not None and current is not None:
         server_updated_at = current.updated_at
         if server_updated_at.tzinfo is None:
             server_updated_at = server_updated_at.replace(tzinfo=timezone.utc)
@@ -521,22 +535,15 @@ async def update_todo(
             # Another device wrote later while this client was offline. Return
             # the winning row so every client converges without a retry loop.
             return await _enrich_todo_response(current, db)
+    was_completed = current is not None and current.status == TaskStatus.COMPLETED
     todo = await todo_service.update_todo(db, todo_id, **data)
+    spawned = await todo_recurrence_service.spawn_next_occurrences(
+        db,
+        [todo] if is_completion and not was_completed else [],
+    )
+    next_todo_id = spawned[0].id if spawned else None
     await db.commit()
     await db.refresh(todo)
-
-    # Spawn next occurrence for recurring tasks on completion
-    next_todo_id = None
-    if (
-        "status" in data
-        and data["status"] == TaskStatus.COMPLETED
-        and todo.recurrence_rule
-    ):
-        from services.tasks.todo_recurrence_service import spawn_next_occurrence
-        next_todo = await spawn_next_occurrence(db, todo)
-        if next_todo:
-            next_todo_id = next_todo.id
-            await db.commit()
 
     await notify_module_data_changed("todos")
     resp = await _enrich_todo_response(todo, db)
