@@ -257,7 +257,9 @@ class ProgressViewModelTest {
         val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
         stubInitial(todos = listOf(active))
         val posted = comment(active.id, "Shipping now")
-        coEvery { comments.addComment(active.id, "Shipping now") } returns ApiResult.Success(posted)
+        coEvery {
+            comments.addComment(active.id, "Shipping now", any())
+        } returns ApiResult.Success(posted)
         val viewModel = viewModel()
         advanceUntilIdle()
 
@@ -266,7 +268,7 @@ class ProgressViewModelTest {
 
         assertEquals(listOf(posted), viewModel.uiState.value.commentsByTodoId[active.id])
         assertNull(viewModel.uiState.value.commentError)
-        coVerify(exactly = 1) { comments.addComment(active.id, "Shipping now") }
+        coVerify(exactly = 1) { comments.addComment(active.id, "Shipping now", any()) }
     }
 
     @Test
