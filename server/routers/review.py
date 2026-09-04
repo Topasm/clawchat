@@ -4,6 +4,7 @@ import logging
 
 from auth.dependencies import get_current_user
 from database import get_db
+from domain.agent_run import AgentRunStatus
 from domain.review import ReviewStatus, ReviewSubjectType
 from exceptions import AppError, ConflictError
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
@@ -161,7 +162,17 @@ async def decide_review(
         )
         await db.commit()
     elif item.subject_type == ReviewSubjectType.AGENT_RUN:
-        outcome = await agent_run_service.decide_run(db, item.subject_id, body.decision)
+        expected_run_status = (
+            AgentRunStatus.WAITING_REVIEW
+            if item.status == ReviewStatus.PENDING
+            else AgentRunStatus.WAITING_INPUT
+        )
+        outcome = await agent_run_service.decide_run(
+            db,
+            item.subject_id,
+            body.decision,
+            expected_status=expected_run_status,
+        )
         await review_item_service.set_subject_review_status(
             db,
             ReviewSubjectType.AGENT_RUN,

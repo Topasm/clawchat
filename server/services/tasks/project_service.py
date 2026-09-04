@@ -7,6 +7,7 @@ from domain.graph_insights import GraphDueRisk
 from domain.task import TaskStatus
 from exceptions import NotFoundError
 from models.conversation import Conversation
+from models.execution_host import ExecutionHost
 from models.project import Project
 from models.review_item import ReviewItem
 from models.agent_run import AgentRun
@@ -166,7 +167,7 @@ async def update_project(
     return project
 
 
-async def _project_counts(db: AsyncSession):
+def _project_aggregates():
     counts = (
         select(
             Todo.project_id.label("project_id"),
@@ -200,63 +201,79 @@ async def _project_counts(db: AsyncSession):
     return counts, conversations
 
 
-async def list_projects(
-    db: AsyncSession,
-    *,
-    include_archived: bool = False,
-) -> list[ProjectResponse]:
-    counts, conversations = await _project_counts(db)
-    query = (
+def _project_response_query():
+    counts, conversations = _project_aggregates()
+    return (
         select(
             Project,
             func.coalesce(counts.c.task_count, 0),
             func.coalesce(counts.c.completed_task_count, 0),
             conversations.c.conversation_id,
+            ExecutionHost,
         )
         .outerjoin(counts, counts.c.project_id == Project.id)
         .outerjoin(conversations, conversations.c.project_id == Project.id)
-        .order_by(Project.updated_at.desc(), Project.id.asc())
+        .outerjoin(ExecutionHost, ExecutionHost.id == Project.execution_host_id)
+    )
+
+
+def _build_project_response(
+    project: Project,
+    task_count: int,
+    completed_task_count: int,
+    conversation_id: str | None,
+    execution_host: ExecutionHost | None,
+) -> ProjectResponse:
+    host_label, host_online = execution_host_service.project_host_state_from_host(
+        execution_host
+    )
+    return ProjectResponse.model_validate(project).model_copy(
+        update={
+            "task_count": max(
+                0,
+                task_count - (1 if project.root_task_id else 0),
+            ),
+            "completed_task_count": max(
+                0,
+                completed_task_count
+                - (
+                    1
+                    if project.root_task_id
+                    and project.status == ProjectStatus.COMPLETED
+                    else 0
+                ),
+            ),
+            "conversation_id": conversation_id,
+            "execution_host_label": host_label,
+            "execution_host_online": host_online,
+        }
+    )
+
+
+async def list_projects(
+    db: AsyncSession,
+    *,
+    include_archived: bool = False,
+) -> list[ProjectResponse]:
+    query = _project_response_query().order_by(
+        Project.updated_at.desc(), Project.id.asc()
     )
     if not include_archived:
         query = query.where(Project.status != ProjectStatus.ARCHIVED)
     rows = (await db.execute(query)).all()
-    responses = []
-    for project, task_count, completed_task_count, conversation_id in rows:
-        host_label, host_online = await execution_host_service.project_host_state(
-            db, project.execution_host_id
-        )
-        responses.append(
-            ProjectResponse.model_validate(project).model_copy(
-                update={
-                    "task_count": max(
-                        0,
-                        task_count - (1 if project.root_task_id else 0),
-                    ),
-                    "completed_task_count": max(
-                        0,
-                        completed_task_count
-                        - (
-                            1
-                            if project.root_task_id
-                            and project.status == ProjectStatus.COMPLETED
-                            else 0
-                        ),
-                    ),
-                    "conversation_id": conversation_id,
-                    "execution_host_label": host_label,
-                    "execution_host_online": host_online,
-                }
-            )
-        )
-    return responses
+    return [_build_project_response(*row) for row in rows]
 
 
 async def build_project_response(
     db: AsyncSession,
     project: Project,
 ) -> ProjectResponse:
-    items = await list_projects(db, include_archived=True)
-    return next(item for item in items if item.id == project.id)
+    row = (
+        await db.execute(_project_response_query().where(Project.id == project.id))
+    ).one_or_none()
+    if row is None:
+        raise NotFoundError(f"Project {project.id} not found")
+    return _build_project_response(*row)
 
 
 async def build_project_overview(

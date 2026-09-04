@@ -113,6 +113,13 @@ async def project_host_state(
     if not execution_host_id:
         return None, None
     host = await db.get(ExecutionHost, execution_host_id)
+    return project_host_state_from_host(host)
+
+
+def project_host_state_from_host(
+    host: ExecutionHost | None,
+) -> tuple[str | None, bool | None]:
+    """Summarise an already-loaded host without issuing another query."""
     if host is None:
         return None, None
     online = host.is_enabled and (

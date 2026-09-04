@@ -296,9 +296,15 @@ async def test_concurrent_review_decisions_have_one_cas_winner(
         async def decide(decision):
             async with session_factory() as db:
                 try:
-                    await agent_run_service.require_run(db, run.id)
+                    loaded_run = await agent_run_service.require_run(db, run.id)
+                    expected_status = AgentRunStatus(loaded_run.status)
                     await barrier.wait()
-                    await agent_run_service.decide_run(db, run.id, decision)
+                    await agent_run_service.decide_run(
+                        db,
+                        run.id,
+                        decision,
+                        expected_status=expected_status,
+                    )
                     await db.commit()
                     return decision.value
                 except ConflictError:

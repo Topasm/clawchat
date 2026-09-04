@@ -447,17 +447,22 @@ async def decide_run(
     db: AsyncSession,
     run_id: str,
     decision: ReviewStatus,
+    *,
+    expected_status: AgentRunStatus | None = None,
 ) -> AgentRunReviewOutcome | dict[str, Any]:
     run = await require_run(db, run_id)
     task = await db.get(AgentTask, run.agent_task_id)
     if task is None:
         raise NotFoundError("Agent task not found")
-    if run.status not in {
+    current_status = AgentRunStatus(run.status)
+    if expected_status is not None and current_status != expected_status:
+        raise ConflictError("Agent run changed before it could be reviewed")
+    expected_status = expected_status or current_status
+    if expected_status not in {
         AgentRunStatus.WAITING_REVIEW,
         AgentRunStatus.WAITING_INPUT,
     }:
-        raise ConflictError(f"Agent run cannot be reviewed from {run.status}")
-    expected_status = AgentRunStatus(run.status)
+        raise ConflictError(f"Agent run cannot be reviewed from {expected_status}")
     if decision == ReviewStatus.APPROVED:
         todo = await db.get(Todo, task.todo_id) if task.todo_id else None
         before_insights = (
