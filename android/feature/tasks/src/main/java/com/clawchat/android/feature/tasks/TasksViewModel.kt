@@ -29,6 +29,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 private const val TAG = "TasksViewModel"
@@ -319,20 +320,27 @@ class TasksViewModel @Inject constructor(
                         )
                     },
                 ) {
+                    if (recordMissingVerdict) {
+                        when (
+                            val result = taskCommentRepository.addComment(
+                                todoId,
+                                MISSING_VERDICT_COMMENT,
+                                missingVerdictOperationId(todoId),
+                            )
+                        ) {
+                            is ApiResult.Success -> Unit
+                            is ApiResult.Error -> throw Exception(result.message)
+                            ApiResult.Loading -> throw Exception("Comment request did not complete")
+                        }
+                    }
                     val result = todoRepository.updateTodo(todoId, TodoUpdate(status = newStatus))
                     if (result is ApiResult.Error) throw Exception(result.message)
-                }
-                if (recordMissingVerdict) {
-                    when (val result = taskCommentRepository.addComment(todoId, MISSING_VERDICT_COMMENT)) {
-                        is ApiResult.Success -> Unit
-                        is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
-                        ApiResult.Loading -> Unit
-                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Optimistic update failed", e)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -451,3 +459,7 @@ class TasksViewModel @Inject constructor(
         const val MAX_CONCURRENT_TITLE_LOOKUPS = 8
     }
 }
+
+internal fun missingVerdictOperationId(todoId: String): String = UUID.nameUUIDFromBytes(
+    "clawchat:missing-verdict:$todoId".toByteArray(Charsets.UTF_8),
+).toString()

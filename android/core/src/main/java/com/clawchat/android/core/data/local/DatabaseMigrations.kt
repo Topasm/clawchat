@@ -191,3 +191,25 @@ val MIGRATION_5_6: Migration = object : Migration(5, 6) {
         }
     }
 }
+
+/** Keeps project identity and execution context intact in the offline server cache. */
+val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        listOf(
+            "projectId" to "TEXT",
+            "source" to "TEXT",
+            "sourceId" to "TEXT",
+            "idempotencyKey" to "TEXT",
+            "assignee" to "TEXT",
+            "estimatedMinutes" to "INTEGER",
+            "projectLabel" to "TEXT",
+        ).forEach { (column, type) ->
+            db.execSQL("ALTER TABLE `todos` ADD COLUMN `$column` $type")
+        }
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_todos_workspace_project_order` " +
+                "ON `todos` (`workspaceKey` ASC, `projectId` ASC, `sortOrder` ASC, " +
+                "`createdAt` DESC, `id` ASC)",
+        )
+    }
+}

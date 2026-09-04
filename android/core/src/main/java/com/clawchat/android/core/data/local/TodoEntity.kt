@@ -17,6 +17,17 @@ import androidx.room.Index
             name = "index_todos_workspace_due_date",
             value = ["workspaceKey", "dueDate", "status"],
         ),
+        Index(
+            name = "index_todos_workspace_project_order",
+            value = ["workspaceKey", "projectId", "sortOrder", "createdAt", "id"],
+            orders = [
+                Index.Order.ASC,
+                Index.Order.ASC,
+                Index.Order.ASC,
+                Index.Order.DESC,
+                Index.Order.ASC,
+            ],
+        ),
     ],
 )
 data class TodoEntity(
@@ -24,6 +35,7 @@ data class TodoEntity(
     val id: String,
     val title: String,
     val description: String? = null,
+    val projectId: String? = null,
     val status: String = "pending",
     val priority: String = "medium",
     val dueDate: String? = null,
@@ -31,7 +43,13 @@ data class TodoEntity(
     val tags: String? = null,  // JSON array as string
     val parentId: String? = null,
     val sortOrder: Int = 0,
+    val source: String? = null,
+    val sourceId: String? = null,
+    val idempotencyKey: String? = null,
+    val assignee: String? = null,
     val inboxState: String = "none",
+    val estimatedMinutes: Int? = null,
+    val projectLabel: String? = null,
     val isRecurring: Boolean = false,
     val recurrenceRule: String? = null,
     val createdAt: String,

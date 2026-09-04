@@ -1,6 +1,7 @@
 """HTTP API for user-authored task comment threads."""
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import get_current_user
@@ -41,8 +42,26 @@ async def create_task_comment(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    comment = await task_comment_service.create_comment(db, body.todo_id, body.content)
-    await db.commit()
+    try:
+        comment = await task_comment_service.create_comment(
+            db,
+            body.todo_id,
+            body.content,
+            idempotency_key=body.idempotency_key,
+        )
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        if body.idempotency_key is None:
+            raise
+        comment = await task_comment_service.get_idempotent_comment(
+            db,
+            body.idempotency_key,
+            body.todo_id,
+            body.content,
+        )
+        if comment is None:
+            raise
     await db.refresh(comment)
     await notify_module_data_changed("todos")
     return comment

@@ -96,6 +96,48 @@ async def test_comment_create_rejects_blank_content(client, auth_headers):
 
 
 @pytest.mark.asyncio
+async def test_comment_create_is_idempotent(client, auth_headers):
+    todo = await _create_todo(client, auth_headers, "Experiment E65a")
+    body = {
+        "todo_id": todo["id"],
+        "content": "판정 미기록",
+        "idempotency_key": "00000000-0000-0000-0000-000000000065",
+    }
+
+    first = await client.post("/api/task-comments", json=body, headers=auth_headers)
+    second = await client.post("/api/task-comments", json=body, headers=auth_headers)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.json()["id"] == first.json()["id"]
+    listed = await client.get(
+        "/api/task-comments",
+        params={"todo_ids": todo["id"]},
+        headers=auth_headers,
+    )
+    assert [item["content"] for item in listed.json()] == ["판정 미기록"]
+
+
+@pytest.mark.asyncio
+async def test_comment_idempotency_key_cannot_be_reused(client, auth_headers):
+    todo = await _create_todo(client, auth_headers, "Experiment E65b")
+    key = "00000000-0000-0000-0000-000000000066"
+    first = await client.post(
+        "/api/task-comments",
+        json={"todo_id": todo["id"], "content": "first", "idempotency_key": key},
+        headers=auth_headers,
+    )
+    conflict = await client.post(
+        "/api/task-comments",
+        json={"todo_id": todo["id"], "content": "second", "idempotency_key": key},
+        headers=auth_headers,
+    )
+
+    assert first.status_code == 201
+    assert conflict.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_comment_delete_rejects_missing_comment(client, auth_headers):
     response = await client.delete(
         "/api/task-comments/missing-comment",

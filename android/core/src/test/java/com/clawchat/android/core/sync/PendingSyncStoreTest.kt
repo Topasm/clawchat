@@ -79,6 +79,27 @@ class PendingSyncStoreTest {
     }
 
     @Test
+    fun `comment mutation decodes from the shared todo outbox`() = runTest {
+        val dao = mockk<PendingTodoMutationDao>()
+        coEvery { dao.getForWorkspace(WORKSPACE) } returns listOf(
+            PendingTodoMutationEntity(
+                workspaceKey = WORKSPACE,
+                operationId = "00000000-0000-0000-0000-000000000065",
+                todoId = "todo-1",
+                operationType = "comment",
+                payload = """{"todo_id":"todo-1","content":"판정 미기록","idempotency_key":"00000000-0000-0000-0000-000000000065"}""",
+                changedAt = "2026-09-01T01:00:00Z",
+            ),
+        )
+        val store = PendingTodoUpdateStore(dao, mockk<Context>(relaxed = true))
+
+        val pending = store.allForWorkspace(WORKSPACE).single() as PendingTodoComment
+
+        assertEquals("todo-1", pending.todoId)
+        assertEquals("판정 미기록", pending.content)
+    }
+
+    @Test
     fun `todo failure records exponential retry diagnostics`() = runTest {
         val dao = mockk<PendingTodoMutationDao>(relaxed = true)
         coEvery { dao.getForTodo(WORKSPACE, "todo-1") } returns listOf(

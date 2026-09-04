@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         PendingTodoMutationEntity::class,
         PendingReviewDecisionEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class ClawChatDatabase : RoomDatabase() {

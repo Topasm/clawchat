@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
@@ -16,6 +17,7 @@ class TaskCommentCreate(BaseModel):
 
     todo_id: str
     content: NonBlankComment
+    idempotency_key: UUID | None = None
 
     model_config = ConfigDict(extra="forbid")
 

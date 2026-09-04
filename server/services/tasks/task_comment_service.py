@@ -1,13 +1,33 @@
 """Validation and persistence for user-authored task comment threads."""
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exceptions import NotFoundError
+from exceptions import ConflictError, NotFoundError
 from models.task_comment import TaskComment
 from models.todo import Todo
 
 _DEFAULT_PER_TODO_LIMIT = 5
+
+
+def _idempotent_comment_id(idempotency_key: UUID) -> str:
+    return f"cmt_{idempotency_key.hex}"
+
+
+async def get_idempotent_comment(
+    db: AsyncSession,
+    idempotency_key: UUID,
+    todo_id: str,
+    content: str,
+) -> TaskComment | None:
+    comment = await db.get(TaskComment, _idempotent_comment_id(idempotency_key))
+    if comment is None:
+        return None
+    if comment.todo_id != todo_id or comment.content != content.strip():
+        raise ConflictError("Comment idempotency key was already used")
+    return comment
 
 
 async def _require_todo(db: AsyncSession, todo_id: str) -> None:
@@ -24,9 +44,16 @@ async def create_comment(
     content: str,
     *,
     created_by: str = "user",
+    idempotency_key: UUID | None = None,
 ) -> TaskComment:
     await _require_todo(db, todo_id)
+    if idempotency_key is not None:
+        existing = await get_idempotent_comment(db, idempotency_key, todo_id, content)
+        if existing is not None:
+            return existing
     comment = TaskComment(todo_id=todo_id, content=content, created_by=created_by)
+    if idempotency_key is not None:
+        comment.id = _idempotent_comment_id(idempotency_key)
     db.add(comment)
     await db.flush()
     return comment
@@ -49,16 +76,20 @@ async def list_comments(
         return []
 
     rows = (
-        await db.execute(
-            select(TaskComment)
-            .where(TaskComment.todo_id.in_(todo_ids))
-            .order_by(
-                TaskComment.todo_id.asc(),
-                TaskComment.created_at.desc(),
-                TaskComment.id.desc(),
+        (
+            await db.execute(
+                select(TaskComment)
+                .where(TaskComment.todo_id.in_(todo_ids))
+                .order_by(
+                    TaskComment.todo_id.asc(),
+                    TaskComment.created_at.desc(),
+                    TaskComment.id.desc(),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     kept_by_todo: dict[str, list[TaskComment]] = {}
     for comment in rows:

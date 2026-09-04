@@ -173,6 +173,9 @@ class TodoRepositoryImpl @Inject constructor(
             WorkspaceMode.UNCONFIGURED -> return workspaceNotConfigured()
             WorkspaceMode.SERVER -> Unit
             WorkspaceMode.LOCAL -> {
+                if (body.projectId != null) {
+                    return ApiResult.Error("Projects require a server", code = 422)
+                }
                 val now = Instant.now().toString()
                 val entity = try {
                     body.copy(title = body.title.trim()).toLocalEntity(
@@ -478,6 +481,9 @@ class TodoRepositoryImpl @Inject constructor(
             .map { todo -> if (todo.id in pendingIds) todo.copy(syncStatus = "pending") else todo }
         params["status"]?.let { status -> cached = cached.filter { it.status.wireValue == status } }
         params["inbox_state"]?.let { inbox -> cached = cached.filter { it.inboxState == inbox } }
+        params["project_id"]?.let { projectId ->
+            cached = cached.filter { it.projectId == projectId }
+        }
         params["due_before"]?.let { dueBefore ->
             cached = cached.filter { it.dueDate != null && it.dueDate < dueBefore }
         }
@@ -510,12 +516,19 @@ class TodoRepositoryImpl @Inject constructor(
         id = id,
         title = title,
         description = description,
+        projectId = projectId,
+        status = status,
+        priority = priority,
         dueDate = dueDate,
         tags = tags,
         parentId = parentId,
+        sortOrder = sortOrder ?: 0,
         source = source,
+        sourceId = sourceId,
         idempotencyKey = idempotencyKey,
+        assignee = assignee,
         inboxState = inboxState ?: "none",
+        estimatedMinutes = estimatedMinutes,
         syncStatus = "pending",
         createdAt = changedAt,
         updatedAt = changedAt,

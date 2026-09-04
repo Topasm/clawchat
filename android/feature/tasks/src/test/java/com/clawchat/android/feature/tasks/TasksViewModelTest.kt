@@ -104,14 +104,16 @@ class TasksViewModelTest {
     }
 
     @Test
-    fun `completing an experiment later records missing verdict after completion`() = runTest {
+    fun `completing an experiment later durably records missing verdict before completion`() = runTest {
         val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
         val completed = experiment.copy(status = TaskStatus.COMPLETED)
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = listOf(experiment), total = 1))
         coEvery { todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED)) } returns
             ApiResult.Success(completed)
-        coEvery { taskCommentRepository.addComment("1", "판정 미기록") } returns
+        coEvery {
+            taskCommentRepository.addComment("1", "판정 미기록", missingVerdictOperationId("1"))
+        } returns
             ApiResult.Success(
                 TaskComment(
                     id = "comment-1",
@@ -130,8 +132,33 @@ class TasksViewModelTest {
 
         assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.tasks.single().status)
         coVerifyOrder {
+            taskCommentRepository.addComment(
+                "1",
+                "판정 미기록",
+                missingVerdictOperationId("1"),
+            )
             todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED))
-            taskCommentRepository.addComment("1", "판정 미기록")
+        }
+    }
+
+    @Test
+    fun `hard comment failure rolls back experiment completion`() = runTest {
+        val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(experiment), total = 1))
+        coEvery {
+            taskCommentRepository.addComment("1", "판정 미기록", missingVerdictOperationId("1"))
+        } returns ApiResult.Error("Comment rejected", code = 422)
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.completeExperiment("1", verdictRecorded = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(TaskStatus.PENDING, viewModel.uiState.value.tasks.single().status)
+        assertEquals("Comment rejected", viewModel.uiState.value.error)
+        coVerify(exactly = 0) {
+            todoRepository.updateTodo("1", TodoUpdate(status = TaskStatus.COMPLETED))
         }
     }
 
@@ -294,6 +321,8 @@ class TasksViewModelTest {
             // Rollback
             val rolledBack = awaitItem()
             assertEquals(TaskStatus.PENDING, rolledBack.tasks.first().status)
+            val reported = awaitItem()
+            assertEquals("Server error", reported.error)
         }
     }
 

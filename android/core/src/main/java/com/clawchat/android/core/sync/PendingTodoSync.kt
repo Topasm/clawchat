@@ -22,6 +22,7 @@ import com.clawchat.android.core.data.local.toEntity
 import com.clawchat.android.core.data.model.ReviewDecision
 import com.clawchat.android.core.data.model.ReviewDecisionRequest
 import com.clawchat.android.core.data.model.ReviewStatus
+import com.clawchat.android.core.data.model.TaskCommentCreateRequest
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
@@ -74,6 +75,13 @@ internal data class PendingTodoUpdate(
 internal data class PendingTodoDelete(
     override val operationId: String,
     override val todoId: String,
+    override val changedAt: String,
+) : PendingTodoMutation
+
+internal data class PendingTodoComment(
+    override val operationId: String,
+    override val todoId: String,
+    val content: String,
     override val changedAt: String,
 ) : PendingTodoMutation
 
@@ -154,6 +162,29 @@ class PendingTodoUpdateStore @Inject constructor(
         TodoSyncWorkScheduler.schedule(context)
     }
 
+    suspend fun enqueueComment(
+        workspaceKey: String,
+        operationId: String,
+        todoId: String,
+        content: String,
+        changedAt: String,
+    ) {
+        dao.clearDiagnostics(workspaceKey, todoId)
+        dao.insert(
+            PendingTodoMutationEntity(
+                workspaceKey = workspaceKey,
+                operationId = operationId,
+                todoId = todoId,
+                operationType = PendingTodoOperation.COMMENT.wireValue,
+                payload = pendingMutationJson.encodeToString(
+                    TaskCommentCreateRequest(todoId, content, operationId),
+                ),
+                changedAt = changedAt,
+            ),
+        )
+        TodoSyncWorkScheduler.schedule(context)
+    }
+
     internal suspend fun allForWorkspace(workspaceKey: String): List<PendingTodoMutation> =
         dao.getForWorkspace(workspaceKey).mapNotNull { it.decodeMutation() }
 
@@ -217,12 +248,20 @@ class PendingTodoUpdateStore @Inject constructor(
                 changedAt = changedAt,
             )
             PendingTodoOperation.DELETE -> PendingTodoDelete(operationId, todoId, changedAt)
+            PendingTodoOperation.COMMENT -> PendingTodoComment(
+                operationId = operationId,
+                todoId = todoId,
+                content = pendingMutationJson
+                    .decodeFromString<TaskCommentCreateRequest>(payload)
+                    .content,
+                changedAt = changedAt,
+            )
         }
     }.getOrNull()
 }
 
 private enum class PendingTodoOperation(val wireValue: String) {
-    CREATE("create"), UPDATE("update"), DELETE("delete");
+    CREATE("create"), UPDATE("update"), DELETE("delete"), COMMENT("comment");
 
     companion object {
         fun fromWire(value: String): PendingTodoOperation =
@@ -238,11 +277,18 @@ internal fun List<PendingTodoUpdate>.mergedUpdate(): TodoUpdate =
 internal fun TodoUpdate.overlay(newer: TodoUpdate): TodoUpdate = TodoUpdate(
     title = newer.title ?: title,
     description = newer.description ?: description,
+    projectId = newer.projectId ?: projectId,
     status = newer.status ?: status,
+    priority = newer.priority ?: priority,
     dueDate = newer.dueDate ?: dueDate,
     tags = newer.tags ?: tags,
+    parentId = newer.parentId ?: parentId,
     sortOrder = newer.sortOrder ?: sortOrder,
+    assignee = newer.assignee ?: assignee,
     inboxState = newer.inboxState ?: inboxState,
+    estimatedMinutes = newer.estimatedMinutes ?: estimatedMinutes,
+    source = newer.source ?: source,
+    sourceId = newer.sourceId ?: sourceId,
     clientUpdatedAt = newer.clientUpdatedAt ?: clientUpdatedAt,
 )
 
@@ -259,12 +305,19 @@ internal fun Todo.applyPending(update: TodoUpdate, changedAt: String): Todo {
     return copy(
         title = update.title ?: title,
         description = update.description ?: description,
+        projectId = update.projectId ?: projectId,
         status = nextStatus,
+        priority = update.priority ?: priority,
         dueDate = update.dueDate ?: dueDate,
         completedAt = nextCompletedAt,
         tags = update.tags ?: tags,
+        parentId = update.parentId ?: parentId,
         sortOrder = update.sortOrder ?: sortOrder,
+        assignee = update.assignee ?: assignee,
         inboxState = update.inboxState ?: inboxState,
+        estimatedMinutes = update.estimatedMinutes ?: estimatedMinutes,
+        source = update.source ?: source,
+        sourceId = update.sourceId ?: sourceId,
         syncStatus = "pending",
         updatedAt = changedAt,
     )
@@ -463,8 +516,23 @@ class PendingTodoSyncCoordinator @Inject constructor(
             return replayDelete(workspaceKey, todoId, ordered, requestScope)
         }
 
+        val commentReplay = replayComments(
+            workspaceKey = workspaceKey,
+            storedTodoId = todoId,
+            remoteTodoId = todoId,
+            comments = ordered.filterIsInstance<PendingTodoComment>(),
+            requestScope = requestScope,
+        )
+        val commentsChanged = when (commentReplay) {
+            CommentReplayResult.CHANGED -> true
+            CommentReplayResult.UNCHANGED -> false
+            CommentReplayResult.TODO_GONE -> return ReplayResult.CHANGED
+            is CommentReplayResult.Retry -> return ReplayResult.Retry(commentReplay.error)
+        }
         val updates = ordered.filterIsInstance<PendingTodoUpdate>()
-        if (updates.isEmpty()) return ReplayResult.UNCHANGED
+        if (updates.isEmpty()) {
+            return if (commentsChanged) ReplayResult.CHANGED else ReplayResult.UNCHANGED
+        }
         val newestChangedAt = updates.maxOf(PendingTodoUpdate::changedAt)
         return when (val remote = apiCall { api.getTodo(todoId, requestScope) }) {
             is ApiResult.Success -> {
@@ -484,7 +552,11 @@ class PendingTodoSyncCoordinator @Inject constructor(
                         is ApiResult.Error -> {
                             if (update.isRetryable()) return ReplayResult.Retry(update.message)
                             store.remove(workspaceKey, updates.map(PendingTodoUpdate::operationId))
-                            return ReplayResult.UNCHANGED
+                            return if (commentsChanged) {
+                                ReplayResult.CHANGED
+                            } else {
+                                ReplayResult.UNCHANGED
+                            }
                         }
                         ApiResult.Loading -> return ReplayResult.Retry(REQUEST_INCOMPLETE_ERROR)
                     }
@@ -502,7 +574,7 @@ class PendingTodoSyncCoordinator @Inject constructor(
                 remote.isRetryable() -> ReplayResult.Retry(remote.message)
                 else -> {
                     store.remove(workspaceKey, updates.map(PendingTodoUpdate::operationId))
-                    ReplayResult.UNCHANGED
+                    if (commentsChanged) ReplayResult.CHANGED else ReplayResult.UNCHANGED
                 }
             }
             ApiResult.Loading -> ReplayResult.Retry(REQUEST_INCOMPLETE_ERROR)
@@ -536,6 +608,24 @@ class PendingTodoSyncCoordinator @Inject constructor(
 
         val updates = ordered.filterIsInstance<PendingTodoUpdate>()
             .filter { it.changedAt >= create.changedAt }
+        when (
+            val comments = replayComments(
+                workspaceKey = workspaceKey,
+                storedTodoId = localTodoId,
+                remoteTodoId = created.id,
+                comments = ordered.filterIsInstance<PendingTodoComment>()
+                    .filter { it.changedAt >= create.changedAt },
+                requestScope = requestScope,
+            )
+        ) {
+            CommentReplayResult.CHANGED,
+            CommentReplayResult.UNCHANGED,
+            -> Unit
+            CommentReplayResult.TODO_GONE -> {
+                return ReplayResult.Retry("Created task was unavailable for its pending comment")
+            }
+            is CommentReplayResult.Retry -> return ReplayResult.Retry(comments.error)
+        }
         val updated = if (updates.isEmpty()) {
             created
         } else {
@@ -578,6 +668,46 @@ class PendingTodoSyncCoordinator @Inject constructor(
         todoDao.deleteById(workspaceKey, localTodoId)
         store.removeTodo(workspaceKey, localTodoId)
         return ReplayResult.CHANGED
+    }
+
+    private suspend fun replayComments(
+        workspaceKey: String,
+        storedTodoId: String,
+        remoteTodoId: String,
+        comments: List<PendingTodoComment>,
+        requestScope: ExpectedSessionScope,
+    ): CommentReplayResult {
+        if (comments.isEmpty()) return CommentReplayResult.UNCHANGED
+        for (comment in comments.sortedBy(PendingTodoComment::changedAt)) {
+            when (
+                val result = apiCall {
+                    api.createTaskComment(
+                        TaskCommentCreateRequest(
+                            todoId = remoteTodoId,
+                            content = comment.content,
+                            idempotencyKey = comment.operationId,
+                        ),
+                        requestScope,
+                    )
+                }
+            ) {
+                is ApiResult.Success -> {
+                    store.remove(workspaceKey, listOf(comment.operationId))
+                }
+                is ApiResult.Error -> {
+                    if (result.code == 404) {
+                        todoDao.deleteById(workspaceKey, storedTodoId)
+                        store.removeTodo(workspaceKey, storedTodoId)
+                        return CommentReplayResult.TODO_GONE
+                    }
+                    return CommentReplayResult.Retry(result.message)
+                }
+                ApiResult.Loading -> {
+                    return CommentReplayResult.Retry(REQUEST_INCOMPLETE_ERROR)
+                }
+            }
+        }
+        return CommentReplayResult.CHANGED
     }
 
     private suspend fun replayDelete(
@@ -624,6 +754,13 @@ class PendingTodoSyncCoordinator @Inject constructor(
         data object CHANGED : ReplayResult
         data object UNCHANGED : ReplayResult
         data class Retry(val error: String) : ReplayResult
+    }
+
+    private sealed interface CommentReplayResult {
+        data object CHANGED : CommentReplayResult
+        data object UNCHANGED : CommentReplayResult
+        data object TODO_GONE : CommentReplayResult
+        data class Retry(val error: String) : CommentReplayResult
     }
 }
 

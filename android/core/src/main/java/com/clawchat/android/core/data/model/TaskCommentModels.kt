@@ -18,4 +18,5 @@ data class TaskComment(
 data class TaskCommentCreateRequest(
     @SerialName("todo_id") val todoId: String,
     val content: String,
+    @SerialName("idempotency_key") val idempotencyKey: String? = null,
 )

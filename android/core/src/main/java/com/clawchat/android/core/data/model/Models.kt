@@ -67,7 +67,9 @@ data class Todo(
     val id: String,
     val title: String,
     val description: String? = null,
+    @SerialName("project_id") val projectId: String? = null,
     val status: TaskStatus = TaskStatus.PENDING,
+    val priority: String = "medium",
     @SerialName("due_date") val dueDate: String? = null,
     @SerialName("completed_at") val completedAt: String? = null,
     val tags: List<String>? = null,
@@ -96,11 +98,18 @@ data class Todo(
 data class TodoCreate(
     val title: String,
     val description: String? = null,
+    @SerialName("project_id") val projectId: String? = null,
+    val status: TaskStatus = TaskStatus.PENDING,
+    val priority: String = "medium",
     @SerialName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
     @SerialName("parent_id") val parentId: String? = null,
+    @SerialName("sort_order") val sortOrder: Int? = null,
     val source: String? = null,
+    @SerialName("source_id") val sourceId: String? = null,
+    val assignee: String? = null,
     @SerialName("inbox_state") val inboxState: String? = null,
+    @SerialName("estimated_minutes") val estimatedMinutes: Int? = null,
     /** Stable operation identity so a retried quick capture cannot create a duplicate. */
     @SerialName("idempotency_key") val idempotencyKey: String? = null,
 )
@@ -109,11 +118,18 @@ data class TodoCreate(
 data class TodoUpdate(
     val title: String? = null,
     val description: String? = null,
+    @SerialName("project_id") val projectId: String? = null,
     val status: TaskStatus? = null,
+    val priority: String? = null,
     @SerialName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
+    @SerialName("parent_id") val parentId: String? = null,
     @SerialName("sort_order") val sortOrder: Int? = null,
+    val assignee: String? = null,
     @SerialName("inbox_state") val inboxState: String? = null,
+    @SerialName("estimated_minutes") val estimatedMinutes: Int? = null,
+    val source: String? = null,
+    @SerialName("source_id") val sourceId: String? = null,
     /** Device edit time used by the server's last-write-wins reconnect policy. */
     @SerialName("client_updated_at") val clientUpdatedAt: String? = null,
 )

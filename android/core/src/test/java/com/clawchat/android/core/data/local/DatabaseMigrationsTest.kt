@@ -151,4 +151,34 @@ class DatabaseMigrationsTest {
         }
         assertTrue(MIGRATION_5_6.startVersion == 5 && MIGRATION_5_6.endVersion == 6)
     }
+
+    @Test
+    fun `migration 6 to 7 preserves project context in the server todo cache`() {
+        val database = mockk<SupportSQLiteDatabase>(relaxed = true)
+
+        MIGRATION_6_7.migrate(database)
+
+        mapOf(
+            "projectId" to "TEXT",
+            "source" to "TEXT",
+            "sourceId" to "TEXT",
+            "idempotencyKey" to "TEXT",
+            "assignee" to "TEXT",
+            "estimatedMinutes" to "INTEGER",
+            "projectLabel" to "TEXT",
+        ).forEach { (column, type) ->
+            verify(exactly = 1) {
+                database.execSQL(
+                    "ALTER TABLE `todos` ADD COLUMN `$column` $type",
+                )
+            }
+        }
+        verify(exactly = 1) {
+            database.execSQL(match { sql ->
+                sql.contains("index_todos_workspace_project_order") &&
+                    sql.contains("`workspaceKey` ASC, `projectId` ASC")
+            })
+        }
+        assertTrue(MIGRATION_6_7.startVersion == 6 && MIGRATION_6_7.endVersion == 7)
+    }
 }

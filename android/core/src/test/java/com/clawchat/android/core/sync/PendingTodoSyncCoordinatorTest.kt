@@ -8,6 +8,8 @@ import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.local.TodoDao
 import com.clawchat.android.core.data.model.TaskStatus
+import com.clawchat.android.core.data.model.TaskComment
+import com.clawchat.android.core.data.model.TaskCommentCreateRequest
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
@@ -18,6 +20,7 @@ import com.clawchat.android.core.data.model.ReviewSubjectType
 import com.clawchat.android.core.data.model.ReviewStatus
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -83,6 +86,91 @@ class PendingTodoSyncCoordinatorTest {
             todoDao.upsertAll(match { it.single().title == "Phone title" })
         }
         verify(exactly = 1) { syncManager.notifyTodoChanged() }
+    }
+
+    @Test
+    fun `missing verdict comment replays before experiment completion`() = runTest {
+        val operationId = "00000000-0000-0000-0000-000000000065"
+        coEvery { store.allForWorkspace(WORKSPACE) } returns listOf(
+            PendingTodoComment(
+                operationId = operationId,
+                todoId = "todo-1",
+                content = "판정 미기록",
+                changedAt = "2026-09-01T01:00:00Z",
+            ),
+            mutation(
+                "update-1",
+                "2026-09-01T02:00:00Z",
+                TodoUpdate(status = TaskStatus.COMPLETED),
+            ),
+        )
+        coEvery {
+            api.createTaskComment(
+                TaskCommentCreateRequest("todo-1", "판정 미기록", operationId),
+                any(),
+            )
+        } returns TaskComment(
+            id = "comment-1",
+            todoId = "todo-1",
+            content = "판정 미기록",
+            createdBy = "user",
+            createdAt = "2026-09-01T01:00:01Z",
+            updatedAt = "2026-09-01T01:00:01Z",
+        )
+        coEvery { api.getTodo("todo-1", any()) } returns
+            todo(title = "E65a", updatedAt = "2026-09-01T00:30:00Z")
+        coEvery {
+            api.updateTodo(
+                "todo-1",
+                match { it.status == TaskStatus.COMPLETED },
+                any(),
+            )
+        } returns todo(
+            title = "E65a",
+            status = TaskStatus.COMPLETED,
+            updatedAt = "2026-09-01T02:00:01Z",
+        )
+
+        assertEquals(PendingTodoSyncResult.SUCCESS, coordinator.flush())
+
+        coVerifyOrder {
+            api.createTaskComment(any(), any())
+            api.getTodo("todo-1", any())
+            api.updateTodo("todo-1", any(), any())
+        }
+        coVerify(exactly = 1) { store.remove(WORKSPACE, listOf(operationId)) }
+    }
+
+    @Test
+    fun `comment replay failure blocks experiment completion retry`() = runTest {
+        val operationId = "00000000-0000-0000-0000-000000000065"
+        coEvery { store.allForWorkspace(WORKSPACE) } returns listOf(
+            PendingTodoComment(
+                operationId = operationId,
+                todoId = "todo-1",
+                content = "판정 미기록",
+                changedAt = "2026-09-01T01:00:00Z",
+            ),
+            mutation(
+                "update-1",
+                "2026-09-01T02:00:00Z",
+                TodoUpdate(status = TaskStatus.COMPLETED),
+            ),
+        )
+        coEvery { api.createTaskComment(any(), any()) } throws IOException("offline")
+
+        assertEquals(PendingTodoSyncResult.RETRY, coordinator.flush())
+
+        coVerify(exactly = 0) { api.getTodo("todo-1", any()) }
+        coVerify(exactly = 0) { api.updateTodo(any(), any(), any()) }
+        coVerify(exactly = 1) {
+            store.recordFailure(
+                WORKSPACE,
+                "todo-1",
+                match { it.contains("offline") },
+                any(),
+            )
+        }
     }
 
     @Test

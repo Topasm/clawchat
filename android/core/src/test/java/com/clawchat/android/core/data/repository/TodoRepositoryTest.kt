@@ -247,6 +247,40 @@ class TodoRepositoryTest {
     }
 
     @Test
+    fun `offline project list stays scoped and preserves project root identity`() = runTest {
+        val params = mapOf("project_id" to "project-a")
+        coEvery { api.listTodos(params, any()) } throws IOException("offline")
+        coEvery { todoDao.getAll("server:url:test") } returns listOf(
+            Todo(
+                id = "project-root-a",
+                title = "P0-R Semantic referent binding",
+                projectId = "project-a",
+                source = "project_root",
+                projectLabel = "P0-R Semantic referent binding",
+                createdAt = "2026-09-04T00:00:00Z",
+                updatedAt = "2026-09-04T00:00:00Z",
+            ).toEntity("server:url:test"),
+            Todo(
+                id = "step-b",
+                title = "E72b Other branch",
+                projectId = "project-b",
+                source = "obsidian",
+                createdAt = "2026-09-04T00:00:00Z",
+                updatedAt = "2026-09-04T00:00:00Z",
+            ).toEntity("server:url:test"),
+        )
+
+        val result = repository.listTodos(params)
+
+        assertTrue(result is ApiResult.Success)
+        val cached = (result as ApiResult.Success).data.items.single()
+        assertEquals("project-root-a", cached.id)
+        assertEquals("project-a", cached.projectId)
+        assertEquals("project_root", cached.source)
+        assertEquals("P0-R Semantic referent binding", cached.projectLabel)
+    }
+
+    @Test
     fun `successful organize accepts an HTTP success response`() = runTest {
         coEvery { api.organizeTodo("todo-1", any()) } returns Response.success(Unit)
 
@@ -586,6 +620,32 @@ class TodoRepositoryTest {
 
         assertEquals(2, insertedIds.size)
         assertEquals(insertedIds.first(), insertedIds.last())
+    }
+
+    @Test
+    fun `local mode rejects project task creation`() = runTest {
+        val localSessionStore = mockk<SessionStore> {
+            every { runtimeState } returns flowOf(appRuntimeState(WorkspaceMode.LOCAL))
+        }
+        val localRepository = TodoRepositoryImpl(
+            api,
+            todoDao,
+            localTodoDao,
+            localSessionStore,
+            deviceZoneProvider,
+            syncManager,
+            pendingUpdates,
+            reminderNotifications,
+        )
+
+        val result = localRepository.createTodo(
+            TodoCreate(title = "E65a Run baseline", projectId = "project-p0-r"),
+        )
+
+        assertTrue(result is ApiResult.Error)
+        assertEquals(422, (result as ApiResult.Error).code)
+        coVerify(exactly = 0) { localTodoDao.insertOrGet(any()) }
+        coVerify(exactly = 0) { api.createTodo(any(), any()) }
     }
 
     private fun todo(
