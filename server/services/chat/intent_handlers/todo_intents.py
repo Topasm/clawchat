@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import datetime
 
 from domain.task import TaskStatus
 from models.conversation import Conversation
+from models.todo import Todo
 from services.tasks import todo_recurrence_service, todo_service
 from services.chat.intent_handlers import (
     IntentContext,
@@ -14,6 +17,8 @@ from services.chat.intent_handlers import (
     find_by_title,
     register_intent_handler,
 )
+
+logger = logging.getLogger(__name__)
 
 _NO_TITLE = {
     "complete": "Which task would you like to complete? Please mention the task name.",
@@ -61,9 +66,17 @@ async def _resolve_target(ctx: IntentContext, action: str):
 
 
 async def create_todo(ctx: IntentContext) -> IntentReply:
-    # Auto-associate with project if conversation is linked to one
+    # A named parent wins ("add a step under X"); otherwise a thread scoped to
+    # a task or project puts the new task under it.
     parent_id = ctx.params.get("parent_id")
+    parent_title = (ctx.params.get("parent_title") or "").strip()
     project_id = None
+    if not parent_id and parent_title:
+        todos, _ = await todo_service.get_todos(ctx.db, limit=100)
+        parent = find_by_title(todos, parent_title)
+        if parent is None:
+            return _not_found(parent_title), None
+        parent_id = parent.id
     if not parent_id and ctx.conversation_id:
         conv = await ctx.db.get(Conversation, ctx.conversation_id)
         if conv and conv.project_todo_id:
@@ -79,9 +92,66 @@ async def create_todo(ctx: IntentContext) -> IntentReply:
         due_date=_parse_due_date(ctx.params.get("due_date")),
         recurrence_rule=ctx.params.get("recurrence_rule"),
     )
+    parent = await ctx.db.get(Todo, parent_id) if parent_id else None
+    text = (
+        f"Added '{todo.title}' as a step under '{parent.title}'."
+        if parent is not None
+        else f"Created task: '{todo.title}'."
+    )
     return (
-        f"Created task: '{todo.title}'.",
-        {"action_type": "todo_created", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
+        text,
+        {
+            "action_type": "todo_created",
+            "module": "todos",
+            "todo_id": todo.id,
+            "todo_title": todo.title,
+            "parent_id": parent_id,
+        },
+    )
+
+
+async def plan_task(ctx: IntentContext) -> IntentReply:
+    """Break a task into steps with the planner; the plan comes back for review.
+
+    Targets the named task, else the task this thread is scoped to. The
+    planner is the same pipeline the task page's "Plan this task" runs, and
+    it runs in the background: the reply confirms, the proposal arrives as a
+    review item and as a plan on the task.
+    """
+    title = (ctx.params.get("title") or "").strip()
+    todo = None
+    if title:
+        todos, _ = await todo_service.get_todos(ctx.db, limit=100)
+        todo = find_by_title(todos, title)
+        if todo is None:
+            return _not_found(title), None
+    elif ctx.conversation_id:
+        conv = await ctx.db.get(Conversation, ctx.conversation_id)
+        if conv and conv.project_todo_id:
+            todo = await ctx.db.get(Todo, conv.project_todo_id)
+    if todo is None:
+        return "Which task should I plan? Name it, or ask from that task's thread.", None
+
+    from services.planning import inbox_pipeline_service
+
+    todo_id, ai = todo.id, ctx.ai
+    if ctx.session_factory is not None:
+        session_factory = ctx.session_factory
+
+        async def _plan() -> None:
+            try:
+                async with session_factory() as plan_db:
+                    await inbox_pipeline_service.process_todo(plan_db, ai, todo_id)
+            except Exception:
+                logger.exception("Planning from chat failed for todo %s", todo_id)
+
+        asyncio.create_task(_plan())
+    else:
+        await inbox_pipeline_service.process_todo(ctx.db, ai, todo_id)
+    return (
+        f"Planning '{todo.title}'. I'll propose steps for you to review; they become "
+        "sub-tasks once you apply them.",
+        {"action_type": "plan_started", "module": "todos", "todo_id": todo.id, "todo_title": todo.title},
     )
 
 
@@ -170,6 +240,7 @@ def register() -> None:
         ("complete_todo", complete_todo),
         ("update_todo", update_todo),
         ("delete_todo", delete_todo),
+        ("plan_task", plan_task),
     ):
         register_intent_handler(
             IntentHandlerDef(intent=intent, handle=handler, module_intent=True)

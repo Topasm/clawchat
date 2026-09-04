@@ -16,6 +16,7 @@ Intents:
 - update_todo: User wants to modify a task (e.g., "change the due date of...")
 - delete_todo: User wants to remove a task
 - complete_todo: User wants to mark a task as done
+- plan_task: User asks to plan a task or break it into steps (e.g., "plan this", "break it down into steps", "계획 세워줘"). Put the task's name in title when one is named.
 - create_event: User wants to be somewhere at a clock time (e.g., "schedule a meeting tomorrow at 3pm"). A day with no clock time is a deadline, not an event -- use create_todo with a due_date for those.
 - query_events: User wants to check their calendar (e.g., "what's on my schedule?")
 - update_event: User wants to modify an event
@@ -49,6 +50,7 @@ INTENT_TOOLS_SCHEMA = [
                             "update_todo",
                             "delete_todo",
                             "complete_todo",
+                            "plan_task",
                             "create_event",
                             "query_events",
                             "update_event",
@@ -71,6 +73,14 @@ INTENT_TOOLS_SCHEMA = [
                     "description": {
                         "type": "string",
                         "description": "Description or body text if applicable",
+                    },
+                    "parent_title": {
+                        "type": "string",
+                        "description": (
+                            "For create_todo: the existing task the new one belongs under, "
+                            "when the user names one (e.g. 'add a step under X', "
+                            "'X 아래에 추가')"
+                        ),
                     },
                     "due_date": {
                         "type": "string",

@@ -7,10 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from constants import SYSTEM_PROMPT
 from exceptions import AIUnavailableError
+from domain.agent_run import AGENT_RUN_ACTIVE_STATUSES
 from models.agent_task import AgentTask
 from models.agent_run import AgentRun
 from models.conversation import Conversation
 from models.message import Message
+from models.project import Project
+from models.todo import Todo
 from services.agents import agent_task_service, agent_run_service
 from services.ai.ai_service import AIService
 from services.chat.conversation_context import build_conversation_context
@@ -90,7 +93,8 @@ class Orchestrator:
                 db, conversation_id, message_id, params, content
             )
             await db.commit()
-            self._launch_delegation(task, run, user_id)
+            if task is not None and run is not None:
+                self._launch_delegation(task, run, user_id)
             return text, metadata
 
         definition = get_intent_handler(intent)
@@ -107,6 +111,7 @@ class Orchestrator:
             params=params,
             content=content,
             conversation_id=conversation_id,
+            session_factory=self.session_factory,
         )
         if not definition.module_intent:
             return await definition.handle(ctx)
@@ -223,6 +228,28 @@ class Orchestrator:
             return getattr(self._app_state, "active_ai_provider", "openclaw")
         return "openclaw"
 
+    async def _scoped_todo(self, db: AsyncSession, conversation_id: str | None) -> Todo | None:
+        """The task a thread is about, when it is a task and not a project root.
+
+        A project's context chat is scoped to the root, which is a container;
+        delegating there creates free-standing work. A thread opened on a task
+        is about that task, so work delegated in it should be that task's run.
+        """
+        if not conversation_id:
+            return None
+        conversation = await db.get(Conversation, conversation_id)
+        if conversation is None or not conversation.project_todo_id:
+            return None
+        todo = await db.get(Todo, conversation.project_todo_id)
+        if todo is None:
+            return None
+        is_root = (
+            await db.execute(
+                select(Project.id).where(Project.root_task_id == todo.id).limit(1)
+            )
+        ).scalar_one_or_none() is not None
+        return None if is_root else todo
+
     async def _create_delegation(
         self,
         db: AsyncSession,
@@ -230,15 +257,41 @@ class Orchestrator:
         message_id: str | None,
         params: dict,
         content: str,
-    ) -> tuple[AgentTask, AgentRun, str, dict]:
+    ) -> tuple[AgentTask | None, AgentRun | None, str, dict]:
         """Create the task and its first run; nothing executes yet.
 
         Shared by both transports. The caller commits, delivers the reply, and
         then launches -- in that order, so the confirmation lands in the thread
         before anything the run itself writes there.
+
+        In a thread scoped to a task the run is bound to that task: it shows
+        on the task in the tree, and approving its result completes the task.
+        A task that already has an active run gets a pointer to it instead of
+        a second run; the reply then carries no task or run.
         """
         instruction = params.get("instruction") or params.get("query") or content
         task_type = params.get("task_type", "research")
+        todo = await self._scoped_todo(db, conversation_id)
+        if todo is not None:
+            active_run_id = (
+                await db.execute(
+                    select(AgentRun.id)
+                    .join(AgentTask, AgentTask.id == AgentRun.agent_task_id)
+                    .where(
+                        AgentTask.todo_id == todo.id,
+                        AgentRun.status.in_(AGENT_RUN_ACTIVE_STATUSES),
+                    )
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if active_run_id is not None:
+                return (
+                    None,
+                    None,
+                    f"“{todo.title}” already has a run in progress. Answer it or wait for "
+                    "its result before starting another.",
+                    {"action_type": "task_run_active", "todo_id": todo.id, "run_id": active_run_id},
+                )
 
         # Use LLM-based skill selection (falls back to keyword heuristic).
         from skills.selector import select_skills
@@ -255,6 +308,8 @@ class Orchestrator:
         )
         # Set the skill chain on the new task.
         task.skill_chain = json.dumps(skill_chain)
+        if todo is not None:
+            task.todo_id = todo.id
         await db.flush()
         run = await agent_run_service.create_run(
             db,
@@ -264,8 +319,14 @@ class Orchestrator:
         )
 
         is_multi_skill = len(skill_chain) > 1
-        if is_multi_skill:
-            chain_label = " → ".join(skill_chain)
+        chain_label = " → ".join(skill_chain)
+        if todo is not None:
+            msg = (
+                f"Got it! I'm working on “{todo.title}”"
+                + (f" ({chain_label})" if is_multi_skill else "")
+                + ". The task is now in progress; the result will wait for your review here."
+            )
+        elif is_multi_skill:
             msg = (
                 f"Got it! I'll run a skill chain ({chain_label}) for this task "
                 f"(ID: {task.id}). I'll keep you updated on progress."
@@ -279,6 +340,7 @@ class Orchestrator:
             "action_type": "task_delegated",
             "task_id": task.id,
             "run_id": run.id,
+            "todo_id": todo.id if todo is not None else None,
             "agent_type": agent_type,
             "skill_chain": skill_chain,
             "is_multi_agent": is_multi_skill,
@@ -327,7 +389,8 @@ class Orchestrator:
         await self._send_assistant_message(
             db, user_id, conversation_id, "delegate_task", msg, metadata=metadata
         )
-        self._launch_delegation(task, run, user_id)
+        if task is not None and run is not None:
+            self._launch_delegation(task, run, user_id)
 
     async def _handle_general_chat(
         self,

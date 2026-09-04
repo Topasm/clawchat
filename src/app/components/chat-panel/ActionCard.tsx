@@ -125,6 +125,47 @@ export default function ActionCard({ metadata, suppressTaskProgress = false }: A
       </div>
     );
   }
+  // Planner started for a task; the proposal arrives on the task and in Review
+  if (actionType === 'plan_started') {
+    return (
+      <div className="cc-action-card">
+        <div className="cc-action-card__icon cc-action-card__icon--todo">
+          <CheckIcon size={14} />
+        </div>
+        <div className="cc-action-card__content">
+          <span className="cc-action-card__label">{translateUi('Planning')}</span>
+          <span className="cc-action-card__title">{metadata.todo_title as string}</span>
+        </div>
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-action-card__view-btn"
+          onClick={() => navigate(`/tasks/${metadata.todo_id}`)}
+        >
+          {translateUi('Open task')}
+        </button>
+      </div>
+    );
+  }
+  // Delegation refused because the thread's task already has a run going
+  if (actionType === 'task_run_active' && typeof metadata.run_id === 'string') {
+    return (
+      <div className="cc-action-card cc-action-card--warning">
+        <div className="cc-action-card__icon cc-action-card__icon--warning">
+          <WarningIcon size={14} />
+        </div>
+        <div className="cc-action-card__content">
+          <span className="cc-action-card__label">{translateUi('Run in progress')}</span>
+        </div>
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost cc-action-card__view-btn"
+          onClick={() => navigate(`/runs?run_id=${metadata.run_id}`)}
+        >
+          {translateUi('Open run')}
+        </button>
+      </div>
+    );
+  }
   // A run reporting into its thread (written by the server, not by chat)
   if (actionType === 'run_update') {
     return <RunStatusCard metadata={metadata} />;

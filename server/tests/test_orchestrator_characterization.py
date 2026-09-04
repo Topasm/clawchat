@@ -139,6 +139,7 @@ def test_module_intent_names_are_frozen():
         "update_todo": "update a todo",
         "delete_todo": "delete a todo",
         "complete_todo": "complete a todo",
+        "plan_task": "plan a task",
         "create_event": "create a calendar event",
         "query_events": "check your calendar",
         "update_event": "update a calendar event",

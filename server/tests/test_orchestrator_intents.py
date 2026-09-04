@@ -223,7 +223,174 @@ async def test_delegate_task_is_confirmed_and_started(orchestrator, db_session, 
     assert metadata["action_type"] == "task_delegated"
     assert metadata["task_id"] == task.id
     assert metadata["run_id"] == run.id
+    assert metadata["todo_id"] is None
     assert task.id in text
+
+
+async def test_create_todo_nests_under_a_named_parent(orchestrator, db_session):
+    parent = Todo(id=make_id("todo_"), title="Write the paper", status=TaskStatus.PENDING)
+    db_session.add(parent)
+    await db_session.commit()
+
+    text, metadata = await _resolve(
+        orchestrator,
+        db_session,
+        "create_todo",
+        {"title": "Draft the abstract", "parent_title": "write the paper"},
+    )
+
+    step = (
+        await db_session.execute(select(Todo).where(Todo.title == "Draft the abstract"))
+    ).scalar_one()
+    assert step.parent_id == parent.id
+    assert metadata["parent_id"] == parent.id
+    assert "under 'Write the paper'" in text
+
+
+async def test_create_todo_with_unknown_parent_creates_nothing(orchestrator, db_session):
+    text, metadata = await _resolve(
+        orchestrator,
+        db_session,
+        "create_todo",
+        {"title": "Draft the abstract", "parent_title": "no such task"},
+    )
+    assert metadata is None
+    assert "no such task" in text
+    assert (await db_session.execute(select(Todo))).scalars().all() == []
+
+
+async def test_plan_task_from_a_task_thread_starts_the_planner(
+    orchestrator, db_session, monkeypatch
+):
+    import asyncio
+
+    from services.planning import inbox_pipeline_service
+
+    planned: list[str] = []
+
+    async def _process(db, ai, todo_id):
+        planned.append(todo_id)
+
+    monkeypatch.setattr(inbox_pipeline_service, "process_todo", _process)
+    todo, conversation = await _task_thread(db_session, as_project_root=False)
+
+    text, metadata = await orchestrator.resolve_intent_response(
+        db_session, conversation.id, "plan_task", {}, "계획 세워줘"
+    )
+    await asyncio.sleep(0)
+
+    assert planned == [todo.id]
+    assert metadata["action_type"] == "plan_started"
+    assert metadata["todo_id"] == todo.id
+    assert "Compare vendors" in text
+
+
+async def test_plan_task_without_a_target_asks_which(orchestrator, db_session):
+    text, metadata = await _resolve(orchestrator, db_session, "plan_task", {})
+    assert metadata is None
+    assert "Which task" in text
+
+
+async def _task_thread(db, *, as_project_root: bool):
+    """A todo and a conversation scoped to it, optionally as a project root."""
+    from models.conversation import Conversation
+    from models.project import Project
+
+    todo = Todo(id=make_id("todo_"), title="Compare vendors", status=TaskStatus.PENDING)
+    db.add(todo)
+    await db.flush()
+    if as_project_root:
+        db.add(Project(id=make_id("project_"), title="Procurement", root_task_id=todo.id))
+        await db.flush()
+    conversation = Conversation(id=make_id("conv_"), title=todo.title, project_todo_id=todo.id)
+    db.add(conversation)
+    await db.commit()
+    return todo, conversation
+
+
+def _swallow_launch(monkeypatch):
+    from services.agents import agent_run_service
+
+    launched: list[str] = []
+
+    def _record(run_id, coroutine):
+        coroutine.close()
+        launched.append(run_id)
+
+    monkeypatch.setattr(agent_run_service, "launch_execution", _record)
+    return launched
+
+
+async def test_delegating_in_a_task_thread_runs_that_task(orchestrator, db_session, monkeypatch):
+    """Work delegated in a thread about a task is that task's run: visible on
+    it in the tree, and its approval completes it."""
+    from models.agent_run import AgentRun
+    from models.agent_task import AgentTask
+
+    launched = _swallow_launch(monkeypatch)
+    todo, conversation = await _task_thread(db_session, as_project_root=False)
+
+    text, metadata = await orchestrator.resolve_intent_response(
+        db_session, conversation.id, "delegate_task", {"instruction": "Find three vendors"}, ""
+    )
+
+    task = (await db_session.execute(select(AgentTask))).scalars().one()
+    run = (await db_session.execute(select(AgentRun))).scalars().one()
+    assert task.todo_id == todo.id
+    assert task.conversation_id == conversation.id
+    assert metadata["todo_id"] == todo.id
+    assert launched == [run.id]
+    await db_session.refresh(todo)
+    assert todo.status == TaskStatus.IN_PROGRESS
+    assert "Compare vendors" in text
+
+
+async def test_delegating_in_a_project_chat_stays_free_standing(
+    orchestrator, db_session, monkeypatch
+):
+    """A project's context chat is scoped to the root container; delegating
+    there must not turn the whole project into one run."""
+    from models.agent_task import AgentTask
+
+    _swallow_launch(monkeypatch)
+    todo, conversation = await _task_thread(db_session, as_project_root=True)
+
+    _text, metadata = await orchestrator.resolve_intent_response(
+        db_session, conversation.id, "delegate_task", {"instruction": "Summarize status"}, ""
+    )
+
+    task = (await db_session.execute(select(AgentTask))).scalars().one()
+    assert task.todo_id is None
+    assert metadata["todo_id"] is None
+    await db_session.refresh(todo)
+    assert todo.status == TaskStatus.PENDING
+
+
+async def test_delegating_twice_in_a_task_thread_points_at_the_active_run(
+    orchestrator, db_session, monkeypatch
+):
+    from models.agent_run import AgentRun
+
+    launched = _swallow_launch(monkeypatch)
+    _todo, conversation = await _task_thread(db_session, as_project_root=False)
+    await orchestrator.resolve_intent_response(
+        db_session, conversation.id, "delegate_task", {"instruction": "Find vendors"}, ""
+    )
+    first_run = (await db_session.execute(select(AgentRun))).scalars().one()
+
+    text, metadata = await orchestrator.resolve_intent_response(
+        db_session, conversation.id, "delegate_task", {"instruction": "Find more vendors"}, ""
+    )
+
+    runs = (await db_session.execute(select(AgentRun))).scalars().all()
+    assert [run.id for run in runs] == [first_run.id]
+    assert launched == [first_run.id]
+    assert metadata == {
+        "action_type": "task_run_active",
+        "todo_id": _todo.id,
+        "run_id": first_run.id,
+    }
+    assert "already has a run in progress" in text
 
 
 # --- a day is a deadline, a clock time is an appointment ------------------
