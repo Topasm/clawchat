@@ -484,7 +484,7 @@ POST   /api/events                 # Create an event
 GET    /api/events/:id             # Get a specific event
 PATCH  /api/events/:id             # Update an event
 DELETE /api/events/:id             # Delete an event
-GET    /api/events/export.ics      # Download all events as iCalendar (bearer auth)
+GET    /api/events/export.ics      # Download events + task deadlines as iCalendar (bearer auth)
 GET    /api/events/subscription    # Subscription status (bearer auth)
 POST   /api/events/subscription    # Issue/reissue the subscription URL (bearer auth)
 DELETE /api/events/subscription    # Revoke the subscription URL (bearer auth)
@@ -517,6 +517,13 @@ GET    /api/events/feed/:token.ics # The subscribable feed itself (no header)
 
 ### Calendar Subscription (ICS feed)
 
+Both the download and the feed carry two kinds of entry: events as they are
+stored, and every open task with a due date as an all-day entry on the day it
+is due. A task-oriented workspace still wants its deadlines to show up in
+whichever calendar the person actually looks at, and an all-day `VEVENT`
+renders everywhere a `VTODO` would be dropped. Completed and cancelled tasks,
+and tasks with no due date, are left out.
+
 `GET /api/events/export.ics` is a bearer-authenticated *download*. External
 calendar applications cannot use it: Google Calendar, Apple Calendar, Outlook
 and Thunderbird fetch a subscribed URL on their own schedule and have no way to
@@ -526,7 +533,8 @@ point whose credential lives in the URL.
 #### Security properties — read before sharing the URL
 
 > **Anyone who has the feed URL can read your entire calendar.**
-> Every event title, description, location and time is served to any client
+> Every event title, description, location and time — and every open task
+> title, description and deadline — is served to any client
 > that requests that URL, with no login, from anywhere the server is reachable.
 > The URL *is* the credential. Treat it like a password: do not post it in a
 > shared document, a chat channel, or a public issue.
@@ -625,6 +633,75 @@ unknown, revoked, or malformed — the three are deliberately indistinguishable
 in the response.
 
 ---
+
+## Execution Hosts
+
+```
+GET    /api/execution-hosts                        # Machines registered to run work
+POST   /api/execution-hosts                        # Register one
+PATCH  /api/execution-hosts/:id                    # Rename, retarget, enable/disable
+DELETE /api/execution-hosts/:id                    # Remove, releasing projects pinned to it
+
+GET    /api/projects/:id/workspace                 # Where this project runs, and whether it can now
+PUT    /api/projects/:id/workspace/paths           # Record the project's path on one machine
+DELETE /api/projects/:id/workspace/paths/:host_id  # Forget that path
+PUT    /api/projects/:id/workspace/host            # Choose the machine work runs on
+```
+
+A workspace path only means something together with the machine holding it:
+`/Users/me/papers` is real on a laptop and absent on the server. A project
+therefore records a path per host and names the one host its work runs on.
+
+Work is never moved to another machine on its own, even when the project has a
+path there — another machine holds different files. Nor is it queued for a
+machine that is off: delegating to an unreachable host is refused with
+`EXECUTION_HOST_UNAVAILABLE`. Holding the work instead would run it hours later
+against files that have moved on, so the request fails while the person is
+still there to decide. The distinct `PASEO_WORKSPACE_REQUIRED` still means
+nobody has said where the work lives.
+
+A desktop app checks its own machine in through `POST /api/execution-hosts/register`
+(idempotent per label) and keeps it counted as reachable with
+`POST /api/execution-hosts/:id/heartbeat`. A worker that stops checking in is
+treated as gone, since it only exists while its app is running.
+
+#### Work handed to a worker
+
+```
+POST /api/execution-hosts/:id/jobs/claim   # take the next run waiting for this machine
+POST /api/runs/:run_id/heartbeat           # progress, while it runs (existing)
+POST /api/runs/:run_id/result              # finish: result, or error
+```
+
+Delegating a task whose project runs on a worker creates the run and stops
+there: nothing executes on the server. The run stays `queued` until that
+machine claims it, which it only does while its app is running and asking for
+work — so a queued run is never work waiting for a machine that is off, because
+delegation refuses that case up front.
+
+Claiming moves the run out of `queued` in the transaction that returns it, so
+two polls, or a worker restarted mid-poll, cannot both pick up the same run. A
+run whose project has lost its path on that machine fails at claim time rather
+than being handed over with nowhere to run.
+
+The result goes through the same `mark_waiting_review` path as work the server
+ran itself, so where a run executed changes nothing about how its result is
+reviewed.
+
+The desktop app is the worker. Its polling loop lives in the renderer so it
+inherits the session the app already holds, and the Rust shell contributes only
+what a browser cannot do: starting a CLI in a directory on that machine. The
+CLI may write — editing the project is the work — and is held to the directory
+the binding named, so what a run can touch is decided by the binding rather
+than by the model. Both CLIs run without stopping for approval, because the
+person who delegated the task is on another device and a prompt nobody answers
+is a run that hangs; the result still waits for review on the server. `agent_runs.host_id` remains the label a provider reported after the
+fact; `agent_runs.execution_host_id` is the registered machine the work was
+addressed to before it ran.
+
+`projects.execution_workspace_path` remains as a compatibility shadow of the
+chosen host's path, the way `todos.depends_on` does, and is no longer the read
+model.
 
 ## Attachment Endpoints
 

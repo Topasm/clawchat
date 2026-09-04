@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -51,7 +52,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawNavigationMenuButton
 import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
@@ -65,7 +65,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
-    onOpenNavigation: () -> Unit = {},
+    onOpenTask: (String) -> Unit = {},
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,9 +90,6 @@ fun CalendarScreen(
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleLarge,
                     )
-                },
-                navigationIcon = {
-                    ClawNavigationMenuButton(onClick = onOpenNavigation)
                 },
                 actions = {
                     TextButton(onClick = { viewModel.onAction(CalendarAction.ShowToday) }) {
@@ -124,7 +121,7 @@ fun CalendarScreen(
             ) {
                 Icon(
                     Icons.Default.Add,
-                    contentDescription = stringResource(R.string.calendar_new_event),
+                    contentDescription = stringResource(R.string.calendar_new_entry),
                 )
             }
         },
@@ -158,6 +155,7 @@ fun CalendarScreen(
                         month = state.visibleMonth,
                         selectedDate = state.selectedDate,
                         eventsByDate = state.eventsByDate,
+                        tasksByDate = state.tasksByDate,
                         onSelect = { viewModel.onAction(CalendarAction.SelectDate(it)) },
                     )
                 }
@@ -171,16 +169,25 @@ fun CalendarScreen(
                 )
             }
 
-            if (state.selectedEvents.isEmpty()) {
+            items(
+                items = state.selectedTasks,
+                key = { it.todo.id },
+            ) { segment ->
+                TaskRow(segment = segment, onClick = { onOpenTask(segment.todo.id) })
+            }
+
+            if (state.selectedEvents.isEmpty() && state.selectedTasks.isEmpty()) {
                 item {
                     ClawEmptyState(
                         title = stringResource(R.string.calendar_nothing_scheduled),
                         description = stringResource(R.string.calendar_nothing_scheduled_description),
-                        actionLabel = stringResource(R.string.calendar_new_event),
+                        actionLabel = stringResource(R.string.calendar_new_entry),
                         onActionClick = { editing = EditorTarget(null) },
                     )
                 }
-            } else {
+            }
+
+            if (state.selectedEvents.isNotEmpty()) {
                 items(
                     items = state.selectedEvents,
                     key = { it.occurrenceKey },
@@ -200,8 +207,8 @@ fun CalendarScreen(
             event = target.event,
             defaultDate = state.selectedDate,
             onDismiss = { editing = null },
-            onCreate = {
-                viewModel.onAction(CalendarAction.Create(it))
+            onCreateTask = {
+                viewModel.onAction(CalendarAction.CreateTask(it))
                 editing = null
             },
             onUpdate = { id, update ->
@@ -221,6 +228,7 @@ private fun MonthGrid(
     month: YearMonth,
     selectedDate: LocalDate,
     eventsByDate: Map<LocalDate, List<Event>>,
+    tasksByDate: Map<LocalDate, List<TaskSegment>>,
     onSelect: (LocalDate) -> Unit,
 ) {
     val firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek
@@ -248,6 +256,7 @@ private fun MonthGrid(
                         isToday = day == today,
                         isSelected = day == selectedDate,
                         eventCount = eventsByDate[day]?.size ?: 0,
+                        taskSegments = tasksByDate[day].orEmpty(),
                         modifier = Modifier.weight(1f),
                         onClick = { onSelect(day) },
                     )
@@ -264,6 +273,7 @@ private fun DayCell(
     isToday: Boolean,
     isSelected: Boolean,
     eventCount: Int,
+    taskSegments: List<TaskSegment>,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -284,6 +294,7 @@ private fun DayCell(
         contentAlignment = Alignment.Center,
     ) {
         Column(
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
@@ -308,6 +319,12 @@ private fun DayCell(
                     color = content,
                 )
             }
+            // Deadline bars run edge to edge so neighbouring days join into
+            // one stretch rather than reading as separate marks.
+            taskSegments.take(MAX_TASK_BARS_PER_DAY).forEach { segment ->
+                TaskBar(segment = segment)
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 repeat(minOf(eventCount, 3)) {
                     Box(
@@ -324,6 +341,65 @@ private fun DayCell(
                     )
                 }
                 if (eventCount == 0) Spacer(Modifier.height(4.dp))
+            }
+        }
+    }
+}
+
+/** How many deadline bars a day cell shows before the rest are left implied. */
+private const val MAX_TASK_BARS_PER_DAY = 2
+
+@Composable
+private fun TaskBar(segment: TaskSegment) {
+    val color = if (segment.isOverdue) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.secondary
+    }
+    val startPad = when (segment.position) {
+        TaskSegmentPosition.START, TaskSegmentPosition.SINGLE -> 3.dp
+        else -> 0.dp
+    }
+    val endPad = when (segment.position) {
+        TaskSegmentPosition.END, TaskSegmentPosition.SINGLE -> 3.dp
+        else -> 0.dp
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = startPad, end = endPad)
+            .height(4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(color),
+    )
+}
+
+@Composable
+private fun TaskRow(segment: TaskSegment, onClick: () -> Unit) {
+    val dueLabel = if (segment.isOverdue) {
+        stringResource(R.string.calendar_task_overdue)
+    } else {
+        stringResource(R.string.calendar_task_due)
+    }
+
+    ClawListItemSurface(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    dueLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (segment.isOverdue) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.secondary
+                    },
+                )
+                Text(
+                    segment.todo.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
     }
@@ -358,13 +434,6 @@ private fun EventRow(event: Event, onClick: () -> Unit, onDelete: () -> Unit) {
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                 )
-                event.location?.takeIf { it.isNotBlank() }?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
             if (event.isOccurrence) {
                 ClawStatusChip(

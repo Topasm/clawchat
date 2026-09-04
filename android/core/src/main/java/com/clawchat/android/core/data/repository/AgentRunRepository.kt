@@ -3,6 +3,7 @@ package com.clawchat.android.core.data.repository
 import com.clawchat.android.core.api.AgentRunApi
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunEvent
+import com.clawchat.android.core.data.model.AgentRunPermissionRequest
 import com.clawchat.android.core.data.model.AgentRunResumeRequest
 import com.clawchat.android.core.data.model.AgentRunRetryRequest
 import com.clawchat.android.core.data.model.AgentRunStatus
@@ -59,6 +60,13 @@ class AgentRunRepository @Inject constructor(
         api.resumeRun(
             runId,
             AgentRunResumeRequest(followUpInstruction = normalized),
+        )
+    }
+
+    suspend fun resolvePermission(runId: String, allow: Boolean): ApiResult<AgentRun> = apiCall {
+        api.resolvePermission(
+            runId,
+            AgentRunPermissionRequest(decision = if (allow) "allow" else "deny"),
         )
     }
 

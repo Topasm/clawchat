@@ -79,7 +79,7 @@ export default function SettingsShell({
     returnTo && !(workspaceReady && returnToNeedsWorkspace)
       ? returnTo
       : workspaceReady
-        ? '/today'
+        ? '/'
         : '/login';
 
   return (

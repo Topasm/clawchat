@@ -1,7 +1,7 @@
 """API contracts for durable agent execution attempts."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -18,6 +18,23 @@ class AgentRunRetryRequest(BaseModel):
 
 class AgentRunResumeRequest(BaseModel):
     follow_up_instruction: str = Field(min_length=1, max_length=10_000)
+
+
+class AgentRunPermissionRequest(BaseModel):
+    decision: Literal["allow", "deny"]
+
+
+class AgentRunResultRequest(BaseModel):
+    """What a worker reports back when its run finishes."""
+
+    result: str | None = None
+    error: str | None = None
+
+    @model_validator(mode="after")
+    def validate_outcome(self):
+        if bool(self.result) == bool(self.error):
+            raise ValueError("Report exactly one of result or error")
+        return self
 
 
 class AgentRunTransitionRequest(BaseModel):
@@ -58,6 +75,8 @@ class AgentRunResponse(BaseModel):
     todo_id: str | None = None
     todo_title: str | None = None
     todo_status: TaskStatus | None = None
+    #: The thread this run reports into; every run has one once it is created.
+    conversation_id: str | None = None
     task_type: str
     instruction: str
     instruction_snapshot: str
@@ -65,6 +84,9 @@ class AgentRunResponse(BaseModel):
     provider: str
     model: str | None = None
     host_id: str | None = None
+    #: The machine this run executes on, as the user named it (worker label,
+    #: Paseo daemon label); None for runs the server executes itself.
+    host_label: str | None = None
     workspace_id: str | None = None
     external_run_id: str | None = None
     status: AgentRunStatus

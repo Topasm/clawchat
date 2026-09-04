@@ -14,6 +14,11 @@ class ReminderRoutesTest {
     }
 
     @Test
+    fun `attention digest opens now`() {
+        assertEquals(NavRoute.Progress.route, reminderRoute("attention"))
+    }
+
+    @Test
     fun `event and review reminders open today`() {
         assertEquals(NavRoute.Today.route, reminderRoute("event"))
         assertEquals(NavRoute.Today.route, reminderRoute("weekly_review"))

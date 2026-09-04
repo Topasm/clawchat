@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { queryKeys } from '../queryKeys';
-import { useSkillsQuery, useStartReadyTaskExecution } from '../useTaskExecutionQueries';
+import {
+  useRunReadyTaskWithProjectDefaults,
+  useSkillsQuery,
+  useStartReadyTaskExecution,
+} from '../useTaskExecutionQueries';
 
 const apiMocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 
@@ -91,5 +95,87 @@ describe('Ready task execution queries', () => {
     ]) {
       expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
     }
+  });
+
+  it('uses the task Skill and Project defaults only after Run next is requested', async () => {
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/todos') {
+        return Promise.resolve({
+          data: {
+            items: [
+              {
+                id: 'todo-next',
+                title: 'Publish report',
+                project_id: 'project-1',
+                status: 'pending',
+                enabled_skills: ['publish'],
+                created_at: '2026-09-04T00:00:00Z',
+                updated_at: '2026-09-04T00:00:00Z',
+              },
+            ],
+          },
+        });
+      }
+      if (url === '/projects') {
+        return Promise.resolve({
+          data: [
+            {
+              id: 'project-1',
+              title: 'Research',
+              status: 'active',
+              root_task_id: 'root-1',
+              graph_revision: 8,
+              default_execution_provider: 'paseo',
+              default_execution_model: 'codex/gpt-5.6',
+              execution_workspace_isolation: 'local',
+              created_at: '2026-09-04T00:00:00Z',
+              updated_at: '2026-09-04T00:00:00Z',
+              task_count: 2,
+              completed_task_count: 1,
+            },
+          ],
+        });
+      }
+      if (url === '/todos/skills/list') {
+        return Promise.resolve({
+          data: {
+            skills: [
+              { id: 'plan', name: 'Plan', description: 'Plan work' },
+              { id: 'publish', name: 'Publish', description: 'Publish work' },
+            ],
+          },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+    apiMocks.post.mockResolvedValue({
+      data: {
+        status: 'delegated',
+        task_id: 'agent-task-next',
+        todo_id: 'todo-next',
+        agent_task_id: 'agent-task-next',
+        run_id: 'run-next',
+        skill_id: 'publish',
+        skill_chain: ['publish'],
+        agent_type: 'publish',
+      },
+    });
+    const { wrapper } = createHarness();
+    const { result } = renderHook(() => useRunReadyTaskWithProjectDefaults(true), { wrapper });
+
+    await waitFor(() => expect(result.current.canRunTask('todo-next')).toBe(true));
+    expect(apiMocks.post).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.runTask('todo-next', 'project-1');
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/todos/todo-next/delegate', {
+      skill_id: 'publish',
+      execution_provider: 'paseo',
+      model: 'codex/gpt-5.6',
+      require_ready: true,
+      approved: true,
+    });
   });
 });

@@ -11,7 +11,7 @@ class NavigationCapabilitiesTest {
     @Test
     fun `local mode exposes only device features`() {
         assertEquals(
-            listOf("today", "tasks", "calendar"),
+            listOf("tasks", "today"),
             NavigationCapabilities.primaryRoutes(WorkspaceMode.LOCAL),
         )
         assertEquals(
@@ -22,7 +22,7 @@ class NavigationCapabilitiesTest {
 
     @Test
     fun `local mode rejects every server-only destination`() {
-        listOf("inbox", "chat", "review", "runs", "runs?run_id=run-1").forEach { route ->
+        listOf("inbox", "progress", "chat", "review", "runs", "runs?run_id=run-1").forEach { route ->
             assertFalse(route, NavigationCapabilities.canOpen(WorkspaceMode.LOCAL, route))
         }
         listOf("today", "tasks", "calendar", "search", "settings", "onboarding").forEach { route ->
@@ -31,16 +31,19 @@ class NavigationCapabilitiesTest {
     }
 
     @Test
-    fun `server mode retains the connected primary navigation`() {
+    fun `server mode exposes four primary destinations and keeps detail routes open`() {
         assertEquals(
-            listOf("today", "inbox", "tasks", "chat", "calendar"),
+            listOf("progress", "tasks", "today", "chat"),
             NavigationCapabilities.primaryRoutes(WorkspaceMode.SERVER),
         )
         assertEquals(
-            listOf("review", "runs", "search", "settings"),
+            listOf("search", "settings"),
             NavigationCapabilities.secondaryRoutes(WorkspaceMode.SERVER),
         )
+        assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "progress"))
+        assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "inbox"))
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "review"))
+        assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "review?review_id=review-1"))
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "runs?run_id=run-1"))
         assertFalse(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "unknown"))
     }
@@ -51,5 +54,12 @@ class NavigationCapabilitiesTest {
         assertTrue(NavigationCapabilities.secondaryRoutes(WorkspaceMode.UNCONFIGURED).isEmpty())
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.UNCONFIGURED, "onboarding"))
         assertFalse(NavigationCapabilities.canOpen(WorkspaceMode.UNCONFIGURED, "today"))
+    }
+
+    @Test
+    fun `start destination follows workspace mode`() {
+        assertEquals("onboarding", NavigationCapabilities.startRoute(WorkspaceMode.UNCONFIGURED))
+        assertEquals("tasks", NavigationCapabilities.startRoute(WorkspaceMode.LOCAL))
+        assertEquals("progress", NavigationCapabilities.startRoute(WorkspaceMode.SERVER))
     }
 }

@@ -1,21 +1,16 @@
 import { formatDueDate, isOverdue, isToday, isTomorrow } from '../../utils/formatters';
-import { PriorityIcon } from './Icons';
 
 interface BadgeProps {
-  variant: 'priority' | 'due' | 'tag' | 'status' | 'count';
-  level?: 'urgent' | 'high' | 'medium' | 'low';
+  variant: 'due' | 'tag' | 'status' | 'count';
   dueDate?: string;
   children?: React.ReactNode;
 }
 
-export default function Badge({ variant, level, dueDate, children }: BadgeProps) {
+export default function Badge({ variant, dueDate, children }: BadgeProps) {
   let className = 'cc-badge';
   let content = children;
 
-  if (variant === 'priority' && level) {
-    className += ` cc-badge--priority-${level}`;
-    content = content ?? level.charAt(0).toUpperCase() + level.slice(1);
-  } else if (variant === 'due' && dueDate) {
+  if (variant === 'due' && dueDate) {
     const dueState = isOverdue(dueDate)
       ? 'overdue'
       : isToday(dueDate)
@@ -33,12 +28,5 @@ export default function Badge({ variant, level, dueDate, children }: BadgeProps)
     className += ' cc-badge--count';
   }
 
-  return (
-    <span className={className}>
-      {variant === 'priority' && level && (
-        <PriorityIcon level={level} size={12} className="cc-badge__priority-icon" />
-      )}
-      {content}
-    </span>
-  );
+  return <span className={className}>{content}</span>;
 }

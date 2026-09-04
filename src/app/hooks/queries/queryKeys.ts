@@ -13,6 +13,8 @@ export const queryKeys = {
   projects: ['projects'] as const,
   project: (id: string) => ['projects', id] as const,
   executionProviders: ['execution-providers'] as const,
+  executionHosts: ['execution-hosts'] as const,
+  projectWorkspace: (id: string) => ['projects', id, 'workspace'] as const,
   skills: ['skills'] as const,
   reviews: ['reviews'] as const,
   reviewList: (status: string, projectId?: string | null) =>
@@ -20,6 +22,7 @@ export const queryKeys = {
   artifacts: (projectId: string) => ['artifacts', projectId] as const,
   runs: ['runs'] as const,
   runList: (projectId?: string | null) => ['runs', projectId ?? 'all'] as const,
+  runsByStatus: (status: string) => ['runs', 'status', status] as const,
   runEvents: (runId: string) => ['runs', runId, 'events'] as const,
   taskExecutionTelemetry: ['task-execution-telemetry'] as const,
   messages: (id: string) => ['messages', id] as const,

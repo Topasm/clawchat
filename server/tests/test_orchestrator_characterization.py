@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import select
 
 from domain.task import TaskStatus
 from exceptions import AIUnavailableError
@@ -39,9 +40,15 @@ class RecordingWS:
     async def send_json(self, user_id: str, data: dict):
         self.sent.append(data)
 
-    async def stream_to_user(self, *, user_id, message_id, conversation_id, token_iterator):
+    async def stream_to_user(
+        self, *, user_id, message_id, conversation_id, token_iterator
+    ):
         self.stream_calls.append(
-            {"user_id": user_id, "message_id": message_id, "conversation_id": conversation_id}
+            {
+                "user_id": user_id,
+                "message_id": message_id,
+                "conversation_id": conversation_id,
+            }
         )
         if self.stream_error is not None:
             raise self.stream_error
@@ -57,7 +64,9 @@ class RecordingWS:
 class StubAI:
     model = "stub-model"
 
-    def __init__(self, completion: str = "analysis text", title: str = "Generated Title"):
+    def __init__(
+        self, completion: str = "analysis text", title: str = "Generated Title"
+    ):
         self._completion = completion
         self._title = title
         self.completion_calls: list[dict] = []
@@ -95,7 +104,9 @@ def orchestrator(session_factory, ws, ai):
     )
 
 
-async def resolve(orchestrator, db, intent, params=None, content="", conversation_id=None):
+async def resolve(
+    orchestrator, db, intent, params=None, content="", conversation_id=None
+):
     return await orchestrator.resolve_intent_response(
         db, conversation_id, intent, params or {}, content
     )
@@ -139,6 +150,7 @@ def test_module_intent_names_are_frozen():
         "update_todo": "update a todo",
         "delete_todo": "delete a todo",
         "complete_todo": "complete a todo",
+        "plan_task": "plan a task",
         "create_event": "create a calendar event",
         "query_events": "check your calendar",
         "update_event": "update a calendar event",
@@ -154,17 +166,17 @@ def test_module_intent_names_are_frozen():
 
 async def test_create_todo_reply_and_metadata(orchestrator, db_session):
     text, metadata = await resolve(
-        orchestrator, db_session, "create_todo", {"title": "Buy milk", "priority": "high"}
+        orchestrator, db_session, "create_todo", {"title": "Buy milk"}
     )
-    assert text == "Created task: 'Buy milk' with high priority."
+    assert text == "Created task: 'Buy milk'."
     assert metadata["action_type"] == "todo_created"
     assert metadata["module"] == "todos"
     assert metadata["todo_title"] == "Buy milk"
 
 
-async def test_create_todo_defaults_title_and_priority(orchestrator, db_session):
+async def test_create_todo_defaults_title(orchestrator, db_session):
     text, _ = await resolve(orchestrator, db_session, "create_todo", {})
-    assert text == "Created task: 'Untitled task' with medium priority."
+    assert text == "Created task: 'Untitled task'."
 
 
 async def test_create_todo_inherits_the_conversation_project(orchestrator, db_session):
@@ -184,19 +196,33 @@ async def test_create_todo_inherits_the_conversation_project(orchestrator, db_se
     assert todo.project_id == project.id
 
 
-async def test_create_todo_inherits_the_conversation_parent_task(orchestrator, db_session):
+async def test_create_todo_in_a_task_thread_waits_for_graph_review(
+    orchestrator, db_session
+):
+    from models.plan_proposal import PlanProposal
+    from schemas.task import PlanPayload
+
     parent = await _todo(db_session, "Parent")
     conv = await _conversation(db_session, project_todo_id=parent.id)
 
-    _text, metadata = await resolve(
+    text, metadata = await resolve(
         orchestrator,
         db_session,
         "create_todo",
         {"title": "Child"},
         conversation_id=conv.id,
     )
-    todo = await db_session.get(Todo, metadata["todo_id"])
-    assert todo.parent_id == parent.id
+    proposal = await db_session.get(PlanProposal, metadata["plan_proposal_id"])
+    payload = PlanPayload.model_validate_json(proposal.payload_json)
+
+    assert metadata["action_type"] == "plan_started"
+    assert metadata["proposal_kind"] == "add_task"
+    assert metadata["todo_id"] == parent.id
+    assert [task.title for task in payload.subtasks] == ["Child"]
+    assert "Apply the graph change" in text
+    assert (
+        await db_session.execute(select(Todo).where(Todo.title == "Child"))
+    ).scalar_one_or_none() is None
 
 
 async def test_query_todos_lists_five_and_counts_the_rest(orchestrator, db_session):
@@ -221,7 +247,9 @@ async def test_update_todo_not_found(orchestrator, db_session):
     text, metadata = await resolve(
         orchestrator, db_session, "update_todo", {"title": "Ghost"}
     )
-    assert text == "I couldn't find a task matching 'Ghost'. Try listing your tasks first."
+    assert (
+        text == "I couldn't find a task matching 'Ghost'. Try listing your tasks first."
+    )
     assert metadata is None
 
 
@@ -246,7 +274,6 @@ async def test_update_todo_applies_known_fields(orchestrator, db_session):
         {
             "title": "Refactor",
             "description": "split it up",
-            "priority": "high",
             "due_date": "2026-09-01T09:00:00+00:00",
             "status": TaskStatus.IN_PROGRESS,
         },
@@ -259,7 +286,6 @@ async def test_update_todo_applies_known_fields(orchestrator, db_session):
         "todo_title": "Refactor",
     }
     assert todo.description == "split it up"
-    assert todo.priority == "high"
 
 
 async def test_delete_todo_reports_the_removed_task(orchestrator, db_session):
@@ -302,7 +328,10 @@ async def test_create_event_requires_a_start_time(orchestrator, db_session):
     text, metadata = await resolve(
         orchestrator, db_session, "create_event", {"title": "Standup"}
     )
-    assert text == "I'd create event 'Standup', but I need a start time. When should it be?"
+    assert (
+        text
+        == "I'd create event 'Standup', but I need a start time. When should it be?"
+    )
     assert metadata is None
 
 
@@ -365,7 +394,9 @@ async def test_query_events_lists_five_and_counts_the_rest(orchestrator, db_sess
 
 async def test_update_event_without_a_title(orchestrator, db_session):
     text, metadata = await resolve(orchestrator, db_session, "update_event", {})
-    assert text == "Which event would you like to update? Please mention the event name."
+    assert (
+        text == "Which event would you like to update? Please mention the event name."
+    )
     assert metadata is None
 
 
@@ -437,7 +468,9 @@ async def test_delete_event_reports_the_removed_event(orchestrator, db_session):
 
 async def test_delete_event_without_a_title(orchestrator, db_session):
     text, metadata = await resolve(orchestrator, db_session, "delete_event", {})
-    assert text == "Which event would you like to delete? Please mention the event name."
+    assert (
+        text == "Which event would you like to delete? Please mention the event name."
+    )
     assert metadata is None
 
 
@@ -459,7 +492,9 @@ async def test_suggest_time_without_slots(orchestrator, db_session, monkeypatch)
     assert metadata is None
 
 
-async def test_suggest_time_formats_the_slots(orchestrator, db_session, ai, monkeypatch):
+async def test_suggest_time_formats_the_slots(
+    orchestrator, db_session, ai, monkeypatch
+):
     captured = {}
     suggestions = [
         {"start": "2026-09-01T09:00:00+00:00", "reason": "morning is free"},
@@ -468,7 +503,12 @@ async def test_suggest_time_formats_the_slots(orchestrator, db_session, ai, monk
 
     async def _suggest(db, ai_service, title, duration, preferred):
         captured.update(
-            {"ai": ai_service, "title": title, "duration": duration, "preferred": preferred}
+            {
+                "ai": ai_service,
+                "title": title,
+                "duration": duration,
+                "preferred": preferred,
+            }
         )
         return suggestions
 
@@ -479,7 +519,11 @@ async def test_suggest_time_formats_the_slots(orchestrator, db_session, ai, monk
         orchestrator,
         db_session,
         "suggest_time",
-        {"title": "1:1", "duration": "45", "preferred_date": "2026-09-01T00:00:00+00:00"},
+        {
+            "title": "1:1",
+            "duration": "45",
+            "preferred_date": "2026-09-01T00:00:00+00:00",
+        },
     )
 
     assert captured["ai"] is ai
@@ -516,7 +560,9 @@ async def test_check_conflicts_when_free(orchestrator, db_session, monkeypatch):
     async def _none(*args, **kwargs):
         return []
 
-    monkeypatch.setattr("services.calendar.scheduling_service.find_conflicts", _none, raising=True)
+    monkeypatch.setattr(
+        "services.calendar.scheduling_service.find_conflicts", _none, raising=True
+    )
     text, metadata = await resolve(
         orchestrator,
         db_session,
@@ -566,9 +612,7 @@ async def test_check_conflicts_without_a_start_time_uses_now(
         "services.calendar.scheduling_service.find_conflicts", _conflicts, raising=True
     )
     await resolve(orchestrator, db_session, "check_conflicts", {})
-    assert abs(
-        (captured["start"] - datetime.now(timezone.utc)).total_seconds()
-    ) < 60
+    assert abs((captured["start"] - datetime.now(timezone.utc)).total_seconds()) < 60
 
 
 async def test_analyze_schedule_on_a_clear_week(orchestrator, db_session):
@@ -603,7 +647,9 @@ async def test_module_intent_failure_falls_back_to_a_generic_apology(
 
     monkeypatch.setattr("services.tasks.todo_service.get_todos", _boom, raising=True)
     text, metadata = await resolve(orchestrator, db_session, "query_todos")
-    assert text == "I tried to list your todos but something went wrong. Please try again."
+    assert (
+        text == "I tried to list your todos but something went wrong. Please try again."
+    )
     assert metadata is None
 
 
@@ -625,7 +671,9 @@ async def test_unhandled_module_intent_without_a_title(
 ):
     monkeypatch.setitem(MODULE_INTENTS, "archive_todo", "archive a todo")
     text, _ = await resolve(orchestrator, db_session, "archive_todo", {})
-    assert text == "I understood you want to archive a todo. This action is coming soon!"
+    assert (
+        text == "I understood you want to archive a todo. This action is coming soon!"
+    )
 
 
 # --- search ---------------------------------------------------------------
@@ -717,7 +765,9 @@ async def test_daily_briefing_delegates_to_the_briefing_service(
         return "your day"
 
     monkeypatch.setattr(
-        "services.notifications.briefing_service.generate_briefing", _briefing, raising=True
+        "services.notifications.briefing_service.generate_briefing",
+        _briefing,
+        raising=True,
     )
     text, metadata = await resolve(orchestrator, db_session, "daily_briefing")
     assert text == "your day"
@@ -735,7 +785,9 @@ async def test_weekly_review_delegates_to_the_review_service(
         return "your week"
 
     monkeypatch.setattr(
-        "services.notifications.weekly_review_service.generate_weekly_review", _review, raising=True
+        "services.notifications.weekly_review_service.generate_weekly_review",
+        _review,
+        raising=True,
     )
     text, metadata = await resolve(orchestrator, db_session, "weekly_review")
     assert text == "your week"
@@ -761,9 +813,28 @@ async def test_briefing_failures_propagate_to_the_caller(
 # --- intents with no self-contained answer --------------------------------
 
 
-@pytest.mark.parametrize("intent", ["general_chat", "delegate_task", "unknown_intent"])
+@pytest.mark.parametrize("intent", ["general_chat", "unknown_intent"])
 async def test_intents_without_a_one_shot_answer(orchestrator, db_session, intent):
     assert await resolve(orchestrator, db_session, intent) is None
+
+
+async def test_delegate_task_has_a_one_shot_answer(
+    orchestrator, db_session, monkeypatch
+):
+    """The reply confirms the delegation; the run's own states follow later
+    through its thread, so SSE clients are not left out."""
+    from services.agents import agent_run_service
+
+    monkeypatch.setattr(
+        agent_run_service,
+        "launch_execution",
+        lambda run_id, coroutine: coroutine.close(),
+    )
+    text, metadata = await resolve(
+        orchestrator, db_session, "delegate_task", {"instruction": "Research suppliers"}
+    )
+    assert "Got it" in text
+    assert metadata["action_type"] == "task_delegated"
 
 
 # --- handle_message: routing, messaging, ws events ------------------------
@@ -854,15 +925,15 @@ async def test_daily_briefing_sends_one_assistant_message(
         return "your day"
 
     monkeypatch.setattr(
-        "services.notifications.briefing_service.generate_briefing", _briefing, raising=True
+        "services.notifications.briefing_service.generate_briefing",
+        _briefing,
+        raising=True,
     )
     await orchestrator.handle_message("user-1", conv_id, msg_id, "brief me")
 
     assert ws.types() == ["stream_start", "stream_chunk", "stream_end"]
     async with session_factory() as db:
-        saved = (
-            await db.get(Message, ws.sent[0]["data"]["message_id"])
-        )
+        saved = await db.get(Message, ws.sent[0]["data"]["message_id"])
         assert saved.intent == "daily_briefing"
         assert saved.content == "your day"
         assert saved.metadata_json is None
@@ -878,7 +949,9 @@ async def test_weekly_review_sends_one_assistant_message(
         return "your week"
 
     monkeypatch.setattr(
-        "services.notifications.weekly_review_service.generate_weekly_review", _review, raising=True
+        "services.notifications.weekly_review_service.generate_weekly_review",
+        _review,
+        raising=True,
     )
     await orchestrator.handle_message("user-1", conv_id, msg_id, "review my week")
 

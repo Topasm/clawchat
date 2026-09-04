@@ -13,14 +13,14 @@
     <string name="week_empty_action">Add task</string>
     <string name="week_loading">Loading this week…</string>
     <string name="week_status_in_progress">In progress</string>
-    <string name="week_priority_low">Low</string>
-    <string name="week_priority_medium">Medium</string>
-    <string name="week_priority_high">High</string>
-    <string name="week_priority_urgent">Urgent</string>
     <string name="week_recurring">Recurring</string>
     <string name="week_mark_complete">Mark %1$s complete</string>
     <plurals name="week_active_tasks">
         <item quantity="one">%1$d active task</item>
         <item quantity="other">%1$d active tasks</item>
+    </plurals>
+    <plurals name="week_timeline_more">
+        <item quantity="one">+%1$d more deadline</item>
+        <item quantity="other">+%1$d more deadlines</item>
     </plurals>
 </resources>

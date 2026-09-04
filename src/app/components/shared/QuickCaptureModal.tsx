@@ -91,7 +91,7 @@ export default function QuickCaptureModal({
   const handleReviewNow = () => {
     if (receiptTimerRef.current) clearTimeout(receiptTimerRef.current);
     onClose();
-    navigate(receipt === 'Event created' ? '/calendar' : '/inbox');
+    navigate(receipt === 'Event created' ? '/schedule/month' : '/inbox');
   };
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -129,7 +129,6 @@ export default function QuickCaptureModal({
         createTodoMutation.mutate(
           {
             title: parsed.title,
-            priority: parsed.priority ?? 'medium',
             due_date: parsed.dueDate?.toISOString(),
             tags: [],
             parent_id: defaultParentId,
@@ -147,7 +146,6 @@ export default function QuickCaptureModal({
           id,
           title: parsed.title,
           status: 'pending',
-          priority: parsed.priority ?? undefined,
           due_date: parsed.dueDate?.toISOString(),
           tags: [],
           parent_id: defaultParentId ?? null,
@@ -246,7 +244,6 @@ export default function QuickCaptureModal({
                           ? translateUi('Note')
                           : translateUi('Task')}
                     </span>
-                    {parsed.priority && <Badge variant="priority" level={parsed.priority} />}
                     {parsed.dueDate && (
                       <Badge variant="due" dueDate={parsed.dueDate.toISOString()} />
                     )}

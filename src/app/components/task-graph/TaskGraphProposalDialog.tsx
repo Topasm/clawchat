@@ -328,22 +328,6 @@ export default function TaskGraphProposalDialog({
                         })}
                       />
                       <div className="cc-task-proposal__item-meta">
-                        <select
-                          value={subtask.priority ?? 'medium'}
-                          onChange={(event) =>
-                            updateSubtask(index, {
-                              priority: event.target.value as PlanSubtask['priority'],
-                            })
-                          }
-                          aria-label={translateUi('Priority for {{title}}', {
-                            title: subtask.title,
-                          })}
-                        >
-                          <option value="low">{translateUi('Low')}</option>
-                          <option value="medium">{translateUi('Medium')}</option>
-                          <option value="high">{translateUi('High')}</option>
-                          <option value="urgent">{translateUi('Urgent')}</option>
-                        </select>
                         {subtask.estimated_minutes ? (
                           <span>{subtask.estimated_minutes}m</span>
                         ) : null}

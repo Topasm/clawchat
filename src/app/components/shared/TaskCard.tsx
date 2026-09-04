@@ -119,9 +119,6 @@ export default function TaskCard({
                 <RepeatIcon size={10} />
               </span>
             )}
-            {task.priority && task.priority !== 'medium' && (
-              <Badge variant="priority" level={task.priority} />
-            )}
             {task.due_date && <Badge variant="due" dueDate={task.due_date} />}
             {task.tags?.map((tag) => (
               <Badge key={tag} variant="tag">

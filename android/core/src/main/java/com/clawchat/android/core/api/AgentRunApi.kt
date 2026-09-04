@@ -2,6 +2,7 @@ package com.clawchat.android.core.api
 
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunEvent
+import com.clawchat.android.core.data.model.AgentRunPermissionRequest
 import com.clawchat.android.core.data.model.AgentRunResumeRequest
 import com.clawchat.android.core.data.model.AgentRunRetryRequest
 import retrofit2.http.Body
@@ -38,5 +39,11 @@ interface AgentRunApi {
     suspend fun resumeRun(
         @Path("runId") runId: String,
         @Body request: AgentRunResumeRequest,
+    ): AgentRun
+
+    @POST("api/runs/{runId}/permission")
+    suspend fun resolvePermission(
+        @Path("runId") runId: String,
+        @Body request: AgentRunPermissionRequest,
     ): AgentRun
 }

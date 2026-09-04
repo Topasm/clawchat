@@ -14,6 +14,8 @@
     <string name="today_overdue_subtitle">Start with the items already slipping.</string>
     <string name="today_focus_title">Today\'s focus</string>
     <string name="today_focus_subtitle">The main work to close out today.</string>
+    <string name="today_needs_date_title">Needs a date</string>
+    <string name="today_needs_date_subtitle">Not today, not overdue — just waiting on a decision.</string>
     <string name="today_empty_title">All clear for today</string>
     <string name="today_empty_description">Ask ClawChat for a plan or capture something new when it comes up.</string>
     <string name="today_empty_description_local">Add a task when something comes up. It will stay on this device.</string>
@@ -91,10 +93,6 @@
     <string name="today_suggestion_break_down">Break down</string>
     <string name="today_suggestion_prioritize">Prioritize</string>
 
-    <string name="today_priority_low">Low</string>
-    <string name="today_priority_medium">Medium</string>
-    <string name="today_priority_high">High</string>
-    <string name="today_priority_urgent">Urgent</string>
     <plurals name="today_reminder_minutes_before">
         <item quantity="one">%1$d min before</item>
         <item quantity="other">%1$d min before</item>

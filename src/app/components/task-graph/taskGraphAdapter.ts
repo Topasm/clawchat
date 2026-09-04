@@ -9,6 +9,57 @@ export interface TaskGraphElements {
   edges: Edge[];
 }
 
+/**
+ * Collapse question/series nodes so project depth-two experiment steps start
+ * hidden. The compatibility project-root Todo is not rendered, but its id is
+ * still useful for identifying the project's depth-one tasks.
+ */
+export function collectDefaultCollapsedTaskIds(
+  todos: readonly TodoResponse[],
+  projectRootTaskId?: string | null,
+): Set<string> {
+  const todoIds = new Set(todos.map((todo) => todo.id));
+  const parentIds = new Set(
+    todos.flatMap((todo) =>
+      todo.parent_id && todoIds.has(todo.parent_id) ? [todo.parent_id] : [],
+    ),
+  );
+
+  return new Set(
+    todos
+      .filter((todo) => {
+        if (!parentIds.has(todo.id)) return false;
+        if (projectRootTaskId) return todo.parent_id === projectRootTaskId;
+        return !todo.parent_id || !todoIds.has(todo.parent_id);
+      })
+      .map((todo) => todo.id),
+  );
+}
+
+/** IDs in one Todo hierarchy, starting from the actual root Todo id. */
+export function collectTaskSubtreeIds(
+  rootTaskId: string,
+  todos: readonly TodoResponse[],
+): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const todo of todos) {
+    if (!todo.parent_id) continue;
+    childrenByParent.set(todo.parent_id, [
+      ...(childrenByParent.get(todo.parent_id) ?? []),
+      todo.id,
+    ]);
+  }
+  const ids = new Set<string>();
+  const pending = [rootTaskId];
+  while (pending.length > 0) {
+    const id = pending.pop();
+    if (!id || ids.has(id)) continue;
+    ids.add(id);
+    pending.push(...(childrenByParent.get(id) ?? []));
+  }
+  return ids;
+}
+
 interface AugmentTaskGraphTodosOptions {
   includeAllMissing: boolean;
   includeContextMissing: boolean;
@@ -23,7 +74,6 @@ export function todoFromGraphInsight(
     id: insight.task_id,
     title: insight.title,
     status: insight.status,
-    priority: 'medium',
     due_date: insight.due_date,
     tags: [],
     parent_id: insight.parent_id,

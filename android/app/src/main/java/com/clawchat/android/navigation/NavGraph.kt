@@ -4,28 +4,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.WindowInsets
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,38 +42,45 @@ import com.clawchat.android.feature.settings.SettingsScreen
 import com.clawchat.android.feature.tasks.TasksScreen
 import com.clawchat.android.feature.planner.PlannerPage
 import com.clawchat.android.feature.planner.PlannerScreen
+import com.clawchat.android.feature.progress.ProgressScreen
 import com.clawchat.android.feature.search.SearchScreen
+import com.clawchat.android.feature.search.QuickFindDestination
 import com.clawchat.android.R
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.SearchType
-import kotlinx.coroutines.launch
 
-private data class DrawerNavItem(
+private data class BottomNavItem(
     val route: String,
     val icon: ImageVector,
     @StringRes val labelRes: Int,
 )
 
-private val allDrawerNavItems = listOf(
-    DrawerNavItem(NavRoute.Today.route, ClawIcons.Today, R.string.nav_today),
-    DrawerNavItem(NavRoute.Inbox.route, ClawIcons.Inbox, R.string.nav_inbox),
-    DrawerNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, R.string.nav_tasks),
-    DrawerNavItem(NavRoute.Chat.route, ClawIcons.Chat, R.string.nav_chat),
-    DrawerNavItem(NavRoute.Calendar.route, Icons.Default.DateRange, R.string.nav_calendar),
-    DrawerNavItem(NavRoute.Review.route, ClawIcons.CheckCircle, R.string.nav_review),
-    DrawerNavItem(NavRoute.Runs.route, Icons.Default.PlayArrow, R.string.nav_runs),
-    DrawerNavItem(NavRoute.Search.route, Icons.Default.Search, R.string.nav_search),
-    DrawerNavItem(NavRoute.Settings.route, Icons.Default.Settings, R.string.nav_settings),
+private val allBottomNavItems = listOf(
+    BottomNavItem(NavRoute.Progress.route, Icons.Default.PlayArrow, R.string.nav_progress),
+    BottomNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, R.string.nav_tasks),
+    BottomNavItem(NavRoute.Today.route, Icons.Default.DateRange, R.string.nav_schedule),
+    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, R.string.nav_chat),
 )
 
-internal fun plannerDrawerRoute(currentRoute: String?, page: PlannerPage): String? =
+internal fun plannerPrimaryRoute(currentRoute: String?): String? =
     when (currentRoute) {
-        NavRoute.Today.route, NavRoute.Calendar.route -> when (page) {
-            PlannerPage.MONTH -> NavRoute.Calendar.route
-            PlannerPage.TODAY, PlannerPage.WEEK -> NavRoute.Today.route
-        }
+        NavRoute.Today.route, NavRoute.Calendar.route -> NavRoute.Today.route
         else -> currentRoute
     }
+
+/**
+ * Whether [targetRoute] is the tab that also serves as the graph's start
+ * destination (Progress in server mode, Tasks in local mode). That entry
+ * sits underneath every other tab's `popUpTo`, so it never actually gets
+ * popped by the normal save/restore dance — navigating back to it with the
+ * usual `saveState`/`restoreState` pair can then silently no-op instead of
+ * restoring it. [startDestinationRoute] is compared with its query pattern
+ * stripped, since a start destination with an optional argument (like Tasks)
+ * registers its route as `tasks?todo_id={todo_id}`, not the bare `tasks` a
+ * bottom-nav tap targets.
+ */
+internal fun isStartDestinationTarget(targetRoute: String, startDestinationRoute: String?): Boolean =
+    targetRoute == startDestinationRoute?.substringBefore('?')
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,21 +95,13 @@ fun ClawChatNavGraph(
     /** Destination a tapped notification asked for, or null. */
     deepLinkRoute: String? = null,
     onDeepLinkHandled: () -> Unit = {},
+    attentionCount: Int = 0,
 ) {
     val navController = rememberNavController()
-    val startDestination = if (workspaceMode == WorkspaceMode.UNCONFIGURED) {
-        NavRoute.Onboarding.route
-    } else {
-        NavRoute.Today.route
-    }
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val coroutineScope = rememberCoroutineScope()
-    val drawerItemsByRoute = remember { allDrawerNavItems.associateBy(DrawerNavItem::route) }
-    val primaryDrawerItems = remember(workspaceMode) {
-        NavigationCapabilities.primaryRoutes(workspaceMode).mapNotNull(drawerItemsByRoute::get)
-    }
-    val secondaryDrawerItems = remember(workspaceMode) {
-        NavigationCapabilities.secondaryRoutes(workspaceMode).mapNotNull(drawerItemsByRoute::get)
+    val startDestination = NavigationCapabilities.startRoute(workspaceMode)
+    val bottomItemsByRoute = remember { allBottomNavItems.associateBy(BottomNavItem::route) }
+    val primaryBottomItems = remember(workspaceMode) {
+        NavigationCapabilities.primaryRoutes(workspaceMode).mapNotNull(bottomItemsByRoute::get)
     }
     var plannerPage by rememberSaveable { mutableStateOf(PlannerPage.TODAY) }
 
@@ -129,7 +123,7 @@ fun ClawChatNavGraph(
             else -> Unit
         }
         navController.navigate(route) {
-            popUpTo(NavRoute.Today.route)
+            popUpTo(navController.graph.findStartDestination().id)
             launchSingleTop = true
         }
         onDeepLinkHandled()
@@ -138,12 +132,11 @@ fun ClawChatNavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val currentBaseRoute = currentRoute?.substringBefore('?')
-    val selectedDrawerRoute = plannerDrawerRoute(currentBaseRoute, plannerPage)
-    val openNavigation: () -> Unit = {
-        coroutineScope.launch { drawerState.open() }
-    }
-    val navigateFromDrawer: (String) -> Unit = { route ->
-        coroutineScope.launch { drawerState.close() }
+    val selectedPrimaryRoute = plannerPrimaryRoute(currentBaseRoute)
+    val showBottomNavigation = currentBaseRoute != null &&
+        currentBaseRoute != NavRoute.Onboarding.route &&
+        currentBaseRoute !in setOf(NavRoute.Inbox.route, NavRoute.Review.route, NavRoute.Runs.route)
+    val navigateToPrimary: (String) -> Unit = { route ->
         when (route) {
             NavRoute.Today.route -> plannerPage = PlannerPage.TODAY
             NavRoute.Calendar.route -> plannerPage = PlannerPage.MONTH
@@ -153,29 +146,26 @@ fun ClawChatNavGraph(
             route != currentBaseRoute &&
             NavigationCapabilities.canOpen(workspaceMode, route)
         ) {
+            val targetIsStartDestination = isStartDestinationTarget(
+                route,
+                navController.graph.findStartDestination().route,
+            )
             navController.navigate(route) {
-                if (route != NavRoute.Review.route && route != NavRoute.Runs.route) {
-                    popUpTo(navController.graph.findStartDestination().id) {
-                        saveState = true
-                    }
-                    restoreState = true
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = !targetIsStartDestination
+                    inclusive = targetIsStartDestination
                 }
+                restoreState = !targetIsStartDestination
                 launchSingleTop = true
             }
         }
     }
-    val navigateToInbox: () -> Unit = {
-        if (NavigationCapabilities.canOpen(workspaceMode, NavRoute.Inbox.route)) {
-            navController.navigate(NavRoute.Inbox.route) {
-                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
-        }
+    val navigateToNow: () -> Unit = {
+        navigateToPrimary(NavRoute.Progress.route)
     }
-    val navigateToReview: () -> Unit = {
+    val navigateToReview: (String?) -> Unit = { reviewId ->
         if (NavigationCapabilities.canOpen(workspaceMode, NavRoute.Review.route)) {
-            navController.navigate(NavRoute.Review.route)
+            navController.navigate(NavRoute.Review.destination(reviewId))
         }
     }
     val navigateToRuns: () -> Unit = {
@@ -186,34 +176,58 @@ fun ClawChatNavGraph(
     val navigateToSearch: () -> Unit = {
         navController.navigate(NavRoute.Search.route)
     }
+    val navigateToSettings: () -> Unit = {
+        navController.navigate(NavRoute.Settings.route) { launchSingleTop = true }
+    }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = workspaceMode != WorkspaceMode.UNCONFIGURED,
-        drawerContent = {
-            ClawChatDrawerContent(
-                workspaceMode = workspaceMode,
-                primaryItems = primaryDrawerItems,
-                secondaryItems = secondaryDrawerItems,
-                selectedRoute = selectedDrawerRoute,
-                onNavigate = navigateFromDrawer,
-            )
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            if (showBottomNavigation && primaryBottomItems.isNotEmpty()) {
+                NavigationBar {
+                    primaryBottomItems.forEach { item ->
+                        NavigationBarItem(
+                            selected = item.route == selectedPrimaryRoute,
+                            onClick = { navigateToPrimary(item.route) },
+                            icon = {
+                                if (item.route == NavRoute.Progress.route && attentionCount > 0) {
+                                    BadgedBox(
+                                        badge = {
+                                            Badge {
+                                                Text(attentionCount.coerceAtMost(99).toString())
+                                            }
+                                        },
+                                    ) {
+                                        Icon(item.icon, contentDescription = null)
+                                    }
+                                } else {
+                                    Icon(item.icon, contentDescription = null)
+                                }
+                            },
+                            label = { Text(stringResource(item.labelRes)) },
+                        )
+                    }
+                }
+            }
         },
-    ) {
+    ) { rootPadding ->
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(rootPadding)
+                .consumeWindowInsets(rootPadding),
         ) {
             composable(NavRoute.Onboarding.route) {
                 OnboardingScreen(
                     onComplete = {
-                        navController.navigate(NavRoute.Today.route) {
+                        navController.navigate(NavRoute.Progress.route) {
                             popUpTo(NavRoute.Onboarding.route) { inclusive = true }
                         }
                     },
                     onSkip = {
-                        navController.navigate(NavRoute.Today.route) {
+                        navController.navigate(NavRoute.Tasks.route) {
                             popUpTo(NavRoute.Onboarding.route) { inclusive = true }
                         }
                     },
@@ -223,11 +237,16 @@ fun ClawChatNavGraph(
                 PlannerScreen(
                     initialPage = plannerPage,
                     showAgentFeatures = workspaceMode == WorkspaceMode.SERVER,
-                    onOpenNavigation = openNavigation,
-                    onNavigateToInbox = navigateToInbox,
-                    onNavigateToReview = navigateToReview,
+                    onNavigateToInbox = navigateToNow,
+                    onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
+                    onNavigateToSettings = navigateToSettings,
+                    onOpenTask = { todoId ->
+                        navController.navigate(NavRoute.Tasks.destination(todoId)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onPageChanged = { plannerPage = it },
                 )
             }
@@ -238,9 +257,36 @@ fun ClawChatNavGraph(
                     } else {
                         SearchType.entries
                     },
-                    onOpenNavigation = openNavigation,
+                    onBack = { navController.popBackStack() },
+                    quickDestinations = if (workspaceMode == WorkspaceMode.LOCAL) {
+                        listOf(
+                            QuickFindDestination.IN_PROGRESS,
+                            QuickFindDestination.SCHEDULE,
+                            QuickFindDestination.SETTINGS,
+                        )
+                    } else {
+                        QuickFindDestination.entries
+                    },
+                    onOpenDestination = { destination ->
+                        val route = when (destination) {
+                            QuickFindDestination.NOW -> NavRoute.Progress.route
+                            QuickFindDestination.IN_PROGRESS -> NavRoute.Tasks.route
+                            QuickFindDestination.SCHEDULE -> NavRoute.Today.route
+                            QuickFindDestination.CHAT -> NavRoute.Chat.route
+                            QuickFindDestination.SETTINGS -> NavRoute.Settings.route
+                        }
+                        if (NavigationCapabilities.canOpen(workspaceMode, route)) {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    },
                     onOpenHit = { hit ->
-                        searchHitRoute(hit.type)?.let { route ->
+                        searchHitRoute(hit.type, hit.id)?.let { route ->
                             if (!NavigationCapabilities.canOpen(workspaceMode, route)) return@let
                             if (route == NavRoute.Calendar.route) plannerPage = PlannerPage.MONTH
                             navController.navigate(route) {
@@ -258,11 +304,16 @@ fun ClawChatNavGraph(
                 PlannerScreen(
                     initialPage = plannerPage,
                     showAgentFeatures = workspaceMode == WorkspaceMode.SERVER,
-                    onOpenNavigation = openNavigation,
-                    onNavigateToInbox = navigateToInbox,
-                    onNavigateToReview = navigateToReview,
+                    onNavigateToInbox = navigateToNow,
+                    onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
+                    onNavigateToSettings = navigateToSettings,
+                    onOpenTask = { todoId ->
+                        navController.navigate(NavRoute.Tasks.destination(todoId)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onPageChanged = { plannerPage = it },
                 )
             }
@@ -271,28 +322,94 @@ fun ClawChatNavGraph(
                     workspaceMode = workspaceMode,
                     onConnectWorkspace = openConnectionSetup,
                 ) {
-                    InboxScreen(onOpenNavigation = openNavigation)
+                    InboxScreen(onBack = { navController.popBackStack() })
                 }
             }
-            composable(NavRoute.Chat.route) {
+            composable(
+                route = NavRoute.Chat.routePattern,
+                arguments = listOf(
+                    navArgument(NavRoute.Chat.ARG_CONVERSATION_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
                 ServerOnlyDestination(
                     workspaceMode = workspaceMode,
                     onConnectWorkspace = openConnectionSetup,
                 ) {
-                    ChatScreen(onOpenNavigation = openNavigation)
+                    ChatScreen(
+                        onOpenSearch = navigateToSearch,
+                        onOpenSettings = navigateToSettings,
+                        initialConversationId = entry.arguments?.getString(
+                            NavRoute.Chat.ARG_CONVERSATION_ID,
+                        ),
+                    )
                 }
             }
-            composable(NavRoute.Tasks.route) {
-                TasksScreen(onOpenNavigation = openNavigation)
+            composable(NavRoute.Progress.route) {
+                ServerOnlyDestination(
+                    workspaceMode = workspaceMode,
+                    onConnectWorkspace = openConnectionSetup,
+                ) {
+                    ProgressScreen(
+                        onOpenSearch = navigateToSearch,
+                        onOpenSettings = navigateToSettings,
+                        onOpenReview = { reviewId -> navigateToReview(reviewId) },
+                        onOpenRun = { runId ->
+                            navController.navigate(NavRoute.Runs.destination(runId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenTask = { todoId ->
+                            navController.navigate(NavRoute.Tasks.destination(todoId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
             }
-            composable(NavRoute.Review.route) {
+            composable(
+                route = NavRoute.Tasks.routePattern,
+                arguments = listOf(
+                    navArgument(NavRoute.Tasks.ARG_TODO_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
+                TasksScreen(
+                    onOpenSearch = navigateToSearch,
+                    onOpenSettings = navigateToSettings,
+                    initialTodoId = entry.arguments?.getString(NavRoute.Tasks.ARG_TODO_ID),
+                    onOpenConversation = { conversationId ->
+                        if (NavigationCapabilities.canOpen(workspaceMode, NavRoute.Chat.route)) {
+                            navController.navigate(NavRoute.Chat.destination(conversationId)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                )
+            }
+            composable(
+                route = NavRoute.Review.routePattern,
+                arguments = listOf(
+                    navArgument(NavRoute.Review.ARG_REVIEW_ID) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { entry ->
                 ServerOnlyDestination(
                     workspaceMode = workspaceMode,
                     onConnectWorkspace = openConnectionSetup,
                 ) {
                     ReviewInboxScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenNavigation = openNavigation,
+                        initialReviewId = entry.arguments?.getString(NavRoute.Review.ARG_REVIEW_ID),
                         onOpenSubject = { review ->
                             val destination = when (review.subjectType) {
                                 com.clawchat.android.core.data.model.ReviewSubjectType.AGENT_RUN ->
@@ -326,9 +443,8 @@ fun ClawChatNavGraph(
                 ) {
                     AgentRunsScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenNavigation = openNavigation,
                         onOpenReview = {
-                            navController.navigate(NavRoute.Review.route) { launchSingleTop = true }
+                            navController.navigate(NavRoute.Review.destination()) { launchSingleTop = true }
                         },
                         initialRunId = entry.arguments?.getString(NavRoute.Runs.ARG_RUN_ID),
                     )
@@ -336,7 +452,7 @@ fun ClawChatNavGraph(
             }
             composable(NavRoute.Settings.route) {
                 SettingsScreen(
-                    onOpenNavigation = openNavigation,
+                    onBack = { navController.popBackStack() },
                     onLoggedOut = {
                         navController.navigate(NavRoute.Onboarding.route) {
                             popUpTo(0) { inclusive = true }
@@ -347,114 +463,6 @@ fun ClawChatNavGraph(
             }
         }
     }
-}
-
-@Composable
-private fun ClawChatDrawerContent(
-    workspaceMode: WorkspaceMode,
-    primaryItems: List<DrawerNavItem>,
-    secondaryItems: List<DrawerNavItem>,
-    selectedRoute: String?,
-    onNavigate: (String) -> Unit,
-) {
-    ModalDrawerSheet(
-        modifier = Modifier.widthIn(max = 304.dp),
-        drawerContainerColor = MaterialTheme.colorScheme.surface,
-        drawerTonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Text(
-                text = stringResource(R.string.app_name),
-                modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = stringResource(
-                    when (workspaceMode) {
-                        WorkspaceMode.LOCAL -> R.string.navigation_local_workspace
-                        WorkspaceMode.SERVER -> R.string.navigation_server_workspace
-                        WorkspaceMode.UNCONFIGURED -> R.string.navigation_setup_workspace
-                    },
-                ),
-                modifier = Modifier.padding(start = 24.dp, top = 4.dp, end = 24.dp, bottom = 20.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            if (primaryItems.isNotEmpty()) {
-                DrawerSectionLabel(R.string.navigation_primary_section)
-                primaryItems.forEach { item ->
-                    ClawChatDrawerItem(
-                        item = item,
-                        selected = item.route == selectedRoute,
-                        onClick = { onNavigate(item.route) },
-                    )
-                }
-            }
-            if (secondaryItems.isNotEmpty()) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
-                DrawerSectionLabel(R.string.navigation_more_section)
-                secondaryItems.forEach { item ->
-                    ClawChatDrawerItem(
-                        item = item,
-                        selected = item.route == selectedRoute,
-                        onClick = { onNavigate(item.route) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DrawerSectionLabel(@StringRes labelRes: Int) {
-    Text(
-        text = stringResource(labelRes),
-        modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 6.dp),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
-private fun ClawChatDrawerItem(
-    item: DrawerNavItem,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val label = stringResource(item.labelRes)
-    NavigationDrawerItem(
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-        },
-        icon = {
-            Icon(
-                imageVector = item.icon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-        },
-        selected = selected,
-        onClick = onClick,
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 1.dp),
-        shape = MaterialTheme.shapes.small,
-        colors = NavigationDrawerItemDefaults.colors(
-            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-            unselectedContainerColor = Color.Transparent,
-        ),
-    )
 }
 
 @Composable

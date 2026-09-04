@@ -3,10 +3,8 @@ import { useModuleStore } from '../../stores/useModuleStore';
 import { useTodosQuery } from '../../hooks/queries';
 import { MagnifyingGlassIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
-const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 const SORT_OPTIONS = [
   { value: 'created_at', label: 'Date Created' },
-  { value: 'priority', label: 'Priority' },
   { value: 'due_date', label: 'Due Date' },
   { value: 'title', label: 'Title' },
   { value: 'updated_at', label: 'Last Updated' },
@@ -19,7 +17,6 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filters = useModuleStore((s) => s.kanbanFilters);
   const setSearch = useModuleStore((s) => s.setKanbanSearchQuery);
-  const togglePriority = useModuleStore((s) => s.toggleKanbanPriorityFilter);
   const toggleTag = useModuleStore((s) => s.toggleKanbanTagFilter);
   const setSort = useModuleStore((s) => s.setKanbanSort);
   const clearFilters = useModuleStore((s) => s.clearKanbanFilters);
@@ -30,8 +27,7 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
     todos.forEach((t) => t.tags?.forEach((tag) => tagSet.add(tag)));
     return Array.from(tagSet).sort();
   }, [todos]);
-  const hasActiveFilters =
-    filters.searchQuery || filters.priorities.length > 0 || filters.tags.length > 0;
+  const hasActiveFilters = filters.searchQuery || filters.tags.length > 0;
   return (
     <div className="cc-kanban-filter">
       <div className="cc-kanban-filter__search">
@@ -45,19 +41,6 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
           value={filters.searchQuery}
           onChange={(e) => setSearch(e.target.value)}
         />
-      </div>
-
-      <div className="cc-kanban-filter__chips">
-        {PRIORITIES.map((p) => (
-          <button
-            key={p}
-            className={`cc-kanban-filter__chip cc-kanban-filter__chip--${p}${filters.priorities.includes(p) ? ' cc-kanban-filter__chip--active' : ''}`}
-            aria-pressed={filters.priorities.includes(p)}
-            onClick={() => togglePriority(p)}
-          >
-            {translateUi(p.charAt(0).toUpperCase() + p.slice(1))}
-          </button>
-        ))}
       </div>
 
       {allTags.length > 0 && (

@@ -17,6 +17,7 @@ from routers import calendar as calendar_router
 from routers import capabilities as capabilities_router
 from routers import change_set as change_set_router
 from routers import chat as chat_router
+from routers import execution_host as execution_host_router
 from routers import execution_provider as execution_provider_router
 from routers import notifications as notifications_router
 from routers import obsidian as obsidian_router
@@ -26,6 +27,7 @@ from routers import review as review_router
 from routers import search as search_router
 from routers import settings as settings_router
 from routers import task_relationship as task_relationship_router
+from routers import task_comment as task_comment_router
 from routers import tasks as tasks_router
 from routers import today as today_router
 from routers import todo as todo_router
@@ -84,7 +86,7 @@ async def lifespan(app: FastAPI):
 
     app.state.paseo_adapter = paseo_execution_service.adapter_from_settings()
 
-    claude_code = ClaudeCodeProvider()
+    claude_code = ClaudeCodeProvider(model=settings.claude_code_model)
     codex_cli = CodexCLIProvider(model=settings.codex_cli_model)
     codex_api = CodexAPIProvider(
         api_key=settings.codex_api_key,
@@ -220,6 +222,11 @@ app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
 app.include_router(project_router.router, prefix="/api/projects", tags=["projects"])
 app.include_router(
+    execution_host_router.router,
+    prefix="/api/execution-hosts",
+    tags=["execution-hosts"],
+)
+app.include_router(
     execution_provider_router.router,
     prefix="/api/execution-providers",
     tags=["execution-providers"],
@@ -235,6 +242,11 @@ app.include_router(
     task_relationship_router.router,
     prefix="/api/task-relationships",
     tags=["task-relationships"],
+)
+app.include_router(
+    task_comment_router.router,
+    prefix="/api/task-comments",
+    tags=["task-comments"],
 )
 app.include_router(calendar_router.router, prefix="/api/events", tags=["calendar"])
 app.include_router(search_router.router, prefix="/api/search", tags=["search"])
@@ -272,7 +284,7 @@ async def health(db: AsyncSession = Depends(get_db)):
     codex_cli_status = getattr(app.state, "codex_cli_status", "unknown")
     if active_provider == "claude_code":
         effective_connected = claude_code_status == "available"
-        ai_model = "claude (via CLI)"
+        ai_model = f"claude {settings.claude_code_model or 'default'} (via CLI)"
     elif active_provider == "codex":
         effective_connected = codex_api_status == "available"
         ai_model = settings.codex_model
@@ -297,6 +309,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "ai_connected": effective_connected,
         "claude_code_status": claude_code_status,
         "claude_code_version": getattr(app.state, "claude_code_version", None),
+        "claude_code_model": settings.claude_code_model,
         "codex_api_status": codex_api_status,
         "codex_model": settings.codex_model,
         "codex_cli_status": codex_cli_status,

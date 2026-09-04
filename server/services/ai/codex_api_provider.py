@@ -31,6 +31,8 @@ class CodexAPIStatus(StrEnum):
 class CodexAPIProvider:
     """ClawChat AI provider for OpenAI's Codex models."""
 
+    supports_native_tool_calling = True
+
     def __init__(
         self,
         *,

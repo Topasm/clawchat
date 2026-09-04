@@ -106,7 +106,7 @@ internal const val RECENT_REMINDER_WINDOW_MILLIS = 30L * 60 * 1_000
 internal const val EXACT_REMINDER_WINDOW_MILLIS = 30L * 24 * 60 * 60 * 1_000
 
 internal fun reminderTypeFamily(reminderType: String): String = when (reminderType) {
-    "todo", "todo_overdue" -> "todo"
+    "todo", "todo_due_today", "todo_overdue" -> "todo"
     else -> reminderType
 }
 

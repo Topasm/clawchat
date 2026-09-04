@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useModuleStore } from '../../stores/useModuleStore';
 import { useBulkUpdateTodos } from '../../hooks/queries';
-import type { TodoResponse } from '../../types/api';
 import { TaskStatusSchema } from '../../types/schemas';
 import { translateUi } from '../../i18n';
 export default function BulkActionToolbar() {
@@ -40,24 +39,6 @@ export default function BulkActionToolbar() {
             <option value="in_progress">{translateUi('In Progress')}</option>
             <option value="completed">{translateUi('Completed')}</option>
             <option value="cancelled">{translateUi('Cancelled')}</option>
-          </select>
-
-          <select
-            className="cc-bulk-toolbar__select"
-            value=""
-            onChange={(e) => {
-              if (e.target.value)
-                bulkUpdate({
-                  ids,
-                  priority: e.target.value as NonNullable<TodoResponse['priority']>,
-                });
-            }}
-          >
-            <option value="">{translateUi('Set Priority')}</option>
-            <option value="urgent">{translateUi('Urgent')}</option>
-            <option value="high">{translateUi('High')}</option>
-            <option value="medium">{translateUi('Medium')}</option>
-            <option value="low">{translateUi('Low')}</option>
           </select>
 
           <button

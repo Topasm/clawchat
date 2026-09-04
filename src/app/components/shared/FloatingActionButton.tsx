@@ -15,7 +15,7 @@ interface FabAction {
   onClick: () => void;
 }
 function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>): FabAction[] {
-  if (pathname === '/today') {
+  if (pathname === '/schedule/today') {
     return [
       {
         label: translateUi('New Task'),
@@ -76,7 +76,7 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
       },
     ];
   }
-  if (pathname === '/calendar') {
+  if (pathname === '/schedule/week' || pathname === '/schedule/month') {
     return [
       {
         label: translateUi('New Event'),

@@ -13,13 +13,12 @@
     <string name="week_empty_action">작업 추가</string>
     <string name="week_loading">이번 주를 불러오는 중…</string>
     <string name="week_status_in_progress">진행 중</string>
-    <string name="week_priority_low">낮음</string>
-    <string name="week_priority_medium">보통</string>
-    <string name="week_priority_high">높음</string>
-    <string name="week_priority_urgent">긴급</string>
     <string name="week_recurring">반복</string>
     <string name="week_mark_complete">%1$s 완료로 표시</string>
     <plurals name="week_active_tasks">
         <item quantity="other">활성 작업 %1$d개</item>
+    </plurals>
+    <plurals name="week_timeline_more">
+        <item quantity="other">마감 %1$d개 더</item>
     </plurals>
 </resources>

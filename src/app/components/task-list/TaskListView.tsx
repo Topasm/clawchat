@@ -31,7 +31,6 @@ export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskLi
       <div className="cc-task-list__header" role="row">
         <span role="columnheader">{translateUi('Task')}</span>
         <span role="columnheader">{translateUi('Status')}</span>
-        <span role="columnheader">{translateUi('Priority')}</span>
         <span role="columnheader">{translateUi('Project / tag')}</span>
         <span role="columnheader">{translateUi('Due')}</span>
       </div>
@@ -77,12 +76,6 @@ export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskLi
             <span role="cell">
               <i className={`cc-task-list__status cc-task-list__status--${status}`} />
               {status.replace('_', ' ')}
-            </span>
-            <span role="cell">
-              <i
-                className={`cc-task-list__priority cc-task-list__priority--${todo.priority ?? 'medium'}`}
-              />
-              {todo.priority ?? 'medium'}
             </span>
             <span role="cell" title={context ?? undefined}>
               {context || '—'}

@@ -7,12 +7,14 @@ from domain.graph_insights import GraphDueRisk
 from domain.task import TaskStatus
 from exceptions import NotFoundError
 from models.conversation import Conversation
+from models.execution_host import ExecutionHost
 from models.project import Project
 from models.review_item import ReviewItem
 from models.agent_run import AgentRun
 from domain.agent_run import AGENT_RUN_EXECUTING_STATUSES
 from models.todo import Todo
 from schemas.project import ProjectOverviewResponse, ProjectResponse
+from services.agents import execution_host_service
 from services.tasks import graph_insights_service
 from sqlalchemy import case, func, select
 from domain.review import ReviewStatus
@@ -33,6 +35,7 @@ async def create_project(
     title: str,
     goal: str | None = None,
     description: str | None = None,
+    execution_instructions: str | None = None,
     status: ProjectStatus = ProjectStatus.ACTIVE,
     deadline: datetime | None = None,
     default_execution_provider: str | None = None,
@@ -46,6 +49,7 @@ async def create_project(
         title=title,
         goal=goal,
         description=description,
+        execution_instructions=execution_instructions,
         status=status,
         deadline=deadline,
         default_execution_provider=default_execution_provider,
@@ -80,6 +84,45 @@ async def create_project(
     return project
 
 
+async def delete_project(db: AsyncSession, project_id: str) -> list[str]:
+    """Remove a project and its root; hand its tasks back to the Inbox.
+
+    The tasks are the user's work and outlive the container: they lose the
+    project, tasks that hung directly off the root become roots of their own,
+    and open ones go back to ``captured`` so the Inbox offers them a new home.
+    Returns the ids of the tasks that were handed back. Caller commits.
+    """
+    from services.tasks.graph_command_service import (
+        current_graph_revision,
+        ensure_graph_revision_advanced,
+    )
+
+    project = await get_project(db, project_id)
+    previous_revision = await current_graph_revision(db)
+    tasks = list(
+        (await db.execute(select(Todo).where(Todo.project_id == project.id)))
+        .scalars()
+        .all()
+    )
+    root = next((task for task in tasks if task.id == project.root_task_id), None)
+    released: list[str] = []
+    for task in tasks:
+        if task is root:
+            continue
+        task.project_id = None
+        if root is not None and task.parent_id == root.id:
+            task.parent_id = None
+        if task.status not in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
+            task.inbox_state = "captured"
+        released.append(task.id)
+    if root is not None:
+        await db.delete(root)
+    await db.delete(project)
+    await db.flush()
+    await ensure_graph_revision_advanced(db, previous_revision)
+    return released
+
+
 async def update_project(
     db: AsyncSession,
     project_id: str,
@@ -102,18 +145,36 @@ async def update_project(
             elif root.status == TaskStatus.COMPLETED:
                 root.status = TaskStatus.PENDING
                 root.completed_at = None
+        if "title" in updates:
+            # Root-scoped conversations without metadata are the canonical
+            # Project Agent threads. Agent-run threads keep their task titles.
+            conversations = list(
+                (
+                    await db.execute(
+                        select(Conversation).where(
+                            Conversation.project_id == project.id,
+                            Conversation.project_todo_id == root.id,
+                            Conversation.metadata_json.is_(None),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for conversation in conversations:
+                conversation.title = project.title
     await db.flush()
     return project
 
 
-async def _project_counts(db: AsyncSession):
+def _project_aggregates():
     counts = (
         select(
             Todo.project_id.label("project_id"),
             func.count(Todo.id).label("task_count"),
-            func.sum(
-                case((Todo.status == TaskStatus.COMPLETED, 1), else_=0)
-            ).label("completed_task_count"),
+            func.sum(case((Todo.status == TaskStatus.COMPLETED, 1), else_=0)).label(
+                "completed_task_count"
+            ),
         )
         .where(Todo.project_id.is_not(None))
         .group_by(Todo.project_id)
@@ -124,9 +185,15 @@ async def _project_counts(db: AsyncSession):
             Conversation.project_id.label("project_id"),
             func.min(Conversation.id).label("conversation_id"),
         )
+        .join(
+            Project,
+            (Project.id == Conversation.project_id)
+            & (Project.root_task_id == Conversation.project_todo_id),
+        )
         .where(
             Conversation.project_id.is_not(None),
             Conversation.is_archived.is_(False),
+            Conversation.metadata_json.is_(None),
         )
         .group_by(Conversation.project_id)
         .subquery()
@@ -134,56 +201,79 @@ async def _project_counts(db: AsyncSession):
     return counts, conversations
 
 
-async def list_projects(
-    db: AsyncSession,
-    *,
-    include_archived: bool = False,
-) -> list[ProjectResponse]:
-    counts, conversations = await _project_counts(db)
-    query = (
+def _project_response_query():
+    counts, conversations = _project_aggregates()
+    return (
         select(
             Project,
             func.coalesce(counts.c.task_count, 0),
             func.coalesce(counts.c.completed_task_count, 0),
             conversations.c.conversation_id,
+            ExecutionHost,
         )
         .outerjoin(counts, counts.c.project_id == Project.id)
         .outerjoin(conversations, conversations.c.project_id == Project.id)
-        .order_by(Project.updated_at.desc(), Project.id.asc())
+        .outerjoin(ExecutionHost, ExecutionHost.id == Project.execution_host_id)
+    )
+
+
+def _build_project_response(
+    project: Project,
+    task_count: int,
+    completed_task_count: int,
+    conversation_id: str | None,
+    execution_host: ExecutionHost | None,
+) -> ProjectResponse:
+    host_label, host_online = execution_host_service.project_host_state_from_host(
+        execution_host
+    )
+    return ProjectResponse.model_validate(project).model_copy(
+        update={
+            "task_count": max(
+                0,
+                task_count - (1 if project.root_task_id else 0),
+            ),
+            "completed_task_count": max(
+                0,
+                completed_task_count
+                - (
+                    1
+                    if project.root_task_id
+                    and project.status == ProjectStatus.COMPLETED
+                    else 0
+                ),
+            ),
+            "conversation_id": conversation_id,
+            "execution_host_label": host_label,
+            "execution_host_online": host_online,
+        }
+    )
+
+
+async def list_projects(
+    db: AsyncSession,
+    *,
+    include_archived: bool = False,
+) -> list[ProjectResponse]:
+    query = _project_response_query().order_by(
+        Project.updated_at.desc(), Project.id.asc()
     )
     if not include_archived:
         query = query.where(Project.status != ProjectStatus.ARCHIVED)
     rows = (await db.execute(query)).all()
-    return [
-        ProjectResponse.model_validate(project).model_copy(
-            update={
-                "task_count": max(
-                    0,
-                    task_count - (1 if project.root_task_id else 0),
-                ),
-                "completed_task_count": max(
-                    0,
-                    completed_task_count
-                    - (
-                        1
-                        if project.root_task_id
-                        and project.status == ProjectStatus.COMPLETED
-                        else 0
-                    ),
-                ),
-                "conversation_id": conversation_id,
-            }
-        )
-        for project, task_count, completed_task_count, conversation_id in rows
-    ]
+    return [_build_project_response(*row) for row in rows]
 
 
 async def build_project_response(
     db: AsyncSession,
     project: Project,
 ) -> ProjectResponse:
-    items = await list_projects(db, include_archived=True)
-    return next(item for item in items if item.id == project.id)
+    row = (
+        await db.execute(_project_response_query().where(Project.id == project.id))
+    ).one_or_none()
+    if row is None:
+        raise NotFoundError(f"Project {project.id} not found")
+    return _build_project_response(*row)
 
 
 async def build_project_overview(

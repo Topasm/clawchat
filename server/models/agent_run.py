@@ -45,7 +45,13 @@ class AgentRun(Base):
     instruction_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
     provider: Mapped[str] = mapped_column(String, nullable=False)
     model: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: Human-readable label of the machine that ran this, as the provider
+    #: reported it.
     host_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: The registered ``execution_hosts`` row this run belongs to. Set when the
+    #: work is claimed by a machine other than the server's own; no foreign key
+    #: for the same reason ``projects.execution_host_id`` has none.
+    execution_host_id: Mapped[str | None] = mapped_column(String, nullable=True)
     workspace_id: Mapped[str | None] = mapped_column(String, nullable=True)
     external_run_id: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(
@@ -113,6 +119,7 @@ class AgentRun(Base):
         Index("idx_agent_runs_project_status", "project_id", "status"),
         Index("idx_agent_runs_task_created", "agent_task_id", "created_at"),
         Index("idx_agent_runs_external_run_id", "external_run_id"),
+        Index("idx_agent_runs_execution_host_id", "execution_host_id"),
     )
 
 

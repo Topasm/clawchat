@@ -67,6 +67,8 @@ data class AgentRun(
     @SerialName("todo_id") val todoId: String? = null,
     @SerialName("todo_title") val todoTitle: String? = null,
     @SerialName("todo_status") val todoStatus: TaskStatus? = null,
+    /** The chat thread this run reports into. */
+    @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("task_type") val taskType: String,
     val instruction: String,
     @SerialName("instruction_snapshot") val instructionSnapshot: String,
@@ -74,6 +76,8 @@ data class AgentRun(
     val provider: String,
     val model: String? = null,
     @SerialName("host_id") val hostId: String? = null,
+    /** The machine this run executes on, as the user named it; null for server-run work. */
+    @SerialName("host_label") val hostLabel: String? = null,
     @SerialName("workspace_id") val workspaceId: String? = null,
     @SerialName("external_run_id") val externalRunId: String? = null,
     val status: AgentRunStatus,
@@ -132,4 +136,9 @@ data class AgentRunRetryRequest(
 @Serializable
 data class AgentRunResumeRequest(
     @SerialName("follow_up_instruction") val followUpInstruction: String,
+)
+
+@Serializable
+data class AgentRunPermissionRequest(
+    val decision: String,
 )

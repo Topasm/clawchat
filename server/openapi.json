@@ -275,6 +275,17 @@
             ],
             "title": "Completed At"
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -324,6 +335,17 @@
               }
             ],
             "title": "Host Id"
+          },
+          "host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Label"
           },
           "id": {
             "title": "Id",
@@ -616,6 +638,23 @@
         "title": "AgentRunHeartbeatRequest",
         "type": "object"
       },
+      "AgentRunPermissionRequest": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "title": "Decision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "AgentRunPermissionRequest",
+        "type": "object"
+      },
       "AgentRunRecoveryResponse": {
         "properties": {
           "direct_blocker_ids": {
@@ -695,6 +734,17 @@
             ],
             "title": "Completed At"
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -744,6 +794,17 @@
               }
             ],
             "title": "Host Id"
+          },
+          "host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Label"
           },
           "id": {
             "title": "Id",
@@ -921,6 +982,35 @@
           "updated_at"
         ],
         "title": "AgentRunResponse",
+        "type": "object"
+      },
+      "AgentRunResultRequest": {
+        "description": "What a worker reports back when its run finishes.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          }
+        },
+        "title": "AgentRunResultRequest",
         "type": "object"
       },
       "AgentRunResumeRequest": {
@@ -1949,6 +2039,63 @@
         "title": "CapabilitiesResponse",
         "type": "object"
       },
+      "ClaimedJobResponse": {
+        "description": "The work a machine has just taken responsibility for.",
+        "properties": {
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "todo_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Todo Title"
+          }
+        },
+        "required": [
+          "run_id",
+          "instruction",
+          "cwd"
+        ],
+        "title": "ClaimedJobResponse",
+        "type": "object"
+      },
       "ClaudeCodeStatusResponse": {
         "properties": {
           "active": {
@@ -2145,6 +2292,18 @@
               }
             ],
             "title": "Last Message"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
           },
           "project_id": {
             "anyOf": [
@@ -2823,6 +2982,206 @@
         "title": "EventUpdate",
         "type": "object"
       },
+      "ExecutionHostCreate": {
+        "properties": {
+          "is_enabled": {
+            "default": true,
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "kind": {
+            "default": "local",
+            "pattern": "^(local|paseo|worker)$",
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "ExecutionHostCreate",
+        "type": "object"
+      },
+      "ExecutionHostResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_enabled": {
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "is_enabled",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ExecutionHostResponse",
+        "type": "object"
+      },
+      "ExecutionHostUpdate": {
+        "properties": {
+          "is_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Enabled"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "pattern": "^(local|paseo|worker)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "title": "ExecutionHostUpdate",
+        "type": "object"
+      },
       "ExecutionProviderStatus": {
         "properties": {
           "available": {
@@ -3488,6 +3847,37 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HostProjectPathResponse": {
+        "description": "A project this machine holds a folder for, as the worker sees it.",
+        "properties": {
+          "context_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Updated At"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "path"
+        ],
+        "title": "HostProjectPathResponse",
         "type": "object"
       },
       "InboxTriagePreviewRequest": {
@@ -4829,6 +5219,17 @@
             ],
             "title": "Execution Base Branch"
           },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
+          },
           "execution_workspace_isolation": {
             "default": "local",
             "pattern": "^(local|worktree)$",
@@ -4872,6 +5273,78 @@
           "title"
         ],
         "title": "ProjectCreate",
+        "type": "object"
+      },
+      "ProjectExecutionHostSelect": {
+        "properties": {
+          "host_id": {
+            "minLength": 1,
+            "title": "Host Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_id"
+        ],
+        "title": "ProjectExecutionHostSelect",
+        "type": "object"
+      },
+      "ProjectHostPathResponse": {
+        "properties": {
+          "context_files": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Context Files",
+            "type": "array"
+          },
+          "context_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Updated At"
+          },
+          "host_id": {
+            "title": "Host Id",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_id",
+          "path"
+        ],
+        "title": "ProjectHostPathResponse",
+        "type": "object"
+      },
+      "ProjectHostPathUpsert": {
+        "properties": {
+          "host_id": {
+            "minLength": 1,
+            "title": "Host Id",
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_id",
+          "path"
+        ],
+        "title": "ProjectHostPathUpsert",
         "type": "object"
       },
       "ProjectOverviewResponse": {
@@ -4977,6 +5450,50 @@
               }
             ],
             "title": "Execution Base Branch"
+          },
+          "execution_host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Id"
+          },
+          "execution_host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Label"
+          },
+          "execution_host_online": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Online"
+          },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
           },
           "execution_workspace_isolation": {
             "default": "local",
@@ -5152,6 +5669,50 @@
               }
             ],
             "title": "Execution Base Branch"
+          },
+          "execution_host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Id"
+          },
+          "execution_host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Label"
+          },
+          "execution_host_online": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Host Online"
+          },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
           },
           "execution_workspace_isolation": {
             "default": "local",
@@ -5355,6 +5916,17 @@
             "title": "Id",
             "type": "string"
           },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
           "inbox_state": {
             "default": "none",
             "title": "Inbox State",
@@ -5514,6 +6086,17 @@
             ],
             "title": "Execution Base Branch"
           },
+          "execution_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Instructions"
+          },
           "execution_workspace_isolation": {
             "anyOf": [
               {
@@ -5573,6 +6156,112 @@
           }
         },
         "title": "ProjectUpdate",
+        "type": "object"
+      },
+      "ProjectWorkspaceContextUpsert": {
+        "description": "What a folder says about itself, sent by the machine that holds it.",
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceContextFile"
+            },
+            "maxItems": 16,
+            "title": "Files",
+            "type": "array"
+          },
+          "host_id": {
+            "minLength": 1,
+            "title": "Host Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_id"
+        ],
+        "title": "ProjectWorkspaceContextUpsert",
+        "type": "object"
+      },
+      "ProjectWorkspaceResponse": {
+        "description": "Where a project's work runs, and whether it can run right now.",
+        "properties": {
+          "context_files": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Context Files",
+            "type": "array"
+          },
+          "context_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Updated At"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Id"
+          },
+          "host_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Label"
+          },
+          "is_available": {
+            "default": false,
+            "title": "Is Available",
+            "type": "boolean"
+          },
+          "is_offline": {
+            "default": false,
+            "title": "Is Offline",
+            "type": "boolean"
+          },
+          "is_unconfigured": {
+            "default": true,
+            "title": "Is Unconfigured",
+            "type": "boolean"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "paths": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProjectHostPathResponse"
+            },
+            "title": "Paths",
+            "type": "array"
+          }
+        },
+        "title": "ProjectWorkspaceResponse",
         "type": "object"
       },
       "PurgeRequest": {
@@ -6674,6 +7363,81 @@
         "title": "TaskBatchPlacementResponse",
         "type": "object"
       },
+      "TaskCommentCreate": {
+        "additionalProperties": false,
+        "description": "Post one comment onto a task's thread.",
+        "properties": {
+          "content": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "todo_id": {
+            "title": "Todo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "todo_id",
+          "content"
+        ],
+        "title": "TaskCommentCreate",
+        "type": "object"
+      },
+      "TaskCommentResponse": {
+        "description": "Persisted task comment returned by the API.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "todo_id": {
+            "title": "Todo Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "todo_id",
+          "content",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TaskCommentResponse",
+        "type": "object"
+      },
       "TaskDependencyCommandRequest": {
         "additionalProperties": false,
         "description": "Revision-sensitive dependency connector command.",
@@ -6831,6 +7595,24 @@
             "title": "Artifact Count",
             "type": "integer"
           },
+          "average_resume_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Resume Seconds"
+          },
+          "human_wait_seconds": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Human Wait Seconds",
+            "type": "integer"
+          },
           "latest_artifact_id": {
             "anyOf": [
               {
@@ -6947,6 +7729,12 @@
             "default": 0,
             "minimum": 0.0,
             "title": "Pending Review Count",
+            "type": "integer"
+          },
+          "question_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Question Count",
             "type": "integer"
           },
           "task_id": {
@@ -7419,6 +8207,14 @@
           "inbox_count": {
             "title": "Inbox Count",
             "type": "integer"
+          },
+          "needs_date_tasks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TodoResponse"
+            },
+            "title": "Needs Date Tasks",
+            "type": "array"
           },
           "needs_review": {
             "default": [],
@@ -7984,6 +8780,19 @@
             ],
             "title": "Assignee"
           },
+          "client_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Client edit time for last-write-wins offline synchronization",
+            "title": "Client Updated At"
+          },
           "depends_on": {
             "anyOf": [
               {
@@ -8315,6 +9124,68 @@
         ],
         "title": "WebSocketTicketResponse",
         "type": "object"
+      },
+      "WorkerRegistration": {
+        "description": "A desktop app announcing the machine it runs on.",
+        "properties": {
+          "device_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "WorkerRegistration",
+        "type": "object"
+      },
+      "WorkspaceContextFile": {
+        "description": "One README-like file the worker read from the bound folder.",
+        "properties": {
+          "path": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 64000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "WorkspaceContextFile",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -8326,7 +9197,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "1.4.6"
+    "version": "1.4.20"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -10498,6 +11369,378 @@
         ]
       }
     },
+    "/api/execution-hosts": {
+      "get": {
+        "operationId": "list_execution_hosts_api_execution_hosts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExecutionHostResponse"
+                  },
+                  "title": "Response List Execution Hosts Api Execution Hosts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Execution Hosts",
+        "tags": [
+          "execution-hosts"
+        ]
+      },
+      "post": {
+        "operationId": "create_execution_host_api_execution_hosts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionHostCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionHostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Execution Host",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
+    "/api/execution-hosts/register": {
+      "post": {
+        "description": "Check a desktop app in as a machine that can run work.\n\nCalled on launch and again on a timer. Registration is idempotent per\nlabel so reopening the app checks the same machine back in.",
+        "operationId": "register_worker_host_api_execution_hosts_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerRegistration"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionHostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Register Worker Host",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
+    "/api/execution-hosts/{host_id}": {
+      "delete": {
+        "operationId": "delete_execution_host_api_execution_hosts__host_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Execution Host",
+        "tags": [
+          "execution-hosts"
+        ]
+      },
+      "patch": {
+        "operationId": "update_execution_host_api_execution_hosts__host_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionHostUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionHostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Execution Host",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
+    "/api/execution-hosts/{host_id}/heartbeat": {
+      "post": {
+        "description": "Keep a worker counted as reachable.",
+        "operationId": "heartbeat_api_execution_hosts__host_id__heartbeat_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionHostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Heartbeat",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
+    "/api/execution-hosts/{host_id}/jobs/claim": {
+      "post": {
+        "description": "Take the next run waiting for this machine, or nothing.\n\nPolled by the worker. Claiming also counts as checking in, so a machine\nasking for work is by definition reachable.",
+        "operationId": "claim_next_job_api_execution_hosts__host_id__jobs_claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ClaimedJobResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Claim Next Job Api Execution Hosts  Host Id  Jobs Claim Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Claim Next Job",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
+    "/api/execution-hosts/{host_id}/paths": {
+      "get": {
+        "description": "The project folders recorded on this machine, for its worker to look after.",
+        "operationId": "list_host_project_paths_api_execution_hosts__host_id__paths_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HostProjectPathResponse"
+                  },
+                  "title": "Response List Host Project Paths Api Execution Hosts  Host Id  Paths Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Host Project Paths",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
     "/api/execution-providers": {
       "get": {
         "operationId": "list_execution_providers_api_execution_providers_get",
@@ -11272,6 +12515,45 @@
       }
     },
     "/api/projects/{project_id}": {
+      "delete": {
+        "description": "Delete a project; its tasks return to the Inbox rather than disappearing.",
+        "operationId": "delete_project_api_projects__project_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Project",
+        "tags": [
+          "projects"
+        ]
+      },
       "get": {
         "operationId": "get_project_api_projects__project_id__get",
         "parameters": [
@@ -11476,6 +12758,277 @@
         "summary": "Create Project Artifact",
         "tags": [
           "artifacts"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/workspace": {
+      "get": {
+        "description": "Where this project's work runs, and whether that machine can take it.",
+        "operationId": "get_project_workspace_api_projects__project_id__workspace_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Project Workspace",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/workspace/context": {
+      "put": {
+        "description": "Keep what the project's folder says about itself on one machine.\n\nSent by the worker on that machine -- the only place the folder can be\nread -- after it checks in, before it runs work there, and on request.",
+        "operationId": "set_project_workspace_context_api_projects__project_id__workspace_context_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorkspaceContextUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Project Workspace Context",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/workspace/host": {
+      "put": {
+        "description": "Choose which machine this project's work runs on.",
+        "operationId": "set_project_execution_host_api_projects__project_id__workspace_host_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectExecutionHostSelect"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Project Execution Host",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/workspace/paths": {
+      "put": {
+        "description": "Record where this project lives on one machine.",
+        "operationId": "set_project_host_path_api_projects__project_id__workspace_paths_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectHostPathUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Project Host Path",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/workspace/paths/{host_id}": {
+      "delete": {
+        "operationId": "delete_project_host_path_api_projects__project_id__workspace_paths__host_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Project Host Path",
+        "tags": [
+          "projects"
         ]
       }
     },
@@ -11899,6 +13452,122 @@
         ]
       }
     },
+    "/api/runs/{run_id}/permission": {
+      "post": {
+        "description": "Allow or deny the permissions blocking a Paseo-backed run.",
+        "operationId": "resolve_run_permission_api_runs__run_id__permission_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunPermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Run Permission",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/result": {
+      "post": {
+        "description": "Finish a run executed elsewhere.\n\nA worker runs the CLI on its own machine and reports the outcome here, so\nthe result lands in the same review flow as work the server ran itself.",
+        "operationId": "report_run_result_api_runs__run_id__result_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRunResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Report Run Result",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
     "/api/runs/{run_id}/resume": {
       "post": {
         "operationId": "resume_run_api_runs__run_id__resume_post",
@@ -12277,6 +13946,163 @@
         "tags": [
           "settings",
           "settings"
+        ]
+      }
+    },
+    "/api/task-comments": {
+      "get": {
+        "operationId": "list_task_comments_api_task_comments_get",
+        "parameters": [
+          {
+            "description": "Comma-separated todo IDs",
+            "in": "query",
+            "name": "todo_ids",
+            "required": true,
+            "schema": {
+              "description": "Comma-separated todo IDs",
+              "title": "Todo Ids",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaskCommentResponse"
+                  },
+                  "title": "Response List Task Comments Api Task Comments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Task Comments",
+        "tags": [
+          "task-comments"
+        ]
+      },
+      "post": {
+        "operationId": "create_task_comment_api_task_comments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCommentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCommentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Todo or task comment not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Task Comment",
+        "tags": [
+          "task-comments"
+        ]
+      }
+    },
+    "/api/task-comments/{comment_id}": {
+      "delete": {
+        "operationId": "delete_task_comment_api_task_comments__comment_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "title": "Comment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Todo or task comment not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Task Comment",
+        "tags": [
+          "task-comments"
         ]
       }
     },
@@ -14385,6 +16211,72 @@
           }
         ],
         "summary": "Get Latest Plan",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/{todo_id}/plan/proposals/{proposal_id}": {
+      "get": {
+        "operationId": "get_plan_proposal_api_todos__todo_id__plan_proposals__proposal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "todo_id",
+            "required": true,
+            "schema": {
+              "title": "Todo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Plan Proposal",
         "tags": [
           "todos"
         ]

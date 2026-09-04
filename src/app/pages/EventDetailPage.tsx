@@ -43,14 +43,10 @@ export default function EventDetailPage() {
   const deleteOccurrenceMutation = useDeleteEventOccurrence();
   const event = events.find((e) => e.id === eventId);
   const [title, setTitle] = useState(event?.title ?? '');
-  const [location, setLocation] = useState(event?.location ?? '');
-  const [description, setDescription] = useState(event?.description ?? '');
   const [showDeleteMode, setShowDeleteMode] = useState(false);
   useEffect(() => {
     if (event) {
       setTitle(event.title);
-      setLocation(event.location ?? '');
-      setDescription(event.description ?? '');
     }
   }, [event]);
   const serverUpdateEvent = useCallback(
@@ -76,14 +72,6 @@ export default function EventDetailPage() {
     setTitle(val);
     persistField({ title: val });
   };
-  const handleLocationChange = (val: string) => {
-    setLocation(val);
-    persistField({ location: val });
-  };
-  const handleDescriptionChange = (val: string) => {
-    setDescription(val);
-    persistField({ description: val });
-  };
   const handleDelete = async () => {
     if (!eventId) return;
     if (event?.recurrence_rule) {
@@ -91,7 +79,7 @@ export default function EventDetailPage() {
       return;
     }
     deleteEventMutation.mutate(eventId);
-    navigate('/today');
+    navigate('/schedule/today');
   };
   const handleDeleteMode = async (mode: 'this_only' | 'this_and_future' | 'all') => {
     if (!eventId || !event) return;
@@ -103,7 +91,7 @@ export default function EventDetailPage() {
         event.occurrence_date ?? new Date(event.start_time).toISOString().slice(0, 10);
       deleteOccurrenceMutation.mutate({ eventId, date: occDate, mode });
     }
-    navigate('/today');
+    navigate('/schedule/today');
   };
   if (!event) {
     return (
@@ -112,7 +100,7 @@ export default function EventDetailPage() {
         <button
           type="button"
           className="cc-btn cc-btn--secondary cc-mt-16"
-          onClick={() => navigate('/today')}
+          onClick={() => navigate('/schedule/today')}
         >
           {translateUi('\n          Back to today\n        ')}
         </button>
@@ -140,36 +128,12 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      <div className="cc-detail__field">
-        <span className="cc-detail__field-label">{translateUi('Location')}</span>
-        <input
-          className="cc-detail__field-btn"
-          style={{
-            border: 'none',
-            flex: 1,
-            background: 'transparent',
-            color: 'var(--cc-text)',
-            fontSize: 14,
-          }}
-          value={location}
-          onChange={(e) => handleLocationChange(e.target.value)}
-          placeholder={translateUi('Add location')}
-        />
-      </div>
-
       {event.recurrence_rule && (
         <div className="cc-detail__field">
           <span className="cc-detail__field-label">{translateUi('Repeats')}</span>
           <div className="cc-detail__field-value">{describeRecurrence(event.recurrence_rule)}</div>
         </div>
       )}
-
-      <textarea
-        className="cc-detail__textarea"
-        value={description}
-        onChange={(e) => handleDescriptionChange(e.target.value)}
-        placeholder={translateUi('Add a description...')}
-      />
 
       <button
         type="button"

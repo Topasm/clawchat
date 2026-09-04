@@ -35,6 +35,7 @@ interface InboxQueueProps {
   onOpenTask: (taskId: string) => void;
   onOrganize: (taskId: string) => void;
   onRetry: (taskId: string) => void;
+  onApplyTriageAndOpen: () => void;
 }
 /** The triage queue: every Inbox pipeline stage plus the drop target that unplaces a task. */
 export default function InboxQueue({
@@ -54,6 +55,7 @@ export default function InboxQueue({
   onOpenTask,
   onOrganize,
   onRetry,
+  onApplyTriageAndOpen,
 }: InboxQueueProps) {
   const { processing, questioning, planReady, errors, needsOrganising, childCountByParent } =
     sections;
@@ -184,6 +186,7 @@ export default function InboxQueue({
               onToggleSuggestion={triage.toggleSuggestion}
               onDismiss={triage.dismissPreview}
               onApply={() => void triage.applyPreview()}
+              onApplyAndOpen={onApplyTriageAndOpen}
             />
           )}
           {needsOrganising.map((task) => (

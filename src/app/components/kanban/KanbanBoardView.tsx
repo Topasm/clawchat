@@ -5,7 +5,7 @@ import KanbanColumn from './KanbanColumn';
 import KanbanColumnTabs from './KanbanColumnTabs';
 import KanbanFilterBar from './KanbanFilterBar';
 import BulkActionToolbar from './BulkActionToolbar';
-import TasksHeader, { type TasksViewMode } from './TasksHeader';
+import TasksHeader, { type TasksStatusFilter, type TasksViewMode } from './TasksHeader';
 
 interface ColumnDef {
   status: TaskStatus;
@@ -18,6 +18,8 @@ interface KanbanBoardViewProps {
   todos: TodoResponse[];
   viewMode: TasksViewMode;
   onViewModeChange: (mode: TasksViewMode) => void;
+  statusFilter: TasksStatusFilter;
+  onStatusFilterChange: (filter: TasksStatusFilter) => void;
   columnDefs: ColumnDef[];
   showSubTasks: boolean;
   isMobile: boolean;
@@ -38,6 +40,8 @@ export default function KanbanBoardView({
   todos,
   viewMode,
   onViewModeChange,
+  statusFilter,
+  onStatusFilterChange,
   columnDefs,
   showSubTasks,
   isMobile,
@@ -55,7 +59,13 @@ export default function KanbanBoardView({
 }: KanbanBoardViewProps) {
   return (
     <div>
-      <TasksHeader todos={todos} viewMode={viewMode} onViewModeChange={onViewModeChange} />
+      <TasksHeader
+        todos={todos}
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        statusFilter={statusFilter}
+        onStatusFilterChange={onStatusFilterChange}
+      />
       <KanbanFilterBar />
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
         {isMobile ? (

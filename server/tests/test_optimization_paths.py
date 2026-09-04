@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -7,12 +8,15 @@ from sqlalchemy import event
 
 from models.conversation import Conversation
 from models.event import Event
+from models.execution_host import ExecutionHost
 from models.message import Message
+from models.project import Project
 from models.todo import Todo
 from routers.chat import list_conversations
 from routers.todo import list_projects
 from services.vault.obsidian_export_service import export_all_todos
 from services.calendar.scheduling_service import _merge_intervals, find_conflicts, find_free_slots
+from services.tasks import project_service
 
 
 @pytest.mark.asyncio
@@ -60,6 +64,65 @@ async def test_project_and_conversation_lists_use_constant_query_counts(db_sessi
         assert len(conversations.items) == 3
         assert all(item.last_message.startswith("Latest") for item in conversations.items)
         assert len(statements) == 2
+    finally:
+        event.remove(engine, "before_cursor_execute", record_statement)
+
+
+@pytest.mark.asyncio
+async def test_first_class_project_responses_load_hosts_in_the_main_query(db_session):
+    hosts = [
+        ExecutionHost(
+            id=f"host_{index}",
+            label=f"Machine {index}",
+            kind="worker",
+            last_seen_at=datetime.now(timezone.utc),
+        )
+        for index in range(3)
+    ]
+    projects = [
+        Project(
+            id=f"project_{index}",
+            title=f"Project {index}",
+            execution_host_id=host.id,
+        )
+        for index, host in enumerate(hosts)
+    ]
+    db_session.add_all([*hosts, *projects])
+    await db_session.commit()
+    project_id = projects[1].id
+    db_session.sync_session.expunge_all()
+
+    statements = []
+
+    def record_statement(_conn, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", record_statement)
+    try:
+        listed = {
+            item.id: item for item in await project_service.list_projects(db_session)
+        }
+        assert {
+            project_id: item.execution_host_label for project_id, item in listed.items()
+        } == {
+            "project_0": "Machine 0",
+            "project_1": "Machine 1",
+            "project_2": "Machine 2",
+        }
+        assert all(item.execution_host_online is True for item in listed.values())
+        assert len(statements) == 1
+
+        selected_project = await db_session.get(Project, project_id)
+        assert selected_project is not None
+        statements.clear()
+        selected = await project_service.build_project_response(
+            db_session,
+            selected_project,
+        )
+        assert selected.id == project_id
+        assert selected.execution_host_label == "Machine 1"
+        assert len(statements) == 1
     finally:
         event.remove(engine, "before_cursor_execute", record_statement)
 

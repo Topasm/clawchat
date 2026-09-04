@@ -3,20 +3,22 @@
     <string name="calendar_today">Today</string>
     <string name="calendar_previous_month">Previous month</string>
     <string name="calendar_next_month">Next month</string>
-    <string name="calendar_new_event">New event</string>
     <string name="calendar_offline_last_synced_month">Offline — showing the last synced month</string>
     <string name="calendar_nothing_scheduled">Nothing scheduled</string>
-    <string name="calendar_nothing_scheduled_description">Add an event for this day, or pick another date above.</string>
+    <string name="calendar_nothing_scheduled_description">Add a task for this day, or pick another date above.</string>
     <string name="calendar_all_day">All day</string>
     <string name="calendar_repeats">Repeats</string>
     <string name="calendar_delete_event">Delete event</string>
     <string name="calendar_edit_event">Edit event</string>
     <string name="calendar_title">Title</string>
-    <string name="calendar_notes">Notes</string>
-    <string name="calendar_location">Location</string>
     <string name="calendar_end">End</string>
     <string name="calendar_cancel">Cancel</string>
     <string name="calendar_create">Create</string>
     <string name="calendar_save">Save</string>
     <string name="calendar_ok">OK</string>
+    <string name="calendar_new_task">New task</string>
+    <string name="calendar_new_entry">Add to calendar</string>
+    <string name="calendar_task_span_hint">Runs from today until this day.</string>
+    <string name="calendar_task_due">Due</string>
+    <string name="calendar_task_overdue">Overdue</string>
 </resources>

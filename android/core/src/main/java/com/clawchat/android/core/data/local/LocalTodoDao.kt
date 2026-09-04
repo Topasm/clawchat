@@ -31,7 +31,6 @@ interface LocalTodoDao {
         """
         SELECT * FROM local_todos
         WHERE (:status IS NULL OR status = :status)
-          AND (:priority IS NULL OR priority = :priority)
           AND (:inboxState IS NULL OR inboxState = :inboxState)
           AND (NOT :filterParent OR parentId = :parentId)
           AND (NOT :rootOnly OR parentId IS NULL)
@@ -45,8 +44,6 @@ interface LocalTodoDao {
           CASE WHEN :orderBy = 'updated_at' AND NOT :ascending THEN updatedAt END DESC,
           CASE WHEN :orderBy = 'sort_order' AND :ascending THEN sortOrder END ASC,
           CASE WHEN :orderBy = 'sort_order' AND NOT :ascending THEN sortOrder END DESC,
-          CASE WHEN :orderBy = 'priority' AND :ascending THEN priority END ASC,
-          CASE WHEN :orderBy = 'priority' AND NOT :ascending THEN priority END DESC,
           CASE WHEN :orderBy = 'due_date' AND :ascending THEN dueDate END ASC,
           CASE WHEN :orderBy = 'due_date' AND NOT :ascending THEN dueDate END DESC,
           id ASC
@@ -55,7 +52,6 @@ interface LocalTodoDao {
     )
     suspend fun loadPageRows(
         status: String?,
-        priority: String?,
         inboxState: String?,
         filterParent: Boolean,
         parentId: String?,
@@ -71,7 +67,6 @@ interface LocalTodoDao {
         """
         SELECT COUNT(*) FROM local_todos
         WHERE (:status IS NULL OR status = :status)
-          AND (:priority IS NULL OR priority = :priority)
           AND (:inboxState IS NULL OR inboxState = :inboxState)
           AND (NOT :filterParent OR parentId = :parentId)
           AND (NOT :rootOnly OR parentId IS NULL)
@@ -80,7 +75,6 @@ interface LocalTodoDao {
     )
     suspend fun countPageRows(
         status: String?,
-        priority: String?,
         inboxState: String?,
         filterParent: Boolean,
         parentId: String?,
@@ -91,7 +85,6 @@ interface LocalTodoDao {
     @Transaction
     suspend fun loadPage(
         status: String?,
-        priority: String?,
         inboxState: String?,
         filterParent: Boolean,
         parentId: String?,
@@ -104,7 +97,6 @@ interface LocalTodoDao {
     ): LocalTodoPage = LocalTodoPage(
         items = loadPageRows(
             status = status,
-            priority = priority,
             inboxState = inboxState,
             filterParent = filterParent,
             parentId = parentId,
@@ -117,7 +109,6 @@ interface LocalTodoDao {
         ),
         total = countPageRows(
             status = status,
-            priority = priority,
             inboxState = inboxState,
             filterParent = filterParent,
             parentId = parentId,

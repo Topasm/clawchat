@@ -167,6 +167,63 @@ describe('WorkspaceConnectionsSection', () => {
     );
   });
 
+  it('guides a fresh install to replace the default PIN before enabling LAN access', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      appMode: 'host',
+      localServerEnabled: true,
+      keepRunningInTray: true,
+      autoStartHost: false,
+      lanAccess: false,
+      port: 8000,
+      pinConfigured: true,
+      defaultPinInUse: true,
+      obsidianVaultPath: '',
+      hostServerUrl: '',
+    });
+    renderSection();
+
+    const lanToggle = await screen.findByRole('switch', { name: 'Allow local network access' });
+    fireEvent.click(lanToggle);
+
+    expect(mocks.updateConfig).not.toHaveBeenCalled();
+    expect(
+      screen.getAllByText('Set a new 6 to 32 digit PIN before enabling local network access.'),
+    ).not.toHaveLength(0);
+    await waitFor(() => expect(screen.getByLabelText('Local network PIN')).toHaveFocus());
+
+    fireEvent.change(screen.getByLabelText('Local network PIN'), {
+      target: { value: '938274' },
+    });
+    fireEvent.click(lanToggle);
+
+    await waitFor(() =>
+      expect(mocks.updateConfig).toHaveBeenCalledWith({ pin: '938274', lanAccess: true }),
+    );
+  });
+
+  it('explains why LAN access is unavailable while the local server is off', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      appMode: 'client',
+      localServerEnabled: false,
+      keepRunningInTray: false,
+      autoStartHost: false,
+      lanAccess: false,
+      port: 8000,
+      pinConfigured: true,
+      defaultPinInUse: false,
+      obsidianVaultPath: '',
+      hostServerUrl: '',
+    });
+    mocks.getStatus.mockResolvedValueOnce({ state: 'stopped', port: 8000 });
+    renderSection();
+
+    const lanToggle = await screen.findByRole('switch', { name: 'Allow local network access' });
+    expect(lanToggle).toBeDisabled();
+    expect(
+      screen.getByText('Turn on Local server before enabling local network access.'),
+    ).toBeInTheDocument();
+  });
+
   it('authenticates before switching away from local and never persists the PIN', async () => {
     renderSection();
 

@@ -88,6 +88,35 @@ class OnboardingViewModelTest {
         coVerify(exactly = 1) { sessionStore.selectLocalMode() }
     }
 
+    @Test
+    fun `pairing QR parser accepts a complete server payload`() {
+        val payload = parsePairingQrPayload(
+            """{"type":"clawchat_pair","server_url":"https://clawchat.local","code":"123456","host_id":"host-1","host_public_key":"key-1"}""",
+        )
+
+        assertEquals("https://clawchat.local", payload?.serverUrl)
+        assertEquals("123456", payload?.code)
+        assertEquals("host-1", payload?.hostId)
+        assertEquals("key-1", payload?.hostPublicKey)
+    }
+
+    @Test
+    fun `pairing QR parser rejects unrelated and malformed codes`() {
+        assertEquals(null, parsePairingQrPayload("not json"))
+        assertEquals(
+            null,
+            parsePairingQrPayload(
+                """{"type":"website","server_url":"https://clawchat.local","code":"123456"}""",
+            ),
+        )
+        assertEquals(
+            null,
+            parsePairingQrPayload(
+                """{"type":"clawchat_pair","server_url":"https://clawchat.local","code":"12345x"}""",
+            ),
+        )
+    }
+
     private fun viewModel() = OnboardingViewModel(
         pairingApi = pairingApi,
         sessionStore = sessionStore,

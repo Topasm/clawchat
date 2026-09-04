@@ -12,6 +12,7 @@
     <application
         android:name=".ClawChatApp"
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -86,6 +87,9 @@
         <!-- Notification action receiver -->
         <receiver
             android:name="com.clawchat.android.core.notification.ReminderActionReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.clawchat.android.core.notification.ReminderDismissReceiver"
             android:exported="false" />
 
         <!-- Deletes a durable shared capture only after an explicit user action. -->

@@ -17,7 +17,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.annotation.StringRes
 import com.clawchat.android.core.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +29,6 @@ fun TaskCreateSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var priority by remember { mutableStateOf("medium") }
     var dueDate by remember(initialDueDate) { mutableStateOf(initialDueDate) }
     var showDatePicker by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
@@ -83,26 +81,6 @@ fun TaskCreateSheet(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             )
-
-            // Priority selector
-            Text(
-                stringResource(R.string.task_priority_label),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                PriorityOption(R.string.task_priority_low, priority == "low", MaterialTheme.colorScheme.outline) {
-                    priority = "low"
-                }
-                PriorityOption(R.string.task_priority_medium, priority == "medium", MaterialTheme.colorScheme.tertiary) {
-                    priority = "medium"
-                }
-                PriorityOption(R.string.task_priority_high, priority == "high", MaterialTheme.colorScheme.error) {
-                    priority = "high"
-                }
-            }
 
             // Due date row
             Row(
@@ -157,7 +135,6 @@ fun TaskCreateSheet(
                             onCreate(TodoCreate(
                                 title = normalizedTitle,
                                 description = description.trim().takeIf { it.isNotEmpty() },
-                                priority = priority,
                                 dueDate = dueDate,
                             ))
                         }
@@ -172,15 +149,17 @@ fun TaskCreateSheet(
 
     // Date picker dialog
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState()
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = dueDate
+                ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+                ?.toDatePickerMillis(),
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val instant = java.time.Instant.ofEpochMilli(millis)
-                        val localDate = instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                        dueDate = localDate.toString()
+                        dueDate = datePickerDate(millis).toString()
                     }
                     showDatePicker = false
                 }) { Text(stringResource(R.string.common_ok)) }
@@ -194,27 +173,4 @@ fun TaskCreateSheet(
             DatePicker(state = datePickerState)
         }
     }
-}
-
-@Composable
-private fun PriorityOption(
-    @StringRes labelRes: Int,
-    isSelected: Boolean,
-    color: androidx.compose.ui.graphics.Color,
-    onClick: () -> Unit,
-) {
-    FilterChip(
-        selected = isSelected,
-        onClick = onClick,
-        label = {
-            Text(
-                stringResource(labelRes),
-                style = MaterialTheme.typography.labelMedium,
-            )
-        },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = color.copy(alpha = 0.12f),
-            selectedLabelColor = color,
-        ),
-    )
 }

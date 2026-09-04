@@ -38,7 +38,7 @@ android {
         applicationId = "com.clawchat.android"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionName = "1.4.8"
+        versionName = "1.4.20"
         versionCode = androidVersionCode(versionName!!)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -117,6 +117,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:runs"))
     implementation(project(":feature:review"))
+    implementation(project(":feature:progress"))
     implementation(project(":widget"))
 
     // Compose

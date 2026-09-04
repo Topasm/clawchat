@@ -29,6 +29,9 @@
     <string name="onboarding_ready_description">이제 ClawChat을 사용할 수 있습니다.</string>
     <string name="onboarding_enter_clawchat">ClawChat 시작</string>
     <string name="onboarding_camera_permission_required">QR 코드를 스캔하려면 카메라 권한이 필요합니다.</string>
+    <string name="onboarding_camera_unavailable">카메라를 시작하지 못했습니다. 다시 시도하거나 직접 연결하세요.</string>
+    <string name="onboarding_retry_camera">카메라 다시 시도</string>
+    <string name="onboarding_invalid_qr">ClawChat 페어링 QR 코드가 아닙니다. 다른 코드를 스캔하세요.</string>
     <string name="onboarding_cancel">취소</string>
     <string name="onboarding_point_camera_at_qr">데스크톱에 표시된 QR 코드를 카메라로 비추세요</string>
     <string name="onboarding_enter_code_manually">코드 직접 입력</string>
