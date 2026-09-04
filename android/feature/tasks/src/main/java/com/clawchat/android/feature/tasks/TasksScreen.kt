@@ -93,7 +93,9 @@ import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
+import com.clawchat.android.core.ui.datePickerDate
 import com.clawchat.android.core.ui.localizedErrorMessage
+import com.clawchat.android.core.ui.toDatePickerMillis
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -922,15 +924,17 @@ private fun TaskDetailView(
     }
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState()
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = task.dueDate
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?.toDatePickerMillis(),
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val instant = java.time.Instant.ofEpochMilli(millis)
-                        val localDate = instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                        onSetDueDate(localDate.toString())
+                        onSetDueDate(datePickerDate(millis).toString())
                     }
                     showDatePicker = false
                 }) { Text(stringResource(CoreR.string.common_ok)) }

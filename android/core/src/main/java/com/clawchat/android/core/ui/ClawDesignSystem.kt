@@ -100,27 +100,6 @@ fun ClawTopBarColors(): TopAppBarColors = TopAppBarDefaults.topAppBarColors(
 )
 
 @Composable
-fun ClawTopBarTitle(
-    title: String,
-    subtitle: String? = null,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (!subtitle.isNullOrBlank()) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
 fun ClawSectionCard(
     modifier: Modifier = Modifier,
     tone: ClawTone = ClawTone.Default,

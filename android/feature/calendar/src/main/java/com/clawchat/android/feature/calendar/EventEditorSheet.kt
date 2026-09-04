@@ -42,7 +42,8 @@ import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.EventUpdate
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.ui.ReminderMinutesPicker
-import java.time.Instant
+import com.clawchat.android.core.ui.datePickerDate
+import com.clawchat.android.core.ui.toDatePickerMillis
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -227,19 +228,14 @@ fun EventEditorSheet(
 
     if (showDatePicker) {
         val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = date
-                .atStartOfDay(ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli(),
+            initialSelectedDateMillis = date.toDatePickerMillis(),
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     pickerState.selectedDateMillis?.let { millis ->
-                        date = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDate()
+                        date = datePickerDate(millis)
                     }
                     showDatePicker = false
                 }) { Text(stringResource(R.string.calendar_ok)) }

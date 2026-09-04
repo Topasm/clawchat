@@ -149,15 +149,17 @@ fun TaskCreateSheet(
 
     // Date picker dialog
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState()
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = dueDate
+                ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+                ?.toDatePickerMillis(),
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val instant = java.time.Instant.ofEpochMilli(millis)
-                        val localDate = instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-                        dueDate = localDate.toString()
+                        dueDate = datePickerDate(millis).toString()
                     }
                     showDatePicker = false
                 }) { Text(stringResource(R.string.common_ok)) }
