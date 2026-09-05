@@ -2,9 +2,14 @@ package com.clawchat.android.feature.tasks
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.text.style.TextOverflow
+import com.clawchat.android.core.ui.ClawMobileLayout
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -17,6 +22,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.clawchat.android.core.data.model.ProjectNode
+import com.clawchat.android.core.data.model.ProjectPlan
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -25,8 +31,10 @@ import kotlinx.coroutines.isActive
 fun ProjectPlanScreen(
     onBack: () -> Unit,
     onOpenTask: (String) -> Unit,
-    onOpenConversation: (String, String?) -> Unit,
+    onOpenConversation: (String, String?, Boolean) -> Unit,
     onOpenRun: (String) -> Unit,
+    initialProjectId: String? = null,
+    initialTaskId: String? = null,
     viewModel: ProjectPlanViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -36,6 +44,23 @@ fun ProjectPlanScreen(
     var collapsed by rememberSaveable(state.project?.id) { mutableStateOf(emptyList<String>()) }
     var showFinished by rememberSaveable(state.project?.id) { mutableStateOf(false) }
     val selected = state.nodes.firstOrNull { it.id == selectedId }
+    val listState = rememberLazyListState()
+    var focusConsumed by rememberSaveable(initialProjectId, initialTaskId) { mutableStateOf(false) }
+    LaunchedEffect(initialProjectId) {
+        if (initialProjectId != null && state.project?.id != initialProjectId) {
+            viewModel.select(ProjectPlan(initialProjectId, ""))
+        }
+    }
+    LaunchedEffect(state.nodes, state.loading, initialTaskId) {
+        if (!focusConsumed && !state.loading && state.nodes.any { it.id == initialTaskId }) {
+            selectedId = initialTaskId
+            collapsed = emptyList()
+            showFinished = state.nodes.first { it.id == initialTaskId }.executionState in setOf("completed", "cancelled")
+            withFrameNanos { }
+            projectTaskScrollIndex(state, requireNotNull(initialTaskId), showFinished)?.let { listState.scrollToItem(it) }
+            focusConsumed = true
+        }
+    }
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.refresh()
@@ -47,19 +72,32 @@ fun ProjectPlanScreen(
         val run = state.openRun
         val title = state.conversationTitle
         viewModel.navigationConsumed()
-        if (conversation != null) onOpenConversation(conversation, title)
+        if (conversation != null) onOpenConversation(conversation, title, state.projectConversation)
         else if (run != null) onOpenRun(run)
     }
-    val back = { if (state.project != null) viewModel.select(null) else onBack() }
+    val back = { if (initialProjectId != null) onBack() else if (state.project != null) viewModel.select(null) else onBack() }
     BackHandler { if (!state.busy) back() }
     Scaffold(topBar = {
-        TopAppBar(title = { Text(state.project?.title ?: stringResource(R.string.projects_title)) },
-            navigationIcon = { TextButton(onClick = back, enabled = !state.busy) { Text(stringResource(R.string.projects_back)) } },
+        TopAppBar(title = { Text(state.project?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.projects_title),
+            style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            navigationIcon = {
+                if (state.project == null && initialProjectId == null) com.clawchat.android.core.ui.NavigationMenuButton()
+                else IconButton(onClick = back, enabled = !state.busy) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.projects_back))
+                }
+            },
             actions = { TextButton(onClick = viewModel::refresh, enabled = !state.loading && !state.busy) { Text(stringResource(R.string.projects_refresh)) } })
     }, bottomBar = {
         selected?.let { node ->
             Surface(tonalElevation = 3.dp) {
-                Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp)) {
+                Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(ClawMobileLayout.PageInset)) {
+                    val ancestors = remember(state.nodes, node.id) { projectAncestorPath(state.nodes, node.id) }
+                    if (ancestors.isNotEmpty()) Text(
+                        (listOfNotNull(state.project?.title) + ancestors).joinToString(" › "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
                     Row {
                         Text(node.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                         TextButton(onClick = { selectedId = null }) { Text(stringResource(R.string.projects_close_selection)) }
@@ -77,7 +115,7 @@ fun ProjectPlanScreen(
             }
         }
     }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
             val project = state.project
@@ -117,9 +155,10 @@ fun ProjectPlanScreen(
                     }
                 }
                 items(visibleProjectOutline(state.nodes, collapsed.toSet(), showFinished), key = { "outline:${it.first.id}" }) { (node, depth) ->
-                    Column(Modifier.fillMaxWidth().clickable { selectedId = node.id }.padding(start = (depth.coerceAtMost(5) * 12).dp, top = 8.dp, bottom = 8.dp)) {
+                    Column(Modifier.fillMaxWidth().clickable { selectedId = node.id }.heightIn(min = ClawMobileLayout.TouchTarget).padding(start = (depth.coerceAtMost(ClawMobileLayout.MaxOutlineIndent) * 12).dp, top = 8.dp, bottom = 8.dp)) {
                         Row {
-                            Text(node.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall,
+                            Text(node.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis,
                                 color = if (selectedId == node.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             if (state.nodes.any { it.parentId == node.id }) TextButton(onClick = {
                                 collapsed = if (node.id in collapsed) collapsed - node.id else collapsed + node.id

@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import com.clawchat.android.core.ui.icons.ClawIcons
 import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.launch
+import com.clawchat.android.core.ui.LocalOpenNavigationMenu
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +25,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,17 +53,20 @@ import com.clawchat.android.R
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.SearchType
 
-private data class BottomNavItem(
+private data class DrawerDestination(
     val route: String,
-    val icon: ImageVector,
     @StringRes val labelRes: Int,
 )
 
-private val allBottomNavItems = listOf(
-    BottomNavItem(NavRoute.Progress.route, Icons.Default.PlayArrow, R.string.nav_progress),
-    BottomNavItem(NavRoute.Tasks.route, ClawIcons.Checklist, R.string.nav_tasks),
-    BottomNavItem(NavRoute.Today.route, Icons.Default.DateRange, R.string.nav_schedule),
-    BottomNavItem(NavRoute.Chat.route, ClawIcons.Chat, R.string.nav_chat),
+private val allDrawerDestinations = listOf(
+    DrawerDestination(NavRoute.Progress.route, R.string.nav_progress),
+    DrawerDestination(NavRoute.Tasks.route, R.string.nav_tasks),
+    DrawerDestination(NavRoute.Today.route, R.string.nav_schedule),
+    DrawerDestination(NavRoute.Chat.route, R.string.nav_chat),
+    DrawerDestination(NavRoute.Inbox.route, R.string.nav_inbox),
+    DrawerDestination(NavRoute.Projects.route, R.string.nav_projects),
+    DrawerDestination(NavRoute.Search.route, R.string.nav_search),
+    DrawerDestination(NavRoute.Settings.route, R.string.nav_settings),
 )
 
 internal fun plannerPrimaryRoute(currentRoute: String?): String? =
@@ -101,9 +107,9 @@ fun ClawChatNavGraph(
 ) {
     val navController = rememberNavController()
     val startDestination = NavigationCapabilities.startRoute(workspaceMode)
-    val bottomItemsByRoute = remember { allBottomNavItems.associateBy(BottomNavItem::route) }
-    val primaryBottomItems = remember(workspaceMode) {
-        NavigationCapabilities.primaryRoutes(workspaceMode).mapNotNull(bottomItemsByRoute::get)
+    val itemsByRoute = remember { allDrawerDestinations.associateBy(DrawerDestination::route) }
+    val drawerItems = remember(workspaceMode) {
+        NavigationCapabilities.drawerRoutes(workspaceMode).mapNotNull(itemsByRoute::get)
     }
     var plannerPage by rememberSaveable { mutableStateOf(PlannerPage.TODAY) }
 
@@ -134,10 +140,10 @@ fun ClawChatNavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val currentBaseRoute = currentRoute?.substringBefore('?')
-    val selectedPrimaryRoute = plannerPrimaryRoute(currentBaseRoute)
-    val showBottomNavigation = currentBaseRoute != null &&
-        currentBaseRoute != NavRoute.Onboarding.route &&
-        currentBaseRoute !in setOf(NavRoute.Inbox.route, NavRoute.Review.route, NavRoute.Runs.route)
+    val selectedPrimaryRoute = if (currentBaseRoute == NavRoute.Calendar.route) NavRoute.Today.route else currentBaseRoute
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
+    LaunchedEffect(workspaceMode) { drawer.close() }
     val navigateToPrimary: (String) -> Unit = { route ->
         when (route) {
             NavRoute.Today.route -> plannerPage = PlannerPage.TODAY
@@ -182,36 +188,37 @@ fun ClawChatNavGraph(
         navController.navigate(NavRoute.Settings.route) { launchSingleTop = true }
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            if (showBottomNavigation && primaryBottomItems.isNotEmpty()) {
-                NavigationBar {
-                    primaryBottomItems.forEach { item ->
-                        NavigationBarItem(
+    CompositionLocalProvider(LocalOpenNavigationMenu provides {
+        drawerScope.launch { drawer.open() }; Unit
+    }) {
+    ModalNavigationDrawer(
+        drawerState = drawer,
+        // Button opens the drawer. Do not steal Android's edge-back or planner swipes.
+        gesturesEnabled = drawer.isOpen,
+        drawerContent = {
+            ModalDrawerSheet {
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
+                    Text(stringResource(R.string.nav_menu_title), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
+                    drawerItems.forEach { item ->
+                        if (item.route == NavRoute.Search.route) HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                        NavigationDrawerItem(
                             selected = item.route == selectedPrimaryRoute,
-                            onClick = { navigateToPrimary(item.route) },
-                            icon = {
-                                if (item.route == NavRoute.Progress.route && attentionCount > 0) {
-                                    BadgedBox(
-                                        badge = {
-                                            Badge {
-                                                Text(attentionCount.coerceAtMost(99).toString())
-                                            }
-                                        },
-                                    ) {
-                                        Icon(item.icon, contentDescription = null)
-                                    }
-                                } else {
-                                    Icon(item.icon, contentDescription = null)
-                                }
-                            },
+                            onClick = { drawerScope.launch {
+                                drawer.close()
+                                if (item.route in NavigationCapabilities.secondaryRoutes(workspaceMode)) {
+                                    navController.navigate(item.route) { launchSingleTop = true }
+                                } else navigateToPrimary(item.route)
+                            } },
                             label = { Text(stringResource(item.labelRes)) },
+                            badge = { if (item.route == NavRoute.Progress.route && attentionCount > 0) Text(attentionCount.coerceAtMost(99).toString()) },
                         )
                     }
                 }
             }
         },
+    ) {
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { rootPadding ->
         NavHost(
             navController = navController,
@@ -324,7 +331,14 @@ fun ClawChatNavGraph(
                     workspaceMode = workspaceMode,
                     onConnectWorkspace = openConnectionSetup,
                 ) {
-                    InboxScreen(onBack = { navController.popBackStack() })
+                    InboxScreen(
+                        onBack = { navController.popBackStack() },
+                        onTaskClick = { navController.navigate(NavRoute.Tasks.destination(it)) },
+                        onOpenPlacement = { taskId, projectId ->
+                            navController.navigate(if (projectId == null) NavRoute.Tasks.destination(taskId)
+                                else NavRoute.Projects.destination(projectId, taskId)) { launchSingleTop = true }
+                        },
+                    )
                 }
             }
             composable(
@@ -336,6 +350,7 @@ fun ClawChatNavGraph(
                         defaultValue = null
                     },
                     navArgument(NavRoute.Chat.ARG_TITLE) { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument(NavRoute.Chat.ARG_PROJECT_PLAN) { type = NavType.BoolType; defaultValue = false },
                 ),
             ) { entry ->
                 ServerOnlyDestination(
@@ -343,6 +358,7 @@ fun ClawChatNavGraph(
                     onConnectWorkspace = openConnectionSetup,
                 ) {
                     ChatScreen(
+                        showProjectPlanReturn = entry.arguments?.getBoolean(NavRoute.Chat.ARG_PROJECT_PLAN) == true,
                         contextTitle = entry.arguments?.getString(NavRoute.Chat.ARG_TITLE),
                         onReturnToSource = { if (!navController.popBackStack()) navController.navigate(NavRoute.Tasks.route) },
                         onOpenSearch = navigateToSearch,
@@ -460,12 +476,17 @@ fun ClawChatNavGraph(
                     )
                 }
             }
-            composable(NavRoute.Projects.route) {
+            composable(NavRoute.Projects.routePattern, arguments = listOf(
+                navArgument(NavRoute.Projects.ARG_PROJECT_ID) { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument(NavRoute.Projects.ARG_TASK_ID) { type = NavType.StringType; nullable = true; defaultValue = null },
+            )) { entry ->
                 if (workspaceMode == WorkspaceMode.SERVER) {
                     ProjectPlanScreen(
+                        initialProjectId = entry.arguments?.getString(NavRoute.Projects.ARG_PROJECT_ID),
+                        initialTaskId = entry.arguments?.getString(NavRoute.Projects.ARG_TASK_ID),
                         onBack = { navController.popBackStack() },
                         onOpenTask = { navController.navigate(NavRoute.Tasks.destination(it)) },
-                        onOpenConversation = { id, title -> navController.navigate(NavRoute.Chat.destination(id, title)) },
+                        onOpenConversation = { id, title, projectPlan -> navController.navigate(NavRoute.Chat.destination(id, title, projectPlan)) },
                         onOpenRun = { navController.navigate(NavRoute.Runs.destination(it)) },
                     )
                 }
@@ -482,6 +503,9 @@ fun ClawChatNavGraph(
                 )
             }
         }
+    }
+    }
+    BackHandler(enabled = drawer.isOpen) { drawerScope.launch { drawer.close() } }
     }
 }
 

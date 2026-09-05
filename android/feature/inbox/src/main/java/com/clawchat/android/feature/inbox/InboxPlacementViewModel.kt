@@ -156,6 +156,29 @@ class InboxPlacementViewModel @Inject constructor(
         }
     }
 
+    fun editPlacement(taskId: String, choice: PlacementChoice, includeDeadline: Boolean, expectedRevision: Long, onSaved: () -> Unit) {
+        val current = state.value
+        val snapshot = current.snapshot ?: return
+        if (snapshot.graph.revision != expectedRevision) return
+        if (current.busy || current.loading || current.stale || snapshot.tasks.none { it.id == taskId }) return
+        if (choice.projectId == null) {
+            if (choice.parentId != null) return
+        } else {
+            val project = snapshot.projects.find { it.id == choice.projectId } ?: return
+            if (choice.parentId != null || project.rootTaskId != null) {
+                if (inboxParentOptions(project, snapshot.graph.nodes, taskId).none { it.id == choice.parentId }) return
+            }
+        }
+        saveReview(taskId, InboxReviewUpdate(
+            choice = InboxReviewChoice(choice.projectId, choice.parentId),
+            revision = snapshot.graph.revision,
+            excludeDeadline = !includeDeadline,
+        ), onSaved = onSaved) {
+            it.copy(choices = it.choices + (taskId to choice.copy(reason = null)),
+                excludedDeadlines = if (includeDeadline) it.excludedDeadlines - taskId else it.excludedDeadlines + taskId)
+        }
+    }
+
     fun includeDeadline(taskId: String, include: Boolean) {
         if (state.value.busy || state.value.loading || state.value.stale) return
         saveReview(taskId, InboxReviewUpdate(excludeDeadline = !include)) {
@@ -173,7 +196,7 @@ class InboxPlacementViewModel @Inject constructor(
         saveReview(null, InboxReviewUpdate()) { it.copy(deferred = emptySet()) }
     }
 
-    private fun saveReview(taskId: String?, body: InboxReviewUpdate, apply: (InboxPlacementState) -> InboxPlacementState) {
+    private fun saveReview(taskId: String?, body: InboxReviewUpdate, onSaved: () -> Unit = {}, apply: (InboxPlacementState) -> InboxPlacementState) {
         val owner = scope ?: return
         val token = ++generation
         job?.cancel()
@@ -184,7 +207,7 @@ class InboxPlacementViewModel @Inject constructor(
             job = null
             state.update { it.copy(busy = false) }
             when (result) {
-                is ApiResult.Success -> state.update(apply)
+                is ApiResult.Success -> { state.update(apply); onSaved() }
                 is ApiResult.Error -> state.update { it.copy(error = result.message, stale = true) }
                 else -> Unit
             }

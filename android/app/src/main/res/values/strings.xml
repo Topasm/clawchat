@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nav_inbox">Inbox</string>
+    <string name="nav_projects">Projects</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_menu_title">ClawChat</string>
     <string name="app_name" translatable="false">ClawChat</string>
     <string name="notification_attention_channel">Needs attention</string>
     <string name="notification_attention_channel_description">Questions, approvals, and failed work that need your action</string>

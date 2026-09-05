@@ -105,6 +105,7 @@ fun TodayScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.today_title),

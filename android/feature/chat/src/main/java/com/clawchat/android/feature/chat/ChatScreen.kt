@@ -13,7 +13,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,8 +46,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -150,10 +151,15 @@ fun ChatScreen(
     onOpenSettings: () -> Unit = {},
     initialConversationId: String? = null,
     contextTitle: String? = null,
+    showProjectPlanReturn: Boolean = false,
     onReturnToSource: (() -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel(),
+    draftViewModel: ChatDraftViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val draftWorkspace by draftViewModel.workspace.collectAsStateWithLifecycle()
+    val drafts by draftViewModel.drafts.collectAsStateWithLifecycle()
+    val draftStorage by draftViewModel.storage.collectAsStateWithLifecycle()
     val newConversationTitle = stringResource(R.string.chat_new_conversation_default_title)
     // Arriving from a task: open its thread once, then behave like the tab.
     var initialSelectionConsumed by rememberSaveable(initialConversationId) { mutableStateOf(false) }
@@ -177,13 +183,19 @@ fun ChatScreen(
     }
 
     if (state.selectedConversationId != null) {
+        val conversationId = requireNotNull(state.selectedConversationId)
         key(state.selectedConversationId) {
             ChatDetailView(
+                inputText = draftWorkspace?.let { drafts[ChatDraftKey(it, conversationId).storageKey] }.orEmpty(),
+                draftStorage = draftStorage,
+                onRetryDraft = draftViewModel::retry,
+                onInputChange = { draftViewModel.edit(draftWorkspace, conversationId, it) },
+                showProjectPlanReturn = showProjectPlanReturn,
                 title = contextTitle ?: state.conversations.firstOrNull { it.id == state.selectedConversationId }?.title,
                 messages = state.messages,
                 streamingText = state.streamingText,
                 isStreaming = state.isStreaming,
-                isLoadingMessages = state.isLoadingMessages,
+                isLoadingMessages = state.isLoadingMessages || draftWorkspace == null || !draftStorage.ready,
                 onSend = viewModel::sendMessage,
                 onStop = viewModel::stopStreaming,
                 onResumeRun = viewModel::resumeRun,
@@ -234,6 +246,7 @@ private fun ConversationListView(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.chat_title),
@@ -428,6 +441,11 @@ private fun ConversationCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatDetailView(
+    draftStorage: DraftStorageState,
+    onRetryDraft: () -> Unit,
+    inputText: String,
+    onInputChange: (String) -> Unit,
+    showProjectPlanReturn: Boolean = false,
     title: String?,
     plans: Map<String, ChatPlanProposal>,
     planChanges: Map<String, String>,
@@ -444,10 +462,10 @@ private fun ChatDetailView(
     onDecideReview: (String, ReviewDecision, String?) -> Unit,
     onBack: () -> Unit,
 ) {
-    var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val locale = LocalLocale.current.platformLocale
     val speechPrompt = stringResource(R.string.chat_speak_now)
+    var moreOpen by remember { mutableStateOf(false) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -457,7 +475,7 @@ private fun ChatDetailView(
                 ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
                 ?.firstOrNull()
             if (spokenText != null) {
-                inputText = if (inputText.isBlank()) spokenText else "$inputText $spokenText"
+                onInputChange(if (inputText.isBlank()) spokenText else "$inputText $spokenText")
             }
         }
     }
@@ -477,7 +495,9 @@ private fun ChatDetailView(
                     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                         Text(
                             text = title ?: stringResource(R.string.chat_conversation),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
@@ -501,30 +521,55 @@ private fun ChatDetailView(
                         )
                     }
                 },
+                actions = {
+                    if (showProjectPlanReturn) TextButton(onClick = onBack) {
+                        Text(stringResource(R.string.chat_return_project_plan))
+                    }
+                    Box {
+                        IconButton(onClick = { moreOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.chat_more_actions))
+                        }
+                        DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                            DropdownMenuItem(enabled = draftStorage.ready,
+                                text = { Text(stringResource(R.string.chat_voice_input)) }, onClick = {
+                                    moreOpen = false
+                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale.toLanguageTag())
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, speechPrompt)
+                                    }
+                                    speechLauncher.launch(intent)
+                                })
+                        }
+                    }
+                },
                 colors = ClawTopBarColors(),
             )
         },
         bottomBar = {
-            ChatComposer(
-                inputText = inputText,
-                onInputChange = { inputText = it },
-                isStreaming = isStreaming,
-                onStop = onStop,
-                onSend = {
-                    if (inputText.isNotBlank() && !isLoadingMessages && !isStreaming) {
+            com.clawchat.android.core.ui.ClawComposer(
+                value = inputText,
+                onValueChange = onInputChange,
+                placeholder = stringResource(R.string.chat_input_placeholder),
+                enabled = draftStorage.ready,
+                actionEnabled = isStreaming || (inputText.isNotBlank() && !isLoadingMessages),
+                actionIcon = if (isStreaming) ClawIcons.Stop else Icons.AutoMirrored.Filled.Send,
+                actionLabel = stringResource(if (isStreaming) R.string.chat_stop else R.string.chat_send),
+                onAction = {
+                    if (isStreaming) onStop()
+                    else if (inputText.isNotBlank() && !isLoadingMessages) {
                         onSend(inputText)
-                        inputText = ""
+                        onInputChange("")
                     }
                 },
-                onVoiceInput = {
-                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale.toLanguageTag())
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, speechPrompt)
-                    }
-                    speechLauncher.launch(intent)
-                },
-            )
+            ) {
+                if (draftStorage.failed) TextButton(onClick = onRetryDraft) {
+                    Text(stringResource(R.string.chat_draft_retry))
+                } else if (draftStorage.saving || !draftStorage.ready) {
+                    Text(stringResource(if (draftStorage.ready) R.string.chat_draft_saving else R.string.chat_draft_loading),
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
@@ -605,125 +650,6 @@ private fun ChatDetailView(
     }
 }
 
-@Composable
-private fun ChatComposer(
-    inputText: String,
-    onInputChange: (String) -> Unit,
-    isStreaming: Boolean,
-    onStop: () -> Unit,
-    onSend: () -> Unit,
-    onVoiceInput: () -> Unit,
-) {
-    Surface(
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        color = MaterialTheme.colorScheme.background,
-    ) {
-        Column {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    TextField(
-                        value = inputText,
-                        onValueChange = onInputChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text(
-                                stringResource(R.string.chat_input_placeholder),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            )
-                        },
-                        maxLines = 5,
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                        ),
-                    )
-                }
-
-                Surface(
-                    modifier = Modifier.size(48.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable(onClick = onVoiceInput),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            ClawIcons.PhoneAndroid,
-                            contentDescription = stringResource(R.string.chat_voice_input),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier.size(48.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isStreaming) {
-                        MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-                    } else if (inputText.isNotBlank()) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surface
-                    },
-                    border = if (isStreaming || inputText.isNotBlank()) null else {
-                        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    },
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .alpha(if (isStreaming || inputText.isNotBlank()) 1f else 0.6f)
-                            .clickable(enabled = isStreaming || inputText.isNotBlank()) {
-                                if (isStreaming) onStop() else onSend()
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (isStreaming) {
-                            Icon(
-                                ClawIcons.Stop,
-                                contentDescription = stringResource(R.string.chat_stop),
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                        } else {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Send,
-                                contentDescription = stringResource(R.string.chat_send),
-                                tint = if (inputText.isNotBlank()) {
-                                    MaterialTheme.colorScheme.onPrimary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun MessageBubble(

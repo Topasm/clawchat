@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="nav_inbox">받은 편지함</string>
+    <string name="nav_projects">프로젝트</string>
+    <string name="nav_search">검색</string>
+    <string name="nav_settings">설정</string>
+    <string name="nav_menu_title">ClawChat</string>
     <string name="notification_attention_channel">확인 필요</string>
     <string name="notification_attention_channel_description">답변, 승인 또는 재시도가 필요한 작업</string>
     <string name="notification_attention_title">ClawChat에 확인이 필요합니다</string>

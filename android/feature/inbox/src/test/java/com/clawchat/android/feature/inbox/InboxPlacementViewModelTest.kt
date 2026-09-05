@@ -68,6 +68,59 @@ class InboxPlacementViewModelTest {
         coVerify(exactly = 0) { repository.approve(any(), any(), any()) }
     }
 
+    @Test fun `editor saves branch and deadline preference together before closing`() = runTest {
+        val branch = ProjectNode("chapter", "Chapter", "root", "task", "pending")
+        coEvery { repository.load(scope, any()) } returns ApiResult.Success(snapshot.copy(graph = InboxGraph(17, listOf(branch))))
+        val pending = CompletableDeferred<ApiResult<Unit>>()
+        coEvery { repository.saveReview(scope, "t", any()) } coAnswers { pending.await() }
+        val vm = loaded()
+        var closed = false
+        vm.editPlacement("t", PlacementChoice("p", "chapter"), false, 17) { closed = true }
+        dispatcher.scheduler.runCurrent()
+        assertFalse(closed)
+        assertTrue(vm.uiState.value.busy)
+        coVerify { repository.saveReview(scope, "t", InboxReviewUpdate(
+            excludeDeadline = true, choice = InboxReviewChoice("p", "chapter"), revision = 17)) }
+        pending.complete(ApiResult.Success(Unit))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(closed)
+        assertEquals("chapter", vm.uiState.value.choices["t"]?.parentId)
+        assertTrue("t" in vm.uiState.value.excludedDeadlines)
+        coVerify(exactly = 0) { repository.approve(any(), any(), any()) }
+    }
+
+    @Test fun `failed editor save keeps existing choice and does not close`() = runTest {
+        coEvery { repository.saveReview(scope, "t", any()) } returns ApiResult.Error("offline")
+        val vm = loaded()
+        var closed = false
+        vm.editPlacement("t", PlacementChoice(null, null), false, 17) { closed = true }
+        dispatcher.scheduler.advanceUntilIdle()
+        assertFalse(closed)
+        assertEquals("p", vm.uiState.value.choices["t"]?.projectId)
+        assertTrue(vm.uiState.value.stale)
+        assertFalse("t" in vm.uiState.value.excludedDeadlines)
+    }
+
+    @Test fun `editor rejects descendants and foreign project parents`() = runTest {
+        val nodes = listOf(ProjectNode("t", "Task", "root", "task", "pending"),
+            ProjectNode("child", "Child", "t", "task", "pending"),
+            ProjectNode("foreign", "Other", "other-root", "task", "pending"))
+        coEvery { repository.load(scope, any()) } returns ApiResult.Success(snapshot.copy(graph = InboxGraph(17, nodes)))
+        val vm = loaded()
+        for (parent in listOf("t", "child", "foreign")) {
+            vm.editPlacement("t", PlacementChoice("p", parent), true, 17) { fail("Invalid choice saved") }
+        }
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 0) { repository.saveReview(any(), any(), any()) }
+    }
+
+    @Test fun `editor does not rebase a draft onto a newer revision`() = runTest {
+        val vm = loaded()
+        vm.editPlacement("t", PlacementChoice(null, null), true, 16) { fail("Stale draft saved") }
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 0) { repository.saveReview(any(), any(), any()) }
+    }
+
     @Test fun `approval includes displayed deadline and location in one request`() = runTest {
         val deadline = InboxDeadlineSuggestion("t", "2026-09-04T14:59:59Z", "2026-09-04", "Asia/Seoul", "금요일까지", true)
         coEvery { repository.preview(any(), any(), any()) } returns ApiResult.Success(preview.copy(deadlines = listOf(deadline)))

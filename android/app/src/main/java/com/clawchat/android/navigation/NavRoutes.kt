@@ -9,13 +9,15 @@ sealed class NavRoute(val route: String) {
     data object Calendar : NavRoute("calendar")
     data object Chat : NavRoute("chat") {
         const val ARG_TITLE = "context_title"
+        const val ARG_PROJECT_PLAN = "project_plan"
         const val ARG_CONVERSATION_ID = "conversation_id"
-        val routePattern = "$route?$ARG_CONVERSATION_ID={$ARG_CONVERSATION_ID}&$ARG_TITLE={$ARG_TITLE}"
+        val routePattern = "$route?$ARG_CONVERSATION_ID={$ARG_CONVERSATION_ID}&$ARG_TITLE={$ARG_TITLE}&$ARG_PROJECT_PLAN={$ARG_PROJECT_PLAN}"
 
         /** Opens the chat tab on one conversation, e.g. the thread scoped to a task. */
-        fun destination(conversationId: String? = null, title: String? = null): String =
+        fun destination(conversationId: String? = null, title: String? = null, projectPlan: Boolean = false): String =
             conversationId?.let { "$route?$ARG_CONVERSATION_ID=${Uri.encode(it)}" +
-                (title?.let { value -> "&$ARG_TITLE=${Uri.encode(value)}" } ?: "") } ?: route
+                (title?.let { value -> "&$ARG_TITLE=${Uri.encode(value)}" } ?: "") +
+                (if (projectPlan) "&$ARG_PROJECT_PLAN=true" else "") } ?: route
     }
     data object Inbox : NavRoute("inbox")
     data object Progress : NavRoute("progress")
@@ -43,6 +45,12 @@ sealed class NavRoute(val route: String) {
             runId?.let { "$route?$ARG_RUN_ID=${Uri.encode(it)}" } ?: route
     }
     data object Search : NavRoute("search")
-    data object Projects : NavRoute("projects")
+    data object Projects : NavRoute("projects") {
+        const val ARG_PROJECT_ID = "project_id"
+        const val ARG_TASK_ID = "task_id"
+        val routePattern = "$route?$ARG_PROJECT_ID={$ARG_PROJECT_ID}&$ARG_TASK_ID={$ARG_TASK_ID}"
+        fun destination(projectId: String, taskId: String): String =
+            "$route?$ARG_PROJECT_ID=${Uri.encode(projectId)}&$ARG_TASK_ID=${Uri.encode(taskId)}"
+    }
     data object Settings : NavRoute("settings")
 }

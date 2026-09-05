@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="chat_more_actions">More actions</string>
+    <string name="chat_draft_retry">Could not save or restore draft. Tap to retry.</string>
+    <string name="chat_draft_saving">Saving draft on this device…</string>
+    <string name="chat_draft_loading">Restoring draft…</string>
+    <string name="chat_return_project_plan">Plan</string>
     <string name="chat_review_note">Review note or requested changes</string>
     <string name="chat_review_request_changes">Request changes</string>
     <string name="chat_search">Quick Find</string>

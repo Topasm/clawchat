@@ -7,6 +7,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NavigationCapabilitiesTest {
+    @Test fun `drawer destinations are unique and supported by their workspace`() {
+        for (mode in WorkspaceMode.entries) {
+            val routes = NavigationCapabilities.drawerRoutes(mode)
+            assertEquals(routes.size, routes.toSet().size)
+            routes.forEach { assertTrue(NavigationCapabilities.canOpen(mode, it)) }
+        }
+        assertEquals(emptyList<String>(), NavigationCapabilities.drawerRoutes(WorkspaceMode.UNCONFIGURED))
+        assertTrue(NavRoute.Inbox.route in NavigationCapabilities.drawerRoutes(WorkspaceMode.SERVER))
+        assertTrue(NavRoute.Projects.route in NavigationCapabilities.drawerRoutes(WorkspaceMode.SERVER))
+        assertFalse(NavRoute.Chat.route in NavigationCapabilities.drawerRoutes(WorkspaceMode.LOCAL))
+    }
 
     @Test
     fun `local mode exposes only device features`() {

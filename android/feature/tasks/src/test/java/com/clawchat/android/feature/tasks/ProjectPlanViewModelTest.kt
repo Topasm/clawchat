@@ -17,6 +17,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.Assert.*
+import androidx.lifecycle.SavedStateHandle
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProjectPlanViewModelTest {
@@ -52,7 +53,52 @@ class ProjectPlanViewModelTest {
         coVerify(exactly = 1) { repository.graph("different-root") }
         vm.discuss()
         assertEquals("canonical", vm.uiState.value.openConversation)
+        assertTrue(vm.uiState.value.projectConversation)
         coVerify(exactly = 0) { conversations.getOrCreateForTodo(any()) }
+    }
+
+    @Test fun `direct project entry resolves current title and root without listing selection`() = runTest {
+        val vm = ProjectPlanViewModel(repository, conversations, runs)
+        vm.select(ProjectPlan("project", ""))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Demo", vm.uiState.value.project?.title)
+        assertEquals(listOf("ready"), vm.uiState.value.nodes.map { it.id })
+    }
+
+    @Test fun `saved project selection restores current project and graph after recreation`() = runTest {
+        val saved = SavedStateHandle()
+        val first = ProjectPlanViewModel(repository, conversations, runs, saved)
+        dispatcher.scheduler.advanceUntilIdle()
+        first.select(project)
+        dispatcher.scheduler.advanceUntilIdle()
+        val restored = ProjectPlanViewModel(repository, conversations, runs,
+            SavedStateHandle(mapOf("selected_project_id" to saved.get<String>("selected_project_id"))))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("Demo", restored.uiState.value.project?.title)
+        assertEquals(listOf("ready"), restored.uiState.value.nodes.map { it.id })
+        restored.select(null)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertNull(restored.uiState.value.project)
+    }
+
+    @Test fun `ancestor path distinguishes deep branches and terminates for cycles`() {
+        val a = ready.copy(id = "a", title = "Chapter")
+        val b = ready.copy(id = "b", title = "Figures", parentId = "a")
+        val c = ready.copy(id = "c", parentId = "b")
+        assertEquals(listOf("Chapter", "Figures"), projectAncestorPath(listOf(c, b, a), "c"))
+        assertEquals(listOf("Figures"), projectAncestorPath(listOf(a.copy(parentId = "b"), b), "a"))
+        assertEquals(emptyList<String>(), projectAncestorPath(listOf(a), "missing"))
+    }
+
+    @Test fun `focus index accounts for ready summaries errors loading and hidden finished work`() {
+        val state = ProjectPlanState(nodes = listOf(ready))
+        assertEquals(3, projectTaskScrollIndex(state, "ready", false))
+        assertEquals(5, projectTaskScrollIndex(state.copy(error = "offline", loading = true), "ready", false))
+        val done = state.copy(nodes = listOf(ready.copy(isReady = false, executionState = "completed")))
+        assertNull(projectTaskScrollIndex(done, "ready", false))
+        assertEquals(3, projectTaskScrollIndex(done, "ready", true))
+        assertEquals(3, projectTaskScrollIndex(done.copy(loading = true), "ready", true))
+        assertNull(projectTaskScrollIndex(state, "missing", false))
     }
 
     @Test fun `ready run is explicit and duplicate submissions are suppressed`() = runTest {
@@ -93,6 +139,9 @@ class ProjectPlanViewModelTest {
 
     @Test fun `execution opens its own conversation without creating a task chat`() = runTest {
         val vm = selected()
+        vm.discuss()
+        assertTrue(vm.uiState.value.projectConversation)
+        vm.navigationConsumed()
         val run = mockk<AgentRun>()
         every { run.conversationId } returns "execution-thread"
         coEvery { runs.getRun("run") } returns ApiResult.Success(run)
@@ -100,6 +149,7 @@ class ProjectPlanViewModelTest {
         vm.run("ready")
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals("execution-thread", vm.uiState.value.openConversation)
+        assertFalse(vm.uiState.value.projectConversation)
         assertEquals("Demo › Ready", vm.uiState.value.conversationTitle)
         assertNull(vm.uiState.value.openRun)
         coVerify(exactly = 0) { conversations.getOrCreateForTodo(any()) }

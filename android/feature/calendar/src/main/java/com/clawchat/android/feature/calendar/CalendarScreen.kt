@@ -84,6 +84,7 @@ fun CalendarScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
                 title = {
                     Text(
                         state.visibleMonth.format(monthLabelFormatter),

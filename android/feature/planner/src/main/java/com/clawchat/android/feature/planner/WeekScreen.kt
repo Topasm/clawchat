@@ -82,6 +82,7 @@ fun WeekScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.week_title),
@@ -336,4 +337,3 @@ private fun WeekTaskRow(task: Todo, onToggle: () -> Unit) {
         }
     }
 }
-

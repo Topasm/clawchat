@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="inbox_capture_saved_server">Inbox에 저장했습니다.</string>
+    <string name="inbox_placement_count">이 페이지의 승인 대기 %1$d개</string>
+    <string name="inbox_editor_location">프로젝트</string>
+    <string name="inbox_editor_parent">어떤 작업 아래에 넣을까요?</string>
+    <string name="inbox_editor_reason">추천 이유</string>
+    <string name="inbox_editor_cancel">취소</string>
+    <string name="inbox_editor_save">수정 저장</string>
     <string name="inbox_deadline_proposed">마감일 적용: %1$s</string>
     <string name="inbox_deadline_past">이미 지난 마감일입니다. 승인 전에 확인하세요.</string>
     <string name="inbox_capture_label">생각이나 해야 할 일을 입력하세요…</string>
@@ -13,7 +20,7 @@
     <string name="inbox_placement_choose">배치할 위치를 선택해주세요</string>
     <string name="inbox_placement_standalone">독립 작업으로 유지</string>
     <string name="inbox_placement_approve">승인</string>
-    <string name="inbox_placement_edit">위치 수정</string>
+    <string name="inbox_placement_edit">수정</string>
     <string name="inbox_placement_defer">나중에</string>
     <string name="inbox_placement_deferred">보류한 입력 다시 보기</string>
     <string name="inbox_placement_due">마감: %1$s</string>

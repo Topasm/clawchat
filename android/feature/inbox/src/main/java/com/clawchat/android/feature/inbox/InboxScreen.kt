@@ -15,12 +15,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -29,10 +29,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,15 +56,37 @@ import com.clawchat.android.core.ui.localizedErrorMessage
 fun InboxScreen(
     viewModel: InboxViewModel = hiltViewModel(),
     onTaskClick: (String) -> Unit = {},
+    onOpenPlacement: (String, String?) -> Unit = { id, _ -> onTaskClick(id) },
     onBack: () -> Unit = {},
     placementViewModel: InboxPlacementViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val placement by placementViewModel.uiState.collectAsStateWithLifecycle()
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(placement.captureSaved) {
+        if (placement.captureSaved) keyboard?.hide()
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            com.clawchat.android.core.ui.ClawComposer(
+                        value = placement.captureText,
+                        onValueChange = placementViewModel::editCapture,
+                        placeholder = stringResource(R.string.inbox_capture_label),
+                        enabled = !placement.capturing,
+                        actionEnabled = placement.captureText.isNotBlank() && !placement.capturing,
+                        actionIcon = Icons.AutoMirrored.Filled.Send,
+                        actionLabel = stringResource(if (placement.capturing) R.string.inbox_capture_saving else R.string.inbox_capture_add),
+                        onAction = placementViewModel::capture,
+            ) {
+                    if (!placement.server) placement.error?.let { Text(localizedErrorMessage(it)) }
+                    if (placement.captureSaved) Text(stringResource(
+                        if (placement.server) R.string.inbox_capture_saved_server else R.string.inbox_capture_saved),
+                        style = MaterialTheme.typography.bodySmall)
+            }
+        },
         topBar = {
             TopAppBar(
                 title = {
@@ -73,7 +97,9 @@ fun InboxScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    if (com.clawchat.android.core.ui.LocalOpenNavigationMenu.current != null) {
+                        com.clawchat.android.core.ui.NavigationMenuButton()
+                    } else IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.inbox_back),
@@ -85,7 +111,7 @@ fun InboxScreen(
         },
     ) { padding ->
         PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
+            isRefreshing = state.isRefreshing || placement.loading,
             onRefresh = { viewModel.refresh(); placementViewModel.refresh() },
             modifier = Modifier
                 .fillMaxSize()
@@ -105,28 +131,10 @@ fun InboxScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            OutlinedTextField(
-                                value = placement.captureText,
-                                onValueChange = placementViewModel::editCapture,
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text(stringResource(R.string.inbox_capture_label)) },
-                                enabled = !placement.capturing,
-                                maxLines = 4,
-                            )
-                            FilledTonalButton(onClick = placementViewModel::capture,
-                                enabled = placement.captureText.isNotBlank() && !placement.capturing) {
-                                Text(stringResource(if (placement.capturing) R.string.inbox_capture_saving else R.string.inbox_capture_add))
-                            }
-                            if (!placement.server) placement.error?.let { Text(localizedErrorMessage(it)) }
-                            if (placement.captureSaved) Text(stringResource(R.string.inbox_capture_saved), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    item {
+                    if (!placement.server) item {
                         InboxSummaryCard(
                             totalItems = totalItems,
                             planningNow = state.planningNow.size,
@@ -137,7 +145,7 @@ fun InboxScreen(
 
                     if (placement.server) {
                         item {
-                            InboxPlacementSection(placement, placementViewModel, onTaskClick)
+                            InboxPlacementSection(placement, placementViewModel, onOpenPlacement)
                         }
                     }
 

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="chat_more_actions">더보기</string>
+    <string name="chat_draft_retry">초안 저장·복원 실패 · 눌러서 다시 시도</string>
+    <string name="chat_draft_saving">이 기기에 초안 저장 중…</string>
+    <string name="chat_draft_loading">초안 불러오는 중…</string>
+    <string name="chat_return_project_plan">계획</string>
     <string name="chat_review_note">검토 의견 또는 수정할 내용</string>
     <string name="chat_review_request_changes">수정 요청</string>
     <string name="chat_search">빠른 찾기</string>

@@ -1,6 +1,7 @@
 package com.clawchat.android.feature.tasks
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.ProjectPlan
 import com.clawchat.android.core.data.model.ProjectNode
@@ -27,6 +28,7 @@ data class ProjectPlanState(
     val openConversation: String? = null,
     val openRun: String? = null,
     val conversationTitle: String? = null,
+    val projectConversation: Boolean = false,
 )
 
 @HiltViewModel
@@ -34,8 +36,11 @@ class ProjectPlanViewModel @Inject constructor(
     private val repository: ProjectPlanRepository,
     private val conversations: ConversationRepository,
     private val runs: AgentRunRepository,
+    private val savedState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
-    private val state = MutableStateFlow(ProjectPlanState())
+    private val state = MutableStateFlow(ProjectPlanState(
+        project = savedState.get<String>("selected_project_id")?.let { ProjectPlan(it, "") },
+    ))
     val uiState = state.asStateFlow()
     private var generation = 0L
     private var load: Job? = null
@@ -82,6 +87,7 @@ class ProjectPlanViewModel @Inject constructor(
 
     fun select(project: ProjectPlan?) {
         if (state.value.busy) return
+        savedState["selected_project_id"] = project?.id
         state.update { it.copy(project = project, nodes = emptyList(), taskTitles = emptyMap(), openConversation = null, openRun = null) }
         // A selection always invalidates earlier reads, including A → B → A.
         load?.cancel()
@@ -94,12 +100,12 @@ class ProjectPlanViewModel @Inject constructor(
         val root = taskId ?: project.rootTaskId ?: return
         val title = if (taskId == null) project.title else "${project.title} › ${state.value.taskTitles[taskId] ?: taskId}"
         if (taskId == null && project.conversationId != null) {
-            state.update { it.copy(openConversation = project.conversationId, conversationTitle = title) }
+            state.update { it.copy(openConversation = project.conversationId, conversationTitle = title, projectConversation = true) }
             return
         }
         mutate {
             when (val result = conversations.getOrCreateForTodo(root)) {
-                is ApiResult.Success -> state.update { it.copy(openConversation = result.data.id, conversationTitle = title) }
+                is ApiResult.Success -> state.update { it.copy(openConversation = result.data.id, conversationTitle = title, projectConversation = taskId == null) }
                 is ApiResult.Error -> state.update { it.copy(error = result.message) }
                 else -> Unit
             }
@@ -114,6 +120,7 @@ class ProjectPlanViewModel @Inject constructor(
                     val run = (runs.getRun(result.data.runId) as? ApiResult.Success)?.data
                     state.update { current -> current.copy(
                         openConversation = run?.conversationId,
+                        projectConversation = false,
                         conversationTitle = "${current.project?.title.orEmpty()} › ${current.taskTitles[taskId] ?: taskId}",
                         openRun = if (run?.conversationId == null) result.data.runId else null,
                         nodes = current.nodes.map { if (it.id == taskId) it.copy(isReady = false, executionState = "in_progress") else it },
@@ -171,4 +178,26 @@ internal fun visibleProjectOutline(nodes: List<ProjectNode>, collapsed: Set<Stri
             node.id in needed
         }
     }
+}
+
+/** Parent path for a selected node; dependency/context nodes must not become ancestors. */
+internal fun projectAncestorPath(nodes: List<ProjectNode>, taskId: String): List<String> {
+    val byId = nodes.associateBy { it.id }
+    val seen = mutableSetOf(taskId)
+    val titles = mutableListOf<String>()
+    var parent = byId[taskId]?.parentId
+    while (parent != null && seen.add(parent)) {
+        val node = byId[parent] ?: break
+        titles.add(node.title)
+        parent = node.parentId
+    }
+    return titles.reversed()
+}
+
+internal fun projectTaskScrollIndex(state: ProjectPlanState, taskId: String, showFinished: Boolean): Int? {
+    val index = visibleProjectOutline(state.nodes, emptySet(), showFinished).indexOfFirst { it.first.id == taskId }
+    if (index < 0) return null
+    val readyCount = state.nodes.count { it.isReady }.coerceAtMost(3)
+    return index + 2 + readyCount + (if (readyCount == 0 && !state.loading) 1 else 0) +
+        (if (state.error != null) 1 else 0) + (if (state.loading) 1 else 0)
 }

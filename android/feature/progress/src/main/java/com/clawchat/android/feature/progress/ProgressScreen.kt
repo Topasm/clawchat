@@ -156,6 +156,7 @@ fun ProgressScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
+                navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
                 title = {
                     Text(
                         text = stringResource(R.string.progress_title),

@@ -66,6 +66,98 @@
   the review-state endpoints, so the client will show an error instead of pretending
   that a preference was saved.
 
+## Stage 4: compact mobile approval UI
+
+- Capture now stays in the bottom composer (one line initially, up to four while
+  typing); the list reserves its height and the composer follows the keyboard.
+  Successful capture hides the keyboard without discarding a failed draft.
+- Server-mode approval count comes from the visible, non-deferred preview-page
+  tasks, not the legacy Inbox summary. Legacy plan/review/error sections remain
+  available below the approval list; navigation tabs are unchanged.
+- Cards show title, destination and a localized date. Past-date warnings remain
+  visible; recommendation reason and deadline inclusion move into one edit sheet.
+- The edit sheet chooses an existing project and parent task by root-task traversal,
+  excluding the current task and its descendants. Location and deadline inclusion
+  are persisted in one review request, without applying a task mutation. Cancel
+  discards the draft; success closes the sheet only after server acknowledgement.
+  A changed graph revision disables saving until the editor is reopened.
+- Arbitrary date editing and the navigation-drawer redesign are not part of this
+  step. Physical-device checks still need small screens, large fonts, keyboard,
+  sheet scrolling, back navigation and offline-save coverage.
+
+## Stage 5: open the approved work in context
+
+- Inbox task actions now have real navigation callbacks. Approved standalone work
+  opens task detail; project work opens its project with the approved task selected,
+  its ancestors expanded, and the outline scrolled to the task.
+- A project opened from Inbox returns directly to Inbox. Opening its conversation
+  leaves the plan on the back stack, preserving selection, collapsed branches and
+  scroll position. Project conversations show a Plan return action; task/run
+  threads do not masquerade as the project conversation.
+- Project and explicitly opened conversation screens hide global bottom navigation
+  to leave space for the selected-task actions or composer. Primary destinations
+  keep their existing navigation.
+- Uses existing project and conversation APIs. No new chat execution system or
+  global drawer change. Physical-device navigation/scroll checks are still pending.
+
+## Stage 6: drawer navigation and conversation drafts
+
+- Primary navigation now uses a modal left drawer instead of a persistent bottom
+  bar. Existing top app bars provide its menu button; detail screens keep Back.
+  Inbox and Projects are directly discoverable. Search/Settings form a separated
+  utility group. Local mode only exposes supported destinations.
+- Opening is button-driven so Android edge-back and the schedule pager keep their
+  gestures. The open drawer supports swipe-to-close, scrim dismissal and Back.
+- Unsent conversation drafts live in an app-process singleton keyed by workspace
+  identity and conversation ID. Returning to Plan and reopening the thread preserves
+  the draft; another workspace/run never shares it. No network writes are involved.
+  This is intentionally not disk persistence: force-stop/process death clears drafts.
+- Physical-device checks remain necessary for menu reachability, Back ordering,
+  large fonts, keyboard sizing, plan/chat round trips and workspace switching.
+
+## Stage 7: durable drafts
+
+- Drafts now persist in the existing app-private DataStore, which is excluded from
+  cloud backup and device transfer. Keys hash workspace identity and conversation ID;
+  text stays local and is not sent until the user sends a message.
+- Restoration must finish before editing is accepted. A process-level serialized
+  writer continues when a chat screen closes and coalesces pending snapshots. Failed
+  saves retain the in-memory draft and expose Retry; failed restoration cannot
+  overwrite stored drafts with an empty map. Unrelated session/settings keys are
+  preserved.
+- The composer shows restoring/saving/failure states. Only completed disk writes
+  survive abrupt termination; killing the process while Saving is visible may lose
+  the latest edit. File reopen, retry, latest-edit and workspace-isolation tests cover
+  this storage behavior. Real-device force-stop/keyboard checks remain outstanding.
+
+## Stage 8: mobile sizing consistency
+
+- Inbox and chat share one bottom composer: 16 dp horizontal inset, up to four
+  lines, body-large text, theme-owned input shape, and a 48 dp action target with
+  a 24 dp icon. Supporting save/error messages use the same aligned area.
+- Voice input moves to the chat app bar's More menu. Send/Stop remain in the input
+  field; there are no separate always-visible voice/send boxes consuming text width.
+- Project/chat titles use title-large, project Back uses the standard arrow, and
+  task titles use title-medium with two-line list truncation. Selected task/detail
+  and placement editor still show complete titles.
+- Placement options are full-width radio rows with minimum 48 dp height and wrapping
+  labels. Footer actions wrap at large font sizes. Outline indentation caps at three
+  visual levels without changing the actual task hierarchy.
+- Automated checks do not replace screenshots on a 320/360 dp device with default
+  and enlarged fonts, keyboard open/closed, and long Korean titles.
+
+## Final navigation hardening
+
+- Project selection is saved with the navigation entry's SavedStateHandle. On
+  recreation the current project title and root graph are fetched again; Back to
+  the project list clears the selection. No project content is frozen in saved state.
+- Selected tasks display their ancestor path so capped indentation does not hide
+  branch context. Path traversal terminates safely on malformed cycles.
+- Inbox-to-outline focus index accounts for ready summaries, errors, loading and
+  hidden completed work. Missing tasks are not silently scrolled to the first node.
+- Automated restoration/path/focus checks supplement, but do not replace, physical
+  device process recreation, enlarged-font, keyboard and back-stack tests.
+
 ## Remaining stages
 
 ### Integration checks

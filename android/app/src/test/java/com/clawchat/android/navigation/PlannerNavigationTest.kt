@@ -5,6 +5,14 @@ import org.junit.Test
 
 class PlannerNavigationTest {
 
+    @Test fun `project detail pattern still maps to tasks navigation`() {
+        assertEquals(NavRoute.Tasks.route, plannerPrimaryRoute(NavRoute.Projects.routePattern.substringBefore('?')))
+        assertEquals(true, NavigationCapabilities.canOpen(
+            com.clawchat.android.core.data.WorkspaceMode.SERVER, "projects?project_id=p&task_id=t"))
+        assertEquals(false, NavigationCapabilities.canOpen(
+            com.clawchat.android.core.data.WorkspaceMode.LOCAL, "projects?project_id=p&task_id=t"))
+    }
+
     @Test
     fun `all planner pages select the single schedule primary destination`() {
         assertEquals(

@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="inbox_capture_saved_server">Saved to Inbox.</string>
+    <string name="inbox_placement_count">Awaiting approval on this page: %1$d</string>
+    <string name="inbox_editor_location">Project</string>
+    <string name="inbox_editor_parent">Place under a task</string>
+    <string name="inbox_editor_reason">Why this suggestion</string>
+    <string name="inbox_editor_cancel">Cancel</string>
+    <string name="inbox_editor_save">Save changes</string>
     <string name="inbox_deadline_proposed">Apply deadline: %1$s</string>
     <string name="inbox_deadline_past">This deadline has passed. Check before approving.</string>
     <string name="inbox_capture_label">Add a thought or task…</string>
@@ -13,7 +20,7 @@
     <string name="inbox_placement_choose">Choose a destination</string>
     <string name="inbox_placement_standalone">Standalone task</string>
     <string name="inbox_placement_approve">Approve</string>
-    <string name="inbox_placement_edit">Change location</string>
+    <string name="inbox_placement_edit">Edit</string>
     <string name="inbox_placement_defer">Later</string>
     <string name="inbox_placement_deferred">Show deferred captures</string>
     <string name="inbox_placement_due">Due: %1$s</string>
