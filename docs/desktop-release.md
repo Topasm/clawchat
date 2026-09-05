@@ -11,11 +11,11 @@ Two different signing systems are involved, and they are independent:
 |                           | Purpose                                                           | Required? | Cost                              |
 | ------------------------- | ----------------------------------------------------------------- | --------- | --------------------------------- |
 | **Updater signing**       | Proves an update came from you. The app refuses unsigned updates. | **Yes**   | Free                              |
-| **Platform code signing** | Stops Gatekeeper / SmartScreen warnings at install time.          | No        | Paid (Apple $99/yr, Windows cert) |
+| **Platform code signing** | Establishes app identity for Keychain and OS installation checks. | macOS by default | Developer certificate |
 
-Without platform signing the release still builds and auto-update still works.
-Users see an OS warning the first time they install. That is the expected state
-for an early release.
+Normal releases require macOS Developer ID signing and notarization. Temporary
+ad-hoc macOS builds require an explicit workflow opt-in. Updater signatures alone
+do not preserve the identity macOS uses to authorize Keychain access.
 
 ## One-time setup
 
@@ -70,11 +70,12 @@ configuration also resolves, but does not provide the same independent
 protection policy. See
 [Android release and in-app update](./android-release.md) for keystore setup.
 
-## Optional: platform code signing
+## Platform code signing
 
 Each platform is all-or-nothing: configure every value for a platform, or none
 of them. A partial configuration fails the release rather than silently
-producing an unsigned build.
+producing an unsigned build. Windows and Linux platform signing remain optional;
+macOS requires all five secrets by default.
 
 | Platform             | Secrets                                                                                          | Variables                     |
 | -------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------- |
@@ -82,9 +83,48 @@ producing an unsigned build.
 | Windows              | `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD`                                            | `TAURI_WINDOWS_TIMESTAMP_URL` |
 | Linux (AppImage GPG) | `LINUX_GPG_PRIVATE_KEY`, `LINUX_GPG_PASSPHRASE`                                                  | `LINUX_GPG_KEY_ID`            |
 
-When macOS signing is absent the app is ad-hoc signed instead. That is not a
-trust anchor, but it is a valid signature, which the macOS updater needs to
-replace the bundle in place.
+### macOS: keep Keychain approval across updates
+
+ClawChat stores login credentials in the Keychain service
+`com.clawchat.desktop.auth`. Ad-hoc signing identifies a specific build, so
+replacing it can trigger another access prompt even after **Always Allow**.
+An app setting cannot grant macOS approval on the user's behalf. Do not disable
+Keychain protection or grant all applications access to this item.
+
+One-time maintainer setup in GitHub **Settings → Environments → desktop-release →
+Environment secrets**:
+
+1. Obtain a **Developer ID Application** certificate with its private key using
+   the Apple Developer account that will own future releases.
+2. Export it as a password-protected `.p12` on a trusted Mac. Store its Base64
+   contents in `APPLE_CERTIFICATE` and its export password in
+   `APPLE_CERTIFICATE_PASSWORD`. Never commit either value or paste them in chat.
+3. Set `APPLE_ID`, an app-specific password in `APPLE_PASSWORD`, and the owning
+   `APPLE_TEAM_ID` for notarization. Do not use the Apple account's login password.
+4. Keep the same team, bundle identifier and compatible signing requirements
+   across releases. Keep the Keychain service name unchanged. The workflow
+   imports the certificate into a temporary keychain, signs and notarizes, then
+   verifies the bundle, Gatekeeper assessment and stapled DMG ticket.
+
+The transition from an ad-hoc build may need one more **Always Allow** approval.
+Verify on a Mac with two consecutive Developer ID releases: sign in, approve
+Keychain access, update in place, then relaunch and confirm that login restores
+without another access prompt. Check both the in-app updater and a DMG replacement
+in `/Applications`. A locked/reset Keychain or changed signing identity can still
+require approval; this is not a promise to suppress all system prompts.
+
+If a temporary ad-hoc build is deliberately needed with **no** Apple secrets set:
+
+```bash
+gh workflow run release-tauri.yml --ref main -f allow_ad_hoc_macos=true
+```
+
+This exception does **not** fix repeated Keychain prompts and does not permit a
+partial Apple configuration. Disclose the limitation before publishing its draft.
+The separate preview workflow remains ad-hoc signed for development.
+
+References: [Apple code signing requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements),
+[Tauri macOS signing setup](https://v2.tauri.app/distribute/sign/macos/).
 
 ## Cutting a release
 

@@ -2,6 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 
 const workflowPath = path.resolve(__dirname, '..', '.github', 'workflows', 'release-tauri.yml');
 
@@ -72,16 +74,14 @@ test('final inventory requires every platform updater and all expected release f
   assert.match(workflow, /draft: true/);
 });
 
-test('platform code signing is optional but all-or-nothing per platform', () => {
-  // A first release has to be possible without a paid Apple or Windows
-  // certificate. Updater signing is a separate, free, mandatory system.
+test('platform signing resolves before imports; temporary macOS signing requires opt-in', () => {
   const workflow = readWorkflow();
 
   for (const platform of ['Apple', 'Windows', 'Linux']) {
     assert.match(
       workflow,
       new RegExp(`name: Resolve ${platform} signing configuration`),
-      `${platform} signing must resolve rather than hard-fail`,
+      `${platform} signing must resolve before import`,
     );
   }
 
@@ -113,6 +113,66 @@ test('platform code signing is optional but all-or-nothing per platform', () => 
 
   // Gatekeeper and stapler checks only apply to a notarized Developer ID build.
   assert.match(workflow, /if \[ "\$\{APPLE_SIGNING_ENABLED:-0\}" = '1' \]/);
+});
+
+test('Apple signing gate rejects missing or partial secrets without leaking their values', () => {
+  const workflow = readWorkflow();
+  assert.match(workflow, /allow_ad_hoc_macos:[\s\S]*?type: boolean[\s\S]*?default: false/);
+  assert.match(workflow, /ALLOW_AD_HOC_MACOS: \$\{\{ inputs.allow_ad_hoc_macos \}\}/);
+  const section = workflow
+    .split('      - name: Resolve Apple signing configuration\n')[1]
+    .split('      - name: Resolve Windows signing configuration\n')[0];
+  const script = section.split('        run: |\n')[1].replace(/^          /gm, '');
+  const keys = [
+    'APPLE_CERTIFICATE',
+    'APPLE_CERTIFICATE_PASSWORD',
+    'APPLE_ID',
+    'APPLE_PASSWORD',
+    'APPLE_TEAM_ID',
+  ];
+  const empty = Object.fromEntries(keys.map((key) => [key, '']));
+  const complete = Object.fromEntries(keys.map((key) => [key, `private-value-${key}`]));
+  const scenarios = [
+    { values: empty, allowed: 'false', success: false },
+    { values: empty, allowed: '', success: false },
+    { values: empty, allowed: 'TRUE', success: false },
+    { values: empty, allowed: 'true', success: true, enabled: '0' },
+    { values: complete, allowed: 'false', success: true, enabled: '1' },
+    { values: complete, allowed: 'true', success: true, enabled: '1' },
+    ...keys.flatMap((key) => [
+      { values: { ...empty, [key]: complete[key] }, allowed: 'true', success: false },
+      { values: { ...complete, [key]: '' }, allowed: 'true', success: false },
+    ]),
+  ];
+  for (const scenario of scenarios) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clawchat-apple-signing-'));
+    try {
+      const outputPath = path.join(dir, 'env');
+      const result = spawnSync('bash', ['-c', script], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          ...scenario.values,
+          ALLOW_AD_HOC_MACOS: scenario.allowed,
+          GITHUB_ENV: outputPath,
+        },
+      });
+      assert.ifError(result.error);
+      assert.equal(result.status, scenario.success ? 0 : 1, result.stdout + result.stderr);
+      assert.doesNotMatch(result.stdout + result.stderr, /private-value-/);
+      if (scenario.success) {
+        assert.equal(
+          fs.readFileSync(outputPath, 'utf8'),
+          `APPLE_SIGNING_ENABLED=${scenario.enabled}\n`,
+        );
+        if (scenario.enabled === '0') assert.match(result.stdout, /Keychain.*every update/);
+      } else {
+        assert.equal(fs.existsSync(outputPath), false);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
 });
 
 test('nothing verifies a platform signature that was never produced', () => {
