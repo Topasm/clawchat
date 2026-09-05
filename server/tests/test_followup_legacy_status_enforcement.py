@@ -29,7 +29,7 @@ _SERVER_ROOT = Path(__file__).resolve().parents[1]
 
 #: The revision a pre-Alembic database gets stamped at -- past c5e936c9d7b1.
 _ADOPTION_REVISION = "e2b7c4d81a35"
-_HEAD_REVISION = "d4f6a8b0c213"
+_HEAD_REVISION = "b2d4f6a8c013"
 _BASELINE_REVISION = "9927ab512428"
 # The revision just below a3f1c72b8d94, which installs the status triggers.
 # Named rather than reached with "-1" so a later head does not silently

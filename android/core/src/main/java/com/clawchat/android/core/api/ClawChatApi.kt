@@ -10,6 +10,27 @@ import retrofit2.http.*
  * The auth token is added automatically by [AuthInterceptor].
  */
 interface ClawChatApi {
+    @GET("api/todos/placements/review-state")
+    suspend fun getInboxReview(@Tag expectedScope: ExpectedSessionScope): InboxReviewState
+
+    @PATCH("api/todos/{id}/inbox-review")
+    suspend fun saveInboxReview(@Path("id") id: String, @Body body: InboxReviewUpdate, @Tag expectedScope: ExpectedSessionScope)
+
+    @POST("api/todos/placements/resume-deferred")
+    suspend fun resumeInboxReview(@Tag expectedScope: ExpectedSessionScope)
+
+    @GET("api/todos/graph/insights")
+    suspend fun getInboxGraph(@Tag expectedScope: ExpectedSessionScope): InboxGraph
+
+    @POST("api/todos/placements/triage-preview")
+    suspend fun previewInboxPlacement(@Body body: InboxTriageRequest, @Tag expectedScope: ExpectedSessionScope): InboxTriagePreview
+
+    @POST("api/todos/{id}/placement")
+    suspend fun applyInboxPlacement(@Path("id") id: String, @Body body: InboxPlacementRequest, @Tag expectedScope: ExpectedSessionScope): InboxPlacementResult
+
+    @POST("api/todos/placements/{id}/undo")
+    suspend fun undoInboxPlacement(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): InboxPlacementResult
+
     @GET("api/projects")
     suspend fun listProjects(@Tag expectedScope: ExpectedSessionScope): List<ProjectPlan>
 

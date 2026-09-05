@@ -2,8 +2,6 @@ package com.clawchat.android.feature.chat
 
 import com.clawchat.android.core.data.model.ReviewDecision
 import com.clawchat.android.core.data.model.ChatPlanProposal
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
@@ -173,10 +171,8 @@ fun ChatScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(state.selectedConversationId, lifecycleOwner) {
         if (state.selectedConversationId != null) lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (isActive) {
-                delay(5_000)
-                viewModel.refreshConversation()
-            }
+            // Revalidate on return; skip overlapping loads and user actions in the ViewModel.
+            viewModel.uiState.pollConversation(viewModel::refreshConversation)
         }
     }
 

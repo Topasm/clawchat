@@ -1,6 +1,7 @@
 """Contracts for atomic Inbox/Tree placement commands."""
 
 from typing import Literal
+from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -25,6 +26,8 @@ class TaskPlacementRequest(BaseModel):
         | None
     ) = None
     expected_graph_revision: int = Field(ge=0)
+    # Omitted/null preserves the current deadline. Approval can set a proposed one.
+    due_date: datetime | None = None
 
 
 class TaskBatchPlacementRequest(TaskPlacementRequest):

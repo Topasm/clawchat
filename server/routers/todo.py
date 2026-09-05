@@ -8,7 +8,7 @@ from config import settings
 from database import get_db
 from domain.plan_proposal import PlanProposalStatus
 from domain.task import TaskStatus
-from exceptions import AppError, NotFoundError
+from exceptions import AppError, ConflictError, NotFoundError
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from models.conversation import Conversation
 from models.plan_proposal import PlanProposal
@@ -21,6 +21,7 @@ from schemas.common import (
 )
 from schemas.graph_insights import GraphInsightsResponse
 from schemas.inbox_triage import InboxTriagePreviewRequest, InboxTriagePreviewResponse
+from schemas.inbox_review import InboxReviewState, InboxReviewUpdate
 from schemas.task import (
     DelegateRequest,
     DelegateResponse,
@@ -54,6 +55,7 @@ from services.ai import resolve_active_ai
 from services.planning import (
     inbox_pipeline_service,
     inbox_triage_service,
+    inbox_review_service,
     plan_proposal_service,
 )
 from services.tasks import (
@@ -317,6 +319,7 @@ async def list_todos(
     project_id: str | None = None,
     parent_id: str | None = None,
     root_only: bool = False,
+    inbox_state: str | None = None,
     order_by: str = "created_at",
     order_dir: str = "desc",
     db: AsyncSession = Depends(get_db),
@@ -330,6 +333,7 @@ async def list_todos(
         project_id=project_id,
         parent_id=parent_id,
         root_only=root_only,
+        inbox_state=inbox_state,
         order_by=order_by,
         order_dir=order_dir,
         page=page,
@@ -459,6 +463,7 @@ async def create_todo(
             source=body.source,
             source_id=body.source_id,
             idempotency_key=body.idempotency_key,
+            captured_at=body.captured_at,
             assignee=body.assignee,
             enabled_skills=body.enabled_skills,
             inbox_state=body.inbox_state,
@@ -608,6 +613,24 @@ async def place_todos_batch(
     )
 
 
+@router.get("/placements/review-state", response_model=InboxReviewState)
+async def read_inbox_review(db: AsyncSession = Depends(get_db), user: str = Depends(get_current_user)):
+    return await inbox_review_service.read_state(db, user)
+
+
+@router.patch("/{todo_id}/inbox-review", status_code=204)
+async def save_inbox_review(todo_id: str, body: InboxReviewUpdate,
+                            db: AsyncSession = Depends(get_db), user: str = Depends(get_current_user)):
+    await inbox_review_service.save_preference(db, user, todo_id, body)
+    await db.commit()
+
+
+@router.post("/placements/resume-deferred", status_code=204)
+async def resume_inbox_review(db: AsyncSession = Depends(get_db), user: str = Depends(get_current_user)):
+    await inbox_review_service.resume_deferred(db, user)
+    await db.commit()
+
+
 @router.post(
     "/placements/triage-preview",
     response_model=InboxTriagePreviewResponse,
@@ -625,6 +648,10 @@ async def preview_inbox_triage(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
+    key = await inbox_review_service.cache_key(db, _user, body)
+    cached = await inbox_review_service.load_preview(db, _user, key)
+    if cached is not None:
+        return cached
     ai_service = resolve_active_ai(request.app.state)
     if ai_service is None:
         raise AppError(
@@ -633,13 +660,19 @@ async def preview_inbox_triage(
             status_code=503,
         )
     try:
-        return await inbox_triage_service.generate_preview(
+        preview = await inbox_triage_service.generate_preview(
             db,
             ai_service,
             todo_ids=body.todo_ids,
             expected_graph_revision=body.expected_graph_revision,
             model_provider=getattr(request.app.state, "active_ai_provider", None),
+            timezone_name=body.timezone,
         )
+        if key != await inbox_review_service.cache_key(db, _user, body):
+            raise ConflictError("Inbox context changed while generating suggestions; refresh and retry")
+        await inbox_review_service.store_preview(db, _user, key, preview)
+        await db.commit()
+        return preview
     except AppError:
         raise
     except Exception as exc:

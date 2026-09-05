@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="widget_complete_failed">완료하지 못했습니다. 다시 누르거나 앱에서 확인하세요.</string>
     <string name="widget_add_task">받은 편지함에 추가</string>
     <string name="widget_refresh">새로고침</string>
     <string name="widget_login_required">위젯을 사용하려면 ClawChat을 먼저 설정하세요</string>

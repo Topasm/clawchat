@@ -62,7 +62,7 @@ function fixture(overrides = {}) {
   );
   write('src-tauri/tauri.conf.json', '{"version":"../package.json"}\n');
   write(
-    'vite.config.ts',
+    'vite.config.mts',
     `import packageJson from './package.json';\nconst packageVersion = packageJson.version;\nexport default { define: { __APP_VERSION__: JSON.stringify(packageVersion) } };\n`,
   );
   write('src/app/platform/tauriPlatformApi.ts', 'appVersion: __APP_VERSION__,\n');

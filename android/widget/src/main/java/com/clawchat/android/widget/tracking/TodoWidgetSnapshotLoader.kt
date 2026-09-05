@@ -4,9 +4,33 @@ import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.widget.common.WidgetState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
+/** Filter on the server before pagination so closed work cannot crowd out open tasks. */
+internal suspend fun loadOpenWidgetTodos(
+    query: Map<String, String>,
+    load: suspend (Map<String, String>) -> ApiResult<PaginatedResponse<Todo>>,
+): ApiResult<PaginatedResponse<Todo>> = coroutineScope {
+    val pending = async { load(query + ("status" to "pending")) }
+    val running = async { load(query + ("status" to "in_progress")) }
+    val results = listOf(pending.await(), running.await())
+    val failure = results.filterIsInstance<ApiResult.Error>().firstOrNull()
+    when {
+        failure != null -> failure // Let the snapshot loader fall back to the complete cache.
+        results.any { it is ApiResult.Loading } -> ApiResult.Loading
+        else -> {
+            val pages = results.filterIsInstance<ApiResult.Success<PaginatedResponse<Todo>>>()
+            val items = pages.flatMap { it.data.items }.distinctBy { it.id }
+                .filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS }
+            ApiResult.Success(PaginatedResponse(items = items, total = pages.sumOf { it.data.total }))
+        }
+    }
+}
 
 internal data class TodoWidgetSnapshot(
     val state: WidgetState<TodoWidgetUiModel>,

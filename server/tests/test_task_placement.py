@@ -1,10 +1,36 @@
 """Atomic Inbox/Tree task placement coverage."""
 
 import pytest
+from datetime import datetime, timezone
 from exceptions import ConflictError, ValidationError
 from models.todo import Todo
 from services.tasks import graph_insights_service, project_service, task_placement_service
 from sqlalchemy import select
+
+
+@pytest.mark.asyncio
+async def test_placement_deadline_is_atomic_and_undoable(client, auth_headers, db_session):
+    project = await _project(db_session)
+    task = Todo(title="금요일까지 논문 초안", inbox_state="captured")
+    db_session.add(task)
+    await db_session.commit()
+    revision = await task_placement_service.current_graph_revision(db_session)
+    body = {"project_id": project.id, "parent_id": None, "inbox_state": "none",
+            "due_date": "2026-09-04T23:59:59+09:00", "expected_graph_revision": revision}
+    result = await client.post(f"/api/todos/{task.id}/placement", headers=auth_headers, json=body)
+    assert result.status_code == 200, result.text
+    await db_session.refresh(task)
+    assert task.project_id == project.id
+    assert task.due_date.replace(tzinfo=timezone.utc) == datetime(2026, 9, 4, 14, 59, 59, tzinfo=timezone.utc)
+    stale = await client.post(f"/api/todos/{task.id}/placement", headers=auth_headers,
+                             json={**body, "due_date": "2026-09-11T14:59:59Z"})
+    assert stale.status_code == 409
+    undone = await client.post(f"/api/todos/placements/{result.json()['change_set_id']}/undo", headers=auth_headers)
+    assert undone.status_code == 200, undone.text
+    await db_session.refresh(task)
+    assert task.project_id is None
+    assert task.due_date is None
+    assert task.inbox_state == "captured"
 
 
 async def _project(db_session, title: str = "Project"):

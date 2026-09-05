@@ -11,6 +11,12 @@ import org.junit.Test
 class TodoCompletionActionHandlerTest {
 
     @Test
+    fun `unexpected repository error becomes visible failure`() = runTest {
+        val handler = TodoCompletionActionHandler { _, _ -> error("storage failure") }
+        assertFalse(handler.complete("todo-1"))
+    }
+
+    @Test
     fun `replayed completion always writes completed instead of toggling`() = runTest {
         val writes = mutableListOf<Pair<String, TodoUpdate>>()
         val handler = TodoCompletionActionHandler { id, update ->

@@ -22,6 +22,14 @@ from services.tasks.graph_command_service import (
 __all__ = ["current_graph_revision"]
 
 
+def _deadline_state(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.replace(tzinfo=value.tzinfo or timezone.utc).astimezone(
+        timezone.utc
+    ).isoformat()
+
+
 def _state(todo: Todo) -> dict[str, object]:
     return {
         "id": todo.id,
@@ -29,6 +37,7 @@ def _state(todo: Todo) -> dict[str, object]:
         "parent_id": todo.parent_id,
         "sort_order": todo.sort_order,
         "inbox_state": todo.inbox_state,
+        "due_date": _deadline_state(todo.due_date),
     }
 
 
@@ -97,6 +106,7 @@ async def place_tasks(
     before_id: str | None,
     inbox_state: str | None,
     expected_graph_revision: int,
+    due_date: datetime | None = None,
 ) -> tuple[list[Todo], TaskPlacementChange, list[str], dict[str, int | None] | None]:
     if not todo_ids:
         raise ValidationError("At least one task is required for placement")
@@ -168,6 +178,11 @@ async def place_tasks(
         if (todo.project_id, todo.parent_id) != (project_id, effective_parent_id)
         for item in subtrees[todo.id]
     ]
+    if due_date is not None:
+        changed_ids.extend(
+            todo.id for todo in todos
+            if _deadline_state(todo.due_date) != _deadline_state(due_date)
+        )
     if changed_ids:
         await require_editable_plan(
             db, changed_ids + ([effective_parent_id] if effective_parent_id else [])
@@ -209,6 +224,8 @@ async def place_tasks(
     for todo in todos:
         todo.parent_id = effective_parent_id
         todo.inbox_state = inbox_state or ("captured" if project_id is None else "none")
+        if due_date is not None:
+            todo.due_date = due_date.astimezone(timezone.utc) if due_date.tzinfo else due_date
         for item in subtrees[todo.id]:
             item.project_id = project_id
     _renumber(target_items)
@@ -248,6 +265,7 @@ async def place_task(
     before_id: str | None,
     inbox_state: str | None,
     expected_graph_revision: int,
+    due_date: datetime | None = None,
 ) -> tuple[Todo, TaskPlacementChange, list[str], dict[str, int | None] | None]:
     todos, change, affected_ids, delta = await place_tasks(
         db,
@@ -257,6 +275,7 @@ async def place_task(
         before_id=before_id,
         inbox_state=inbox_state,
         expected_graph_revision=expected_graph_revision,
+        due_date=due_date,
     )
     return todos[0], change, affected_ids, delta
 
@@ -433,11 +452,16 @@ async def undo_placement(
         str(state["id"]) for state in before if state.get("exists", True) is False
     }
     conflicts: list[str] = []
-    placement_fields = ("project_id", "parent_id", "sort_order", "inbox_state")
+    base_fields = ("project_id", "parent_id", "sort_order", "inbox_state")
     restored_ids: list[str] = []
     for state in before:
         todo_id = str(state["id"])
         applied_state = after_by_id[todo_id]
+        # Old persisted change sets did not record deadlines.
+        has_deadline = "due_date" in state or (
+            todo_id in created_ids and "due_date" in applied_state
+        )
+        placement_fields = base_fields + (("due_date",) if has_deadline else ())
         current_state = _state(by_id[todo_id])
         if todo_id in created_ids:
             for field in ("title", "description", "source"):
@@ -476,6 +500,11 @@ async def undo_placement(
             todo.sort_order = int(state["sort_order"])
         if state["inbox_state"] != applied_state["inbox_state"]:
             todo.inbox_state = str(state["inbox_state"])
+        if "due_date" in state and state["due_date"] != applied_state["due_date"]:
+            todo.due_date = (
+                datetime.fromisoformat(str(state["due_date"]))
+                if state["due_date"] else None
+            )
     await db.flush()
     for todo_id in created_ids:
         await db.delete(by_id[todo_id])

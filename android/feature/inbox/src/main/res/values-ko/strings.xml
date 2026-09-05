@@ -1,5 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="inbox_deadline_proposed">마감일 적용: %1$s</string>
+    <string name="inbox_deadline_past">이미 지난 마감일입니다. 승인 전에 확인하세요.</string>
+    <string name="inbox_capture_label">생각이나 해야 할 일을 입력하세요…</string>
+    <string name="inbox_capture_add">Inbox에 추가</string>
+    <string name="inbox_capture_saving">저장 중…</string>
+    <string name="inbox_capture_saved">Inbox에 저장했습니다. 배치 제안은 서버 연결이 필요합니다.</string>
+    <string name="inbox_placement_title">배치 제안 검토</string>
+    <string name="inbox_placement_help">AI가 입력의 위치를 제안합니다. 승인 전에는 이동하지 않습니다.</string>
+    <string name="inbox_placement_loading">입력한 내용을 어디에 넣을지 정리하고 있어요…</string>
+    <string name="inbox_placement_stale">계획이 변경됐을 수 있습니다. 새로 확인한 뒤 승인해주세요.</string>
+    <string name="inbox_placement_choose">배치할 위치를 선택해주세요</string>
+    <string name="inbox_placement_standalone">독립 작업으로 유지</string>
+    <string name="inbox_placement_approve">승인</string>
+    <string name="inbox_placement_edit">위치 수정</string>
+    <string name="inbox_placement_defer">나중에</string>
+    <string name="inbox_placement_deferred">보류한 입력 다시 보기</string>
+    <string name="inbox_placement_due">마감: %1$s</string>
+    <string name="inbox_placement_applied">계획에 반영됨: %1$s</string>
+    <string name="inbox_placement_open">작업 열기</string>
+    <string name="inbox_placement_undo">실행 취소</string>
+    <string name="inbox_placement_more">입력 %2$d개 중 %1$d개를 표시합니다.</string>
+    <string name="inbox_placement_previous">이전 입력</string>
+    <string name="inbox_placement_next">다음 입력</string>
     <string name="inbox_back">뒤로</string>
     <string name="inbox_title">받은 편지함</string>
     <string name="inbox_loading">받은 편지함 불러오는 중…</string>

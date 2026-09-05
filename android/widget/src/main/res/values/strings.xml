@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="widget_complete_failed">Couldn’t mark complete. Retry or open the app.</string>
     <string name="widget_add_task">Add to Inbox</string>
     <string name="widget_refresh">Refresh</string>
     <string name="widget_login_required">Set up ClawChat to use this widget</string>

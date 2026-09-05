@@ -17,6 +17,20 @@ import java.util.Locale
 class CalendarMonthTest {
 
     @Test
+    fun `approved inbox date only deadlines stay on Friday in either device timezone`() {
+        val deadline = "2026-09-04T23:59:59"
+        for (zone in listOf("Asia/Seoul", "America/Los_Angeles")) {
+            val deviceZone = ZoneId.of(zone)
+            assertEquals(LocalDate.of(2026, 9, 4), eventDate(deadline, deviceZone))
+            val days = taskSegmentsByDate(
+                listOf(Todo(id = "inbox", title = "Paper draft", dueDate = deadline)),
+                today = LocalDate.of(2026, 9, 2), deviceZone = deviceZone,
+            )
+            assertEquals(LocalDate.of(2026, 9, 4), days.keys.maxOrNull())
+        }
+    }
+
+    @Test
     fun `the grid always covers six weeks starting on the chosen weekday`() {
         val grid = monthGrid(YearMonth.of(2026, 8), DayOfWeek.MONDAY)
 

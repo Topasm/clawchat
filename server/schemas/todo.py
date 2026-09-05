@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
 from domain.task import TaskStatus
 from utils.vault_paths import normalize_vault_relative_path
@@ -27,6 +27,7 @@ class TodoCreate(BaseModel):
     source: str | None = None
     source_id: str | None = None
     idempotency_key: str | None = None
+    captured_at: AwareDatetime | None = None
     assignee: str | None = None
     enabled_skills: list[str] | None = None
     inbox_state: str = "none"

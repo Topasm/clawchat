@@ -20,6 +20,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -54,8 +55,10 @@ fun InboxScreen(
     viewModel: InboxViewModel = hiltViewModel(),
     onTaskClick: (String) -> Unit = {},
     onBack: () -> Unit = {},
+    placementViewModel: InboxPlacementViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val placement by placementViewModel.uiState.collectAsStateWithLifecycle()
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
 
     Scaffold(
@@ -83,7 +86,7 @@ fun InboxScreen(
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::refresh,
+            onRefresh = { viewModel.refresh(); placementViewModel.refresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -106,12 +109,36 @@ fun InboxScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedTextField(
+                                value = placement.captureText,
+                                onValueChange = placementViewModel::editCapture,
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(stringResource(R.string.inbox_capture_label)) },
+                                enabled = !placement.capturing,
+                                maxLines = 4,
+                            )
+                            FilledTonalButton(onClick = placementViewModel::capture,
+                                enabled = placement.captureText.isNotBlank() && !placement.capturing) {
+                                Text(stringResource(if (placement.capturing) R.string.inbox_capture_saving else R.string.inbox_capture_add))
+                            }
+                            if (!placement.server) placement.error?.let { Text(localizedErrorMessage(it)) }
+                            if (placement.captureSaved) Text(stringResource(R.string.inbox_capture_saved), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    item {
                         InboxSummaryCard(
                             totalItems = totalItems,
                             planningNow = state.planningNow.size,
                             reviewSuggestion = state.reviewSuggestion.size,
                             failed = state.failed.size,
                         )
+                    }
+
+                    if (placement.server) {
+                        item {
+                            InboxPlacementSection(placement, placementViewModel, onTaskClick)
+                        }
                     }
 
                     if (state.planningNow.isNotEmpty()) {
@@ -144,7 +171,7 @@ fun InboxScreen(
                                 },
                                 items = state.reviewSuggestion,
                                 actionLabel = stringResource(R.string.inbox_action_review),
-                                onAction = viewModel::organize,
+                                onAction = onTaskClick,
                                 isError = false,
                                 showSpinner = false,
                                 onTaskClick = onTaskClick,
@@ -154,7 +181,7 @@ fun InboxScreen(
                         }
                     }
 
-                    if (state.needsOrganizing.isNotEmpty()) {
+                    if (!placement.server && state.needsOrganizing.isNotEmpty()) {
                         item {
                             InboxSectionCard(
                                 title = stringResource(R.string.inbox_organize_title),
@@ -194,7 +221,7 @@ fun InboxScreen(
                         }
                     }
 
-                    if (isEmpty(state)) {
+                    if (isEmpty(state) && placement.snapshot?.tasks.isNullOrEmpty() && !placement.loading) {
                         item {
                             ClawEmptyState(
                                 title = stringResource(R.string.inbox_empty_title),

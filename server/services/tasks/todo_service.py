@@ -61,6 +61,7 @@ async def get_todos(
     project_id: str | None = None,
     parent_id: str | None = None,
     root_only: bool = False,
+    inbox_state: str | None = None,
     order_by: str = "created_at",
     order_dir: str = "desc",
     page: int = 1,
@@ -79,6 +80,8 @@ async def get_todos(
         conditions.append(Todo.parent_id == parent_id)
     if root_only:
         conditions.append(Todo.parent_id.is_(None))
+    if inbox_state is not None:
+        conditions.append(Todo.inbox_state == inbox_state)
 
     count_q = select(func.count(Todo.id)).where(*conditions)
     total = (await db.execute(count_q)).scalar() or 0
@@ -119,6 +122,7 @@ async def create_todo(
     source: str | None = None,
     source_id: str | None = None,
     idempotency_key: str | None = None,
+    captured_at: datetime | None = None,
     assignee: str | None = None,
     enabled_skills: list[str] | None = None,
     inbox_state: str = "none",
@@ -164,6 +168,9 @@ async def create_todo(
         recurrence_rule=recurrence_rule,
         recurrence_end=recurrence_end,
     )
+    if captured_at is not None and inbox_state == "captured":
+        # Offline Inbox captures retain their original date anchor after sync.
+        todo.created_at = min(captured_at.astimezone(timezone.utc), datetime.now(timezone.utc))
     db.add(todo)
     await db.flush()
 

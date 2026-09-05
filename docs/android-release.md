@@ -151,5 +151,21 @@ A fork publishing its own releases points the updater at its own repository:
 
 ## Related
 
+Widget completion smoke check before shipping:
+
+- Keep the home-screen widget visible and complete a task; it must disappear
+  without reopening the app or waiting for the widget session to expire.
+- Repeat with two widget instances, local-only mode and an offline cached task.
+- A rejected completion must leave the task visible and show an error message.
+- Manual refresh dismisses that error without marking the task complete. With
+  many old completed tasks, open tasks must still appear: the widget requests
+  pending and in-progress pages separately, applying status before pagination.
+- Switch workspace while refresh is pending; old titles/actions must not appear
+  under the new workspace. Change the look-ahead window and verify a new query.
+
+Tracking widgets observe a refresh token within the active Glance composition;
+`WidgetUpdater` changes that token for each instance before calling `update()`.
+The token is necessary because an active session does not restart `provideGlance`.
+
 - [Desktop release and auto-update](./desktop-release.md) — the Tauri updater,
   which shares the release and tag but uses an independent signing key.

@@ -27,14 +27,18 @@ async function loadSourceKoreanCatalog(): Promise<KoreanCatalog> {
   };
 }
 
-async function loadCompressedJson<T>(url: string): Promise<T> {
+export async function loadCompressedJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to load application translations (${response.status}).`);
   }
 
-  const compressed = new Uint8Array(await response.arrayBuffer());
-  const json = new TextDecoder().decode(gunzipSync(compressed));
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  // Fetch already decodes Content-Encoding: gzip (e.g. Vite preview).
+  // Tauri's asset protocol can instead return the original gzip file.
+  // Inspect bytes, not headers, to avoid decompressing a catalog twice.
+  const decoded = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes) : bytes;
+  const json = new TextDecoder().decode(decoded);
   return JSON.parse(json) as T;
 }
 

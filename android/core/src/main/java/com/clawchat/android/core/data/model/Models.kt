@@ -112,6 +112,7 @@ data class TodoCreate(
     @SerialName("estimated_minutes") val estimatedMinutes: Int? = null,
     /** Stable operation identity so a retried quick capture cannot create a duplicate. */
     @SerialName("idempotency_key") val idempotencyKey: String? = null,
+    @SerialName("captured_at") val capturedAt: String? = null,
 )
 
 @Serializable

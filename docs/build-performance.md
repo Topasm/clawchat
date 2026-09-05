@@ -12,7 +12,7 @@ bundling to the Python resource build.
 
 ## Renderer targets
 
-`vite.config.ts` reads Tauri's build environment and selects a WebView-compatible target:
+`vite.config.mts` reads Tauri's build environment and selects a WebView-compatible target:
 
 - Windows: Chrome 105
 - macOS and Linux WebKit: Safari 13
@@ -21,9 +21,32 @@ bundling to the Python resource build.
 Tauri debug builds keep source maps and skip minification. Production builds are minified.
 The dev server uses the fixed port from `tauri.conf.json` and ignores Rust and server changes.
 
-The router lazily loads the authenticated layout, authentication pages, and feature pages. React
-and React Router live in a stable shared chunk so task-only dependencies such as drag-and-drop and
-the graph renderer do not become initial-entry dependencies.
+The router lazily loads the authenticated layout, authentication pages, and feature pages.
+Vite 8 uses Rolldown's automatic chunk splitting and Oxc minification. The previous Rollup
+vendor groups must not be carried forward: they pulled editor and drag-and-drop code into
+the initial preload. Keep the existing budget ceilings and verify every renderer target.
+`npm run typecheck` also checks the Vite configuration, including its Vitest options.
+
+Lightning CSS 1.33.0 and its platform packages are reviewed as unmodified build-only
+MPL-2.0 tools, not renderer/runtime dependencies. The license guard permits only these
+named packages at that version with `dev: true`; a version or runtime-scope change requires
+another review. Source and license: https://github.com/parcel-bundler/lightningcss/tree/v1.33.0.
+The build distributes transformed application CSS, not the compiler's native binaries.
+Mozilla's usage/distribution guidance: https://www.mozilla.org/en-US/MPL/2.0/FAQ/.
+
+The 2026-09-05 Vite 8 migration measured the same Linux/Safari 13 target at
+305.77 KiB raw / 98.08 KiB gzip initial JavaScript, versus 321.73 / 103.06 KiB
+before migration. No budget ceilings were raised. Web, macOS, Windows, and Linux
+renderer builds passed; these are renderer checks, not native installer smoke tests.
+Browser startup was checked in English and Korean with both raw gzip catalogs and
+HTTP-decoded catalogs. The catalog loader checks gzip magic bytes so preview servers
+using `Content-Encoding: gzip` cannot cause double decompression at startup.
+
+TypeScript is kept on the 6.0 patch line (`~6.0.3`): typescript-eslint 8.69.0
+supports `>=4.8.4 <6.1.0`, so TypeScript 7 is not yet an eligible upgrade for this
+toolchain. Do not bypass peer dependency checks. The app tsconfig explicitly includes
+Node types because it also checks tests which read native command source files;
+TypeScript 6 no longer automatically includes all installed `@types` packages.
 
 ## Performance budget
 

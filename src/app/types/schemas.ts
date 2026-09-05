@@ -103,6 +103,7 @@ export const TodoCreateSchema = z.object({
   source: z.string().nullable().optional(),
   source_id: z.string().nullable().optional(),
   idempotency_key: z.string().nullable().optional(),
+  captured_at: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.optional(),
   recurrence_rule: z.string().nullable().optional(),
   recurrence_end: z.string().nullable().optional(),
@@ -136,6 +137,7 @@ export const TaskPlacementRequestSchema = z.object({
   before_id: z.string().nullable().optional(),
   inbox_state: InboxStateSchema.nullable().optional(),
   expected_graph_revision: z.number().int().nonnegative(),
+  due_date: z.string().nullable().optional(),
 });
 
 export const TaskPlacementResponseSchema = z.object({
@@ -198,6 +200,7 @@ export const TaskGroupedPlacementRequestSchema = z.object({
 export const InboxTriagePreviewRequestSchema = z.object({
   todo_ids: z.array(z.string().min(1)).min(1).max(50),
   expected_graph_revision: z.number().int().nonnegative(),
+  timezone: z.string().optional(),
 });
 
 export const InboxTriageSuggestionSchema = z.object({
@@ -225,6 +228,18 @@ export const InboxTriagePreviewResponseSchema = z.object({
   proposed_workstreams: z.array(InboxTriageProposedWorkstreamSchema).optional().default([]),
   unassigned_task_ids: z.array(z.string()),
   model_provider: z.string().nullable().optional(),
+  deadlines: z
+    .array(
+      z.object({
+        task_id: z.string(),
+        due_date: z.string(),
+        local_date: z.string(),
+        timezone: z.string(),
+        source_text: z.string(),
+        is_past: z.boolean(),
+      }),
+    )
+    .optional(),
 });
 
 export const ProjectTodoResponseSchema = z.object({

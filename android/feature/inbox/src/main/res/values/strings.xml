@@ -1,5 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="inbox_deadline_proposed">Apply deadline: %1$s</string>
+    <string name="inbox_deadline_past">This deadline has passed. Check before approving.</string>
+    <string name="inbox_capture_label">Add a thought or task…</string>
+    <string name="inbox_capture_add">Add to Inbox</string>
+    <string name="inbox_capture_saving">Saving…</string>
+    <string name="inbox_capture_saved">Saved to Inbox. Placement suggestions require a connected server.</string>
+    <string name="inbox_placement_title">Review placement</string>
+    <string name="inbox_placement_help">AI suggests where each capture belongs. Nothing moves until you approve.</string>
+    <string name="inbox_placement_loading">Finding a place for your captures…</string>
+    <string name="inbox_placement_stale">The plan may have changed. Refresh before approving.</string>
+    <string name="inbox_placement_choose">Choose a destination</string>
+    <string name="inbox_placement_standalone">Standalone task</string>
+    <string name="inbox_placement_approve">Approve</string>
+    <string name="inbox_placement_edit">Change location</string>
+    <string name="inbox_placement_defer">Later</string>
+    <string name="inbox_placement_deferred">Show deferred captures</string>
+    <string name="inbox_placement_due">Due: %1$s</string>
+    <string name="inbox_placement_applied">Added to plan: %1$s</string>
+    <string name="inbox_placement_open">Open task</string>
+    <string name="inbox_placement_undo">Undo</string>
+    <string name="inbox_placement_more">Showing %1$d of %2$d captures.</string>
+    <string name="inbox_placement_previous">Previous captures</string>
+    <string name="inbox_placement_next">Next captures</string>
     <string name="inbox_back">Back</string>
     <string name="inbox_title">Inbox</string>
     <string name="inbox_loading">Loading inbox…</string>

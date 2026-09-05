@@ -39,3 +39,19 @@ test('fails closed for unsupported lockfile formats', () => {
     /package-lock v3/,
   );
 });
+
+test('permits only the reviewed build-only Lightning CSS version', () => {
+  const metadata = { version: '1.33.0', license: 'MPL-2.0', dev: true };
+  assert.deepEqual(inspectPackageLicenses(lockfile({ 'node_modules/lightningcss': metadata })), []);
+  for (const changed of [{ dev: false }, { version: '1.34.0' }, { license: 'GPL-3.0-only' }]) {
+    assert.equal(
+      inspectPackageLicenses(
+        lockfile({
+          'node_modules/lightningcss': { ...metadata, ...changed },
+        }),
+      ).length,
+      1,
+    );
+  }
+  assert.equal(inspectPackageLicenses(lockfile({ 'node_modules/unreviewed': metadata })).length, 1);
+});

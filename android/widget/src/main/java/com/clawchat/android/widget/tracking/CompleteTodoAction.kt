@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.state.updateAppWidgetState
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.network.ApiResult
@@ -11,6 +12,7 @@ import com.clawchat.android.widget.common.WidgetUpdater
 import com.clawchat.android.widget.di.WidgetEntryPoint
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 
 /**
  * A widget checkbox is a one-way "done" action, not a status toggle.
@@ -40,9 +42,12 @@ class CompleteTodoAction : ActionCallback {
             ) is ApiResult.Success
         }
 
-        if (handler.complete(todoId)) {
-            WidgetUpdater.updateAll(context)
+        val completed = handler.complete(todoId)
+        updateAppWidgetState(context, glanceId) { preferences ->
+            if (completed) preferences.remove(WidgetCompletionErrorWorkspaceKey)
+            else preferences[WidgetCompletionErrorWorkspaceKey] = expectedWorkspaceKey
         }
+        WidgetUpdater.updateAll(context)
     }
 }
 
@@ -51,6 +56,12 @@ internal class TodoCompletionActionHandler(
 ) {
     suspend fun complete(todoId: String): Boolean {
         if (todoId.isBlank()) return false
-        return updateTodo(todoId, TodoUpdate(status = TaskStatus.COMPLETED))
+        return try {
+            updateTodo(todoId, TodoUpdate(status = TaskStatus.COMPLETED))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
     }
 }

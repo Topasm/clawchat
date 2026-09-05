@@ -3880,12 +3880,200 @@
         "title": "HostProjectPathResponse",
         "type": "object"
       },
+      "InboxDeadlineSuggestion": {
+        "properties": {
+          "due_date": {
+            "format": "date-time",
+            "title": "Due Date",
+            "type": "string"
+          },
+          "is_past": {
+            "title": "Is Past",
+            "type": "boolean"
+          },
+          "local_date": {
+            "format": "date",
+            "title": "Local Date",
+            "type": "string"
+          },
+          "source_text": {
+            "title": "Source Text",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "due_date",
+          "local_date",
+          "timezone",
+          "source_text",
+          "is_past"
+        ],
+        "title": "InboxDeadlineSuggestion",
+        "type": "object"
+      },
+      "InboxReviewChoice": {
+        "properties": {
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "project_id",
+          "parent_id"
+        ],
+        "title": "InboxReviewChoice",
+        "type": "object"
+      },
+      "InboxReviewItem": {
+        "properties": {
+          "choice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxReviewChoice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "choice_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice Revision"
+          },
+          "deferred": {
+            "title": "Deferred",
+            "type": "boolean"
+          },
+          "exclude_deadline": {
+            "title": "Exclude Deadline",
+            "type": "boolean"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "deferred",
+          "exclude_deadline"
+        ],
+        "title": "InboxReviewItem",
+        "type": "object"
+      },
+      "InboxReviewState": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InboxReviewItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "InboxReviewState",
+        "type": "object"
+      },
+      "InboxReviewUpdate": {
+        "properties": {
+          "choice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxReviewChoice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deferred": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deferred"
+          },
+          "exclude_deadline": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclude Deadline"
+          },
+          "expected_graph_revision": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Graph Revision"
+          }
+        },
+        "title": "InboxReviewUpdate",
+        "type": "object"
+      },
       "InboxTriagePreviewRequest": {
         "properties": {
           "expected_graph_revision": {
             "minimum": 0.0,
             "title": "Expected Graph Revision",
             "type": "integer"
+          },
+          "timezone": {
+            "default": "UTC",
+            "maxLength": 100,
+            "title": "Timezone",
+            "type": "string"
           },
           "todo_ids": {
             "items": {
@@ -3910,6 +4098,13 @@
             "minimum": 0.0,
             "title": "Base Graph Revision",
             "type": "integer"
+          },
+          "deadlines": {
+            "items": {
+              "$ref": "#/components/schemas/InboxDeadlineSuggestion"
+            },
+            "title": "Deadlines",
+            "type": "array"
           },
           "model_provider": {
             "anyOf": [
@@ -7261,6 +7456,18 @@
             ],
             "title": "Before Id"
           },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
           "expected_graph_revision": {
             "minimum": 0.0,
             "title": "Expected Graph Revision",
@@ -7949,6 +8156,18 @@
             ],
             "title": "Before Id"
           },
+          "due_date": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
           "expected_graph_revision": {
             "minimum": 0.0,
             "title": "Expected Graph Revision",
@@ -8285,6 +8504,18 @@
               }
             ],
             "title": "Assignee"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
           },
           "depends_on": {
             "anyOf": [
@@ -9213,7 +9444,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "1.4.22"
+    "version": "1.4.23"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -14953,6 +15184,22 @@
           },
           {
             "in": "query",
+            "name": "inbox_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inbox State"
+            }
+          },
+          {
+            "in": "query",
             "name": "order_by",
             "required": false,
             "schema": {
@@ -15338,6 +15585,51 @@
           }
         ],
         "summary": "Place Todo Groups",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/placements/resume-deferred": {
+      "post": {
+        "operationId": "resume_inbox_review_api_todos_placements_resume_deferred_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resume Inbox Review",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/placements/review-state": {
+      "get": {
+        "operationId": "read_inbox_review_api_todos_placements_review_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxReviewState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Inbox Review",
         "tags": [
           "todos"
         ]
@@ -15828,6 +16120,56 @@
           }
         ],
         "summary": "Delegate Todo",
+        "tags": [
+          "todos"
+        ]
+      }
+    },
+    "/api/todos/{todo_id}/inbox-review": {
+      "patch": {
+        "operationId": "save_inbox_review_api_todos__todo_id__inbox_review_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "todo_id",
+            "required": true,
+            "schema": {
+              "title": "Todo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboxReviewUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save Inbox Review",
         "tags": [
           "todos"
         ]

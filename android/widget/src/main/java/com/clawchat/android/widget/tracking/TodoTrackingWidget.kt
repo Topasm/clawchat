@@ -3,6 +3,10 @@ package com.clawchat.android.widget.tracking
 import android.content.ComponentName
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.datastore.preferences.core.Preferences
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -25,9 +29,7 @@ import androidx.glance.appwidget.action.actionStartActivity as actionStartActivi
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.background
-import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -65,25 +67,37 @@ class TodoTrackingWidget : GlanceAppWidget() {
             WidgetEntryPoint::class.java,
         )
         val sessionStore = entryPoint.sessionStore()
-        val horizonDays = widgetHorizonDays(getAppWidgetState(context, PreferencesGlanceStateDefinition, id))
+        val initialRuntime = sessionStore.runtimeState.first()
         val todoRepository = entryPoint.todoRepository()
-        val snapshot = loadTodoWidgetSnapshot(
-            horizonDays = horizonDays,
-            runtimeState = { sessionStore.runtimeState.first() },
-            loadDeadlines = { todoRepository.listTodos(deadlineQuery(horizonDays)) },
-            loadCachedTodos = { todoRepository.getCachedTodosFlow().first() },
-        )
 
         val mainActivity = ComponentName(context.packageName, "com.clawchat.android.MainActivity")
 
         provideContent {
-            val appearance = WidgetAppearance.from(currentState())
+            val preferences = currentState<Preferences>()
+            val appearance = WidgetAppearance.from(preferences)
+            val horizonDays = widgetHorizonDays(preferences)
+            val refreshToken = preferences[WidgetRefreshKey]
+            val runtime by sessionStore.runtimeState.collectAsState(initialRuntime)
+            val snapshots = remember(horizonDays, refreshToken) {
+                observeTodoWidgetSnapshots(sessionStore.runtimeState) {
+                    loadTodoWidgetSnapshot(
+                        horizonDays = horizonDays,
+                        runtimeState = { sessionStore.runtimeState.first() },
+                        loadDeadlines = { loadOpenWidgetTodos(deadlineQuery(horizonDays), todoRepository::listTodos) },
+                        loadCachedTodos = { todoRepository.getCachedTodosFlow().first() },
+                    )
+                }
+            }
+            val snapshot by snapshots.collectAsState(TodoWidgetSnapshot(WidgetState.Loading, null))
+            val currentWorkspace = snapshot.workspaceKey == runtime.workspaceKey
             GlanceTheme {
                 TodoTrackingContent(
-                    state = snapshot.state,
+                    state = if (currentWorkspace) snapshot.state else WidgetState.Loading,
                     mainActivity = mainActivity,
-                    workspaceKey = snapshot.workspaceKey,
+                    workspaceKey = if (currentWorkspace) snapshot.workspaceKey else null,
                     backgroundOpacity = appearance.backgroundOpacity,
+                    completionFailed = currentWorkspace && runtime.workspaceKey != null &&
+                        preferences[WidgetCompletionErrorWorkspaceKey] == runtime.workspaceKey,
                 )
             }
         }
@@ -119,6 +133,7 @@ private fun TodoTrackingContent(
     mainActivity: ComponentName,
     workspaceKey: String?,
     backgroundOpacity: Float,
+    completionFailed: Boolean = false,
 ) {
     val context = LocalContext.current
     val size = LocalSize.current
@@ -178,6 +193,11 @@ private fun TodoTrackingContent(
             }
         }
 
+        if (completionFailed) {
+            Text(context.getString(R.string.widget_complete_failed),
+                style = TextStyle(color = GlanceTheme.colors.error, fontSize = 12.sp),
+                modifier = GlanceModifier.padding(horizontal = 14.dp).clickable(actionStartActivityByComponent(mainActivity)))
+        }
         when (state) {
             is WidgetState.NotLoggedIn -> CenterMessage(
                 text = context.getString(R.string.widget_login_required),

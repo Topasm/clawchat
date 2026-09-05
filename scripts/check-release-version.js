@@ -64,16 +64,16 @@ function requirePackageVersionWiring(projectRoot, version) {
     );
   }
 
-  const viteConfig = readText(projectRoot, 'vite.config.ts');
+  const viteConfig = readText(projectRoot, 'vite.config.mts');
   requireSourceInvariant(
     viteConfig,
     /import\s+packageJson\s+from\s+['"]\.\/package\.json['"]/,
-    'vite.config.ts package.json import',
+    'vite.config.mts package.json import',
   );
   requireSourceInvariant(
     viteConfig,
     /__APP_VERSION__:\s*JSON\.stringify\(packageVersion\)/,
-    'vite.config.ts __APP_VERSION__ define',
+    'vite.config.mts __APP_VERSION__ define',
   );
 
   for (const relativePath of [

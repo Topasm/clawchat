@@ -20,6 +20,23 @@ const APPROVED_LICENSES = new Set([
   'WTFPL OR ISC',
 ]);
 
+// Vite 8's unmodified, build-only CSS compiler. See docs/build-performance.md.
+// Do not permit MPL dependencies generally or allow these packages into runtime dependencies.
+const REVIEWED_BUILD_PACKAGES = new Set([
+  'lightningcss',
+  'lightningcss-android-arm64',
+  'lightningcss-darwin-arm64',
+  'lightningcss-darwin-x64',
+  'lightningcss-freebsd-x64',
+  'lightningcss-linux-arm-gnueabihf',
+  'lightningcss-linux-arm64-gnu',
+  'lightningcss-linux-arm64-musl',
+  'lightningcss-linux-x64-gnu',
+  'lightningcss-linux-x64-musl',
+  'lightningcss-win32-arm64-msvc',
+  'lightningcss-win32-x64-msvc',
+]);
+
 function dependencyName(packagePath, metadata) {
   if (metadata.name) return metadata.name;
   const marker = 'node_modules/';
@@ -41,7 +58,15 @@ function inspectPackageLicenses(lockfile, approvedLicenses = APPROVED_LICENSES) 
 
     if (!license) {
       violations.push(`${name}@${version}: missing license metadata`);
-    } else if (!approvedLicenses.has(license)) {
+    } else if (
+      !approvedLicenses.has(license) &&
+      !(
+        license === 'MPL-2.0' &&
+        metadata.dev === true &&
+        version === '1.33.0' &&
+        REVIEWED_BUILD_PACKAGES.has(name)
+      )
+    ) {
       violations.push(`${name}@${version}: unreviewed license ${license}`);
     }
   }
