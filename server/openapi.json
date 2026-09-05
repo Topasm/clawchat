@@ -4836,6 +4836,22 @@
             ],
             "title": "Base Graph Revision"
           },
+          "can_undo": {
+            "default": false,
+            "title": "Can Undo",
+            "type": "boolean"
+          },
+          "change_set_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Set Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -9197,7 +9213,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "1.4.21"
+    "version": "1.4.22"
   },
   "openapi": "3.1.0",
   "paths": {

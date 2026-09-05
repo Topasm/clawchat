@@ -6,6 +6,7 @@ import { translateUi } from '../../i18n';
 import { useChatPanelController } from '../chat-panel/ChatPanelControllerContext';
 import { runStatusLabel } from '../chat-panel/RunStatusCard';
 import EmptyState from '../shared/EmptyState';
+import useOpenRunThread from '../../hooks/useOpenRunThread';
 
 const ACTIVE_STATUSES = new Set([
   'queued',
@@ -18,11 +19,14 @@ const ACTIVE_STATUSES = new Set([
 export default function ProjectActivity({
   project,
   todos,
+  attentionOnly = false,
 }: {
   project: ProjectOverviewResponse;
   todos: TodoResponse[];
+  attentionOnly?: boolean;
 }) {
   const navigate = useNavigate();
+  const openRunThread = useOpenRunThread();
   const panel = useChatPanelController();
   const { data: runs = [] } = useAgentRunsQuery(project.id);
   const { data: reviews = [] } = useReviewsQuery('pending', project.id);
@@ -40,6 +44,8 @@ export default function ProjectActivity({
     [conversations, project.id, todoById],
   );
   const activeRuns = runs.filter((run) => ACTIVE_STATUSES.has(run.status));
+  const needsAttention =
+    reviews.length > 0 || activeRuns.some((run) => run.status === 'waiting_input');
   const openThread = (conversation: ConversationResponse) => {
     const metadataTodoId =
       typeof conversation.metadata?.todo_id === 'string' ? conversation.metadata.todo_id : null;
@@ -49,12 +55,14 @@ export default function ProjectActivity({
     const task = taskId ? todoById.get(taskId) : null;
     const isRun = conversation.metadata?.origin === 'agent_run';
     panel.open(conversation.id, {
+      projectId: project.id,
       kind: isRun ? 'run' : task ? 'task' : 'project',
       title: isRun || task ? 'Task Agent' : 'Project Agent',
       subtitle: task ? `${project.title} › ${task.title}` : project.title,
     });
   };
 
+  if (attentionOnly && !needsAttention) return null;
   if (activeRuns.length === 0 && reviews.length === 0 && projectThreads.length === 0) {
     return (
       <EmptyState
@@ -68,7 +76,7 @@ export default function ProjectActivity({
 
   return (
     <div className="cc-project-activity">
-      {(reviews.length > 0 || activeRuns.some((run) => run.status === 'waiting_input')) && (
+      {needsAttention && (
         <section className="cc-project-workspace__section">
           <div className="cc-project-workspace__section-header">
             <div>
@@ -88,7 +96,7 @@ export default function ProjectActivity({
                       (thread) => thread.id === run.conversation_id,
                     );
                     if (conversation) openThread(conversation);
-                    else navigate(`/runs?run_id=${run.id}`);
+                    else void openRunThread(run.id, run.todo_title ?? undefined);
                   }}
                 >
                   <span>
@@ -102,7 +110,12 @@ export default function ProjectActivity({
               <button
                 type="button"
                 key={review.id}
-                onClick={() => navigate(`/review?project_id=${project.id}`)}
+                onClick={() => {
+                  const runId = review.metadata?.run_id;
+                  if (review.subject_type === 'agent_run' && typeof runId === 'string') {
+                    void openRunThread(runId, review.subject_title ?? undefined);
+                  } else navigate(`/review?project_id=${project.id}`);
+                }}
               >
                 <span>
                   <strong>{review.subject_title || review.summary}</strong>
@@ -115,7 +128,7 @@ export default function ProjectActivity({
         </section>
       )}
 
-      {activeRuns.length > 0 && (
+      {!attentionOnly && activeRuns.length > 0 && (
         <section className="cc-project-workspace__section">
           <div className="cc-project-workspace__section-header">
             <div>
@@ -133,7 +146,7 @@ export default function ProjectActivity({
                     (thread) => thread.id === run.conversation_id,
                   );
                   if (conversation) openThread(conversation);
-                  else navigate(`/runs?run_id=${run.id}`);
+                  else void openRunThread(run.id, run.todo_title ?? undefined);
                 }}
               >
                 <span>
@@ -147,7 +160,7 @@ export default function ProjectActivity({
         </section>
       )}
 
-      {projectThreads.length > 0 && (
+      {!attentionOnly && projectThreads.length > 0 && (
         <section className="cc-project-workspace__section">
           <div className="cc-project-workspace__section-header">
             <div>

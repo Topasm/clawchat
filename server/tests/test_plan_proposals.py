@@ -87,6 +87,34 @@ def _apply_body(proposal: PlanProposal, **updates) -> dict:
 
 
 @pytest.mark.asyncio
+async def test_plan_read_restores_durable_undo_only_at_applied_revision(
+    client, auth_headers, db_session
+):
+    root = await _create_root(db_session)
+    proposal = await _create_proposal(
+        db_session, root, {"summary": "Plan", "subtasks": [{"title": "Step"}]}
+    )
+    applied = await client.post(
+        f"/api/todos/{root.id}/plan/apply",
+        headers=auth_headers,
+        json=_apply_body(proposal),
+    )
+    assert applied.status_code == 200
+    change_id = applied.json()["change_set_id"]
+    url = f"/api/todos/{root.id}/plan/proposals/{proposal.id}"
+    fresh = await client.get(url, headers=auth_headers)
+    assert fresh.json()["change_set_id"] == change_id
+    assert fresh.json()["can_undo"] is True
+
+    state = await db_session.get(TaskGraphState, GLOBAL_TASK_GRAPH_SCOPE_ID)
+    state.revision += 1
+    await db_session.commit()
+    stale = await client.get(url, headers=auth_headers)
+    assert stale.json()["change_set_id"] == change_id
+    assert stale.json()["can_undo"] is False
+
+
+@pytest.mark.asyncio
 async def test_gets_exact_proposal_only_from_its_task(client, auth_headers, db_session):
     root = await _create_root(db_session)
     proposal = await _create_proposal(

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="chat_review_note">검토 의견 또는 수정할 내용</string>
+    <string name="chat_review_request_changes">수정 요청</string>
     <string name="chat_search">빠른 찾기</string>
     <string name="chat_settings">설정</string>
     <string name="chat_title">채팅</string>
@@ -53,4 +55,29 @@
     <plurals name="chat_days_ago">
         <item quantity="other">%1$d일 전</item>
     </plurals>
+    <string name="chat_plan_title">작업 계획 제안</string>
+    <string name="chat_plan_unavailable">제안을 불러오는 중입니다. 표시되지 않으면 대화를 다시 열어 주세요.</string>
+    <string name="chat_plan_draft">미리보기 · 아직 적용되지 않음</string>
+    <string name="chat_plan_applied">적용됨</string>
+    <string name="chat_plan_dismissed">거절됨</string>
+    <string name="chat_plan_stale">현재 계획과 달라진 제안입니다. 새 계획을 요청해 주세요.</string>
+    <string name="chat_plan_minutes">%1$d분</string>
+    <string name="chat_plan_dependencies">선행 단계: %1$s</string>
+    <string name="chat_plan_root_changes">상위 작업 변경 사항</string>
+    <string name="chat_plan_due">기한</string>
+    <string name="chat_plan_assignee">담당 / 스킬</string>
+    <string name="chat_plan_project">프로젝트</string>
+    <string name="chat_plan_other">기타 변경</string>
+    <plurals name="chat_plan_apply">
+        <item quantity="other">%1$d개 단계 적용</item>
+    </plurals>
+    <string name="chat_plan_dismiss">거절</string>
+    <string name="chat_plan_undo">되돌리기</string>
+    <string name="chat_plan_generating">계획을 생성하는 중…</string>
+    <string name="chat_plan_applying">적용 중…</string>
+    <string name="chat_plan_reverted">되돌림 완료</string>
+    <string name="chat_plan_failed">계획 생성에 실패했습니다. 다시 요청해 주세요.</string>
+    <string name="chat_plan_parent">단계를 추가할 작업: %1$s</string>
+    <string name="chat_plan_review_details">변경 검토 (%1$d)</string>
+    <string name="chat_plan_hide_details">상세 접기</string>
 </resources>

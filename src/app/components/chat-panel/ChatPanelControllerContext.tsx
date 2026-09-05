@@ -22,3 +22,7 @@ export function useChatPanelController(): ChatPanelState {
   if (!controller) throw new Error('useChatPanelController must be used inside Layout');
   return controller;
 }
+
+export function useOptionalChatPanelController(): ChatPanelState | null {
+  return useContext(ChatPanelControllerContext);
+}

@@ -6,6 +6,7 @@
 import type { ConnectionStatus } from '../stores/useAuthStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { markStartupPhase } from './startupPerformance';
+import { recordDebug } from './debugLogging';
 
 type MessageHandler = (data: unknown) => void;
 type StatusChangeHandler = (status: ConnectionStatus) => void;
@@ -136,6 +137,7 @@ class WSClient {
       this.ws = socket;
 
       socket.onopen = () => {
+        recordDebug({ event: 'websocket-open' });
         if (generation !== this.connectionGeneration || this.ws !== socket) {
           socket.close(1000, 'Stale connection');
           return;
@@ -170,6 +172,7 @@ class WSClient {
       };
 
       socket.onclose = (event) => {
+        recordDebug({ event: 'websocket-close', status: event.code });
         if (generation !== this.connectionGeneration || this.ws !== socket) return;
         this._stopKeepalive();
         this._stopLivenessCheck();

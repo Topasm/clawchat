@@ -1221,6 +1221,8 @@ export const PlanProposalDiffSchema = z
   .strict();
 
 export const PlanProposalResponseSchema = z.object({
+  change_set_id: z.string().nullable().optional(),
+  can_undo: z.boolean().optional(),
   proposal_id: z.string().min(1),
   task_id: z.string().min(1),
   agent_task_id: z.string().nullable(),

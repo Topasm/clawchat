@@ -13,6 +13,7 @@ from domain.task_relationship import TaskRelationshipType
 from exceptions import ConflictError, NotFoundError, ValidationError
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
+from services.tasks.task_plan_guard_service import require_editable_plan
 from schemas.task_relationship import TaskRelationshipCreate, TaskRelationshipUpdate
 from schemas.task_relationship import TaskDependencyCommandRequest
 from services.tasks.graph_command_service import (
@@ -157,6 +158,8 @@ async def _validate_candidate(
     if source_task_id == target_task_id:
         raise ValidationError("A task relationship cannot reference itself")
     await _require_tasks(db, {source_task_id, target_task_id})
+    if relationship_type == TaskRelationshipType.DEPENDS_ON and exclude_relationship_id is None:
+        await require_editable_plan(db, [source_task_id])
 
     duplicate_query = select(TaskRelationship.id).where(
         TaskRelationship.source_task_id == source_task_id,
@@ -391,6 +394,15 @@ async def update_relationship(
 
     old_source_task_id = relationship.source_task_id
     old_type = TaskRelationshipType(relationship.type)
+    if (source_task_id, target_task_id, relationship_type) != (
+        old_source_task_id, relationship.target_task_id, old_type,
+    ):
+        guarded_ids = []
+        if old_type == TaskRelationshipType.DEPENDS_ON:
+            guarded_ids.append(old_source_task_id)
+        if relationship_type == TaskRelationshipType.DEPENDS_ON:
+            guarded_ids.append(source_task_id)
+        await require_editable_plan(db, guarded_ids)
     for field, value in updates.items():
         setattr(relationship, field, value)
     relationship.updated_at = _now()
@@ -419,6 +431,8 @@ async def delete_relationship(
     relationship = await get_relationship(db, relationship_id)
     source_task_id = relationship.source_task_id
     is_dependency = relationship.type == TaskRelationshipType.DEPENDS_ON
+    if is_dependency:
+        await require_editable_plan(db, [source_task_id])
     await db.delete(relationship)
     await db.flush()
     if is_dependency:
@@ -466,6 +480,8 @@ async def replace_task_dependencies(
         for relationship in existing_relationships
     }
     desired_targets = set(dependency_ids)
+    if desired_targets != set(existing_by_target):
+        await require_editable_plan(db, [source_task_id])
     for relationship in existing_relationships:
         if relationship.target_task_id not in desired_targets:
             await db.delete(relationship)

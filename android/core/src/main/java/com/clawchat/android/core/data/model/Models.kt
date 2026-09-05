@@ -250,6 +250,7 @@ data class Message(
         get() = metadata?.takeIf { actionType == "run_update" }
             ?.let { data ->
                 RunUpdate(
+                    actionsLive = data["actions_live"]?.jsonPrimitive?.booleanOrNull == true,
                     runId = data["run_id"]?.jsonPrimitive?.contentOrNull,
                     status = data["status"]?.jsonPrimitive?.contentOrNull ?: "running",
                     title = data["title"]?.jsonPrimitive?.contentOrNull,
@@ -274,6 +275,7 @@ data class Message(
 
 /** What a `run_update` chat message says about its run. */
 data class RunUpdate(
+    val actionsLive: Boolean = false,
     val runId: String?,
     val status: String,
     val title: String?,

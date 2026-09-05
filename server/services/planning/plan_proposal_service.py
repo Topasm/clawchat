@@ -407,6 +407,18 @@ async def build_plan_response(
         else None
     )
     diff = _proposal_diff(payload.subtasks, payload, root)
+    if root is not None and proposal.status == PlanProposalStatus.DRAFT:
+        from services.tasks.task_plan_guard_service import (
+            ACTIVE_PLAN_MESSAGE,
+            active_plan_run,
+        )
+
+        if await active_plan_run(db, [root.id]) is not None:
+            validation.errors.append(
+                PlanValidationIssue(
+                    code="TASK_PLAN_ACTIVE_RUN", message=ACTIVE_PLAN_MESSAGE
+                )
+            )
     due_dates = sorted(
         subtask.due_date for subtask in payload.subtasks if subtask.due_date
     )
@@ -418,6 +430,22 @@ async def build_plan_response(
             else f"{due_dates[0].isoformat()} – {due_dates[-1].isoformat()}"
         )
     suggested_skills = payload.suggested_skills
+    change_set = None
+    can_undo = False
+    if proposal.status == PlanProposalStatus.APPLIED and proposal.is_revertible:
+        change_set = (
+            await db.execute(
+                select(ChangeSet).where(
+                    ChangeSet.proposal_id == proposal.id,
+                    ChangeSet.status == ChangeSetStatus.APPLIED,
+                )
+            )
+        ).scalar_one_or_none()
+        if change_set is not None:
+            can_undo = (
+                change_set.applied_graph_revision
+                == await _current_graph_revision(db, proposal.project_id)
+            )
     return PlanResponse(
         proposal_id=proposal.id,
         task_id=proposal.id,
@@ -425,6 +453,8 @@ async def build_plan_response(
         todo_id=proposal.root_task_id or "",
         base_graph_revision=proposal.base_graph_revision,
         status=PlanProposalStatus(proposal.status),
+        change_set_id=change_set.id if change_set is not None else None,
+        can_undo=can_undo,
         validation=validation,
         diff=diff,
         summary=payload.summary,
@@ -503,6 +533,10 @@ async def apply_proposal(
         todo = await db.get(Todo, todo_id)
         if todo is None:
             raise NotFoundError("Todo not found")
+
+        from services.tasks.task_plan_guard_service import require_editable_plan
+
+        await require_editable_plan(db, [todo_id])
 
         original_plan = PlanPayload.model_validate_json(proposal.payload_json or "{}")
         if request.subtasks is not None and len(request.subtasks) != len(

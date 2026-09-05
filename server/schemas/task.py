@@ -214,6 +214,8 @@ class PlanResponse(BaseModel):
     todo_id: str
     base_graph_revision: int | None = None
     status: PlanProposalStatus
+    change_set_id: str | None = None
+    can_undo: bool = False
     validation: PlanValidationResult = Field(default_factory=PlanValidationResult)
     diff: PlanProposalDiff
     summary: str

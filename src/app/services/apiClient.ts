@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from './logger';
 import { getOfflineQueueScope, offlineQueue } from './offlineQueue';
 import { refreshAuthSession } from './sessionRefresh';
+import { debugResource, getDebugSnapshot, recordDebug } from './debugLogging';
 
 declare module 'axios' {
   // Keep Axios' generic defaults identical so request helpers such as
@@ -11,10 +12,28 @@ declare module 'axios' {
   interface AxiosRequestConfig<D = any, P = any> {
     /** Opt in only for JSON mutations that are safe to replay after reconnecting. */
     queueOfflineMutation?: boolean;
+    diagnosticStartedAt?: number;
   }
 }
 
 const apiClient = axios.create();
+
+function diagnosticMethod(method = 'GET'): string {
+  const normalized = method.toUpperCase();
+  return ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(normalized)
+    ? normalized
+    : 'OTHER';
+}
+function recordTransport(config: InternalAxiosRequestConfig, status?: number) {
+  if (config.diagnosticStartedAt == null) return;
+  recordDebug({
+    event: status == null ? 'network-failure' : 'response',
+    resource: debugResource(config.url),
+    method: diagnosticMethod(config.method),
+    status,
+    durationMs: Math.round(performance.now() - config.diagnosticStartedAt),
+  });
+}
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -22,6 +41,14 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 
 // Request interceptor: attach baseURL and Authorization header from auth store
 apiClient.interceptors.request.use((config) => {
+  if (getDebugSnapshot().enabled) {
+    config.diagnosticStartedAt = performance.now();
+    recordDebug({
+      event: 'request',
+      resource: debugResource(config.url),
+      method: diagnosticMethod(config.method),
+    });
+  } else delete config.diagnosticStartedAt;
   const { token, serverUrl } = useAuthStore.getState();
   config.baseURL = `${serverUrl}/api`;
   if (token) {
@@ -32,9 +59,13 @@ apiClient.interceptors.request.use((config) => {
 
 // Response interceptor: handle network errors + token refresh on 401
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    recordTransport(response.config, response.status);
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
+    if (originalRequest) recordTransport(originalRequest, error.response?.status);
 
     // Detect network error (no response at all, e.g. offline)
     const isNetworkError =
@@ -64,6 +95,11 @@ apiClient.interceptors.response.use(
                 : originalRequest.data == null
                   ? null
                   : JSON.stringify(originalRequest.data),
+          });
+          recordDebug({
+            event: 'relay-response',
+            status: relayResponse.status,
+            resource: debugResource(originalRequest.url),
           });
           if (relayResponse.status >= 400) {
             const relayError = new Error(

@@ -114,6 +114,13 @@ export default function ChatPlanProposalCard({ metadata }: { metadata: Record<st
         <div className="cc-action-card__plan-heading">
           <div>
             <span className="cc-action-card__label">{translateUi('Graph change proposal')}</span>
+            {typeof metadata.discovered_from_task_id === 'string' && (
+              <span className="cc-action-card__detail">
+                {translateUi(
+                  'Follow-up work. Applying this proposal does not change the current run.',
+                )}
+              </span>
+            )}
             <span className="cc-action-card__title">{todoTitle}</span>
           </div>
           <button

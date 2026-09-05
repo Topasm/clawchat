@@ -128,6 +128,9 @@ async def create_todo(
     recurrence_end: datetime | None = None,
 ) -> Todo:
     if parent_id is not None:
+        from services.tasks.task_plan_guard_service import require_editable_plan
+
+        await require_editable_plan(db, [parent_id])
         parent = await db.get(Todo, parent_id)
         if parent is None:
             raise NotFoundError(f"Parent todo {parent_id} not found")
@@ -189,6 +192,19 @@ async def create_todo(
 
 async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
     todo = await get_todo(db, todo_id)
+    from services.tasks.task_plan_guard_service import require_editable_plan
+
+    if "status" in updates and updates["status"] != todo.status:
+        await require_editable_plan(db, [todo.id], message=(
+            "This task has an active agent run. Review its result or stop the run "
+            "before changing the task status."
+        ))
+    if any(field in updates and updates[field] != getattr(todo, field)
+           for field in ("title", "description")):
+        await require_editable_plan(db, [todo.id], message=(
+            "This task has an active agent run. Send a follow-up in its run thread "
+            "to change the current instructions, or stop the run before editing the task."
+        ))
     dependency_ids = (
         updates.pop("depends_on") if "depends_on" in updates else _DEPENDENCIES_UNSET
     )
@@ -204,6 +220,19 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
         and await db.get(Project, proposed_project_id) is None
     ):
         raise NotFoundError(f"Project {proposed_project_id} not found")
+    if (proposed_parent_id, updates.get("project_id", todo.project_id)) != (
+        todo.parent_id,
+        todo.project_id,
+    ):
+        from services.tasks.task_plan_guard_service import (
+            require_editable_branch,
+            require_editable_plan,
+        )
+
+        await require_editable_branch(db, todo.id)
+        await require_editable_plan(
+            db, [proposed_parent_id] if proposed_parent_id else []
+        )
     apply_model_updates(todo, updates)
 
     # A project's root is the project as seen from task views; a rename there
@@ -272,6 +301,13 @@ async def delete_todo(db: AsyncSession, todo_id: str) -> None:
         db,
         {todo.id},
     )
+    from services.tasks.task_plan_guard_service import require_editable_branch, require_editable_plan
+
+    await require_editable_branch(db, todo.id)
+    await require_editable_plan(db, list(dependent_source_ids), message=(
+        "This task is a prerequisite of an active agent run. Stop the affected run "
+        "before deleting its prerequisite."
+    ))
     await db.delete(todo)
     await db.flush()
     await task_relationship_service.sync_dependency_shadows(

@@ -120,6 +120,7 @@ private fun taskTagLabel(tag: String): String = "#${tag.removePrefix("#")}"
 
 @Composable
 fun TasksScreen(
+    onOpenProjects: (() -> Unit)? = null,
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     initialTodoId: String? = null,
@@ -147,12 +148,10 @@ fun TasksScreen(
         viewModel.selectTask(null)
     }
 
-    LaunchedEffect(initialTodoId, state.tasks) {
+    LaunchedEffect(initialTodoId) {
         if (initialSelectionConsumed || initialTodoId == null) return@LaunchedEffect
-        state.tasks.firstOrNull { it.id == initialTodoId }?.let { task ->
-            initialSelectionConsumed = true
-            viewModel.selectTask(task)
-        }
+        initialSelectionConsumed = true
+        viewModel.selectTaskById(initialTodoId)
     }
 
     LaunchedEffect(state.pendingDeletion?.token) {
@@ -207,6 +206,7 @@ fun TasksScreen(
             statusFilter = state.statusFilter,
             snackbarHostState = snackbarHostState,
             onOpenSearch = onOpenSearch,
+            onOpenProjects = onOpenProjects,
             onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectTask,
             onToggle = { task ->
@@ -256,6 +256,7 @@ fun TasksScreen(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun TaskListView(
+    onOpenProjects: (() -> Unit)?,
     tasks: List<Todo>,
     isLoading: Boolean,
     statusFilter: TaskStatus?,
@@ -312,6 +313,9 @@ private fun TaskListView(
                     )
                 },
                 actions = {
+                    onOpenProjects?.let { open ->
+                        TextButton(onClick = open) { Text(stringResource(R.string.projects_title)) }
+                    }
                     IconButton(onClick = onOpenSearch) {
                         Icon(
                             Icons.Default.Search,

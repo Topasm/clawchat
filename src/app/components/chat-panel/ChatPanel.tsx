@@ -230,8 +230,16 @@ export default function ChatPanel({
         editingMessageId={editingMessageId}
         editingText={editingText}
         onCancelEdit={handleCancelEdit}
-        modeLabel={answerRun ? translateUi('Answering the agent') : undefined}
-        onClearMode={answerRun ? () => setDismissedAnswerRunId(answerRun.id) : undefined}
+        modeLabel={
+          answerRun
+            ? translateUi('Answering the agent')
+            : waitingRun
+              ? translateUi('Planning only — this message will not resume the run')
+              : undefined
+        }
+        onClearMode={
+          waitingRun ? () => setDismissedAnswerRunId(answerRun ? waitingRun.id : null) : undefined
+        }
       />
     </>
   );

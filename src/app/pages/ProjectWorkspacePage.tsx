@@ -22,6 +22,9 @@ import { useToastStore } from '../stores/useToastStore';
 import { translateUi } from '../i18n';
 import CanonicalDocumentButton from '../components/shared/CanonicalDocumentButton';
 import { extractCanonicalDoc } from '../utils/canonicalDoc';
+import { getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
+import apiClient from '../services/apiClient';
+import { ConversationResponseSchema } from '../types/schemas';
 
 type ProjectSection = 'plan' | 'activity' | 'files';
 
@@ -39,7 +42,7 @@ export default function ProjectWorkspacePage() {
         ? 'files'
         : 'plan';
   const { data: project, isLoading, isError } = useProjectQuery(projectId);
-  const { data: todos = [] } = useTodosQuery();
+  const { data: todos = [], isLoading: areTodosLoading } = useTodosQuery();
   const { mutateAsync: getOrCreateConversation, isPending: isOpeningConversation } =
     useGetOrCreateProjectConversation();
   const deleteProject = useDeleteProject();
@@ -48,11 +51,16 @@ export default function ProjectWorkspacePage() {
     reset: resetChatPanel,
     presentation: panelPresentation,
     setPresentation: setPanelPresentation,
+    setConversationId: setPanelConversationId,
+    conversationId: panelConversationId,
+    beginSelection,
   } = useChatPanelController();
   const { isMobile } = usePlatform();
   const addToast = useToastStore((state) => state.addToast);
   const autoOpenedProjectId = useRef<string | null>(null);
   const lifecycleGeneration = useRef(0);
+  const currentPanelConversation = useRef(panelConversationId);
+  currentPanelConversation.current = panelConversationId;
   const projectTasks = useMemo(
     () =>
       todos
@@ -61,20 +69,22 @@ export default function ProjectWorkspacePage() {
     [project?.root_task_id, projectId, todos],
   );
   useEffect(() => {
-    const generation = ++lifecycleGeneration.current;
+    lifecycleGeneration.current += 1;
     return () => {
-      if (lifecycleGeneration.current === generation) lifecycleGeneration.current += 1;
+      lifecycleGeneration.current += 1;
       autoOpenedProjectId.current = null;
       resetChatPanel();
     };
   }, [projectId, resetChatPanel]);
   const openProjectAgent = useCallback(async () => {
     if (!project?.root_task_id) return;
-    const generation = lifecycleGeneration.current;
+    const generation = ++lifecycleGeneration.current;
+    const isCurrentSelection = beginSelection?.() ?? (() => true);
     try {
       const conversation = await getOrCreateConversation(project.root_task_id);
-      if (lifecycleGeneration.current !== generation) return;
+      if (lifecycleGeneration.current !== generation || !isCurrentSelection()) return;
       openChatPanel(conversation.id, {
+        projectId: project.id,
         kind: 'project',
         title: 'Project Agent',
         subtitle: project.title,
@@ -84,15 +94,17 @@ export default function ProjectWorkspacePage() {
         addToast('error', translateUi('Could not open the agent conversation.'));
       }
     }
-  }, [addToast, getOrCreateConversation, openChatPanel, project]);
+  }, [addToast, getOrCreateConversation, openChatPanel, project, beginSelection]);
   const openTaskAgent = useCallback(
     async (task: (typeof projectTasks)[number], breadcrumb: string) => {
       if (!project) return;
-      const generation = lifecycleGeneration.current;
+      const generation = ++lifecycleGeneration.current;
+      const isCurrentSelection = beginSelection?.() ?? (() => true);
       try {
         const conversation = await getOrCreateConversation(task.id);
-        if (lifecycleGeneration.current !== generation) return;
+        if (lifecycleGeneration.current !== generation || !isCurrentSelection()) return;
         openChatPanel(conversation.id, {
+          projectId: project.id,
           kind: 'task',
           title: 'Task Agent',
           subtitle: `${project.title} › ${breadcrumb}`,
@@ -103,17 +115,82 @@ export default function ProjectWorkspacePage() {
         }
       }
     },
-    [addToast, getOrCreateConversation, openChatPanel, project],
+    [addToast, getOrCreateConversation, openChatPanel, project, beginSelection],
   );
   useEffect(() => {
-    if (!project || isMobile || autoOpenedProjectId.current === project.id) return;
+    if (!project || areTodosLoading || autoOpenedProjectId.current === project.id) return;
     autoOpenedProjectId.current = project.id;
-    void openProjectAgent();
-  }, [isMobile, openProjectAgent, project]);
+    const generation = lifecycleGeneration.current;
+    const initialPanelConversation = currentPanelConversation.current;
+    const savedId =
+      useChatStore.getState().activeConversationByProject[
+        JSON.stringify([getChatWorkspaceScope(), project.id])
+      ];
+    if (!savedId) {
+      if (!isMobile) void openProjectAgent();
+      return;
+    }
+    const isCurrentSelection = beginSelection?.() ?? (() => true);
+    void (async () => {
+      try {
+        const response = await apiClient.get(`/chat/conversations/${savedId.conversationId}`);
+        const conversation = ConversationResponseSchema.parse(response.data);
+        if (lifecycleGeneration.current !== generation || !isCurrentSelection()) return;
+        if (currentPanelConversation.current !== initialPanelConversation) return;
+        const task = projectTasks.find((item) => item.id === conversation.project_todo_id);
+        if (
+          !conversation.is_archived &&
+          (conversation.project_id === project.id ||
+            conversation.project_todo_id === project.root_task_id ||
+            task)
+        ) {
+          const isRun = savedId.kind === 'run';
+          const presentation = {
+            projectId: project.id,
+            kind: isRun ? ('run' as const) : task ? ('task' as const) : ('project' as const),
+            title: isRun || task ? 'Task Agent' : 'Project Agent',
+            subtitle: task ? `${project.title} › ${task.title}` : project.title,
+          };
+          if (isMobile) {
+            setPanelPresentation(presentation);
+            setPanelConversationId(conversation.id);
+          } else openChatPanel(conversation.id, presentation);
+          return;
+        }
+        useChatStore.getState().rememberProjectConversation(project.id, null);
+      } catch (error) {
+        if (lifecycleGeneration.current !== generation || !isCurrentSelection()) return;
+        const status = (error as { response?: { status?: number } }).response?.status;
+        if (status === 404) {
+          useChatStore.getState().rememberProjectConversation(project.id, null);
+        } else {
+          addToast('error', translateUi('Could not open the agent conversation.'));
+          return;
+        }
+      }
+      if (lifecycleGeneration.current === generation && !isMobile) void openProjectAgent();
+    })();
+  }, [
+    isMobile,
+    areTodosLoading,
+    openProjectAgent,
+    openChatPanel,
+    project,
+    projectTasks,
+    setPanelPresentation,
+    setPanelConversationId,
+    addToast,
+    beginSelection,
+  ]);
   useEffect(() => {
     if (!project || panelPresentation.kind !== 'project') return;
     if (panelPresentation.subtitle === project.title) return;
-    setPanelPresentation({ kind: 'project', title: 'Project Agent', subtitle: project.title });
+    setPanelPresentation({
+      projectId: project.id,
+      kind: 'project',
+      title: 'Project Agent',
+      subtitle: project.title,
+    });
   }, [panelPresentation.kind, panelPresentation.subtitle, project, setPanelPresentation]);
   if (isLoading)
     return (
@@ -240,6 +317,7 @@ export default function ProjectWorkspacePage() {
             </div>
           </section>
 
+          <ProjectActivity project={project} todos={projectTasks} attentionOnly />
           <ProjectPlan project={project} todos={projectTasks} onDiscussTask={openTaskAgent} />
 
           <details className="cc-project-settings-disclosure" id={EXECUTION_SETTINGS_ID}>

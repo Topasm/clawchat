@@ -40,6 +40,7 @@ import com.clawchat.android.feature.review.ReviewInboxScreen
 import com.clawchat.android.feature.runs.AgentRunsScreen
 import com.clawchat.android.feature.settings.SettingsScreen
 import com.clawchat.android.feature.tasks.TasksScreen
+import com.clawchat.android.feature.tasks.ProjectPlanScreen
 import com.clawchat.android.feature.planner.PlannerPage
 import com.clawchat.android.feature.planner.PlannerScreen
 import com.clawchat.android.feature.progress.ProgressScreen
@@ -64,6 +65,7 @@ private val allBottomNavItems = listOf(
 
 internal fun plannerPrimaryRoute(currentRoute: String?): String? =
     when (currentRoute) {
+        NavRoute.Projects.route -> NavRoute.Tasks.route
         NavRoute.Today.route, NavRoute.Calendar.route -> NavRoute.Today.route
         else -> currentRoute
     }
@@ -333,6 +335,7 @@ fun ClawChatNavGraph(
                         nullable = true
                         defaultValue = null
                     },
+                    navArgument(NavRoute.Chat.ARG_TITLE) { type = NavType.StringType; nullable = true; defaultValue = null },
                 ),
             ) { entry ->
                 ServerOnlyDestination(
@@ -340,6 +343,8 @@ fun ClawChatNavGraph(
                     onConnectWorkspace = openConnectionSetup,
                 ) {
                     ChatScreen(
+                        contextTitle = entry.arguments?.getString(NavRoute.Chat.ARG_TITLE),
+                        onReturnToSource = { if (!navController.popBackStack()) navController.navigate(NavRoute.Tasks.route) },
                         onOpenSearch = navigateToSearch,
                         onOpenSettings = navigateToSettings,
                         initialConversationId = entry.arguments?.getString(
@@ -381,6 +386,9 @@ fun ClawChatNavGraph(
                 ),
             ) { entry ->
                 TasksScreen(
+                    onOpenProjects = if (workspaceMode == WorkspaceMode.SERVER) {
+                        { navController.navigate(NavRoute.Projects.route) { launchSingleTop = true } }
+                    } else null,
                     onOpenSearch = navigateToSearch,
                     onOpenSettings = navigateToSettings,
                     initialTodoId = entry.arguments?.getString(NavRoute.Tasks.ARG_TODO_ID),
@@ -401,6 +409,7 @@ fun ClawChatNavGraph(
                         nullable = true
                         defaultValue = null
                     },
+                    navArgument(NavRoute.Review.ARG_RUN_ID) { type = NavType.StringType; nullable = true; defaultValue = null },
                 ),
             ) { entry ->
                 ServerOnlyDestination(
@@ -408,6 +417,7 @@ fun ClawChatNavGraph(
                     onConnectWorkspace = openConnectionSetup,
                 ) {
                     ReviewInboxScreen(
+                        initialRunId = entry.arguments?.getString(NavRoute.Review.ARG_RUN_ID),
                         onBack = { navController.popBackStack() },
                         initialReviewId = entry.arguments?.getString(NavRoute.Review.ARG_REVIEW_ID),
                         onOpenSubject = { review ->
@@ -443,10 +453,20 @@ fun ClawChatNavGraph(
                 ) {
                     AgentRunsScreen(
                         onBack = { navController.popBackStack() },
-                        onOpenReview = {
-                            navController.navigate(NavRoute.Review.destination()) { launchSingleTop = true }
+                        onOpenReview = { run ->
+                            navController.navigate(NavRoute.Review.forRun(run.id)) { launchSingleTop = true }
                         },
                         initialRunId = entry.arguments?.getString(NavRoute.Runs.ARG_RUN_ID),
+                    )
+                }
+            }
+            composable(NavRoute.Projects.route) {
+                if (workspaceMode == WorkspaceMode.SERVER) {
+                    ProjectPlanScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTask = { navController.navigate(NavRoute.Tasks.destination(it)) },
+                        onOpenConversation = { id, title -> navController.navigate(NavRoute.Chat.destination(id, title)) },
+                        onOpenRun = { navController.navigate(NavRoute.Runs.destination(it)) },
                     )
                 }
             }

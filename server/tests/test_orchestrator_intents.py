@@ -5,6 +5,7 @@ covering it covers WebSocket and SSE at once.
 """
 
 from datetime import datetime, timezone
+import json
 
 import pytest
 from sqlalchemy import select
@@ -385,6 +386,48 @@ async def test_create_todo_from_task_agent_is_a_revisioned_apply_and_undo_propos
         db_session, applied.change_set_id
     )
     assert undone.reverted_subtask_ids == [child_id]
+    assert await db_session.get(Todo, child_id) is None
+
+
+async def test_discovered_work_is_previewed_as_sibling_and_does_not_change_run(
+    orchestrator, db_session
+):
+    from models.agent_task import AgentTask
+    from models.agent_run import AgentRun
+    from services.planning import plan_proposal_service
+
+    root, conversation = await _task_thread(db_session, as_project_root=False)
+    branch = Todo(id=make_id("todo_"), title="Mobile", parent_id=root.id)
+    db_session.add(branch)
+    await db_session.flush()
+    task = Todo(id=make_id("todo_"), title="Panel", parent_id=branch.id, status="in_progress")
+    db_session.add(task)
+    await db_session.flush()
+    agent = AgentTask(id=make_id("agent_"), task_type="delegate_research", instruction="Original scope", todo_id=task.id)
+    db_session.add(agent)
+    await db_session.flush()
+    run = AgentRun(id=make_id("run_"), agent_task_id=agent.id, attempt=1,
+                   instruction_snapshot="Original scope", provider="builtin", status="waiting_input")
+    db_session.add(run)
+    conversation.metadata_json = json.dumps({"origin": "agent_run", "todo_id": task.id})
+    await db_session.commit()
+    _, metadata = await orchestrator.resolve_intent_response(
+        db_session, conversation.id, "create_todo", {"title": "Preserve thread selection"}, "Add follow-up work",
+    )
+    assert metadata["discovered_from_task_id"] == task.id
+    assert metadata["todo_id"] == branch.id
+    assert (await db_session.execute(select(Todo).where(Todo.title == "Preserve thread selection"))).scalar_one_or_none() is None
+    proposal = await db_session.get(PlanProposal, metadata["plan_proposal_id"])
+    applied, _ = await plan_proposal_service.apply_proposal(db_session, branch.id, PlanApplyRequest(
+        proposal_id=proposal.id, base_graph_revision=proposal.base_graph_revision,
+    ))
+    child_id = applied.created_subtask_ids[0]
+    child = await db_session.get(Todo, child_id)
+    assert child.parent_id == branch.id
+    await db_session.refresh(run)
+    assert run.status == "waiting_input"
+    assert run.instruction_snapshot == "Original scope"
+    await plan_proposal_service.revert_change_set(db_session, applied.change_set_id)
     assert await db_session.get(Todo, child_id) is None
 
 

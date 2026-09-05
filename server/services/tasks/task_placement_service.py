@@ -161,6 +161,18 @@ async def place_tasks(
             details={"todo_ids": todo_ids, "parent_id": effective_parent_id},
         )
 
+    from services.tasks.task_plan_guard_service import require_editable_plan
+
+    changed_ids = [
+        item.id for todo in todos
+        if (todo.project_id, todo.parent_id) != (project_id, effective_parent_id)
+        for item in subtrees[todo.id]
+    ]
+    if changed_ids:
+        await require_editable_plan(
+            db, changed_ids + ([effective_parent_id] if effective_parent_id else [])
+        )
+
     analysis_time = datetime.now(timezone.utc)
     before_insights = await load_graph_insights(db, generated_at=analysis_time)
 

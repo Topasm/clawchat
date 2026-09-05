@@ -4,6 +4,12 @@ import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.ReviewDecision
+import com.clawchat.android.core.data.model.AgentRun
+import com.clawchat.android.core.data.model.AgentRunStatus
+import com.clawchat.android.core.data.model.ChatPlanProposal
+import com.clawchat.android.core.data.model.ChatPlanStep
+import com.clawchat.android.core.data.model.ChatPlanApplyRequest
+import com.clawchat.android.core.data.model.ChatPlanApplyResult
 import com.clawchat.android.core.data.repository.ConversationRepository
 import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.ReviewRepository
@@ -15,6 +21,11 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
@@ -290,7 +301,9 @@ class ChatViewModelTest {
         val viewModel = selectedViewModel()
 
         viewModel.resumeRun("run-1", "Use the short version")
+        dispatcher.scheduler.advanceUntilIdle()
         viewModel.resolvePermission("run-1", true)
+        dispatcher.scheduler.advanceUntilIdle()
         viewModel.decideReview("review-1", true)
         dispatcher.scheduler.advanceUntilIdle()
 
@@ -298,5 +311,124 @@ class ChatViewModelTest {
         coVerify { agentRuns.resolvePermission("run-1", true) }
         coVerify { reviews.decideById("review-1", ReviewDecision.APPROVED) }
         assertEquals("review failed", viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun `late response from previous conversation cannot replace selection`() = runTest {
+        val delayed = CompletableDeferred<ApiResult<PaginatedResponse<Message>>>()
+        coEvery { repository.getMessages("c1") } coAnswers { withContext(NonCancellable) { delayed.await() } }
+        coEvery { repository.getMessages("c2") } returns ApiResult.Success(
+            PaginatedResponse(items = listOf(message("new", "assistant", "Second"))))
+        val vm = viewModel()
+        vm.selectConversation("c1")
+        dispatcher.scheduler.runCurrent()
+        vm.selectConversation("c2")
+        dispatcher.scheduler.runCurrent()
+        delayed.complete(ApiResult.Success(PaginatedResponse(items = listOf(message("old", "assistant", "First")))))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("c2", vm.uiState.value.selectedConversationId)
+        assertEquals(listOf("new"), vm.uiState.value.messages.map { it.id })
+    }
+
+    @Test
+    fun `clearing selection cancels pending messages`() = runTest {
+        val delayed = CompletableDeferred<ApiResult<PaginatedResponse<Message>>>()
+        coEvery { repository.getMessages("c1") } coAnswers { withContext(NonCancellable) { delayed.await() } }
+        val vm = viewModel()
+        vm.selectConversation("c1")
+        dispatcher.scheduler.runCurrent()
+        vm.sendMessage("Do not send into a loading thread")
+        coVerify(exactly = 0) { streamer.stream(any(), any()) }
+        vm.clearSelection()
+        delayed.complete(ApiResult.Success(PaginatedResponse(items = listOf(message("old", "assistant", "First")))))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertNull(vm.uiState.value.selectedConversationId)
+        assertTrue(vm.uiState.value.messages.isEmpty())
+        assertFalse(vm.uiState.value.isLoadingMessages)
+    }
+
+    private fun runMessage(id: String) = message(id, "assistant", "Question").copy(metadata = buildJsonObject {
+        put("action_type", "run_update")
+        put("run_id", "r1")
+        put("status", "waiting_input")
+    })
+
+    @Test
+    fun `only newest question on live matching run has actions`() = runTest {
+        val run = mockk<AgentRun>()
+        every { run.conversationId } returns "c1"
+        every { run.status } returns AgentRunStatus.WAITING_INPUT
+        coEvery { agentRuns.getRun("r1") } returns ApiResult.Success(run)
+        val vm = selectedViewModel(listOf(runMessage("new"), runMessage("old")))
+        assertFalse(vm.uiState.value.messages[0].runUpdate!!.actionsLive)
+        assertTrue(vm.uiState.value.messages[1].runUpdate!!.actionsLive)
+
+        every { run.status } returns AgentRunStatus.COMPLETED
+        vm.refreshConversation()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.messages.none { it.runUpdate!!.actionsLive })
+
+        every { run.status } returns AgentRunStatus.WAITING_INPUT
+        every { run.conversationId } returns "another-thread"
+        vm.refreshConversation()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.messages.none { it.runUpdate!!.actionsLive })
+    }
+
+    @Test
+    fun `changes request needs note and repeated submits are ignored`() = runTest {
+        coEvery { reviews.decideById("review", ReviewDecision.CHANGES_REQUESTED, "Fix mobile") } returns ApiResult.Error("offline")
+        val vm = selectedViewModel()
+        vm.decideReview("review", ReviewDecision.CHANGES_REQUESTED, "  ")
+        coVerify(exactly = 0) { reviews.decideById(any(), any(), any()) }
+        vm.decideReview("review", ReviewDecision.CHANGES_REQUESTED, " Fix mobile ")
+        vm.decideReview("review", ReviewDecision.CHANGES_REQUESTED, " Fix mobile ")
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 1) { reviews.decideById("review", ReviewDecision.CHANGES_REQUESTED, "Fix mobile") }
+        assertFalse(vm.uiState.value.isRunActionPending)
+        assertEquals("offline", vm.uiState.value.error)
+    }
+
+    @Test
+    fun `proposal stays preview until apply and passes revision then supports undo`() = runTest {
+        val plan = ChatPlanProposal("p1", "t1", "draft", 12, subtasks = listOf(ChatPlanStep("Mobile")))
+        coEvery { repository.getPlan("t1", "p1") } returns plan.let { ApiResult.Success(it) }
+        coEvery { repository.applyPlan("t1", ChatPlanApplyRequest("p1", 12)) } coAnswers {
+            coEvery { repository.getPlan("t1", "p1") } returns ApiResult.Success(plan.copy(status = "applied"))
+            ApiResult.Success(ChatPlanApplyResult("change1", true))
+        }
+        coEvery { repository.undoPlan("change1") } returns ApiResult.Success(Unit)
+        val vm = selectedViewModel(listOf(message("proposal", "assistant", "Preview").copy(metadata = buildJsonObject {
+            put("plan_proposal_id", "p1")
+            put("todo_id", "t1")
+        })))
+        assertTrue(vm.uiState.value.plans.getValue("p1").canApply)
+        coVerify(exactly = 0) { repository.applyPlan(any(), any()) }
+        vm.planAction("p1", "apply")
+        vm.planAction("p1", "apply")
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 1) { repository.applyPlan("t1", ChatPlanApplyRequest("p1", 12)) }
+        assertFalse(vm.uiState.value.plans.getValue("p1").canApply)
+        assertEquals("change1", vm.uiState.value.planChanges["p1"])
+        vm.planAction("p1", "undo")
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 1) { repository.undoPlan("change1") }
+        assertTrue(vm.uiState.value.pendingPlans.isEmpty())
+        assertFalse(vm.uiState.value.planChanges.containsKey("p1"))
+    }
+
+    @Test
+    fun `new chat session restores undo from server and removes it when graph changed`() = runTest {
+        val plan = ChatPlanProposal("p1", "t1", "applied", changeSetId = "durable", canUndo = true)
+        coEvery { repository.getPlan("t1", "p1") } returns ApiResult.Success(plan)
+        val vm = selectedViewModel(listOf(message("p", "assistant", "Plan").copy(metadata = buildJsonObject {
+            put("plan_proposal_id", "p1")
+            put("todo_id", "t1")
+        })))
+        assertEquals("durable", vm.uiState.value.planChanges["p1"])
+        coEvery { repository.getPlan("t1", "p1") } returns ApiResult.Success(plan.copy(canUndo = false))
+        vm.refreshConversation()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.uiState.value.planChanges.containsKey("p1"))
     }
 }

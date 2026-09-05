@@ -119,6 +119,11 @@ function dedupeMessages(msgs: ChatMessage[]): ChatMessage[] {
   });
 }
 interface ChatState {
+  projectPlanSelections: Record<string, { view: 'outline' | 'flow'; taskId: string | null }>;
+  setProjectPlanSelection: (
+    projectId: string,
+    selection: { view: 'outline' | 'flow'; taskId: string | null },
+  ) => void;
   // Only optimistic and in-flight messages live here. Durable history remains
   // server-authoritative and reconciles these entries by server message id.
   streamingMessages: ChatMessage[];
@@ -129,6 +134,15 @@ interface ChatState {
   taskProgress: Record<string, TaskProgressData>;
   drafts: Record<string, string>;
   activeConversationByWorkspace: Record<string, string>;
+  activeConversationByProject: Record<
+    string,
+    { conversationId: string; kind: 'project' | 'task' | 'run' }
+  >;
+  rememberProjectConversation: (
+    projectId: string,
+    conversationId: string | null,
+    kind?: 'project' | 'task' | 'run',
+  ) => void;
   setCurrentConversationId: (id: string | null) => void;
   addStreamingMessage: (message: ChatMessage) => void;
   appendToMessage: (messageId: string, content: string) => void;
@@ -168,6 +182,23 @@ export const useChatStore = create<ChatState>()(
       taskProgress: {},
       drafts: {},
       activeConversationByWorkspace: {},
+      projectPlanSelections: {},
+      setProjectPlanSelection: (projectId, selection) =>
+        set((state) => ({
+          projectPlanSelections: {
+            ...state.projectPlanSelections,
+            [JSON.stringify([getChatWorkspaceScope(), projectId])]: selection,
+          },
+        })),
+      activeConversationByProject: {},
+      rememberProjectConversation: (projectId, conversationId, kind = 'project') =>
+        set((state) => {
+          const key = JSON.stringify([getChatWorkspaceScope(), projectId]);
+          const saved = { ...state.activeConversationByProject };
+          if (conversationId) saved[key] = { conversationId, kind };
+          else delete saved[key];
+          return { activeConversationByProject: saved };
+        }),
       setCurrentConversationId: (id) =>
         set((state) => {
           const scope = getChatWorkspaceScope();
@@ -259,6 +290,8 @@ export const useChatStore = create<ChatState>()(
           taskProgress: {},
           drafts: {},
           activeConversationByWorkspace: {},
+          projectPlanSelections: {},
+          activeConversationByProject: {},
         }),
       // --- Streaming ---
       sendMessageStreaming: async (conversationId, text, options = {}) => {
@@ -419,6 +452,8 @@ export const useChatStore = create<ChatState>()(
         ),
         drafts: state.drafts,
         activeConversationByWorkspace: state.activeConversationByWorkspace,
+        projectPlanSelections: state.projectPlanSelections,
+        activeConversationByProject: state.activeConversationByProject,
       }),
       merge: (persisted, current) => {
         const saved = persisted as Partial<ChatState>;
@@ -427,6 +462,8 @@ export const useChatStore = create<ChatState>()(
           currentConversationId: saved.currentConversationId ?? null,
           drafts: saved.drafts ?? {},
           activeConversationByWorkspace: saved.activeConversationByWorkspace ?? {},
+          projectPlanSelections: saved.projectPlanSelections ?? {},
+          activeConversationByProject: saved.activeConversationByProject ?? {},
           streamingMessages: (saved.streamingMessages ?? []).map((message) => ({
             ...message,
             createdAt: new Date(message.createdAt),

@@ -42,7 +42,7 @@ describe('AgentRunReviewHandoff', () => {
           todo_id: 'task-run',
           todo_status: 'completed',
           graph_revision: 18,
-          newly_ready_tasks: readyTasks,
+          newly_ready_tasks: [readyTasks[0]],
           adopted: true,
         }}
         onOpenTask={onOpenTask}
@@ -55,7 +55,6 @@ describe('AgentRunReviewHandoff', () => {
     );
 
     expect(screen.getByLabelText('Agent approval outcome')).toHaveTextContent('Task completed');
-    expect(screen.getByText('2 downstream tasks are now Ready.')).toBeInTheDocument();
     expect(onRunNext).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Analyze experiment' }));
@@ -72,5 +71,31 @@ describe('AgentRunReviewHandoff', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onOpenRun).toHaveBeenCalledWith('run-next');
     expect(onStop).toHaveBeenCalledOnce();
+  });
+
+  it('requires a choice when approval unlocks multiple Ready tasks', () => {
+    const run = vi.fn();
+    const choose = vi.fn();
+    render(
+      <AgentRunReviewHandoff
+        outcome={{
+          run_id: 'run',
+          agent_task_id: 'agent',
+          todo_id: 'task',
+          todo_status: 'completed',
+          graph_revision: 18,
+          newly_ready_tasks: readyTasks,
+          adopted: true,
+        }}
+        onOpenTask={vi.fn()}
+        onRunNext={run}
+        canRunNext
+        onChooseAnother={choose}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Run next' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another' }));
+    expect(choose).toHaveBeenCalledOnce();
+    expect(run).not.toHaveBeenCalled();
   });
 });

@@ -58,6 +58,15 @@ function renderCard(cardMetadata: Record<string, unknown> = metadata) {
 }
 
 describe('chat graph proposal card', () => {
+  it('identifies discovered work as a proposal that does not alter the run', async () => {
+    renderCard({ ...metadata, discovered_from_task_id: 'running-task' });
+    expect(
+      await screen.findByText(
+        'Follow-up work. Applying this proposal does not change the current run.',
+      ),
+    ).toBeInTheDocument();
+    expect(apiMocks.post).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     apiMocks.get.mockReset().mockResolvedValue({ data: proposal });
     apiMocks.post.mockReset();

@@ -32,6 +32,7 @@ internal object NavigationCapabilities {
 
     /** Detail routes opened from Now rows or existing deep links, not drawer destinations. */
     private val serverInternalRoutes = listOf(
+        NavRoute.Projects.route,
         NavRoute.Inbox.route,
         NavRoute.Review.route,
         NavRoute.Runs.route,

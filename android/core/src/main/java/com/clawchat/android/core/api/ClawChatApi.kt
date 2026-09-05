@@ -10,6 +10,29 @@ import retrofit2.http.*
  * The auth token is added automatically by [AuthInterceptor].
  */
 interface ClawChatApi {
+    @GET("api/projects")
+    suspend fun listProjects(@Tag expectedScope: ExpectedSessionScope): List<ProjectPlan>
+
+    @GET("api/projects/{id}")
+    suspend fun getProject(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope): ProjectPlan
+
+    @GET("api/todos/graph/insights")
+    suspend fun getProjectGraph(@Query("root_task_id") rootId: String, @Tag expectedScope: ExpectedSessionScope): ProjectGraph
+
+    @POST("api/todos/{id}/delegate")
+    suspend fun runReadyTask(@Path("id") id: String, @Body body: ReadyRunRequest, @Tag expectedScope: ExpectedSessionScope): ReadyRunResult
+
+    @GET("api/todos/{todoId}/plan/proposals/{proposalId}")
+    suspend fun getChatPlan(@Path("todoId") todoId: String, @Path("proposalId") proposalId: String): ChatPlanProposal
+
+    @POST("api/todos/{todoId}/plan/apply")
+    suspend fun applyChatPlan(@Path("todoId") todoId: String, @Body body: ChatPlanApplyRequest): ChatPlanApplyResult
+
+    @POST("api/todos/{todoId}/plan/dismiss")
+    suspend fun dismissChatPlan(@Path("todoId") todoId: String, @Body body: Map<String, String>): kotlinx.serialization.json.JsonObject
+
+    @POST("api/change-sets/{changeSetId}/revert")
+    suspend fun undoChatPlan(@Path("changeSetId") changeSetId: String): kotlinx.serialization.json.JsonObject
 
     // --- Health ---
 

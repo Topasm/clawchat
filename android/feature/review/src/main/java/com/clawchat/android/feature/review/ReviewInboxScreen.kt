@@ -73,30 +73,41 @@ import kotlinx.serialization.json.jsonPrimitive
 fun ReviewInboxScreen(
     onBack: () -> Unit = {},
     initialReviewId: String? = null,
+    initialRunId: String? = null,
     onOpenSubject: (ReviewItem) -> Unit = {},
     /** Opens the exact waiting-input run after requesting changes. */
     onOpenRun: (String) -> Unit = {},
     viewModel: ReviewInboxViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var initialSelectionConsumed by rememberSaveable(initialReviewId) { mutableStateOf(false) }
+    val rawState by viewModel.uiState.collectAsStateWithLifecycle()
+    val state = rawState.copy(
+        items = scopedReviews(rawState.items, initialReviewId, initialRunId),
+        selected = scopedReviews(listOfNotNull(rawState.selected), initialReviewId, initialRunId).firstOrNull(),
+    )
+    var initialSelectionConsumed by rememberSaveable(initialReviewId, initialRunId) { mutableStateOf(false) }
     val selected = state.selected
     val feedback = state.error?.let { localizedErrorMessage(it) }
         ?: state.notice
         ?: state.errorResource?.let { stringResource(it) }
         ?: state.noticeResource?.let { stringResource(it) }
 
-    LaunchedEffect(initialReviewId, state.items) {
-        if (initialSelectionConsumed || initialReviewId == null) return@LaunchedEffect
-        if (state.items.any { it.id == initialReviewId }) {
+    LaunchedEffect(initialReviewId, initialRunId, state.items) {
+        if (initialSelectionConsumed) return@LaunchedEffect
+        val target = state.items.firstOrNull {
+            if (initialReviewId != null) it.id == initialReviewId
+            else initialRunId != null && it.subjectId == initialRunId &&
+                it.subjectType == com.clawchat.android.core.data.model.ReviewSubjectType.AGENT_RUN
+        }
+        if (target != null) {
             initialSelectionConsumed = true
-            viewModel.onAction(ReviewInboxAction.Select(initialReviewId))
+            viewModel.onAction(ReviewInboxAction.Select(target.id))
         }
     }
 
     BackHandler(enabled = selected != null || state.isSubmitting) {
         if (!state.isSubmitting && selected != null) {
-            viewModel.onAction(ReviewInboxAction.CloseDetail)
+            if (initialReviewId != null || initialRunId != null) onBack()
+            else viewModel.onAction(ReviewInboxAction.CloseDetail)
         }
     }
 
@@ -134,7 +145,7 @@ fun ReviewInboxScreen(
                     IconButton(
                         enabled = !state.isSubmitting,
                         onClick = {
-                            if (selected != null) {
+                            if (selected != null && initialReviewId == null && initialRunId == null) {
                                 viewModel.onAction(ReviewInboxAction.CloseDetail)
                             } else {
                                 onBack()

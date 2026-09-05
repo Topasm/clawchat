@@ -1,6 +1,7 @@
 import type { StreamEventMeta } from '../types/api';
 import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from './logger';
+import { recordDebug } from './debugLogging';
 
 const SSE_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 2;
@@ -39,7 +40,18 @@ export function connectSSE(
   token: string,
   callbacks: SSECallbacks,
 ): AbortController {
-  const { onMeta, onToken, onTitleGenerated, onModuleDataChanged, onDone, onError } = callbacks;
+  const {
+    onMeta,
+    onToken,
+    onTitleGenerated,
+    onModuleDataChanged,
+    onDone: finish,
+    onError,
+  } = callbacks;
+  const onDone = (message: string) => {
+    recordDebug({ event: 'stream-end' });
+    finish?.(message);
+  };
   const abortController = new AbortController();
 
   let accumulated = '';
@@ -57,6 +69,7 @@ export function connectSSE(
   const resetInactivityTimer = () => {
     clearInactivityTimer();
     inactivityTimer = setTimeout(() => {
+      recordDebug({ event: 'stream-timeout' });
       logger.warn('SSE connection timed out after inactivity', {
         url,
         accumulatedLength: accumulated.length,
@@ -66,6 +79,7 @@ export function connectSSE(
   };
 
   const run = async () => {
+    recordDebug({ event: 'stream-start' });
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -78,6 +92,7 @@ export function connectSSE(
         signal: abortController.signal,
       });
 
+      recordDebug({ event: 'stream-headers', status: response.status });
       if (!response.ok) {
         if (response.status === 401) {
           logger.warn('SSE received 401, logging out');
@@ -177,6 +192,9 @@ export function connectSSE(
         onDone?.(accumulated);
       }
     } catch (error) {
+      recordDebug({
+        event: (error as Error).name === 'AbortError' ? 'stream-cancelled' : 'stream-error',
+      });
       clearInactivityTimer();
 
       if ((error as Error).name === 'AbortError') {

@@ -1,5 +1,12 @@
 package com.clawchat.android.feature.chat
 
+import com.clawchat.android.core.data.model.ReviewDecision
+import com.clawchat.android.core.data.model.ChatPlanProposal
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+
 import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
@@ -48,6 +55,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +74,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.model.RunUpdate
@@ -140,6 +151,8 @@ fun ChatScreen(
     onOpenSearch: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     initialConversationId: String? = null,
+    contextTitle: String? = null,
+    onReturnToSource: (() -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -152,23 +165,41 @@ fun ChatScreen(
         viewModel.selectConversation(initialConversationId)
     }
 
-    BackHandler(enabled = state.selectedConversationId != null) {
-        viewModel.clearSelection()
+    val leaveConversation: () -> Unit = {
+        if (initialConversationId != null && onReturnToSource != null) onReturnToSource()
+        else viewModel.clearSelection()
+    }
+    BackHandler(enabled = state.selectedConversationId != null, onBack = leaveConversation)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(state.selectedConversationId, lifecycleOwner) {
+        if (state.selectedConversationId != null) lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (isActive) {
+                delay(5_000)
+                viewModel.refreshConversation()
+            }
+        }
     }
 
     if (state.selectedConversationId != null) {
-        ChatDetailView(
-            messages = state.messages,
-            streamingText = state.streamingText,
-            isStreaming = state.isStreaming,
-            isLoadingMessages = state.isLoadingMessages,
-            onSend = viewModel::sendMessage,
-            onStop = viewModel::stopStreaming,
-            onResumeRun = viewModel::resumeRun,
-            onResolvePermission = viewModel::resolvePermission,
-            onDecideReview = viewModel::decideReview,
-            onBack = viewModel::clearSelection,
-        )
+        key(state.selectedConversationId) {
+            ChatDetailView(
+                title = contextTitle ?: state.conversations.firstOrNull { it.id == state.selectedConversationId }?.title,
+                messages = state.messages,
+                streamingText = state.streamingText,
+                isStreaming = state.isStreaming,
+                isLoadingMessages = state.isLoadingMessages,
+                onSend = viewModel::sendMessage,
+                onStop = viewModel::stopStreaming,
+                onResumeRun = viewModel::resumeRun,
+                onResolvePermission = viewModel::resolvePermission,
+                onDecideReview = viewModel::decideReview,
+                onBack = leaveConversation,
+                plans = state.plans,
+                planChanges = state.planChanges,
+                pendingPlans = state.pendingPlans,
+                onPlanAction = viewModel::planAction,
+            )
+        }
     } else {
         ConversationListView(
             conversations = state.conversations,
@@ -401,6 +432,11 @@ private fun ConversationCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatDetailView(
+    title: String?,
+    plans: Map<String, ChatPlanProposal>,
+    planChanges: Map<String, String>,
+    pendingPlans: Set<String>,
+    onPlanAction: (String, String) -> Unit,
     messages: List<Message>,
     streamingText: String,
     isStreaming: Boolean,
@@ -409,7 +445,7 @@ private fun ChatDetailView(
     onStop: () -> Unit,
     onResumeRun: (String, String) -> Unit,
     onResolvePermission: (String, Boolean) -> Unit,
-    onDecideReview: (String, Boolean) -> Unit,
+    onDecideReview: (String, ReviewDecision, String?) -> Unit,
     onBack: () -> Unit,
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -444,7 +480,7 @@ private fun ChatDetailView(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                         Text(
-                            text = stringResource(R.string.chat_conversation),
+                            text = title ?: stringResource(R.string.chat_conversation),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -479,7 +515,7 @@ private fun ChatDetailView(
                 isStreaming = isStreaming,
                 onStop = onStop,
                 onSend = {
-                    if (inputText.isNotBlank()) {
+                    if (inputText.isNotBlank() && !isLoadingMessages && !isStreaming) {
                         onSend(inputText)
                         inputText = ""
                     }
@@ -542,6 +578,10 @@ private fun ChatDetailView(
 
                 itemsIndexed(messages, key = { _, message -> message.id }) { _, message ->
                     MessageBubble(
+                        plans = plans,
+                        planChanges = planChanges,
+                        pendingPlans = pendingPlans,
+                        onPlanAction = onPlanAction,
                         message = message,
                         onResumeRun = onResumeRun,
                         onResolvePermission = onResolvePermission,
@@ -691,11 +731,15 @@ private fun ChatComposer(
 
 @Composable
 private fun MessageBubble(
+    plans: Map<String, ChatPlanProposal> = emptyMap(),
+    planChanges: Map<String, String> = emptyMap(),
+    pendingPlans: Set<String> = emptySet(),
+    onPlanAction: (String, String) -> Unit = { _, _ -> },
     message: Message,
     streaming: Boolean = false,
     onResumeRun: (String, String) -> Unit,
     onResolvePermission: (String, Boolean) -> Unit,
-    onDecideReview: (String, Boolean) -> Unit,
+    onDecideReview: (String, ReviewDecision, String?) -> Unit,
 ) {
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
@@ -774,6 +818,13 @@ private fun MessageBubble(
                 )
             }
             message.taskDelegation?.let { delegation -> TaskDelegationCard(delegation) }
+            val proposalId = message.metadata?.get("plan_proposal_id")?.jsonPrimitive?.contentOrNull
+            if (proposalId != null) {
+                ChatPlanCard(plans[proposalId], proposalId in pendingPlans,
+                    proposalId in planChanges,
+                    parentTitle = message.metadata?.get("todo_title")?.jsonPrimitive?.contentOrNull,
+                    onAction = { onPlanAction(proposalId, it) })
+            }
         }
     }
 }
@@ -788,11 +839,12 @@ private fun RunUpdateCard(
     update: RunUpdate,
     onResume: (String, String) -> Unit,
     onResolvePermission: (String, Boolean) -> Unit,
-    onDecideReview: (String, Boolean) -> Unit,
+    onDecideReview: (String, ReviewDecision, String?) -> Unit,
 ) {
     var answer by remember(update.runId) { mutableStateOf("") }
-    val actionableRunId = update.runId
-    val actionableReviewId = update.reviewId
+    var reviewNote by remember(update.reviewId) { mutableStateOf("") }
+    val actionableRunId = update.runId.takeIf { update.actionsLive }
+    val actionableReviewId = update.reviewId.takeIf { update.actionsLive }
     val statusLabel = stringResource(
         when (update.status) {
             "waiting_input" -> R.string.chat_run_status_waiting_input
@@ -837,7 +889,7 @@ private fun RunUpdateCard(
                     color = accent,
                 )
             }
-            if (update.needsUser) {
+            if (update.needsUser && update.actionsLive) {
                 Text(
                     text = stringResource(R.string.chat_run_needs_you_hint),
                     style = MaterialTheme.typography.bodySmall,
@@ -883,14 +935,25 @@ private fun RunUpdateCard(
                 }
             }
             if (update.status == "waiting_review" && actionableReviewId != null) {
+                TextField(
+                    value = reviewNote,
+                    onValueChange = { reviewNote = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.chat_review_note)) },
+                    maxLines = 3,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(onClick = { onDecideReview(actionableReviewId, true) }) {
+                    Button(onClick = { onDecideReview(actionableReviewId, ReviewDecision.APPROVED, reviewNote) }) {
                         Text(stringResource(R.string.chat_review_approve))
                     }
-                    OutlinedButton(onClick = { onDecideReview(actionableReviewId, false) }) {
+                    OutlinedButton(onClick = { onDecideReview(actionableReviewId, ReviewDecision.REJECTED, reviewNote) }) {
                         Text(stringResource(R.string.chat_review_reject))
                     }
                 }
+                OutlinedButton(
+                    enabled = reviewNote.isNotBlank(),
+                    onClick = { onDecideReview(actionableReviewId, ReviewDecision.CHANGES_REQUESTED, reviewNote) },
+                ) { Text(stringResource(R.string.chat_review_request_changes)) }
             }
         }
     }

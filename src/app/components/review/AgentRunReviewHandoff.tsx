@@ -37,7 +37,7 @@ export default function AgentRunReviewHandoff({
   const graphRevision = outcome?.graph_revision ?? impact?.graph_revision;
   const newlyReadyTasks = outcome?.newly_ready_tasks ?? impact?.newly_ready_tasks ?? [];
   const readyCount = newlyReadyTasks.length;
-  const nextTask = newlyReadyTasks[0];
+  const nextTask = readyCount === 1 ? newlyReadyTasks[0] : undefined;
   const completedLabel = taskTitle ? `“${taskTitle}”` : 'The linked task';
   return (
     <section
@@ -165,6 +165,11 @@ export default function AgentRunReviewHandoff({
             </>
           ) : (
             <>
+              {readyCount > 1 && onChooseAnother && (
+                <button className="cc-btn cc-btn--primary" type="button" onClick={onChooseAnother}>
+                  {translateUi('Choose another')}
+                </button>
+              )}
               {todoId && (
                 <button className="cc-btn" type="button" onClick={() => onOpenTask(todoId)}>
                   {translateUi('Open completed task')}

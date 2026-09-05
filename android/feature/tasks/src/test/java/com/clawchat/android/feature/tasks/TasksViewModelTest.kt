@@ -87,6 +87,26 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun `project task outside first list page opens by exact id and remains editable`() = runTest {
+        val older = sampleTodo.copy(id = "older", title = "Outside first page")
+        coEvery { todoRepository.listTodos(any()) } returns ApiResult.Success(PaginatedResponse(items = sampleTodos))
+        coEvery { todoRepository.getTodo("older") } returns ApiResult.Success(older)
+        coEvery { todoRepository.updateTodo("older", TodoUpdate(status = TaskStatus.IN_PROGRESS)) } returns
+            ApiResult.Success(older.copy(status = TaskStatus.IN_PROGRESS))
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.selectTaskById("older")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("older", vm.uiState.value.selectedTask?.id)
+        todoChanged.tryEmit(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.tasks.any { it.id == "older" })
+        vm.setTaskStatus("older", TaskStatus.IN_PROGRESS)
+        testDispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 1) { todoRepository.updateTodo("older", TodoUpdate(status = TaskStatus.IN_PROGRESS)) }
+    }
+
+    @Test
     fun `only unfinished experiment tasks require verdict confirmation`() {
         val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
         val hashedExperiment = sampleTodo.copy(tags = listOf("#exp/E65b"))

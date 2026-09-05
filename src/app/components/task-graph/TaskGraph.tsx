@@ -35,6 +35,8 @@ interface TaskGraphProps {
   fixedProjectId?: string;
   showPlanningAction?: boolean;
   initialMode?: TaskGraphMode;
+  selectedTaskId?: string | null;
+  onSelectTask?: (id: string | null) => void;
 }
 const GRAPH_MODE_OPTIONS = [
   { label: 'Structure', value: 'structure' },
@@ -48,6 +50,8 @@ export default function TaskGraph({
   fixedProjectId,
   showPlanningAction = true,
   initialMode = 'structure',
+  selectedTaskId: controlledTaskId,
+  onSelectTask,
 }: TaskGraphProps) {
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
@@ -58,7 +62,15 @@ export default function TaskGraph({
   const [projectId, setProjectId] = useState(fixedProjectId ?? 'all');
   const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
   const [proposalOpen, setProposalOpen] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [localTaskId, setLocalTaskId] = useState<string | null>(null);
+  const selectedTaskId = controlledTaskId === undefined ? localTaskId : controlledTaskId;
+  const setSelectedTaskId = useCallback(
+    (id: string | null) => {
+      if (onSelectTask) onSelectTask(id);
+      else setLocalTaskId(id);
+    },
+    [onSelectTask],
+  );
   const [layoutResetVersion, setLayoutResetVersion] = useState(0);
   const projectsQuery = useProjectsQuery();
   const projectOptions = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
@@ -195,10 +207,14 @@ export default function TaskGraph({
     [insightsQuery.data, selectedTaskId],
   );
   useEffect(() => {
-    if (selectedTaskId && !elements.nodes.some((node) => node.id === selectedTaskId)) {
+    if (
+      controlledTaskId === undefined &&
+      selectedTaskId &&
+      !elements.nodes.some((node) => node.id === selectedTaskId)
+    ) {
       setSelectedTaskId(null);
     }
-  }, [elements.nodes, selectedTaskId]);
+  }, [controlledTaskId, elements.nodes, selectedTaskId, setSelectedTaskId]);
   const handleStatusFilter = (value: string) => {
     const parsed = TaskStatusSchema.safeParse(value);
     const next = value === 'all' ? 'all' : parsed.success ? parsed.data : 'all';

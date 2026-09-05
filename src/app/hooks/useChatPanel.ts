@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 
 export interface ChatPanelPresentation {
+  projectId?: string;
   kind: 'quick' | 'project' | 'task' | 'run';
   title: string;
   subtitle?: string;
@@ -17,6 +18,7 @@ export interface ChatPanelState {
   setConversationId: (id: string | null) => void;
   setPresentation: (presentation: ChatPanelPresentation) => void;
   reset: () => void;
+  beginSelection: () => () => boolean;
 }
 
 const QUICK_CHAT_PRESENTATION: ChatPanelPresentation = {
@@ -37,14 +39,26 @@ export default function useChatPanel(): ChatPanelState {
   });
   const presentationRef = useRef(presentation);
   const quickConversationIdRef = useRef(conversationId);
+  const selectionGeneration = useRef(0);
+  const beginSelection = useCallback(() => {
+    const generation = ++selectionGeneration.current;
+    return () => selectionGeneration.current === generation;
+  }, []);
 
   const storeConversationId = useCallback((id: string | null) => {
     setConversationIdState(id);
     useChatStore.getState().setCurrentConversationId(id);
+    const projectId = presentationRef.current.projectId;
+    if (projectId && id && presentationRef.current.kind !== 'quick') {
+      useChatStore
+        .getState()
+        .rememberProjectConversation(projectId, id, presentationRef.current.kind);
+    }
   }, []);
 
   const setConversationId = useCallback(
     (id: string | null) => {
+      selectionGeneration.current += 1;
       if (presentationRef.current.kind === 'quick') quickConversationIdRef.current = id;
       storeConversationId(id);
     },
@@ -56,9 +70,13 @@ export default function useChatPanel(): ChatPanelState {
     setPresentation(nextPresentation);
   }, []);
 
-  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
+  const toggle = useCallback(() => {
+    selectionGeneration.current += 1;
+    setIsOpen((prev) => !prev);
+  }, []);
   const open = useCallback(
     (id?: string, nextPresentation?: ChatPanelPresentation) => {
+      selectionGeneration.current += 1;
       setIsOpen(true);
       if (nextPresentation) updatePresentation(nextPresentation);
       const nextKind = nextPresentation?.kind ?? presentationRef.current.kind;
@@ -69,8 +87,12 @@ export default function useChatPanel(): ChatPanelState {
     },
     [storeConversationId, updatePresentation],
   );
-  const close = useCallback(() => setIsOpen(false), []);
+  const close = useCallback(() => {
+    selectionGeneration.current += 1;
+    setIsOpen(false);
+  }, []);
   const reset = useCallback(() => {
+    selectionGeneration.current += 1;
     setIsOpen(false);
     updatePresentation(QUICK_CHAT_PRESENTATION);
     storeConversationId(quickConversationIdRef.current);
@@ -86,5 +108,6 @@ export default function useChatPanel(): ChatPanelState {
     setConversationId,
     setPresentation: updatePresentation,
     reset,
+    beginSelection,
   };
 }

@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProjectWorkspacePage from '../ProjectWorkspacePage';
+import { useChatStore } from '../../stores/useChatStore';
 
 const mocks = vi.hoisted(() => ({
   openPanel: vi.fn(),
@@ -10,8 +11,12 @@ const mocks = vi.hoisted(() => ({
   setPanelPresentation: vi.fn(),
   getConversation: vi.fn(),
   updateProject: vi.fn(),
+  get: vi.fn(),
+  setConversationId: vi.fn(),
+  isMobile: false,
   planTodos: [] as Array<Record<string, unknown>>,
 }));
+vi.mock('../../services/apiClient', () => ({ default: { get: mocks.get } }));
 
 const project = {
   id: 'project-1',
@@ -59,13 +64,14 @@ vi.mock('../../hooks/queries', () => ({
   useTestPaseoConnection: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
-vi.mock('../../hooks/usePlatform', () => ({ default: () => ({ isMobile: false }) }));
+vi.mock('../../hooks/usePlatform', () => ({ default: () => ({ isMobile: mocks.isMobile }) }));
 vi.mock('../../components/chat-panel/ChatPanelControllerContext', () => ({
   useChatPanelController: () => ({
     open: mocks.openPanel,
     reset: mocks.resetPanel,
     presentation: { kind: 'quick', title: 'Quick Chat' },
     setPresentation: mocks.setPanelPresentation,
+    setConversationId: mocks.setConversationId,
   }),
 }));
 vi.mock('../../components/projects/ProjectPlan', () => ({
@@ -98,6 +104,10 @@ function renderPage() {
 
 describe('ProjectWorkspacePage', () => {
   beforeEach(() => {
+    useChatStore.setState({ activeConversationByProject: {} });
+    mocks.get.mockReset();
+    mocks.isMobile = false;
+    mocks.setConversationId.mockReset();
     mocks.openPanel.mockReset();
     mocks.resetPanel.mockReset();
     mocks.setPanelPresentation.mockReset();
@@ -113,6 +123,7 @@ describe('ProjectWorkspacePage', () => {
     expect(screen.getByText('Project plan content')).toBeInTheDocument();
     await waitFor(() =>
       expect(mocks.openPanel).toHaveBeenCalledWith('conv-project', {
+        projectId: project.id,
         kind: 'project',
         title: 'Project Agent',
         subtitle: project.title,
@@ -120,6 +131,80 @@ describe('ProjectWorkspacePage', () => {
     );
     expect(mocks.openPanel).toHaveBeenCalledTimes(1);
     expect(mocks.planTodos.map((todo) => todo.id)).toEqual(['todo-task']);
+  });
+
+  it('restores the remembered run instead of creating a project conversation', async () => {
+    useChatStore.getState().rememberProjectConversation(project.id, 'run-thread', 'run');
+    mocks.get.mockResolvedValue({
+      data: {
+        id: 'run-thread',
+        project_id: project.id,
+        created_at: '2026-09-05T00:00:00Z',
+        updated_at: '2026-09-05T00:00:00Z',
+      },
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(mocks.openPanel).toHaveBeenCalledWith('run-thread', {
+        projectId: project.id,
+        kind: 'run',
+        title: 'Task Agent',
+        subtitle: project.title,
+      }),
+    );
+    expect(mocks.getConversation).not.toHaveBeenCalled();
+    expect(mocks.openPanel).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores mobile selection without opening the panel', async () => {
+    mocks.isMobile = true;
+    useChatStore.getState().rememberProjectConversation(project.id, 'run-mobile', 'run');
+    mocks.get.mockResolvedValue({
+      data: {
+        id: 'run-mobile',
+        project_id: project.id,
+        created_at: '2026-09-05T00:00:00Z',
+        updated_at: '2026-09-05T00:00:00Z',
+      },
+    });
+    renderPage();
+    await waitFor(() => expect(mocks.setConversationId).toHaveBeenCalledWith('run-mobile'));
+    expect(mocks.openPanel).not.toHaveBeenCalled();
+    expect(mocks.setPanelPresentation).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'run' }),
+    );
+  });
+
+  it('keeps the last run on a transient connection failure', async () => {
+    useChatStore.getState().rememberProjectConversation(project.id, 'run-offline', 'run');
+    mocks.get.mockRejectedValue({ response: { status: 503 } });
+    renderPage();
+    await waitFor(() => expect(mocks.get).toHaveBeenCalled());
+    expect(mocks.getConversation).not.toHaveBeenCalled();
+    expect(Object.values(useChatStore.getState().activeConversationByProject)).toContainEqual({
+      conversationId: 'run-offline',
+      kind: 'run',
+    });
+  });
+
+  it('falls back to Project Agent when the remembered conversation belongs elsewhere', async () => {
+    useChatStore.getState().rememberProjectConversation(project.id, 'foreign-thread', 'run');
+    mocks.get.mockResolvedValue({
+      data: {
+        id: 'foreign-thread',
+        project_id: 'another-project',
+        created_at: '2026-09-05T00:00:00Z',
+        updated_at: '2026-09-05T00:00:00Z',
+      },
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(mocks.openPanel).toHaveBeenCalledWith(
+        'conv-project',
+        expect.objectContaining({ kind: 'project' }),
+      ),
+    );
+    expect(mocks.openPanel).not.toHaveBeenCalledWith('foreign-thread', expect.anything());
   });
 
   it('uses only Plan, Activity and Files as workspace sections', () => {

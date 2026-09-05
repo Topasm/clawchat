@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import SettingsShell from '../components/settings/SettingsShell';
 import SettingsSection from '../components/shared/SettingsSection';
+import DebugLoggingSection from '../components/settings/DebugLoggingSection';
 import { PropertyRow } from '../components/shared/WorkspacePrimitives';
 import { platformApi } from '../platform';
 import { useToastStore } from '../stores/useToastStore';
@@ -61,6 +62,7 @@ export default function DiagnosticsPage() {
       description={t('settingsShell.diagnosticsDescription')}
     >
       <div className="cc-settings-page">
+        <DebugLoggingSection />
         <SettingsSection title={translateUi('Local server status')}>
           <dl className="cc-diagnostics-grid">
             <div>

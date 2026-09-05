@@ -1,5 +1,24 @@
 /** Korean translations keyed by their canonical English UI message. */
 export const koreanUiTranslations: Record<string, string> = {
+  'Debug logging': '디버깅 로그',
+  'Capture diagnostic logs': '진단 로그 기록',
+  'Off by default. Starts immediately and resets when the app reloads. Turning off stops capture but keeps the current log until cleared.':
+    '기본은 꺼짐입니다. 켜면 바로 기록하며 앱을 다시 불러오면 꺼집니다. 끄면 수집을 중지하며 기존 로그는 지울 때까지 남습니다.',
+  'Captures API timing, status, button activity and runtime error signals. No message text, request bodies, credentials or full URLs. Latest 500 events stay in memory; nothing is uploaded automatically.':
+    'API 소요 시간·상태, 버튼 동작, 실행 오류 발생 여부를 기록합니다. 대화 본문·요청 본문·인증 정보·전체 URL은 수집하지 않습니다. 최근 500개를 메모리에만 보관하며 자동 전송하지 않습니다.',
+  'Export diagnostic logs': '진단 로그 내보내기',
+  'Clear diagnostic logs': '진단 로그 지우기',
+  'Copy diagnostic logs': '진단 로그 복사',
+  'Diagnostic logs copied': '진단 로그를 복사했습니다',
+  'Could not copy diagnostic logs': '진단 로그를 복사하지 못했습니다',
+  'Could not export diagnostic logs': '진단 로그를 내보내지 못했습니다',
+  'Live capture is on': '실시간 기록 중',
+  'Capture stopped': '기록 중지됨',
+  'Diagnostic log': '진단 로그',
+  'Reproduce the issue to see new events here.':
+    '문제를 다시 발생시키면 이곳에 새 로그가 표시됩니다.',
+  'Server and native process logs are separate. Use Open log folder below. Review files before sharing.':
+    '서버·네이티브 프로세스 로그는 별도입니다. 아래 로그 폴더 열기를 사용하세요. 공유 전에 파일 내용을 확인해 주세요.',
   'Agent run conversations': '에이전트 실행 대화',
   'Average time to resume: ': '평균 재개 시간: ',
   'Items with a note resume automatically and move back to the run thread, so they no longer remain in this filter.':
@@ -7,6 +26,10 @@ export const koreanUiTranslations: Record<string, string> = {
   'Questions: ': '질문: ',
   'Waiting on people: ': '사람 응답 대기: ',
   'Answering the agent': '에이전트에게 답하는 중',
+  'Planning only — this message will not resume the run':
+    '계획 대화 — 이 메시지로 실행을 재개하지 않습니다',
+  'Follow-up work. Applying this proposal does not change the current run.':
+    '발견한 후속 작업입니다. 제안을 적용해도 현재 실행은 변경되지 않습니다.',
   'Answer the agent...': '에이전트에게 답변...',
   'Exit agent answer mode': '에이전트 답변 모드 종료',
   'Permission response sent': '권한 응답을 보냈습니다',

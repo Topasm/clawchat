@@ -16,6 +16,9 @@ import EmptyState from '../shared/EmptyState';
 import SegmentedControl from '../shared/SegmentedControl';
 import TaskGraph from '../task-graph/TaskGraph';
 import TaskGraphProposalDialog from '../task-graph/TaskGraphProposalDialog';
+import useOpenRunThread from '../../hooks/useOpenRunThread';
+import { useOptionalChatPanelController } from '../chat-panel/ChatPanelControllerContext';
+import { getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 
 type PlanView = 'outline' | 'flow';
 
@@ -52,9 +55,21 @@ function taskBreadcrumb(
 
 export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPlanProps) {
   const navigate = useNavigate();
+  const openRunThread = useOpenRunThread();
+  const panel = useOptionalChatPanelController();
   const addToast = useToastStore((state) => state.addToast);
-  const [view, setView] = useState<PlanView>('outline');
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const selectionKey = JSON.stringify([getChatWorkspaceScope(), project.id]);
+  const selection = useChatStore((state) => state.projectPlanSelections[selectionKey]);
+  const view = selection?.view === 'flow' ? 'flow' : 'outline';
+  const selectedTaskId = todos.some((todo) => todo.id === selection?.taskId)
+    ? selection!.taskId
+    : null;
+  const setView = (nextView: PlanView) =>
+    useChatStore
+      .getState()
+      .setProjectPlanSelection(project.id, { view: nextView, taskId: selectedTaskId });
+  const setSelectedTaskId = (taskId: string | null) =>
+    useChatStore.getState().setProjectPlanSelection(project.id, { view, taskId });
   const [proposalTarget, setProposalTarget] = useState<TodoResponse | null>(null);
   const { data: relationships = [] } = useTaskRelationshipsQuery();
   const insightsQuery = useTaskGraphInsightsQuery(
@@ -92,13 +107,17 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
     ) {
       return;
     }
+    const isCurrentSelection = panel?.beginSelection?.() ?? (() => true);
     try {
-      await startExecution.mutateAsync({
+      const result = await startExecution.mutateAsync({
         todoId: selectedTask.id,
         skillId,
         executionProvider: project.default_execution_provider || 'builtin',
         model: project.default_execution_model,
       });
+      if (isCurrentSelection()) {
+        await openRunThread(result.run_id, `${project.title} › ${selectedTask.title}`);
+      }
     } catch {
       // The mutation presents the server's actionable error in a toast.
     }
@@ -203,6 +222,8 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
             fixedProjectId={project.id}
             showPlanningAction={false}
             initialMode="execution"
+            selectedTaskId={selectedTaskId}
+            onSelectTask={setSelectedTaskId}
           />
         )}
 

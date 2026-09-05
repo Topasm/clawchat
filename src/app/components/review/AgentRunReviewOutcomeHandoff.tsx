@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { useRunReadyTaskWithProjectDefaults } from '../../hooks/queries';
 import type { AgentRunReviewOutcome } from '../../types/api';
 import AgentRunReviewHandoff from './AgentRunReviewHandoff';
+import useOpenRunThread from '../../hooks/useOpenRunThread';
+import { useOptionalChatPanelController } from '../chat-panel/ChatPanelControllerContext';
 
 interface AgentRunReviewOutcomeHandoffProps {
   projectId?: string | null;
@@ -18,7 +20,10 @@ export default function AgentRunReviewOutcomeHandoff({
   onDismiss,
 }: AgentRunReviewOutcomeHandoffProps) {
   const navigate = useNavigate();
-  const nextTask = outcome.newly_ready_tasks?.[0];
+  const openRunThread = useOpenRunThread();
+  const panel = useOptionalChatPanelController();
+  const nextTask =
+    outcome.newly_ready_tasks?.length === 1 ? outcome.newly_ready_tasks[0] : undefined;
   const runner = useRunReadyTaskWithProjectDefaults(Boolean(nextTask));
 
   return (
@@ -26,7 +31,12 @@ export default function AgentRunReviewOutcomeHandoff({
       taskTitle={taskTitle}
       outcome={outcome}
       onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
-      onRunNext={(task) => runner.runTask(task.id, projectId)}
+      onRunNext={async (task) => {
+        const isCurrentSelection = panel?.beginSelection?.() ?? (() => true);
+        const result = await runner.runTask(task.id, projectId);
+        if (result && isCurrentSelection()) await openRunThread(result.run_id, task.title);
+        return result;
+      }}
       canRunNext={Boolean(nextTask && runner.canRunTask(nextTask.id, projectId))}
       isStartingNext={runner.isPending || runner.isPreparing}
       onChooseAnother={() =>
@@ -37,7 +47,7 @@ export default function AgentRunReviewOutcomeHandoff({
             : undefined
       }
       onStop={onDismiss}
-      onOpenRun={(runId) => navigate(`/runs?run_id=${runId}`)}
+      onOpenRun={(runId) => void openRunThread(runId)}
     />
   );
 }

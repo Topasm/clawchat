@@ -4,12 +4,19 @@ import com.clawchat.android.core.api.ClawChatApi
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.model.PaginatedResponse
+import com.clawchat.android.core.data.model.ChatPlanProposal
+import com.clawchat.android.core.data.model.ChatPlanApplyRequest
+import com.clawchat.android.core.data.model.ChatPlanApplyResult
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.apiCall
 import javax.inject.Inject
 import javax.inject.Singleton
 
 interface ConversationRepository {
+    suspend fun getPlan(todoId: String, proposalId: String): ApiResult<ChatPlanProposal>
+    suspend fun applyPlan(todoId: String, body: ChatPlanApplyRequest): ApiResult<ChatPlanApplyResult>
+    suspend fun dismissPlan(todoId: String, proposalId: String): ApiResult<Unit>
+    suspend fun undoPlan(changeSetId: String): ApiResult<Unit>
     suspend fun listConversations(params: Map<String, String> = emptyMap()): ApiResult<PaginatedResponse<Conversation>>
     suspend fun createConversation(body: Map<String, String>): ApiResult<Conversation>
     suspend fun getConversation(id: String): ApiResult<Conversation>
@@ -23,6 +30,14 @@ interface ConversationRepository {
 class ConversationRepositoryImpl @Inject constructor(
     private val api: ClawChatApi,
 ) : ConversationRepository {
+    override suspend fun getPlan(todoId: String, proposalId: String) = apiCall { api.getChatPlan(todoId, proposalId) }
+    override suspend fun applyPlan(todoId: String, body: ChatPlanApplyRequest) = apiCall { api.applyChatPlan(todoId, body) }
+    override suspend fun dismissPlan(todoId: String, proposalId: String): ApiResult<Unit> = apiCall<Unit> {
+        api.dismissChatPlan(todoId, mapOf("proposal_id" to proposalId))
+    }
+    override suspend fun undoPlan(changeSetId: String): ApiResult<Unit> = apiCall<Unit> {
+        api.undoChatPlan(changeSetId)
+    }
 
     override suspend fun listConversations(params: Map<String, String>): ApiResult<PaginatedResponse<Conversation>> =
         apiCall { api.listConversations(params) }

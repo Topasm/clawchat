@@ -93,6 +93,7 @@ class TasksViewModel @Inject constructor(
     }
 
     private var taskRequestGeneration = 0L
+    private var taskSelectionGeneration = 0L
     private var relationshipRequestGeneration = 0L
     private var deletionToken = 0L
     private var deletionCommitJob: Job? = null
@@ -124,6 +125,21 @@ class TasksViewModel @Inject constructor(
     }
 
     fun selectTask(task: Todo?) = onAction(TasksAction.SelectTask(task))
+    fun selectTaskById(id: String) {
+        _uiState.value.tasks.firstOrNull { it.id == id }?.let { selectTask(it); return }
+        doSelectTask(null)
+        val generation = taskSelectionGeneration
+        viewModelScope.launch {
+            when (val result = todoRepository.getTodo(id)) {
+                is ApiResult.Success -> if (generation == taskSelectionGeneration && result.data.source != PROJECT_ROOT_SOURCE) {
+                    _uiState.update { it.copy(tasks = it.tasks.filterNot { task -> task.id == id } + result.data) }
+                    doSelectTask(result.data)
+                }
+                is ApiResult.Error -> if (generation == taskSelectionGeneration) _uiState.update { it.copy(error = result.message) }
+                else -> Unit
+            }
+        }
+    }
     fun toggleComplete(todoId: String) = onAction(TasksAction.ToggleComplete(todoId))
     fun setStatusFilter(status: TaskStatus?) = onAction(TasksAction.SetFilter(status))
     fun createTask(input: TodoCreate) = onAction(TasksAction.Create(input))
@@ -155,7 +171,9 @@ class TasksViewModel @Inject constructor(
                                 task.source == PROJECT_ROOT_SOURCE
                         }
                         state.copy(
-                            tasks = visibleItems,
+                            tasks = if (state.selectedTask != null && visibleItems.none { it.id == state.selectedTask.id }) {
+                                visibleItems + state.selectedTask
+                            } else visibleItems,
                             selectedTask = state.selectedTask?.let { selected ->
                                 visibleItems.firstOrNull { it.id == selected.id } ?: selected
                             },
@@ -178,6 +196,7 @@ class TasksViewModel @Inject constructor(
     }
 
     private fun doSelectTask(task: Todo?) {
+        taskSelectionGeneration++
         _uiState.update {
             it.copy(
                 selectedTask = task,
@@ -268,7 +287,10 @@ class TasksViewModel @Inject constructor(
                 is ApiResult.Success -> _uiState.update { state ->
                     if (state.selectedTask?.id == taskId) {
                         relationshipTitleCache[taskId] = result.data.title
-                        state.copy(selectedTask = result.data)
+                        state.copy(
+                            selectedTask = result.data,
+                            tasks = state.tasks.map { if (it.id == taskId) result.data else it },
+                        )
                     } else {
                         state
                     }

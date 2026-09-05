@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -96,6 +97,22 @@ async def create_todo(ctx: IntentContext) -> IntentReply:
     conversation, project_id = await _conversation_scope(ctx)
     parent_id = ctx.params.get("parent_id")
     parent_title = (ctx.params.get("parent_title") or "").strip()
+    try:
+        origin = json.loads(conversation.metadata_json or "{}") if conversation else {}
+    except (ValueError, TypeError):
+        origin = {}
+    if not isinstance(origin, dict):
+        origin = {}
+    discovered_from = None
+    if origin.get("origin") == "agent_run":
+        source_id = origin.get("todo_id")
+        source = await ctx.db.get(Todo, source_id) if isinstance(source_id, str) else None
+        if source is not None and source.project_id == project_id:
+            discovered_from = source.id
+            if not parent_id and not parent_title:
+                if source.parent_id is None:
+                    return "Place this task in a project before proposing follow-up work.", None
+                parent_id = source.parent_id
     if not parent_id and parent_title:
         todos, _ = await todo_service.get_todos(
             ctx.db,
@@ -140,6 +157,7 @@ async def create_todo(ctx: IntentContext) -> IntentReply:
                 "plan_proposal_id": proposal.proposal_id,
                 "plan_requested_at": proposal.created_at.isoformat(),
                 "proposal_kind": "add_task",
+                **({"discovered_from_task_id": discovered_from} if discovered_from else {}),
             },
         )
 
