@@ -3,6 +3,25 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { inspectRuntimeBoundary } = require('./runtime-boundary');
+const fs = require('node:fs');
+const path = require('node:path');
+
+// Source guard only: the native panel still needs a real macOS/GTK smoke test.
+test('folder picker yields while the native UI is open instead of blocking its event loop', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../src-tauri/src/commands/server.rs'),
+    'utf8',
+  );
+  const command = source.match(
+    /pub async fn server_select_folder[\s\S]*?(?=\n#\[tauri::command\])/,
+  );
+  assert.ok(command, 'folder selection must remain an asynchronous command');
+  assert.match(command[0], /oneshot::channel\(/);
+  assert.match(command[0], /\.pick_folder\(/);
+  assert.match(command[0], /receiver\s*\.await/);
+  assert.doesNotMatch(command[0], /blocking_pick_folder|\.recv\(|block_on\(/);
+  assert.match(command[0], /sender\.send\(path\.map\(/, 'cancel must be forwarded as None');
+});
 
 test('accepts native calls inside platform adapters', () => {
   const violations = inspectRuntimeBoundary([

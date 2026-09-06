@@ -117,11 +117,28 @@
 }
 .cc-project-workspace__machine {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--cc-text-secondary);
+}
+.cc-project-location {
+  min-width: 0;
+}
+.cc-project-location__path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--cc-text-secondary);
+}
+.cc-project-location__path code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 .cc-project-workspace__machine--unset {
   color: var(--cc-text-tertiary);

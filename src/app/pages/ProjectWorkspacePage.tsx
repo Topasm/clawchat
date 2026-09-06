@@ -16,6 +16,7 @@ import ProjectActivity from '../components/projects/ProjectActivity';
 import ProjectPlan from '../components/projects/ProjectPlan';
 import type { ProjectOverviewResponse } from '../types/api';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
+import ProjectMachineLine from '../components/shared/ProjectMachineLine';
 import { useChatPanelController } from '../components/chat-panel/ChatPanelControllerContext';
 import usePlatform from '../hooks/usePlatform';
 import { useToastStore } from '../stores/useToastStore';
@@ -204,18 +205,12 @@ export default function ProjectWorkspacePage() {
       />
     );
   }
-  // The header line is a shortcut to the full "Where this runs" section, which
-  // lives folded away under the plan. Open it and bring it into view.
+  // Execution settings are shared by all tabs, immediately below the header.
   const revealWhereItRuns = () => {
-    if (section !== 'plan') setSearchParams({});
-    const reveal = () => {
-      const details = document.getElementById(EXECUTION_SETTINGS_ID);
-      if (!(details instanceof HTMLDetailsElement)) return;
-      details.open = true;
-      details.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-    };
-    if (document.getElementById(EXECUTION_SETTINGS_ID)) reveal();
-    else window.setTimeout(reveal, 0);
+    const details = document.getElementById(EXECUTION_SETTINGS_ID);
+    if (!(details instanceof HTMLDetailsElement)) return;
+    details.open = true;
+    details.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
   };
   return (
     <div className="cc-project-workspace">
@@ -261,6 +256,16 @@ export default function ProjectWorkspacePage() {
           {translateUi('Delete project')}
         </button>
       </header>
+
+      <details
+        key={project.id}
+        className="cc-project-settings-disclosure"
+        id={EXECUTION_SETTINGS_ID}
+      >
+        <summary>{translateUi('Execution settings')}</summary>
+        <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
+        <ProjectExecutionSettings project={project} />
+      </details>
 
       <div
         className="cc-project-workspace__tabs"
@@ -319,12 +324,6 @@ export default function ProjectWorkspacePage() {
 
           <ProjectActivity project={project} todos={projectTasks} attentionOnly />
           <ProjectPlan project={project} todos={projectTasks} onDiscussTask={openTaskAgent} />
-
-          <details className="cc-project-settings-disclosure" id={EXECUTION_SETTINGS_ID}>
-            <summary>{translateUi('Execution settings')}</summary>
-            <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
-            <ProjectExecutionSettings project={project} />
-          </details>
         </>
       )}
     </div>
@@ -422,52 +421,6 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
 }
 
 const EXECUTION_SETTINGS_ID = 'cc-project-execution-settings';
-
-/** Where this project's work runs, at a glance: machine, reachability, path. */
-function ProjectMachineLine({
-  project,
-  onChange,
-}: {
-  project: ProjectOverviewResponse;
-  onChange: () => void;
-}) {
-  if (!project.execution_host_label) {
-    return (
-      <p className="cc-project-workspace__machine cc-project-workspace__machine--unset">
-        {translateUi('No machine chosen')}
-        <button
-          type="button"
-          className="cc-btn cc-btn--ghost cc-btn--compact cc-project-workspace__machine-action"
-          onClick={onChange}
-        >
-          {translateUi('Choose machine')}
-        </button>
-      </p>
-    );
-  }
-  const online = project.execution_host_online;
-  return (
-    <p
-      className={`cc-project-workspace__machine cc-project-workspace__machine--${online ? 'online' : 'offline'}`}
-    >
-      <span className="cc-project-card__host-dot" aria-hidden="true" />
-      {translateUi('Runs on {{host}}', { host: project.execution_host_label })}
-      {' · '}
-      {online
-        ? translateUi('Online')
-        : translateUi('Machine offline — runs are refused until it is back')}
-      {project.execution_workspace_path ? ` · ${project.execution_workspace_path}` : ''}
-      <button
-        type="button"
-        className="cc-btn cc-btn--ghost cc-btn--compact cc-project-workspace__machine-action"
-        onClick={onChange}
-        aria-label={translateUi('Change where this runs')}
-      >
-        {translateUi('Change')}
-      </button>
-    </p>
-  );
-}
 
 function ProjectExecutionSettings({ project }: { project: ProjectOverviewResponse }) {
   const { data: providers = [], isLoading } = useExecutionProvidersQuery();

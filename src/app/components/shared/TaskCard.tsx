@@ -4,7 +4,6 @@ import { useTaskRelationshipsQuery } from '../../hooks/queries';
 import { getDependsOnCountBySource } from '../../utils/taskRelationships';
 import Checkbox from './Checkbox';
 import Badge from './Badge';
-import { RepeatIcon } from './Icons';
 import { translateUi } from '../../i18n';
 const EMPTY_RELATIONSHIPS = [] as const;
 const SKILL_BADGE_LABELS: Record<string, string> = {
@@ -110,15 +109,6 @@ export default function TaskCard({
             )}
           </div>
           <div className="cc-card__meta">
-            {task.is_recurring && (
-              <span
-                className="cc-card__source"
-                data-tone="recurring"
-                title={translateUi('Recurring')}
-              >
-                <RepeatIcon size={10} />
-              </span>
-            )}
             {task.due_date && <Badge variant="due" dueDate={task.due_date} />}
             {task.tags?.map((tag) => (
               <Badge key={tag} variant="tag">

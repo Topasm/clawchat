@@ -37,6 +37,7 @@ class TodoCreate(BaseModel):
         description="Compatibility input; use /api/task-relationships instead",
         json_schema_extra={"deprecated": True},
     )
+    # Legacy compatibility only: task recurrence inputs are ignored.
     recurrence_rule: str | None = None
     recurrence_end: datetime | None = None
 
@@ -71,6 +72,7 @@ class TodoUpdate(BaseModel):
     )
     source: str | None = None
     source_id: str | None = None
+    # Legacy compatibility only: task recurrence inputs are ignored.
     recurrence_rule: str | None = None
     recurrence_end: datetime | None = None
     client_updated_at: datetime | None = Field(
@@ -169,7 +171,7 @@ class TodoResponse(BaseModel):
     clarification_questions: list[str] | None = None
     clarification_answers: dict[str, str] | None = None
 
-    # Recurrence fields
+    # Legacy fields retained for client/database compatibility; no task spawning.
     recurrence_rule: str | None = None
     recurrence_end: datetime | None = None
     is_recurring: bool = False

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -68,6 +68,15 @@ export function useProjectWorkspaceQuery(projectId: string | undefined) {
   });
 }
 
+function refreshProjectLocation(queryClient: QueryClient, projectId: string) {
+  // The detail prefix includes its workspace query. Refresh the list separately,
+  // without refetching every other project's detail or the workspace twice.
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects, exact: true }),
+  ]);
+}
+
 function useWorkspaceMutation<TVariables>(
   projectId: string,
   request: (variables: TVariables) => Promise<unknown>,
@@ -75,10 +84,7 @@ function useWorkspaceMutation<TVariables>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: request,
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projectWorkspace(projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
-    },
+    onSettled: () => refreshProjectLocation(queryClient, projectId),
   });
 }
 
@@ -137,10 +143,7 @@ export function useBindProjectWorkspace() {
       });
       await apiClient.put(`/projects/${body.projectId}/workspace/host`, { host_id: body.hostId });
     },
-    onSettled: (_data, _error, body) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projectWorkspace(body.projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.project(body.projectId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-    },
+    // Refresh even after failure: the path may have saved before binding failed.
+    onSettled: (_data, _error, body) => refreshProjectLocation(queryClient, body.projectId),
   });
 }

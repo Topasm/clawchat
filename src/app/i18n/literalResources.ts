@@ -876,8 +876,7 @@ Object.assign(koreanUiTranslations, {
   'Offline — work here is refused until it is back':
     '오프라인 — 돌아올 때까지 이 기기 작업은 거절됩니다',
   'Where this runs': '어디서 실행하나',
-  'A path belongs to one machine. Record it per machine, then pick the one this project runs on.':
-    '경로는 기기마다 다릅니다. 기기별로 기록한 뒤 이 프로젝트가 돌 기기를 고르세요.',
+  'Applies to all tasks in this project.': '이 프로젝트의 모든 작업에 적용됩니다.',
   'Loading machines…': '기기를 불러오는 중…',
   'Runs here': '여기서 실행',
   'Path on this machine': '이 기기에서의 경로',

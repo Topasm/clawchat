@@ -944,12 +944,6 @@ private fun TaskDetailView(
                         } ?: TextButton(onClick = { showDatePicker = true }) {
                             Text(stringResource(CoreR.string.task_add_due_date))
                         }
-                        if (task.isRecurring) {
-                            ClawStatusChip(
-                                text = stringResource(R.string.tasks_recurring),
-                                tone = ClawTone.Success,
-                            )
-                        }
                         inboxStateLabel(task.inboxState)?.let {
                             ClawStatusChip(text = it, tone = ClawTone.Default)
                         }

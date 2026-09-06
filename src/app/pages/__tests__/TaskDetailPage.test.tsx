@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   deleteTodo: vi.fn(),
   toggleTodo: vi.fn(),
   persist: vi.fn(),
+  projectPath: '/Users/test/papers' as string | null,
+  hostLabel: 'My Mac' as string | null,
+  projectError: false,
 }));
 
 const task = {
@@ -55,8 +58,12 @@ vi.mock('../../hooks/queries', () => ({
           id: projectId,
           title: 'P0-R Semantic referent binding',
           description: mocks.projectDescription,
+          execution_host_label: mocks.hostLabel,
+          execution_host_online: true,
+          execution_workspace_path: mocks.projectPath,
         }
       : undefined,
+    isError: mocks.projectError,
   }),
 }));
 
@@ -76,6 +83,9 @@ vi.mock('../../components/task-relationships/RelationshipsSection', () => ({
 }));
 vi.mock('../../components/shared/FileDropZone', () => ({ default: () => null }));
 vi.mock('../../components/shared/AttachmentList', () => ({ default: () => null }));
+vi.mock('../../components/shared/ProjectWorkspaceHosts', () => ({
+  default: ({ projectId }: { projectId: string }) => <div>Workspace editor: {projectId}</div>,
+}));
 
 function renderPage() {
   const queryClient = new QueryClient({
@@ -101,6 +111,9 @@ describe('TaskDetailPage project context', () => {
     mocks.toggleTodo.mockReset();
     mocks.persist.mockReset();
     task.recurrence_rule = null;
+    mocks.projectPath = '/Users/test/papers';
+    mocks.hostLabel = 'My Mac';
+    mocks.projectError = false;
   });
 
   it('shows the original-document action from the project description first line', () => {
@@ -121,13 +134,53 @@ describe('TaskDetailPage project context', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows the project path before opening details and edits it without opening chat', () => {
+    renderPage();
+    expect(screen.getByText('/Users/test/papers')).toBeVisible();
+    expect(screen.getByText('Runs on My Mac')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'P0-R Semantic referent binding' })).toHaveAttribute(
+      'href',
+      '/projects/project-p0-r',
+    );
+    expect(screen.getByText('Workspace editor: project-p0-r')).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));
+    expect(screen.getByText('Workspace editor: project-p0-r')).toBeVisible();
+    expect(screen.getByPlaceholderText('Task title')).toBeVisible();
+    expect(mocks.persist).not.toHaveBeenCalled();
+  });
+
+  it('shows missing location explicitly and offers the same editor', () => {
+    mocks.projectPath = null;
+    mocks.hostLabel = null;
+    renderPage();
+    expect(screen.getByText('Not set up')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
+    expect(screen.getByText('Workspace editor: project-p0-r')).toBeVisible();
+  });
+
+  it('does not present a failed project lookup as an unset workspace', () => {
+    mocks.projectError = true;
+    renderPage();
+    expect(screen.getByRole('alert')).toHaveTextContent('This project could not be loaded.');
+    expect(screen.queryByText('Not set up')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Choose machine' })).not.toBeInTheDocument();
+  });
+
+  it('refreshes the visible path and resets the editor when switching tasks', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));
+    mocks.projectPath = '/Users/test/new-folder';
+    fireEvent.click(screen.getByRole('link', { name: 'Other task' }));
+    expect(screen.getByText('/Users/test/new-folder')).toBeVisible();
+    expect(screen.queryByText('/Users/test/papers')).not.toBeInTheDocument();
+    expect(screen.getByText('Workspace editor: project-p0-r')).not.toBeVisible();
+  });
+
   it('collapses optional settings without hiding the next action or thread', () => {
     renderPage();
     expect(screen.getByText('Agent thread')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Discuss with agent' })).toBeVisible();
-    expect(
-      screen.getByText('Repeat', { selector: 'summary' }).closest('details'),
-    ).not.toHaveAttribute('open');
+    expect(screen.queryByText('Repeat')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Research' })).not.toBeVisible();
     fireEvent.click(screen.getByText('Skills:'));
     fireEvent.click(screen.getByRole('button', { name: 'Research' }));
@@ -137,12 +190,11 @@ describe('TaskDetailPage project context', () => {
     });
   });
 
-  it('keeps configured recurrence visible', () => {
+  it('does not offer recurrence even for a legacy recurring task', () => {
     task.recurrence_rule = 'RRULE:FREQ=WEEKLY';
     renderPage();
-    expect(screen.getByText('Repeat', { selector: 'summary' }).closest('details')).toHaveAttribute(
-      'open',
-    );
+    expect(screen.queryByText('Repeat')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Task title')).toBeVisible();
   });
 
   it('exposes details accessibly and resets disclosure when changing tasks', () => {

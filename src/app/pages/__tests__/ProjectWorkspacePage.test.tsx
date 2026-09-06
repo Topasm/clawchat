@@ -231,7 +231,7 @@ describe('ProjectWorkspacePage', () => {
     expect(screen.getByRole('button', { name: 'Open original document' })).toBeInTheDocument();
   });
 
-  it('jumps from the header machine line to the folded "Where this runs" section', () => {
+  it('opens the one workspace editor beside the header', () => {
     const { container } = renderPage();
     const details = container.querySelector<HTMLDetailsElement>(
       'details.cc-project-settings-disclosure',
@@ -241,6 +241,20 @@ describe('ProjectWorkspacePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
 
     expect(details?.open).toBe(true);
+    expect(screen.getAllByText('Workspace settings')).toHaveLength(1);
+  });
+
+  it.each(['Activity', 'Files'])('edits the workspace without leaving the %s tab', (tab) => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: tab }));
+    const content = screen.getByText(
+      tab === 'Files' ? 'Project files content' : 'Project activity content',
+    );
+    expect(content).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
+    expect(screen.getByText('Workspace settings')).toBeVisible();
+    expect(content).toBeVisible();
+    expect(screen.queryByText('Project plan content')).not.toBeInTheDocument();
   });
 
   it('saves project-wide agent execution rules', () => {

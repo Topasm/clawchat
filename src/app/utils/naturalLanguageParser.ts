@@ -17,57 +17,62 @@ export function parseNaturalInput(text: string): ParsedInput {
   let cleanTitle = text.trim();
   const now = new Date();
 
-  // Recurrence detection — extract before date parsing
-  const everyDayMatch = cleanTitle.match(/\bevery\s+day\b/i);
-  const everyWeekdayMatch = cleanTitle.match(/\bevery\s+weekday\b/i);
-  const everyWeekMatch = cleanTitle.match(/\bevery\s+week\b/i);
-  const everyMonthMatch = cleanTitle.match(/\bevery\s+month\b/i);
-  const everyYearMatch = cleanTitle.match(/\bevery\s+year\b/i);
-  const everyDayOfWeekMatch = cleanTitle.match(
-    /\bevery\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+  // Recurrence belongs to calendar events only. Keep these words in task titles.
+  const isEvent = /\b(meeting|call|appointment|lunch|dinner|interview|conference)\b/i.test(
+    cleanTitle,
   );
-  const dailyMatch = cleanTitle.match(/\b(daily)\b/i);
-  const weeklyMatch = cleanTitle.match(/\b(weekly)\b/i);
-  const monthlyMatch = cleanTitle.match(/\b(monthly)\b/i);
+  if (isEvent) {
+    const everyDayMatch = cleanTitle.match(/\bevery\s+day\b/i);
+    const everyWeekdayMatch = cleanTitle.match(/\bevery\s+weekday\b/i);
+    const everyWeekMatch = cleanTitle.match(/\bevery\s+week\b/i);
+    const everyMonthMatch = cleanTitle.match(/\bevery\s+month\b/i);
+    const everyYearMatch = cleanTitle.match(/\bevery\s+year\b/i);
+    const everyDayOfWeekMatch = cleanTitle.match(
+      /\bevery\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+    );
+    const dailyMatch = cleanTitle.match(/\b(daily)\b/i);
+    const weeklyMatch = cleanTitle.match(/\b(weekly)\b/i);
+    const monthlyMatch = cleanTitle.match(/\b(monthly)\b/i);
 
-  const dayToRRule: Record<string, string> = {
-    monday: 'MO',
-    tuesday: 'TU',
-    wednesday: 'WE',
-    thursday: 'TH',
-    friday: 'FR',
-    saturday: 'SA',
-    sunday: 'SU',
-  };
+    const dayToRRule: Record<string, string> = {
+      monday: 'MO',
+      tuesday: 'TU',
+      wednesday: 'WE',
+      thursday: 'TH',
+      friday: 'FR',
+      saturday: 'SA',
+      sunday: 'SU',
+    };
 
-  if (everyDayMatch) {
-    result.recurrenceRule = 'FREQ=DAILY';
-    cleanTitle = cleanTitle.replace(everyDayMatch[0], '').trim();
-  } else if (everyWeekdayMatch) {
-    result.recurrenceRule = 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR';
-    cleanTitle = cleanTitle.replace(everyWeekdayMatch[0], '').trim();
-  } else if (everyDayOfWeekMatch) {
-    const day = dayToRRule[everyDayOfWeekMatch[1].toLowerCase()];
-    result.recurrenceRule = `FREQ=WEEKLY;BYDAY=${day}`;
-    cleanTitle = cleanTitle.replace(everyDayOfWeekMatch[0], '').trim();
-  } else if (everyWeekMatch) {
-    result.recurrenceRule = 'FREQ=WEEKLY';
-    cleanTitle = cleanTitle.replace(everyWeekMatch[0], '').trim();
-  } else if (everyMonthMatch) {
-    result.recurrenceRule = 'FREQ=MONTHLY';
-    cleanTitle = cleanTitle.replace(everyMonthMatch[0], '').trim();
-  } else if (everyYearMatch) {
-    result.recurrenceRule = 'FREQ=YEARLY';
-    cleanTitle = cleanTitle.replace(everyYearMatch[0], '').trim();
-  } else if (dailyMatch) {
-    result.recurrenceRule = 'FREQ=DAILY';
-    cleanTitle = cleanTitle.replace(dailyMatch[0], '').trim();
-  } else if (weeklyMatch) {
-    result.recurrenceRule = 'FREQ=WEEKLY';
-    cleanTitle = cleanTitle.replace(weeklyMatch[0], '').trim();
-  } else if (monthlyMatch) {
-    result.recurrenceRule = 'FREQ=MONTHLY';
-    cleanTitle = cleanTitle.replace(monthlyMatch[0], '').trim();
+    if (everyDayMatch) {
+      result.recurrenceRule = 'FREQ=DAILY';
+      cleanTitle = cleanTitle.replace(everyDayMatch[0], '').trim();
+    } else if (everyWeekdayMatch) {
+      result.recurrenceRule = 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR';
+      cleanTitle = cleanTitle.replace(everyWeekdayMatch[0], '').trim();
+    } else if (everyDayOfWeekMatch) {
+      const day = dayToRRule[everyDayOfWeekMatch[1].toLowerCase()];
+      result.recurrenceRule = `FREQ=WEEKLY;BYDAY=${day}`;
+      cleanTitle = cleanTitle.replace(everyDayOfWeekMatch[0], '').trim();
+    } else if (everyWeekMatch) {
+      result.recurrenceRule = 'FREQ=WEEKLY';
+      cleanTitle = cleanTitle.replace(everyWeekMatch[0], '').trim();
+    } else if (everyMonthMatch) {
+      result.recurrenceRule = 'FREQ=MONTHLY';
+      cleanTitle = cleanTitle.replace(everyMonthMatch[0], '').trim();
+    } else if (everyYearMatch) {
+      result.recurrenceRule = 'FREQ=YEARLY';
+      cleanTitle = cleanTitle.replace(everyYearMatch[0], '').trim();
+    } else if (dailyMatch) {
+      result.recurrenceRule = 'FREQ=DAILY';
+      cleanTitle = cleanTitle.replace(dailyMatch[0], '').trim();
+    } else if (weeklyMatch) {
+      result.recurrenceRule = 'FREQ=WEEKLY';
+      cleanTitle = cleanTitle.replace(weeklyMatch[0], '').trim();
+    } else if (monthlyMatch) {
+      result.recurrenceRule = 'FREQ=MONTHLY';
+      cleanTitle = cleanTitle.replace(monthlyMatch[0], '').trim();
+    }
   }
 
   // Date detection
@@ -149,7 +154,7 @@ export function parseNaturalInput(text: string): ParsedInput {
   }
 
   // Type detection
-  if (/\b(meeting|call|appointment|lunch|dinner|interview|conference)\b/i.test(cleanTitle)) {
+  if (isEvent) {
     result.type = 'event';
   } else if (/\b(note|remember that|fyi)\b/i.test(cleanTitle)) {
     result.type = 'note';

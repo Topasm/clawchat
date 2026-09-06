@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from domain.task import TaskStatus
 from models.conversation import Conversation
 from models.todo import Todo
-from services.tasks import todo_recurrence_service, todo_service
+from services.tasks import todo_service
 from utils import make_id
 from ws.notifications import notify_module_data_changed
 from services.chat.intent_handlers import (
@@ -278,15 +278,11 @@ async def complete_todo(ctx: IntentContext) -> IntentReply:
     todo, error = await _resolve_target(ctx, "complete")
     if error is not None:
         return error
-    was_completed = todo.status == TaskStatus.COMPLETED
     todo = await todo_service.update_todo(
         ctx.db,
         todo.id,
         status=TaskStatus.COMPLETED,
     )
-    # Completing through chat must continue a recurring series the
-    # same way the REST update does; otherwise the series silently
-    # ends whenever the user says "done" instead of ticking the box.
     message = f"Marked '{todo.title}' as complete."
     metadata = {
         "action_type": "todo_completed",
@@ -294,15 +290,6 @@ async def complete_todo(ctx: IntentContext) -> IntentReply:
         "todo_id": todo.id,
         "todo_title": todo.title,
     }
-    spawned = await todo_recurrence_service.spawn_next_occurrences(
-        ctx.db,
-        [todo] if not was_completed else [],
-    )
-    if spawned:
-        next_todo = spawned[0]
-        metadata["next_todo_id"] = next_todo.id
-        if next_todo.due_date:
-            message += f" Next one is due {next_todo.due_date.date().isoformat()}."
     return message, metadata
 
 

@@ -27,6 +27,7 @@ import type { ProjectWorkspace } from '../../hooks/queries';
  * project can be moved deliberately, not so it can wander.
  */
 export default function ProjectWorkspaceHosts({ projectId }: { projectId: string }) {
+  const queryClient = useQueryClient();
   const { data: hosts = [], isLoading: hostsLoading } = useExecutionHostsQuery();
   const { data: workspace } = useProjectWorkspaceQuery(projectId);
   const setPath = useSetProjectHostPath(projectId);
@@ -41,6 +42,23 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const busy = localBusy || setPath.isPending || setHost.isPending || removePath.isPending;
+  const clearDraft = (hostId: string) =>
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[hostId];
+      return next;
+    });
+  const clearSavedDraft = (hostId: string, path: string) => {
+    const savedWorkspace = queryClient.getQueryData<ProjectWorkspace>(
+      queryKeys.projectWorkspace(projectId),
+    );
+    // A successful write can be followed by a failed refetch. Keep the input
+    // until the server snapshot confirms it, rather than showing the old path.
+    if (savedWorkspace?.paths.some((entry) => entry.host_id === hostId && entry.path === path)) {
+      clearDraft(hostId);
+    }
+  };
+  const reportSaveError = () => setLocalError(translateUi('Could not save project settings'));
 
   const browse = async () => {
     if (busyRef.current || !thisHostId) return;
@@ -76,6 +94,7 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
       }
       checked = true;
       await bindWorkspace.mutateAsync({ projectId, hostId: thisHostId, path });
+      clearSavedDraft(thisHostId, path);
       useToastStore.getState().addToast('success', translateUi('Project updated'));
     } catch {
       setLocalError(
@@ -104,11 +123,7 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
       <div className="cc-project-workspace__section-header">
         <div>
           <h2>{translateUi('Where this runs')}</h2>
-          <p>
-            {translateUi(
-              'A path belongs to one machine. Record it per machine, then pick the one this project runs on.',
-            )}
-          </p>
+          <p>{translateUi('Applies to all tasks in this project.')}</p>
         </div>
         <span className={`cc-settings-status cc-settings-status--${statusTone()}`}>
           {workspace?.host_label ? `${workspace.host_label} · ` : ''}
@@ -183,11 +198,18 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
                       !draft.trim() ||
                       (isThisMachine ? !isDirty && isSelected && !localError : !isDirty)
                     }
-                    onClick={() =>
-                      isThisMachine
-                        ? void connectLocalFolder(draft.trim())
-                        : setPath.mutate({ host_id: host.id, path: draft.trim() })
-                    }
+                    onClick={() => {
+                      setLocalError(null);
+                      if (isThisMachine) void connectLocalFolder(draft.trim());
+                      else
+                        setPath.mutate(
+                          { host_id: host.id, path: draft.trim() },
+                          {
+                            onSuccess: () => clearSavedDraft(host.id, draft.trim()),
+                            onError: reportSaveError,
+                          },
+                        );
+                    }}
                   >
                     {isThisMachine ? translateUi('Run here') : translateUi('Save path')}
                   </button>
@@ -196,7 +218,10 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
                       type="button"
                       className="cc-btn cc-btn--compact cc-btn--primary"
                       disabled={busy}
-                      onClick={() => setHost.mutate({ host_id: host.id })}
+                      onClick={() => {
+                        setLocalError(null);
+                        setHost.mutate({ host_id: host.id }, { onError: reportSaveError });
+                      }}
                     >
                       {translateUi('Run here')}
                     </button>
@@ -206,7 +231,13 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
                       type="button"
                       className="cc-btn cc-btn--ghost cc-btn--compact"
                       disabled={busy}
-                      onClick={() => removePath.mutate(host.id)}
+                      onClick={() => {
+                        setLocalError(null);
+                        removePath.mutate(host.id, {
+                          onSuccess: () => clearDraft(host.id),
+                          onError: reportSaveError,
+                        });
+                      }}
                     >
                       {translateUi('Forget')}
                     </button>

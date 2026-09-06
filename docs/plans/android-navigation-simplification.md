@@ -93,3 +93,18 @@ No data deletion or server contract change is required for this stage.
   devices with large text and screen readers, including expanding Details,
   changing status and returning from a child task. Automated checks do not replace
   those device checks.
+
+## Retire task recurrence (unreleased)
+
+- Remove Repeat from desktop task detail and recurring badges from desktop task
+  cards and Android task detail. Due dates and ordinary task completion remain.
+- Quick capture no longer extracts recurrence from task text or sends a task
+  recurrence rule. Recurrence phrases remain in task titles; calendar events
+  retain their separate recurrence parsing and editor.
+- Single, bulk and chat task completion no longer spawn follow-up occurrences.
+  The task recurrence generation service is removed. Existing tasks and stored
+  historical metadata are not deleted, and no database migration is required.
+- Retain legacy API fields for older clients, but ignore recurrence on task
+  create/update and report tasks as non-recurring. Apply the updated server as
+  well as the client: an old server can still generate repeated tasks.
+- Calendar event recurrence, imported calendars and their reminders are unchanged.

@@ -81,11 +81,10 @@ async def _recurring(db, **overrides) -> Todo:
     return todo
 
 
-async def test_completing_a_recurring_task_by_chat_continues_the_series(
+async def test_completing_a_legacy_recurring_task_by_chat_does_not_continue_the_series(
     orchestrator, db_session
 ):
-    """Only the REST update used to spawn the next occurrence, so saying
-    "done" in chat silently ended the series."""
+    """Historical recurrence metadata must not create new tasks after retirement."""
     await _recurring(db_session)
 
     text, metadata = await _resolve(
@@ -104,10 +103,9 @@ async def test_completing_a_recurring_task_by_chat_continues_the_series(
         .scalars()
         .all()
     )
-    assert len(pending) == 1
-    assert pending[0].due_date.date() == datetime(2026, 8, 29).date()
-    assert metadata["next_todo_id"] == pending[0].id
-    assert "2026-08-29" in text
+    assert pending == []
+    assert "next_todo_id" not in metadata
+    assert "Next one" not in text
 
 
 async def test_recompleting_a_recurring_task_by_chat_does_not_duplicate_the_series(

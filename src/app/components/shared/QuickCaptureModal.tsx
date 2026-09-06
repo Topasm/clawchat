@@ -134,7 +134,6 @@ export default function QuickCaptureModal({
             parent_id: defaultParentId,
             source: defaultParentId ? undefined : 'quick_capture',
             inbox_state: defaultParentId ? 'none' : 'classifying',
-            recurrence_rule: parsed.recurrenceRule ?? undefined,
           },
           {
             onSuccess: () => finishCapture(defaultParentId ? 'Added as subtask' : 'Saved to Inbox'),

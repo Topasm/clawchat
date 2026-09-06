@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorkerStore } from '../../../stores/useWorkerStore';
 import ProjectWorkspaceHosts from '../ProjectWorkspaceHosts';
+import { queryKeys } from '../../../hooks/queries/queryKeys';
 
 const apiMocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), delete: vi.fn() }));
 const native = vi.hoisted(() => ({
@@ -50,6 +51,7 @@ function renderHosts() {
     </MemoryRouter>
   );
   render(<ProjectWorkspaceHosts projectId="project-1" />, { wrapper });
+  return queryClient;
 }
 
 describe('ProjectWorkspaceHosts', () => {
@@ -79,6 +81,64 @@ describe('ProjectWorkspaceHosts', () => {
         path: '/Users/me/papers',
       }),
     );
+  });
+
+  it.each(['Save path', 'Run here', 'Forget'])(
+    'shows a failed remote %s and allows retry',
+    async (action) => {
+      mockWorkspace({
+        is_available: false,
+        is_offline: false,
+        is_unconfigured: true,
+        paths: [{ host_id: 'host-mac', path: '/Users/me/old' }],
+      });
+      apiMocks.put.mockRejectedValueOnce(new Error('Unavailable'));
+      apiMocks.delete.mockRejectedValueOnce(new Error('Unavailable'));
+      renderHosts();
+      const input = await screen.findByLabelText('Path on this machine · MacBook');
+      if (action === 'Save path') fireEvent.change(input, { target: { value: '/Users/me/new' } });
+      const button =
+        action === 'Save path'
+          ? screen.getAllByRole('button', { name: action })[1]
+          : screen.getByRole('button', { name: action });
+      fireEvent.click(button);
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not save project settings');
+      expect(input).toHaveValue(action === 'Save path' ? '/Users/me/new' : '/Users/me/old');
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+      await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(action === 'Forget' ? apiMocks.delete : apiMocks.put).toHaveBeenCalledTimes(2),
+      );
+    },
+  );
+
+  it('releases an acknowledged draft so later server changes remain visible', async () => {
+    const snapshot = (path: string) => ({
+      is_available: false,
+      is_offline: false,
+      is_unconfigured: true,
+      paths: [{ host_id: 'host-mac', path }],
+    });
+    mockWorkspace(snapshot('/old'));
+    apiMocks.put.mockImplementation(async () => {
+      mockWorkspace(snapshot('/saved'));
+      return { data: {} };
+    });
+    const client = renderHosts();
+    const input = await screen.findByLabelText('Path on this machine · MacBook');
+    fireEvent.change(input, { target: { value: '/saved' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save path' })[1]);
+    await waitFor(() => expect(apiMocks.put).toHaveBeenCalledOnce());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: 'Save path' })[1]).toBeDisabled(),
+    );
+    mockWorkspace(snapshot('/updated-elsewhere'));
+    await act(async () => {
+      await client.refetchQueries({ queryKey: queryKeys.projectWorkspace('project-1') });
+    });
+    await waitFor(() => expect(input).toHaveValue('/updated-elsewhere'));
   });
 
   function localWorkspace() {
@@ -122,6 +182,25 @@ describe('ProjectWorkspaceHosts', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Browse…' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Browse…' })).toBeEnabled());
     expect(screen.getByLabelText('Path on this machine · MacBook')).toHaveValue('/Users/me/draft');
+    expect(apiMocks.put).not.toHaveBeenCalled();
+  });
+
+  it('recovers from a native picker failure and can reopen it', async () => {
+    native.selectFolder.mockRejectedValueOnce(new Error('Folder picker did not return a result'));
+    localWorkspace();
+    const browse = await screen.findByRole('button', { name: 'Browse…' });
+    fireEvent.click(browse);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Choose a folder or enter an absolute path.',
+    );
+    expect(browse).toBeEnabled();
+    fireEvent.click(browse);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Path on this machine · MacBook')).toHaveValue(
+        '/Users/me/paper',
+      ),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(apiMocks.put).not.toHaveBeenCalled();
   });
 

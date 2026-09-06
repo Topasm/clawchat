@@ -110,11 +110,17 @@ pub fn server_update_config<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn server_select_folder<R: Runtime>(app: AppHandle<R>) -> Option<String> {
-    app.dialog()
-        .file()
-        .blocking_pick_folder()
-        .map(|path| path.to_string())
+pub async fn server_select_folder<R: Runtime>(app: AppHandle<R>) -> Result<Option<String>, String> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    // The native panel needs the UI thread while navigating folders and showing
+    // permission prompts. Never block that thread waiting for the panel to close.
+    app.dialog().file().pick_folder(move |path| {
+        // None means the user cancelled. A dropped receiver is safe on shutdown.
+        let _ = sender.send(path.map(|path| path.to_string()));
+    });
+    receiver
+        .await
+        .map_err(|_| "Folder picker did not return a result".to_owned())
 }
 
 #[tauri::command]

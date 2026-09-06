@@ -165,8 +165,7 @@ async def create_todo(
         inbox_state=inbox_state,
         estimated_minutes=estimated_minutes,
         depends_on=None,
-        recurrence_rule=recurrence_rule,
-        recurrence_end=recurrence_end,
+        # Legacy clients may still send recurrence fields. New tasks are one-off.
     )
     if captured_at is not None and inbox_state == "captured":
         # Offline Inbox captures retain their original date anchor after sync.
@@ -198,6 +197,9 @@ async def create_todo(
 
 
 async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
+    # Keep stored legacy metadata without allowing old clients to enable a series.
+    updates.pop("recurrence_rule", None)
+    updates.pop("recurrence_end", None)
     todo = await get_todo(db, todo_id)
     from services.tasks.task_plan_guard_service import require_editable_plan
 

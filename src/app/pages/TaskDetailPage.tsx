@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
@@ -22,7 +22,6 @@ import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
 import TaskCard from '../components/shared/TaskCard';
 import PlanReviewDiff from '../components/shared/PlanReviewDiff';
-import RecurrenceSelector from '../components/shared/RecurrenceSelector';
 import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
@@ -34,6 +33,8 @@ import { translateUi } from '../i18n';
 import CanonicalDocumentButton from '../components/shared/CanonicalDocumentButton';
 import { extractCanonicalDoc } from '../utils/canonicalDoc';
 import useExperimentCompletionGate from '../hooks/useExperimentCompletionGate';
+import ProjectMachineLine from '../components/shared/ProjectMachineLine';
+import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
 const SKILL_OPTIONS = [
   { id: 'plan', label: 'Plan' },
   { id: 'research', label: 'Research' },
@@ -82,7 +83,12 @@ export default function TaskDetailPage() {
   const toggleCompleteMutation = useToggleTodoComplete();
   const { requestStatusChange, confirmationDialog } = useExperimentCompletionGate();
   const task = todos.find((t) => t.id === taskId);
-  const { data: project } = useProjectQuery(task?.project_id ?? undefined);
+  const {
+    data: project,
+    isLoading: projectLoading,
+    isError: projectError,
+  } = useProjectQuery(task?.project_id ?? undefined);
+  const workspaceSettings = useRef<HTMLDetailsElement>(null);
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
   const generatePlanMutation = useGeneratePlanProposal();
   const applyPlanMutation = useApplyPlanProposal();
@@ -298,27 +304,42 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
-      {/* Section 2b: Recurrence */}
-      <details
-        key={`repeat-${task.id}`}
-        className="cc-exec-panel__section"
-        open={task.recurrence_rule ? true : undefined}
-      >
-        <summary className="cc-exec-panel__section-title">{translateUi('Repeat')}</summary>
-        <RecurrenceSelector
-          value={task.recurrence_rule ?? undefined}
-          onChange={(rule) => persistField({ recurrence_rule: rule ?? null })}
-        />
-      </details>
-
       {/* Section 3: Project context */}
-      {(isProject || task.parent_id || task.assignee || project) && (
+      {(isProject || task.parent_id || task.assignee || task.project_id) && (
         <div className="cc-exec-panel__section">
           <div className="cc-exec-panel__section-heading">
             <div className="cc-exec-panel__section-title">{translateUi('Project context')}</div>
             <CanonicalDocumentButton target={canonicalDoc} />
           </div>
           <div className="cc-exec-panel__context">
+            {projectLoading && <p>{translateUi('Loading project…')}</p>}
+            {projectError && <p role="alert">{translateUi('This project could not be loaded.')}</p>}
+            {project && !projectError && (
+              <>
+                <Link className="cc-exec-panel__context-link" to={`/projects/${project.id}`}>
+                  {project.title}
+                </Link>
+                <ProjectMachineLine
+                  project={project}
+                  onChange={() => {
+                    if (!workspaceSettings.current) return;
+                    workspaceSettings.current.open = true;
+                    workspaceSettings.current.scrollIntoView?.({
+                      behavior: 'smooth',
+                      block: 'nearest',
+                    });
+                  }}
+                />
+                <details
+                  key={`${task.id}-${project.id}`}
+                  ref={workspaceSettings}
+                  className="cc-project-settings-disclosure"
+                >
+                  <summary>{translateUi('Where this runs')}</summary>
+                  <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
+                </details>
+              </>
+            )}
             {isProject && (
               <div className="cc-exec-panel__context-row">
                 <span className="cc-exec-panel__context-label">{translateUi('Source')}</span>
