@@ -107,6 +107,25 @@ class TasksViewModelTest {
     }
 
     @Test
+    fun `child outside main list supports existing delete and undo`() = runTest {
+        val child = sampleTodo.copy(id = "child", parentId = "1")
+        coEvery { todoRepository.listTodos(any()) } returns ApiResult.Success(PaginatedResponse(items = sampleTodos))
+        coEvery { todoRepository.getTodo(child.id) } returns ApiResult.Success(child)
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.selectTaskById(child.id)
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.deleteTask(child.id)
+        val pending = vm.uiState.value.pendingDeletion!!
+        assertEquals(child.id, pending.task.id)
+        assertNull(vm.uiState.value.selectedTask)
+        vm.undoDelete(pending.token)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.tasks.any { it.id == child.id })
+        coVerify(exactly = 0) { todoRepository.deleteTodo(any(), any()) }
+    }
+
+    @Test
     fun `only unfinished experiment tasks require verdict confirmation`() {
         val experiment = sampleTodo.copy(tags = listOf("exp/E65a"))
         val hashedExperiment = sampleTodo.copy(tags = listOf("#exp/E65b"))

@@ -53,6 +53,7 @@ class ProjectPlanViewModelTest {
         coVerify(exactly = 1) { repository.graph("different-root") }
         vm.discuss()
         assertEquals("canonical", vm.uiState.value.openConversation)
+        assertTrue(vm.uiState.value.focusConversationInput)
         assertTrue(vm.uiState.value.projectConversation)
         coVerify(exactly = 0) { conversations.getOrCreateForTodo(any()) }
     }
@@ -149,6 +150,7 @@ class ProjectPlanViewModelTest {
         vm.run("ready")
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals("execution-thread", vm.uiState.value.openConversation)
+        assertFalse(vm.uiState.value.focusConversationInput)
         assertFalse(vm.uiState.value.projectConversation)
         assertEquals("Demo › Ready", vm.uiState.value.conversationTitle)
         assertNull(vm.uiState.value.openRun)

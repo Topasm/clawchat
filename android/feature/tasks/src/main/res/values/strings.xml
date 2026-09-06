@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="tasks_cd_search">Quick Find</string>
+    <string name="tasks_cd_search">Search all</string>
     <string name="tasks_cd_settings">Settings</string>
     <string name="tasks_title">Tasks</string>
     <string name="tasks_cd_new_task">New task</string>
@@ -92,4 +92,17 @@
     <string name="projects_hide_finished">Hide finished</string>
     <string name="projects_expand">Expand</string>
     <string name="projects_collapse">Collapse</string>
+    <string name="tasks_notes_title">Task notes</string>
+    <string name="tasks_note_hint">Add a note to this task…</string>
+    <string name="tasks_note_send">Save note</string>
+    <string name="tasks_note_sending">Saving note…</string>
+    <string name="tasks_note_scope">Task note · Does not message the agent</string>
+    <string name="tasks_notes_loading">Loading notes…</string>
+    <string name="tasks_notes_retry">Retry</string>
+    <string name="tasks_note_too_long">Keep notes within 4,000 characters.</string>
+    <string name="tasks_steps_title">Steps</string>
+    <string name="tasks_step_add">Add step</string>
+    <string name="tasks_step_hint">What needs to be done?</string>
+    <string name="tasks_step_scope">Adds a child task, not a message to the agent.</string>
+    <string name="tasks_steps_empty">Break this task into steps when needed.</string>
 </resources>

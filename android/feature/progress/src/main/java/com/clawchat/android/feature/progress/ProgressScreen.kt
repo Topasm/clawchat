@@ -14,18 +14,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,10 +29,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -49,15 +41,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -65,10 +55,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.ReviewRiskLevel
-import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
-import com.clawchat.android.core.data.model.QuickCaptureParser
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawSectionCard
@@ -77,11 +65,6 @@ import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.localizedErrorMessage
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlinx.coroutines.delay
 
 private const val ACTIVE_POLL_INTERVAL_MS = 3_000L
@@ -90,7 +73,6 @@ private const val ACTIVE_POLL_INTERVAL_MS = 3_000L
 @Composable
 fun ProgressScreen(
     onOpenSearch: () -> Unit = {},
-    onOpenSettings: () -> Unit = {},
     onOpenReview: (String) -> Unit = {},
     onOpenRun: (String) -> Unit = {},
     onOpenTask: (String) -> Unit = {},
@@ -98,10 +80,7 @@ fun ProgressScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedAction by remember { mutableStateOf<NowItem?>(null) }
-    var captureText by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
-    val capturedMessage = stringResource(R.string.progress_capture_saved)
-    val undoLabel = stringResource(R.string.progress_capture_undo)
 
     LaunchedEffect(state.hasExecutingRuns) {
         if (!state.hasExecutingRuns) return@LaunchedEffect
@@ -118,27 +97,7 @@ fun ProgressScreen(
         }
     }
 
-    LaunchedEffect(viewModel) {
-        viewModel.captureEvents.collect { captured ->
-            captureText = ""
-            val result = snackbarHostState.showSnackbar(
-                message = capturedMessage,
-                actionLabel = undoLabel,
-                withDismissAction = true,
-                duration = SnackbarDuration.Long,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoCapture(captured)
-            }
-        }
-    }
 
-    val localizedCommentError = state.commentError?.let { localizedErrorMessage(it) }
-    LaunchedEffect(localizedCommentError) {
-        val message = localizedCommentError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.clearCommentError()
-    }
 
     val localizedWorkError = state.workError?.let { localizedErrorMessage(it) }
     LaunchedEffect(localizedWorkError) {
@@ -147,9 +106,6 @@ fun ProgressScreen(
         viewModel.clearWorkError()
     }
 
-    LaunchedEffect(viewModel) {
-        viewModel.startEvents.collect { captureText = "" }
-    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -169,12 +125,6 @@ fun ProgressScreen(
                         Icon(
                             Icons.Default.Search,
                             contentDescription = stringResource(R.string.progress_search),
-                        )
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.progress_settings),
                         )
                     }
                 },
@@ -207,16 +157,8 @@ fun ProgressScreen(
                         selectedAction = item
                     },
                     onRetryPending = viewModel::retryPending,
-                    captureText = captureText,
-                    onCaptureTextChange = { captureText = it },
-                    onCapture = { viewModel.captureToInbox(captureText) },
-                    onStartNow = { viewModel.startTaskNow(captureText) },
-                    onSubmitComment = viewModel::addComment,
                     onCompleteTask = viewModel::completeTask,
                     onPauseTask = viewModel::pauseTask,
-                    onAddStep = viewModel::addStep,
-                    onToggleStep = viewModel::setStepDone,
-                    onRemoveStep = viewModel::removeStep,
                     onCancelRun = viewModel::cancelRun,
                 )
             }
@@ -251,39 +193,20 @@ private fun ProgressContent(
     onOpenTask: (String) -> Unit,
     onSelectAction: (NowItem) -> Unit,
     onRetryPending: () -> Unit,
-    captureText: String,
-    onCaptureTextChange: (String) -> Unit,
-    onCapture: () -> Unit,
-    onStartNow: () -> Unit,
-    onSubmitComment: (todoId: String, text: String) -> Unit,
     onCompleteTask: (todoId: String) -> Unit,
     onPauseTask: (todoId: String) -> Unit,
-    onAddStep: (parentId: String, title: String) -> Unit,
-    onToggleStep: (stepId: String, done: Boolean) -> Unit,
-    onRemoveStep: (stepId: String) -> Unit,
     onCancelRun: (runId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showActiveWork by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item(key = "connection") {
+        if (!state.isConnected || state.pendingSyncCount > 0) item(key = "connection") {
             ProgressConnectionCard(state)
         }
-
-        item(key = "capture") {
-            QuickCaptureCard(
-                text = captureText,
-                isSubmitting = state.isCapturing,
-                error = state.captureError,
-                onTextChange = onCaptureTextChange,
-                onSubmit = onCapture,
-                onStartNow = onStartNow,
-            )
-        }
-
         state.errors.firstOrNull()?.let { error ->
             item(key = "error") {
                 ClawStatusChip(
@@ -338,7 +261,7 @@ private fun ProgressContent(
             }
         }
 
-        if (!state.hasAnyContent && state.errors.isEmpty()) {
+        if (state.attentionItems.isEmpty() && !state.isLoading && state.errors.isEmpty()) {
             item(key = "empty") {
                 ClawEmptyState(
                     title = stringResource(R.string.progress_empty_title),
@@ -386,12 +309,11 @@ private fun ProgressContent(
 
         if (state.executingRuns.isNotEmpty() || state.inProgressTasks.isNotEmpty()) {
             item(key = "active_header") {
-                ClawSectionHeader(
-                    title = stringResource(R.string.progress_active_title),
-                    subtitle = stringResource(R.string.progress_active_description),
-                )
+                TextButton(onClick = { showActiveWork = !showActiveWork }) {
+                    Text(stringResource(if (showActiveWork) R.string.progress_hide_active else R.string.progress_show_active))
+                }
             }
-            items(state.executingRuns, key = { "run:${it.id}" }) { run ->
+            if (showActiveWork) items(state.executingRuns, key = { "run:${it.id}" }) { run ->
                 AgentRunProgressRow(
                     run = run,
                     isPending = run.id in state.pendingWorkIds,
@@ -399,104 +321,20 @@ private fun ProgressContent(
                     onCancel = { onCancelRun(run.id) },
                 )
             }
-            items(state.inProgressTasks, key = { "task:${it.id}" }) { task ->
+            if (showActiveWork) items(state.inProgressTasks, key = { "task:${it.id}" }) { task ->
                 WorkCard(
                     task = task,
                     steps = state.stepsFor(task.id),
-                    comments = state.commentsByTodoId[task.id].orEmpty(),
                     pendingWorkIds = state.pendingWorkIds,
                     onOpenTask = { onOpenTask(task.id) },
                     onComplete = { onCompleteTask(task.id) },
                     onPause = { onPauseTask(task.id) },
-                    onAddStep = { title -> onAddStep(task.id, title) },
-                    onToggleStep = onToggleStep,
-                    onRemoveStep = onRemoveStep,
-                    onSubmitComment = { text -> onSubmitComment(task.id, text) },
                 )
             }
         }
     }
 }
 
-@Composable
-private fun QuickCaptureCard(
-    text: String,
-    isSubmitting: Boolean,
-    error: String?,
-    onTextChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onStartNow: () -> Unit,
-) {
-    val parsed = remember(text) { QuickCaptureParser.parse(text) }
-    ClawSectionCard(tone = ClawTone.Primary) {
-        Text(
-            text = stringResource(R.string.progress_capture_title),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        OutlinedTextField(
-            value = text,
-            onValueChange = { if (!isSubmitting) onTextChange(it) },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.progress_capture_hint)) },
-            singleLine = true,
-            enabled = !isSubmitting,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Done,
-            ),
-            keyboardActions = KeyboardActions(onDone = { if (parsed != null) onSubmit() }),
-            trailingIcon = {
-                IconButton(
-                    onClick = onSubmit,
-                    enabled = parsed != null && !isSubmitting,
-                ) {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(modifier = Modifier.padding(8.dp))
-                    } else {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = stringResource(R.string.progress_capture_add),
-                        )
-                    }
-                }
-            },
-        )
-        parsed?.let { draft ->
-            val metadata = draft.tags.map { "#$it" }
-            if (metadata.isNotEmpty()) {
-                Text(
-                    text = metadata.joinToString(" · "),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-        error?.let {
-            ClawStatusChip(text = localizedErrorMessage(it), tone = ClawTone.Error)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.progress_capture_description),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            // Capture is for later; this is for the thing you are doing right now.
-            TextButton(
-                onClick = onStartNow,
-                enabled = parsed != null && !isSubmitting,
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Text(stringResource(R.string.progress_start_now))
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -812,28 +650,17 @@ private fun AgentRunProgressRow(
 }
 
 /**
- * One piece of work in progress, with everything you do to it while working:
- * tick off or add steps, leave a note, finish it, or set it aside.
- *
- * "In progress" used to be a list of titles that opened the task page; every
- * change meant leaving this tab and coming back.
+ * Compact active-work summary. Steps and notes are edited in task detail.
  */
 @Composable
 private fun WorkCard(
     task: Todo,
     steps: List<Todo>,
-    comments: List<TaskComment>,
     pendingWorkIds: Set<String>,
     onOpenTask: () -> Unit,
     onComplete: () -> Unit,
     onPause: () -> Unit,
-    onAddStep: (String) -> Unit,
-    onToggleStep: (stepId: String, done: Boolean) -> Unit,
-    onRemoveStep: (stepId: String) -> Unit,
-    onSubmitComment: (String) -> Unit,
 ) {
-    var stepDraft by remember(task.id) { mutableStateOf("") }
-    var draft by remember(task.id) { mutableStateOf("") }
     val taskPending = task.id in pendingWorkIds
     val doneSteps = steps.count { it.status == TaskStatus.COMPLETED }
     ClawSectionCard {
@@ -874,75 +701,6 @@ private fun WorkCard(
             }
         }
 
-        steps.forEach { step ->
-            val done = step.status == TaskStatus.COMPLETED
-            val stepPending = step.id in pendingWorkIds
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(
-                    checked = done,
-                    enabled = !stepPending,
-                    onCheckedChange = { checked -> onToggleStep(step.id, checked) },
-                )
-                Text(
-                    text = step.title,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textDecoration = if (done) TextDecoration.LineThrough else null,
-                    color = if (done) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                IconButton(onClick = { onRemoveStep(step.id) }, enabled = !stepPending) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = stringResource(R.string.progress_step_remove),
-                    )
-                }
-            }
-        }
-        OutlinedTextField(
-            value = stepDraft,
-            onValueChange = { stepDraft = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.progress_step_hint)) },
-            singleLine = true,
-            enabled = !taskPending,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Done,
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    if (stepDraft.isNotBlank()) {
-                        onAddStep(stepDraft)
-                        stepDraft = ""
-                    }
-                },
-            ),
-            trailingIcon = {
-                IconButton(
-                    onClick = {
-                        if (stepDraft.isNotBlank()) {
-                            onAddStep(stepDraft)
-                            stepDraft = ""
-                        }
-                    },
-                    enabled = stepDraft.isNotBlank() && !taskPending,
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.progress_step_add),
-                    )
-                }
-            },
-        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -958,92 +716,7 @@ private fun WorkCard(
             }
         }
 
-        Text(
-            text = stringResource(R.string.progress_threads_title),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (comments.isEmpty()) {
-            Text(
-                text = stringResource(R.string.progress_threads_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                comments.forEach { comment -> CommentBubbleRow(comment) }
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.progress_threads_hint)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                    imeAction = ImeAction.Send,
-                ),
-                keyboardActions = KeyboardActions(
-                    onSend = {
-                        if (draft.isNotBlank()) {
-                            onSubmitComment(draft)
-                            draft = ""
-                        }
-                    },
-                ),
-            )
-            IconButton(
-                onClick = {
-                    if (draft.isNotBlank()) {
-                        onSubmitComment(draft)
-                        draft = ""
-                    }
-                },
-                enabled = draft.isNotBlank(),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = stringResource(R.string.progress_threads_send),
-                )
-            }
-        }
     }
-}
-
-@Composable
-private fun CommentBubbleRow(comment: TaskComment) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = formatCommentTime(comment.createdAt),
-            modifier = Modifier.width(88.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = comment.content,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-private fun formatCommentTime(value: String): String {
-    val zoned = runCatching {
-        OffsetDateTime.parse(value).atZoneSameInstant(ZoneId.systemDefault())
-    }.recoverCatching {
-        LocalDateTime.parse(value).atZone(ZoneId.systemDefault())
-    }.getOrNull()
-    val formatter = DateTimeFormatter.ofPattern("MMM d · h:mm a", Locale.getDefault())
-    return zoned?.format(formatter) ?: value
 }
 
 @Composable

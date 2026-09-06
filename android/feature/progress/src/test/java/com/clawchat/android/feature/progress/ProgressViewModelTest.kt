@@ -241,15 +241,14 @@ class ProgressViewModelTest {
     }
 
     @Test
-    fun `loading in-progress tasks fetches their comment threads`() = runTest {
+    fun `attention no longer fetches comment threads owned by task detail`() = runTest {
         val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
         stubInitial(todos = listOf(active))
-        val note = comment(active.id, "Halfway there")
-        coEvery { comments.listForTodos(listOf(active.id)) } returns ApiResult.Success(listOf(note))
         val viewModel = viewModel()
         advanceUntilIdle()
 
-        assertEquals(listOf(note), viewModel.uiState.value.commentsByTodoId[active.id])
+        assertEquals(listOf(active), viewModel.uiState.value.tasks)
+        coVerify(exactly = 0) { comments.listForTodos(any()) }
     }
 
     @Test

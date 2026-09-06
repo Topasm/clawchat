@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="tasks_cd_search">빠른 찾기</string>
+    <string name="tasks_cd_search">전체 검색</string>
     <string name="tasks_cd_settings">설정</string>
     <string name="tasks_title">작업</string>
     <string name="tasks_cd_new_task">새 작업</string>
@@ -89,4 +89,17 @@
     <string name="projects_hide_finished">완료 숨기기</string>
     <string name="projects_expand">펼치기</string>
     <string name="projects_collapse">접기</string>
+    <string name="tasks_notes_title">작업 메모</string>
+    <string name="tasks_note_hint">이 작업에 메모 남기기…</string>
+    <string name="tasks_note_send">메모 저장</string>
+    <string name="tasks_note_sending">메모 저장 중…</string>
+    <string name="tasks_note_scope">작업 메모 · 에이전트에게 전송하지 않습니다</string>
+    <string name="tasks_notes_loading">메모 불러오는 중…</string>
+    <string name="tasks_notes_retry">다시 시도</string>
+    <string name="tasks_note_too_long">메모는 4,000자 이내로 입력하세요.</string>
+    <string name="tasks_steps_title">단계</string>
+    <string name="tasks_step_add">단계 추가</string>
+    <string name="tasks_step_hint">어떤 일이 필요한가요?</string>
+    <string name="tasks_step_scope">하위 작업으로 추가됩니다. 에이전트에게 전송하지 않습니다.</string>
+    <string name="tasks_steps_empty">필요할 때 이 작업을 단계로 나눠보세요.</string>
 </resources>

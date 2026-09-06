@@ -26,6 +26,7 @@
     <string name="inbox_placement_due">Due: %1$s</string>
     <string name="inbox_placement_applied">Added to plan: %1$s</string>
     <string name="inbox_placement_open">Open task</string>
+    <string name="inbox_placement_open_project">Open project</string>
     <string name="inbox_placement_undo">Undo</string>
     <string name="inbox_placement_more">Showing %1$d of %2$d captures.</string>
     <string name="inbox_placement_previous">Previous captures</string>

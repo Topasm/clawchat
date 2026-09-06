@@ -34,7 +34,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +51,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
@@ -148,10 +148,10 @@ internal fun parseDisplayDateTime(
 @Composable
 fun ChatScreen(
     onOpenSearch: () -> Unit = {},
-    onOpenSettings: () -> Unit = {},
     initialConversationId: String? = null,
     contextTitle: String? = null,
     showProjectPlanReturn: Boolean = false,
+    focusComposerOnOpen: Boolean = false,
     onReturnToSource: (() -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel(),
     draftViewModel: ChatDraftViewModel = hiltViewModel(),
@@ -164,9 +164,13 @@ fun ChatScreen(
     // Arriving from a task: open its thread once, then behave like the tab.
     var initialSelectionConsumed by rememberSaveable(initialConversationId) { mutableStateOf(false) }
     LaunchedEffect(initialConversationId) {
-        if (initialSelectionConsumed || initialConversationId == null) return@LaunchedEffect
+        if (initialConversationId == null) return@LaunchedEffect
+        // Reopening a project sheet must not cancel the existing thread's stream.
+        // After process recreation a saved "consumed" flag still needs a fresh selection.
+        if (shouldSelectInitialConversation(initialConversationId, state.selectedConversationId, initialSelectionConsumed)) {
+            viewModel.selectConversation(initialConversationId)
+        }
         initialSelectionConsumed = true
-        viewModel.selectConversation(initialConversationId)
     }
 
     val leaveConversation: () -> Unit = {
@@ -191,6 +195,7 @@ fun ChatScreen(
                 onRetryDraft = draftViewModel::retry,
                 onInputChange = { draftViewModel.edit(draftWorkspace, conversationId, it) },
                 showProjectPlanReturn = showProjectPlanReturn,
+                focusComposerOnOpen = focusComposerOnOpen,
                 title = contextTitle ?: state.conversations.firstOrNull { it.id == state.selectedConversationId }?.title,
                 messages = state.messages,
                 streamingText = state.streamingText,
@@ -208,12 +213,14 @@ fun ChatScreen(
                 onPlanAction = viewModel::planAction,
             )
         }
+    } else if (initialConversationId != null) {
+        // Do not flash the unrelated global conversation list while binding a project thread.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
     } else {
         ConversationListView(
             conversations = state.conversations,
             isLoading = state.isLoadingConversations,
             onOpenSearch = onOpenSearch,
-            onOpenSettings = onOpenSettings,
             onSelect = viewModel::selectConversation,
             onCreate = { viewModel.createConversation(newConversationTitle) },
             onDelete = viewModel::deleteConversation,
@@ -227,7 +234,6 @@ private fun ConversationListView(
     conversations: List<Conversation>,
     isLoading: Boolean,
     onOpenSearch: () -> Unit,
-    onOpenSettings: () -> Unit,
     onSelect: (String) -> Unit,
     onCreate: () -> Unit,
     onDelete: (String) -> Unit,
@@ -259,12 +265,6 @@ private fun ConversationListView(
                         Icon(
                             Icons.Default.Search,
                             contentDescription = stringResource(R.string.chat_search),
-                        )
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.chat_settings),
                         )
                     }
                 },
@@ -446,6 +446,7 @@ private fun ChatDetailView(
     inputText: String,
     onInputChange: (String) -> Unit,
     showProjectPlanReturn: Boolean = false,
+    focusComposerOnOpen: Boolean = false,
     title: String?,
     plans: Map<String, ChatPlanProposal>,
     planChanges: Map<String, String>,
@@ -552,6 +553,7 @@ private fun ChatDetailView(
                 onValueChange = onInputChange,
                 placeholder = stringResource(R.string.chat_input_placeholder),
                 enabled = draftStorage.ready,
+                focusOnOpen = focusComposerOnOpen,
                 actionEnabled = isStreaming || (inputText.isNotBlank() && !isLoadingMessages),
                 actionIcon = if (isStreaming) ClawIcons.Stop else Icons.AutoMirrored.Filled.Send,
                 actionLabel = stringResource(if (isStreaming) R.string.chat_stop else R.string.chat_send),

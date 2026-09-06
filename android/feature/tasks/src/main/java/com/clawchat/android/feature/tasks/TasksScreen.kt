@@ -29,10 +29,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import com.clawchat.android.core.ui.ClawComposer
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
@@ -120,17 +121,32 @@ private fun taskTagLabel(tag: String): String = "#${tag.removePrefix("#")}"
 
 @Composable
 fun TasksScreen(
+    allowTaskNotes: Boolean = false,
     onOpenProjects: (() -> Unit)? = null,
     onOpenSearch: () -> Unit = {},
-    onOpenSettings: () -> Unit = {},
     initialTodoId: String? = null,
     onOpenConversation: (String) -> Unit = {},
     viewModel: TasksViewModel = hiltViewModel(),
+    notesViewModel: TaskNotesViewModel = hiltViewModel(),
+    stepsViewModel: TaskStepsViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(viewModel) {
         viewModel.openThreadEvents.collect(onOpenConversation)
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val notesByTask by notesViewModel.notes.collectAsStateWithLifecycle()
+    val noteTaskId = state.selectedTask?.id
+    val stepsByTask by stepsViewModel.steps.collectAsStateWithLifecycle()
+    var parentTrail by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val returnFromDetail: () -> Unit = {
+        val parentId = parentTrail.lastOrNull()
+        parentTrail = parentTrail.dropLast(1)
+        if (parentId == null) viewModel.selectTask(null) else viewModel.selectTaskById(parentId)
+    }
+    LaunchedEffect(noteTaskId) { noteTaskId?.let(stepsViewModel::load) }
+    LaunchedEffect(state.selectedTask?.id, allowTaskNotes) {
+        if (allowTaskNotes) state.selectedTask?.id?.let(notesViewModel::load)
+    }
     var initialSelectionConsumed by rememberSaveable(initialTodoId) { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val deletedMessage = stringResource(R.string.tasks_deleted)
@@ -145,7 +161,7 @@ fun TasksScreen(
     }
 
     BackHandler(enabled = state.selectedTask != null) {
-        viewModel.selectTask(null)
+        returnFromDetail()
     }
 
     LaunchedEffect(initialTodoId) {
@@ -175,7 +191,7 @@ fun TasksScreen(
             relationshipError = state.relationshipError,
             taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
             snackbarHostState = snackbarHostState,
-            onBack = { viewModel.selectTask(null) },
+            onBack = returnFromDetail,
             onToggle = {
                 state.selectedTask?.let { task ->
                     val status = if (task.status == TaskStatus.COMPLETED) {
@@ -198,6 +214,18 @@ fun TasksScreen(
             },
             onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
             onDiscuss = { viewModel.openTaskThread(state.selectedTask!!.id) },
+            notes = if (allowTaskNotes) notesByTask[noteTaskId] ?: TaskNotesState() else null,
+            onNoteChange = { text -> noteTaskId?.let { notesViewModel.edit(it, text) } },
+            onSendNote = { noteTaskId?.let(notesViewModel::send) },
+            onReloadNotes = { noteTaskId?.let(notesViewModel::load) },
+            steps = stepsByTask[noteTaskId] ?: TaskStepsState(),
+            onOpenStep = { step ->
+                noteTaskId?.let { parentTrail = parentTrail + it }
+                viewModel.selectTaskById(step.id)
+            },
+            onStepEdit = { text -> noteTaskId?.let { stepsViewModel.edit(it, text) } },
+            onStepAdd = { state.selectedTask?.let(stepsViewModel::add) },
+            onStepsReload = { noteTaskId?.let(stepsViewModel::load) },
         )
     } else {
         TaskListView(
@@ -207,8 +235,10 @@ fun TasksScreen(
             snackbarHostState = snackbarHostState,
             onOpenSearch = onOpenSearch,
             onOpenProjects = onOpenProjects,
-            onOpenSettings = onOpenSettings,
-            onSelect = viewModel::selectTask,
+            onSelect = { task ->
+                parentTrail = emptyList()
+                viewModel.selectTask(task)
+            },
             onToggle = { task ->
                 val status = if (task.status == TaskStatus.COMPLETED) {
                     TaskStatus.PENDING
@@ -262,7 +292,6 @@ private fun TaskListView(
     statusFilter: TaskStatus?,
     snackbarHostState: SnackbarHostState,
     onOpenSearch: () -> Unit,
-    onOpenSettings: () -> Unit,
     onSelect: (Todo) -> Unit,
     onToggle: (Todo) -> Unit,
     onDelete: (String) -> Unit,
@@ -321,12 +350,6 @@ private fun TaskListView(
                         Icon(
                             Icons.Default.Search,
                             contentDescription = stringResource(R.string.tasks_cd_search),
-                        )
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.tasks_cd_settings),
                         )
                     }
                 },
@@ -795,6 +818,15 @@ private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TaskDetailView(
+    steps: TaskStepsState,
+    onOpenStep: (Todo) -> Unit,
+    onStepEdit: (String) -> Unit,
+    onStepAdd: () -> Unit,
+    onStepsReload: () -> Unit,
+    notes: TaskNotesState?,
+    onNoteChange: (String) -> Unit,
+    onSendNote: () -> Unit,
+    onReloadNotes: () -> Unit,
     task: Todo,
     relationships: List<TaskRelationship>,
     isLoadingRelationships: Boolean,
@@ -817,6 +849,23 @@ private fun TaskDetailView(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            notes?.let { note ->
+                ClawComposer(
+                    value = note.draft, onValueChange = onNoteChange,
+                    placeholder = stringResource(R.string.tasks_note_hint),
+                    enabled = !note.sending,
+                    actionEnabled = !note.loading && !note.sending && note.draft.trim().length in 1..4000,
+                    actionIcon = Icons.AutoMirrored.Filled.Send,
+                    actionLabel = stringResource(R.string.tasks_note_send), onAction = onSendNote,
+                ) {
+                    Text(stringResource(if (note.sending) R.string.tasks_note_sending else R.string.tasks_note_scope),
+                        style = MaterialTheme.typography.bodySmall)
+                    note.sendError?.let { Text(localizedErrorMessage(it), color = MaterialTheme.colorScheme.error) }
+                    if (note.draft.trim().length > 4000) Text(stringResource(R.string.tasks_note_too_long), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
         topBar = {
             TopAppBar(
                 title = {
@@ -978,6 +1027,32 @@ private fun TaskDetailView(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            item(key = "task-steps") {
+                TaskStepsSection(task.id, steps, onOpenStep, onStepEdit, onStepAdd, onStepsReload)
+            }
+            notes?.let { note ->
+                item {
+                    Text(stringResource(R.string.tasks_notes_title), style = MaterialTheme.typography.titleMedium)
+                    if (note.loading) Text(stringResource(R.string.tasks_notes_loading))
+                    note.loadError?.let {
+                        Text(localizedErrorMessage(it), color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = onReloadNotes) { Text(stringResource(R.string.tasks_notes_retry)) }
+                    }
+                }
+                items(note.comments, key = { "note:${it.id}" }) { comment ->
+                    ClawSectionCard {
+                        val time = remember(comment.createdAt) {
+                            runCatching { java.time.OffsetDateTime.parse(comment.createdAt)
+                                .atZoneSameInstant(java.time.ZoneId.systemDefault())
+                                .format(java.time.format.DateTimeFormatter.ofLocalizedDateTime(java.time.format.FormatStyle.SHORT))
+                            }.getOrDefault(comment.createdAt)
+                        }
+                        Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(comment.content, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }

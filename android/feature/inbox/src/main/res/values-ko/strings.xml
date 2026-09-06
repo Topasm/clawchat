@@ -26,6 +26,7 @@
     <string name="inbox_placement_due">마감: %1$s</string>
     <string name="inbox_placement_applied">계획에 반영됨: %1$s</string>
     <string name="inbox_placement_open">작업 열기</string>
+    <string name="inbox_placement_open_project">프로젝트 열기</string>
     <string name="inbox_placement_undo">실행 취소</string>
     <string name="inbox_placement_more">입력 %2$d개 중 %1$d개를 표시합니다.</string>
     <string name="inbox_placement_previous">이전 입력</string>

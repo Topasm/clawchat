@@ -3,6 +3,8 @@ package com.clawchat.android.feature.inbox
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -13,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.localizedErrorMessage
 import com.clawchat.android.core.ui.ClawSelectionRow
+import com.clawchat.android.core.ui.ClawActionLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +89,7 @@ internal fun InboxPlacementEditor(
                 TextButton(onClick = onDismiss, enabled = !state.busy) { Text(stringResource(R.string.inbox_editor_cancel)) }
                 Button(enabled = enabled && valid, onClick = {
                     viewModel.editPlacement(task.id, PlacementChoice(projectId, effectiveParent), includeDeadline, baseRevision, onDismiss)
-                }) { Text(stringResource(R.string.inbox_editor_save)) }
+                }) { ClawActionLabel(Icons.Default.Check, stringResource(R.string.inbox_editor_save)) }
             }
         }
     }

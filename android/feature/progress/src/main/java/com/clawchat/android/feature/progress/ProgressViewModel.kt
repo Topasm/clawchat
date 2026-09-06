@@ -592,28 +592,17 @@ class ProgressViewModel @Inject constructor(
 
                 val tasks = (tasksResult as? ApiResult.Success)?.data?.items
                     ?: _uiState.value.tasks
-                val inProgressIds = tasks
-                    .filter {
-                        it.status == TaskStatus.IN_PROGRESS &&
-                            (it.inboxState == null || it.inboxState == "none")
-                    }
-                    .map(Todo::id)
-                val commentsResult = taskCommentRepository.listForTodos(inProgressIds)
 
                 _uiState.update { state ->
                     val errors = buildList {
                         if (runsResult is ApiResult.Error) add(runsResult.message)
                         if (reviewsResult is ApiResult.Error) add(reviewsResult.message)
                         if (tasksResult is ApiResult.Error) add(tasksResult.message)
-                        if (commentsResult is ApiResult.Error) add(commentsResult.message)
                     }.distinct()
                     state.copy(
                         runs = (runsResult as? ApiResult.Success)?.data ?: state.runs,
                         reviews = (reviewsResult as? ApiResult.Success)?.data ?: state.reviews,
                         tasks = tasks,
-                        commentsByTodoId = (commentsResult as? ApiResult.Success)?.data
-                            ?.groupBy(TaskComment::todoId)
-                            ?: state.commentsByTodoId,
                         isLoading = false,
                         isRefreshing = false,
                         errors = errors,

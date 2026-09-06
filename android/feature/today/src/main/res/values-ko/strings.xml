@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="today_title">오늘</string>
-    <string name="today_cd_search">검색</string>
+    <string name="today_cd_search">전체 검색</string>
     <string name="today_cd_settings">설정</string>
     <string name="today_cd_capture_task">작업 추가</string>
     <string name="today_offline_cached">오프라인 — 마지막으로 동기화한 오늘 화면을 표시합니다</string>

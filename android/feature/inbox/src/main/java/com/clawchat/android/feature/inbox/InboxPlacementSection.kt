@@ -1,6 +1,11 @@
 package com.clawchat.android.feature.inbox
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -9,7 +14,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import com.clawchat.android.core.ui.ClawListItemSurface
+import com.clawchat.android.core.ui.ClawActionLabel
 import com.clawchat.android.core.ui.localizedErrorMessage
+import com.clawchat.android.core.ui.icons.ClawIcons
 
 @Composable
 internal fun InboxPlacementSection(
@@ -29,13 +36,17 @@ internal fun InboxPlacementSection(
         if (state.stale) Text(stringResource(R.string.inbox_placement_stale), color = MaterialTheme.colorScheme.error)
         state.error?.let { Text(localizedErrorMessage(it), color = MaterialTheme.colorScheme.error) }
         if (state.error != null || state.stale) TextButton(onClick = viewModel::refresh, enabled = !state.busy && !state.loading) {
-            Text(stringResource(R.string.inbox_action_retry))
+            ClawActionLabel(Icons.Default.Refresh, stringResource(R.string.inbox_action_retry))
         }
         state.applied?.let { applied ->
             ClawListItemSurface {
-                Text(stringResource(R.string.inbox_placement_applied, applied.todo.title))
+                InboxPlacementDetail(ClawIcons.CheckCircle, stringResource(R.string.inbox_placement_applied, applied.todo.title))
                 FlowRow {
-                    TextButton(onClick = { onOpenPlacement(applied.todo.id, applied.todo.projectId) }) { Text(stringResource(R.string.inbox_placement_open)) }
+                    FilledTonalButton(onClick = { onOpenPlacement(applied.todo.id, applied.todo.projectId) }) {
+                        ClawActionLabel(Icons.AutoMirrored.Filled.ArrowForward, stringResource(
+                            if (applied.todo.projectId == null) R.string.inbox_placement_open else R.string.inbox_placement_open_project,
+                        ))
+                    }
                     TextButton(onClick = viewModel::undo, enabled = !state.busy) { Text(stringResource(R.string.inbox_placement_undo)) }
                 }
             }
@@ -53,19 +64,28 @@ internal fun InboxPlacementSection(
             }
             ClawListItemSurface {
                 Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(destination, style = MaterialTheme.typography.bodyMedium)
-                task.dueDate?.let { Text(stringResource(R.string.inbox_placement_due, inboxDisplayDate(it, locale)), style = MaterialTheme.typography.bodySmall) }
+                InboxPlacementDetail(
+                    when {
+                        choice == null -> ClawIcons.Inbox
+                        choice.projectId == null -> ClawIcons.Checklist
+                        else -> ClawIcons.Folder
+                    },
+                    destination,
+                )
+                task.dueDate?.let {
+                    InboxPlacementDetail(ClawIcons.Today, stringResource(R.string.inbox_placement_due, inboxDisplayDate(it, locale)))
+                }
                 state.deadlines[task.id]?.takeUnless { task.id in state.excludedDeadlines }?.let { deadline ->
-                    Text(stringResource(R.string.inbox_placement_due, inboxDisplayDate(deadline.localDate, locale)), style = MaterialTheme.typography.bodySmall)
+                    InboxPlacementDetail(ClawIcons.Today, stringResource(R.string.inbox_placement_due, inboxDisplayDate(deadline.localDate, locale)))
                     if (deadline.isPast) Text(stringResource(R.string.inbox_deadline_past), color = MaterialTheme.colorScheme.error)
                 }
                 FlowRow {
                     FilledTonalButton(
                         onClick = { viewModel.approve(task.id) },
                         enabled = choice != null && !state.loading && !state.busy && !state.stale,
-                    ) { Text(stringResource(R.string.inbox_placement_approve)) }
+                    ) { ClawActionLabel(Icons.Default.Check, stringResource(R.string.inbox_placement_approve)) }
                     TextButton(onClick = { choosing = true }, enabled = state.snapshot != null && !state.loading && !state.busy && !state.stale) {
-                        Text(stringResource(R.string.inbox_placement_edit))
+                        ClawActionLabel(Icons.Default.Edit, stringResource(R.string.inbox_placement_edit))
                     }
                     TextButton(onClick = { viewModel.defer(task.id) }, enabled = !state.busy && !state.loading) { Text(stringResource(R.string.inbox_placement_defer)) }
                 }

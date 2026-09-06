@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="today_title">Today</string>
-    <string name="today_cd_search">Search</string>
+    <string name="today_cd_search">Search all</string>
     <string name="today_cd_settings">Settings</string>
     <string name="today_cd_capture_task">Capture task</string>
     <string name="today_offline_cached">Offline — showing the last synced day</string>

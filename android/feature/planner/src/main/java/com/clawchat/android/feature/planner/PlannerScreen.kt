@@ -49,7 +49,6 @@ fun PlannerScreen(
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {},
     onOpenTask: (String) -> Unit = {},
     onPageChanged: (PlannerPage) -> Unit = {},
 ) {
@@ -83,7 +82,6 @@ fun PlannerScreen(
                     onNavigateToReview = onNavigateToReview,
                     onNavigateToRuns = onNavigateToRuns,
                     onNavigateToSearch = onNavigateToSearch,
-                    onNavigateToSettings = onNavigateToSettings,
                 )
                 PlannerPage.WEEK -> WeekScreen()
                 PlannerPage.MONTH -> CalendarScreen(onOpenTask = onOpenTask)

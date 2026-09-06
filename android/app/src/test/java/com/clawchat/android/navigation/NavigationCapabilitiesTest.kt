@@ -7,6 +7,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NavigationCapabilitiesTest {
+    @Test fun `Inbox is the server home while attention remains reachable without becoming a primary tab`() {
+        assertEquals(NavRoute.Inbox.route, NavigationCapabilities.drawerRoutes(WorkspaceMode.SERVER).first())
+        assertTrue(NavRoute.Progress.route in NavigationCapabilities.secondaryRoutes(WorkspaceMode.SERVER))
+        assertFalse(NavRoute.Progress.route in NavigationCapabilities.primaryRoutes(WorkspaceMode.SERVER))
+    }
+
+    @Test fun `settings stays available as a drawer detail destination in both workspaces`() {
+        for (mode in listOf(WorkspaceMode.LOCAL, WorkspaceMode.SERVER)) {
+            assertTrue(NavRoute.Settings.route in NavigationCapabilities.drawerRoutes(mode))
+            assertTrue(NavRoute.Settings.route in NavigationCapabilities.secondaryRoutes(mode))
+            assertFalse(NavRoute.Settings.route in NavigationCapabilities.primaryRoutes(mode))
+        }
+    }
+
     @Test fun `drawer destinations are unique and supported by their workspace`() {
         for (mode in WorkspaceMode.entries) {
             val routes = NavigationCapabilities.drawerRoutes(mode)
@@ -42,13 +56,13 @@ class NavigationCapabilitiesTest {
     }
 
     @Test
-    fun `server mode exposes four primary destinations and keeps detail routes open`() {
+    fun `server mode starts with capture and keeps attention as a secondary destination`() {
         assertEquals(
-            listOf("progress", "tasks", "today", "chat"),
+            listOf("inbox", "projects", "tasks", "today", "chat"),
             NavigationCapabilities.primaryRoutes(WorkspaceMode.SERVER),
         )
         assertEquals(
-            listOf("search", "settings"),
+            listOf("progress", "search", "settings"),
             NavigationCapabilities.secondaryRoutes(WorkspaceMode.SERVER),
         )
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "progress"))
@@ -72,6 +86,6 @@ class NavigationCapabilitiesTest {
     fun `start destination follows workspace mode`() {
         assertEquals("onboarding", NavigationCapabilities.startRoute(WorkspaceMode.UNCONFIGURED))
         assertEquals("tasks", NavigationCapabilities.startRoute(WorkspaceMode.LOCAL))
-        assertEquals("progress", NavigationCapabilities.startRoute(WorkspaceMode.SERVER))
+        assertEquals("inbox", NavigationCapabilities.startRoute(WorkspaceMode.SERVER))
     }
 }

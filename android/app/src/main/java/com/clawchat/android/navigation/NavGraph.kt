@@ -28,7 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.annotation.StringRes
+import com.clawchat.android.core.ui.ClawMobileLayout
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -53,22 +53,6 @@ import com.clawchat.android.R
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.SearchType
 
-private data class DrawerDestination(
-    val route: String,
-    @StringRes val labelRes: Int,
-)
-
-private val allDrawerDestinations = listOf(
-    DrawerDestination(NavRoute.Progress.route, R.string.nav_progress),
-    DrawerDestination(NavRoute.Tasks.route, R.string.nav_tasks),
-    DrawerDestination(NavRoute.Today.route, R.string.nav_schedule),
-    DrawerDestination(NavRoute.Chat.route, R.string.nav_chat),
-    DrawerDestination(NavRoute.Inbox.route, R.string.nav_inbox),
-    DrawerDestination(NavRoute.Projects.route, R.string.nav_projects),
-    DrawerDestination(NavRoute.Search.route, R.string.nav_search),
-    DrawerDestination(NavRoute.Settings.route, R.string.nav_settings),
-)
-
 internal fun plannerPrimaryRoute(currentRoute: String?): String? =
     when (currentRoute) {
         NavRoute.Projects.route -> NavRoute.Tasks.route
@@ -78,7 +62,7 @@ internal fun plannerPrimaryRoute(currentRoute: String?): String? =
 
 /**
  * Whether [targetRoute] is the tab that also serves as the graph's start
- * destination (Progress in server mode, Tasks in local mode). That entry
+ * destination (Inbox in server mode, Tasks in local mode). That entry
  * sits underneath every other tab's `popUpTo`, so it never actually gets
  * popped by the normal save/restore dance — navigating back to it with the
  * usual `saveState`/`restoreState` pair can then silently no-op instead of
@@ -168,8 +152,8 @@ fun ClawChatNavGraph(
             }
         }
     }
-    val navigateToNow: () -> Unit = {
-        navigateToPrimary(NavRoute.Progress.route)
+    val navigateToInbox: () -> Unit = {
+        navigateToPrimary(NavRoute.Inbox.route)
     }
     val navigateToReview: (String?) -> Unit = { reviewId ->
         if (NavigationCapabilities.canOpen(workspaceMode, NavRoute.Review.route)) {
@@ -183,9 +167,6 @@ fun ClawChatNavGraph(
     }
     val navigateToSearch: () -> Unit = {
         navController.navigate(NavRoute.Search.route)
-    }
-    val navigateToSettings: () -> Unit = {
-        navController.navigate(NavRoute.Settings.route) { launchSingleTop = true }
     }
 
     CompositionLocalProvider(LocalOpenNavigationMenu provides {
@@ -209,8 +190,25 @@ fun ClawChatNavGraph(
                                     navController.navigate(item.route) { launchSingleTop = true }
                                 } else navigateToPrimary(item.route)
                             } },
-                            label = { Text(stringResource(item.labelRes)) },
-                            badge = { if (item.route == NavRoute.Progress.route && attentionCount > 0) Text(attentionCount.coerceAtMost(99).toString()) },
+                            icon = {
+                                Icon(
+                                    imageVector = item.icon,
+                                    // The row label already names this action for TalkBack.
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ClawMobileLayout.IconSize),
+                                )
+                            },
+                            label = {
+                                Text(
+                                    stringResource(item.labelRes),
+                                    fontWeight = if (item.route == selectedPrimaryRoute) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            },
+                            badge = {
+                                if (item.route == NavRoute.Progress.route && attentionCount > 0) {
+                                    Badge { Text(if (attentionCount > 99) "99+" else attentionCount.toString()) }
+                                }
+                            },
                         )
                     }
                 }
@@ -231,7 +229,7 @@ fun ClawChatNavGraph(
             composable(NavRoute.Onboarding.route) {
                 OnboardingScreen(
                     onComplete = {
-                        navController.navigate(NavRoute.Progress.route) {
+                        navController.navigate(NavRoute.Inbox.route) {
                             popUpTo(NavRoute.Onboarding.route) { inclusive = true }
                         }
                     },
@@ -246,11 +244,10 @@ fun ClawChatNavGraph(
                 PlannerScreen(
                     initialPage = plannerPage,
                     showAgentFeatures = workspaceMode == WorkspaceMode.SERVER,
-                    onNavigateToInbox = navigateToNow,
+                    onNavigateToInbox = navigateToInbox,
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
-                    onNavigateToSettings = navigateToSettings,
                     onOpenTask = { todoId ->
                         navController.navigate(NavRoute.Tasks.destination(todoId)) {
                             launchSingleTop = true
@@ -313,11 +310,10 @@ fun ClawChatNavGraph(
                 PlannerScreen(
                     initialPage = plannerPage,
                     showAgentFeatures = workspaceMode == WorkspaceMode.SERVER,
-                    onNavigateToInbox = navigateToNow,
+                    onNavigateToInbox = navigateToInbox,
                     onNavigateToReview = { navigateToReview(null) },
                     onNavigateToRuns = navigateToRuns,
                     onNavigateToSearch = navigateToSearch,
-                    onNavigateToSettings = navigateToSettings,
                     onOpenTask = { todoId ->
                         navController.navigate(NavRoute.Tasks.destination(todoId)) {
                             launchSingleTop = true
@@ -362,7 +358,6 @@ fun ClawChatNavGraph(
                         contextTitle = entry.arguments?.getString(NavRoute.Chat.ARG_TITLE),
                         onReturnToSource = { if (!navController.popBackStack()) navController.navigate(NavRoute.Tasks.route) },
                         onOpenSearch = navigateToSearch,
-                        onOpenSettings = navigateToSettings,
                         initialConversationId = entry.arguments?.getString(
                             NavRoute.Chat.ARG_CONVERSATION_ID,
                         ),
@@ -376,7 +371,6 @@ fun ClawChatNavGraph(
                 ) {
                     ProgressScreen(
                         onOpenSearch = navigateToSearch,
-                        onOpenSettings = navigateToSettings,
                         onOpenReview = { reviewId -> navigateToReview(reviewId) },
                         onOpenRun = { runId ->
                             navController.navigate(NavRoute.Runs.destination(runId)) {
@@ -402,11 +396,11 @@ fun ClawChatNavGraph(
                 ),
             ) { entry ->
                 TasksScreen(
+                    allowTaskNotes = workspaceMode == WorkspaceMode.SERVER,
                     onOpenProjects = if (workspaceMode == WorkspaceMode.SERVER) {
                         { navController.navigate(NavRoute.Projects.route) { launchSingleTop = true } }
                     } else null,
                     onOpenSearch = navigateToSearch,
-                    onOpenSettings = navigateToSettings,
                     initialTodoId = entry.arguments?.getString(NavRoute.Tasks.ARG_TODO_ID),
                     onOpenConversation = { conversationId ->
                         if (NavigationCapabilities.canOpen(workspaceMode, NavRoute.Chat.route)) {
@@ -481,14 +475,29 @@ fun ClawChatNavGraph(
                 navArgument(NavRoute.Projects.ARG_TASK_ID) { type = NavType.StringType; nullable = true; defaultValue = null },
             )) { entry ->
                 if (workspaceMode == WorkspaceMode.SERVER) {
+                    var projectThreadId by rememberSaveable { mutableStateOf<String?>(null) }
+                    var projectThreadTitle by rememberSaveable { mutableStateOf<String?>(null) }
+                    var projectThreadFocus by rememberSaveable { mutableStateOf(false) }
                     ProjectPlanScreen(
                         initialProjectId = entry.arguments?.getString(NavRoute.Projects.ARG_PROJECT_ID),
                         initialTaskId = entry.arguments?.getString(NavRoute.Projects.ARG_TASK_ID),
                         onBack = { navController.popBackStack() },
                         onOpenTask = { navController.navigate(NavRoute.Tasks.destination(it)) },
-                        onOpenConversation = { id, title, projectPlan -> navController.navigate(NavRoute.Chat.destination(id, title, projectPlan)) },
+                        onOpenConversation = { id, title, _, focusInput ->
+                            projectThreadTitle = title
+                            projectThreadFocus = focusInput
+                            projectThreadId = id
+                        },
                         onOpenRun = { navController.navigate(NavRoute.Runs.destination(it)) },
                     )
+                    projectThreadId?.let { id ->
+                        ProjectAgentSheet(
+                            conversationId = id,
+                            title = projectThreadTitle,
+                            focusInput = projectThreadFocus,
+                            onDismiss = { projectThreadId = null },
+                        )
+                    }
                 }
             }
             composable(NavRoute.Settings.route) {

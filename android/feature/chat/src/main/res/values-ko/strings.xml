@@ -7,7 +7,7 @@
     <string name="chat_return_project_plan">계획</string>
     <string name="chat_review_note">검토 의견 또는 수정할 내용</string>
     <string name="chat_review_request_changes">수정 요청</string>
-    <string name="chat_search">빠른 찾기</string>
+    <string name="chat_search">전체 검색</string>
     <string name="chat_settings">설정</string>
     <string name="chat_title">채팅</string>
     <string name="chat_new_chat">새 채팅</string>

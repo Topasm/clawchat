@@ -6,10 +6,12 @@
     <string name="progress_capture_add">Inbox에 추가</string>
     <string name="progress_capture_saved">Inbox에 추가했습니다</string>
     <string name="progress_capture_undo">되돌리기</string>
-    <string name="progress_search">빠른 찾기</string>
+    <string name="progress_search">전체 검색</string>
     <string name="progress_settings">설정</string>
-    <string name="progress_title">Now</string>
-    <string name="progress_refresh">Now 새로고침</string>
+    <string name="progress_title">확인 필요</string>
+    <string name="progress_refresh">확인 요청 새로고침</string>
+    <string name="progress_show_active">진행 중 작업 보기</string>
+    <string name="progress_hide_active">진행 중 작업 접기</string>
     <plurals name="progress_summary">
         <item quantity="other">확인 필요 %1$d개</item>
     </plurals>
@@ -23,7 +25,7 @@
     <string name="progress_sync_retry">다시 시도</string>
     <string name="progress_sync_retrying">재시도 중…</string>
     <string name="progress_empty_title">지금 확인할 항목이 없습니다</string>
-    <string name="progress_empty_description">질문, 결정 요청, 진행 중 작업과 최근 결과가 여기에 표시됩니다.</string>
+    <string name="progress_empty_description">답변·검토·실패 처리 등 내 결정이 필요한 요청이 여기에 표시됩니다.</string>
 
     <string name="progress_attention_title">확인 필요</string>
     <string name="progress_attention_description">진행을 막고 있는 결정, 입력 요청, 실패 항목입니다.</string>

@@ -9,8 +9,8 @@ import com.clawchat.android.core.data.WorkspaceMode
  */
 internal object NavigationCapabilities {
     fun drawerRoutes(mode: WorkspaceMode): List<String> = when (mode) {
-        WorkspaceMode.SERVER -> listOf(NavRoute.Inbox.route, NavRoute.Progress.route, NavRoute.Projects.route,
-            NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Chat.route, NavRoute.Search.route, NavRoute.Settings.route)
+        WorkspaceMode.SERVER -> listOf(NavRoute.Inbox.route, NavRoute.Projects.route, NavRoute.Today.route,
+            NavRoute.Tasks.route, NavRoute.Chat.route, NavRoute.Progress.route, NavRoute.Search.route, NavRoute.Settings.route)
         WorkspaceMode.LOCAL -> listOf(NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Search.route, NavRoute.Settings.route)
         WorkspaceMode.UNCONFIGURED -> emptyList()
     }
@@ -25,21 +25,21 @@ internal object NavigationCapabilities {
     )
 
     private val serverPrimaryRoutes = listOf(
-        NavRoute.Progress.route,
+        NavRoute.Inbox.route,
+        NavRoute.Projects.route,
         NavRoute.Tasks.route,
         NavRoute.Today.route,
         NavRoute.Chat.route,
     )
 
     private val serverSecondaryRoutes = listOf(
+        NavRoute.Progress.route,
         NavRoute.Search.route,
         NavRoute.Settings.route,
     )
 
-    /** Detail routes opened from Now rows or existing deep links, not drawer destinations. */
+    /** Detail routes opened from attention rows or existing deep links. */
     private val serverInternalRoutes = listOf(
-        NavRoute.Projects.route,
-        NavRoute.Inbox.route,
         NavRoute.Review.route,
         NavRoute.Runs.route,
     )
@@ -58,7 +58,7 @@ internal object NavigationCapabilities {
     fun startRoute(mode: WorkspaceMode): String = when (mode) {
         WorkspaceMode.UNCONFIGURED -> NavRoute.Onboarding.route
         WorkspaceMode.LOCAL -> NavRoute.Tasks.route
-        WorkspaceMode.SERVER -> NavRoute.Progress.route
+        WorkspaceMode.SERVER -> NavRoute.Inbox.route
     }
 
     fun primaryRoutes(mode: WorkspaceMode): List<String> = when (mode) {

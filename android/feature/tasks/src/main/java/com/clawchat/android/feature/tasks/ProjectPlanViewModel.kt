@@ -29,6 +29,7 @@ data class ProjectPlanState(
     val openRun: String? = null,
     val conversationTitle: String? = null,
     val projectConversation: Boolean = false,
+    val focusConversationInput: Boolean = false,
 )
 
 @HiltViewModel
@@ -97,15 +98,15 @@ class ProjectPlanViewModel @Inject constructor(
 
     fun discuss(taskId: String? = null) {
         val project = state.value.project ?: return
-        val root = taskId ?: project.rootTaskId ?: return
         val title = if (taskId == null) project.title else "${project.title} › ${state.value.taskTitles[taskId] ?: taskId}"
         if (taskId == null && project.conversationId != null) {
-            state.update { it.copy(openConversation = project.conversationId, conversationTitle = title, projectConversation = true) }
+            state.update { it.copy(openConversation = project.conversationId, conversationTitle = title, projectConversation = true, focusConversationInput = true) }
             return
         }
+        val root = taskId ?: project.rootTaskId ?: return
         mutate {
             when (val result = conversations.getOrCreateForTodo(root)) {
-                is ApiResult.Success -> state.update { it.copy(openConversation = result.data.id, conversationTitle = title, projectConversation = taskId == null) }
+                is ApiResult.Success -> state.update { it.copy(openConversation = result.data.id, conversationTitle = title, projectConversation = taskId == null, focusConversationInput = true) }
                 is ApiResult.Error -> state.update { it.copy(error = result.message) }
                 else -> Unit
             }
@@ -121,6 +122,7 @@ class ProjectPlanViewModel @Inject constructor(
                     state.update { current -> current.copy(
                         openConversation = run?.conversationId,
                         projectConversation = false,
+                        focusConversationInput = false,
                         conversationTitle = "${current.project?.title.orEmpty()} › ${current.taskTitles[taskId] ?: taskId}",
                         openRun = if (run?.conversationId == null) result.data.runId else null,
                         nodes = current.nodes.map { if (it.id == taskId) it.copy(isReady = false, executionState = "in_progress") else it },

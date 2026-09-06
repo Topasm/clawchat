@@ -4,8 +4,16 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.text.style.TextOverflow
 import com.clawchat.android.core.ui.ClawMobileLayout
+import com.clawchat.android.core.ui.ClawActionLabel
+import com.clawchat.android.core.ui.icons.ClawIcons
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,7 +39,7 @@ import kotlinx.coroutines.isActive
 fun ProjectPlanScreen(
     onBack: () -> Unit,
     onOpenTask: (String) -> Unit,
-    onOpenConversation: (String, String?, Boolean) -> Unit,
+    onOpenConversation: (String, String?, Boolean, Boolean) -> Unit,
     onOpenRun: (String) -> Unit,
     initialProjectId: String? = null,
     initialTaskId: String? = null,
@@ -72,7 +80,7 @@ fun ProjectPlanScreen(
         val run = state.openRun
         val title = state.conversationTitle
         viewModel.navigationConsumed()
-        if (conversation != null) onOpenConversation(conversation, title, state.projectConversation)
+        if (conversation != null) onOpenConversation(conversation, title, state.projectConversation, state.focusConversationInput)
         else if (run != null) onOpenRun(run)
     }
     val back = { if (initialProjectId != null) onBack() else if (state.project != null) viewModel.select(null) else onBack() }
@@ -86,8 +94,24 @@ fun ProjectPlanScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.projects_back))
                 }
             },
-            actions = { TextButton(onClick = viewModel::refresh, enabled = !state.loading && !state.busy) { Text(stringResource(R.string.projects_refresh)) } })
+            actions = {
+                IconButton(onClick = viewModel::refresh, enabled = !state.loading && !state.busy) {
+                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.projects_refresh))
+                }
+            })
     }, bottomBar = {
+        if (selected == null && state.project != null) {
+            Surface(tonalElevation = 3.dp) {
+                OutlinedButton(
+                    onClick = { viewModel.discuss() },
+                    enabled = !state.busy && !state.loading && (state.project?.rootTaskId != null || state.project?.conversationId != null),
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding()
+                        .padding(ClawMobileLayout.ContentInset).heightIn(min = ClawMobileLayout.TouchTarget),
+                ) {
+                    ClawActionLabel(ClawIcons.Chat, stringResource(R.string.projects_agent))
+                }
+            }
+        }
         selected?.let { node ->
             Surface(tonalElevation = 3.dp) {
                 Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(ClawMobileLayout.PageInset)) {
@@ -98,18 +122,24 @@ fun ProjectPlanScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(node.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                        TextButton(onClick = { selectedId = null }) { Text(stringResource(R.string.projects_close_selection)) }
+                        IconButton(onClick = { selectedId = null }) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.projects_close_selection))
+                        }
                     }
                     if (node.blockers.isNotEmpty()) Text(stringResource(R.string.projects_dependencies,
                         node.blockers.joinToString(", ") { state.taskTitles[it] ?: it }))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (node.isReady) Button(onClick = { confirmRun = node }, enabled = !state.busy && !state.loading) {
-                            Text(stringResource(R.string.projects_run))
+                            ClawActionLabel(Icons.Default.PlayArrow, stringResource(R.string.projects_run))
                         }
-                        TextButton(onClick = { onOpenTask(node.id) }, enabled = !state.busy) { Text(stringResource(R.string.projects_task)) }
-                        TextButton(onClick = { viewModel.discuss(node.id) }, enabled = !state.busy) { Text(stringResource(R.string.projects_discuss)) }
+                        TextButton(onClick = { onOpenTask(node.id) }, enabled = !state.busy) {
+                            ClawActionLabel(ClawIcons.Checklist, stringResource(R.string.projects_task))
+                        }
+                        TextButton(onClick = { viewModel.discuss(node.id) }, enabled = !state.busy) {
+                            ClawActionLabel(ClawIcons.Chat, stringResource(R.string.projects_discuss))
+                        }
                     }
                 }
             }
@@ -123,9 +153,13 @@ fun ProjectPlanScreen(
                 if (!state.loading && state.projects.isEmpty()) item { Text(stringResource(R.string.projects_empty)) }
                 items(state.projects, key = { it.id }) { entry ->
                     Card(Modifier.fillMaxWidth().clickable { viewModel.select(entry) }) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(entry.title, style = MaterialTheme.typography.titleMedium)
-                            entry.goal?.let { Text(it) }
+                        Row(Modifier.padding(ClawMobileLayout.PageInset), horizontalArrangement = Arrangement.spacedBy(ClawMobileLayout.ItemGap)) {
+                            Icon(ClawIcons.Folder, contentDescription = null,
+                                modifier = Modifier.size(ClawMobileLayout.IconSize), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(Modifier.weight(1f)) {
+                                Text(entry.title, style = MaterialTheme.typography.titleMedium)
+                                entry.goal?.let { Text(it) }
+                            }
                         }
                     }
                 }
@@ -134,9 +168,6 @@ fun ProjectPlanScreen(
                     project.goal?.let { Text(it) }
                     project.hostLabel?.let { Text(stringResource(R.string.projects_machine, it,
                         stringResource(if (project.hostOnline == true) R.string.projects_online else R.string.projects_offline))) }
-                    Button(onClick = { viewModel.discuss() }, enabled = !state.busy && project.rootTaskId != null) {
-                        Text(stringResource(R.string.projects_agent))
-                    }
                     Text("${stringResource(R.string.projects_ready)} · ${state.nodes.count { it.isReady }}", style = MaterialTheme.typography.titleMedium)
                 }
                 val ready = state.nodes.filter { it.isReady }
@@ -156,13 +187,18 @@ fun ProjectPlanScreen(
                 }
                 items(visibleProjectOutline(state.nodes, collapsed.toSet(), showFinished), key = { "outline:${it.first.id}" }) { (node, depth) ->
                     Column(Modifier.fillMaxWidth().clickable { selectedId = node.id }.heightIn(min = ClawMobileLayout.TouchTarget).padding(start = (depth.coerceAtMost(ClawMobileLayout.MaxOutlineIndent) * 12).dp, top = 8.dp, bottom = 8.dp)) {
-                        Row {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(node.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis,
                                 color = if (selectedId == node.id) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                            if (state.nodes.any { it.parentId == node.id }) TextButton(onClick = {
+                            if (state.nodes.any { it.parentId == node.id }) IconButton(onClick = {
                                 collapsed = if (node.id in collapsed) collapsed - node.id else collapsed + node.id
-                            }) { Text(stringResource(if (node.id in collapsed) R.string.projects_expand else R.string.projects_collapse)) }
+                            }) {
+                                Icon(
+                                    if (node.id in collapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = stringResource(if (node.id in collapsed) R.string.projects_expand else R.string.projects_collapse),
+                                )
+                            }
                         }
                         Text(stringResource(when (node.executionState) {
                             "ready" -> R.string.projects_ready

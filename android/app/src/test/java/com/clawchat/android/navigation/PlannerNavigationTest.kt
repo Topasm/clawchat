@@ -42,13 +42,13 @@ class PlannerNavigationTest {
     }
 
     // Regression: tapping the tab that is also the graph's start destination
-    // (Progress in server mode) after visiting another tab silently did
+    // (Inbox in server mode) after visiting another tab silently did
     // nothing, because the normal saveState/restoreState popUpTo never
     // actually pops the start destination's own back-stack entry.
     @Test
     fun `a bare start destination is recognised regardless of query pattern`() {
-        assertEquals(true, isStartDestinationTarget(NavRoute.Progress.route, NavRoute.Progress.route))
-        assertEquals(false, isStartDestinationTarget(NavRoute.Tasks.route, NavRoute.Progress.route))
+        assertEquals(true, isStartDestinationTarget(NavRoute.Inbox.route, NavRoute.Inbox.route))
+        assertEquals(false, isStartDestinationTarget(NavRoute.Tasks.route, NavRoute.Inbox.route))
     }
 
     @Test

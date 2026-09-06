@@ -2,9 +2,12 @@ package com.clawchat.android.core.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 
 /** Shared mobile dimensions. Use minimum heights so system font scaling can grow rows. */
@@ -28,15 +31,27 @@ fun ClawComposer(
     actionIcon: ImageVector,
     actionLabel: String,
     onAction: () -> Unit,
+    focusOnOpen: Boolean = false,
     supportingContent: @Composable ColumnScope.() -> Unit = {},
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var requestedFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(focusOnOpen, enabled) {
+        if (focusOnOpen && enabled && !requestedFocus) {
+            withFrameNanos { }
+            focusRequester.requestFocus()
+            keyboard?.show()
+            requestedFocus = true
+        }
+    }
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(Modifier.navigationBarsPadding().imePadding()) {
             HorizontalDivider()
             Column(Modifier.fillMaxWidth().padding(horizontal = ClawMobileLayout.PageInset, vertical = ClawMobileLayout.ItemGap)) {
                 OutlinedTextField(
                     value = value, onValueChange = onValueChange, enabled = enabled,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                     placeholder = { Text(placeholder) },
                     textStyle = MaterialTheme.typography.bodyLarge,
                     shape = MaterialTheme.shapes.large,
