@@ -39,21 +39,22 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
     insight?.is_on_critical_path && 'critical path',
     isAtRisk && 'at risk',
   ].filter(Boolean);
+  const displayStatus = status === 'in_progress' ? 'pending' : status;
+  const statusLabel =
+    displayStatus === 'completed'
+      ? translateUi('Done')
+      : displayStatus === 'cancelled'
+        ? translateUi('Cancelled')
+        : translateUi('Active');
   return (
     <article
-      className={`cc-task-flow-node cc-task-flow-node--${status}${proposalSelection ? ` cc-task-flow-node--proposal-${proposalSelection}` : ''}${insightClasses ? ` ${insightClasses}` : ''}`}
-      aria-label={`${todo.title}, ${status.replace('_', ' ')}${insightLabels.length ? `, ${insightLabels.join(', ')}` : ''}`}
+      className={`cc-task-flow-node cc-task-flow-node--${displayStatus}${proposalSelection ? ` cc-task-flow-node--proposal-${proposalSelection}` : ''}${insightClasses ? ` ${insightClasses}` : ''}`}
+      aria-label={`${todo.title}, ${statusLabel}${insightLabels.length ? `, ${insightLabels.join(', ')}` : ''}`}
     >
       <Handle type="target" position={Position.Left} className="cc-task-flow-node__handle" />
       <div className="cc-task-flow-node__topline">
-        <span className={`cc-task-flow-node__status cc-task-flow-node__status--${status}`}>
-          {status === 'in_progress'
-            ? translateUi('In progress')
-            : status === 'completed'
-              ? translateUi('Done')
-              : status === 'cancelled'
-                ? translateUi('Cancelled')
-                : translateUi('Todo')}
+        <span className={`cc-task-flow-node__status cc-task-flow-node__status--${displayStatus}`}>
+          {statusLabel}
         </span>
         {childCount > 0 && (
           <span className="cc-task-flow-node__kind">{translateUi('Project')}</span>

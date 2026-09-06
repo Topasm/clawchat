@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useChatStore } from '../../../stores/useChatStore';
 import type {
@@ -64,11 +64,6 @@ const project = {
   critical_path_minutes: 0,
 } as ProjectOverviewResponse;
 
-function LocationSearch() {
-  const location = useLocation();
-  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
-}
-
 describe('ProjectPlan', () => {
   beforeEach(() => {
     useChatStore.setState({ projectPlanSelections: {} });
@@ -93,7 +88,11 @@ describe('ProjectPlan', () => {
         </MemoryRouter>,
       );
     const first = mount(project.id);
-    fireEvent.click(screen.getByRole('button', { name: /^Saved task\s*Ready$/ }));
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Plan' })).getByRole('button', {
+        name: /^Saved task\s*Ready$/,
+      }),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Flow' }));
     first.unmount();
     const restored = mount(project.id);
@@ -123,7 +122,11 @@ describe('ProjectPlan', () => {
         />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /^Ready task\s*Ready$/ }));
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Plan' })).getByRole('button', {
+        name: /^Ready task\s*Ready$/,
+      }),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Run agent' }));
     await waitFor(() =>
       expect(execution.open).toHaveBeenCalledWith('new-run', `${project.title} › Ready task`),
@@ -136,21 +139,6 @@ describe('ProjectPlan', () => {
     });
     confirm.mockRestore();
   });
-  it('opens the task graph scoped to the current project', () => {
-    render(
-      <MemoryRouter initialEntries={[`/projects/${project.id}`]}>
-        <ProjectPlan project={project} todos={[]} onDiscussTask={vi.fn()} />
-        <LocationSearch />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open graph' }));
-
-    expect(screen.getByTestId('location')).toHaveTextContent(
-      `/tasks?view=graph&project_id=${project.id}`,
-    );
-  });
-
   it('emphasizes review instead of starting another run and keeps secondary actions collapsed', async () => {
     execution.telemetry = [
       {
@@ -175,7 +163,11 @@ describe('ProjectPlan', () => {
         />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /^Review task\s*Ready$/ }));
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Plan' })).getByRole('button', {
+        name: /^Review task\s*Ready$/,
+      }),
+    );
     expect(screen.queryByRole('button', { name: 'Run agent' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '+ Step' })).not.toBeVisible();
     const actions = screen.getByLabelText('Selected task actions');

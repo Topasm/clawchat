@@ -1,19 +1,16 @@
 package com.clawchat.android.feature.progress
 
-import app.cash.turbine.test
 import com.clawchat.android.core.data.AppRuntimeState
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.PaginatedResponse
-import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.repository.AgentRunRepository
 import com.clawchat.android.core.data.repository.ReviewRepository
-import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.PendingReviewDecisionStore
@@ -48,7 +45,6 @@ class ProgressViewModelTest {
     private lateinit var runs: AgentRunRepository
     private lateinit var reviews: ReviewRepository
     private lateinit var todos: TodoRepository
-    private lateinit var comments: TaskCommentRepository
     private lateinit var syncManager: SyncManager
     private lateinit var sessionStore: SessionStore
     private lateinit var pendingTodos: PendingTodoUpdateStore
@@ -61,7 +57,6 @@ class ProgressViewModelTest {
         runs = mockk()
         reviews = mockk()
         todos = mockk()
-        comments = mockk()
         syncManager = mockk()
         sessionStore = mockk()
         pendingTodos = mockk()
@@ -83,7 +78,6 @@ class ProgressViewModelTest {
         every { pendingTodos.observeStatus("local") } returns flowOf(PendingSyncStatus())
         every { pendingReviews.observeStatus("local") } returns flowOf(PendingSyncStatus())
         coEvery { reviews.listPending() } returns ApiResult.Success(emptyList())
-        coEvery { comments.listForTodos(any()) } returns ApiResult.Success(emptyList())
     }
 
     @After
@@ -124,7 +118,8 @@ class ProgressViewModelTest {
         advanceUntilIdle()
 
         assertTrue(viewModel.uiState.value.attentionItems.isEmpty())
-        assertEquals(listOf("restarted"), viewModel.uiState.value.executingRuns.map(AgentRun::id))
+        assertEquals(listOf("restarted"), viewModel.uiState.value.runs.map(AgentRun::id))
+        assertTrue(viewModel.uiState.value.hasExecutingRuns)
         coVerify(exactly = 1) { runs.retryRun(failed.id) }
     }
 
@@ -216,182 +211,6 @@ class ProgressViewModelTest {
         assertNull(viewModel.uiState.value.pendingActionId)
     }
 
-    @Test
-    fun `capture success is delivered once and can be undone`() = runTest {
-        val captured = todo(inboxState = "captured", nextAction = "organize")
-        stubInitial()
-        coEvery { todos.createTodo(any()) } returns ApiResult.Success(captured)
-        coEvery { todos.deleteTodo(captured.id) } returns ApiResult.Success(Unit)
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        viewModel.captureEvents.test {
-            viewModel.captureToInbox("Task #work")
-            advanceUntilIdle()
-
-            assertEquals(captured, awaitItem())
-            expectNoEvents()
-        }
-
-        viewModel.undoCapture(captured)
-        advanceUntilIdle()
-
-        assertTrue(viewModel.uiState.value.tasks.none { it.id == captured.id })
-        coVerify(exactly = 1) { todos.deleteTodo(captured.id) }
-    }
-
-    @Test
-    fun `attention no longer fetches comment threads owned by task detail`() = runTest {
-        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
-        stubInitial(todos = listOf(active))
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        assertEquals(listOf(active), viewModel.uiState.value.tasks)
-        coVerify(exactly = 0) { comments.listForTodos(any()) }
-    }
-
-    @Test
-    fun `addComment appends the posted comment to its thread`() = runTest {
-        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
-        stubInitial(todos = listOf(active))
-        val posted = comment(active.id, "Shipping now")
-        coEvery {
-            comments.addComment(active.id, "Shipping now", any())
-        } returns ApiResult.Success(posted)
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        viewModel.addComment(active.id, "  Shipping now  ")
-        advanceUntilIdle()
-
-        assertEquals(listOf(posted), viewModel.uiState.value.commentsByTodoId[active.id])
-        assertNull(viewModel.uiState.value.commentError)
-        coVerify(exactly = 1) { comments.addComment(active.id, "Shipping now", any()) }
-    }
-
-    @Test
-    fun `a project root in progress is not a work card`() = runTest {
-        val root = todo(id = "root-1", inboxState = "none")
-            .copy(status = TaskStatus.IN_PROGRESS, source = "project_root")
-        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
-        stubInitial(todos = listOf(root, active))
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        assertEquals(listOf("active-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
-    }
-
-    @Test
-    fun `start now creates the task and puts it under In progress`() = runTest {
-        stubInitial()
-        val created = todo(id = "new-1", inboxState = "none")
-        coEvery { todos.createTodo(match { it.title == "Write the abstract" && it.inboxState == "none" }) } returns
-            ApiResult.Success(created)
-        coEvery {
-            todos.updateTodo("new-1", TodoUpdate(status = TaskStatus.IN_PROGRESS))
-        } returns ApiResult.Success(created.copy(status = TaskStatus.IN_PROGRESS))
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        viewModel.startTaskNow("Write the abstract")
-        advanceUntilIdle()
-
-        assertEquals(listOf("new-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
-        assertNull(viewModel.uiState.value.captureError)
-        coVerify(exactly = 1) { todos.updateTodo("new-1", TodoUpdate(status = TaskStatus.IN_PROGRESS)) }
-    }
-
-    @Test
-    fun `steps are added, ticked off and removed on the work card`() = runTest {
-        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
-        stubInitial(todos = listOf(active))
-        val step = todo(id = "step-1", inboxState = "none").copy(parentId = active.id, title = "Outline")
-        coEvery { todos.createTodo(match { it.parentId == active.id && it.title == "Outline" }) } returns
-            ApiResult.Success(step)
-        coEvery {
-            todos.updateTodo("step-1", TodoUpdate(status = TaskStatus.COMPLETED))
-        } returns ApiResult.Success(step.copy(status = TaskStatus.COMPLETED))
-        coEvery { todos.deleteTodo("step-1") } returns ApiResult.Success(Unit)
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        viewModel.addStep(active.id, "  Outline ")
-        advanceUntilIdle()
-        assertEquals(listOf("step-1"), viewModel.uiState.value.stepsFor(active.id).map(Todo::id))
-        // A step is part of its card, not a second card.
-        assertEquals(listOf("active-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
-
-        viewModel.setStepDone("step-1", done = true)
-        advanceUntilIdle()
-        assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.stepsFor(active.id).single().status)
-
-        viewModel.removeStep("step-1")
-        advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.stepsFor(active.id).isEmpty())
-        assertNull(viewModel.uiState.value.workError)
-    }
-
-    @Test
-    fun `finishing a task removes it from In progress`() = runTest {
-        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
-        stubInitial(todos = listOf(active))
-        coEvery {
-            todos.updateTodo(active.id, TodoUpdate(status = TaskStatus.COMPLETED))
-        } returns ApiResult.Success(active.copy(status = TaskStatus.COMPLETED))
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        viewModel.completeTask(active.id)
-        advanceUntilIdle()
-
-        assertTrue(viewModel.uiState.value.inProgressTasks.isEmpty())
-        assertTrue(viewModel.uiState.value.pendingWorkIds.isEmpty())
-    }
-
-    @Test
-    fun `a failed work action keeps the task and surfaces the error`() = runTest {
-        val active = todo(id = "active-1", inboxState = "none").copy(status = TaskStatus.IN_PROGRESS)
-        stubInitial(todos = listOf(active))
-        coEvery {
-            todos.updateTodo(active.id, TodoUpdate(status = TaskStatus.PENDING))
-        } returns ApiResult.Error("offline")
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        viewModel.pauseTask(active.id)
-        advanceUntilIdle()
-
-        assertEquals(listOf("active-1"), viewModel.uiState.value.inProgressTasks.map(Todo::id))
-        assertEquals("offline", viewModel.uiState.value.workError)
-        assertTrue(viewModel.uiState.value.pendingWorkIds.isEmpty())
-    }
-
-    @Test
-    fun `cancelling a run replaces it with the cancelled attempt`() = runTest {
-        val running = run("run-1", AgentRunStatus.RUNNING)
-        stubInitial(runs = listOf(running))
-        coEvery { runs.cancelRun("run-1") } returns
-            ApiResult.Success(running.copy(status = AgentRunStatus.CANCELLED))
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        viewModel.cancelRun("run-1")
-        advanceUntilIdle()
-
-        assertTrue(viewModel.uiState.value.executingRuns.isEmpty())
-        coVerify(exactly = 1) { runs.cancelRun("run-1") }
-    }
-
-    private fun comment(todoId: String, content: String, id: String = "cmt-$content") = TaskComment(
-        id = id,
-        todoId = todoId,
-        content = content,
-        createdBy = "user",
-        createdAt = "2026-09-01T00:00:00Z",
-        updatedAt = "2026-09-01T00:00:00Z",
-    )
-
     private fun stubInitial(
         todos: List<Todo> = emptyList(),
         runs: List<AgentRun> = emptyList(),
@@ -410,7 +229,6 @@ class ProgressViewModelTest {
         agentRunRepository = runs,
         reviewRepository = reviews,
         todoRepository = todos,
-        taskCommentRepository = comments,
         syncManager = syncManager,
         sessionStore = sessionStore,
         pendingTodos = pendingTodos,

@@ -52,7 +52,13 @@ vi.mock('../../../stores/useModuleStore', () => ({
 }));
 vi.mock('../../../hooks/useKanbanFilters', () => ({ default: (todos: unknown[]) => todos }));
 vi.mock('../../kanban/KanbanFilterBar', () => ({ default: () => null }));
-vi.mock('../../kanban/TasksHeader', () => ({ default: () => null }));
+vi.mock('../../kanban/TasksHeader', () => ({
+  default: () => null,
+  matchesTasksStatusFilter: (status: string, filter: string) =>
+    filter === 'all' ||
+    (filter === 'active' && (status === 'pending' || status === 'in_progress')) ||
+    status === filter,
+}));
 vi.mock('../TaskGraph', () => ({
   default: (props: Record<string, unknown>) => {
     mocks.graphProps = props;
@@ -90,6 +96,7 @@ describe('TaskGraphPage project scope', () => {
       fixedProjectId: 'project-a',
       initialMode: 'execution',
       showPlanningAction: false,
+      showStatusControls: false,
     });
     expect((mocks.graphProps?.todos as Array<{ id: string }>).map((todo) => todo.id)).toEqual([
       'question-a',

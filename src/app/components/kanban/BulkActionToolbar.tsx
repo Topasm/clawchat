@@ -35,9 +35,8 @@ export default function BulkActionToolbar() {
             }}
           >
             <option value="">{translateUi('Set Status')}</option>
-            <option value="pending">{translateUi('Pending')}</option>
-            <option value="in_progress">{translateUi('In Progress')}</option>
-            <option value="completed">{translateUi('Completed')}</option>
+            <option value="pending">{translateUi('Active')}</option>
+            <option value="completed">{translateUi('Done')}</option>
             <option value="cancelled">{translateUi('Cancelled')}</option>
           </select>
 

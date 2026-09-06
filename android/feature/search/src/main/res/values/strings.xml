@@ -13,10 +13,4 @@
     <string name="search_type_tasks">Tasks</string>
     <string name="search_type_events">Events</string>
     <string name="search_type_messages">Messages</string>
-    <string name="search_quick_destinations">Go to</string>
-    <string name="search_destination_now">Attention</string>
-    <string name="search_destination_in_progress">In progress</string>
-    <string name="search_destination_schedule">Schedule</string>
-    <string name="search_destination_chat">Chat</string>
-    <string name="search_destination_settings">Settings</string>
 </resources>

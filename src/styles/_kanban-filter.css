@@ -50,11 +50,6 @@
 
 /* -- Filter Chips -------------------------------------------- */
 
-.cc-kanban-filter__chips {
-  display: flex;
-  gap: 4px;
-}
-
 .cc-kanban-filter__chip {
   padding: 4px 10px;
   border: 1px solid var(--cc-border);

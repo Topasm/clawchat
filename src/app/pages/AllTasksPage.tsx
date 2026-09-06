@@ -13,7 +13,7 @@ const TASKS_VIEW_STORAGE_KEY = 'clawchat.tasksView';
 
 export default function AllTasksPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [statusFilter, setStatusFilter] = useState<TasksStatusFilter>('in_progress');
+  const [statusFilter, setStatusFilter] = useState<TasksStatusFilter>('active');
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
   const [viewMode, setViewMode] = useState<TasksViewMode>(() => {
@@ -24,9 +24,9 @@ export default function AllTasksPage() {
     try {
       const stored = localStorage.getItem(TASKS_VIEW_STORAGE_KEY);
       if (stored === 'graph' || stored === 'list') return stored;
-      return 'kanban';
+      return 'list';
     } catch {
-      return 'kanban';
+      return 'list';
     }
   });
 

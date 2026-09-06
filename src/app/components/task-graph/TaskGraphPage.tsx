@@ -4,7 +4,11 @@ import { useProjectsQuery, useTaskRelationshipsQuery, useTodosQuery } from '../.
 import useKanbanFilters from '../../hooks/useKanbanFilters';
 import { useModuleStore } from '../../stores/useModuleStore';
 import KanbanFilterBar from '../kanban/KanbanFilterBar';
-import TasksHeader, { type TasksStatusFilter, type TasksViewMode } from '../kanban/TasksHeader';
+import TasksHeader, {
+  matchesTasksStatusFilter,
+  type TasksStatusFilter,
+  type TasksViewMode,
+} from '../kanban/TasksHeader';
 import TaskGraph from './TaskGraph';
 import { expandTaskGraphContext } from './taskGraphAdapter';
 import { isTaskTodo } from '../../utils/inboxState';
@@ -43,10 +47,7 @@ export default function TaskGraphPage({
     [selectedProject, taskTodos],
   );
   const scopedTodos = useMemo(
-    () =>
-      statusFilter === 'all'
-        ? graphScopeTodos
-        : graphScopeTodos.filter((todo) => todo.status === statusFilter),
+    () => graphScopeTodos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter)),
     [graphScopeTodos, statusFilter],
   );
   const filteredTodos = useKanbanFilters(scopedTodos, filters);
@@ -101,6 +102,7 @@ export default function TaskGraphPage({
         fixedProjectId={selectedProject?.id ?? 'all'}
         initialMode="execution"
         showPlanningAction={false}
+        showStatusControls={false}
       />
     </div>
   );

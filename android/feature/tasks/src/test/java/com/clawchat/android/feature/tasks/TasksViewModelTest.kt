@@ -202,36 +202,21 @@ class TasksViewModelTest {
     }
 
     @Test
-    fun `task status pages start with in progress and put all last`() {
-        assertEquals(
-            listOf(
-                TaskStatus.IN_PROGRESS,
-                TaskStatus.PENDING,
-                TaskStatus.COMPLETED,
-                TaskStatus.CANCELLED,
-                null,
-            ),
-            TASK_STATUS_FILTER_ORDER,
-        )
-    }
-
-    @Test
-    fun `all page keeps completed tasks in a separate bottom section`() {
+    fun `unified page groups active completed and cancelled tasks`() {
         val pending = Todo(id = "pending", title = "Pending", status = TaskStatus.PENDING)
         val completed = Todo(id = "completed", title = "Completed", status = TaskStatus.COMPLETED)
+        val cancelled = Todo(id = "cancelled", title = "Cancelled", status = TaskStatus.CANCELLED)
         val inProgress = Todo(
             id = "in-progress",
             title = "In progress",
             status = TaskStatus.IN_PROGRESS,
         )
 
-        val sections = splitTasksForAllView(
-            tasks = listOf(completed, pending, inProgress),
-            separateCompleted = true,
-        )
+        val sections = splitTasksForUnifiedView(listOf(completed, pending, cancelled, inProgress))
 
         assertEquals(listOf(pending, inProgress), sections.active)
         assertEquals(listOf(completed), sections.completed)
+        assertEquals(listOf(cancelled), sections.cancelled)
     }
 
     @Test
@@ -286,7 +271,6 @@ class TasksViewModelTest {
             // Initial empty state
             val initial = awaitItem()
             assertEquals(emptyList<Todo>(), initial.tasks)
-            assertEquals(TaskStatus.IN_PROGRESS, initial.statusFilter)
 
             // Loading state
             val loading = awaitItem()
@@ -362,24 +346,6 @@ class TasksViewModelTest {
             assertEquals(TaskStatus.PENDING, rolledBack.tasks.first().status)
             val reported = awaitItem()
             assertEquals("Server error", reported.error)
-        }
-    }
-
-    @Test
-    fun `setFilter updates filter without reloading the complete snapshot`() = runTest {
-        coEvery { todoRepository.listTodos(any()) } returns
-            ApiResult.Success(PaginatedResponse(items = sampleTodos, total = 2))
-
-        viewModel = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.onAction(TasksAction.SetFilter(TaskStatus.COMPLETED))
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(TaskStatus.COMPLETED, viewModel.uiState.value.statusFilter)
-        assertEquals(sampleTodos, viewModel.uiState.value.tasks)
-        coVerify(exactly = 1) {
-            todoRepository.listTodos(match { "status" !in it })
         }
     }
 

@@ -13,8 +13,6 @@
     <string name="inbox_capture_add">Add to Inbox</string>
     <string name="inbox_capture_saving">Saving…</string>
     <string name="inbox_capture_saved">Saved to Inbox. Placement suggestions require a connected server.</string>
-    <string name="inbox_placement_title">Review placement</string>
-    <string name="inbox_placement_help">AI suggests where each capture belongs. Nothing moves until you approve.</string>
     <string name="inbox_placement_loading">Finding a place for your captures…</string>
     <string name="inbox_placement_stale">The plan may have changed. Refresh before approving.</string>
     <string name="inbox_placement_choose">Choose a destination</string>

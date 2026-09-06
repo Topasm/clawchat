@@ -105,18 +105,27 @@ function callMessageHasEnglish(node) {
   return renderedExpressionHasEnglish(node);
 }
 
+const failures = [];
 const catalog = new Set();
 const catalogSource = parse(catalogPath);
 function visitCatalog(node) {
   if (ts.isPropertyAssignment(node)) {
     const name = node.name;
-    if (ts.isStringLiteralLike(name) || ts.isIdentifier(name)) catalog.add(canonical(name.text));
+    if (ts.isStringLiteralLike(name) || ts.isIdentifier(name)) {
+      const key = canonical(name.text);
+      if (catalog.has(key)) {
+        const position = catalogSource.getLineAndCharacterOfPosition(node.getStart(catalogSource));
+        failures.push(
+          `${path.relative(root, catalogPath)}:${position.line + 1}:${position.character + 1} duplicate Korean catalog entry: ${JSON.stringify(key)}`,
+        );
+      }
+      catalog.add(key);
+    }
   }
   ts.forEachChild(node, visitCatalog);
 }
 visitCatalog(catalogSource);
 
-const failures = [];
 for (const file of collectFiles(sourceRoot)) {
   if (file === catalogPath) continue;
   const source = parse(file);

@@ -223,14 +223,14 @@ fun ProjectPlanScreen(
                                 )
                             }
                         }
-                        Text(stringResource(when (node.executionState) {
+                        when (node.executionState) {
                             "ready" -> R.string.projects_ready
                             "blocked" -> R.string.projects_blocked
                             "in_progress" -> R.string.projects_running
                             "completed" -> R.string.projects_done
                             "cancelled" -> R.string.projects_cancelled
-                            else -> R.string.projects_pending
-                        }))
+                            else -> null
+                        }?.let { Text(stringResource(it)) }
                         HorizontalDivider()
                     }
                 }

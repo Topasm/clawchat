@@ -51,8 +51,6 @@
     <string name="settings_checking">확인 중…</string>
     <string name="settings_run_again">다시 실행</string>
 
-    <string name="settings_connect_server">Workspace 연결</string>
-    <string name="settings_connect_server_description">ClawChat 서버 연결을 설정합니다.</string>
     <string name="settings_theme_mode">테마 모드</string>
     <string name="settings_theme_light">라이트</string>
     <string name="settings_theme_dark">다크</string>

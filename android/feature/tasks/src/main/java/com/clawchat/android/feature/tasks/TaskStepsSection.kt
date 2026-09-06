@@ -49,12 +49,18 @@ internal fun TaskStepsSection(
             ClawListItemSurface(onClick = { onOpen(step) }) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(step.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text(stringResource(when (step.status) {
-                        TaskStatus.COMPLETED -> R.string.tasks_status_completed
-                        TaskStatus.IN_PROGRESS -> R.string.tasks_status_in_progress
-                        TaskStatus.CANCELLED -> R.string.tasks_status_cancelled
-                        else -> R.string.tasks_status_pending
-                    }), style = MaterialTheme.typography.labelMedium)
+                    if (step.status == TaskStatus.COMPLETED || step.status == TaskStatus.CANCELLED) {
+                        Text(
+                            stringResource(
+                                if (step.status == TaskStatus.COMPLETED) {
+                                    R.string.tasks_status_completed
+                                } else {
+                                    R.string.tasks_status_cancelled
+                                },
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
                 }
             }
         }

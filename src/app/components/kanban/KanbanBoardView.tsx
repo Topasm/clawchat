@@ -5,10 +5,14 @@ import KanbanColumn from './KanbanColumn';
 import KanbanColumnTabs from './KanbanColumnTabs';
 import KanbanFilterBar from './KanbanFilterBar';
 import BulkActionToolbar from './BulkActionToolbar';
-import TasksHeader, { type TasksStatusFilter, type TasksViewMode } from './TasksHeader';
+import TasksHeader, {
+  type TasksColumnStatus,
+  type TasksStatusFilter,
+  type TasksViewMode,
+} from './TasksHeader';
 
 interface ColumnDef {
-  status: TaskStatus;
+  status: TasksColumnStatus;
   title: string;
   icon: ReactNode;
   tasks: TodoResponse[];

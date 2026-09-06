@@ -38,7 +38,6 @@
 }
 
 .cc-project-execution-form__rules,
-.cc-project-execution-form__path,
 .cc-project-execution-form__actions {
   grid-column: 1 / -1;
 }
@@ -74,7 +73,6 @@
   }
 
   .cc-project-execution-form__rules,
-  .cc-project-execution-form__path,
   .cc-project-execution-form__actions {
     grid-column: auto;
   }

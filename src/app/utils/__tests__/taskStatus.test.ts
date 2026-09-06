@@ -9,9 +9,9 @@ describe('task status helpers', () => {
     expect(isTerminalTaskStatus('cancelled')).toBe(true);
   });
 
-  it('provides a label for every canonical status', () => {
-    expect(getTaskStatusLabel('pending')).toBe('Todo');
-    expect(getTaskStatusLabel('in_progress')).toBe('In Progress');
+  it('uses one user-facing label for both active wire statuses', () => {
+    expect(getTaskStatusLabel('pending')).toBe('Active');
+    expect(getTaskStatusLabel('in_progress')).toBe('Active');
     expect(getTaskStatusLabel('completed')).toBe('Done');
     expect(getTaskStatusLabel('cancelled')).toBe('Cancelled');
   });

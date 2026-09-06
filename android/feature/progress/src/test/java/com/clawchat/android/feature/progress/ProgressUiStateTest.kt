@@ -15,7 +15,7 @@ import org.junit.Test
 class ProgressUiStateTest {
 
     @Test
-    fun `task progress and agent execution remain separate`() {
+    fun `running agents keep attention polling active without becoming attention items`() {
         val state = ProgressUiState(
             runs = listOf(run("run-running", AgentRunStatus.RUNNING)),
             tasks = listOf(
@@ -24,9 +24,9 @@ class ProgressUiStateTest {
             ),
         )
 
-        assertEquals(listOf("run-running"), state.executingRuns.map(AgentRun::id))
-        assertEquals(listOf("manual"), state.inProgressTasks.map(Todo::id))
-        assertEquals(2, state.activeCount)
+        assertTrue(state.hasExecutingRuns)
+        assertTrue(state.attentionItems.isEmpty())
+        assertFalse(state.hasAnyContent)
     }
 
     @Test
@@ -60,7 +60,7 @@ class ProgressUiStateTest {
     }
 
     @Test
-    fun `inbox and pending tasks do not become active progress`() {
+    fun `ordinary tasks do not become attention content`() {
         val state = ProgressUiState(
             tasks = listOf(
                 Todo(
@@ -73,7 +73,7 @@ class ProgressUiStateTest {
             ),
         )
 
-        assertTrue(state.inProgressTasks.isEmpty())
+        assertTrue(state.attentionItems.isEmpty())
         assertFalse(state.hasAnyContent)
     }
 

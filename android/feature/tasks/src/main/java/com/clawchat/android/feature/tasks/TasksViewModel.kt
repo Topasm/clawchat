@@ -37,7 +37,6 @@ private const val TAG = "TasksViewModel"
 data class TasksUiState(
     val tasks: List<Todo> = emptyList(),
     val isLoading: Boolean = false,
-    val statusFilter: TaskStatus? = TaskStatus.IN_PROGRESS, // null = all
     val selectedTask: Todo? = null,
     val relationships: List<TaskRelationship> = emptyList(),
     val relationshipTaskTitles: Map<String, String> = emptyMap(),
@@ -55,7 +54,6 @@ data class PendingTaskDeletion(
 
 sealed interface TasksAction {
     data class ToggleComplete(val todoId: String) : TasksAction
-    data class SetFilter(val status: TaskStatus?) : TasksAction
     data class SelectTask(val task: Todo?) : TasksAction
     data class Create(val input: TodoCreate) : TasksAction
     data class Update(val id: String, val update: TodoUpdate) : TasksAction
@@ -116,7 +114,6 @@ class TasksViewModel @Inject constructor(
     fun onAction(action: TasksAction) {
         when (action) {
             is TasksAction.ToggleComplete -> doToggleComplete(action.todoId)
-            is TasksAction.SetFilter -> doSetStatusFilter(action.status)
             is TasksAction.SelectTask -> doSelectTask(action.task)
             is TasksAction.Create -> doCreateTask(action.input)
             is TasksAction.Update -> doUpdateTask(action.id, action.update)
@@ -141,7 +138,6 @@ class TasksViewModel @Inject constructor(
         }
     }
     fun toggleComplete(todoId: String) = onAction(TasksAction.ToggleComplete(todoId))
-    fun setStatusFilter(status: TaskStatus?) = onAction(TasksAction.SetFilter(status))
     fun createTask(input: TodoCreate) = onAction(TasksAction.Create(input))
     fun updateTask(id: String, update: TodoUpdate) = onAction(TasksAction.Update(id, update))
     fun deleteTask(id: String) = onAction(TasksAction.Delete(id))
@@ -188,11 +184,6 @@ class TasksViewModel @Inject constructor(
                 is ApiResult.Loading -> { /* not used here */ }
             }
         }
-    }
-
-    private fun doSetStatusFilter(status: TaskStatus?) {
-        if (_uiState.value.statusFilter == status) return
-        _uiState.update { it.copy(statusFilter = status) }
     }
 
     private fun doSelectTask(task: Todo?) {

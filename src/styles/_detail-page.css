@@ -41,21 +41,6 @@
   flex: 1;
 }
 
-.cc-detail__field-btn {
-  padding: 4px 10px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-sm);
-  background: transparent;
-  font-size: 13px;
-  color: var(--cc-text);
-  cursor: pointer;
-  transition: background 0.1s ease;
-}
-
-.cc-detail__field-btn:hover {
-  background: var(--cc-surface-secondary);
-}
-
 .cc-detail__textarea {
   width: 100%;
   min-height: 80px;

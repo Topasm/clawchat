@@ -1,6 +1,7 @@
 import { useState, Fragment, type ReactNode } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
 import type { TodoResponse, TaskStatus } from '../../types/api';
+import type { TasksColumnStatus } from './TasksHeader';
 import KanbanCard from './KanbanCard';
 import SwipeActions from './SwipeActions';
 import EmptyState from '../shared/EmptyState';
@@ -8,7 +9,7 @@ import { ClipboardIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
 
 interface KanbanColumnProps {
-  status: TaskStatus;
+  status: TasksColumnStatus;
   title: string;
   icon: ReactNode;
   tasks: TodoResponse[];
@@ -27,9 +28,8 @@ interface KanbanColumnProps {
   onDelete?: (id: string) => void;
 }
 
-const variantMap: Record<TaskStatus, string> = {
-  pending: 'todo',
-  in_progress: 'progress',
+const variantMap: Record<TasksColumnStatus, string> = {
+  active: 'todo',
   completed: 'done',
   cancelled: 'cancelled',
 };
@@ -101,7 +101,12 @@ export default function KanbanColumn({
   const wrapWithSwipe = (taskId: string, node: React.ReactNode) => {
     if (!isMobile || !onMove || !onComplete) return node;
     return (
-      <SwipeActions taskId={taskId} currentStatus={status} onMove={onMove} onComplete={onComplete}>
+      <SwipeActions
+        taskId={taskId}
+        currentStatus={tasks.find((task) => task.id === taskId)?.status ?? 'pending'}
+        onMove={onMove}
+        onComplete={onComplete}
+      >
         {node}
       </SwipeActions>
     );

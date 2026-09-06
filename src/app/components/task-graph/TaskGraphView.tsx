@@ -120,11 +120,9 @@ function TaskGraphCanvas({
             if (insight?.is_on_critical_path) return 'var(--cc-warning)';
             return status === 'completed'
               ? 'var(--cc-success)'
-              : status === 'in_progress'
-                ? 'var(--cc-warning)'
-                : status === 'cancelled'
-                  ? 'var(--cc-text-tertiary)'
-                  : 'var(--cc-primary)';
+              : status === 'cancelled'
+                ? 'var(--cc-text-tertiary)'
+                : 'var(--cc-primary)';
           }}
         />
       )}

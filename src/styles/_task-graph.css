@@ -128,11 +128,8 @@
   background: var(--cc-text-tertiary);
 }
 
-.cc-task-list__status--pending {
+.cc-task-list__status--active {
   background: var(--cc-primary);
-}
-.cc-task-list__status--in_progress {
-  background: var(--cc-warning);
 }
 .cc-task-list__status--completed {
   background: var(--cc-success);

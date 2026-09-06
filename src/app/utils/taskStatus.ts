@@ -9,12 +9,24 @@ export function isTerminalTaskStatus(status: TaskStatus): boolean {
 export function getTaskStatusLabel(status: TaskStatus): string {
   switch (status) {
     case 'pending':
-      return translateUi('Todo');
     case 'in_progress':
-      return translateUi('In Progress');
+      return translateUi('Active');
     case 'completed':
       return translateUi('Done');
     case 'cancelled':
       return translateUi('Cancelled');
   }
+}
+
+export type TasksStatusFilter = 'active' | 'completed' | 'all';
+export type TasksColumnStatus = 'active' | 'completed' | 'cancelled';
+
+export function matchesTasksStatusFilter(status: TaskStatus, filter: TasksStatusFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'active') return status === 'pending' || status === 'in_progress';
+  return status === 'completed';
+}
+
+export function taskStatusForColumn(column: TasksColumnStatus): TaskStatus {
+  return column === 'active' ? 'pending' : column;
 }

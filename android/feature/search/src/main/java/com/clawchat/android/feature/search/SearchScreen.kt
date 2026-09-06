@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,7 +19,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,21 +51,11 @@ import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.localizedErrorMessage
 
-enum class QuickFindDestination {
-    NOW,
-    IN_PROGRESS,
-    SCHEDULE,
-    CHAT,
-    SETTINGS,
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onBack: () -> Unit = {},
     onOpenHit: (SearchHit) -> Unit = {},
-    quickDestinations: List<QuickFindDestination> = QuickFindDestination.entries,
-    onOpenDestination: (QuickFindDestination) -> Unit = {},
     availableTypes: List<SearchType> = SearchType.entries,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -79,11 +67,6 @@ fun SearchScreen(
     LaunchedEffect(availableTypes) { viewModel.setAvailableTypes(availableTypes) }
 
     val supportsMessages = SearchType.Messages in availableTypes
-    val destinationLabels = quickDestinations.associateWith { it.localizedLabel() }
-    val matchingDestinations = destinationLabels.filterValues { label ->
-        state.query.isBlank() || label.contains(state.query.trim(), ignoreCase = true)
-    }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -157,25 +140,6 @@ fun SearchScreen(
                 }
             }
 
-            if (matchingDestinations.isNotEmpty()) {
-                Text(
-                    text = stringResource(R.string.search_quick_destinations),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(
-                        items = matchingDestinations.entries.toList(),
-                        key = { it.key.name },
-                    ) { (destination, label) ->
-                        AssistChip(
-                            onClick = { onOpenDestination(destination) },
-                            label = { Text(label) },
-                        )
-                    }
-                }
-            }
-
             when {
                 state.isSearching && state.hits.isEmpty() -> LoadingRow()
 
@@ -184,12 +148,10 @@ fun SearchScreen(
                     tone = ClawTone.Error,
                 )
 
-                state.hasSearched && state.hits.isEmpty() && matchingDestinations.isEmpty() -> ClawEmptyState(
+                state.hasSearched && state.hits.isEmpty() -> ClawEmptyState(
                     title = stringResource(R.string.search_no_matches_title),
                     description = stringResource(R.string.search_no_matches_description, state.query),
                 )
-
-                state.hasSearched && state.hits.isEmpty() -> Unit
 
                 !state.hasSearched -> ClawEmptyState(
                     title = stringResource(R.string.search_initial_title),
@@ -207,17 +169,6 @@ fun SearchScreen(
         }
     }
 }
-
-@Composable
-private fun QuickFindDestination.localizedLabel(): String = stringResource(
-    when (this) {
-        QuickFindDestination.NOW -> R.string.search_destination_now
-        QuickFindDestination.IN_PROGRESS -> R.string.search_destination_in_progress
-        QuickFindDestination.SCHEDULE -> R.string.search_destination_schedule
-        QuickFindDestination.CHAT -> R.string.search_destination_chat
-        QuickFindDestination.SETTINGS -> R.string.search_destination_settings
-    },
-)
 
 @Composable
 private fun LoadingRow() {

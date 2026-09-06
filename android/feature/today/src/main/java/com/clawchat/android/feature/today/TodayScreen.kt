@@ -537,10 +537,10 @@ private fun TodoRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    if (todo.status != TaskStatus.PENDING) {
+                    if (todo.status == TaskStatus.CANCELLED) {
                         ClawStatusChip(
-                            text = taskStatusLabel(todo.status),
-                            tone = taskStatusTone(todo.status),
+                            text = stringResource(R.string.today_status_cancelled),
+                            tone = ClawTone.Default,
                         )
                     }
                     todo.dueDate?.let {
@@ -549,31 +549,10 @@ private fun TodoRow(
                             tone = if (todo.status == TaskStatus.COMPLETED) ClawTone.Default else ClawTone.Warning,
                         )
                     }
-                    if (todo.isRecurring) {
-                        ClawStatusChip(
-                            text = stringResource(R.string.today_recurring),
-                            tone = ClawTone.Success,
-                        )
-                    }
                 }
             }
         }
     }
-}
-
-@Composable
-private fun taskStatusLabel(status: TaskStatus): String = when (status) {
-    TaskStatus.PENDING -> stringResource(R.string.today_status_pending)
-    TaskStatus.IN_PROGRESS -> stringResource(R.string.today_status_in_progress)
-    TaskStatus.COMPLETED -> stringResource(R.string.today_status_completed)
-    TaskStatus.CANCELLED -> stringResource(R.string.today_status_cancelled)
-}
-
-private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
-    TaskStatus.PENDING -> ClawTone.Default
-    TaskStatus.IN_PROGRESS -> ClawTone.Primary
-    TaskStatus.COMPLETED -> ClawTone.Success
-    TaskStatus.CANCELLED -> ClawTone.Default
 }
 
 @Composable

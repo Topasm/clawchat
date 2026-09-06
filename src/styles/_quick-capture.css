@@ -107,11 +107,6 @@
     letter-spacing: 0.02em;
   }
 
-  .cc-detail__field-btn {
-    min-height: var(--cc-control-height);
-    align-self: flex-start;
-  }
-
   .cc-today-progress {
     padding: 9px 12px;
     margin-bottom: 12px;

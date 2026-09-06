@@ -2,7 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AllTasksPage from '../AllTasksPage';
-import { TASK_STATUS_FILTERS, type TasksStatusFilter } from '../../components/kanban/TasksHeader';
+import {
+  matchesTasksStatusFilter,
+  TASK_STATUS_FILTERS,
+  type TasksStatusFilter,
+} from '../../components/kanban/TasksHeader';
 
 vi.mock('../../components/kanban/KanbanBoard', () => ({
   default: ({ statusFilter }: { statusFilter: TasksStatusFilter }) => (
@@ -11,7 +15,11 @@ vi.mock('../../components/kanban/KanbanBoard', () => ({
 }));
 
 vi.mock('../../components/task-list/TaskListPage', () => ({
-  default: () => <div>List</div>,
+  default: ({ statusFilter }: { statusFilter: TasksStatusFilter }) => (
+    <div>
+      List <span data-testid="active-task-filter">{statusFilter}</span>
+    </div>
+  ),
 }));
 
 vi.mock('../../components/task-graph/TaskGraphPage', () => ({
@@ -29,17 +37,27 @@ function renderPage(entry = '/tasks') {
 }
 
 describe('AllTasksPage status flow', () => {
-  it('starts with in-progress work and keeps All last', () => {
+  it('starts with all active work and keeps All last', () => {
     renderPage();
 
-    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('in_progress');
-    expect(TASK_STATUS_FILTERS).toEqual([
-      'in_progress',
-      'pending',
-      'completed',
-      'cancelled',
-      'all',
-    ]);
+    expect(screen.getByText(/List/)).toBeInTheDocument();
+    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('active');
+    expect(TASK_STATUS_FILTERS).toEqual(['active', 'completed', 'all']);
+    expect(matchesTasksStatusFilter('pending', 'active')).toBe(true);
+    expect(matchesTasksStatusFilter('in_progress', 'active')).toBe(true);
+    expect(matchesTasksStatusFilter('completed', 'active')).toBe(false);
+    expect(matchesTasksStatusFilter('cancelled', 'all')).toBe(true);
+  });
+
+  it('migrates the old kanban default to the simpler list while keeping explicit kanban links', () => {
+    localStorage.setItem('clawchat.tasksView', 'kanban');
+    const first = renderPage();
+    expect(screen.getByText(/List/)).toBeInTheDocument();
+    first.unmount();
+
+    renderPage('/tasks?view=kanban');
+    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('active');
+    expect(screen.queryByText(/List/)).not.toBeInTheDocument();
   });
 
   it('moves through task statuses with horizontal swipes', () => {
@@ -50,7 +68,7 @@ describe('AllTasksPage status flow', () => {
     fireEvent.touchStart(page!, { touches: [{ clientX: 240, clientY: 100 }] });
     fireEvent.touchEnd(page!, { changedTouches: [{ clientX: 120, clientY: 105 }] });
 
-    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('pending');
+    expect(screen.getByTestId('active-task-filter')).toHaveTextContent('completed');
   });
 
   it('opens the graph requested by a project deep link', () => {

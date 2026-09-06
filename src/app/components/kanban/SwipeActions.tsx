@@ -12,12 +12,11 @@ interface SwipeActionsProps {
 const THRESHOLD = 40; // px to reveal action panel
 const DIRECTION_RATIO = 1.5; // horizontal must exceed vertical by this factor
 const statusLabels: Record<TaskStatus, string> = {
-  pending: 'Todo',
-  in_progress: 'In Progress',
+  pending: 'Active',
+  in_progress: 'Active',
   completed: 'Done',
   cancelled: 'Cancelled',
 };
-const allStatuses: TaskStatus[] = ['pending', 'in_progress', 'completed', 'cancelled'];
 export default function SwipeActions({
   children,
   taskId,
@@ -89,7 +88,12 @@ export default function SwipeActions({
     onMove(taskId, status);
     reset();
   };
-  const moveTargets = allStatuses.filter((s) => s !== currentStatus);
+  const moveTargets: TaskStatus[] =
+    currentStatus === 'completed'
+      ? ['pending', 'cancelled']
+      : currentStatus === 'cancelled'
+        ? ['pending', 'completed']
+        : ['completed', 'cancelled'];
   const isActive = offsetX !== 0 || showMoveMenu;
   return (
     <div

@@ -206,7 +206,7 @@ export default function TaskDetailPage() {
           />
         </div>
         <div className="cc-exec-panel__badges">
-          {task.status !== 'pending' && (
+          {(task.status === 'completed' || task.status === 'cancelled') && (
             <Badge variant="status">{getTaskStatusLabel(task.status)}</Badge>
           )}
           {task.inbox_state && task.inbox_state !== 'none' && (

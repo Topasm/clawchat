@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { TaskStatus, TodoResponse } from '../../types/api';
-import { TaskStatusSchema } from '../../types/schemas';
+import type { TodoResponse } from '../../types/api';
 import usePlatform from '../../hooks/usePlatform';
 import { useProjectsQuery, useTaskGraphInsightsQuery } from '../../hooks/queries';
 import { useAuthStore } from '../../stores/useAuthStore';
@@ -27,6 +26,7 @@ import {
   updateTaskGraphLayout,
 } from './taskGraphPersistence';
 import { translateUi } from '../../i18n';
+import { matchesTasksStatusFilter, type TasksStatusFilter } from '../kanban/TasksHeader';
 interface TaskGraphProps {
   todos: TodoResponse[];
   metadataTodos?: TodoResponse[];
@@ -34,6 +34,7 @@ interface TaskGraphProps {
   hasExternalFilter?: boolean;
   fixedProjectId?: string;
   showPlanningAction?: boolean;
+  showStatusControls?: boolean;
   initialMode?: TaskGraphMode;
   selectedTaskId?: string | null;
   onSelectTask?: (id: string | null) => void;
@@ -49,6 +50,7 @@ export default function TaskGraph({
   hasExternalFilter = false,
   fixedProjectId,
   showPlanningAction = true,
+  showStatusControls = true,
   initialMode = 'structure',
   selectedTaskId: controlledTaskId,
   onSelectTask,
@@ -60,7 +62,7 @@ export default function TaskGraph({
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
   const [hideCompleted, setHideCompleted] = useState(true);
   const [projectId, setProjectId] = useState(fixedProjectId ?? 'all');
-  const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<TasksStatusFilter>('all');
   const [proposalOpen, setProposalOpen] = useState(false);
   const [localTaskId, setLocalTaskId] = useState<string | null>(null);
   const selectedTaskId = controlledTaskId === undefined ? localTaskId : controlledTaskId;
@@ -150,7 +152,9 @@ export default function TaskGraph({
   }, [hasExternalFilter, insightsQuery.data, metadataTodos, mode, projectIds, todos]);
   const graphTodos = useMemo(() => {
     if (statusFilter === 'all') return scopedTodos;
-    const matches = scopedTodos.filter((todo) => todo.status === statusFilter);
+    const matches = scopedTodos.filter((todo) =>
+      matchesTasksStatusFilter(todo.status, statusFilter),
+    );
     return expandTaskGraphContext(scopedTodos, matches, graphRelationships);
   }, [graphRelationships, scopedTodos, statusFilter]);
   const graphMetadataTodos = useMemo(() => {
@@ -183,7 +187,7 @@ export default function TaskGraph({
       buildTaskGraphElements(graphTodos, {
         mode,
         collapsedIds,
-        hideCompleted,
+        hideCompleted: showStatusControls ? hideCompleted : false,
         relationships: graphRelationships,
         metadataTodos: graphMetadataTodos,
         insightNodes: mode === 'execution' ? insightsQuery.data?.nodes : undefined,
@@ -199,6 +203,7 @@ export default function TaskGraph({
       graphMetadataTodos,
       graphRelationships,
       mode,
+      showStatusControls,
       toggleCollapsed,
     ],
   );
@@ -216,8 +221,7 @@ export default function TaskGraph({
     }
   }, [controlledTaskId, elements.nodes, selectedTaskId, setSelectedTaskId]);
   const handleStatusFilter = (value: string) => {
-    const parsed = TaskStatusSchema.safeParse(value);
-    const next = value === 'all' ? 'all' : parsed.success ? parsed.data : 'all';
+    const next: TasksStatusFilter = value === 'active' || value === 'completed' ? value : 'all';
     setStatusFilter(next);
     if (next === 'completed') setHideCompleted(false);
   };
@@ -265,26 +269,28 @@ export default function TaskGraph({
               ))}
             </select>
           )}
-          <select
-            value={statusFilter}
-            onChange={(event) => handleStatusFilter(event.target.value)}
-            aria-label={translateUi('Filter graph by status')}
-          >
-            <option value="all">{translateUi('All statuses')}</option>
-            <option value="pending">{translateUi('Todo')}</option>
-            <option value="in_progress">{translateUi('In progress')}</option>
-            <option value="completed">{translateUi('Done')}</option>
-            <option value="cancelled">{translateUi('Cancelled')}</option>
-          </select>
-          <label className="cc-task-flow__completed-toggle">
-            <input
-              type="checkbox"
-              checked={hideCompleted}
-              onChange={(event) => setHideCompleted(event.target.checked)}
-              disabled={statusFilter === 'completed'}
-            />
-            {translateUi('\n            Hide completed\n          ')}
-          </label>
+          {showStatusControls && (
+            <>
+              <select
+                value={statusFilter}
+                onChange={(event) => handleStatusFilter(event.target.value)}
+                aria-label={translateUi('Filter graph by status')}
+              >
+                <option value="all">{translateUi('All statuses')}</option>
+                <option value="active">{translateUi('Active')}</option>
+                <option value="completed">{translateUi('Done')}</option>
+              </select>
+              <label className="cc-task-flow__completed-toggle">
+                <input
+                  type="checkbox"
+                  checked={hideCompleted}
+                  onChange={(event) => setHideCompleted(event.target.checked)}
+                  disabled={statusFilter === 'completed'}
+                />
+                {translateUi('\n                Hide completed\n              ')}
+              </label>
+            </>
+          )}
           {collapsedIds.size > 0 && (
             <button type="button" className="cc-btn cc-btn--ghost" onClick={expandAll}>
               {translateUi('\n              Expand all\n            ')}

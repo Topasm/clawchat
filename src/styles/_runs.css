@@ -205,10 +205,6 @@
 .cc-project-workspace__section h2 {
   font-size: 15px;
 }
-.cc-project-task-list {
-  display: flex;
-  flex-direction: column;
-}
 .cc-project-task-row {
   display: flex;
   align-items: center;
@@ -242,16 +238,6 @@
   border-color: var(--cc-success);
   background: var(--cc-success);
 }
-.cc-project-task-row__body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-.cc-project-task-row__body strong {
-  font-size: 13px;
-}
-.cc-project-task-row__body small,
 .cc-project-task-row time {
   color: var(--cc-text-tertiary);
   font-size: 10px;

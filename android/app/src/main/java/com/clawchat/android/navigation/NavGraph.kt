@@ -48,7 +48,6 @@ import com.clawchat.android.feature.planner.PlannerPage
 import com.clawchat.android.feature.planner.PlannerScreen
 import com.clawchat.android.feature.progress.ProgressScreen
 import com.clawchat.android.feature.search.SearchScreen
-import com.clawchat.android.feature.search.QuickFindDestination
 import com.clawchat.android.R
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.SearchType
@@ -170,7 +169,7 @@ fun ClawChatNavGraph(
     }
 
     CompositionLocalProvider(LocalOpenNavigationMenu provides {
-        drawerScope.launch { drawer.open() }; Unit
+        drawerScope.launch { drawer.open() }
     }) {
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -264,33 +263,6 @@ fun ClawChatNavGraph(
                         SearchType.entries
                     },
                     onBack = { navController.popBackStack() },
-                    quickDestinations = if (workspaceMode == WorkspaceMode.LOCAL) {
-                        listOf(
-                            QuickFindDestination.IN_PROGRESS,
-                            QuickFindDestination.SCHEDULE,
-                            QuickFindDestination.SETTINGS,
-                        )
-                    } else {
-                        QuickFindDestination.entries
-                    },
-                    onOpenDestination = { destination ->
-                        val route = when (destination) {
-                            QuickFindDestination.NOW -> NavRoute.Progress.route
-                            QuickFindDestination.IN_PROGRESS -> NavRoute.Tasks.route
-                            QuickFindDestination.SCHEDULE -> NavRoute.Today.route
-                            QuickFindDestination.CHAT -> NavRoute.Chat.route
-                            QuickFindDestination.SETTINGS -> NavRoute.Settings.route
-                        }
-                        if (NavigationCapabilities.canOpen(workspaceMode, route)) {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    },
                     onOpenHit = { hit ->
                         searchHitRoute(hit.type, hit.id)?.let { route ->
                             if (!NavigationCapabilities.canOpen(workspaceMode, route)) return@let

@@ -18,8 +18,13 @@ import useKanbanDragDrop from '../../hooks/useKanbanDragDrop';
 import type { TaskStatus } from '../../types/api';
 import { useKanbanShortcuts } from '../../keyboard';
 import KanbanBoardView from './KanbanBoardView';
-import type { TasksStatusFilter, TasksViewMode } from './TasksHeader';
-import { ClipboardIcon, SpinArrowsIcon, CheckCircleIcon, CloseIcon } from '../shared/Icons';
+import {
+  matchesTasksStatusFilter,
+  type TasksColumnStatus,
+  type TasksStatusFilter,
+  type TasksViewMode,
+} from './TasksHeader';
+import { ClipboardIcon, CheckCircleIcon, CloseIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
 import { isTaskTodo } from '../../utils/inboxState';
 import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
@@ -59,20 +64,15 @@ export default function KanbanBoard({
   );
   const taskTodos = useMemo(() => todos.filter(isTaskTodo), [todos]);
   const scopedTodos = useMemo(
-    () =>
-      statusFilter === 'all' ? taskTodos : taskTodos.filter((todo) => todo.status === statusFilter),
+    () => taskTodos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter)),
     [statusFilter, taskTodos],
   );
   const filteredTodos = useKanbanFilters(scopedTodos, kanbanFilters);
   const visibleTodos = kanbanFilters.showSubTasks
     ? filteredTodos
     : filteredTodos.filter((t) => !t.parent_id);
-  const todoTasks = useMemo(
-    () => visibleTodos.filter((t) => t.status === 'pending'),
-    [visibleTodos],
-  );
-  const inProgressTasks = useMemo(
-    () => visibleTodos.filter((t) => t.status === 'in_progress'),
+  const activeTasks = useMemo(
+    () => visibleTodos.filter((t) => t.status === 'pending' || t.status === 'in_progress'),
     [visibleTodos],
   );
   const doneTasks = useMemo(
@@ -84,8 +84,8 @@ export default function KanbanBoard({
     [visibleTodos],
   );
   const allTasksFlat = useMemo(
-    () => [...todoTasks, ...inProgressTasks, ...doneTasks, ...cancelledTasks],
-    [todoTasks, inProgressTasks, doneTasks, cancelledTasks],
+    () => [...activeTasks, ...doneTasks, ...cancelledTasks],
+    [activeTasks, doneTasks, cancelledTasks],
   );
   const handleToggle = useCallback(
     (id: string) => {
@@ -119,9 +119,15 @@ export default function KanbanBoard({
     [requestStatusChange, setTaskStatusMutation, todos],
   );
   const handleReorder = useCallback(
-    (todoId: string, newIndex: number, columnStatus: TaskStatus) => {
+    (todoId: string, newIndex: number, columnStatus: TasksColumnStatus) => {
       const columnTodos = taskTodos
-        .filter((t) => t.status === columnStatus && !t.parent_id)
+        .filter(
+          (t) =>
+            !t.parent_id &&
+            (columnStatus === 'active'
+              ? t.status === 'pending' || t.status === 'in_progress'
+              : t.status === columnStatus),
+        )
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
       const fromIdx = columnTodos.findIndex((t) => t.id === todoId);
       if (fromIdx < 0) return;
@@ -172,16 +178,10 @@ export default function KanbanBoard({
   const handleMove = (id: string, status: TaskStatus) => handleSetTaskStatus(id, status);
   const columnDefs = [
     {
-      status: 'in_progress' as const,
-      title: translateUi('In Progress'),
-      icon: <SpinArrowsIcon size={14} />,
-      tasks: inProgressTasks,
-    },
-    {
-      status: 'pending' as const,
-      title: translateUi('Todo'),
+      status: 'active' as const,
+      title: translateUi('Active'),
       icon: <ClipboardIcon size={14} />,
-      tasks: todoTasks,
+      tasks: activeTasks,
     },
     {
       status: 'completed' as const,
@@ -195,7 +195,12 @@ export default function KanbanBoard({
       icon: <CloseIcon size={14} />,
       tasks: cancelledTasks,
     },
-  ].filter((column) => statusFilter === 'all' || column.status === statusFilter);
+  ].filter(
+    (column) =>
+      statusFilter === 'all' ||
+      column.status === statusFilter ||
+      (statusFilter === 'active' && column.status === 'active'),
+  );
   return (
     <>
       <KanbanBoardView

@@ -1,14 +1,13 @@
 import { useCallback } from 'react';
 import type { DropResult } from '@hello-pangea/dnd';
 import { hapticLight } from '../utils/haptics';
-import type { TaskStatus } from '../types/api';
-import { TaskStatusSchema } from '../types/schemas';
+import { taskStatusForColumn, type TasksColumnStatus } from '../utils/taskStatus';
 
 const CARD_DROP_PREFIX = 'card-drop-';
 
 interface UseKanbanDragDropOptions {
-  setTaskStatus: (id: string, status: TaskStatus) => void;
-  reorderTodoInColumn: (id: string, index: number, status: TaskStatus) => void;
+  setTaskStatus: (id: string, status: ReturnType<typeof taskStatusForColumn>) => void;
+  reorderTodoInColumn: (id: string, index: number, column: TasksColumnStatus) => void;
   setParent: (childId: string, parentId: string) => void;
   clearParent: (childId: string) => void;
   getParentId: (todoId: string) => string | null | undefined;
@@ -49,11 +48,15 @@ export default function useKanbanDragDrop({
       }
 
       // -- Dropped into a column (existing reorder / status-change logic) --
-      const sourceStatus = TaskStatusSchema.safeParse(result.source.droppableId);
-      const destinationStatus = TaskStatusSchema.safeParse(destDroppableId);
-      if (!sourceStatus.success || !destinationStatus.success) return;
-      const sourceCol: TaskStatus = sourceStatus.data;
-      const destCol: TaskStatus = destinationStatus.data;
+      const columns: TasksColumnStatus[] = ['active', 'completed', 'cancelled'];
+      if (
+        !columns.includes(result.source.droppableId as TasksColumnStatus) ||
+        !columns.includes(destDroppableId as TasksColumnStatus)
+      ) {
+        return;
+      }
+      const sourceCol = result.source.droppableId as TasksColumnStatus;
+      const destCol = destDroppableId as TasksColumnStatus;
 
       // If the dragged card has a parent_id, clear it (un-parent on column drop)
       const currentParent = getParentId(taskId);
@@ -66,7 +69,7 @@ export default function useKanbanDragDrop({
         reorderTodoInColumn(taskId, result.destination.index, destCol);
       } else {
         // Cross-column -> status change
-        setTaskStatus(taskId, destCol);
+        setTaskStatus(taskId, taskStatusForColumn(destCol));
       }
     },
     [setTaskStatus, reorderTodoInColumn, setParent, clearParent, getParentId, getChildIds],

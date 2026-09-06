@@ -36,6 +36,7 @@ export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskLi
       </div>
       {todos.map((todo) => {
         const status = todo.status;
+        const displayStatus = status === 'pending' || status === 'in_progress' ? 'active' : status;
         const depth = getTaskDepth(todo, todoById);
         const context =
           todo.project_label ||
@@ -44,7 +45,7 @@ export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskLi
         return (
           <div
             key={todo.id}
-            className={`cc-task-list__row cc-task-list__row--${status}`}
+            className={`cc-task-list__row cc-task-list__row--${displayStatus}`}
             role="row"
             tabIndex={0}
             onClick={() => onOpenTask(todo.id)}
@@ -74,8 +75,14 @@ export default function TaskListView({ todos, onOpenTask, onToggleTask }: TaskLi
               <strong>{todo.title}</strong>
             </span>
             <span role="cell">
-              <i className={`cc-task-list__status cc-task-list__status--${status}`} />
-              {status.replace('_', ' ')}
+              <i className={`cc-task-list__status cc-task-list__status--${displayStatus}`} />
+              {translateUi(
+                displayStatus === 'active'
+                  ? 'Active'
+                  : displayStatus === 'completed'
+                    ? 'Done'
+                    : 'Cancelled',
+              )}
             </span>
             <span role="cell" title={context ?? undefined}>
               {context || '—'}

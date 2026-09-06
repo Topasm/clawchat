@@ -2,7 +2,6 @@
 <resources>
     <string name="today_title">오늘</string>
     <string name="today_cd_search">전체 검색</string>
-    <string name="today_cd_settings">설정</string>
     <string name="today_cd_capture_task">작업 추가</string>
     <string name="today_offline_cached">오프라인 — 마지막으로 동기화한 오늘 화면을 표시합니다</string>
     <string name="today_ready_when_you_are">준비됐어요</string>
@@ -54,11 +53,7 @@
         <item quantity="other">오늘 진행도: 작업 %2$d개 중 %1$d개 완료</item>
     </plurals>
 
-    <string name="today_status_pending">대기 중</string>
-    <string name="today_status_in_progress">진행 중</string>
-    <string name="today_status_completed">완료</string>
     <string name="today_status_cancelled">취소됨</string>
-    <string name="today_recurring">반복</string>
     <string name="today_task_mark_complete">%1$s 완료로 표시</string>
     <string name="today_task_mark_incomplete">%1$s 미완료로 표시</string>
 

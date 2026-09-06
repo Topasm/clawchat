@@ -15,7 +15,6 @@ import {
   FlameIcon,
   CalendarIcon,
   CheckCircleIcon,
-  SpinArrowsIcon,
   ChevronRightIcon,
 } from '../shared/Icons';
 import { GearIcon } from '../shared/NavIcons';
@@ -344,12 +343,6 @@ export default function TodayView({
                     <span className="cc-briefing-pill cc-briefing-pill--warning">
                       <FlameIcon size={13} /> {briefingData.stats.overdue}
                       {translateUi(' overdue\n                    ')}
-                    </span>
-                  )}
-                  {briefingData.stats.in_progress > 0 && (
-                    <span className="cc-briefing-pill cc-briefing-pill--progress">
-                      <SpinArrowsIcon size={13} /> {briefingData.stats.in_progress}
-                      {translateUi(' in progress\n                    ')}
                     </span>
                   )}
                   {briefingData.stats.inbox > 0 && (

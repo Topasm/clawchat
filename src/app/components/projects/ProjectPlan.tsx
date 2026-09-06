@@ -31,10 +31,9 @@ interface ProjectPlanProps {
 }
 
 function statusLabel(status: TodoResponse['status']): string {
-  if (status === 'in_progress') return translateUi('In progress');
   if (status === 'completed') return translateUi('Done');
   if (status === 'cancelled') return translateUi('Cancelled');
-  return translateUi('Todo');
+  return '';
 }
 
 function taskBreadcrumb(
@@ -145,7 +144,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
         </div>
         {readyTasks.length > 0 ? (
           <div className="cc-project-ready__list">
-            {readyTasks.slice(0, 5).map((task) => (
+            {readyTasks.slice(0, 1).map((task) => (
               <button
                 type="button"
                 key={task.id}
@@ -162,7 +161,10 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
         )}
       </section>
 
-      <section className="cc-project-workspace__section cc-project-plan">
+      <section
+        className="cc-project-workspace__section cc-project-plan"
+        aria-label={translateUi('Plan')}
+      >
         <div className="cc-project-workspace__section-header">
           <div>
             <h2>{translateUi('Plan')}</h2>
@@ -174,13 +176,6 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
             </p>
           </div>
           <div className="cc-project-plan__view-actions">
-            <button
-              type="button"
-              className="cc-btn cc-btn--ghost"
-              onClick={() => navigate(`/tasks?view=graph&project_id=${project.id}`)}
-            >
-              {translateUi('Open graph')}
-            </button>
             <SegmentedControl
               ariaLabel={translateUi('Project plan view')}
               options={[
@@ -360,6 +355,8 @@ function ProjectOutline({
     const children = childrenByParent.get(task.id) ?? [];
     const collapsed = collapsedIds.has(task.id);
     const insight = insightById.get(task.id);
+    const displayStatus = task.status === 'in_progress' ? 'pending' : task.status;
+    const taskStatusLabel = statusLabel(task.status);
     return (
       <div key={task.id} className="cc-project-outline__branch">
         <div
@@ -395,11 +392,11 @@ function ProjectOutline({
             onClick={() => onSelectTask(task.id)}
           >
             <span
-              className={`cc-project-task-row__state cc-project-task-row__state--${task.status}`}
+              className={`cc-project-task-row__state cc-project-task-row__state--${displayStatus}`}
             />
             <span className="cc-project-outline__copy">
               <strong>{task.title}</strong>
-              <small>{statusLabel(task.status)}</small>
+              {taskStatusLabel && <small>{taskStatusLabel}</small>}
             </span>
             {insight?.is_ready && (
               <span className="cc-project-outline__badge">{translateUi('Ready')}</span>

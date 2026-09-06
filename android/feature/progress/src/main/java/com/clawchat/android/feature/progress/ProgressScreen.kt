@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -29,8 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -41,7 +38,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,11 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.clawchat.android.core.data.model.AgentRun
-import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.ReviewRiskLevel
-import com.clawchat.android.core.data.model.TaskStatus
-import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawSectionCard
@@ -80,7 +72,6 @@ fun ProgressScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedAction by remember { mutableStateOf<NowItem?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.hasExecutingRuns) {
         if (!state.hasExecutingRuns) return@LaunchedEffect
@@ -96,20 +87,8 @@ fun ProgressScreen(
             selectedAction = null
         }
     }
-
-
-
-    val localizedWorkError = state.workError?.let { localizedErrorMessage(it) }
-    LaunchedEffect(localizedWorkError) {
-        val message = localizedWorkError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.clearWorkError()
-    }
-
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
@@ -157,9 +136,6 @@ fun ProgressScreen(
                         selectedAction = item
                     },
                     onRetryPending = viewModel::retryPending,
-                    onCompleteTask = viewModel::completeTask,
-                    onPauseTask = viewModel::pauseTask,
-                    onCancelRun = viewModel::cancelRun,
                 )
             }
         }
@@ -193,12 +169,8 @@ private fun ProgressContent(
     onOpenTask: (String) -> Unit,
     onSelectAction: (NowItem) -> Unit,
     onRetryPending: () -> Unit,
-    onCompleteTask: (todoId: String) -> Unit,
-    onPauseTask: (todoId: String) -> Unit,
-    onCancelRun: (runId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showActiveWork by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 28.dp),
@@ -307,31 +279,6 @@ private fun ProgressContent(
             }
         }
 
-        if (state.executingRuns.isNotEmpty() || state.inProgressTasks.isNotEmpty()) {
-            item(key = "active_header") {
-                TextButton(onClick = { showActiveWork = !showActiveWork }) {
-                    Text(stringResource(if (showActiveWork) R.string.progress_hide_active else R.string.progress_show_active))
-                }
-            }
-            if (showActiveWork) items(state.executingRuns, key = { "run:${it.id}" }) { run ->
-                AgentRunProgressRow(
-                    run = run,
-                    isPending = run.id in state.pendingWorkIds,
-                    onClick = { onOpenRun(run.id) },
-                    onCancel = { onCancelRun(run.id) },
-                )
-            }
-            if (showActiveWork) items(state.inProgressTasks, key = { "task:${it.id}" }) { task ->
-                WorkCard(
-                    task = task,
-                    steps = state.stepsFor(task.id),
-                    pendingWorkIds = state.pendingWorkIds,
-                    onOpenTask = { onOpenTask(task.id) },
-                    onComplete = { onCompleteTask(task.id) },
-                    onPause = { onPauseTask(task.id) },
-                )
-            }
-        }
     }
 }
 
@@ -595,148 +542,4 @@ private fun nowActionTone(item: NowItem): ClawTone = when (item.action) {
     }
     NowAction.FILE -> ClawTone.Default
     NowAction.RETRY -> ClawTone.Error
-}
-
-@Composable
-private fun AgentRunProgressRow(
-    run: AgentRun,
-    isPending: Boolean,
-    onClick: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    ClawListItemSurface(onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = run.displayTitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = listOfNotNull(
-                        run.hostLabel?.takeIf(String::isNotBlank),
-                        run.progressMessage?.takeIf(String::isNotBlank)
-                            ?: agentRunStatusLabel(run.status),
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (run.status.isExecuting) {
-                    LinearProgressIndicator(
-                        progress = { run.progress.coerceIn(0, 100) / 100f },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-            ClawStatusChip(
-                text = agentRunStatusLabel(run.status),
-                tone = agentRunTone(run.status),
-            )
-        }
-        if (run.canCancel) {
-            TextButton(onClick = onCancel, enabled = !isPending) {
-                Text(stringResource(R.string.progress_run_cancel))
-            }
-        }
-    }
-}
-
-/**
- * Compact active-work summary. Steps and notes are edited in task detail.
- */
-@Composable
-private fun WorkCard(
-    task: Todo,
-    steps: List<Todo>,
-    pendingWorkIds: Set<String>,
-    onOpenTask: () -> Unit,
-    onComplete: () -> Unit,
-    onPause: () -> Unit,
-) {
-    val taskPending = task.id in pendingWorkIds
-    val doneSteps = steps.count { it.status == TaskStatus.COMPLETED }
-    ClawSectionCard {
-        ClawListItemSurface(onClick = onOpenTask) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    task.nextAction?.takeIf(String::isNotBlank)?.let { nextAction ->
-                        Text(
-                            text = nextAction,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                ClawStatusChip(
-                    text = if (task.syncStatus == "pending") {
-                        stringResource(R.string.progress_task_sync_pending)
-                    } else if (steps.isNotEmpty()) {
-                        stringResource(R.string.progress_steps_progress, doneSteps, steps.size)
-                    } else {
-                        stringResource(R.string.progress_task_state)
-                    },
-                    tone = if (task.syncStatus == "pending") ClawTone.Warning else ClawTone.Primary,
-                )
-            }
-        }
-
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onComplete, enabled = !taskPending) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Text(stringResource(R.string.progress_work_done))
-            }
-            TextButton(onClick = onPause, enabled = !taskPending) {
-                Text(stringResource(R.string.progress_work_pause))
-            }
-        }
-
-    }
-}
-
-@Composable
-private fun agentRunStatusLabel(status: AgentRunStatus): String = stringResource(
-    when (status) {
-        AgentRunStatus.QUEUED -> R.string.progress_run_queued
-        AgentRunStatus.STARTING -> R.string.progress_run_starting
-        AgentRunStatus.RUNNING -> R.string.progress_run_running
-        AgentRunStatus.WAITING_INPUT -> R.string.progress_run_waiting_input
-        AgentRunStatus.WAITING_REVIEW -> R.string.progress_run_waiting_review
-        AgentRunStatus.COMPLETED -> R.string.progress_run_completed
-        AgentRunStatus.FAILED -> R.string.progress_run_failed
-        AgentRunStatus.CANCELLED -> R.string.progress_run_cancelled
-    },
-)
-
-private fun agentRunTone(status: AgentRunStatus): ClawTone = when (status) {
-    AgentRunStatus.QUEUED, AgentRunStatus.STARTING, AgentRunStatus.RUNNING -> ClawTone.Primary
-    AgentRunStatus.WAITING_INPUT, AgentRunStatus.WAITING_REVIEW -> ClawTone.Warning
-    AgentRunStatus.COMPLETED -> ClawTone.Success
-    AgentRunStatus.FAILED -> ClawTone.Error
-    AgentRunStatus.CANCELLED -> ClawTone.Default
 }

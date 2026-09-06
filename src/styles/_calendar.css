@@ -429,42 +429,6 @@
   color: var(--cc-text-tertiary);
 }
 
-.cc-event-form__textarea {
-  padding: 8px 10px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-sm);
-  font-size: 13px;
-  color: var(--cc-text);
-  background: var(--cc-background);
-  outline: none;
-  resize: vertical;
-  min-height: 60px;
-  width: 100%;
-  box-sizing: border-box;
-  font-family: inherit;
-  transition: border-color 0.15s ease;
-}
-
-.cc-event-form__textarea:focus {
-  border-color: var(--cc-primary);
-}
-
-.cc-event-form__textarea::placeholder {
-  color: var(--cc-text-tertiary);
-}
-
-.cc-event-form__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0;
-}
-
-.cc-event-form__time-row {
-  display: flex;
-  gap: 12px;
-}
-
 /* ============================================================
    Responsive — mobile (<768px)
    ============================================================ */

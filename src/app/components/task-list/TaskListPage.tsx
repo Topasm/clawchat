@@ -4,7 +4,11 @@ import { useTodosQuery, useToggleTodoComplete } from '../../hooks/queries';
 import useKanbanFilters from '../../hooks/useKanbanFilters';
 import { useModuleStore } from '../../stores/useModuleStore';
 import KanbanFilterBar from '../kanban/KanbanFilterBar';
-import TasksHeader, { type TasksStatusFilter, type TasksViewMode } from '../kanban/TasksHeader';
+import TasksHeader, {
+  matchesTasksStatusFilter,
+  type TasksStatusFilter,
+  type TasksViewMode,
+} from '../kanban/TasksHeader';
 import TaskListView from './TaskListView';
 import { isTaskTodo } from '../../utils/inboxState';
 import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
@@ -27,8 +31,7 @@ export default function TaskListPage({
   const filters = useModuleStore((state) => state.kanbanFilters);
   const taskTodos = useMemo(() => todos.filter(isTaskTodo), [todos]);
   const scopedTodos = useMemo(
-    () =>
-      statusFilter === 'all' ? taskTodos : taskTodos.filter((todo) => todo.status === statusFilter),
+    () => taskTodos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter)),
     [statusFilter, taskTodos],
   );
   const filteredTodos = useKanbanFilters(scopedTodos, filters);

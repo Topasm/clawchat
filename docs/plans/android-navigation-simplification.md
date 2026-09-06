@@ -108,3 +108,36 @@ No data deletion or server contract change is required for this stage.
   create/update and report tasks as non-recurring. Apply the updated server as
   well as the client: an old server can still generate repeated tasks.
 - Calendar event recurrence, imported calendars and their reminders are unchanged.
+
+## Unified active task flow (unreleased)
+
+- Pending and in-progress tasks are one user-facing active group. Desktop uses
+  Active, Done and All filters; Android presents one vertical list with completed
+  and cancelled boundaries instead of a status pager.
+- Active rows do not repeat a status chip. Ready, blocked, running, review and
+  terminal states remain visible when they help the user choose the next action.
+- New and reopened tasks continue to use the existing pending value, while an
+  agent run may still set in-progress internally. The server contract, execution
+  claim/recovery behavior and stored data are unchanged, so no migration is needed.
+- Completing or reopening a task still uses the same checkbox action. Reopening a
+  completed task maps to pending, the compatibility value for active work;
+  cancelled work remains separately identified in finished history.
+
+## Focused primary surfaces (unreleased)
+
+- Android Search now searches only. Its route shortcut chips duplicated the
+  navigation drawer and exposed the retired in-progress wording, so they are
+  removed.
+- Attention now contains only questions, review requests, failed work, processing
+  and synchronization problems that need the user. Generic active-task and
+  running-agent cards remain available from Tasks, Projects and their threads.
+  The obsolete Attention-only capture, notes, steps, pause and cancel paths are
+  removed; authoritative task detail and run screens keep those actions.
+- Android Tasks keeps active work visible and folds completed and cancelled
+  history behind one `Finished` disclosure. This avoids reintroducing status tabs
+  while preventing history from pushing current work below the fold.
+- Desktop Tasks opens in List after this update. Kanban remains available when
+  explicitly selected, and Graph remains the dependency view.
+- Project Plan promotes one Ready task instead of repeating up to five above the
+  outline. Its embedded Outline/Flow switch is the only graph view selector; the
+  duplicate `Open graph` button is removed.

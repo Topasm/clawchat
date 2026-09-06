@@ -5,7 +5,6 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,13 +19,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -62,8 +56,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -71,9 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -104,16 +94,6 @@ import com.clawchat.android.core.ui.toDatePickerMillis
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
-
-internal val TASK_STATUS_FILTER_ORDER: List<TaskStatus?> = listOf(
-    TaskStatus.IN_PROGRESS,
-    TaskStatus.PENDING,
-    TaskStatus.COMPLETED,
-    TaskStatus.CANCELLED,
-    null,
-)
 
 internal fun requiresVerdictConfirmation(todo: Todo, nextStatus: TaskStatus): Boolean =
     nextStatus == TaskStatus.COMPLETED &&
@@ -205,11 +185,6 @@ fun TasksScreen(
                     requestStatusChange(task, status)
                 }
             },
-            onSetStatus = { status ->
-                state.selectedTask?.let { task ->
-                    requestStatusChange(task, status)
-                }
-            },
             onSetDueDate = { date ->
                 state.selectedTask?.let { task ->
                     viewModel.updateTask(task.id, TodoUpdate(dueDate = date))
@@ -234,7 +209,6 @@ fun TasksScreen(
         TaskListView(
             tasks = state.tasks,
             isLoading = state.isLoading,
-            statusFilter = state.statusFilter,
             snackbarHostState = snackbarHostState,
             onOpenSearch = onOpenSearch,
             onOpenProjects = onOpenProjects,
@@ -252,7 +226,6 @@ fun TasksScreen(
             },
             onDelete = viewModel::deleteTask,
             onSetDueToday = viewModel::setDueToday,
-            onSetFilter = viewModel::setStatusFilter,
             onCreate = viewModel::createTask,
         )
     }
@@ -286,20 +259,18 @@ fun TasksScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TaskListView(
     onOpenProjects: (() -> Unit)?,
     tasks: List<Todo>,
     isLoading: Boolean,
-    statusFilter: TaskStatus?,
     snackbarHostState: SnackbarHostState,
     onOpenSearch: () -> Unit,
     onSelect: (Todo) -> Unit,
     onToggle: (Todo) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
-    onSetFilter: (TaskStatus?) -> Unit,
     onCreate: (TodoCreate) -> Unit,
 ) {
     var showCreateSheet by remember { mutableStateOf(false) }
@@ -308,30 +279,6 @@ private fun TaskListView(
         val inboxState = task.inboxState
         inboxState == null || inboxState == "none"
     }
-    val completedCount = taskCandidates.count { it.status == TaskStatus.COMPLETED }
-    val activeCount = taskCandidates.count {
-        it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS
-    }
-    val initialPage = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { TASK_STATUS_FILTER_ORDER.size },
-    )
-    val pagerScope = rememberCoroutineScope()
-
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.settledPage }
-            .distinctUntilChanged()
-            .collect { page -> onSetFilter(TASK_STATUS_FILTER_ORDER[page]) }
-    }
-
-    LaunchedEffect(statusFilter) {
-        val targetPage = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
-        if (!pagerState.isScrollInProgress && pagerState.settledPage != targetPage) {
-            pagerState.scrollToPage(targetPage)
-        }
-    }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -374,49 +321,16 @@ private fun TaskListView(
             }
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            TaskSummaryCard(
-                totalCount = taskCandidates.size,
-                activeCount = activeCount,
-                completedCount = completedCount,
-                statusFilter = TASK_STATUS_FILTER_ORDER[pagerState.currentPage],
-                onSetFilter = { filter ->
-                    val targetPage = TASK_STATUS_FILTER_ORDER.indexOf(filter)
-                    if (targetPage >= 0 && targetPage != pagerState.currentPage) {
-                        pagerScope.launch { pagerState.animateScrollToPage(targetPage) }
-                    }
-                },
-            )
-
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                key = { page -> TASK_STATUS_FILTER_ORDER[page]?.wireValue ?: "all" },
-            ) { page ->
-                val pageFilter = TASK_STATUS_FILTER_ORDER[page]
-                val pageTasks = if (pageFilter == null) {
-                    taskCandidates
-                } else {
-                    taskCandidates.filter { it.status == pageFilter }
-                }
-                TaskStatusPage(
-                    tasks = pageTasks,
-                    isLoading = isLoading,
-                    onSelect = onSelect,
-                    onToggle = onToggle,
-                    onDelete = onDelete,
-                    onSetDueToday = onSetDueToday,
-                    onCreate = { showCreateSheet = true },
-                    separateCompleted = pageFilter == null,
-                )
-            }
-        }
+        TaskStatusPage(
+            modifier = Modifier.padding(padding),
+            tasks = taskCandidates,
+            isLoading = isLoading,
+            onSelect = onSelect,
+            onToggle = onToggle,
+            onDelete = onDelete,
+            onSetDueToday = onSetDueToday,
+            onCreate = { showCreateSheet = true },
+        )
     }
 
     if (showCreateSheet) {
@@ -432,6 +346,7 @@ private fun TaskListView(
 
 @Composable
 private fun TaskStatusPage(
+    modifier: Modifier = Modifier,
     tasks: List<Todo>,
     isLoading: Boolean,
     onSelect: (Todo) -> Unit,
@@ -439,11 +354,10 @@ private fun TaskStatusPage(
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onCreate: () -> Unit,
-    separateCompleted: Boolean,
 ) {
     if (isLoading && tasks.isEmpty()) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -454,7 +368,7 @@ private fun TaskStatusPage(
         }
     } else if (tasks.isEmpty()) {
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(horizontal = 12.dp),
             contentAlignment = Alignment.Center,
@@ -468,10 +382,11 @@ private fun TaskStatusPage(
         }
     } else {
         val lazyListState = rememberLazyListState()
-        val sections = splitTasksForAllView(tasks, separateCompleted)
+        val sections = splitTasksForUnifiedView(tasks)
+        var showFinished by rememberSaveable { mutableStateOf(false) }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier.fillMaxSize(),
             state = lazyListState,
             contentPadding = PaddingValues(
                 start = 12.dp,
@@ -490,10 +405,17 @@ private fun TaskStatusPage(
                     onClick = { onSelect(task) },
                 )
             }
-            if (sections.completed.isNotEmpty()) {
-                item(key = "completed_boundary") {
-                    CompletedTasksBoundary(count = sections.completed.size)
+            val finishedCount = sections.completed.size + sections.cancelled.size
+            if (finishedCount > 0) {
+                item(key = "finished_boundary") {
+                    FinishedTasksBoundary(
+                        count = finishedCount,
+                        expanded = showFinished,
+                        onToggle = { showFinished = !showFinished },
+                    )
                 }
+            }
+            if (showFinished) {
                 items(sections.completed, key = { it.id }) { task ->
                     SwipeableTaskRow(
                         task = task,
@@ -503,6 +425,20 @@ private fun TaskStatusPage(
                         onClick = { onSelect(task) },
                     )
                 }
+                if (sections.cancelled.isNotEmpty()) {
+                    item(key = "cancelled_boundary") {
+                        CancelledTasksBoundary(count = sections.cancelled.size)
+                    }
+                    items(sections.cancelled, key = { it.id }) { task ->
+                        SwipeableTaskRow(
+                            task = task,
+                            onToggle = { onToggle(task) },
+                            onDelete = { onDelete(task.id) },
+                            onSetDueToday = { onSetDueToday(task.id) },
+                            onClick = { onSelect(task) },
+                        )
+                    }
+                }
             }
         }
     }
@@ -511,22 +447,53 @@ private fun TaskStatusPage(
 internal data class TaskListSections(
     val active: List<Todo>,
     val completed: List<Todo>,
+    val cancelled: List<Todo>,
 )
 
-internal fun splitTasksForAllView(
-    tasks: List<Todo>,
-    separateCompleted: Boolean,
-): TaskListSections = if (separateCompleted) {
-    TaskListSections(
-        active = tasks.filterNot { it.status == TaskStatus.COMPLETED },
-        completed = tasks.filter { it.status == TaskStatus.COMPLETED },
-    )
-} else {
-    TaskListSections(active = tasks, completed = emptyList())
+internal fun splitTasksForUnifiedView(tasks: List<Todo>): TaskListSections = TaskListSections(
+    active = tasks.filter { it.status == TaskStatus.PENDING || it.status == TaskStatus.IN_PROGRESS },
+    completed = tasks.filter { it.status == TaskStatus.COMPLETED },
+    cancelled = tasks.filter { it.status == TaskStatus.CANCELLED },
+)
+
+@Composable
+private fun FinishedTasksBoundary(
+    count: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        TextButton(onClick = onToggle) {
+            Text(
+                text = stringResource(R.string.tasks_finished_boundary, count),
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(
+                    if (expanded) R.string.tasks_hide_finished else R.string.tasks_show_finished,
+                ),
+            )
+        }
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    }
 }
 
 @Composable
-private fun CompletedTasksBoundary(count: Int) {
+private fun CancelledTasksBoundary(count: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -539,7 +506,7 @@ private fun CompletedTasksBoundary(count: Int) {
             color = MaterialTheme.colorScheme.outlineVariant,
         )
         Text(
-            text = stringResource(R.string.tasks_completed_boundary, count),
+            text = stringResource(R.string.tasks_cancelled_boundary, count),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -547,131 +514,6 @@ private fun CompletedTasksBoundary(count: Int) {
             modifier = Modifier.weight(1f),
             color = MaterialTheme.colorScheme.outlineVariant,
         )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TaskSummaryCard(
-    totalCount: Int,
-    activeCount: Int,
-    completedCount: Int,
-    statusFilter: TaskStatus?,
-    onSetFilter: (TaskStatus?) -> Unit,
-) {
-    val selectedFilterIndex = TASK_STATUS_FILTER_ORDER.indexOf(statusFilter).coerceAtLeast(0)
-    val filterListState = rememberLazyListState()
-
-    LaunchedEffect(selectedFilterIndex) {
-        filterListState.animateScrollToItem(selectedFilterIndex)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = if (totalCount == 0) {
-                    stringResource(R.string.tasks_none_yet)
-                } else {
-                    stringResource(
-                        R.string.tasks_summary_format,
-                        pluralStringResource(
-                            R.plurals.tasks_summary_active,
-                            activeCount,
-                            activeCount,
-                        ),
-                        pluralStringResource(
-                            R.plurals.tasks_summary_completed,
-                            completedCount,
-                            completedCount,
-                        ),
-                        pluralStringResource(
-                            R.plurals.tasks_summary_total,
-                            totalCount,
-                            totalCount,
-                        ),
-                    )
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = when (statusFilter) {
-                    null -> stringResource(R.string.tasks_filter_all)
-                    else -> taskStatusLabel(statusFilter)
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            state = filterListState,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            itemsIndexed(
-                items = TASK_STATUS_FILTER_ORDER,
-                key = { _, status -> status?.wireValue ?: "all" },
-            ) { _, status ->
-                TaskFilterChip(
-                    label = if (status == null) {
-                        stringResource(R.string.tasks_filter_all)
-                    } else {
-                        taskStatusLabel(status)
-                    },
-                    selected = statusFilter == status,
-                    onClick = { onSetFilter(status) },
-                )
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-    }
-}
-
-@Composable
-private fun TaskFilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .heightIn(min = 48.dp)
-            .selectable(
-                selected = selected,
-                onClick = onClick,
-                role = Role.Tab,
-            )
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-        if (selected) {
-            HorizontalDivider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
-                thickness = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
     }
 }
 
@@ -766,10 +608,6 @@ private fun TaskRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                ClawStatusChip(
-                    text = taskStatusLabel(task.status),
-                    tone = taskStatusTone(task.status),
-                )
                 task.tags.orEmpty().filter(String::isNotBlank).forEach { tag ->
                     ClawStatusChip(
                         text = taskTagLabel(tag),
@@ -803,21 +641,6 @@ private fun inboxStateLabel(inboxState: String?): String? = when (inboxState) {
     else -> inboxState.replace('_', ' ')
 }
 
-@Composable
-private fun taskStatusLabel(status: TaskStatus): String = when (status) {
-    TaskStatus.PENDING -> stringResource(R.string.tasks_status_pending)
-    TaskStatus.IN_PROGRESS -> stringResource(R.string.tasks_status_in_progress)
-    TaskStatus.COMPLETED -> stringResource(R.string.tasks_status_completed)
-    TaskStatus.CANCELLED -> stringResource(R.string.tasks_status_cancelled)
-}
-
-private fun taskStatusTone(status: TaskStatus): ClawTone = when (status) {
-    TaskStatus.PENDING -> ClawTone.Default
-    TaskStatus.IN_PROGRESS -> ClawTone.Primary
-    TaskStatus.COMPLETED -> ClawTone.Success
-    TaskStatus.CANCELLED -> ClawTone.Default
-}
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TaskDetailView(
@@ -838,7 +661,6 @@ private fun TaskDetailView(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onToggle: () -> Unit,
-    onSetStatus: (TaskStatus) -> Unit,
     onSetDueDate: (String) -> Unit,
     onDelete: () -> Unit,
     onDiscuss: () -> Unit = {},
@@ -926,10 +748,12 @@ private fun TaskDetailView(
                             },
                             onCheckedChange = { onToggle() },
                         )
-                        Text(
-                            text = taskStatusLabel(task.status),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        if (task.status == TaskStatus.CANCELLED) {
+                            Text(
+                                text = stringResource(R.string.tasks_status_cancelled),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -963,18 +787,6 @@ private fun TaskDetailView(
                         Text(stringResource(R.string.tasks_details_title))
                     }
                     if (detailsOpen) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            TaskStatus.entries.forEach { status ->
-                                TaskFilterChip(
-                                    label = taskStatusLabel(status),
-                                    selected = task.status == status,
-                                    onClick = { onSetStatus(status) },
-                                )
-                            }
-                        }
                         task.description?.takeIf { it.isNotBlank() }?.let { description ->
                             ClawSectionHeader(title = stringResource(R.string.tasks_description_title))
                             Text(text = description, style = MaterialTheme.typography.bodyMedium)

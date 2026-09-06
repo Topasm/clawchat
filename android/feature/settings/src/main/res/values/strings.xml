@@ -51,8 +51,6 @@
     <string name="settings_checking">Checking…</string>
     <string name="settings_run_again">Run again</string>
 
-    <string name="settings_connect_server">Connect a workspace</string>
-    <string name="settings_connect_server_description">Set up your ClawChat server connection.</string>
     <string name="settings_theme_mode">Theme mode</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
