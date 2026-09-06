@@ -60,3 +60,36 @@
   child completion/delete/undo through the existing detail screen.
 
 No data deletion or server contract change is required for this stage.
+
+## State-aware project task actions (v1.4.27)
+
+- Desktop and Android now emphasize one action for a selected project task:
+  run a Ready leaf, open an active execution, answer a waiting agent, review a
+  result, or open task details for blocked/completed/human work.
+- Active execution takes precedence over an older Ready graph snapshot. Missing
+  telemetry or a missing active run id does not offer a new run. Server-side Ready
+  validation and the existing explicit run confirmation remain required.
+- Desktop puts step/expand/discuss/details in a collapsed Actions section;
+  Android keeps task detail/chat in its overflow menu, omitting duplicate Details
+  when it is already the primary action. No execution is started by opening a run.
+- Android reads the existing project-filtered execution telemetry endpoint with
+  its workspace request scope on project refresh. It does not add background
+  polling; the refresh button updates status after external changes. Desktop
+  reuses the existing telemetry query's polling and run-thread resolution.
+- Device checks remain: keyboard/overflow accessibility, large text, review or
+  input thread selection, and refresh after an agent changes state elsewhere.
+
+## Task detail progressive disclosure (v1.4.27)
+
+- Android combines title, completion, due date and task conversation access into
+  one card. A Details disclosure contains additional status choices, description
+  and tags. It is scoped to the task; the bottom note composer and steps remain.
+- Relationship rows, relationship loading/errors and note/step errors stay
+  visible. Only an empty relationship placeholder follows the Details disclosure.
+- Desktop collapses unconfigured recurrence and skill choices. Existing recurring
+  schedules and assigned-skill status remain visible. The existing Details button
+  exposes its expanded state to assistive technology and resets on task navigation.
+- No server behavior, task statuses or execution permissions change. Verify on
+  devices with large text and screen readers, including expanding Details,
+  changing status and returning from a child task. Automated checks do not replace
+  those device checks.

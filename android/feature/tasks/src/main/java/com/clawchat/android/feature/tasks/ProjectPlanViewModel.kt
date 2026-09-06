@@ -5,6 +5,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.ProjectPlan
 import com.clawchat.android.core.data.model.ProjectNode
+import com.clawchat.android.core.data.model.ProjectTaskRun
+import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.repository.ProjectPlanRepository
 import com.clawchat.android.core.data.repository.ConversationRepository
 import com.clawchat.android.core.data.repository.AgentRunRepository
@@ -22,6 +24,8 @@ data class ProjectPlanState(
     val project: ProjectPlan? = null,
     val nodes: List<ProjectNode> = emptyList(),
     val taskTitles: Map<String, String> = emptyMap(),
+    val taskRuns: Map<String, ProjectTaskRun> = emptyMap(),
+    val runsAvailable: Boolean = false,
     val loading: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
@@ -53,7 +57,7 @@ class ProjectPlanViewModel @Inject constructor(
         val selected = state.value.project
         load?.cancel()
         val token = ++generation
-        state.update { it.copy(loading = true, error = null) }
+        state.update { it.copy(loading = true, error = null, runsAvailable = false) }
         load = viewModelScope.launch {
             if (selected == null) {
                 when (val result = repository.list()) {
@@ -77,6 +81,15 @@ class ProjectPlanViewModel @Inject constructor(
                                 else -> Unit
                             }
                         } ?: state.update { it.copy(nodes = emptyList()) }
+                        when (val telemetry = repository.taskRuns(selected.id)) {
+                            is ApiResult.Success -> if (token == generation) state.update {
+                                it.copy(taskRuns = telemetry.data.associateBy { run -> run.taskId }, runsAvailable = true)
+                            }
+                            is ApiResult.Error -> if (token == generation) state.update {
+                                it.copy(error = telemetry.message, runsAvailable = false)
+                            }
+                            else -> Unit
+                        }
                     }
                     is ApiResult.Error -> if (token == generation) state.update { it.copy(nodes = emptyList(), error = result.message) }
                     else -> Unit
@@ -89,7 +102,7 @@ class ProjectPlanViewModel @Inject constructor(
     fun select(project: ProjectPlan?) {
         if (state.value.busy) return
         savedState["selected_project_id"] = project?.id
-        state.update { it.copy(project = project, nodes = emptyList(), taskTitles = emptyMap(), openConversation = null, openRun = null) }
+        state.update { it.copy(project = project, nodes = emptyList(), taskTitles = emptyMap(), taskRuns = emptyMap(), runsAvailable = false, openConversation = null, openRun = null) }
         // A selection always invalidates earlier reads, including A → B → A.
         load?.cancel()
         generation++
@@ -114,7 +127,8 @@ class ProjectPlanViewModel @Inject constructor(
     }
 
     fun run(taskId: String) {
-        if (state.value.loading || state.value.nodes.none { it.id == taskId && it.isReady }) return
+        val node = state.value.nodes.firstOrNull { it.id == taskId } ?: return
+        if (state.value.loading || projectTaskAction(node, state.value.taskRuns[taskId], state.value.runsAvailable) != ProjectTaskAction.RUN) return
         mutate {
             when (val result = repository.run(taskId)) {
                 is ApiResult.Success -> {
@@ -125,12 +139,27 @@ class ProjectPlanViewModel @Inject constructor(
                         focusConversationInput = false,
                         conversationTitle = "${current.project?.title.orEmpty()} › ${current.taskTitles[taskId] ?: taskId}",
                         openRun = if (run?.conversationId == null) result.data.runId else null,
+                        taskRuns = current.taskRuns + (taskId to ProjectTaskRun(taskId, result.data.runId, run?.status ?: AgentRunStatus.QUEUED)),
                         nodes = current.nodes.map { if (it.id == taskId) it.copy(isReady = false, executionState = "in_progress") else it },
                     ) }
                 }
                 is ApiResult.Error -> state.update { it.copy(error = result.message) }
                 else -> Unit
             }
+        }
+    }
+
+    fun openTaskRun(taskId: String) {
+        val runId = state.value.taskRuns[taskId]?.runId ?: return
+        mutate {
+            // Resolve the run conversation, never create a planning conversation.
+            val run = (runs.getRun(runId) as? ApiResult.Success)?.data
+            state.update { current -> current.copy(
+                openConversation = run?.conversationId,
+                openRun = if (run?.conversationId == null) runId else null,
+                projectConversation = false, focusConversationInput = false,
+                conversationTitle = "${current.project?.title.orEmpty()} › ${current.taskTitles[taskId] ?: taskId}",
+            ) }
         }
     }
 

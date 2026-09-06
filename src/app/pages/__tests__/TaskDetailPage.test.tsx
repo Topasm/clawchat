@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TaskDetailPage from '../TaskDetailPage';
 
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   updateTodo: vi.fn(),
   deleteTodo: vi.fn(),
   toggleTodo: vi.fn(),
+  persist: vi.fn(),
 }));
 
 const task = {
@@ -31,7 +32,7 @@ const task = {
   inbox_state: 'none',
   estimated_minutes: null,
   depends_on: null,
-  recurrence_rule: null,
+  recurrence_rule: null as string | null,
   recurrence_end: null,
   created_at: '2026-09-04T00:00:00Z',
   updated_at: '2026-09-04T00:00:00Z',
@@ -39,7 +40,7 @@ const task = {
 
 vi.mock('../../hooks/queries', () => ({
   queryKeys: { todos: ['todos'] },
-  useTodosQuery: () => ({ data: [task] }),
+  useTodosQuery: () => ({ data: [task, { ...task, id: 'other-task', title: 'Other task' }] }),
   useUpdateTodo: () => ({ mutate: mocks.updateTodo }),
   useDeleteTodo: () => ({ mutate: mocks.deleteTodo }),
   useToggleTodoComplete: () => ({ mutate: mocks.toggleTodo }),
@@ -60,7 +61,7 @@ vi.mock('../../hooks/queries', () => ({
 }));
 
 vi.mock('../../hooks/useDebouncedPersist', () => ({
-  useDebouncedPersist: () => vi.fn(),
+  useDebouncedPersist: () => mocks.persist,
 }));
 
 vi.mock('../../hooks/useExperimentCompletionGate', () => ({
@@ -70,6 +71,11 @@ vi.mock('../../hooks/useExperimentCompletionGate', () => ({
 vi.mock('../../components/task-detail/TaskAgentThreadSection', () => ({
   default: () => <div>Agent thread</div>,
 }));
+vi.mock('../../components/task-relationships/RelationshipsSection', () => ({
+  default: () => null,
+}));
+vi.mock('../../components/shared/FileDropZone', () => ({ default: () => null }));
+vi.mock('../../components/shared/AttachmentList', () => ({ default: () => null }));
 
 function renderPage() {
   const queryClient = new QueryClient({
@@ -78,6 +84,7 @@ function renderPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/tasks/todo-e65a']}>
+        <Link to="/tasks/other-task">Other task</Link>
         <Routes>
           <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
         </Routes>
@@ -92,6 +99,8 @@ describe('TaskDetailPage project context', () => {
     mocks.updateTodo.mockReset();
     mocks.deleteTodo.mockReset();
     mocks.toggleTodo.mockReset();
+    mocks.persist.mockReset();
+    task.recurrence_rule = null;
   });
 
   it('shows the original-document action from the project description first line', () => {
@@ -110,5 +119,44 @@ describe('TaskDetailPage project context', () => {
     expect(
       screen.queryByRole('button', { name: 'Open original document' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('collapses optional settings without hiding the next action or thread', () => {
+    renderPage();
+    expect(screen.getByText('Agent thread')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Discuss with agent' })).toBeVisible();
+    expect(
+      screen.getByText('Repeat', { selector: 'summary' }).closest('details'),
+    ).not.toHaveAttribute('open');
+    expect(screen.getByRole('button', { name: 'Research' })).not.toBeVisible();
+    fireEvent.click(screen.getByText('Skills:'));
+    fireEvent.click(screen.getByRole('button', { name: 'Research' }));
+    expect(mocks.persist).toHaveBeenCalledWith({
+      enabled_skills: ['research'],
+      assignee: 'research',
+    });
+  });
+
+  it('keeps configured recurrence visible', () => {
+    task.recurrence_rule = 'RRULE:FREQ=WEEKLY';
+    renderPage();
+    expect(screen.getByText('Repeat', { selector: 'summary' }).closest('details')).toHaveAttribute(
+      'open',
+    );
+  });
+
+  it('exposes details accessibly and resets disclosure when changing tasks', () => {
+    renderPage();
+    const details = screen.getByRole('button', { name: /Details/ });
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByPlaceholderText('Add a description...')).toBeVisible();
+    fireEvent.click(screen.getByRole('link', { name: 'Other task' }));
+    expect(screen.getByRole('button', { name: /Details/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.queryByPlaceholderText('Add a description...')).not.toBeInTheDocument();
   });
 });

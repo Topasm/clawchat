@@ -14,7 +14,7 @@ import {
   transferHasType,
   transferredBatchTaskIds,
 } from './inboxDragTransfer';
-import type { InboxAiTriage } from '../../hooks/useInboxAiTriage';
+import type { AppliedInboxPlacement, InboxAiTriage } from '../../hooks/useInboxAiTriage';
 import type { InboxSections } from '../../hooks/useInboxSections';
 import type { InboxSelection } from '../../hooks/useInboxSelection';
 import { translateUi } from '../../i18n';
@@ -36,6 +36,7 @@ interface InboxQueueProps {
   onOrganize: (taskId: string) => void;
   onRetry: (taskId: string) => void;
   onApplyTriageAndOpen: () => void;
+  onOpenApplied: (placement: AppliedInboxPlacement) => void;
 }
 /** The triage queue: every Inbox pipeline stage plus the drop target that unplaces a task. */
 export default function InboxQueue({
@@ -56,12 +57,40 @@ export default function InboxQueue({
   onOrganize,
   onRetry,
   onApplyTriageAndOpen,
+  onOpenApplied,
 }: InboxQueueProps) {
   const { processing, questioning, planReady, errors, needsOrganising, childCountByParent } =
     sections;
   const cardsDraggable = !isPlacing && !isBatchPlacing && !triage.isApplying;
   return (
     <Pane as="main" className="cc-inbox-triage__queue">
+      {triage.applied && (
+        <div className="cc-inbox-card" role="status">
+          <strong>
+            {translateUi('Applied {{count}} AI placement suggestions', {
+              count: triage.applied.count,
+            })}
+          </strong>
+          <div className="cc-inbox-card__actions">
+            <button
+              type="button"
+              className="cc-btn cc-btn--primary"
+              onClick={() => triage.applied && onOpenApplied(triage.applied)}
+            >
+              {triage.applied.projectId
+                ? translateUi('Open project {{title}}', {
+                    title:
+                      projects.find((project) => project.id === triage.applied?.projectId)?.title ??
+                      '',
+                  })
+                : translateUi('Projects')}
+            </button>
+            <button type="button" className="cc-btn cc-btn--ghost" onClick={triage.dismissApplied}>
+              {translateUi('Dismiss')}
+            </button>
+          </div>
+        </div>
+      )}
       <div
         className="cc-inbox-triage__inbox-target"
         onDragOver={(event) => {

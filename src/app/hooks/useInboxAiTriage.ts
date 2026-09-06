@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePlaceTodoGroups, usePreviewInboxTriage, useUndoTodoPlacement } from './queries';
 import { useToastStore } from '../stores/useToastStore';
 import type { InboxTriagePreviewResponse } from '../types/api';
@@ -12,13 +12,21 @@ interface InboxAiTriageOptions {
   batchTaskIds: string[];
   dropFromBatchSelection: (taskIds: ReadonlySet<string>) => void;
 }
+export interface AppliedInboxPlacement {
+  changeSetId: string;
+  projectId: string | null;
+  taskId: string | null;
+  count: number;
+}
 export interface InboxAiTriage {
+  applied: AppliedInboxPlacement | null;
+  dismissApplied: () => void;
   preview: InboxTriagePreviewResponse | null;
   selectedTaskIds: string[];
   isSuggesting: boolean;
   isApplying: boolean;
   requestPreview: () => Promise<void>;
-  applyPreview: () => Promise<string | null>;
+  applyPreview: () => Promise<AppliedInboxPlacement | null>;
   toggleSuggestion: (taskId: string) => void;
   dismissPreview: () => void;
 }
@@ -39,6 +47,8 @@ export default function useInboxAiTriage({
   const undoPlacement = useUndoTodoPlacement();
   const [triagePreview, setTriagePreview] = useState<InboxTriagePreviewResponse | null>(null);
   const [selectedTriageTaskIds, setSelectedTriageTaskIds] = useState<string[]>([]);
+  const [applied, setApplied] = useState<AppliedInboxPlacement | null>(null);
+  const applying = useRef(false);
   useEffect(() => {
     if (triagePreview && placementRevision !== triagePreview.base_graph_revision) {
       setTriagePreview(null);
@@ -87,7 +97,7 @@ export default function useInboxAiTriage({
     }
   };
   const applyPreview = async () => {
-    if (!triagePreview) return null;
+    if (!triagePreview || applying.current) return null;
     const selected = new Set(selectedTriageTaskIds);
     const suggestions = triagePreview.suggestions.filter((suggestion) =>
       selected.has(suggestion.task_id),
@@ -108,6 +118,7 @@ export default function useInboxAiTriage({
       );
       return null;
     }
+    applying.current = true;
     try {
       const result = await placeGroupsMutation.mutateAsync({
         groups,
@@ -118,6 +129,13 @@ export default function useInboxAiTriage({
       dropFromBatchSelection(appliedIds);
       setTriagePreview(null);
       setSelectedTriageTaskIds([]);
+      const receipt: AppliedInboxPlacement = {
+        changeSetId: result.change_set_id,
+        projectId: singleProjectId,
+        taskId: suggestions.length === 1 ? suggestions[0].task_id : null,
+        count: suggestions.length,
+      };
+      setApplied(receipt);
       addToast(
         'success',
         translateUi('Applied {{count}} AI placement suggestions', { count: suggestions.length }),
@@ -130,6 +148,9 @@ export default function useInboxAiTriage({
                 .mutateAsync(result.change_set_id)
                 .then((undone) => {
                   setPlacementRevision(undone.graph_revision);
+                  setApplied((current) =>
+                    current?.changeSetId === result.change_set_id ? null : current,
+                  );
                   addToast('info', translateUi('AI placements reverted'));
                 })
                 .catch((error: unknown) => {
@@ -142,7 +163,7 @@ export default function useInboxAiTriage({
           },
         },
       );
-      return singleProjectId;
+      return receipt;
     } catch (error) {
       addToast(
         'error',
@@ -154,9 +175,13 @@ export default function useInboxAiTriage({
         await refreshPlacementRevision();
       }
       return null;
+    } finally {
+      applying.current = false;
     }
   };
   return {
+    applied,
+    dismissApplied: () => setApplied(null),
     preview: triagePreview,
     selectedTaskIds: selectedTriageTaskIds,
     isSuggesting: triagePreviewMutation.isPending,

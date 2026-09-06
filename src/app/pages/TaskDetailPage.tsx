@@ -97,6 +97,9 @@ export default function TaskDetailPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const plan = latestPlanQuery.data ?? null;
   useEffect(() => {
+    setDetailsOpen(false);
+  }, [taskId]);
+  useEffect(() => {
     if (task) {
       setTitle(task.title);
       setDescription(task.description ?? '');
@@ -255,9 +258,7 @@ export default function TaskDetailPage() {
 
       {/* Section 2: Due / Estimate / Recurrence / Blockers */}
       <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">
-          {translateUi('Due / Estimate / Blockers')}
-        </div>
+        <div className="cc-exec-panel__section-title">{translateUi('Due')}</div>
         <div className="cc-exec-panel__info-grid">
           <div
             className={`cc-exec-panel__info-item${dueInfo ? ` cc-exec-panel__info-item--${dueInfo.variant}` : ''}`}
@@ -298,13 +299,17 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Section 2b: Recurrence */}
-      <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">{translateUi('Repeat')}</div>
+      <details
+        key={`repeat-${task.id}`}
+        className="cc-exec-panel__section"
+        open={task.recurrence_rule ? true : undefined}
+      >
+        <summary className="cc-exec-panel__section-title">{translateUi('Repeat')}</summary>
         <RecurrenceSelector
           value={task.recurrence_rule ?? undefined}
           onChange={(rule) => persistField({ recurrence_rule: rule ?? null })}
         />
-      </div>
+      </details>
 
       {/* Section 3: Project context */}
       {(isProject || task.parent_id || task.assignee || project) && (
@@ -396,33 +401,35 @@ export default function TaskDetailPage() {
           )}
 
           {/* Skill delegate buttons */}
-          <div className="cc-exec-panel__delegate">
-            <span className="cc-exec-panel__delegate-label">{translateUi('Skills:')}</span>
-            {SKILL_OPTIONS.map(({ id, label }) => {
-              const isActive = task.enabled_skills?.includes(id) || task.assignee === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className={`cc-btn cc-btn--ghost cc-exec-panel__delegate-btn${isActive ? ' cc-exec-panel__delegate-btn--active' : ''}`}
-                  onClick={() => {
-                    if (isActive) {
-                      const updated = (task.enabled_skills || []).filter((s) => s !== id);
-                      persistField({
-                        enabled_skills: updated.length ? updated : null,
-                        assignee: updated[0] || null,
-                      });
-                    } else {
-                      const updated = [...(task.enabled_skills || []), id];
-                      persistField({ enabled_skills: updated, assignee: id });
-                    }
-                  }}
-                >
-                  {translateUi(label)}
-                </button>
-              );
-            })}
-          </div>
+          <details key={`skills-${task.id}`}>
+            <summary className="cc-btn cc-btn--ghost">{translateUi('Skills:')}</summary>
+            <div className="cc-exec-panel__delegate">
+              {SKILL_OPTIONS.map(({ id, label }) => {
+                const isActive = task.enabled_skills?.includes(id) || task.assignee === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`cc-btn cc-btn--ghost cc-exec-panel__delegate-btn${isActive ? ' cc-exec-panel__delegate-btn--active' : ''}`}
+                    onClick={() => {
+                      if (isActive) {
+                        const updated = (task.enabled_skills || []).filter((s) => s !== id);
+                        persistField({
+                          enabled_skills: updated.length ? updated : null,
+                          assignee: updated[0] || null,
+                        });
+                      } else {
+                        const updated = [...(task.enabled_skills || []), id];
+                        persistField({ enabled_skills: updated, assignee: id });
+                      }
+                    }}
+                  >
+                    {translateUi(label)}
+                  </button>
+                );
+              })}
+            </div>
+          </details>
 
           {(task.enabled_skills?.length ||
             (task.assignee &&
@@ -454,6 +461,8 @@ export default function TaskDetailPage() {
         <button
           type="button"
           className="cc-exec-panel__details-btn"
+          aria-expanded={detailsOpen}
+          aria-controls="task-supplemental-details"
           onClick={() => setDetailsOpen(!detailsOpen)}
         >
           <ChevronRightIcon
@@ -476,7 +485,7 @@ export default function TaskDetailPage() {
       </div>
 
       {detailsOpen && (
-        <div className="cc-exec-panel__details">
+        <div id="task-supplemental-details" className="cc-exec-panel__details">
           {/* Description */}
           <textarea
             className="cc-detail__textarea"

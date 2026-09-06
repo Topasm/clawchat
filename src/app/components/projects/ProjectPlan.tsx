@@ -6,6 +6,7 @@ import {
   useStartReadyTaskExecution,
   useTaskGraphInsightsQuery,
   useTaskRelationshipsQuery,
+  useTaskExecutionTelemetryQuery,
 } from '../../hooks/queries';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
 import { useToastStore } from '../../stores/useToastStore';
@@ -19,6 +20,7 @@ import TaskGraphProposalDialog from '../task-graph/TaskGraphProposalDialog';
 import useOpenRunThread from '../../hooks/useOpenRunThread';
 import { useOptionalChatPanelController } from '../chat-panel/ChatPanelControllerContext';
 import { getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
+import { projectTaskAction } from './projectTaskAction';
 
 type PlanView = 'outline' | 'flow';
 
@@ -78,6 +80,11 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
   );
   const selectedTask = todos.find((todo) => todo.id === selectedTaskId) ?? null;
   const selectedInsight = insightsQuery.data?.nodes.find((node) => node.task_id === selectedTaskId);
+  const telemetryQuery = useTaskExecutionTelemetryQuery(project.id);
+  const selectedTelemetry = telemetryQuery.data?.find((item) => item.task_id === selectedTaskId);
+  const primaryAction = selectedTask
+    ? projectTaskAction(selectedTask, selectedInsight, selectedTelemetry, telemetryQuery.isSuccess)
+    : null;
   const { data: skillsData } = useSkillsQuery(Boolean(selectedInsight?.is_ready));
   const startExecution = useStartReadyTaskExecution();
   const todoById = useMemo(() => new Map(todos.map((todo) => [todo.id, todo])), [todos]);
@@ -94,7 +101,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
     [insightById, todos],
   );
   const runSelectedTask = async () => {
-    if (!selectedTask || !selectedInsight?.is_ready) return;
+    if (!selectedTask || primaryAction?.kind !== 'run') return;
     const skillId = resolveExecutionSkillId(selectedTask, skillsData?.skills ?? []);
     if (!skillId) {
       addToast('warning', translateUi('No execution skill is available for this task.'));
@@ -239,48 +246,60 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
             <div className="cc-project-task-actions__buttons">
               <button
                 type="button"
-                className="cc-btn"
-                onClick={() =>
-                  useQuickCaptureStore.getState().open({ defaultParentId: selectedTask.id })
-                }
-              >
-                {translateUi('+ Step')}
-              </button>
-              <button
-                type="button"
-                className="cc-btn"
-                onClick={() => setProposalTarget(selectedTask)}
-              >
-                <SparkleIcon size={14} />
-                {translateUi(' Expand')}
-              </button>
-              <button
-                type="button"
-                className="cc-btn"
-                onClick={() => void onDiscussTask(selectedTask, selectedBreadcrumb)}
-              >
-                {translateUi('Discuss')}
-              </button>
-              <button
-                type="button"
                 className="cc-btn cc-btn--primary"
-                disabled={!selectedInsight?.is_ready || startExecution.isPending}
-                title={
-                  selectedInsight?.is_ready
-                    ? translateUi('Run with the project defaults')
-                    : translateUi('This task is not Ready yet')
-                }
-                onClick={() => void runSelectedTask()}
+                disabled={startExecution.isPending}
+                onClick={() => {
+                  if (primaryAction?.kind === 'run') void runSelectedTask();
+                  else if (primaryAction?.kind === 'thread' && primaryAction.runId) {
+                    void openRunThread(
+                      primaryAction.runId,
+                      `${project.title} › ${selectedTask.title}`,
+                    );
+                  } else navigate(`/tasks/${selectedTask.id}`);
+                }}
               >
-                {startExecution.isPending ? translateUi('Starting…') : translateUi('Run agent')}
+                {startExecution.isPending
+                  ? translateUi('Starting…')
+                  : translateUi(primaryAction?.label ?? 'Details')}
               </button>
-              <button
-                type="button"
-                className="cc-btn cc-btn--ghost"
-                onClick={() => navigate(`/tasks/${selectedTask.id}`)}
-              >
-                {translateUi('Details')}
-              </button>
+              <details key={selectedTask.id}>
+                <summary className="cc-btn cc-btn--ghost">{translateUi('Actions')}</summary>
+                <div className="cc-project-task-actions__buttons">
+                  <button
+                    type="button"
+                    className="cc-btn"
+                    onClick={() =>
+                      useQuickCaptureStore.getState().open({ defaultParentId: selectedTask.id })
+                    }
+                  >
+                    {translateUi('+ Step')}
+                  </button>
+                  <button
+                    type="button"
+                    className="cc-btn"
+                    onClick={() => setProposalTarget(selectedTask)}
+                  >
+                    <SparkleIcon size={14} />
+                    {translateUi(' Expand')}
+                  </button>
+                  <button
+                    type="button"
+                    className="cc-btn"
+                    onClick={() => void onDiscussTask(selectedTask, selectedBreadcrumb)}
+                  >
+                    {translateUi('Discuss')}
+                  </button>
+                  {primaryAction?.kind !== 'details' && (
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--ghost"
+                      onClick={() => navigate(`/tasks/${selectedTask.id}`)}
+                    >
+                      {translateUi('Details')}
+                    </button>
+                  )}
+                </div>
+              </details>
             </div>
           </div>
         )}

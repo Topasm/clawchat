@@ -322,7 +322,7 @@ export default function ProjectWorkspacePage() {
 
           <details className="cc-project-settings-disclosure" id={EXECUTION_SETTINGS_ID}>
             <summary>{translateUi('Execution settings')}</summary>
-            <ProjectWorkspaceHosts projectId={project.id} />
+            <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
             <ProjectExecutionSettings project={project} />
           </details>
         </>

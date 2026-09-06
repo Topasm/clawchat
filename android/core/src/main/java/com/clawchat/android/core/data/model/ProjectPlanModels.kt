@@ -17,6 +17,14 @@ data class ProjectPlan(
 @Serializable
 data class ProjectGraph(val nodes: List<ProjectNode> = emptyList())
 
+/** Small projection of the existing task execution telemetry response. */
+@Serializable
+data class ProjectTaskRun(
+    @SerialName("task_id") val taskId: String,
+    @SerialName("latest_run_id") val runId: String? = null,
+    @SerialName("latest_run_status") val status: AgentRunStatus? = null,
+)
+
 @Serializable
 data class ProjectNode(
     @SerialName("task_id") val id: String,
@@ -26,6 +34,7 @@ data class ProjectNode(
     @SerialName("execution_state") val executionState: String,
     @SerialName("is_ready") val isReady: Boolean = false,
     @SerialName("direct_blocker_ids") val blockers: List<String> = emptyList(),
+    @SerialName("is_container") val isContainer: Boolean = false,
 )
 
 @Serializable

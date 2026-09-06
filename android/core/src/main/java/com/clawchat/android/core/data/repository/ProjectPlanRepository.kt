@@ -24,6 +24,7 @@ class ProjectPlanRepository @Inject constructor(
     suspend fun list() = request { api.listProjects(it) }
     suspend fun project(id: String) = request { api.getProject(id, it) }
     suspend fun graph(rootId: String) = request { api.getProjectGraph(rootId, it) }
+    suspend fun taskRuns(projectId: String) = request { api.getProjectTaskRuns(projectId, it) }
     suspend fun run(taskId: String) = request {
         // Send both flags explicitly even when Retrofit's Json omits default values.
         api.runReadyTask(taskId, ReadyRunRequest(requireReady = true, approved = true), it)

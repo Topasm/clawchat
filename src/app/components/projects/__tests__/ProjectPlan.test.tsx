@@ -2,10 +2,18 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useChatStore } from '../../../stores/useChatStore';
-import type { ProjectOverviewResponse, TodoResponse } from '../../../types/api';
+import type {
+  ProjectOverviewResponse,
+  TodoResponse,
+  TaskExecutionTelemetryResponse,
+} from '../../../types/api';
 import ProjectPlan from '../ProjectPlan';
 
-const execution = vi.hoisted(() => ({ start: vi.fn(), open: vi.fn() }));
+const execution = vi.hoisted(() => ({
+  start: vi.fn(),
+  open: vi.fn(),
+  telemetry: [] as TaskExecutionTelemetryResponse[],
+}));
 vi.mock('../../../hooks/useOpenRunThread', () => ({ default: () => execution.open }));
 
 vi.mock('../../../hooks/queries', () => ({
@@ -17,6 +25,7 @@ vi.mock('../../../hooks/queries', () => ({
     isLoading: false,
   }),
   useTaskRelationshipsQuery: () => ({ data: [] }),
+  useTaskExecutionTelemetryQuery: () => ({ data: execution.telemetry, isSuccess: true }),
 }));
 
 vi.mock('../../task-graph/TaskGraph', () => ({
@@ -61,7 +70,12 @@ function LocationSearch() {
 }
 
 describe('ProjectPlan', () => {
-  beforeEach(() => useChatStore.setState({ projectPlanSelections: {} }));
+  beforeEach(() => {
+    useChatStore.setState({ projectPlanSelections: {} });
+    execution.telemetry = [];
+    execution.open.mockReset();
+    execution.start.mockReset();
+  });
 
   it('restores view and task after remount, without applying them to another project', () => {
     const todos = [
@@ -135,5 +149,43 @@ describe('ProjectPlan', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(
       `/tasks?view=graph&project_id=${project.id}`,
     );
+  });
+
+  it('emphasizes review instead of starting another run and keeps secondary actions collapsed', async () => {
+    execution.telemetry = [
+      {
+        task_id: 'ready-task',
+        latest_run_id: 'review-run',
+        latest_run_status: 'waiting_review',
+      } as TaskExecutionTelemetryResponse,
+    ];
+    render(
+      <MemoryRouter>
+        <ProjectPlan
+          project={project}
+          todos={[
+            {
+              id: 'ready-task',
+              title: 'Review task',
+              status: 'pending',
+              parent_id: 'todo-root',
+            } as TodoResponse,
+          ]}
+          onDiscussTask={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Review task\s*Ready$/ }));
+    expect(screen.queryByRole('button', { name: 'Run agent' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Step' })).not.toBeVisible();
+    const actions = screen.getByLabelText('Selected task actions');
+    expect(actions.querySelectorAll('.cc-btn--primary')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Review result' }));
+    await waitFor(() =>
+      expect(execution.open).toHaveBeenCalledWith('review-run', `${project.title} › Review task`),
+    );
+    expect(execution.start).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Actions'));
+    expect(screen.getByRole('button', { name: '+ Step' })).toBeVisible();
   });
 });

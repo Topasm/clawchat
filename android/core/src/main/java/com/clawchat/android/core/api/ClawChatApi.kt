@@ -40,6 +40,9 @@ interface ClawChatApi {
     @GET("api/todos/graph/insights")
     suspend fun getProjectGraph(@Query("root_task_id") rootId: String, @Tag expectedScope: ExpectedSessionScope): ProjectGraph
 
+    @GET("api/todos/execution-telemetry")
+    suspend fun getProjectTaskRuns(@Query("project_id") projectId: String, @Tag expectedScope: ExpectedSessionScope): List<ProjectTaskRun>
+
     @POST("api/todos/{id}/delegate")
     suspend fun runReadyTask(@Path("id") id: String, @Body body: ReadyRunRequest, @Tag expectedScope: ExpectedSessionScope): ReadyRunResult
 

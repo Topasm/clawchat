@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.ui.text.style.TextOverflow
 import com.clawchat.android.core.ui.ClawMobileLayout
 import com.clawchat.android.core.ui.ClawActionLabel
@@ -131,14 +132,36 @@ fun ProjectPlanScreen(
                     if (node.blockers.isNotEmpty()) Text(stringResource(R.string.projects_dependencies,
                         node.blockers.joinToString(", ") { state.taskTitles[it] ?: it }))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (node.isReady) Button(onClick = { confirmRun = node }, enabled = !state.busy && !state.loading) {
-                            ClawActionLabel(Icons.Default.PlayArrow, stringResource(R.string.projects_run))
+                        val action = projectTaskAction(node, state.taskRuns[node.id], state.runsAvailable)
+                        Button(onClick = {
+                            when (action) {
+                                ProjectTaskAction.RUN -> confirmRun = node
+                                ProjectTaskAction.DETAILS -> onOpenTask(node.id)
+                                else -> viewModel.openTaskRun(node.id)
+                            }
+                        }, enabled = !state.busy && !state.loading) {
+                            ClawActionLabel(if (action == ProjectTaskAction.RUN) Icons.Default.PlayArrow else ClawIcons.Checklist,
+                                stringResource(when (action) {
+                                    ProjectTaskAction.RUN -> R.string.projects_run
+                                    ProjectTaskAction.PROGRESS -> R.string.projects_open_run
+                                    ProjectTaskAction.INPUT -> R.string.projects_answer_run
+                                    ProjectTaskAction.REVIEW -> R.string.projects_review_run
+                                    ProjectTaskAction.DETAILS -> R.string.projects_task
+                                }))
                         }
-                        TextButton(onClick = { onOpenTask(node.id) }, enabled = !state.busy) {
-                            ClawActionLabel(ClawIcons.Checklist, stringResource(R.string.projects_task))
-                        }
-                        TextButton(onClick = { viewModel.discuss(node.id) }, enabled = !state.busy) {
-                            ClawActionLabel(ClawIcons.Chat, stringResource(R.string.projects_discuss))
+                        Box {
+                            var more by remember(node.id) { mutableStateOf(false) }
+                            IconButton(onClick = { more = true }, enabled = !state.busy) {
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.projects_actions))
+                            }
+                            DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                                if (action != ProjectTaskAction.DETAILS) DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.projects_task)) },
+                                    onClick = { more = false; onOpenTask(node.id) },
+                                )
+                                DropdownMenuItem(text = { Text(stringResource(R.string.projects_discuss)) },
+                                    onClick = { more = false; viewModel.discuss(node.id) })
+                            }
                         }
                     }
                 }

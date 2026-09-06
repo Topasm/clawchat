@@ -46,6 +46,8 @@
     <string name="tasks_description_title">설명</string>
     <string name="tasks_description_subtitle">메모와 참고할 세부 내용입니다.</string>
     <string name="tasks_details_title">세부 정보</string>
+    <string name="tasks_details_expanded">펼쳐짐</string>
+    <string name="tasks_details_collapsed">접힘</string>
     <string name="tasks_details_subtitle">이 작업의 운영 정보입니다.</string>
     <string name="tasks_discuss_with_agent">에이전트와 논의</string>
     <string name="tasks_links_title">작업 연결</string>
@@ -102,4 +104,8 @@
     <string name="tasks_step_hint">어떤 일이 필요한가요?</string>
     <string name="tasks_step_scope">하위 작업으로 추가됩니다. 에이전트에게 전송하지 않습니다.</string>
     <string name="tasks_steps_empty">필요할 때 이 작업을 단계로 나눠보세요.</string>
+    <string name="projects_open_run">진행 보기</string>
+    <string name="projects_answer_run">에이전트에게 답변</string>
+    <string name="projects_review_run">결과 확인</string>
+    <string name="projects_actions">추가 작업</string>
 </resources>

@@ -31,6 +31,7 @@ class ProjectPlanViewModelTest {
     @Before fun setup() {
         Dispatchers.setMain(dispatcher)
         coEvery { runs.getRun(any()) } returns ApiResult.Error("Unavailable")
+        coEvery { repository.taskRuns(any()) } returns ApiResult.Success(emptyList())
         coEvery { repository.list() } returns ApiResult.Success(listOf(project))
         coEvery { repository.project("project") } returns ApiResult.Success(project)
         coEvery { repository.graph("different-root") } returns ApiResult.Success(ProjectGraph(listOf(
@@ -116,6 +117,28 @@ class ProjectPlanViewModelTest {
         assertEquals("""{"require_ready":true,"approved":true}""", Json.encodeToString(ReadyRunRequest(true, true)))
     }
 
+    @Test fun `waiting review opens its existing execution thread and never starts another run`() = runTest {
+        coEvery { repository.taskRuns("project") } returns ApiResult.Success(listOf(ProjectTaskRun("ready", "review-run", AgentRunStatus.WAITING_REVIEW)))
+        val vm = selected()
+        vm.run("ready")
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 0) { repository.run(any()) }
+        vm.openTaskRun("ready")
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("review-run", vm.uiState.value.openRun)
+        assertFalse(vm.uiState.value.focusConversationInput)
+        coVerify(exactly = 0) { conversations.getOrCreateForTodo(any()) }
+    }
+
+    @Test fun `unknown execution state does not offer a new run`() = runTest {
+        coEvery { repository.taskRuns("project") } returns ApiResult.Error("Offline")
+        val vm = selected()
+        assertFalse(vm.uiState.value.runsAvailable)
+        vm.run("ready")
+        dispatcher.scheduler.advanceUntilIdle()
+        coVerify(exactly = 0) { repository.run(any()) }
+    }
+
     @Test fun `late project read cannot restore a closed project`() = runTest {
         val delayed = CompletableDeferred<ApiResult<ProjectGraph>>()
         coEvery { repository.graph("different-root") } coAnswers { withContext(NonCancellable) { delayed.await() } }
@@ -145,6 +168,7 @@ class ProjectPlanViewModelTest {
         vm.navigationConsumed()
         val run = mockk<AgentRun>()
         every { run.conversationId } returns "execution-thread"
+        every { run.status } returns AgentRunStatus.RUNNING
         coEvery { runs.getRun("run") } returns ApiResult.Success(run)
         coEvery { repository.run("ready") } returns ApiResult.Success(ReadyRunResult("run"))
         vm.run("ready")
@@ -154,6 +178,11 @@ class ProjectPlanViewModelTest {
         assertFalse(vm.uiState.value.projectConversation)
         assertEquals("Demo › Ready", vm.uiState.value.conversationTitle)
         assertNull(vm.uiState.value.openRun)
+        vm.navigationConsumed()
+        vm.openTaskRun("ready")
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("execution-thread", vm.uiState.value.openConversation)
+        assertFalse(vm.uiState.value.focusConversationInput)
         coVerify(exactly = 0) { conversations.getOrCreateForTodo(any()) }
     }
 

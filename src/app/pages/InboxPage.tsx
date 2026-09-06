@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
+import { useChatStore } from '../stores/useChatStore';
 import usePlatform from '../hooks/usePlatform';
 import {
   useDeleteTodo,
@@ -20,7 +21,7 @@ import InboxInspector from '../components/inbox/InboxInspector';
 import InboxQueue from '../components/inbox/InboxQueue';
 import InboxTriageTree from '../components/inbox/InboxTriageTree';
 import type { ReadyTaskExecutionRequest } from '../components/inbox/ReadyTaskExecutionPanel';
-import useInboxAiTriage from '../hooks/useInboxAiTriage';
+import useInboxAiTriage, { type AppliedInboxPlacement } from '../hooks/useInboxAiTriage';
 import useInboxDependencyPreview from '../hooks/useInboxDependencyPreview';
 import useInboxGraphRevision from '../hooks/useInboxGraphRevision';
 import useInboxPlacement from '../hooks/useInboxPlacement';
@@ -148,6 +149,17 @@ export default function InboxPage() {
     placement.isBatchPlacing ||
     dependency.isPreviewing ||
     dependency.isCreating;
+  const openAppliedPlacement = (placement: AppliedInboxPlacement) => {
+    if (!placement.projectId) {
+      navigate('/projects');
+      return;
+    }
+    useChatStore.getState().setProjectPlanSelection(placement.projectId, {
+      view: 'outline',
+      taskId: placement.taskId,
+    });
+    navigate(`/projects/${placement.projectId}`);
+  };
   return (
     <div>
       <div
@@ -191,10 +203,11 @@ export default function InboxPage() {
           onOrganize={handleOrganize}
           onRetry={handleRetry}
           onApplyTriageAndOpen={() => {
-            void triage.applyPreview().then((targetProjectId) => {
-              if (targetProjectId) navigate(`/projects/${targetProjectId}`);
+            void triage.applyPreview().then((placement) => {
+              if (placement) openAppliedPlacement(placement);
             });
           }}
+          onOpenApplied={openAppliedPlacement}
         />
         {!isMobile && (
           <InboxTriageTree

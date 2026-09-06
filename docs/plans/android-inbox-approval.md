@@ -187,3 +187,18 @@
    them. For now omit a proposed deadline and edit the task manually when necessary.
 
 No release or background agent execution is implied by this stage.
+
+### Desktop handoff parity (2026-09-06, v1.4.27)
+
+- Android already opens an approved placement at its selected task in the project.
+  Desktop AI batch placement now retains one compact success card in Inbox after
+  ordinary Apply, even when the captured queue becomes empty. It does not navigate
+  automatically; Open project and Dismiss are explicit actions.
+- Opening a single applied task selects it in the project's Outline using the
+  existing workspace-scoped plan selection. A same-project batch opens that plan
+  without arbitrarily selecting one task; a mixed-project batch opens Projects.
+- Apply & Open uses the same destination logic. Failed applies do not navigate.
+  Duplicate applies are guarded before the request starts. Successful Undo removes
+  the matching success card without clearing a more recent approval result.
+- The card is local to the current Inbox visit, not a new history screen. Existing
+  timed Undo notification and server change-set validation remain unchanged.

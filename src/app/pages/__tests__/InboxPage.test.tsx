@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useToastStore } from '../../stores/useToastStore';
+import { getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 import type {
   InboxTriagePreviewResponse,
   ProjectResponse,
@@ -516,6 +517,77 @@ describe('InboxPage', () => {
         expect.objectContaining({ duration: 6000 }),
       ),
     );
+  });
+
+  it.each([false, true])(
+    'opens a single approved task in its project (open immediately: %s)',
+    async (immediate) => {
+      mocks.previewTriage.mockResolvedValue({
+        base_graph_revision: 7,
+        suggestions: [
+          {
+            task_id: 'captured-1',
+            project_id: project.id,
+            parent_id: null,
+            confidence: 0.9,
+            reason: 'Matches',
+          },
+        ],
+        proposed_workstreams: [],
+        unassigned_task_ids: [],
+        model_provider: null,
+      });
+      mocks.placeGroups.mockResolvedValue({ graph_revision: 10, change_set_id: 'single-change' });
+      renderInbox();
+      fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
+      fireEvent.click(screen.getByRole('button', { name: 'AI suggest' }));
+      await screen.findByText('AI placement preview');
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: immediate ? 'Apply & Open Project' : 'Apply selected (1)',
+        }),
+      );
+      if (!immediate) {
+        const receipt = await screen.findByRole('status');
+        expect(mocks.navigate).not.toHaveBeenCalled();
+        fireEvent.click(
+          within(receipt).getByRole('button', { name: `Open project ${project.title}` }),
+        );
+      }
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith(`/projects/${project.id}`));
+      const key = JSON.stringify([getChatWorkspaceScope(), project.id]);
+      expect(useChatStore.getState().projectPlanSelections[key]).toEqual({
+        view: 'outline',
+        taskId: 'captured-1',
+      });
+    },
+  );
+
+  it('does not leave Inbox or show a receipt when apply fails', async () => {
+    mocks.previewTriage.mockResolvedValue({
+      base_graph_revision: 7,
+      suggestions: [
+        {
+          task_id: 'captured-1',
+          project_id: project.id,
+          parent_id: null,
+          confidence: 0.9,
+          reason: 'Matches',
+        },
+      ],
+      proposed_workstreams: [],
+      unassigned_task_ids: [],
+      model_provider: null,
+    });
+    mocks.placeGroups.mockRejectedValue(new Error('Offline'));
+    renderInbox();
+    fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'AI suggest' }));
+    await screen.findByText('AI placement preview');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply & Open Project' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', expect.any(String)));
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(screen.queryByText('Applied 1 AI placement suggestions')).not.toBeInTheDocument();
   });
 
   it('drops the AI preview when the graph revision moves on', async () => {

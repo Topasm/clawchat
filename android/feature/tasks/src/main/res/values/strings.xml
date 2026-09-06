@@ -49,6 +49,8 @@
     <string name="tasks_description_title">Description</string>
     <string name="tasks_description_subtitle">Notes and supporting detail.</string>
     <string name="tasks_details_title">Details</string>
+    <string name="tasks_details_expanded">Expanded</string>
+    <string name="tasks_details_collapsed">Collapsed</string>
     <string name="tasks_details_subtitle">Operational metadata for this task.</string>
     <string name="tasks_discuss_with_agent">Discuss with agent</string>
     <string name="tasks_links_title">Task links</string>
@@ -105,4 +107,8 @@
     <string name="tasks_step_hint">What needs to be done?</string>
     <string name="tasks_step_scope">Adds a child task, not a message to the agent.</string>
     <string name="tasks_steps_empty">Break this task into steps when needed.</string>
+    <string name="projects_open_run">View progress</string>
+    <string name="projects_answer_run">Answer agent</string>
+    <string name="projects_review_run">Review result</string>
+    <string name="projects_actions">More actions</string>
 </resources>

@@ -1555,6 +1555,8 @@ Object.assign(koreanUiTranslations, {
   'Choose machine': '머신 선택',
   'Change where this runs': '실행 위치 변경',
   'Folder on a machine': '머신의 폴더',
+  'Choose a folder or enter an absolute path.': '폴더를 선택하거나 절대 경로를 입력하세요.',
+  'Path may be saved. Retry connection.': '경로가 저장됐을 수 있습니다. 다시 연결하세요.',
   'Path on that machine': '그 머신의 경로',
   'Browse…': '찾아보기…',
   'Optional. Ready tasks run in this folder on that machine.':

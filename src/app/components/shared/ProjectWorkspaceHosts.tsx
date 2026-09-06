@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   queryKeys,
+  useBindProjectWorkspace,
   useDeleteProjectHostPath,
   useExecutionHostsQuery,
   useProjectWorkspaceQuery,
@@ -12,6 +14,8 @@ import { useToastStore } from '../../stores/useToastStore';
 import { useWorkerStore } from '../../stores/useWorkerStore';
 import { logger } from '../../services/logger';
 import { translateUi } from '../../i18n';
+import usePlatform from '../../hooks/usePlatform';
+import { platformApi } from '../../platform';
 import type { ProjectWorkspace } from '../../hooks/queries';
 
 /**
@@ -28,12 +32,62 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
   const setPath = useSetProjectHostPath(projectId);
   const setHost = useSetProjectExecutionHost(projectId);
   const removePath = useDeleteProjectHostPath(projectId);
+  const bindWorkspace = useBindProjectWorkspace();
+  const { isDesktop } = usePlatform();
+  const thisHostId = useWorkerStore((state) => state.hostId);
+  const [localBusy, setLocalBusy] = useState(false);
+  const busyRef = useRef(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  useEffect(() => {
-    if (!workspace) return;
-    setDrafts(Object.fromEntries(workspace.paths.map((entry) => [entry.host_id, entry.path])));
-  }, [workspace]);
+  const busy = localBusy || setPath.isPending || setHost.isPending || removePath.isPending;
+
+  const browse = async () => {
+    if (busyRef.current || !thisHostId) return;
+    busyRef.current = true;
+    setLocalBusy(true);
+    setLocalError(null);
+    try {
+      const folder = await platformApi.server.selectFolder();
+      if (folder && useWorkerStore.getState().hostId === thisHostId) {
+        setDrafts((current) => ({ ...current, [thisHostId]: folder }));
+      }
+    } catch {
+      setLocalError(translateUi('Choose a folder or enter an absolute path.'));
+    } finally {
+      busyRef.current = false;
+      setLocalBusy(false);
+    }
+  };
+
+  const connectLocalFolder = async (path: string) => {
+    if (busyRef.current || !thisHostId || !platformApi.worker) return;
+    busyRef.current = true;
+    setLocalBusy(true);
+    setLocalError(null);
+    let checked = false;
+    try {
+      // Validate locally before changing either server setting. This bounded
+      // reader also works for empty directories; no README is required.
+      await platformApi.worker.readContext(path);
+      if (useWorkerStore.getState().hostId !== thisHostId) {
+        setLocalError(translateUi('Disconnected'));
+        return;
+      }
+      checked = true;
+      await bindWorkspace.mutateAsync({ projectId, hostId: thisHostId, path });
+      useToastStore.getState().addToast('success', translateUi('Project updated'));
+    } catch {
+      setLocalError(
+        checked
+          ? translateUi('Path may be saved. Retry connection.')
+          : translateUi('Choose a folder or enter an absolute path.'),
+      );
+    } finally {
+      busyRef.current = false;
+      setLocalBusy(false);
+    }
+  };
 
   const statusLabel = () => {
     if (!workspace || workspace.is_unconfigured) return translateUi('Not set up');
@@ -65,6 +119,12 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
       {workspace?.host_id && workspace.path && (
         <FolderContextLine projectId={projectId} workspace={workspace} />
       )}
+      {localError && <p role="alert">{localError}</p>}
+      {isDesktop && !thisHostId && (
+        <p className="cc-project-workspace__hint">
+          <Link to="/settings#this-machine">{translateUi("Open this machine's settings")}</Link>
+        </p>
+      )}
 
       {hostsLoading ? (
         <p className="cc-project-workspace__hint">{translateUi('Loading machines…')}</p>
@@ -79,8 +139,9 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
           {hosts.map((host) => {
             const isSelected = workspace?.host_id === host.id;
             const saved = workspace?.paths.find((entry) => entry.host_id === host.id)?.path ?? '';
-            const draft = drafts[host.id] ?? '';
+            const draft = drafts[host.id] ?? saved;
             const isDirty = draft.trim() !== saved;
+            const isThisMachine = isDesktop && host.id === thisHostId && !!platformApi.worker;
             return (
               <div
                 key={host.id}
@@ -97,24 +158,44 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
                   <input
                     className="cc-settings-input"
                     value={draft}
+                    disabled={busy}
+                    aria-label={`${translateUi('Path on this machine')} · ${host.label}`}
                     placeholder={translateUi('Path on this machine')}
                     onChange={(event) =>
                       setDrafts((current) => ({ ...current, [host.id]: event.target.value }))
                     }
                   />
+                  {isThisMachine && (
+                    <button
+                      type="button"
+                      className="cc-btn cc-btn--compact"
+                      disabled={busy}
+                      onClick={() => void browse()}
+                    >
+                      {translateUi('Browse…')}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="cc-btn cc-btn--compact"
-                    disabled={!isDirty || !draft.trim() || setPath.isPending}
-                    onClick={() => setPath.mutate({ host_id: host.id, path: draft.trim() })}
+                    disabled={
+                      busy ||
+                      !draft.trim() ||
+                      (isThisMachine ? !isDirty && isSelected && !localError : !isDirty)
+                    }
+                    onClick={() =>
+                      isThisMachine
+                        ? void connectLocalFolder(draft.trim())
+                        : setPath.mutate({ host_id: host.id, path: draft.trim() })
+                    }
                   >
-                    {translateUi('Save path')}
+                    {isThisMachine ? translateUi('Run here') : translateUi('Save path')}
                   </button>
-                  {saved && !isSelected && (
+                  {saved && !isSelected && !isThisMachine && (
                     <button
                       type="button"
                       className="cc-btn cc-btn--compact cc-btn--primary"
-                      disabled={setHost.isPending}
+                      disabled={busy}
                       onClick={() => setHost.mutate({ host_id: host.id })}
                     >
                       {translateUi('Run here')}
@@ -124,7 +205,7 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
                     <button
                       type="button"
                       className="cc-btn cc-btn--ghost cc-btn--compact"
-                      disabled={removePath.isPending}
+                      disabled={busy}
                       onClick={() => removePath.mutate(host.id)}
                     >
                       {translateUi('Forget')}

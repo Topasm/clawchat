@@ -33,6 +33,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import com.clawchat.android.core.ui.ClawComposer
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -74,6 +76,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -841,7 +844,9 @@ private fun TaskDetailView(
     onDiscuss: () -> Unit = {},
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
-    var showDatePicker by remember { mutableStateOf(false) }
+    var showDatePicker by rememberSaveable(task.id) { mutableStateOf(false) }
+    var detailsOpen by rememberSaveable(task.id) { mutableStateOf(false) }
+    val detailsState = stringResource(if (detailsOpen) R.string.tasks_details_expanded else R.string.tasks_details_collapsed)
     val checkboxDescription = stringResource(
         if (isCompleted) R.string.tasks_mark_incomplete else R.string.tasks_mark_complete,
         task.title,
@@ -930,43 +935,6 @@ private fun TaskDetailView(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        TaskStatus.entries.forEach { status ->
-                            TaskFilterChip(
-                                label = taskStatusLabel(status),
-                                selected = task.status == status,
-                                onClick = { onSetStatus(status) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            val description = task.description
-            if (!description.isNullOrBlank()) {
-                item {
-                    ClawSectionCard {
-                        ClawSectionHeader(
-                            title = stringResource(R.string.tasks_description_title),
-                            subtitle = stringResource(R.string.tasks_description_subtitle),
-                        )
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-            }
-
-            item {
-                ClawSectionCard {
-                    ClawSectionHeader(
-                        title = stringResource(R.string.tasks_details_title),
-                        subtitle = stringResource(R.string.tasks_details_subtitle),
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
                         task.dueDate?.let {
                             InputChip(
                                 selected = true,
@@ -990,10 +958,52 @@ private fun TaskDetailView(
                     TextButton(onClick = onDiscuss) {
                         Text(stringResource(R.string.tasks_discuss_with_agent))
                     }
+                    TextButton(
+                        onClick = { detailsOpen = !detailsOpen },
+                        modifier = Modifier.semantics { stateDescription = detailsState },
+                    ) {
+                        Icon(
+                            if (detailsOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                        )
+                        Text(stringResource(R.string.tasks_details_title))
+                    }
+                    if (detailsOpen) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            TaskStatus.entries.forEach { status ->
+                                TaskFilterChip(
+                                    label = taskStatusLabel(status),
+                                    selected = task.status == status,
+                                    onClick = { onSetStatus(status) },
+                                )
+                            }
+                        }
+                        task.description?.takeIf { it.isNotBlank() }?.let { description ->
+                            ClawSectionHeader(title = stringResource(R.string.tasks_description_title))
+                            Text(text = description, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        task.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+                            ClawSectionHeader(title = stringResource(R.string.tasks_tags_title))
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                tags.forEach { tag ->
+                                    ClawStatusChip(text = taskTagLabel(tag), tone = ClawTone.Default)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            if (task.syncStatus != "local") {
+            // Keep dependencies, loading and failures visible; hide only the empty placeholder.
+            if (task.syncStatus != "local" &&
+                (detailsOpen || relationships.isNotEmpty() || isLoadingRelationships || relationshipError != null)
+            ) {
                 item {
                     ClawSectionCard {
                         ClawSectionHeader(
@@ -1057,28 +1067,6 @@ private fun TaskDetailView(
                 }
             }
 
-            val tags = task.tags
-            if (!tags.isNullOrEmpty()) {
-                item {
-                    ClawSectionCard {
-                        ClawSectionHeader(
-                            title = stringResource(R.string.tasks_tags_title),
-                            subtitle = stringResource(R.string.tasks_tags_subtitle),
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            tags.forEach { tag ->
-                                ClawStatusChip(
-                                    text = taskTagLabel(tag),
-                                    tone = ClawTone.Default,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
