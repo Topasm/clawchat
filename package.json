@@ -80,7 +80,7 @@
     "axios": "^1.20.0",
     "cmdk": "^1.1.1",
     "fflate": "^0.8.3",
-    "framer-motion": "^13.1.1",
+    "framer-motion": "^13.2.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
