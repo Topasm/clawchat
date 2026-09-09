@@ -136,12 +136,16 @@
   background: color-mix(in srgb, var(--cc-primary) 18%, var(--cc-surface));
 }
 
+/* The card variant carries a label, so it is a pill sized by its text rather
+   than the square icon-only connector used in the tree. */
 .cc-inbox-dependency-handle {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   padding: 4px 9px;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .cc-inbox-tree__nodes {
@@ -267,6 +271,26 @@
 .cc-inbox-tree__node small {
   color: var(--cc-text-tertiary);
   font-size: 9px;
+}
+
+/* One connector per row reads as clutter when it is not in play. Keep it out of
+   the way until the row is reached, or until another task is selected — then
+   clicking it links the two, so it has to be visible to be findable. */
+.cc-inbox-tree__dependency-handle {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.cc-inbox-tree__node:hover .cc-inbox-tree__dependency-handle,
+.cc-inbox-tree__node:focus-within .cc-inbox-tree__dependency-handle,
+.cc-inbox-tree__dependency-handle[data-actionable='true'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .cc-inbox-tree__dependency-handle {
+    opacity: 1;
+  }
 }
 
 .cc-inbox-tree__empty {

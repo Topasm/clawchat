@@ -5,7 +5,7 @@ import type {
 } from '../../types/api';
 import { getTaskExecutionBadges } from '../../utils/taskExecutionTelemetry';
 import { isInboxTodo } from '../../utils/inboxState';
-import { isTerminalTaskStatus } from '../../utils/taskStatus';
+import { getTaskStatusLabel, isTerminalTaskStatus } from '../../utils/taskStatus';
 import { InsertionTarget, Pane } from '../shared/WorkspacePrimitives';
 import {
   acceptsPlacementDrag,
@@ -241,7 +241,9 @@ export default function InboxTriageTree({
                     <span className="cc-inbox-tree__identity">
                       <strong>{task.title}</strong>
                     </span>
-                    <small>{task.status.replace('_', ' ')}</small>
+                    {isTerminalTaskStatus(task.status) && (
+                      <small>{getTaskStatusLabel(task.status)}</small>
+                    )}
                   </button>
                 </div>
               ))}
@@ -348,11 +350,17 @@ function TreeNode({
               </span>
             )}
           </span>
-          <small>{task.status.replace('_', ' ')}</small>
+          {/* Everything in the tree is active unless it is finished, so a status
+              on every row is noise. Only a terminal status earns a label. */}
+          {isTerminalTaskStatus(task.status) && <small>{getTaskStatusLabel(task.status)}</small>}
         </button>
         <button
           type="button"
+          /* Quiet until the row is hovered or focused, except while another task
+             is selected — that is when clicking this actually links the two, so
+             it has to be visible to be findable. */
           className="cc-inbox-tree__dependency-handle"
+          data-actionable={selectedTaskId && selectedTaskId !== task.id ? 'true' : undefined}
           aria-label={translateUi(
             'Dependency connector for {{title}}. Drag to a prerequisite or drop a dependent here.',
             { title: task.title },

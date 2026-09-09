@@ -13,6 +13,8 @@ import InboxExecutionTelemetryPanel from './InboxExecutionTelemetryPanel';
 import ReadyTaskExecutionPanel, { type ReadyTaskExecutionRequest } from './ReadyTaskExecutionPanel';
 import type { InboxDependencyPreview } from '../../hooks/useInboxDependencyPreview';
 import { Pane } from '../shared/WorkspacePrimitives';
+import EmptyState from '../shared/EmptyState';
+import { InboxTrayIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
 interface InboxInspectorProps {
   task: TodoResponse | null;
@@ -192,7 +194,12 @@ export default function InboxInspector({
           )}
         </>
       ) : (
-        <p>{translateUi('Select or drag an Inbox card to organize it.')}</p>
+        /* Bare text here read as a stray sentence floating beside the tree. As an
+           empty state it reads as what it is: this panel, waiting for a task. */
+        <EmptyState
+          icon={<InboxTrayIcon size={28} />}
+          message={translateUi('Select or drag an Inbox card to organize it.')}
+        />
       )}
     </Pane>
   );

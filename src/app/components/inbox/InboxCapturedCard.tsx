@@ -60,7 +60,7 @@ export default function InboxCapturedCard({
         onDelete={() => onDelete(task.id)}
         subTaskCount={subTaskCount}
       />
-      <div className="cc-inbox-card__actions">
+      <div className="cc-inbox-card__actions cc-inbox-card__actions--triage">
         <label className="cc-inbox-batch-check">
           <input
             type="checkbox"
@@ -99,8 +99,10 @@ export default function InboxCapturedCard({
         >
           {translateUi('\n          Select\n        ')}
         </button>
+        {/* The one action a captured card always offers. The rest are secondary
+            and stay quiet until the card is reached — see _inbox-card.css. */}
         <button
-          className="cc-btn cc-btn--secondary"
+          className="cc-btn cc-btn--secondary cc-inbox-card__organize"
           style={{ fontSize: 12 }}
           onClick={() => onOrganize(task.id)}
         >

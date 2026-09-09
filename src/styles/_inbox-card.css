@@ -45,8 +45,41 @@
 
 .cc-inbox-card__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   padding: 2px 0 8px 36px;
+}
+
+/* The triage column is only ~260px wide, so without this the row squeezes
+   every control below its label width and CJK labels break one glyph per
+   line. Let the row wrap to a second line instead. */
+.cc-inbox-card__actions > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Four controls under every captured card read as noise when only one of them —
+   Organize — is what such a card is usually for. The rest stay quiet until the
+   card is hovered, focused, or actually in play. Scoped to the triage row on
+   purpose: the review, error, and questionnaire cards share the base class and
+   their buttons (Review, Retry, Dismiss) are the point of those cards. */
+.cc-inbox-card__actions--triage > *:not(.cc-inbox-card__organize) {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.cc-inbox-card:hover .cc-inbox-card__actions--triage > *,
+.cc-inbox-card:focus-within .cc-inbox-card__actions--triage > *,
+.cc-inbox-card--selected .cc-inbox-card__actions--triage > *,
+.cc-inbox-card--batch-selected .cc-inbox-card__actions--triage > * {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .cc-inbox-card__actions--triage > * {
+    opacity: 1;
+  }
 }
 
 /* --- Inbox Questionnaire Card ------------------------------------------- */
