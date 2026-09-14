@@ -3,7 +3,7 @@ agp = "9.3.2"
 kotlin = "2.4.10"
 ksp = "2.3.11"
 hilt = "2.60.1"
-room = "2.8.4"
+room = "2.8.5"
 
 compileSdk = "37"
 minSdk = "26"
