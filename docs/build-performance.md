@@ -93,6 +93,14 @@ recorded from the ES2022 web build rather than `build:tauri-renderer`, so they u
 output CI actually measures; they are now taken from `build:tauri-renderer` as this document
 requires.
 
+The 2026-09-25 Agent Todo update adds Korean UI messages for Inbox notes, external CLI
+sessions, and model selection, and updates the product name. The two compressed catalogs
+increase from 29,574 bytes at v1.4.30 to 30,851 bytes (+1,277 bytes). The catalogs still use
+level-9 gzip and the existing locale loader. This intentional feature content sets the
+localization-only baseline to 30,851 bytes and its ceiling to 31,800 bytes (3.1 percent
+headroom); JavaScript and renderer core ceilings stay unchanged. The Tauri renderer is
+rebuilt and measured before accepting this change.
+
 Do not raise a threshold solely to make CI pass. Measure the new output, identify which entry or
 route owns the increase, and record an intentional baseline change in the same commit.
 
