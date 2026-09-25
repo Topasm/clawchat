@@ -10,7 +10,7 @@ minSdk = "26"
 targetSdk = "37"
 jvmTarget = "17"
 
-composeBom = "2026.08.00"
+composeBom = "2026.09.00"
 activityCompose = "1.13.0"
 navigation = "2.10.0"
 androidxHilt = "1.4.0"
