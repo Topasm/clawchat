@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cli_sessions_title">CLI 세션</string>
+    <string name="cli_sessions_host">연결된 호스트의 Codex·Claude Code 세션입니다. 5초마다 갱신됩니다.</string>
+    <string name="cli_sessions_search">세션 검색</string>
+    <string name="cli_sessions_saved">저장된 세션도 표시</string>
+    <string name="cli_sessions_error">요청 접수를 확인하지 못했습니다. 새로고침 후 다시 시도하세요.</string>
+    <string name="cli_sessions_disconnected">%1$s: 실시간 연결을 사용할 수 없습니다. 저장된 세션은 표시할 수 있습니다.</string>
+    <string name="cli_sessions_empty">조건에 맞는 CLI 세션이 없습니다.</string>
+    <string name="cli_sessions_accepted">세션에서 요청을 접수했습니다</string>
+    <string name="cli_sessions_foreground">이 Claude 세션은 실행한 터미널에서 조작하세요. 백그라운드 세션은 여기서 로그 확인·중지·재시작할 수 있습니다.</string>
+    <string name="cli_sessions_message">추가 지시</string>
+    <string name="cli_sessions_send">세션에 보내기</string>
+    <string name="cli_sessions_stop">세션 중지</string>
+    <string name="cli_sessions_restart">세션 재시작</string>
+    <string name="cli_status_running">실행 중</string>
+    <string name="cli_status_waiting">입력 대기</string>
+    <string name="cli_status_idle">대기 중</string>
+    <string name="cli_status_completed">완료</string>
+    <string name="cli_status_failed">실패</string>
+    <string name="cli_status_stopped">중지됨</string>
+    <string name="cli_status_unknown">저장된 세션</string>
+</resources>

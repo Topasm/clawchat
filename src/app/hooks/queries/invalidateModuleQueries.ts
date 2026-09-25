@@ -28,8 +28,11 @@ export function invalidateModuleQueries(queryClient: QueryClient, module?: strin
   } else if (module === 'artifacts') {
     queryClient.invalidateQueries({ queryKey: ['artifacts'] });
     invalidateExecutionTelemetry();
+  } else if (module === 'notes') {
+    queryClient.invalidateQueries({ queryKey: ['notes'] });
   } else if (module === 'projects') {
     queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+    queryClient.invalidateQueries({ queryKey: ['notes'] });
   } else if (module === 'runs') {
     queryClient.invalidateQueries({ queryKey: ['runs'] });
     queryClient.invalidateQueries({ queryKey: queryKeys.projects });

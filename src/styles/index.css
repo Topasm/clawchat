@@ -34,6 +34,7 @@
 @import './_inbox-tree.css';
 @import './_inbox-inspector.css';
 @import './_inbox-card.css';
+@import './_notes.css';
 @import './_project-execution.css';
 @import './_kanban.css';
 @import './_kanban-filter.css';

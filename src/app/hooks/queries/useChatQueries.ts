@@ -172,7 +172,7 @@ export function useMessagesQuery(conversationId: string | null) {
           _id: m.id,
           text: m.content,
           createdAt: new Date(m.created_at),
-          user: { _id: m.role, name: m.role === 'user' ? 'You' : 'ClawChat' },
+          user: { _id: m.role, name: m.role === 'user' ? 'You' : 'Agent Todo' },
           conversationId: m.conversation_id,
           metadata: m.metadata ?? undefined,
         })),

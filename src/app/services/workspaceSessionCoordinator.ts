@@ -201,7 +201,7 @@ export async function activateSavedRemoteWorkspace(
     ]);
     if (!session) return { kind: 'needs-pin' };
     if (session.hostId && session.hostId !== health.hostId) {
-      throw new Error('The saved session belongs to a different ClawChat host.');
+      throw new Error('The saved session belongs to a different Agent Todo host.');
     }
 
     useAuthStore.setState({ ...session, isLoading: false });

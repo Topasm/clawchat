@@ -9,6 +9,8 @@ from exceptions import AppError, app_error_handler
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
+from routers import note as note_router
+from routers import ai_models as ai_models_router
 from routers import agent_run as agent_run_router
 from routers import attachment as attachment_router
 from routers import artifact as artifact_router
@@ -19,6 +21,7 @@ from routers import change_set as change_set_router
 from routers import chat as chat_router
 from routers import execution_host as execution_host_router
 from routers import execution_provider as execution_provider_router
+from routers import cli_session as cli_session_router
 from routers import notifications as notifications_router
 from routers import obsidian as obsidian_router
 from routers import pairing as pairing_router
@@ -218,6 +221,7 @@ app.add_middleware(
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(agent_run_router.router, prefix="/api/runs", tags=["runs"])
+app.include_router(cli_session_router.router, prefix="/api/cli-sessions", tags=["cli-sessions"])
 app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
 app.include_router(project_router.router, prefix="/api/projects", tags=["projects"])
@@ -256,6 +260,8 @@ app.include_router(settings_router.router, prefix="/api/settings", tags=["settin
 app.include_router(tasks_router.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(attachment_router.router, prefix="/api/attachments", tags=["attachments"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
+app.include_router(note_router.router, prefix="/api/notes", tags=["notes"])
+app.include_router(ai_models_router.router, prefix="/api/admin/ai/models", tags=["admin"])
 app.include_router(obsidian_router.router, prefix="/api/obsidian", tags=["obsidian"])
 app.include_router(pairing_router.router, prefix="/api/pairing", tags=["pairing"])
 app.include_router(capabilities_router.router, prefix="/api/capabilities", tags=["capabilities"])

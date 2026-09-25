@@ -213,3 +213,14 @@ val MIGRATION_6_7: Migration = object : Migration(6, 7) {
         )
     }
 }
+
+val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS `local_notes` (
+            `id` TEXT NOT NULL, `content` TEXT NOT NULL, `projectId` TEXT,
+            `createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`),
+            FOREIGN KEY(`projectId`) REFERENCES `local_todos`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+        )""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_local_notes_projectId` ON `local_notes` (`projectId`)")
+    }
+}

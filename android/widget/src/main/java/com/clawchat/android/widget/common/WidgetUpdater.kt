@@ -7,9 +7,6 @@ import com.clawchat.android.widget.quickadd.InboxQuickAddWidget
 import com.clawchat.android.widget.tracking.TodoTrackingWidget
 import com.clawchat.android.widget.tracking.WidgetRefreshKey
 import java.util.UUID
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 
 /** Single refresh path for callbacks, quick capture, and periodic work. */
 object WidgetUpdater {
@@ -19,17 +16,19 @@ object WidgetUpdater {
         val trackingIds = manager.getGlanceIds(TodoTrackingWidget::class.java)
         val inboxIds = manager.getGlanceIds(InboxQuickAddWidget::class.java)
 
-        coroutineScope {
-            val trackingUpdates = trackingIds.map { id ->
-                async {
-                    updateAppWidgetState(appContext, id) { it[WidgetRefreshKey] = UUID.randomUUID().toString() }
+        val updates = buildList<suspend () -> Unit> {
+            trackingIds.forEach { id ->
+                add {
+                    updateAppWidgetState(appContext, id) {
+                        it[WidgetRefreshKey] = UUID.randomUUID().toString()
+                    }
                     TodoTrackingWidget().update(appContext, id)
                 }
             }
-            val inboxUpdates = inboxIds.map { id ->
-                async { InboxQuickAddWidget().update(appContext, id) }
+            inboxIds.forEach { id ->
+                add { InboxQuickAddWidget().update(appContext, id) }
             }
-            (trackingUpdates + inboxUpdates).awaitAll()
         }
+        refreshWidgetsIndependently(updates)
     }
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ClawChat",
+  "productName": "Agent Todo",
   "version": "../package.json",
   "identifier": "com.clawchat.desktop",
   "build": {
@@ -15,7 +15,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "ClawChat",
+        "title": "Agent Todo",
         "width": 1280,
         "height": 820,
         "minWidth": 800,
@@ -26,7 +26,9 @@
       }
     ],
     "security": {
-      "capabilities": ["main-window"],
+      "capabilities": [
+        "main-window"
+      ],
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: http: https:; connect-src 'self' http: https: ws: wss:;"
     }
   },
@@ -41,7 +43,7 @@
     "targets": "all",
     "category": "Productivity",
     "shortDescription": "Privacy-first agentic todo app",
-    "longDescription": "ClawChat is a self-hosted agentic todo app that plans work, runs approved tasks with AI agents, and keeps results under human review.",
+    "longDescription": "Agent Todo is a self-hosted agentic todo app that plans work, runs approved tasks with AI agents, and keeps results under human review.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
@@ -19,6 +19,7 @@ import {
 import apiClient from '../services/apiClient';
 import InboxInspector from '../components/inbox/InboxInspector';
 import InboxQueue from '../components/inbox/InboxQueue';
+import InboxNotesPanel from '../components/inbox/InboxNotesPanel';
 import InboxTriageTree from '../components/inbox/InboxTriageTree';
 import type { ReadyTaskExecutionRequest } from '../components/inbox/ReadyTaskExecutionPanel';
 import useInboxAiTriage, { type AppliedInboxPlacement } from '../hooks/useInboxAiTriage';
@@ -34,6 +35,7 @@ import { translateUi } from '../i18n';
  * three views; every command and its optimistic graph revision lives in the hooks.
  */
 export default function InboxPage() {
+  const [showNotes, setShowNotes] = useState(false);
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
   const { data: projects = [] } = useProjectsQuery();
@@ -174,7 +176,7 @@ export default function InboxPage() {
               : translateUi('Capture first, organise later')}
           </div>
         </div>
-        {!isMobile && (
+        {!isMobile && !showNotes && (
           <button
             className="cc-btn cc-btn--primary"
             onClick={() => useQuickCaptureStore.getState().open()}
@@ -184,70 +186,84 @@ export default function InboxPage() {
         )}
       </div>
 
-      <div className="cc-inbox-triage">
-        <InboxQueue
-          sections={sections}
-          selection={selection}
-          triage={triage}
-          projects={projects}
-          graphRevisionReady={placementRevision != null}
-          isPlacing={placement.isPlacing}
-          isBatchPlacing={placement.isBatchPlacing}
-          dependencyBusy={dependency.isPreviewing || dependency.isCreating}
-          isMobile={isMobile}
-          onUnplaceTask={(taskId) => void placement.placeTask(taskId, null, null)}
-          onUnplaceTasks={(taskIds) => void placement.placeTaskBatch(taskIds, null, null)}
-          onToggleComplete={handleToggle}
-          onDelete={handleDelete}
-          onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
-          onOrganize={handleOrganize}
-          onRetry={handleRetry}
-          onApplyTriageAndOpen={() => {
-            void triage.applyPreview().then((placement) => {
-              if (placement) openAppliedPlacement(placement);
-            });
-          }}
-          onOpenApplied={openAppliedPlacement}
-        />
-        {!isMobile && (
-          <InboxTriageTree
-            {...treeProps}
-            disabled={treeBusy || triage.isApplying || triage.isSuggesting}
-          />
-        )}
-        <InboxInspector
-          task={selectedTask}
-          projects={projects}
-          todoById={sections.todoById}
-          insight={selectedInsight}
-          telemetry={
-            selection.selectedTaskId
-              ? executionTelemetryByTaskId.get(selection.selectedTaskId)
-              : undefined
-          }
-          summary={graphInsights.data?.summary}
-          project={selectedProject}
-          skills={skillsData?.skills ?? []}
-          providers={executionProviders}
-          isStartingExecution={startReadyExecution.isPending}
-          dependency={dependency}
-          dependencyCandidates={dependencyCandidates}
-          graphRevisionReady={placementRevision != null}
-          isPlacing={placement.isPlacing}
-          mobileTree={isMobile ? <InboxTriageTree {...treeProps} disabled={treeBusy} /> : undefined}
-          onStartExecution={(taskId: string, request: ReadyTaskExecutionRequest) =>
-            startReadyExecution.mutateAsync({ todoId: taskId, ...request })
-          }
-          onReturnToInbox={(taskId) => void placement.placeTask(taskId, null, null)}
-          onNavigate={(path) => navigate(path)}
-          onOpenConversation={(taskId) => {
-            void getConversation.mutateAsync(taskId).then(
-              (conversation) => navigate(`/chats/${conversation.id}`),
-              () => addToast('error', translateUi('Failed')),
-            );
-          }}
-        />
+      <div className="cc-notes__tabs">
+        <button className="cc-btn" aria-pressed={!showNotes} onClick={() => setShowNotes(false)}>
+          {translateUi('Tasks')}
+        </button>
+        <button className="cc-btn" aria-pressed={showNotes} onClick={() => setShowNotes(true)}>
+          {translateUi('Notes')}
+        </button>
       </div>
+      {showNotes ? (
+        <InboxNotesPanel projects={projects} />
+      ) : (
+        <div className="cc-inbox-triage">
+          <InboxQueue
+            sections={sections}
+            selection={selection}
+            triage={triage}
+            projects={projects}
+            graphRevisionReady={placementRevision != null}
+            isPlacing={placement.isPlacing}
+            isBatchPlacing={placement.isBatchPlacing}
+            dependencyBusy={dependency.isPreviewing || dependency.isCreating}
+            isMobile={isMobile}
+            onUnplaceTask={(taskId) => void placement.placeTask(taskId, null, null)}
+            onUnplaceTasks={(taskIds) => void placement.placeTaskBatch(taskIds, null, null)}
+            onToggleComplete={handleToggle}
+            onDelete={handleDelete}
+            onOpenTask={(taskId) => navigate(`/tasks/${taskId}`)}
+            onOrganize={handleOrganize}
+            onRetry={handleRetry}
+            onApplyTriageAndOpen={() => {
+              void triage.applyPreview().then((placement) => {
+                if (placement) openAppliedPlacement(placement);
+              });
+            }}
+            onOpenApplied={openAppliedPlacement}
+          />
+          {!isMobile && (
+            <InboxTriageTree
+              {...treeProps}
+              disabled={treeBusy || triage.isApplying || triage.isSuggesting}
+            />
+          )}
+          <InboxInspector
+            task={selectedTask}
+            projects={projects}
+            todoById={sections.todoById}
+            insight={selectedInsight}
+            telemetry={
+              selection.selectedTaskId
+                ? executionTelemetryByTaskId.get(selection.selectedTaskId)
+                : undefined
+            }
+            summary={graphInsights.data?.summary}
+            project={selectedProject}
+            skills={skillsData?.skills ?? []}
+            providers={executionProviders}
+            isStartingExecution={startReadyExecution.isPending}
+            dependency={dependency}
+            dependencyCandidates={dependencyCandidates}
+            graphRevisionReady={placementRevision != null}
+            isPlacing={placement.isPlacing}
+            mobileTree={
+              isMobile ? <InboxTriageTree {...treeProps} disabled={treeBusy} /> : undefined
+            }
+            onStartExecution={(taskId: string, request: ReadyTaskExecutionRequest) =>
+              startReadyExecution.mutateAsync({ todoId: taskId, ...request })
+            }
+            onReturnToInbox={(taskId) => void placement.placeTask(taskId, null, null)}
+            onNavigate={(path) => navigate(path)}
+            onOpenConversation={(taskId) => {
+              void getConversation.mutateAsync(taskId).then(
+                (conversation) => navigate(`/chats/${conversation.id}`),
+                () => addToast('error', translateUi('Failed')),
+              );
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

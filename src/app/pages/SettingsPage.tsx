@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import SettingsShell from '../components/settings/SettingsShell';
+import AIModelSettings from '../components/settings/AIModelSettings';
 import CalendarSubscriptionCard from '../components/shared/CalendarSubscriptionCard';
 import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
@@ -369,6 +370,15 @@ export default function SettingsPage() {
                   }
                 />
               </SettingsRow>
+              {['codex', 'codex_cli', 'claude_code'].includes(aiProvider.active_provider) && (
+                <AIModelSettings
+                  key={`${serverUrl}:${aiProvider.active_provider}`}
+                  provider={aiProvider.active_provider}
+                  onSaved={() => {
+                    void loadAiProvider();
+                  }}
+                />
+              )}
               {aiProvider.active_provider === 'codex' && (
                 <>
                   <SettingsRow

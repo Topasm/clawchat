@@ -1,0 +1,107 @@
+.cc-notes__tabs,
+.cc-notes__actions,
+.cc-notes__projects {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cc-notes__tabs {
+  margin-bottom: 16px;
+}
+.cc-notes {
+  max-width: 960px;
+  margin: 0 auto;
+}
+.cc-notes__hint {
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.cc-notes__projects {
+  overflow-x: auto;
+  padding: 8px 0 16px;
+  align-items: flex-start;
+}
+.cc-notes__target {
+  flex-shrink: 0;
+  min-width: 120px;
+  border-radius: var(--cc-radius-md);
+}
+.cc-notes__target .cc-btn {
+  width: 100%;
+  min-height: 56px;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cc-notes__target.is-over {
+  outline: 2px solid var(--cc-primary);
+  background: var(--cc-surface);
+}
+.cc-notes [aria-pressed='true'],
+.cc-notes__tabs [aria-pressed='true'] {
+  border-color: var(--cc-primary);
+  color: var(--cc-primary);
+}
+.cc-notes__composer,
+.cc-notes__editor {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 20px;
+}
+.cc-notes textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 14px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+}
+.cc-notes__list {
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cc-notes__card {
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-lg);
+  background: var(--cc-surface);
+  padding: 16px;
+}
+.cc-notes__body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-bottom: 8px;
+}
+.cc-notes__body strong,
+.cc-notes__body p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-line-clamp: 4;
+}
+.cc-notes__body strong {
+  -webkit-line-clamp: 2;
+}
+.cc-notes__body p {
+  margin: 8px 0;
+  color: var(--cc-text-secondary);
+}
+.cc-notes__actions {
+  flex-wrap: wrap;
+}
+.cc-notes select {
+  min-height: 40px;
+  max-width: 100%;
+  color: var(--cc-text);
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  padding: 6px 10px;
+}
+.cc-notes__editor {
+  border-top: 1px solid var(--cc-border);
+  padding-top: 16px;
+}

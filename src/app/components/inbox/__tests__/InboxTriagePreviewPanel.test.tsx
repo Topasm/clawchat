@@ -6,7 +6,7 @@ import InboxTriagePreviewPanel from '../InboxTriagePreviewPanel';
 const projects: ProjectResponse[] = [
   {
     id: 'project-1',
-    title: 'ClawChat improvements',
+    title: 'Agent Todo improvements',
     status: 'active',
     root_task_id: 'todo-root',
     graph_revision: 5,

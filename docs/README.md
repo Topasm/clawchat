@@ -4,6 +4,9 @@ ClawChat is a privacy-first, self-hosted agentic todo app that turns captured wo
 
 ## Documentation Index
 
+CLI session monitoring and controls: [Codex and Claude Code sessions](./cli-sessions.md).
+Model selection and upgrades: [AI model updates](./ai-models.md).
+
 | Document                                                                                       | Description                                                                                               |
 | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | [Architecture Overview](./architecture.md)                                                     | System design, data flow, and design principles                                                           |

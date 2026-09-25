@@ -2,7 +2,7 @@ export const translationResources = {
   en: {
     translation: {
       common: {
-        appName: 'ClawChat',
+        appName: 'Agent Todo',
       },
       nav: {
         inbox: 'Inbox',
@@ -191,7 +191,7 @@ export const translationResources = {
         },
         machines: {
           thisServer: 'The machine running the server',
-          desktopApp: 'A ClawChat app checking in',
+          desktopApp: 'A Agent Todo app checking in',
         },
         thisMachine: {
           name: 'Machine name',
@@ -292,7 +292,7 @@ export const translationResources = {
           paired: 'Paired!',
           connected: 'Device successfully connected',
           title: 'Pair a Mobile Device',
-          subtitle: 'Scan the QR code with the ClawChat mobile app, or enter the code manually',
+          subtitle: 'Scan the QR code with the Agent Todo mobile app, or enter the code manually',
           expiresIn: 'Expires in {{time}}',
           refreshing: 'Refreshing...',
         },
@@ -300,7 +300,7 @@ export const translationResources = {
       camera: {
         prompt: 'Point camera at QR code',
         denied: 'Camera access was denied.',
-        deniedHint: 'Allow camera access for ClawChat in your system settings, then try again.',
+        deniedHint: 'Allow camera access for Agent Todo in your system settings, then try again.',
         notFound: 'No camera was found on this device.',
         inUse: 'The camera is being used by another application.',
         insecure: 'The camera is only available over HTTPS or on localhost.',
@@ -318,7 +318,7 @@ export const translationResources = {
   ko: {
     translation: {
       common: {
-        appName: 'ClawChat',
+        appName: 'Agent Todo',
       },
       nav: {
         inbox: 'Inbox',
@@ -508,7 +508,7 @@ export const translationResources = {
         },
         machines: {
           thisServer: '서버가 도는 기기',
-          desktopApp: '체크인 중인 ClawChat 앱',
+          desktopApp: '체크인 중인 Agent Todo 앱',
         },
         thisMachine: {
           name: '기기 이름',
@@ -608,7 +608,7 @@ export const translationResources = {
           paired: '페어링 완료!',
           connected: '기기가 성공적으로 연결되었습니다',
           title: '모바일 기기 페어링',
-          subtitle: 'ClawChat 모바일 앱으로 QR 코드를 스캔하거나 코드를 직접 입력하세요',
+          subtitle: 'Agent Todo 모바일 앱으로 QR 코드를 스캔하거나 코드를 직접 입력하세요',
           expiresIn: '{{time}} 후 만료',
           refreshing: '새로 만드는 중...',
         },
@@ -616,7 +616,7 @@ export const translationResources = {
       camera: {
         prompt: 'QR 코드를 카메라에 비춰 주세요',
         denied: '카메라 접근이 거부되었습니다.',
-        deniedHint: '시스템 설정에서 ClawChat의 카메라 권한을 허용한 뒤 다시 시도해 주세요.',
+        deniedHint: '시스템 설정에서 Agent Todo의 카메라 권한을 허용한 뒤 다시 시도해 주세요.',
         notFound: '이 기기에서 카메라를 찾을 수 없습니다.',
         inUse: '다른 앱이 카메라를 사용하고 있습니다.',
         insecure: '카메라는 HTTPS 또는 localhost에서만 사용할 수 있습니다.',

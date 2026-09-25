@@ -325,10 +325,10 @@ export default function OnboardingPage() {
   };
   const renderWelcome = () => (
     <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">{translateUi('Welcome to ClawChat')}</h2>
+      <h2 className="cc-onboarding__card-title">{translateUi('Welcome to Agent Todo')}</h2>
       <p className="cc-onboarding__card-description">
         {translateUi(
-          '\n        ClawChat is your personal productivity hub with AI-powered chat, tasks, calendar, and notes\n        &mdash; all in one place. This wizard will help you get everything set up in a few quick\n        steps.\n      ',
+          '\n        Agent Todo is your personal productivity hub with AI-powered chat, tasks, calendar, and notes\n        &mdash; all in one place. This wizard will help you get everything set up in a few quick\n        steps.\n      ',
         )}
       </p>
       <div className="cc-onboarding__actions">
@@ -346,7 +346,7 @@ export default function OnboardingPage() {
       <h2 className="cc-onboarding__card-title">{translateUi('Choose where to start')}</h2>
       <p className="cc-onboarding__card-description">
         {translateUi(
-          '\n        You can use the private workspace on this computer or connect to an existing ClawChat. This\n        can be changed at any time.\n      ',
+          '\n        You can use the private workspace on this computer or connect to an existing Agent Todo. This\n        can be changed at any time.\n      ',
         )}
       </p>
 
@@ -373,11 +373,11 @@ export default function OnboardingPage() {
           <div className="cc-onboarding__role-icon">{'\uD83D\uDD17'}</div>
           <div className="cc-onboarding__role-content">
             <div className="cc-onboarding__role-title">
-              {translateUi('Connect to an existing ClawChat')}
+              {translateUi('Connect to an existing Agent Todo')}
             </div>
             <p className="cc-onboarding__role-description">
               {translateUi(
-                '\n              View a ClawChat workspace running on another device. This computer can still keep its\n              own local server available.\n            ',
+                '\n              View an Agent Todo workspace running on another device. This computer can still keep its\n              own local server available.\n            ',
               )}
             </p>
           </div>
@@ -402,9 +402,9 @@ export default function OnboardingPage() {
         </h2>
         <p className="cc-onboarding__card-description">
           {isDesktopHost
-            ? translateUi('ClawChat includes an embedded server. It should start automatically.')
+            ? translateUi('Agent Todo includes an embedded server. It should start automatically.')
             : translateUi(
-                'Connect to your ClawChat host by scanning a QR code or entering the server URL.',
+                'Connect to your Agent Todo host by scanning a QR code or entering the server URL.',
               )}
         </p>
 
@@ -434,7 +434,7 @@ export default function OnboardingPage() {
               />
               <div className="cc-onboarding__input-hint">
                 {translateUi(
-                  '\n                Enter the URL where your ClawChat host is running, or scan a QR code from the host.\n              ',
+                  '\n                Enter the URL where your Agent Todo host is running, or scan a QR code from the host.\n              ',
                 )}
               </div>
             </div>
@@ -487,7 +487,7 @@ export default function OnboardingPage() {
       <h2 className="cc-onboarding__card-title">{translateUi('Claude Code')}</h2>
       <p className="cc-onboarding__card-description">
         {translateUi(
-          '\n        ClawChat can use Claude Code for AI-powered features like smart task suggestions, natural\n        language chat, and more. This is optional &mdash; all non-AI features work without it.\n      ',
+          '\n        Agent Todo can use Claude Code for AI-powered features like smart task suggestions, natural\n        language chat, and more. This is optional &mdash; all non-AI features work without it.\n      ',
         )}
       </p>
 
@@ -576,7 +576,7 @@ export default function OnboardingPage() {
       <h2 className="cc-onboarding__card-title">{translateUi('Mobile Pairing')}</h2>
       <p className="cc-onboarding__card-description">
         {translateUi(
-          '\n        Optionally pair a mobile device to access ClawChat on the go. You can always set this up\n        later in Settings.\n      ',
+          '\n        Optionally pair a mobile device to access Agent Todo on the go. You can always set this up\n        later in Settings.\n      ',
         )}
       </p>
 
@@ -633,8 +633,10 @@ export default function OnboardingPage() {
       </h2>
       <p className="cc-onboarding__card-description" style={{ textAlign: 'center' }}>
         {IS_DESKTOP && chosenRole === 'host'
-          ? translateUi('Your ClawChat host is running. Other devices can connect to this machine.')
-          : translateUi('ClawChat is ready to use.')}{' '}
+          ? translateUi(
+              'Your Agent Todo host is running. Other devices can connect to this machine.',
+            )
+          : translateUi('Agent Todo is ready to use.')}{' '}
         {translateUi(
           '\n        You can adjust any of these settings later from the Settings page.\n      ',
         )}
@@ -645,7 +647,7 @@ export default function OnboardingPage() {
           onClick={enterApp}
           style={{ padding: '12px 32px', fontSize: 15 }}
         >
-          {translateUi('\n          Enter ClawChat\n        ')}
+          {translateUi('\n          Enter Agent Todo\n        ')}
         </button>
       </div>
     </div>

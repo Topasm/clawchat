@@ -231,7 +231,7 @@ class RelayClient {
   private async handleFrame(raw: string): Promise<void> {
     const frame = JSON.parse(raw);
     if (frame.kind === 'host_offline') {
-      this.failConnection(new Error('ClawChat host is offline'));
+      this.failConnection(new Error('Agent Todo host is offline'));
       return;
     }
     if (frame.kind !== 'encrypted' || !this.encryptionKey) return;

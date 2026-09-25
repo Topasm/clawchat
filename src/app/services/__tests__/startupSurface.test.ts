@@ -54,7 +54,7 @@ describe('startup surface', () => {
     const alert = document.getElementById('cc-startup-shell');
     expect(alert).toHaveAttribute('role', 'alert');
     expect(alert).toHaveAttribute('aria-busy', 'false');
-    expect(alert).toHaveTextContent('ClawChat could not start');
+    expect(alert).toHaveTextContent('Agent Todo could not start');
     expect(alert).toHaveTextContent('<unsafe>');
     expect(alert).not.toHaveTextContent('startup-secret');
     expect(alert).not.toHaveTextContent('/scratch/user');

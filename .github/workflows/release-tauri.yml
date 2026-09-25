@@ -575,6 +575,9 @@ jobs:
         working-directory: android
         run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all
 
+      - name: Verify optimized widget callbacks
+        run: bash scripts/check-android-widget-callbacks.sh android/app/build/outputs/apk/release/app-release.apk
+
       - name: Verify the Android artifact signatures and version
         env:
           VERSION: ${{ needs.preflight.outputs.version }}

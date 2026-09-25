@@ -14,7 +14,7 @@ const TRAY_ICON: tauri::image::Image<'static> =
 const TRAY_ICON: tauri::image::Image<'static> = tauri::include_image!("icons/tray-color.png");
 
 pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
-    let show = menu_item(app, TrayMenuCommand::ShowMain, "Show ClawChat")?;
+    let show = menu_item(app, TrayMenuCommand::ShowMain, "Show Agent Todo")?;
     let quick_capture = menu_item(app, TrayMenuCommand::QuickCapture, "Quick Capture")?;
     let settings = menu_item(app, TrayMenuCommand::Settings, "Settings…")?;
     let connections = menu_item(app, TrayMenuCommand::Connections, "Open Connections…")?;
@@ -22,7 +22,7 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
     let restart = menu_item(app, TrayMenuCommand::RestartServer, "Restart Server")?;
     let first_separator = PredefinedMenuItem::separator(app)?;
     let second_separator = PredefinedMenuItem::separator(app)?;
-    let quit = menu_item(app, TrayMenuCommand::Quit, "Quit ClawChat")?;
+    let quit = menu_item(app, TrayMenuCommand::Quit, "Quit Agent Todo")?;
     let menu = Menu::with_items(
         app,
         &[
@@ -41,7 +41,7 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
         .icon(TRAY_ICON)
         .icon_as_template(cfg!(target_os = "macos"))
         .menu(&menu)
-        .tooltip("ClawChat")
+        .tooltip("Agent Todo")
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| {
             if let Some(command) = TrayMenuCommand::from_id(event.id().as_ref()) {

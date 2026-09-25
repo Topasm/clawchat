@@ -117,7 +117,7 @@ beforeEach(() => {
     hostId: 'claw_test',
     hostPublicKey: 'public-key',
     apiVersion: '1',
-    workspaceName: 'ClawChat',
+    workspaceName: 'Agent Todo',
   });
   mocks.verifyHealth.mockResolvedValue({
     service: 'clawchat',

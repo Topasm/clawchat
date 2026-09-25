@@ -12,6 +12,7 @@ import {
 import { ChatBubbleIcon, ChevronLeftIcon, EditIcon, TrashIcon } from '../components/shared/Icons';
 import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
+import InboxNotesPanel from '../components/inbox/InboxNotesPanel';
 import ProjectActivity from '../components/projects/ProjectActivity';
 import ProjectPlan from '../components/projects/ProjectPlan';
 import type { ProjectOverviewResponse } from '../types/api';
@@ -27,7 +28,7 @@ import { getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import apiClient from '../services/apiClient';
 import { ConversationResponseSchema } from '../types/schemas';
 
-type ProjectSection = 'plan' | 'activity' | 'files';
+type ProjectSection = 'plan' | 'activity' | 'files' | 'notes';
 
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams<{
@@ -37,11 +38,13 @@ export default function ProjectWorkspacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = searchParams.get('section');
   const section: ProjectSection =
-    requestedSection === 'activity'
-      ? 'activity'
-      : requestedSection === 'files' || requestedSection === 'artifacts'
-        ? 'files'
-        : 'plan';
+    requestedSection === 'notes'
+      ? 'notes'
+      : requestedSection === 'activity'
+        ? 'activity'
+        : requestedSection === 'files' || requestedSection === 'artifacts'
+          ? 'files'
+          : 'plan';
   const { data: project, isLoading, isError } = useProjectQuery(projectId);
   const { data: todos = [], isLoading: areTodosLoading } = useTodosQuery();
   const { mutateAsync: getOrCreateConversation, isPending: isOpeningConversation } =
@@ -295,10 +298,19 @@ export default function ProjectWorkspacePage() {
         >
           {translateUi('Files')}
         </button>
+        <button
+          type="button"
+          className={`cc-project-workspace__tab${section === 'notes' ? ' cc-project-workspace__tab--active' : ''}`}
+          onClick={() => setSearchParams({ section: 'notes' })}
+        >
+          {translateUi('Notes')}
+        </button>
       </div>
 
       {section === 'files' ? (
         <ProjectArtifacts projectId={project.id} />
+      ) : section === 'notes' ? (
+        <InboxNotesPanel projectId={project.id} projects={[project]} />
       ) : section === 'activity' ? (
         <ProjectActivity project={project} todos={projectTasks} />
       ) : (
@@ -463,7 +475,7 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
           <h2>{translateUi('Execution provider')}</h2>
           <p>
             {translateUi(
-              'Choose where delegated tasks run. Plan generation continues to use ClawChat.',
+              'Choose where delegated tasks run. Plan generation continues to use Agent Todo.',
             )}
           </p>
         </div>

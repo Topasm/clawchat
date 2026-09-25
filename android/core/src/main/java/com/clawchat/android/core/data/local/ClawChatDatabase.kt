@@ -11,11 +11,13 @@ import androidx.room.RoomDatabase
         LocalEventEntity::class,
         PendingTodoMutationEntity::class,
         PendingReviewDecisionEntity::class,
+        LocalNoteEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class ClawChatDatabase : RoomDatabase() {
+    abstract fun localNoteDao(): LocalNoteDao
     abstract fun todoDao(): TodoDao
     abstract fun eventDao(): EventDao
     abstract fun localTodoDao(): LocalTodoDao

@@ -42,7 +42,7 @@ export function showStartupError(error: unknown): void {
     : 'Review the local diagnostic log, then restart the app.';
   const title = document.createElement('strong');
   const message = document.createElement('span');
-  title.textContent = 'ClawChat could not start';
+  title.textContent = 'Agent Todo could not start';
   message.textContent = detail;
 
   shell.className = 'cc-startup-shell cc-startup-shell--error';

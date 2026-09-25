@@ -38,7 +38,7 @@
 
     <string name="notification_reminders_channel">Reminders</string>
     <string name="notification_reminders_channel_description">Event and task reminders</string>
-    <string name="notification_reminders_summary_title">ClawChat reminders</string>
+    <string name="notification_reminders_summary_title">Agent Todo reminders</string>
     <plurals name="notification_reminders_summary_count">
         <item quantity="one">%1$d reminder needs attention</item>
         <item quantity="other">%1$d reminders need attention</item>
@@ -60,8 +60,8 @@
     </plurals>
 
     <string name="update_available_title">Update available</string>
-    <string name="update_available_message">ClawChat %1$s is available. You have %2$s.</string>
-    <string name="update_install_permission">Android needs permission to install apps from ClawChat. Grant it on the screen that opens, then tap Install again.</string>
+    <string name="update_available_message">Agent Todo %1$s is available. You have %2$s.</string>
+    <string name="update_install_permission">Android needs permission to install apps from Agent Todo. Grant it on the screen that opens, then tap Install again.</string>
     <string name="update_install_action">Install</string>
     <string name="update_downloading_action">Downloading…</string>
     <string name="update_download_action">Download</string>
@@ -77,10 +77,10 @@
     <string name="update_status_manual">This build installs updates manually.</string>
     <string name="update_status_checking">Checking for updates…</string>
     <string name="update_status_downloading">Downloading %1$s…</string>
-    <string name="update_status_ready">ClawChat %1$s is ready to install.</string>
-    <string name="update_status_available">ClawChat %1$s is available.</string>
+    <string name="update_status_ready">Agent Todo %1$s is ready to install.</string>
+    <string name="update_status_available">Agent Todo %1$s is available.</string>
     <string name="update_status_failed">Update check failed.</string>
-    <string name="update_status_current">ClawChat is up to date.</string>
+    <string name="update_status_current">Agent Todo is up to date.</string>
     <string name="update_status_delivery">Updates are delivered through GitHub releases.</string>
     <string name="update_error_unsupported_build">This build does not receive GitHub releases. Install a release build to update automatically.</string>
     <string name="update_error_check">Could not check for updates.</string>

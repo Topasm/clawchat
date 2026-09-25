@@ -6,7 +6,7 @@ function message(id: string, text = 'Hello'): ChatMessage {
     _id: id,
     text,
     createdAt: new Date('2026-01-01T00:00:00Z'),
-    user: { _id: 'assistant', name: 'ClawChat' },
+    user: { _id: 'assistant', name: 'Agent Todo' },
   };
 }
 

@@ -23,7 +23,7 @@
     <string name="chat_loading_messages">Loading messages…</string>
     <string name="chat_start_conversation">Start the conversation</string>
     <string name="chat_start_conversation_description">Try asking what is due today, add a task in natural language, or request a summary of pending work.</string>
-    <string name="chat_input_placeholder">Ask ClawChat anything…</string>
+    <string name="chat_input_placeholder">Ask Agent Todo anything…</string>
     <string name="chat_voice_input">Voice input</string>
     <string name="chat_stop">Stop</string>
     <string name="chat_send">Send</string>

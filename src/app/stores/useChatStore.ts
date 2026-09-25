@@ -338,7 +338,7 @@ export const useChatStore = create<ChatState>()(
             _id: assistantPlaceholderId,
             text: '',
             createdAt: new Date(),
-            user: { _id: 'assistant', name: 'ClawChat' },
+            user: { _id: 'assistant', name: 'Agent Todo' },
             conversationId,
             deliveryStatus: 'streaming',
             workspaceScope: getChatWorkspaceScope(),

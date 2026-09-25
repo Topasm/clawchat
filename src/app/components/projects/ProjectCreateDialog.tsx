@@ -231,7 +231,7 @@ export default function ProjectCreateDialog({ open, onOpenChange }: ProjectCreat
             ) : hosts.length === 0 ? (
               <p className="cc-project-form__hint">
                 {translateUi(
-                  'No machines registered. Open ClawChat on the machine that holds the folder and turn it on in Settings.',
+                  'No machines registered. Open Agent Todo on the machine that holds the folder and turn it on in Settings.',
                 )}
               </p>
             ) : (

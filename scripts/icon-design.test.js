@@ -44,27 +44,20 @@ function readIcnsChunks(filename) {
   return { chunks, chunkOrder, size: contents.length };
 }
 
-test('ships a detailed canonical app icon and generated desktop assets', () => {
+test('ships a canonical vector app icon and generated desktop assets', () => {
   const iconsDirectory = path.join(repositoryRoot, 'src-tauri', 'icons');
-  const source = readPngHeader(path.join(iconsDirectory, 'clawchat-app-icon-source.png'));
-  assert.deepEqual(
-    {
-      width: source.width,
-      height: source.height,
-      bitDepth: source.bitDepth,
-      colorType: source.colorType,
-    },
-    { width: 1254, height: 1254, bitDepth: 8, colorType: 6 },
-  );
-  assert.ok(source.size > 500_000, 'canonical icon must not regress to a flat placeholder');
+  const source = fs.readFileSync(path.join(iconsDirectory, 'agent-todo-icon.svg'), 'utf8');
+  assert.match(source, /viewBox="0 0 1024 1024"/);
+  assert.match(source, /<path/);
+  assert.match(source, /#102E35/);
 
   const appPng = readPngHeader(path.join(iconsDirectory, 'icon.png'));
   assert.deepEqual({ width: appPng.width, height: appPng.height }, { width: 512, height: 512 });
-  assert.ok(appPng.size > 50_000, 'desktop PNG must contain the rendered brand mark');
+  assert.ok(appPng.size > 5_000, 'desktop PNG must contain the rendered brand mark');
 
   const smallPng = readPngHeader(path.join(iconsDirectory, '32x32.png'));
   assert.deepEqual({ width: smallPng.width, height: smallPng.height }, { width: 32, height: 32 });
-  assert.ok(smallPng.size > 1_000, 'small desktop PNG must not be a single-color tile');
+  assert.ok(smallPng.size > 500, 'small desktop PNG must not be a single-color tile');
 
   const icns = readIcnsChunks(path.join(iconsDirectory, 'icon.icns'));
   for (const chunk of ['ic11', 'ic12', 'ic07', 'ic08', 'ic09', 'ic10']) {
@@ -84,7 +77,7 @@ test('ships a detailed canonical app icon and generated desktop assets', () => {
     'ic09',
     'ic10',
   ]);
-  assert.ok(icns.size > 500_000, 'icon.icns must contain the detailed multi-resolution icon');
+  assert.ok(icns.size > 20_000, 'icon.icns must contain the multi-resolution vector icon');
 
   const tauriConfig = JSON.parse(
     fs.readFileSync(path.join(repositoryRoot, 'src-tauri', 'tauri.conf.json'), 'utf8'),
@@ -117,7 +110,7 @@ test('keeps web, mobile, and tray branding synchronized with platform-safe asset
   const manifest = JSON.parse(
     fs.readFileSync(path.join(repositoryRoot, 'public', 'manifest.webmanifest'), 'utf8'),
   );
-  assert.equal(manifest.name, 'ClawChat');
+  assert.equal(manifest.name, 'Agent Todo');
   assert.equal(manifest.display, 'standalone');
   assert.deepEqual(
     manifest.icons.map(({ src, sizes, purpose }) => ({ src, sizes, purpose })),
@@ -176,10 +169,10 @@ test('keeps web, mobile, and tray branding synchronized with platform-safe asset
     path.join(repositoryRoot, 'android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml'),
     'utf8',
   );
-  assert.match(androidBackground, /#1976D2/);
+  assert.match(androidBackground, /#102E35/);
   assert.doesNotMatch(`${androidBackground}${androidForeground}`, /#6C5CE7/i);
-  assert.match(androidForeground, /#2196F3/);
-  assert.match(androidForeground, /#0D47A1/);
+  assert.match(androidForeground, /#16876A/);
+  assert.match(androidForeground, /#83E6B3/);
   assert.match(
     androidThemedIcon,
     /<monochrome android:drawable="@drawable\/ic_launcher_monochrome"/,

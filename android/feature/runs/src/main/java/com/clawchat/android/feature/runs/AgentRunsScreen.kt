@@ -94,6 +94,7 @@ fun AgentRunsScreen(
     initialRunId: String? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showCliSessions by remember { mutableStateOf(false) }
     val errorMessage = state.error?.let { localizedErrorMessage(it) }
         ?: state.errorResource?.let { stringResource(it) }
     val noticeMessage = state.notice ?: state.noticeResource?.let { stringResource(it) }
@@ -136,6 +137,9 @@ fun AgentRunsScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = { showCliSessions = !showCliSessions }) {
+                        Text(stringResource(if (showCliSessions) R.string.runs_title else R.string.cli_sessions_title))
+                    }
                     IconButton(onClick = viewModel::refresh) {
                         Icon(
                             Icons.Default.Refresh,
@@ -147,6 +151,10 @@ fun AgentRunsScreen(
             )
         },
     ) { padding ->
+        if (showCliSessions) {
+            CliSessionsScreen(modifier = Modifier.padding(padding))
+            return@Scaffold
+        }
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = viewModel::refresh,

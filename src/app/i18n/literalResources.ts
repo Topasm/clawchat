@@ -1,5 +1,71 @@
 /** Korean translations keyed by their canonical English UI message. */
 export const koreanUiTranslations: Record<string, string> = {
+  Notes: '메모',
+  'Long-press a note and drop it on a project. Tap a project to see its notes.':
+    '메모를 길게 눌러 프로젝트에 놓으세요. 프로젝트를 누르면 모아 둔 메모를 볼 수 있습니다.',
+  'Write a note': '메모 작성',
+  'Write a thought, reference, or idea…': '생각, 참고 자료, 아이디어를 적어 보세요…',
+  'Save note': '메모 저장',
+  'Could not save or load notes. Your text is still here. Try again.':
+    '메모를 저장하거나 불러오지 못했습니다. 작성한 내용은 유지됩니다. 다시 시도해 주세요.',
+  'Note moved': '메모를 옮겼습니다',
+  'Undo move': '이동 취소',
+  'No notes here yet': '아직 메모가 없습니다',
+  'Move note': '메모 이동',
+  'Move to project': '프로젝트로 이동',
+  'Edit note': '메모 편집',
+  'Note content': '메모 내용',
+  'Delete note': '메모 삭제',
+  'Delete this note?': '이 메모를 삭제할까요?',
+  'gpt-6-sol': 'gpt-6-sol',
+  'AI model': 'AI 모델',
+  'Choose a model or enter its ID. Applies to new Agent Todo requests; existing CLI sessions keep their model.':
+    '모델을 선택하거나 ID를 입력하세요. 새 Agent Todo 요청에 적용되며 기존 CLI 세션의 모델은 유지됩니다.',
+  'CLI default (empty)': 'CLI 기본값 (비워 두기)',
+  'Save model': '모델 저장',
+  'Refresh models': '모델 목록 새로고침',
+  'Live model discovery unavailable. Suggestions do not confirm account access.':
+    '모델 목록을 조회하지 못했습니다. 제안된 모델의 사용 가능 여부는 계정에 따라 다릅니다.',
+  'Claude aliases follow your CLI and account settings.':
+    'Claude 별칭은 설치된 CLI와 계정 설정에 따라 모델이 결정됩니다.',
+  'Could not load models. Refresh to retry.':
+    '모델을 불러오지 못했습니다. 새로고침해 다시 시도하세요.',
+  'Could not save the model.': '모델을 저장하지 못했습니다.',
+  'Model saved for this server.': '이 서버에 사용할 모델을 저장했습니다.',
+  'Model saved until the server restarts.':
+    '서버를 다시 시작하기 전까지 적용할 모델을 저장했습니다.',
+  Refresh: '새로고침',
+  'CLI sessions': 'CLI 세션',
+  'CLI provider': 'CLI 종류',
+  'All providers': '모든 CLI',
+  'Search sessions': '세션 검색',
+  'Show saved sessions': '저장된 세션도 표시',
+  'Saved session': '저장된 세션',
+  'Codex and Claude Code sessions on the connected host. Updates every 5 seconds.':
+    '연결된 호스트의 Codex·Claude Code 세션입니다. 5초마다 갱신됩니다.',
+  'Loading sessions…': '세션을 불러오는 중…',
+  'Loading session…': '세션을 불러오는 중…',
+  'No CLI sessions match this view.': '조건에 맞는 CLI 세션이 없습니다.',
+  'Could not load CLI sessions. Check the host connection and retry.':
+    'CLI 세션을 불러오지 못했습니다. 호스트 연결을 확인하고 다시 시도하세요.',
+  'Live Codex connection unavailable. Saved sessions are available.':
+    '실행 중인 Codex에 연결하지 못했습니다. 저장된 세션은 표시할 수 있습니다.',
+  'CLI is not installed on this host.': '이 호스트에 CLI가 설치되어 있지 않습니다.',
+  'Could not connect to the CLI on this host.': '이 호스트의 CLI에 연결하지 못했습니다.',
+  'Could not load session. Refresh to retry.':
+    '세션을 불러오지 못했습니다. 새로고침으로 다시 시도하세요.',
+  'Manage this foreground Claude session in its original terminal. Background sessions support logs, stop, and restart here.':
+    '이 Claude 세션은 실행한 터미널에서 조작하세요. 백그라운드 세션은 여기서 로그 확인·중지·재시작할 수 있습니다.',
+  'Follow-up instruction': '추가 지시',
+  'Send to session': '세션에 보내기',
+  'Stop session': '세션 중지',
+  'Restart session': '세션 재시작',
+  'Copy terminal command': '터미널 명령 복사',
+  'Could not copy. Select the command above.':
+    '복사하지 못했습니다. 위 명령을 선택해서 복사하세요.',
+  'Session action accepted': '세션에서 요청을 접수했습니다',
+  'Could not confirm the action. Refresh before retrying.':
+    '요청 접수를 확인하지 못했습니다. 새로고침 후 다시 시도하세요.',
   'Debug logging': '디버깅 로그',
   'Capture diagnostic logs': '진단 로그 기록',
   'Off by default. Starts immediately and resets when the app reloads. Turning off stops capture but keeps the current log until cleared.':
@@ -117,7 +183,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Are you sure you want to delete this conversation? This action cannot be undone.':
     '이 대화를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
   Artifacts: '아티팩트',
-  'Ask ClawChat anything...': 'ClawChat에 무엇이든 물어보세요...',
+  'Ask Agent Todo anything...': 'Agent Todo에 무엇이든 물어보세요...',
   'Assigned · start from Inbox when Ready': '할당됨 · 준비되면 받은 작업에서 시작',
   at: '시간',
   'At risk': '위험',
@@ -162,8 +228,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'Choose a prerequisite…': '전제조건을 선택하세요…',
   "Choose the workspace to view and manage this device's local server separately.":
     '이 장치의 로컬 서버를 별도로 보고 관리하려면 작업 공간을 선택하세요.',
-  'Choose where delegated tasks run. Plan generation continues to use ClawChat.':
-    '위임된 작업이 실행되는 위치를 선택하세요. 계획 생성에는 ClawChat을 계속 사용합니다.',
+  'Choose where delegated tasks run. Plan generation continues to use Agent Todo.':
+    '위임된 작업이 실행되는 위치를 선택하세요. 계획 생성에는 Agent Todo를 계속 사용합니다.',
   'Choose where to start': '어디서부터 시작할지 선택하세요',
   'Classifying...': '분류 중...',
   'Claude Code': 'Claude Code',
@@ -171,17 +237,17 @@ export const koreanUiTranslations: Record<string, string> = {
   'Claude Code is not authenticated': 'Claude Code가 인증되지 않았습니다',
   'Claude Code is not installed': 'Claude Code가 설치되지 않았습니다',
   'claude login': 'claude login',
-  ClawChat: 'ClawChat',
-  'ClawChat can use Claude Code for AI-powered features like smart task suggestions, natural language chat, and more. This is optional — all non-AI features work without it.':
-    'ClawChat은 스마트 작업 제안, 자연어 채팅 등과 같은 AI 기반 기능에 Claude Code를 사용할 수 있습니다. 이는 선택 사항입니다. AI가 아닌 모든 기능은 이 기능 없이도 작동합니다.',
-  'ClawChat includes an embedded server. It should start automatically.':
-    'ClawChat에는 내장 서버가 포함되어 있으며 자동으로 시작됩니다.',
-  'ClawChat is ready to use.': 'ClawChat을 사용할 준비가 되었습니다.',
-  'ClawChat is up to date': 'ClawChat이 최신 상태입니다',
-  'ClawChat is up to date.': 'ClawChat이 최신 상태입니다.',
-  'ClawChat is your personal productivity hub with AI-powered chat, tasks, calendar, and notes — all in one place. This wizard will help you get everything set up in a few quick steps.':
-    'ClawChat은 AI 기반 채팅, 작업, 캘린더, 메모가 모두 한곳에 있는 개인 생산성 허브입니다. 이 마법사는 몇 가지 빠른 단계를 통해 모든 설정을 완료하는 데 도움이 됩니다.',
-  'ClawChat v': 'ClawChat v',
+  'Agent Todo': 'Agent Todo',
+  'Agent Todo can use Claude Code for AI-powered features like smart task suggestions, natural language chat, and more. This is optional — all non-AI features work without it.':
+    'Agent Todo는 스마트 작업 제안, 자연어 채팅 등과 같은 AI 기반 기능에 Claude Code를 사용할 수 있습니다. 이는 선택 사항입니다. AI가 아닌 모든 기능은 이 기능 없이도 작동합니다.',
+  'Agent Todo includes an embedded server. It should start automatically.':
+    'Agent Todo에는 내장 서버가 포함되어 있으며 자동으로 시작됩니다.',
+  'Agent Todo is ready to use.': 'Agent Todo를 사용할 준비가 되었습니다.',
+  'Agent Todo is up to date': 'Agent Todo가 최신 상태입니다',
+  'Agent Todo is up to date.': 'Agent Todo가 최신 상태입니다.',
+  'Agent Todo is your personal productivity hub with AI-powered chat, tasks, calendar, and notes — all in one place. This wizard will help you get everything set up in a few quick steps.':
+    'Agent Todo는 AI 기반 채팅, 작업, 캘린더, 메모가 모두 한곳에 있는 개인 생산성 허브입니다. 이 마법사는 몇 가지 빠른 단계를 통해 모든 설정을 완료하는 데 도움이 됩니다.',
+  'Agent Todo v': 'Agent Todo v',
   Clear: '지우기',
   Close: '닫기',
   'Close actions': '빠른 작업 닫기',
@@ -201,10 +267,10 @@ export const koreanUiTranslations: Record<string, string> = {
   'Connect a prerequisite': '전제 조건 연결',
   'Connect elsewhere': '다른 곳에서 연결',
   'Connect to a server to use AI planning': 'AI 계획을 사용하려면 서버에 연결하세요',
-  'Connect to an existing ClawChat': '기존 ClawChat에 연결',
+  'Connect to an existing Agent Todo': '기존 Agent Todo에 연결',
   'Connect to Host': '호스트에 연결',
-  'Connect to your ClawChat host by scanning a QR code or entering the server URL.':
-    'QR 코드를 스캔하거나 서버 URL을 입력하여 ClawChat 호스트에 연결하세요.',
+  'Connect to your Agent Todo host by scanning a QR code or entering the server URL.':
+    'QR 코드를 스캔하거나 서버 URL을 입력하여 Agent Todo 호스트에 연결하세요.',
   Connected: '연결됨',
   'Connecting...': '연결 중...',
   'Connecting…': '연결 중…',
@@ -305,10 +371,10 @@ export const koreanUiTranslations: Record<string, string> = {
   'End time': '종료 시간',
   Ends: '종료',
   'Enter a new PIN': '새 PIN 입력',
-  'Enter ClawChat': 'ClawChat 시작',
+  'Enter Agent Todo': 'Agent Todo 시작',
   'Enter the PIN for this workspace to connect.': '연결하려면 이 워크스페이스의 PIN을 입력하세요.',
-  'Enter the URL where your ClawChat host is running, or scan a QR code from the host.':
-    'ClawChat 호스트가 실행 중인 URL을 입력하거나 호스트에서 QR 코드를 스캔하세요.',
+  'Enter the URL where your Agent Todo host is running, or scan a QR code from the host.':
+    'Agent Todo 호스트가 실행 중인 URL을 입력하거나 호스트에서 QR 코드를 스캔하세요.',
   'Enter your PIN': 'PIN을 입력하세요',
   'Enter your system prompt...': '시스템 프롬프트를 입력하세요...',
   error: '오류',
@@ -402,12 +468,12 @@ export const koreanUiTranslations: Record<string, string> = {
   'Keep capturing': '계속 캡처하세요',
   'Keep tasks and calendar on this device. No server address, pairing, account, or PIN is required.':
     '이 기기에 작업과 캘린더를 보관하세요. 서버 주소, 페어링, 계정 또는 PIN이 필요하지 않습니다.',
-  'Keep the local server running when the ClawChat window is closed.':
-    'ClawChat 창이 닫혀도 로컬 서버를 계속 실행하세요.',
+  'Keep the local server running when the Agent Todo window is closed.':
+    'Agent Todo 창이 닫혀도 로컬 서버를 계속 실행하세요.',
   'Keyboard Shortcuts': '키보드 단축키',
   'Latest artifact:': '최신 아티팩트:',
-  'Launch ClawChat and make the local workspace available after signing in.':
-    '시스템 로그인 후 ClawChat을 실행하고 로컬 워크스페이스를 사용할 수 있게 합니다.',
+  'Launch Agent Todo and make the local workspace available after signing in.':
+    '시스템 로그인 후 Agent Todo를 실행하고 로컬 워크스페이스를 사용할 수 있게 합니다.',
   'Loading artifacts…': '아티팩트 로드 중…',
   'Loading dependencies…': '종속 항목 로드 중…',
   'Loading event log…': '이벤트 로그 로드 중…',
@@ -527,8 +593,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'Opening…': '여는 중…',
   optional: '선택사항',
   'Optional review note': '선택적 검토 메모',
-  'Optionally pair a mobile device to access ClawChat on the go. You can always set this up later in Settings.':
-    '선택적으로 모바일 장치를 페어링하여 이동 중에도 ClawChat에 액세스할 수 있습니다. 나중에 설정에서 언제든지 설정할 수 있습니다.',
+  'Optionally pair a mobile device to access Agent Todo on the go. You can always set this up later in Settings.':
+    '선택적으로 모바일 장치를 페어링하여 이동 중에도 Agent Todo에 액세스할 수 있습니다. 나중에 설정에서 언제든지 설정할 수 있습니다.',
   'or more': '이상',
   Organize: '정리',
   'Organizing...': '정리 중...',
@@ -831,8 +897,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'Using the private workspace on this device.': '이 장치에서 개인 작업 공간을 사용합니다.',
   Version: '버전',
   View: '보기',
-  'View a ClawChat workspace running on another device. This computer can still keep its own local server available.':
-    '다른 장치에서 실행 중인 ClawChat 작업 공간을 봅니다. 이 컴퓨터는 여전히 자체 로컬 서버를 사용할 수 있습니다.',
+  'View an Agent Todo workspace running on another device. This computer can still keep its own local server available.':
+    '다른 장치에서 실행 중인 Agent Todo 작업 공간을 봅니다. 이 컴퓨터는 여전히 자체 로컬 서버를 사용할 수 있습니다.',
   'View all in Inbox →': '받은편지함에서 모두 보기 →',
   'Voice input': '음성 입력',
   'Waiting review': '검토 대기 중',
@@ -840,29 +906,29 @@ export const koreanUiTranslations: Record<string, string> = {
   'WebSocket Connections': '웹소켓 연결',
   Week: '주',
   Weekly: '주간',
-  'Welcome to ClawChat': 'ClawChat에 오신 것을 환영합니다.',
+  'Welcome to Agent Todo': 'Agent Todo에 오신 것을 환영합니다.',
   'What are you working toward?': '당신은 무엇을 위해 노력하고 있나요?',
   'What to add': '무엇을 추가할까요',
-  'When ClawChat is opened through a reverse proxy or tunnel, leaving this as the current site URL is usually correct.':
-    'ClawChat이 역방향 프록시나 터널을 통해 열리면 이를 현재 사이트 URL로 두는 것이 일반적으로 정확합니다.',
+  'When Agent Todo is opened through a reverse proxy or tunnel, leaving this as the current site URL is usually correct.':
+    'Agent Todo가 역방향 프록시나 터널을 통해 열리면 이를 현재 사이트 URL로 두는 것이 일반적으로 정확합니다.',
   'Workspaces & Connections': '워크스페이스 및 연결',
   Yearly: '매년',
   'You can adjust any of these settings later from the Settings page.':
     '나중에 설정 페이지에서 이러한 설정을 조정할 수 있습니다.',
   'You can pair devices later from Settings after logging in.':
     '나중에 로그인한 후 설정에서 장치를 페어링할 수 있습니다.',
-  'You can use the private workspace on this computer or connect to an existing ClawChat. This can be changed at any time.':
-    '이 컴퓨터의 개인 작업 공간을 사용하거나 기존 ClawChat에 연결할 수 있습니다. 이는 언제든지 변경될 수 있습니다.',
+  'You can use the private workspace on this computer or connect to an existing Agent Todo. This can be changed at any time.':
+    '이 컴퓨터의 개인 작업 공간을 사용하거나 기존 Agent Todo에 연결할 수 있습니다. 이는 언제든지 변경될 수 있습니다.',
   "You're all set!": '모든 준비가 완료되었습니다.',
   'Your answer...': '답변 입력...',
-  'Your ClawChat host is running. Other devices can connect to this machine.':
-    'ClawChat 호스트가 실행 중입니다. 다른 기기에서 이 컴퓨터에 연결할 수 있습니다.',
+  'Your Agent Todo host is running. Other devices can connect to this machine.':
+    'Agent Todo 호스트가 실행 중입니다. 다른 기기에서 이 컴퓨터에 연결할 수 있습니다.',
   'Your project workspaces': '프로젝트 작업공간',
   'Your schedule is clear for this time.': '이 시간에는 다른 일정이 없습니다.',
-  'Your tasks and calendar stay on this device. ClawChat could not prepare that local workspace yet.':
-    '작업과 캘린더는 이 기기에 유지됩니다. ClawChat이 아직 해당 로컬 작업 공간을 준비할 수 없습니다.',
-  'No machines registered yet. Open ClawChat on a machine and turn that machine on in its settings.':
-    '등록된 기기가 없습니다. 그 기기에서 ClawChat을 열고 설정에서 켜세요.',
+  'Your tasks and calendar stay on this device. Agent Todo could not prepare that local workspace yet.':
+    '작업과 캘린더는 이 기기에 유지됩니다. Agent Todo가 아직 해당 로컬 작업 공간을 준비할 수 없습니다.',
+  'No machines registered yet. Open Agent Todo on a machine and turn that machine on in its settings.':
+    '등록된 기기가 없습니다. 그 기기에서 Agent Todo를 열고 설정에서 켜세요.',
   'Not set up': '설정되지 않음',
   'Offline — work here is refused until it is back':
     '오프라인 — 돌아올 때까지 이 기기 작업은 거절됩니다',
@@ -1040,7 +1106,7 @@ export const koreanUiTranslations: Record<string, string> = {
   '{{message}} Enter the PIN to reconnect.': '{{message}} 다시 연결하려면 PIN을 입력하세요.',
   'Enter the PIN for this workspace to reconnect.':
     '이 워크스페이스에 다시 연결하려면 PIN을 입력하세요.',
-  'ClawChat will open at system login.': '시스템 로그인 시 ClawChat이 열립니다.',
+  'Agent Todo will open at system login.': '시스템 로그인 시 Agent Todo가 열립니다.',
   'Launch at system login disabled.': '시스템 로그인 시 실행을 비활성화했습니다.',
   'LAN access enabled with the updated PIN.': '변경된 PIN으로 LAN 접근을 활성화했습니다.',
   'Local network access enabled.': '로컬 네트워크 접근을 활성화했습니다.',
@@ -1267,8 +1333,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'Name for this machine': '이 머신의 이름',
   'This machine': '이 머신',
   'Pick the machine that holds this folder.': '이 폴더가 있는 머신을 고르세요.',
-  'No machines registered. Open ClawChat on the machine that holds the folder and turn it on in Settings.':
-    '등록된 머신이 없습니다. 폴더가 있는 머신에서 ClawChat을 열고 설정에서 켜세요.',
+  'No machines registered. Open Agent Todo on the machine that holds the folder and turn it on in Settings.':
+    '등록된 머신이 없습니다. 폴더가 있는 머신에서 Agent Todo를 열고 설정에서 켜세요.',
   'Project created, but the folder could not be attached. Set it under "Where this runs".':
     '프로젝트는 만들어졌지만 폴더를 연결하지 못했습니다. "Where this runs"에서 지정하세요.',
   'Folder context: {{files}} · updated {{time}}': '폴더 컨텍스트: {{files}} · {{time}} 갱신',

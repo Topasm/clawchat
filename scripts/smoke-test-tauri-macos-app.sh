@@ -147,7 +147,7 @@ on run arguments
   tell application "System Events"
     tell process processName
       set frontmost to true
-      tell menu 1 of menu bar item "ClawChat" of menu bar 1
+      tell menu 1 of menu bar item "Agent Todo" of menu bar 1
         set settingsItem to first menu item whose name starts with "Settings"
         set commandCharacter to value of attribute "AXMenuItemCmdChar" of settingsItem
         if commandCharacter is not "," then
@@ -192,7 +192,7 @@ if [[ ! -f "$app_icon" ]]; then
   echo "Packaged macOS icon is missing: $app_icon" >&2
   exit 1
 fi
-iconset_directory="$icon_temp_root/ClawChat.iconset"
+iconset_directory="$icon_temp_root/Agent Todo.iconset"
 /usr/bin/iconutil -c iconset "$app_icon" -o "$iconset_directory"
 for required_icon in icon_16x16.png icon_128x128@2x.png icon_512x512@2x.png; do
   if [[ ! -f "$iconset_directory/$required_icon" ]]; then
@@ -228,7 +228,7 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
     exit_code=$?
     set -e
     launch_waiter_pid=''
-    failure_message="ClawChat exited during the macOS startup smoke test (exit code $exit_code)."
+    failure_message="Agent Todo exited during the macOS startup smoke test (exit code $exit_code)."
     echo "$failure_message" >&2
     cat "$app_log" >&2
     if [[ -f "$startup_log" ]]; then
@@ -251,7 +251,7 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
     ready_line="$(tail -c "+$((startup_log_offset + 1))" "$startup_log" \
       | grep -F '[clawchat] local server ready on port' | tail -1)"
     if [[ "$ready_line" == *"port 8000 "* ]]; then
-      echo "ClawChat reused the occupied default port instead of selecting a safe fallback." >&2
+      echo "Agent Todo reused the occupied default port instead of selecting a safe fallback." >&2
       tail -c "+$((startup_log_offset + 1))" "$startup_log" >&2
       exit 1
     fi
@@ -265,7 +265,7 @@ for ((second = 0; second < smoke_seconds; second += 1)); do
     stop_app
     wait "$launch_waiter_pid" 2>/dev/null || true
     launch_waiter_pid=''
-    echo "ClawChat opened its local workspace and passed macOS reopen and Settings smoke tests."
+    echo "Agent Todo opened its local workspace and passed macOS reopen and Settings smoke tests."
     exit 0
   fi
 done
@@ -277,7 +277,7 @@ if [[ -f "$startup_log" ]] && tail -c "+$((startup_log_offset + 1))" "$startup_l
   exit 1
 fi
 
-echo "ClawChat did not open its local workspace within ${smoke_seconds}s." >&2
+echo "Agent Todo did not open its local workspace within ${smoke_seconds}s." >&2
 cat "$app_log" >&2
 if [[ -f "$startup_log" ]]; then
   tail -c "+$((startup_log_offset + 1))" "$startup_log" >&2

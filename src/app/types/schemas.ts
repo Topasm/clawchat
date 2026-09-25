@@ -269,6 +269,14 @@ export const ProjectTodoResponseSchema = z.object({
   completed_subtask_count: z.number().optional(),
 });
 
+export const NoteResponseSchema = z.object({
+  id: z.string(),
+  content: z.string(),
+  project_id: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
 export const ProjectStatusSchema = z.enum(['planned', 'active', 'completed', 'archived']);
 
 export const ProjectResponseSchema = z.object({
@@ -968,6 +976,17 @@ export const AdminOverviewResponseSchema = z.object({
   server: ServerOverviewSchema,
   counts: TableCountsSchema,
   storage: StorageStatsSchema,
+});
+
+export const AIModelSelectionSchema = z.object({
+  provider: z.enum(['codex_cli', 'claude_code', 'codex']),
+  model: z.string(),
+  persistent: z.boolean(),
+});
+
+export const AIModelCatalogSchema = AIModelSelectionSchema.extend({
+  models: z.array(z.string()),
+  source: z.enum(['cli', 'api', 'aliases', 'suggestions']),
 });
 
 export const AIConfigResponseSchema = z.object({

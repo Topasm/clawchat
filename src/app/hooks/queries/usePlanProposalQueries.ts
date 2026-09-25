@@ -48,7 +48,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     ? (value as Record<string, unknown>)
     : undefined;
 }
-/** Normalize both ClawChat and FastAPI error envelopes for inline proposal feedback. */
+/** Normalize both Agent Todo and FastAPI error envelopes for inline proposal feedback. */
 export function getPlanProposalMutationError(error: unknown): PlanProposalMutationError {
   const errorRecord = asRecord(error);
   const response = asRecord(errorRecord?.response);

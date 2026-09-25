@@ -20,7 +20,7 @@ vi.mock('../../services/apiClient', () => ({ default: { get: mocks.get } }));
 
 const project = {
   id: 'project-1',
-  title: 'ClawChat improvements',
+  title: 'Agent Todo improvements',
   goal: 'Connect planning and execution',
   description: null as string | null,
   execution_instructions: null,

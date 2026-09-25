@@ -243,7 +243,7 @@ export default function useWebSocket(): void {
         _id: d.message_id,
         text: '',
         createdAt: new Date(),
-        user: { _id: 'assistant', name: 'ClawChat' },
+        user: { _id: 'assistant', name: 'Agent Todo' },
         conversationId: d.conversation_id,
         deliveryStatus: 'streaming',
         workspaceScope: getChatWorkspaceScope(),

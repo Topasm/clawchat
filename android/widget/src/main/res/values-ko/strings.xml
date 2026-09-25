@@ -3,9 +3,9 @@
     <string name="widget_complete_failed">완료하지 못했습니다. 다시 누르거나 앱에서 확인하세요.</string>
     <string name="widget_add_task">받은 편지함에 추가</string>
     <string name="widget_refresh">새로고침</string>
-    <string name="widget_login_required">위젯을 사용하려면 ClawChat을 먼저 설정하세요</string>
+    <string name="widget_login_required">위젯을 사용하려면 Agent Todo를 먼저 설정하세요</string>
     <string name="widget_loading">불러오는 중…</string>
-    <string name="widget_load_error">작업을 불러오지 못했습니다</string>
+    <string name="widget_load_error">불러오기 실패. 눌러서 재시도</string>
     <string name="widget_empty">다가오는 마감 없음</string>
     <string name="widget_mark_done">%1$s 완료 처리</string>
     <string name="widget_inbox">받은 편지함</string>

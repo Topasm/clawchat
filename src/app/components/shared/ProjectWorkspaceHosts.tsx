@@ -146,7 +146,7 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
       ) : hosts.length === 0 ? (
         <p className="cc-project-workspace__hint">
           {translateUi(
-            'No machines registered yet. Open ClawChat on a machine and turn that machine on in its settings.',
+            'No machines registered yet. Open Agent Todo on a machine and turn that machine on in its settings.',
           )}
         </p>
       ) : (

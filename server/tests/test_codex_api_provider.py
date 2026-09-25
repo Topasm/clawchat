@@ -7,7 +7,34 @@ from exceptions import AIUnavailableError
 from services.ai.codex_api_provider import CodexAPIProvider, CodexAPIStatus
 
 
-def _provider(client: httpx.AsyncClient, api_key: str = "sk-test-secret") -> CodexAPIProvider:
+@pytest.mark.parametrize("model", ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra"])
+async def test_gpt6_uses_responses_reasoning_without_sampling_parameters(model):
+    def handler(request):
+        assert request.url.path == "/v1/responses"
+        payload = json.loads(request.content)
+        assert payload["model"] == model
+        assert payload["reasoning"] == {"effort": "medium"}
+        assert not {"temperature", "top_p", "top_logprobs"}.intersection(payload)
+        return httpx.Response(
+            200,
+            json={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "Ready"}],
+                    }
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = CodexAPIProvider(api_key="sk-test", model=model, client=client)
+        assert await provider.generate_completion("Be concise", "Test") == "Ready"
+
+
+def _provider(
+    client: httpx.AsyncClient, api_key: str = "sk-test-secret"
+) -> CodexAPIProvider:
     return CodexAPIProvider(
         api_key=api_key,
         model="gpt-5.3-codex",

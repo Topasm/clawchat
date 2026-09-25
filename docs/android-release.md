@@ -153,9 +153,16 @@ A fork publishing its own releases points the updater at its own repository:
 
 Widget completion smoke check before shipping:
 
+- Use the optimized release APK for this check. CI verifies that completion,
+  refresh, and legacy callbacks still have public no-argument constructors after
+  R8. Glance creates these callbacks by reflection; a debug-only test cannot
+  detect a constructor removed by release optimization. The widget module owns
+  the explicit constructor keep rule in `consumer-rules.pro`.
 - Keep the home-screen widget visible and complete a task; it must disappear
   without reopening the app or waiting for the widget session to expire.
 - Repeat with two widget instances, local-only mode and an offline cached task.
+- A failed instance must not cancel refreshes of the other widgets. On a load
+  error, tapping the error message retries even at sizes without a refresh icon.
 - A rejected completion must leave the task visible and show an error message.
 - Manual refresh dismisses that error without marking the task complete. With
   many old completed tasks, open tasks must still appear: the widget requests
@@ -166,6 +173,12 @@ Widget completion smoke check before shipping:
 Tracking widgets observe a refresh token within the active Glance composition;
 `WidgetUpdater` changes that token for each instance before calling `update()`.
 The token is necessary because an active session does not restart `provideGlance`.
+
+The checkbox invokes `CompleteTodoAction` through Glance's reflective callback
+creation, validates the workspace, and writes `COMPLETED` through `TodoRepository`.
+It then updates the error state and refresh token; the new snapshot excludes
+completed tasks. A missing callback constructor breaks this flow before any
+repository write or completion error can be shown. Tapping the title opens the app.
 
 - [Desktop release and auto-update](./desktop-release.md) — the Tauri updater,
   which shares the release and tag but uses an independent signing key.

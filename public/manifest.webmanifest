@@ -1,13 +1,13 @@
 {
   "id": "/",
-  "name": "ClawChat",
-  "short_name": "ClawChat",
+  "name": "Agent Todo",
+  "short_name": "Agent Todo",
   "description": "A privacy-first, self-hosted agentic todo app",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f7f8fa",
-  "theme_color": "#1976d2",
+  "theme_color": "#102E35",
   "icons": [
     {
       "src": "/icons/pwa-192.png",

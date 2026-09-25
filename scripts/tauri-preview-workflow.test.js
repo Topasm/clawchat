@@ -57,7 +57,7 @@ test('preview and release workflows launch the packaged macOS app', () => {
   assert.match(smokeScript, /system tray is unavailable/);
   assert.match(smokeScript, /\/usr\/bin\/open -n -W "\$app_path"/);
   assert.match(smokeScript, /tell application id/);
-  assert.match(smokeScript, /ClawChat exited during the macOS startup smoke test/);
+  assert.match(smokeScript, /Agent Todo exited during the macOS startup smoke test/);
   assert.match(smokeScript, /kill -0 "\$launch_waiter_pid"/);
   assert.match(smokeScript, /python3 -m http\.server 8000 --bind 0\.0\.0\.0/);
   assert.match(smokeScript, /port_blocker_pid/);
@@ -69,7 +69,7 @@ test('preview and release workflows launch the packaged macOS app', () => {
   assert.match(smokeScript, /main window restore requested by macOS Dock reopen/);
   assert.match(smokeScript, /main window hidden after macOS close request/);
   assert.match(smokeScript, /first menu item whose name starts with "Settings"/);
-  assert.match(smokeScript, /menu bar item "ClawChat"/);
+  assert.match(smokeScript, /menu bar item "Agent Todo"/);
   assert.match(smokeScript, /attribute "AXMenuItemCmdChar"/);
   assert.match(smokeScript, /click settingsItem/);
   assert.match(smokeScript, /main window restore requested by macOS Settings menu/);

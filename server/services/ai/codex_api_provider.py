@@ -37,7 +37,7 @@ class CodexAPIProvider:
         self,
         *,
         api_key: str = "",
-        model: str = "gpt-5.3-codex",
+        model: str = "gpt-6-sol",
         base_url: str = "https://api.openai.com/v1",
         reasoning_effort: str = "medium",
         client: httpx.AsyncClient | None = None,

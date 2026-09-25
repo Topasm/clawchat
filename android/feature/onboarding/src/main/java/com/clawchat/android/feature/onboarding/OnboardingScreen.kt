@@ -2,6 +2,7 @@ package com.clawchat.android.feature.onboarding
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -102,21 +104,8 @@ private fun WelcomeStep(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // App icon placeholder
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(80.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    stringResource(R.string.onboarding_brand_initial),
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
+        Image(painter = painterResource(com.clawchat.android.core.R.drawable.ic_agent_todo_brand),
+            contentDescription = null, modifier = Modifier.size(80.dp))
         Spacer(Modifier.height(24.dp))
         Text(
             stringResource(R.string.onboarding_welcome_title),

@@ -3,9 +3,9 @@
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_appearance">Appearance</string>
-    <string name="settings_appearance_description">Choose how ClawChat looks on this device.</string>
+    <string name="settings_appearance_description">Choose how Agent Todo looks on this device.</string>
     <string name="settings_workspace">Workspace</string>
-    <string name="settings_workspace_description">Choose where ClawChat stores and runs your work.</string>
+    <string name="settings_workspace_description">Choose where Agent Todo stores and runs your work.</string>
     <string name="settings_workspace_this_device">This device</string>
     <string name="settings_workspace_local_description">Local only · Not synced</string>
     <string name="settings_workspace_connected">Connected workspace</string>
@@ -18,7 +18,7 @@
     <string name="settings_switch_to_device_mode">Switch to this device</string>
     <string name="settings_switch_to_device_mode_description">Stop syncing and use data stored only on this device.</string>
     <string name="settings_switch_to_device_confirm_title">Switch to this device?</string>
-    <string name="settings_switch_to_device_confirm_message">ClawChat will stop syncing and use local data. Your server connection will be remembered so you can reconnect later.</string>
+    <string name="settings_switch_to_device_confirm_message">Agent Todo will stop syncing and use local data. Your server connection will be remembered so you can reconnect later.</string>
     <string name="settings_use_this_device">Use this device</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_switching_workspace">Switching…</string>
@@ -84,7 +84,7 @@
     <string name="settings_value_paired_device">Paired device</string>
     <string name="settings_value_pin_session">PIN session</string>
 
-    <string name="settings_report_header">ClawChat Android connection diagnostics</string>
+    <string name="settings_report_header">Agent Todo Android connection diagnostics</string>
     <string name="settings_report_server">Server: %1$s</string>
     <string name="settings_report_mode">Mode: %1$s</string>
     <string name="settings_report_authentication">Authentication: %1$s (%2$s)</string>

@@ -1,0 +1,18 @@
+<resources>
+    <string name="inbox_tasks_tab">Tasks</string>
+    <string name="inbox_notes_tab">Notes</string>
+    <string name="inbox_note_hint">Write a thought, reference, or idea…</string>
+    <string name="inbox_note_add">Save note</string>
+    <string name="inbox_note_drag_hint">Long-press a note and drop it on a project. Tap a project to see its notes.</string>
+    <string name="inbox_note_unfiled">Inbox</string>
+    <string name="inbox_note_empty">No notes here yet</string>
+    <string name="inbox_note_move">Move to project</string>
+    <string name="inbox_note_edit">Edit note</string>
+    <string name="inbox_note_save">Save</string>
+    <string name="inbox_note_cancel">Cancel</string>
+    <string name="inbox_note_delete">Delete note</string>
+    <string name="inbox_note_delete_confirm">Delete this note?</string>
+    <string name="inbox_note_error">Could not save or load notes. Your text is still here. Try again.</string>
+    <string name="inbox_note_undo">Undo move</string>
+    <string name="inbox_note_moved">Note moved</string>
+</resources>

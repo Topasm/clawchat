@@ -46,7 +46,7 @@ describe('verifyClawChatHealth', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 'ok' })));
 
     await expect(verifyClawChatHealth('http://localhost:8000')).rejects.toThrow(
-      'not a ClawChat workspace',
+      'not an Agent Todo workspace',
     );
   });
 

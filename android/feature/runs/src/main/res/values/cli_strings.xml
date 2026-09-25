@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cli_sessions_title">CLI sessions</string>
+    <string name="cli_sessions_host">Codex and Claude Code sessions on the connected host. Updates every 5 seconds.</string>
+    <string name="cli_sessions_search">Search sessions</string>
+    <string name="cli_sessions_saved">Show saved sessions</string>
+    <string name="cli_sessions_error">Could not confirm the request. Refresh before retrying.</string>
+    <string name="cli_sessions_disconnected">%1$s: live connection unavailable. Saved sessions may still be available.</string>
+    <string name="cli_sessions_empty">No CLI sessions match this view.</string>
+    <string name="cli_sessions_accepted">Session action accepted</string>
+    <string name="cli_sessions_foreground">Manage this foreground Claude session in its original terminal. Background sessions support logs, stop, and restart here.</string>
+    <string name="cli_sessions_message">Follow-up instruction</string>
+    <string name="cli_sessions_send">Send to session</string>
+    <string name="cli_sessions_stop">Stop session</string>
+    <string name="cli_sessions_restart">Restart session</string>
+    <string name="cli_status_running">Running</string>
+    <string name="cli_status_waiting">Waiting for input</string>
+    <string name="cli_status_idle">Idle</string>
+    <string name="cli_status_completed">Completed</string>
+    <string name="cli_status_failed">Failed</string>
+    <string name="cli_status_stopped">Stopped</string>
+    <string name="cli_status_unknown">Saved session</string>
+</resources>

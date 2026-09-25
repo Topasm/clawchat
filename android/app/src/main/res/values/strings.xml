@@ -4,11 +4,11 @@
     <string name="nav_projects">Projects</string>
     <string name="nav_search">Search all</string>
     <string name="nav_settings">Settings</string>
-    <string name="nav_menu_title">ClawChat</string>
-    <string name="app_name" translatable="false">ClawChat</string>
+    <string name="nav_menu_title">Agent Todo</string>
+    <string name="app_name" translatable="false">Agent Todo</string>
     <string name="notification_attention_channel">Needs attention</string>
     <string name="notification_attention_channel_description">Questions, approvals, and failed work that need your action</string>
-    <string name="notification_attention_title">ClawChat needs you</string>
+    <string name="notification_attention_title">Agent Todo needs you</string>
     <plurals name="notification_attention_count">
         <item quantity="one">%1$d item needs your attention</item>
         <item quantity="other">%1$d items need your attention</item>
@@ -22,23 +22,23 @@
     <string name="nav_chat">Chat</string>
     <string name="nav_tasks">Tasks</string>
     <string name="server_feature_requires_workspace_title">Connect a workspace</string>
-    <string name="server_feature_requires_workspace_description">This feature runs on a ClawChat server. Your local tasks and calendar will stay on this device.</string>
+    <string name="server_feature_requires_workspace_description">This feature runs on an Agent Todo server. Your local tasks and calendar will stay on this device.</string>
     <string name="server_feature_connect_action">Connect a workspace</string>
     <string name="weekly_review_ready">Weekly review is ready!</string>
     <string name="widget_todo_tracking_label">Today</string>
     <string name="widget_todo_tracking_description">Review today\'s tasks and capture new items into Inbox</string>
     <string name="widget_inbox_quick_add_label">Add task</string>
     <string name="widget_inbox_quick_add_description">Capture a task directly into your Inbox</string>
-    <string name="share_rejected">Nothing shareable was found. ClawChat accepts images, PDF, text, Markdown, and ZIP files up to 10 MB.</string>
+    <string name="share_rejected">Nothing shareable was found. Agent Todo accepts images, PDF, text, Markdown, and ZIP files up to 10 MB.</string>
     <string name="share_failed">Couldn’t save the shared item. Check your connection and try again.</string>
-    <string name="share_queued">Saved securely. ClawChat will add it to Inbox when connected.</string>
+    <string name="share_queued">Saved securely. Agent Todo will add it to Inbox when connected.</string>
     <string name="share_saved_locally">Saved to this device</string>
     <string name="share_files_require_server">File attachments require a server connection</string>
     <plurals name="share_multiple_files_title">
         <item quantity="one">%1$d shared file</item>
         <item quantity="other">%1$d shared files</item>
     </plurals>
-    <string name="share_queue_full">The share queue is full. Open ClawChat and reconnect or discard an older capture before sharing again.</string>
+    <string name="share_queue_full">The share queue is full. Open Agent Todo and reconnect or discard an older capture before sharing again.</string>
     <string name="share_malformed">This app sent an invalid share. Nothing was saved.</string>
     <string name="share_channel_name">Shared captures</string>
     <string name="share_delivery_complete_title">Shared item saved</string>
@@ -52,10 +52,10 @@
         <item quantity="other">Added to Inbox: %1$d attached, %2$d unsupported files skipped</item>
     </plurals>
     <string name="share_direct_connection_title">Direct connection needed</string>
-    <string name="share_direct_connection_message">A shared file is too large for the 1 MiB relay. It remains stored securely and will upload when this phone can reach ClawChat directly.</string>
+    <string name="share_direct_connection_message">A shared file is too large for the 1 MiB relay. It remains stored securely and will upload when this phone can reach Agent Todo directly.</string>
     <string name="share_connection_required_title">Reconnect the original workspace</string>
-    <string name="share_connection_required_message">This capture belongs to another ClawChat workspace. It remains stored securely until that workspace is active.</string>
+    <string name="share_connection_required_message">This capture belongs to another Agent Todo workspace. It remains stored securely until that workspace is active.</string>
     <string name="share_delivery_failed_title">Shared capture needs attention</string>
-    <string name="share_delivery_failed_message">ClawChat could not deliver this capture. Its files remain stored securely until you discard them.</string>
+    <string name="share_delivery_failed_message">Agent Todo could not deliver this capture. Its files remain stored securely until you discard them.</string>
     <string name="share_discard_action">Discard</string>
 </resources>

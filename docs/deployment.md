@@ -82,7 +82,7 @@ configured by `AI_BASE_URL`. To select it at startup:
 ```bash
 AI_PROVIDER=codex
 CODEX_API_KEY=your-openai-api-key
-CODEX_MODEL=gpt-5.3-codex
+CODEX_MODEL=gpt-6-sol
 ```
 
 `OPENAI_API_KEY` can be used instead of `CODEX_API_KEY`. In the desktop app,
@@ -98,7 +98,7 @@ To reuse an existing local Codex login without storing an API key in ClawChat:
 codex login
 AI_PROVIDER=codex_cli
 # Defaults to the cheaper Luna tier; empty uses ~/.codex/config.toml
-CODEX_CLI_MODEL=gpt-5.6-luna
+CODEX_CLI_MODEL=gpt-6-luna
 ```
 
 ClawChat runs `codex exec` non-interactively with a read-only sandbox, disabled
@@ -126,9 +126,9 @@ is not included in the Docker image.
 | `CODEX_API_BASE_URL` | `https://api.openai.com/v1` | OpenAI Responses API base URL |
 | `CODEX_API_KEY` | *(empty)* | OpenAI API key for Codex; falls back to `OPENAI_API_KEY` |
 | `CODEX_API_KEY_FILE` | *(empty)* | Optional owner-only file used to persist the Codex API key |
-| `CODEX_MODEL` | `gpt-5.3-codex` | Codex model used for chat, planning, and tool calls |
+| `CODEX_MODEL` | `gpt-6-sol` | Codex model used for chat, planning, and tool calls |
 | `CODEX_REASONING_EFFORT` | `medium` | Codex reasoning effort: `low`, `medium`, `high`, or `xhigh` |
-| `CODEX_CLI_MODEL` | `gpt-5.6-luna` | Codex CLI model; empty uses the CLI config default |
+| `CODEX_CLI_MODEL` | `gpt-6-luna` | Codex CLI model; empty uses the CLI config default |
 | `CLAUDE_CODE_MODEL` | `sonnet` | Model alias passed to `claude --model`; empty uses the CLI default |
 | `PASEO_ENABLED` | `false` | Enable the optional Paseo execution adapter |
 | `PASEO_CLI_COMMAND` | `paseo` | Official Paseo CLI command available to the server process |

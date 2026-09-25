@@ -44,7 +44,10 @@ jobs:
 
       - name: Test, lint, and build Android artifacts
         working-directory: android
-        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug bundleRelease --warning-mode all
+        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease bundleRelease --warning-mode all
+
+      - name: Verify optimized widget callbacks
+        run: bash scripts/check-android-widget-callbacks.sh android/app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

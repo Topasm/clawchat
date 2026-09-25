@@ -31,11 +31,11 @@ export default function UpdateNotification() {
     >
       <div className="cc-update-banner__content">
         {status === 'checking' && <span>{translateUi('Checking for updates\u2026')}</span>}
-        {status === 'up-to-date' && <span>{translateUi('ClawChat is up to date.')}</span>}
+        {status === 'up-to-date' && <span>{translateUi('Agent Todo is up to date.')}</span>}
         {status === 'available' && (
           <div className="cc-update-banner__message">
             <span>
-              {translateUi('ClawChat v')}
+              {translateUi('Agent Todo v')}
               {info?.version}
               {translateUi(' is available.')}
             </span>

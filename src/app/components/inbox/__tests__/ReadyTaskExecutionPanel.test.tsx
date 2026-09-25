@@ -61,7 +61,7 @@ const providers: ExecutionProviderStatus[] = [
     enabled: true,
     available: true,
     connected: true,
-    host: 'ClawChat',
+    host: 'Agent Todo',
     providers: [],
   },
 ];

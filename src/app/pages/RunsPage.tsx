@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import RunCard, { isUnsuccessfulRun } from '../components/runs/RunCard';
+import CliSessionsPanel from '../components/runs/CliSessionsPanel';
 import EmptyState from '../components/shared/EmptyState';
 import { SpinArrowsIcon } from '../components/shared/Icons';
 import { useAgentRunsQuery } from '../hooks/queries';
@@ -59,6 +60,7 @@ export default function RunsPage() {
           )}
         </div>
       </header>
+      <CliSessionsPanel />
       <div className="cc-review-filters" aria-label={translateUi('Run filters')}>
         {FILTERS.map((option) => (
           <button

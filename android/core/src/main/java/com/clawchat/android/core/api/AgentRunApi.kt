@@ -5,14 +5,35 @@ import com.clawchat.android.core.data.model.AgentRunEvent
 import com.clawchat.android.core.data.model.AgentRunPermissionRequest
 import com.clawchat.android.core.data.model.AgentRunResumeRequest
 import com.clawchat.android.core.data.model.AgentRunRetryRequest
+import com.clawchat.android.core.data.model.CliSessionList
+import com.clawchat.android.core.data.model.CliSessionDetail
+import com.clawchat.android.core.data.model.CliSessionAction
+import com.clawchat.android.core.data.model.CliSessionActionResult
+import com.clawchat.android.core.network.ExpectedSessionScope
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Tag
 
 /** Authenticated API used by the mobile run monitor and controls. */
 interface AgentRunApi {
+    @GET("api/cli-sessions")
+    suspend fun listCliSessions(@Tag expectedScope: ExpectedSessionScope): CliSessionList
+
+    @GET("api/cli-sessions/{provider}/{sessionId}")
+    suspend fun getCliSession(@Path("provider") provider: String, @Path("sessionId") sessionId: String,
+        @Tag expectedScope: ExpectedSessionScope): CliSessionDetail
+
+    @POST("api/cli-sessions/{provider}/{sessionId}/actions")
+    suspend fun controlCliSession(
+        @Path("provider") provider: String,
+        @Path("sessionId") sessionId: String,
+        @Body request: CliSessionAction,
+        @Tag expectedScope: ExpectedSessionScope,
+    ): CliSessionActionResult
+
     @GET("api/runs")
     suspend fun listRuns(
         @Query("project_id") projectId: String? = null,

@@ -5,6 +5,7 @@ from models.review_item import ReviewItem  # noqa: F401
 from models.artifact import Artifact, ArtifactRevision  # noqa: F401
 from models.message import Message  # noqa: F401
 from models.todo import Todo  # noqa: F401
+from models.note import Note  # noqa: F401
 from models.task_relationship import TaskRelationship  # noqa: F401
 from models.data_migration_marker import DataMigrationMarker  # noqa: F401
 from models.task_graph_state import TaskGraphState  # noqa: F401

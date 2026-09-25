@@ -7,7 +7,7 @@ import { debugResource, getDebugSnapshot, recordDebug } from './debugLogging';
 
 declare module 'axios' {
   // Keep Axios' generic defaults identical so request helpers such as
-  // `apiClient.post` accept the ClawChat-specific transport option.
+  // `apiClient.post` accept the Agent Todo-specific transport option.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
   interface AxiosRequestConfig<D = any, P = any> {
     /** Opt in only for JSON mutations that are safe to replay after reconnecting. */

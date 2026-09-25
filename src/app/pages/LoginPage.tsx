@@ -48,17 +48,17 @@ export function describeHostBlock(
 }
 const HOST_PHASE_HEADINGS: Record<HostSessionPhase, string> = {
   idle: 'Sign in',
-  checking: 'Preparing ClawChat',
+  checking: 'Preparing Agent Todo',
   starting: 'Preparing your local workspace',
   connecting: 'Opening your workspace',
   connected: 'Workspace ready',
-  blocked: 'ClawChat could not open its local workspace',
+  blocked: 'Agent Todo could not open its local workspace',
 };
 const HOST_PHASE_DETAILS: Record<HostSessionPhase, string> = {
   idle: '',
   checking: 'Checking the private workspace stored on this device.',
   starting:
-    'ClawChat is preparing local storage for your tasks and calendar. This usually takes a few seconds.',
+    'Agent Todo is preparing local storage for your tasks and calendar. This usually takes a few seconds.',
   connecting: 'No account or PIN is needed. Taking you straight to your workspace.',
   connected: 'Taking you to your workspace.',
   blocked: '',
@@ -314,7 +314,7 @@ export default function LoginPage() {
           }}
         >
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: colors.primary }}>
-            {translateUi('\n            ClawChat\n          ')}
+            {translateUi('\n            Agent Todo\n          ')}
           </h1>
           {IS_DESKTOP && (
             <button
@@ -361,7 +361,7 @@ export default function LoginPage() {
                   }}
                 >
                   {translateUi(
-                    '\n                  Your tasks and calendar stay on this device. ClawChat could not prepare that local\n                  workspace yet.\n                ',
+                    '\n                  Your tasks and calendar stay on this device. Agent Todo could not prepare that local\n                  workspace yet.\n                ',
                   )}
                 </div>
                 <div
@@ -574,7 +574,7 @@ export default function LoginPage() {
                   }}
                 >
                   {translateUi(
-                    '\n                  When ClawChat is opened through a reverse proxy or tunnel, leaving this as the\n                  current site URL is usually correct.\n                ',
+                    '\n                  When Agent Todo is opened through a reverse proxy or tunnel, leaving this as the\n                  current site URL is usually correct.\n                ',
                   )}
                 </div>
               </>

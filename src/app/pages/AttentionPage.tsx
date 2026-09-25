@@ -64,6 +64,9 @@ export default function AttentionPage() {
           </p>
         </div>
         <div className="cc-page-header__actions">
+          <button type="button" className="cc-btn" onClick={() => navigate('/runs#cli-sessions')}>
+            {translateUi('CLI sessions')}
+          </button>
           <button type="button" className="cc-btn" onClick={() => navigate(`/runs${projectQuery}`)}>
             {translateUi('All runs')}
           </button>

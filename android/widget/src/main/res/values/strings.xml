@@ -3,9 +3,9 @@
     <string name="widget_complete_failed">Couldn’t mark complete. Retry or open the app.</string>
     <string name="widget_add_task">Add to Inbox</string>
     <string name="widget_refresh">Refresh</string>
-    <string name="widget_login_required">Set up ClawChat to use this widget</string>
+    <string name="widget_login_required">Set up Agent Todo to use this widget</string>
     <string name="widget_loading">Loading…</string>
-    <string name="widget_load_error">Couldn’t load tasks</string>
+    <string name="widget_load_error">Load failed. Tap to retry.</string>
     <string name="widget_empty">No deadlines ahead</string>
     <string name="widget_mark_done">Mark %1$s complete</string>
     <string name="widget_inbox">Inbox</string>

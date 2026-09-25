@@ -272,11 +272,11 @@ AI_MODEL=llama3.2                           # Model name
 CODEX_API_BASE_URL=https://api.openai.com/v1
 CODEX_API_KEY=                              # OPENAI_API_KEY also works
 CODEX_API_KEY_FILE=                         # Optional protected secret file
-CODEX_MODEL=gpt-5.3-codex
+CODEX_MODEL=gpt-6-sol
 CODEX_REASONING_EFFORT=medium
 
 # Local Codex CLI (optional; uses the existing `codex login`)
-CODEX_CLI_MODEL=gpt-5.6-luna                # Empty uses ~/.codex/config.toml
+CODEX_CLI_MODEL=gpt-6-luna                # Empty uses ~/.codex/config.toml
 
 # Local Claude Code CLI (optional; uses the existing `claude` login)
 CLAUDE_CODE_MODEL=sonnet                    # Empty uses the CLI's own default

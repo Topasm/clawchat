@@ -3,7 +3,7 @@
     <string name="settings_title">설정</string>
     <string name="settings_back">뒤로</string>
     <string name="settings_appearance">화면</string>
-    <string name="settings_appearance_description">이 기기에서 ClawChat이 표시되는 방식을 선택합니다.</string>
+    <string name="settings_appearance_description">이 기기에서 Agent Todo가 표시되는 방식을 선택합니다.</string>
     <string name="settings_workspace">Workspace</string>
     <string name="settings_workspace_description">작업을 저장하고 실행할 위치를 선택합니다.</string>
     <string name="settings_workspace_this_device">이 기기에서 사용</string>
@@ -83,7 +83,7 @@
     <string name="settings_value_paired_device">페어링된 기기</string>
     <string name="settings_value_pin_session">PIN 세션</string>
 
-    <string name="settings_report_header">ClawChat Android 연결 진단</string>
+    <string name="settings_report_header">Agent Todo Android 연결 진단</string>
     <string name="settings_report_server">서버: %1$s</string>
     <string name="settings_report_mode">방식: %1$s</string>
     <string name="settings_report_authentication">인증: %1$s (%2$s)</string>

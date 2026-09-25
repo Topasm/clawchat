@@ -143,7 +143,7 @@ export default function AppSettingsPage() {
                       : updateStatus === 'restarting'
                         ? translateUi('Installing update\u2026')
                         : updateStatus === 'up-to-date'
-                          ? translateUi('ClawChat is up to date')
+                          ? translateUi('Agent Todo is up to date')
                           : updateStatus === 'error'
                             ? translateUi('The last update operation failed')
                             : translateUi('Current version {{version}}', {
@@ -181,7 +181,7 @@ export default function AppSettingsPage() {
 
         <SettingsSection title={translateUi('About')}>
           <SettingsRow
-            label={translateUi('ClawChat')}
+            label={translateUi('Agent Todo')}
             sublabel={translateUi('Application version')}
           >
             <span className="cc-settings-status cc-settings-status--muted">

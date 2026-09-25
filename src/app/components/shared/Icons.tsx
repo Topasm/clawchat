@@ -9,7 +9,7 @@ export const ICON_SIZE = {
   empty: 28,
 } as const;
 
-/** Default stroke shared by ClawChat's line icons. */
+/** Default stroke shared by Agent Todo's line icons. */
 export const ICON_STROKE_WIDTH = 1.75;
 
 export interface IconProps {
@@ -25,7 +25,7 @@ interface IconBaseProps extends IconProps {
   strokeWidth?: number;
 }
 
-/** Shared geometry and accessibility contract for ClawChat's line icon set. */
+/** Shared geometry and accessibility contract for Agent Todo's line icon set. */
 export function IconBase({
   children,
   size = ICON_SIZE.feature,

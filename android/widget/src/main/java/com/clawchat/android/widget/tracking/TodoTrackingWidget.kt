@@ -211,7 +211,10 @@ private fun TodoTrackingContent(
             )
             is WidgetState.Error -> CenterMessage(
                 context.getString(R.string.widget_load_error),
-                GlanceModifier.defaultWeight(),
+                GlanceModifier
+                    .defaultWeight()
+                    .clickable(actionRunCallback<RefreshTodosAction>()),
+                maxLines = 4,
             )
             is WidgetState.Success -> {
                 if (state.data.isEmpty) {
@@ -412,6 +415,7 @@ private fun AddTaskAction() {
 private fun CenterMessage(
     text: String,
     modifier: GlanceModifier,
+    maxLines: Int = 2,
 ) {
     Box(
         modifier = modifier
@@ -425,7 +429,7 @@ private fun CenterMessage(
                 color = GlanceTheme.colors.onSurfaceVariant,
                 fontSize = 13.sp,
             ),
-            maxLines = 2,
+            maxLines = maxLines,
         )
     }
 }

@@ -30,14 +30,14 @@ export async function verifyClawChatHealth(
   }
   const data = (await response.json()) as RawHealth;
   if (data.service !== 'clawchat') {
-    throw new Error('This address is not a ClawChat workspace.');
+    throw new Error('This address is not an Agent Todo workspace.');
   }
   const apiVersion = String(data.api_version ?? '');
   if (apiVersion !== '1') {
-    throw new Error(`This ClawChat API version is not supported (${apiVersion || 'missing'}).`);
+    throw new Error(`This Agent Todo API version is not supported (${apiVersion || 'missing'}).`);
   }
   if (typeof data.host_id !== 'string' || !data.host_id) {
-    throw new Error('This ClawChat server does not expose a stable host identity.');
+    throw new Error('This Agent Todo server does not expose a stable host identity.');
   }
   if (expectedHostId && data.host_id !== expectedHostId) {
     throw new Error(

@@ -67,6 +67,95 @@
         "title": "AIConfigResponse",
         "type": "object"
       },
+      "AIModelCatalog": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "persistent": {
+            "title": "Persistent",
+            "type": "boolean"
+          },
+          "provider": {
+            "enum": [
+              "codex_cli",
+              "claude_code",
+              "codex"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "cli",
+              "api",
+              "aliases",
+              "suggestions"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "persistent",
+          "models",
+          "source"
+        ],
+        "title": "AIModelCatalog",
+        "type": "object"
+      },
+      "AIModelSelection": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "persistent": {
+            "title": "Persistent",
+            "type": "boolean"
+          },
+          "provider": {
+            "enum": [
+              "codex_cli",
+              "claude_code",
+              "codex"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "persistent"
+        ],
+        "title": "AIModelSelection",
+        "type": "object"
+      },
+      "AIModelUpdate": {
+        "properties": {
+          "model": {
+            "maxLength": 200,
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "AIModelUpdate",
+        "type": "object"
+      },
       "AIProviderResponse": {
         "properties": {
           "active_provider": {
@@ -1930,6 +2019,230 @@
           "ids"
         ],
         "title": "BulkTodoUpdate",
+        "type": "object"
+      },
+      "CLIProviderState": {
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "provider": {
+            "enum": [
+              "codex",
+              "claude"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "connected"
+        ],
+        "title": "CLIProviderState",
+        "type": "object"
+      },
+      "CLISessionActionRequest": {
+        "properties": {
+          "action": {
+            "enum": [
+              "message",
+              "stop",
+              "restart"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "CLISessionActionRequest",
+        "type": "object"
+      },
+      "CLISessionActionResponse": {
+        "properties": {
+          "accepted": {
+            "default": true,
+            "title": "Accepted",
+            "type": "boolean"
+          }
+        },
+        "title": "CLISessionActionResponse",
+        "type": "object"
+      },
+      "CLISessionDetailResponse": {
+        "properties": {
+          "output": {
+            "default": "",
+            "title": "Output",
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/CLISessionResponse"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "title": "CLISessionDetailResponse",
+        "type": "object"
+      },
+      "CLISessionListResponse": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/CLIProviderState"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/CLISessionResponse"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessions",
+          "providers"
+        ],
+        "title": "CLISessionListResponse",
+        "type": "object"
+      },
+      "CLISessionResponse": {
+        "properties": {
+          "can_read": {
+            "default": false,
+            "title": "Can Read",
+            "type": "boolean"
+          },
+          "can_restart": {
+            "default": false,
+            "title": "Can Restart",
+            "type": "boolean"
+          },
+          "can_send": {
+            "default": false,
+            "title": "Can Send",
+            "type": "boolean"
+          },
+          "can_stop": {
+            "default": false,
+            "title": "Can Stop",
+            "type": "boolean"
+          },
+          "cwd": {
+            "default": "",
+            "title": "Cwd",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "interactive",
+              "background",
+              "history"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "codex",
+              "claude"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "resume_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Command"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "waiting_input",
+              "idle",
+              "completed",
+              "failed",
+              "stopped",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "waiting_for": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting For"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "title",
+          "status",
+          "kind"
+        ],
+        "title": "CLISessionResponse",
         "type": "object"
       },
       "CalendarSubscriptionSecret": {
@@ -4412,6 +4725,117 @@
           "count"
         ],
         "title": "ModuleDataOverview",
+        "type": "object"
+      },
+      "NoteCreate": {
+        "properties": {
+          "content": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "NoteCreate",
+        "type": "object"
+      },
+      "NoteResponse": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "content",
+          "project_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NoteResponse",
+        "type": "object"
+      },
+      "NoteUpdate": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "title": "NoteUpdate",
         "type": "object"
       },
       "PaginatedResponse_AgentTaskResponse_": {
@@ -9444,7 +9868,7 @@
   },
   "info": {
     "title": "ClawChat Server",
-    "version": "1.4.25"
+    "version": "1.4.30"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -9677,6 +10101,118 @@
           }
         ],
         "summary": "Recheck Codex Api",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/ai/models/{provider}": {
+      "get": {
+        "operationId": "get_models_api_admin_ai_models__provider__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "codex_cli",
+                "claude_code",
+                "codex"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIModelCatalog"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Models",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "set_model_api_admin_ai_models__provider__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "codex_cli",
+                "claude_code",
+                "codex"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIModelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIModelSelection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Model",
         "tags": [
           "admin"
         ]
@@ -11122,6 +11658,164 @@
         ]
       }
     },
+    "/api/cli-sessions": {
+      "get": {
+        "operationId": "list_sessions_api_cli_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CLISessionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Sessions",
+        "tags": [
+          "cli-sessions"
+        ]
+      }
+    },
+    "/api/cli-sessions/{provider}/{session_id}": {
+      "get": {
+        "operationId": "read_session_api_cli_sessions__provider___session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "codex",
+                "claude"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CLISessionDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Session",
+        "tags": [
+          "cli-sessions"
+        ]
+      }
+    },
+    "/api/cli-sessions/{provider}/{session_id}/actions": {
+      "post": {
+        "operationId": "control_session_api_cli_sessions__provider___session_id__actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "codex",
+                "claude"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CLISessionActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CLISessionActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Control Session",
+        "tags": [
+          "cli-sessions"
+        ]
+      }
+    },
     "/api/events": {
       "get": {
         "operationId": "list_events_api_events_get",
@@ -12058,6 +12752,175 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/notes": {
+      "get": {
+        "operationId": "list_notes_api_notes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NoteResponse"
+                  },
+                  "title": "Response List Notes Api Notes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Notes",
+        "tags": [
+          "notes"
+        ]
+      },
+      "post": {
+        "operationId": "create_note_api_notes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Note",
+        "tags": [
+          "notes"
+        ]
+      }
+    },
+    "/api/notes/{note_id}": {
+      "delete": {
+        "operationId": "delete_note_api_notes__note_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Note",
+        "tags": [
+          "notes"
+        ]
+      },
+      "patch": {
+        "operationId": "update_note_api_notes__note_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Note",
+        "tags": [
+          "notes"
+        ]
       }
     },
     "/api/notifications/register-token": {

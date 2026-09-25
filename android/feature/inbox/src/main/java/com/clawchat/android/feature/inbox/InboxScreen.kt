@@ -30,6 +30,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -60,6 +63,7 @@ fun InboxScreen(
     onBack: () -> Unit = {},
     placementViewModel: InboxPlacementViewModel = hiltViewModel(),
 ) {
+    var showNotes by rememberSaveable { mutableStateOf(false) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val placement by placementViewModel.uiState.collectAsStateWithLifecycle()
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
@@ -71,6 +75,7 @@ fun InboxScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
+            if (!showNotes) {
             com.clawchat.android.core.ui.ClawComposer(
                         value = placement.captureText,
                         onValueChange = placementViewModel::editCapture,
@@ -85,6 +90,7 @@ fun InboxScreen(
                     if (placement.captureSaved) Text(stringResource(
                         if (placement.server) R.string.inbox_capture_saved_server else R.string.inbox_capture_saved),
                         style = MaterialTheme.typography.bodySmall)
+            }
             }
         },
         topBar = {
@@ -107,9 +113,18 @@ fun InboxScreen(
                     }
                 },
                 colors = ClawTopBarColors(),
+                actions = {
+                    TextButton(onClick = { showNotes = !showNotes }) {
+                        Text(stringResource(if (showNotes) R.string.inbox_tasks_tab else R.string.inbox_notes_tab))
+                    }
+                },
             )
         },
     ) { padding ->
+        if (showNotes) {
+            Box(Modifier.fillMaxSize().padding(padding)) { InboxNotesPanel() }
+            return@Scaffold
+        }
         PullToRefreshBox(
             isRefreshing = state.isRefreshing || placement.loading,
             onRefresh = { viewModel.refresh(); placementViewModel.refresh() },

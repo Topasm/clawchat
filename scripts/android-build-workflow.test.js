@@ -30,8 +30,23 @@ test('keeps tests, debug and release lint, installable debug output, and the rel
 
   assert.match(
     workflow,
-    /\.\/gradlew testDebugUnitTest lintDebug lintRelease assembleDebug bundleRelease --warning-mode all/,
+    /\.\/gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease bundleRelease --warning-mode all/,
   );
   assert.match(workflow, /android\/app\/build\/outputs\/apk\/debug\/app-debug\.apk/);
   assert.match(workflow, /android\/app\/build\/outputs\/bundle\/release\/app-release\.aab/);
+});
+
+test('checks widget callback constructors in optimized APKs before uploading or publishing', () => {
+  for (const [filename, apk, nextStep] of [
+    ['build-android.yml', 'app-release-unsigned.apk', 'name: Upload Android artifacts'],
+    ['release-tauri.yml', 'app-release.apk', 'name: Stage verified Android release artifacts'],
+  ]) {
+    const workflow = fs.readFileSync(path.join(path.dirname(workflowPath), filename), 'utf8');
+    const checkIndex = workflow.indexOf(
+      `bash scripts/check-android-widget-callbacks.sh android/app/build/outputs/apk/release/${apk}`,
+    );
+    const buildIndex = workflow.indexOf('./gradlew testDebugUnitTest');
+    assert.ok(buildIndex >= 0 && checkIndex > buildIndex, filename);
+    assert.ok(checkIndex < workflow.indexOf(nextStep), filename);
+  }
 });

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
+from services.ai.model_settings import MODEL_FIELDS, read_models
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,8 @@ class Settings(BaseSettings):
     # Remembers the provider picked in the app's settings screen so a restart
     # keeps it. Empty disables persistence, leaving AI_PROVIDER authoritative.
     ai_provider_file: str = ""
+    # Empty uses a sibling of AI_PROVIDER_FILE, or session-only preferences.
+    ai_models_file: str = ""
     # When the configured provider is unreachable at startup, activate any
     # other provider that is ready instead of leaving chat dead. Set false to
     # keep a deployment pinned to its configured backend.
@@ -181,16 +184,20 @@ class Settings(BaseSettings):
     codex_api_base_url: str = "https://api.openai.com/v1"
     codex_api_key: str = ""
     codex_api_key_file: str = ""
-    codex_model: str = "gpt-5.3-codex"
+    codex_model: str = "gpt-6-sol"
     codex_reasoning_effort: str = "medium"
 
     # Local Codex CLI. Empty uses the model selected in ~/.codex/config.toml.
     # Defaults to the cheaper Luna tier so background agent runs stay affordable.
-    codex_cli_model: str = "gpt-5.6-luna"
+    codex_cli_model: str = "gpt-6-luna"
 
     # Local Claude Code CLI. Empty uses the model the CLI itself defaults to;
     # "sonnet" keeps ClawChat's own calls off the pricier flagship tier.
     claude_code_model: str = "sonnet"
+
+    # Authenticated clients can inspect/control this host's existing CLI sessions.
+    cli_sessions_enabled: bool = True
+    cli_sessions_codex_socket: str = ""
 
     # Optional Paseo execution daemon. The CLI owns daemon authentication and
     # supports local, TCP, unix-socket, and E2EE offer URL targets.
@@ -294,6 +301,17 @@ class Settings(BaseSettings):
             stored = _read_ai_provider(self.ai_provider_file)
             if stored:
                 self.ai_provider = stored
+        return self
+
+    @model_validator(mode="after")
+    def resolve_ai_models(self):
+        if not self.ai_models_file and self.ai_provider_file:
+            self.ai_models_file = self.ai_provider_file + ".models.json"
+        try:
+            for provider, model in read_models(self.ai_models_file).items():
+                setattr(self, MODEL_FIELDS[provider], model)
+        except (OSError, ValueError):
+            logger.warning("Could not load saved model preferences; using configured defaults")
         return self
 
     @model_validator(mode="after")

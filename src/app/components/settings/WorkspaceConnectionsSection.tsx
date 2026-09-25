@@ -140,7 +140,7 @@ export default function WorkspaceConnectionsSection() {
       addToast(
         'success',
         translateUi(
-          enabled ? 'ClawChat will open at system login.' : 'Launch at system login disabled.',
+          enabled ? 'Agent Todo will open at system login.' : 'Launch at system login disabled.',
         ),
       );
     } catch (cause) {
@@ -408,7 +408,7 @@ export default function WorkspaceConnectionsSection() {
               <div className="cc-workspace-card__name">{translateUi('Keep available in tray')}</div>
               <div className="cc-workspace-card__description">
                 {translateUi(
-                  '\n                Keep the local server running when the ClawChat window is closed.\n              ',
+                  '\n                Keep the local server running when the Agent Todo window is closed.\n              ',
                 )}
               </div>
             </div>
@@ -529,7 +529,7 @@ export default function WorkspaceConnectionsSection() {
               <div className="cc-workspace-card__name">{translateUi('Open at system login')}</div>
               <div className="cc-workspace-card__description">
                 {translateUi(
-                  '\n                Launch ClawChat and make the local workspace available after signing in.\n              ',
+                  '\n                Launch Agent Todo and make the local workspace available after signing in.\n              ',
                 )}
               </div>
             </div>

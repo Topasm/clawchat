@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="onboarding_brand_initial" translatable="false">C</string>
-    <string name="onboarding_welcome_title">Welcome to\nClawChat</string>
-    <string name="onboarding_welcome_description">Start with a private to-do list on this device, or connect to a ClawChat server for sync and agent features.</string>
+    <string name="onboarding_brand_initial" translatable="false">AT</string>
+    <string name="onboarding_welcome_title">Welcome to\nAgent Todo</string>
+    <string name="onboarding_welcome_description">Start with a private to-do list on this device, or connect to an Agent Todo server for sync and agent features.</string>
     <string name="onboarding_use_on_this_device">Use on this device</string>
     <string name="onboarding_local_mode_description">Your data stays on this phone. Server sync and AI remain off until you connect later in Settings.</string>
     <string name="onboarding_connect_with_qr">Connect with QR code</string>
     <string name="onboarding_connect_manually">Connect manually</string>
     <string name="onboarding_connecting">Connecting…</string>
     <string name="onboarding_connect_server_title">Connect to server</string>
-    <string name="onboarding_connect_server_description">Enter the URL of your ClawChat server.</string>
+    <string name="onboarding_connect_server_description">Enter the URL of your Agent Todo server.</string>
     <string name="onboarding_server_url">Server URL</string>
     <string name="onboarding_server_url_example" translatable="false">http://192.168.1.100:8000</string>
     <string name="onboarding_server_reachable">Server is reachable</string>
@@ -18,7 +18,7 @@
     <string name="onboarding_login_with_pin_instead">Log in with PIN instead</string>
     <string name="onboarding_use_on_this_device_instead">Use on this device instead</string>
     <string name="onboarding_pair_with_desktop">Pair with desktop</string>
-    <string name="onboarding_pair_with_desktop_description">Open ClawChat on your desktop, go to Settings &gt; Devices, and generate a pairing code.</string>
+    <string name="onboarding_pair_with_desktop_description">Open Agent Todo on your desktop, go to Settings &gt; Devices, and generate a pairing code.</string>
     <string name="onboarding_pairing_code">6-digit pairing code</string>
     <string name="onboarding_pair">Pair</string>
     <string name="onboarding_back">Back</string>
@@ -28,12 +28,12 @@
     <string name="onboarding_pin">PIN</string>
     <string name="onboarding_log_in">Log in</string>
     <string name="onboarding_ready_title">You’re all set!</string>
-    <string name="onboarding_ready_description">ClawChat is ready to use.</string>
-    <string name="onboarding_enter_clawchat">Enter ClawChat</string>
+    <string name="onboarding_ready_description">Agent Todo is ready to use.</string>
+    <string name="onboarding_enter_clawchat">Enter Agent Todo</string>
     <string name="onboarding_camera_permission_required">Camera permission is required to scan QR codes.</string>
     <string name="onboarding_camera_unavailable">Couldn’t start the camera. Try again or connect manually.</string>
     <string name="onboarding_retry_camera">Try camera again</string>
-    <string name="onboarding_invalid_qr">This isn’t a ClawChat pairing QR code. Try another code.</string>
+    <string name="onboarding_invalid_qr">This isn’t an Agent Todo pairing QR code. Try another code.</string>
     <string name="onboarding_cancel">Cancel</string>
     <string name="onboarding_point_camera_at_qr">Point your camera at the QR code on your desktop</string>
     <string name="onboarding_enter_code_manually">Enter code manually</string>

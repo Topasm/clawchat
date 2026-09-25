@@ -10,6 +10,21 @@ import retrofit2.http.*
  * The auth token is added automatically by [AuthInterceptor].
  */
 interface ClawChatApi {
+    @GET("api/notes")
+    suspend fun listNotes(@Tag expectedScope: ExpectedSessionScope): List<Note>
+
+    @POST("api/notes")
+    suspend fun createNote(@Body body: NoteCreate, @Tag expectedScope: ExpectedSessionScope): Note
+
+    @PATCH("api/notes/{id}")
+    suspend fun editNote(@Path("id") id: String, @Body body: NoteContentUpdate, @Tag expectedScope: ExpectedSessionScope): Note
+
+    @PATCH("api/notes/{id}")
+    suspend fun moveNote(@Path("id") id: String, @Body body: NoteMove, @Tag expectedScope: ExpectedSessionScope): Note
+
+    @DELETE("api/notes/{id}")
+    suspend fun deleteNote(@Path("id") id: String, @Tag expectedScope: ExpectedSessionScope)
+
     @GET("api/todos/placements/review-state")
     suspend fun getInboxReview(@Tag expectedScope: ExpectedSessionScope): InboxReviewState
 

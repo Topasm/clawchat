@@ -1,4 +1,75 @@
 /* --- Agent Runs -------------------------------------------- */
+.cc-cli-sessions {
+  padding: 16px;
+  border: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
+}
+.cc-cli-sessions h2 {
+  margin: 0;
+}
+.cc-cli-sessions p {
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+}
+.cc-cli-sessions__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+.cc-cli-sessions__filters label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cc-cli-session__toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 0;
+  text-align: left;
+  color: var(--cc-text);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.cc-cli-session__toggle .cc-run-card__identity {
+  display: grid;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.cc-cli-session__toggle .cc-run-status {
+  flex-shrink: 0;
+}
+.cc-cli-session__details {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.cc-cli-session__details label {
+  display: grid;
+  gap: 8px;
+}
+.cc-cli-session__details textarea {
+  width: 100%;
+  min-height: 80px;
+}
+.cc-cli-session__details code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cc-cli-session__output {
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: var(--cc-surface-secondary);
+  font-size: 12px;
+}
 .cc-runs-page {
   display: flex;
   flex-direction: column;
