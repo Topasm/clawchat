@@ -212,11 +212,14 @@ async def test_an_expired_orm_instance_is_exactly_what_the_snapshot_avoids(
 
     with pytest.raises(BaseException) as excinfo:
         await asyncio.to_thread(_todo_to_md_line, todo)
-    assert type(excinfo.value).__name__ in {
+    # SQLAlchemy 2.1 wraps the refresh failure in StatementError; judge the
+    # underlying error.
+    error = getattr(excinfo.value, "orig", None) or excinfo.value
+    assert type(error).__name__ in {
         "MissingGreenlet",
         "InvalidRequestError",
         "DetachedInstanceError",
-    }, f"unexpected error type: {type(excinfo.value).__name__}"
+    }, f"unexpected error type: {type(error).__name__}"
 
     # And the snapshot taken while the attributes were loaded is unaffected.
     await db_session.refresh(todo)
