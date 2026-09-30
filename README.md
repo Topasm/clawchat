@@ -73,6 +73,21 @@ docker compose exec ollama ollama pull llama3.2
 
 When using the Ollama profile, set `AI_BASE_URL=http://ollama:11434` in your `.env`.
 
+### Web search for agents (SearXNG)
+
+```bash
+docker compose --profile search up -d
+```
+
+This starts a private [SearXNG](https://docs.searxng.org) instance with JSON output enabled
+(`searxng/settings.yml`). In **Settings → Agent tools**, set the web search address to
+`http://searxng:8080` when ClawChat also runs in Docker, or `http://localhost:8888` otherwise,
+and press **Test**. The Research skill can then search the web; results cite their URLs.
+
+The same settings section adds **MCP servers** (a command to start, or a URL). Their tools are
+offered to every skill. A server set to *Ask before each call* pauses the run in Attention until
+you allow or deny that call; every call is recorded on the run.
+
 ## Make Targets
 
 | Target | Description |

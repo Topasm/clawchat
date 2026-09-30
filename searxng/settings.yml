@@ -1,0 +1,15 @@
+# SearXNG for ClawChat agents (docker compose --profile search).
+# Only the differences from SearXNG's defaults are listed here.
+use_default_settings: true
+
+server:
+  # The instance serves one household; the limiter would need a Valkey
+  # service and only gets in the way of an agent's few queries.
+  limiter: false
+  image_proxy: false
+
+search:
+  # Agents read results as JSON.
+  formats:
+    - html
+    - json

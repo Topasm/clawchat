@@ -101,6 +101,12 @@ localization-only baseline to 30,851 bytes and its ceiling to 31,800 bytes (3.1 
 headroom); JavaScript and renderer core ceilings stay unchanged. The Tauri renderer is
 rebuilt and measured before accepting this change.
 
+The 2026-09-30 agent tools settings (web search and MCP servers) and the run card's tool
+approval add 39 Korean UI messages. The compressed catalogs grow from 30,851 to 31,935 bytes
+(+1,084 bytes). The localization baseline is set to 31,935 bytes with a 32,900-byte ceiling
+(3 percent headroom); JavaScript ceilings stay unchanged. The Tauri renderer is rebuilt and
+measured before accepting this change.
+
 Do not raise a threshold solely to make CI pass. Measure the new output, identify which entry or
 route owns the increase, and record an intentional baseline change in the same commit.
 

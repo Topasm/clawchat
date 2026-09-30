@@ -119,3 +119,15 @@ export {
   useObsidianFlushQueue,
   useObsidianRetryDeadLetter,
 } from './useObsidianQueries';
+export {
+  useAgentToolSettingsQuery,
+  useSaveSearxngUrl,
+  useTestSearxng,
+  useMcpServersQuery,
+  useCreateMcpServer,
+  useUpdateMcpServer,
+  useRefreshMcpServer,
+  useDeleteMcpServer,
+  useDecideToolCall,
+} from './useAgentToolQueries';
+export type { McpServerInput, ToolTrust } from './useAgentToolQueries';
