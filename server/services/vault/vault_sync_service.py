@@ -17,7 +17,7 @@ from models.task_graph_state import TaskGraphState
 from models.project import Project
 from models.todo import Todo
 from models.vault_sync_job import VaultSyncJob
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.vault.obsidian_export_service import reconcile_todos_in_vault
@@ -27,6 +27,77 @@ logger = logging.getLogger(__name__)
 _PROCESSING_LEASE = timedelta(minutes=5)
 _MAX_BATCH_SIZE = 20
 _MAX_SNAPSHOT_RECONCILE_ATTEMPTS = 3
+
+# The outbox loop only retries failures and recovers abandoned leases (new
+# jobs are delivered inline), so it sleeps until the next job is due instead of
+# querying on a fixed short tick. The floor keeps retries batched; the ceiling
+# covers anything the wake-up below misses.
+OUTBOX_MIN_WAIT_SECONDS = 15.0
+OUTBOX_MAX_WAIT_SECONDS = _PROCESSING_LEASE.total_seconds()
+_outbox_changed: asyncio.Event | None = None
+
+
+def watch_vault_outbox() -> asyncio.Event:
+    """Start a fresh watch for the outbox loop's next pass.
+
+    Arm it before processing so a wake-up during the pass is not lost. A new
+    event per pass also keeps it bound to the loop that is running.
+    """
+    global _outbox_changed
+    _outbox_changed = asyncio.Event()
+    return _outbox_changed
+
+
+def wake_vault_outbox() -> None:
+    """Have the outbox loop re-plan now, e.g. after a retry was scheduled."""
+    if _outbox_changed is not None:
+        _outbox_changed.set()
+
+
+async def wait_for_vault_outbox(watch: asyncio.Event, timeout: float) -> None:
+    """Sleep up to ``timeout`` seconds, returning early once ``watch`` is set."""
+    try:
+        await asyncio.wait_for(watch.wait(), timeout)
+    except TimeoutError:
+        pass
+
+
+async def seconds_until_next_vault_sync_job(db: AsyncSession) -> float:
+    """How long the outbox can sleep before a job becomes due, within its bounds."""
+    retry_at = (
+        await db.execute(
+            select(func.min(VaultSyncJob.available_at)).where(
+                VaultSyncJob.status.in_(
+                    [VaultSyncJobStatus.PENDING, VaultSyncJobStatus.FAILED]
+                )
+            )
+        )
+    ).scalar()
+    locked_at = (
+        await db.execute(
+            select(func.min(VaultSyncJob.locked_at)).where(
+                VaultSyncJob.status == VaultSyncJobStatus.PROCESSING
+            )
+        )
+    ).scalar()
+    await db.commit()
+    due = [
+        _as_utc(moment)
+        for moment in (
+            retry_at,
+            locked_at + _PROCESSING_LEASE if locked_at else None,
+        )
+        if moment is not None
+    ]
+    if not due:
+        return OUTBOX_MAX_WAIT_SECONDS
+    wait = (min(due) - datetime.now(timezone.utc)).total_seconds()
+    return min(max(wait, OUTBOX_MIN_WAIT_SECONDS), OUTBOX_MAX_WAIT_SECONDS)
+
+
+def _as_utc(moment: datetime) -> datetime:
+    # SQLite hands back naive datetimes for values stored in UTC.
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
 async def process_vault_sync_job(
@@ -108,6 +179,7 @@ async def process_vault_sync_job(
         )
         await _update_change_set_response(db, job, VaultSyncJobStatus.FAILED)
         await db.commit()
+        wake_vault_outbox()
         return VaultSyncJobStatus.FAILED
 
 
