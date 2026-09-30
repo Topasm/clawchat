@@ -17,12 +17,11 @@ from services.notifications import (
 )
 from services.ai.ai_service import AIService
 from ws.manager import ConnectionManager
+from ws.notifications import DEFAULT_USER_ID
 
 
 logger = logging.getLogger(__name__)
 
-# Default user ID for single-user app
-DEFAULT_USER_ID = "default"
 _VAULT_FULL_AUDIT_SECONDS = 60 * 60
 
 
@@ -271,7 +270,7 @@ class Scheduler:
                     if report.failed_run_ids or report.reminded_run_ids:
                         for module in ("runs", "reviews", "todos"):
                             await self.ws_manager.send_json(
-                                "user",
+                                DEFAULT_USER_ID,
                                 {"type": "module_data_changed", "data": {"module": module}},
                             )
                 except Exception:
