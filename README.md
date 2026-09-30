@@ -87,6 +87,14 @@ and press **Test**. The Research skill can then search the web; results cite the
 The same settings section adds **MCP servers** (a command to start, or a URL). Their tools are
 offered to every skill. A server set to *Ask before each call* pauses the run in Attention until
 you allow or deny that call; every call is recorded on the run.
+### Calendar sync (CalDAV)
+
+In **Settings → Calendar sync**, connect iCloud, Fastmail, Nextcloud, or any CalDAV server with
+an app-specific password. Checked calendars show in Schedule and count as busy time when ClawChat
+looks for free slots; their events are read-only in ClawChat. Pick one calendar under **Save
+ClawChat events to** and events you create in ClawChat are written there, and edits or deletions
+made to them in another app come back. When both sides changed the same event, the later change
+wins. Google Calendar needs OAuth and is not supported yet.
 
 ## Make Targets
 

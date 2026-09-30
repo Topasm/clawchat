@@ -12,6 +12,7 @@ export const queryKeys = {
   scheduledJobs: ['scheduled-jobs'] as const,
   agentToolSettings: ['agent-tools', 'settings'] as const,
   mcpServers: ['agent-tools', 'mcp-servers'] as const,
+  calendarAccounts: ['calendar-sync', 'accounts'] as const,
   conversations: ['conversations'] as const,
   projects: ['projects'] as const,
   project: (id: string) => ['projects', id] as const,

@@ -2303,6 +2303,199 @@
         "title": "CLISessionResponse",
         "type": "object"
       },
+      "CalendarAccountCreate": {
+        "properties": {
+          "label": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Label",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "server_url": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Server Url",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server_url",
+          "username",
+          "password"
+        ],
+        "title": "CalendarAccountCreate",
+        "type": "object"
+      },
+      "CalendarAccountListResponse": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarAccountResponse"
+            },
+            "title": "Accounts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "title": "CalendarAccountListResponse",
+        "type": "object"
+      },
+      "CalendarAccountResponse": {
+        "properties": {
+          "calendars": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarSourceResponse"
+            },
+            "title": "Calendars",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "server_url": {
+            "title": "Server Url",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "server_url",
+          "username",
+          "last_sync_at",
+          "last_error",
+          "calendars"
+        ],
+        "title": "CalendarAccountResponse",
+        "type": "object"
+      },
+      "CalendarSourceResponse": {
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "import_enabled": {
+            "title": "Import Enabled",
+            "type": "boolean"
+          },
+          "is_write_target": {
+            "title": "Is Write Target",
+            "type": "boolean"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "color",
+          "import_enabled",
+          "is_write_target",
+          "last_synced_at"
+        ],
+        "title": "CalendarSourceResponse",
+        "type": "object"
+      },
+      "CalendarSourceUpdate": {
+        "properties": {
+          "import_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Enabled"
+          },
+          "is_write_target": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Write Target"
+          }
+        },
+        "title": "CalendarSourceUpdate",
+        "type": "object"
+      },
       "CalendarSubscriptionSecret": {
         "description": "The issue/reissue response -- the only place the feed URL is returned.\n\n``url`` embeds the feed token and is therefore a bearer credential in its\nown right: anyone holding it can read every event. It is shown once.",
         "properties": {
@@ -3061,6 +3254,17 @@
       },
       "EventResponse": {
         "properties": {
+          "calendar_source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendar Source Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -3124,6 +3328,11 @@
             ],
             "title": "Occurrence Date"
           },
+          "origin": {
+            "default": "local",
+            "title": "Origin",
+            "type": "string"
+          },
           "project_id": {
             "anyOf": [
               {
@@ -3134,6 +3343,11 @@
               }
             ],
             "title": "Project Id"
+          },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
+            "type": "boolean"
           },
           "recurrence_end": {
             "anyOf": [
@@ -12319,6 +12533,220 @@
         "summary": "Websocket Ticket",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/calendar-sync/accounts": {
+      "get": {
+        "operationId": "list_accounts_api_calendar_sync_accounts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarAccountListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Accounts",
+        "tags": [
+          "calendar-sync"
+        ]
+      },
+      "post": {
+        "operationId": "connect_account_api_calendar_sync_accounts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarAccountCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarAccountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Connect Account",
+        "tags": [
+          "calendar-sync"
+        ]
+      }
+    },
+    "/api/calendar-sync/accounts/{account_id}": {
+      "delete": {
+        "operationId": "delete_account_api_calendar_sync_accounts__account_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Account",
+        "tags": [
+          "calendar-sync"
+        ]
+      }
+    },
+    "/api/calendar-sync/accounts/{account_id}/sync": {
+      "post": {
+        "operationId": "sync_now_api_calendar_sync_accounts__account_id__sync_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarAccountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Sync Now",
+        "tags": [
+          "calendar-sync"
+        ]
+      }
+    },
+    "/api/calendar-sync/calendars/{source_id}": {
+      "patch": {
+        "operationId": "update_calendar_api_calendar_sync_calendars__source_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSourceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Calendar",
+        "tags": [
+          "calendar-sync"
         ]
       }
     },

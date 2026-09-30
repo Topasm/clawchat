@@ -419,6 +419,8 @@
 
 /* Agent tools: web search and MCP servers */
 .cc-agent-tools__block {
+/* Calendar sync: connected CalDAV accounts */
+.cc-calendar-sync__block {
   display: flex;
   flex-direction: column;
   gap: var(--cc-space-1);
@@ -431,6 +433,7 @@
 }
 
 .cc-agent-tools__stack {
+.cc-calendar-sync__stack {
   display: flex;
   flex-direction: column;
   gap: var(--cc-space-2);
@@ -439,6 +442,10 @@
 }
 
 .cc-agent-tools__servers {
+  margin-top: var(--cc-space-2);
+}
+
+.cc-calendar-sync__servers {
   display: flex;
   flex-direction: column;
   gap: var(--cc-space-3);
@@ -448,6 +455,7 @@
 }
 
 .cc-agent-tools__server {
+.cc-calendar-sync__server {
   display: flex;
   flex-direction: column;
   gap: var(--cc-space-1);
@@ -479,24 +487,58 @@
 }
 
 .cc-agent-tools__note {
+.cc-calendar-sync__server-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--cc-space-2);
+}
+
+.cc-calendar-sync__calendars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+  margin: var(--cc-space-1) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cc-calendar-sync__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+  color: var(--cc-text);
+  font-size: 13px;
+}
+
+.cc-calendar-sync__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--cc-radius-pill);
+}
+
+.cc-calendar-sync__note {
   margin: 0;
   color: var(--cc-text-tertiary);
   font-size: 12px;
 }
 
 .cc-agent-tools__error {
+.cc-calendar-sync__error {
   margin: 0;
   color: var(--cc-warning);
   font-size: 12px;
 }
 
 .cc-agent-tools__form {
+.cc-calendar-sync__form {
   display: flex;
   flex-direction: column;
   gap: var(--cc-space-2);
 }
 
 .cc-agent-tools__wide {
+.cc-calendar-sync__wide {
   width: 100%;
   box-sizing: border-box;
 }

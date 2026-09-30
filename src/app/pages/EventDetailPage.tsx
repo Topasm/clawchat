@@ -112,9 +112,16 @@ export default function EventDetailPage() {
       <input
         className="cc-detail__title-input"
         value={title}
+        readOnly={event.read_only}
         onChange={(e) => handleTitleChange(e.target.value)}
         placeholder={translateUi('Event title')}
       />
+
+      {event.read_only && (
+        <p className="cc-page-header__subtitle">
+          {translateUi('From a connected calendar. Change it in that calendar.')}
+        </p>
+      )}
 
       <div className="cc-detail__field">
         <span className="cc-detail__field-label">{translateUi('Start')}</span>
@@ -135,13 +142,15 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      <button
-        type="button"
-        className="cc-btn cc-btn--danger cc-detail__delete-btn"
-        onClick={handleDelete}
-      >
-        {translateUi('\n        Delete Event\n      ')}
-      </button>
+      {!event.read_only && (
+        <button
+          type="button"
+          className="cc-btn cc-btn--danger cc-detail__delete-btn"
+          onClick={handleDelete}
+        >
+          {translateUi('\n        Delete Event\n      ')}
+        </button>
+      )}
 
       {showDeleteMode && (
         <div className="cc-detail__delete-mode">

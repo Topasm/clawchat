@@ -138,3 +138,10 @@ export type { ScheduledJobInput } from './useScheduledJobQueries';
   useDecideToolCall,
 } from './useAgentToolQueries';
 export type { McpServerInput, ToolTrust } from './useAgentToolQueries';
+  useCalendarAccountsQuery,
+  useConnectCalendarAccount,
+  useDeleteCalendarAccount,
+  useSyncCalendarAccount,
+  useUpdateCalendarSource,
+} from './useCalendarSyncQueries';
+export type { CalendarAccountInput } from './useCalendarSyncQueries';
