@@ -9,6 +9,7 @@ export const queryKeys = {
   planProposal: (proposalId: string) => ['plan-proposals', 'detail', proposalId] as const,
   events: ['events'] as const,
   calendarSubscription: ['calendar-subscription'] as const,
+  calendarAccounts: ['calendar-sync', 'accounts'] as const,
   conversations: ['conversations'] as const,
   projects: ['projects'] as const,
   project: (id: string) => ['projects', id] as const,

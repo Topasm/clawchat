@@ -1353,4 +1353,41 @@ export const koreanUiTranslations: Record<string, string> = {
   'My Linux machine': '내 Linux 머신',
   'Steps live under this task; ask the agent to add, plan, or run them.':
     '이 작업 아래에 단계가 쌓입니다. 에이전트에게 추가·계획·실행을 요청하세요.',
+  'App password': '앱 비밀번호',
+  'CalDAV server address': 'CalDAV 서버 주소',
+  'Calendar account connected': '캘린더 계정을 연결했습니다',
+  'Calendar account removed': '캘린더 계정을 삭제했습니다',
+  'Calendar provider': '캘린더 제공자',
+  'Checked calendars show in Schedule and count as busy when finding free time. Their events are read-only here.':
+    '선택한 캘린더는 일정에 표시되고 빈 시간을 찾을 때 바쁜 시간으로 계산됩니다. 이 일정들은 여기서 수정할 수 없습니다.',
+  'Connect a calendar': '캘린더 연결',
+  'Connected calendars': '연결된 캘린더',
+  'Could not connect the calendar account.': '캘린더 계정을 연결하지 못했습니다.',
+  'Could not remove the calendar account.': '캘린더 계정을 삭제하지 못했습니다.',
+  'Could not sync the calendar account.': '캘린더를 동기화하지 못했습니다.',
+  'Could not update the calendar.': '캘린더 설정을 바꾸지 못했습니다.',
+  'Events you create in ClawChat are copied there, and changes made there come back.':
+    'ClawChat에서 만든 일정이 그 캘린더에 복사되고, 그곳에서 바꾼 내용도 다시 반영됩니다.',
+  'From a connected calendar. Change it in that calendar.':
+    '연결된 캘린더의 일정입니다. 해당 캘린더에서 수정하세요.',
+  'https://caldav.example.com/': 'https://caldav.example.com/',
+  'Keep them in ClawChat only': 'ClawChat에만 보관',
+  'Last synced {{time}}': '마지막 동기화 {{time}}',
+  'Not synced yet': '아직 동기화하지 않음',
+  'Save ClawChat events to': 'ClawChat 일정 저장 위치',
+  'Syncing…': '동기화 중…',
+  'Sync now': '지금 동기화',
+  Username: '사용자 이름',
+  iCloud: 'iCloud',
+  Fastmail: 'Fastmail',
+  Nextcloud: 'Nextcloud',
+  'Other CalDAV server': '다른 CalDAV 서버',
+  'Use your Apple ID email and an app-specific password from account.apple.com.':
+    'Apple ID 이메일과 account.apple.com에서 만든 앱 암호를 사용하세요.',
+  'Use your Fastmail address and an app password with calendar access.':
+    'Fastmail 주소와 캘린더 접근 권한이 있는 앱 비밀번호를 사용하세요.',
+  'Replace the host with yours and use an app password from Settings > Security.':
+    '호스트를 내 서버 주소로 바꾸고, 설정 > 보안에서 만든 앱 비밀번호를 사용하세요.',
+  'Any CalDAV server address, such as Radicale or Baikal.':
+    'Radicale, Baikal 같은 CalDAV 서버 주소를 입력하세요.',
 };

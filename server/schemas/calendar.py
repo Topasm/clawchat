@@ -48,6 +48,10 @@ class EventResponse(BaseModel):
     occurrence_date: str | None = None
     recurring_event_id: str | None = None
     tags: list[str] | None = None
+    # "remote" events come from a connected calendar and are read-only here.
+    origin: str = "local"
+    calendar_source_id: str | None = None
+    read_only: bool = False
     created_at: datetime
     updated_at: datetime
 

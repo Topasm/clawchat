@@ -627,6 +627,9 @@ export const EventResponseSchema = z.object({
   occurrence_date: z.string().nullable().optional(),
   recurring_event_id: z.string().nullable().optional(),
   tags: z.array(z.string()).nullable().optional(),
+  origin: z.string().optional(),
+  calendar_source_id: z.string().nullable().optional(),
+  read_only: z.boolean().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -1477,3 +1480,30 @@ export const ObsidianScanResultSchema = z.object({
 
 export type ObsidianHealth = z.infer<typeof ObsidianHealthSchema>;
 export type ObsidianScanResult = z.infer<typeof ObsidianScanResultSchema>;
+
+// CalDAV calendar sync.
+export const CalendarSourceResponseSchema = z.object({
+  id: z.string(),
+  display_name: z.string(),
+  color: z.string().nullable(),
+  import_enabled: z.boolean(),
+  is_write_target: z.boolean(),
+  last_synced_at: z.string().nullable(),
+});
+
+export const CalendarAccountResponseSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  server_url: z.string(),
+  username: z.string(),
+  last_sync_at: z.string().nullable(),
+  last_error: z.string().nullable(),
+  calendars: z.array(CalendarSourceResponseSchema),
+});
+
+export const CalendarAccountListResponseSchema = z.object({
+  accounts: z.array(CalendarAccountResponseSchema),
+});
+
+export type CalendarAccount = z.infer<typeof CalendarAccountResponseSchema>;
+export type CalendarSource = z.infer<typeof CalendarSourceResponseSchema>;

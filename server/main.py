@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
 from routers import note as note_router
+from routers import calendar_sync as calendar_sync_router
 from routers import ai_models as ai_models_router
 from routers import agent_run as agent_run_router
 from routers import attachment as attachment_router
@@ -151,6 +152,13 @@ async def lifespan(app: FastAPI):
     else:
         app.state.scheduler = None
 
+    # Connected calendars sync whether or not the feature scheduler runs.
+    from services.calendar.calendar_sync_service import sync_loop as calendar_sync_loop
+
+    app.state.calendar_sync_task = asyncio.create_task(
+        calendar_sync_loop(async_session_factory), name="calendar-sync"
+    )
+
     # Outbox recovery is independent of the optional feature scheduler. This
     # also resolves jobs as succeeded when no Vault is configured.
     app.state.vault_outbox_task = asyncio.create_task(
@@ -175,6 +183,9 @@ async def lifespan(app: FastAPI):
     if app.state.scheduler:
         await app.state.scheduler.stop()
 
+    app.state.calendar_sync_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await app.state.calendar_sync_task
     app.state.vault_outbox_task.cancel()
     with suppress(asyncio.CancelledError):
         await app.state.vault_outbox_task
@@ -266,6 +277,9 @@ app.include_router(obsidian_router.router, prefix="/api/obsidian", tags=["obsidi
 app.include_router(pairing_router.router, prefix="/api/pairing", tags=["pairing"])
 app.include_router(capabilities_router.router, prefix="/api/capabilities", tags=["capabilities"])
 app.include_router(voice_router.router, prefix="/api/voice", tags=["voice"])
+app.include_router(
+    calendar_sync_router.router, prefix="/api/calendar-sync", tags=["calendar-sync"]
+)
 
 app.websocket("/ws")(websocket_endpoint)
 

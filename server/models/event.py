@@ -45,10 +45,24 @@ class Event(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
     tags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array
+    # --- Calendar sync (CalDAV) ---
+    # "local": made in ClawChat (pushed to the write calendar when one is set).
+    # "remote": imported from a connected calendar; read-only here.
+    origin: Mapped[str] = mapped_column(String, nullable=False, default="local", server_default="local")
+    # No database-level foreign key: adding one would mean rebuilding the
+    # events table, which other tables reference. The sync service removes an
+    # imported event together with its calendar.
+    calendar_source_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_uid: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # For one occurrence of an imported series: that occurrence's original start.
+    external_recurrence_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_href: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_etag: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("idx_events_start_time", "start_time"),
         Index("idx_events_project_id", "project_id"),
         Index("idx_events_end_time", "end_time"),
         Index("idx_events_conversation_id", "conversation_id"),
+        Index("idx_events_calendar_source_id", "calendar_source_id"),
     )

@@ -12,6 +12,7 @@ from exceptions import NotFoundError
 from models.event import Event
 from models.project import Project
 from models.todo import Todo
+from services.calendar import calendar_sync_service
 from services.calendar.recurrence_service import generate_occurrences
 from utils import apply_model_updates, make_id, serialize_tags
 
@@ -116,11 +117,13 @@ async def create_event(
     )
     db.add(event)
     await db.flush()
+    await calendar_sync_service.queue_push(db, event)
     return event
 
 
 async def update_event(db: AsyncSession, event_id: str, **updates) -> Event:
     event = await get_event(db, event_id)
+    calendar_sync_service.ensure_editable(event)
     if (
         "project_id" in updates
         and updates["project_id"] is not None
@@ -129,11 +132,14 @@ async def update_event(db: AsyncSession, event_id: str, **updates) -> Event:
         raise NotFoundError(f"Project {updates['project_id']} not found")
     apply_model_updates(event, updates)
     await db.flush()
+    await calendar_sync_service.queue_push(db, event)
     return event
 
 
 async def delete_event(db: AsyncSession, event_id: str) -> None:
     event = await get_event(db, event_id)
+    calendar_sync_service.ensure_editable(event)
+    await calendar_sync_service.queue_delete(db, event)
     await db.delete(event)
     await db.flush()
 
@@ -148,8 +154,10 @@ async def delete_event_occurrence(
           'all' — deletes entire series
     """
     event = await get_event(db, event_id)
+    calendar_sync_service.ensure_editable(event)
 
     if mode == "all":
+        await calendar_sync_service.queue_delete(db, event)
         await db.delete(event)
         await db.flush()
         return
@@ -163,6 +171,7 @@ async def delete_event_occurrence(
         event.recurrence_end = occ_dt - timedelta(microseconds=1)
         event.updated_at = datetime.now(timezone.utc)
         await db.flush()
+        await calendar_sync_service.queue_push(db, event)
         return
 
     # mode == "this_only" — add to exceptions
@@ -177,6 +186,7 @@ async def delete_event_occurrence(
     event.recurrence_exceptions = json.dumps(exceptions)
     event.updated_at = datetime.now(timezone.utc)
     await db.flush()
+    await calendar_sync_service.queue_push(db, event)
 
 
 def _utc(moment: datetime) -> datetime:
@@ -186,9 +196,74 @@ def _utc(moment: datetime) -> datetime:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
+def event_to_vevent(event: Event, *, uid: str | None = None) -> ICalEvent:
+    """One ClawChat event as a VEVENT, for the feed and for calendar sync."""
+    vevent = ICalEvent()
+    vevent.add("uid", uid or event.id)
+    vevent.add("summary", event.title)
+    vevent.add("dtstamp", datetime.now(timezone.utc))
+
+    if event.is_all_day:
+        vevent.add("dtstart", event.start_time.date())
+        if event.end_time:
+            vevent.add("dtend", event.end_time.date())
+    else:
+        vevent.add("dtstart", _utc(event.start_time))
+        if event.end_time:
+            vevent.add("dtend", _utc(event.end_time))
+
+    if event.description:
+        vevent.add("description", event.description)
+    if event.location:
+        vevent.add("location", event.location)
+
+    if event.recurrence_rule:
+        # recurrence_rule is stored as an RRULE string like "FREQ=WEEKLY;BYDAY=MO"
+        params: dict[str, str | list[str]] = {}
+        for part in event.recurrence_rule.split(";"):
+            if "=" not in part:
+                continue
+            key, val = part.split("=", 1)
+            # BYDAY etc. can have multiple values
+            if "," in val:
+                params[key] = val.split(",")
+            else:
+                params[key] = val
+        vevent.add("rrule", params)
+
+    if event.recurrence_exceptions:
+        try:
+            exception_dates = json.loads(event.recurrence_exceptions)
+            for exc_date_str in exception_dates:
+                exc_dt = datetime.fromisoformat(exc_date_str)
+                if event.is_all_day:
+                    vevent.add("exdate", exc_dt.date())
+                else:
+                    if exc_dt.tzinfo is None:
+                        exc_dt = exc_dt.replace(tzinfo=timezone.utc)
+                    vevent.add("exdate", exc_dt)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if event.reminder_minutes is not None:
+        alarm = Alarm()
+        alarm.add("action", "DISPLAY")
+        alarm.add("description", f"Reminder: {event.title}")
+        alarm.add("trigger", timedelta(minutes=-event.reminder_minutes))
+        vevent.add_component(alarm)
+
+    vevent.add("created", _utc(event.created_at))
+    vevent.add("last-modified", _utc(event.updated_at))
+    return vevent
+
+
 async def export_events_ical(db: AsyncSession) -> str:
-    """Export the calendar -- events and task deadlines -- as an iCalendar string."""
-    q = select(Event).order_by(Event.start_time.asc())
+    """Export the calendar -- events and task deadlines -- as an iCalendar string.
+
+    Events imported from a connected calendar are left out: whoever subscribes
+    to this feed already has them in that calendar.
+    """
+    q = select(Event).where(Event.origin != "remote").order_by(Event.start_time.asc())
     rows = (await db.execute(q)).scalars().all()
 
     cal = Calendar()
@@ -197,64 +272,7 @@ async def export_events_ical(db: AsyncSession) -> str:
     cal.add("calscale", "GREGORIAN")
 
     for event in rows:
-        vevent = ICalEvent()
-        vevent.add("uid", event.id)
-        vevent.add("summary", event.title)
-        vevent.add("dtstamp", datetime.now(timezone.utc))
-
-        if event.is_all_day:
-            vevent.add("dtstart", event.start_time.date())
-            if event.end_time:
-                vevent.add("dtend", event.end_time.date())
-        else:
-            vevent.add("dtstart", _utc(event.start_time))
-            if event.end_time:
-                vevent.add("dtend", _utc(event.end_time))
-
-        if event.description:
-            vevent.add("description", event.description)
-        if event.location:
-            vevent.add("location", event.location)
-
-        if event.recurrence_rule:
-            # recurrence_rule is stored as an RRULE string like "FREQ=WEEKLY;BYDAY=MO"
-            params: dict[str, str | list[str]] = {}
-            for part in event.recurrence_rule.split(";"):
-                if "=" not in part:
-                    continue
-                key, val = part.split("=", 1)
-                # BYDAY etc. can have multiple values
-                if "," in val:
-                    params[key] = val.split(",")
-                else:
-                    params[key] = val
-            vevent.add("rrule", params)
-
-        if event.recurrence_exceptions:
-            try:
-                exception_dates = json.loads(event.recurrence_exceptions)
-                for exc_date_str in exception_dates:
-                    exc_dt = datetime.fromisoformat(exc_date_str)
-                    if event.is_all_day:
-                        vevent.add("exdate", exc_dt.date())
-                    else:
-                        if exc_dt.tzinfo is None:
-                            exc_dt = exc_dt.replace(tzinfo=timezone.utc)
-                        vevent.add("exdate", exc_dt)
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        if event.reminder_minutes is not None:
-            alarm = Alarm()
-            alarm.add("action", "DISPLAY")
-            alarm.add("description", f"Reminder: {event.title}")
-            alarm.add("trigger", timedelta(minutes=-event.reminder_minutes))
-            vevent.add_component(alarm)
-
-        vevent.add("created", _utc(event.created_at))
-        vevent.add("last-modified", _utc(event.updated_at))
-
-        cal.add_component(vevent)
+        cal.add_component(event_to_vevent(event))
 
     for todo in await _open_deadlines(db):
         cal.add_component(_deadline_vevent(todo))

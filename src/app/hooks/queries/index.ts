@@ -119,3 +119,11 @@ export {
   useObsidianFlushQueue,
   useObsidianRetryDeadLetter,
 } from './useObsidianQueries';
+export {
+  useCalendarAccountsQuery,
+  useConnectCalendarAccount,
+  useDeleteCalendarAccount,
+  useSyncCalendarAccount,
+  useUpdateCalendarSource,
+} from './useCalendarSyncQueries';
+export type { CalendarAccountInput } from './useCalendarSyncQueries';
