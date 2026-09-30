@@ -316,6 +316,8 @@ app.include_router(capabilities_router.router, prefix="/api/capabilities", tags=
 app.include_router(voice_router.router, prefix="/api/voice", tags=["voice"])
 app.include_router(
     scheduled_jobs_router.router, prefix="/api/scheduled-jobs", tags=["scheduled-jobs"]
+)
+app.include_router(
     calendar_sync_router.router, prefix="/api/calendar-sync", tags=["calendar-sync"]
 )
 

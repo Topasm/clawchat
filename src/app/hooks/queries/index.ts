@@ -127,6 +127,7 @@ export {
   useRunScheduledJobNow,
 } from './useScheduledJobQueries';
 export type { ScheduledJobInput } from './useScheduledJobQueries';
+export {
   useAgentToolSettingsQuery,
   useSaveSearxngUrl,
   useTestSearxng,
@@ -138,6 +139,7 @@ export type { ScheduledJobInput } from './useScheduledJobQueries';
   useDecideToolCall,
 } from './useAgentToolQueries';
 export type { McpServerInput, ToolTrust } from './useAgentToolQueries';
+export {
   useCalendarAccountsQuery,
   useConnectCalendarAccount,
   useDeleteCalendarAccount,

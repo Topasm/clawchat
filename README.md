@@ -87,6 +87,7 @@ and press **Test**. The Research skill can then search the web; results cite the
 The same settings section adds **MCP servers** (a command to start, or a URL). Their tools are
 offered to every skill. A server set to *Ask before each call* pauses the run in Attention until
 you allow or deny that call; every call is recorded on the run.
+
 ### Calendar sync (CalDAV)
 
 In **Settings → Calendar sync**, connect iCloud, Fastmail, Nextcloud, or any CalDAV server with

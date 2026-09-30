@@ -101,18 +101,13 @@ localization-only baseline to 30,851 bytes and its ceiling to 31,800 bytes (3.1 
 headroom); JavaScript and renderer core ceilings stay unchanged. The Tauri renderer is
 rebuilt and measured before accepting this change.
 
-The 2026-09-30 Automations page (scheduled AI jobs) adds a lazily loaded route, its editor, and
-54 Korean UI messages. The compressed catalogs grow from 30,851 to 32,159 bytes (+1,308 bytes)
-and all renderer JavaScript from 2,184,964 to 2,200,558 bytes (+15,594 bytes); the initial HTML
-JavaScript is unchanged because the page loads on demand. The localization baseline is set to
-32,159 bytes with a 33,200-byte ceiling and the all-JavaScript baseline to 2,200,558 bytes with a
-2,266,600-byte ceiling (3 percent headroom each). The Tauri renderer is rebuilt and measured
-before accepting this change.
-The 2026-09-30 agent tools settings (web search and MCP servers) and the run card's tool
-approval add 39 Korean UI messages. The compressed catalogs grow from 30,851 to 31,935 bytes
-(+1,084 bytes). The localization baseline is set to 31,935 bytes with a 32,900-byte ceiling
-(3 percent headroom); JavaScript ceilings stay unchanged. The Tauri renderer is rebuilt and
-measured before accepting this change.
+The v1.4.31 release combines React 19.3, the Automations page (scheduled AI jobs), agent tools
+settings with tool approval on run cards, and calendar sync settings. Measured on the Tauri
+renderer build of that tree: initial HTML JavaScript 342,839 bytes (109,154 gzip), all renderer
+JavaScript 2,272,480 bytes, renderer core files 2,482,569 bytes, and compressed localization
+catalogs 33,990 bytes (from 30,851 at v1.4.30, for about 120 new Korean UI messages). Each metric's
+baseline is set to that measurement with 3 percent headroom for its ceiling. The new pages load
+on demand, so the initial JavaScript growth is React 19.3's larger client.
 
 Do not raise a threshold solely to make CI pass. Measure the new output, identify which entry or
 route owns the increase, and record an intentional baseline change in the same commit.
