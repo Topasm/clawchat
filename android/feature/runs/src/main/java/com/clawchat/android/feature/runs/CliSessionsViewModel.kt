@@ -35,14 +35,14 @@ data class CliSessionsState(
      */
     val pollIntervalMillis: Long
         get() = if (listing?.sessions.orEmpty().any { it.isActive } || selected?.isActive == true) {
-            ACTIVE_POLL_INTERVAL_MS
+            CLI_SESSIONS_ACTIVE_POLL_MS
         } else {
-            IDLE_POLL_INTERVAL_MS
+            CLI_SESSIONS_IDLE_POLL_MS
         }
 }
 
-internal const val ACTIVE_POLL_INTERVAL_MS = 5_000L
-internal const val IDLE_POLL_INTERVAL_MS = 30_000L
+internal const val CLI_SESSIONS_ACTIVE_POLL_MS = 5_000L
+internal const val CLI_SESSIONS_IDLE_POLL_MS = 30_000L
 
 private val CliSession.isActive: Boolean
     get() = status == "running" || status == "waiting_input"
