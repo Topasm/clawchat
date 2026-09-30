@@ -9,6 +9,11 @@
   z-index: 90;
 }
 
+/* Clears the collapsed chat bar as well as the tabs. */
+.cc-fab--above-chat {
+  bottom: calc(132px + env(safe-area-inset-bottom));
+}
+
 .cc-fab__button {
   width: 56px;
   height: 56px;

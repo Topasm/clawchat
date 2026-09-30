@@ -25,6 +25,17 @@
   align-items: center;
 }
 
+.cc-page-header__actions > .cc-btn {
+  white-space: nowrap;
+}
+
+/* On a phone the header's links would squeeze the title into a column;
+   they go under it instead. */
+.cc-root--mobile .cc-review-page__header {
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* Attention page: sections of what has stopped for the user */
 .cc-attention-section {
   margin-top: 16px;
@@ -96,22 +107,18 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  color: var(--cc-text-tertiary);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
 }
 .cc-review-card__topline time {
   margin-left: auto;
-  text-transform: none;
-  letter-spacing: normal;
 }
 .cc-review-card__risk {
   padding: 2px 6px;
   border-radius: var(--cc-radius-pill);
   background: color-mix(in srgb, var(--cc-warning) 12%, transparent);
   color: var(--cc-warning);
-  font-weight: 700;
+  font-weight: 600;
 }
 .cc-review-card__risk--low {
   background: color-mix(in srgb, var(--cc-success) 12%, transparent);
@@ -163,6 +170,20 @@
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  outline: none;
+}
+.cc-review-card__decision textarea:focus-visible {
+  border-color: var(--cc-primary);
+}
+.cc-review-card__decision textarea::placeholder {
+  color: var(--cc-text-tertiary);
 }
 .cc-review-card__actions {
   display: flex;

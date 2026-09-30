@@ -56,8 +56,8 @@ export default function AttentionPage() {
     <div className="cc-review-page cc-attention-page">
       <header className="cc-page-header cc-review-page__header">
         <div>
-          <h1>{translateUi('Attention')}</h1>
-          <p>
+          <h1 className="cc-page-header__title">{translateUi('Attention')}</h1>
+          <p className="cc-page-header__subtitle">
             {translateUi(
               'Questions from agents, results to review, and runs that need a decision.',
             )}
