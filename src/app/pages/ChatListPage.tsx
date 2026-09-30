@@ -225,8 +225,10 @@ export default function ChatListPage() {
                     {totalCount > 0 && (
                       <span className="cc-project-card__tasks">
                         <CheckIcon size={14} />
-                        {meta?.openCount ?? 0}/{totalCount}
-                        {translateUi(' tasks\n                    ')}
+                        {translateUi('{{done}}/{{total}} done', {
+                          done: completedCount,
+                          total: totalCount,
+                        })}
                       </span>
                     )}
                     {meta?.nextDue && <Badge variant="due" dueDate={meta.nextDue} />}

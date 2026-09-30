@@ -8,13 +8,13 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from domain.graph_insights import GraphDueRisk, GraphScopeRole
+from domain.graph_insights import GraphDueRisk
 from domain.task import TaskStatus
 from exceptions import ValidationError
 from models.project import Project
 from models.todo import Todo
 from schemas.graph_insights import GraphInsightNode
-from services.tasks.graph_insights_service import get_graph_insights
+from services.tasks.graph_insights_service import get_graph_insights, project_work_insights
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,26 +61,33 @@ async def build_task_snapshot(
     since = since or now - DEFAULT_LOOKBACK
     scope = f'project "{project.title}"' if project else "all tasks"
     header = f"# Task snapshot: {scope}, as of {_when(now, zone)}"
-    if project is not None and project.root_task_id is None:
-        return f"{header}\n\nThis project has no tasks yet."
     try:
-        insights = await get_graph_insights(
-            db,
-            root_task_id=project.root_task_id if project else None,
-            generated_at=now,
-        )
+        if project is not None:
+            insights, work = await project_work_insights(
+                db,
+                project_id=project.id,
+                root_task_id=project.root_task_id,
+                generated_at=now,
+            )
+        else:
+            insights = await get_graph_insights(db, generated_at=now)
+            # A project's root stands for the project, not a piece of work.
+            roots = set(
+                (
+                    await db.execute(
+                        select(Project.root_task_id).where(Project.root_task_id.isnot(None))
+                    )
+                ).scalars()
+            )
+            work = [
+                node
+                for node in insights.nodes
+                if not node.is_container and node.task_id not in roots
+            ]
     except ValidationError:
         return f"{header}\n\nThere are too many tasks to summarize here."
 
     titles = {node.task_id: node.title for node in insights.nodes}
-    # Context nodes are outside prerequisites: named as blockers, not listed.
-    work = [
-        node
-        for node in insights.nodes
-        if node.scope_role != GraphScopeRole.CONTEXT
-        and node.scope_role != GraphScopeRole.ROOT
-        and not node.is_container
-    ]
 
     in_progress = [
         _line(node, zone) for node in work if node.status == TaskStatus.IN_PROGRESS
@@ -119,14 +126,16 @@ async def build_task_snapshot(
     ).all()
     completed = [f"- {title} ({_when(done, zone)})" for title, done in completed_rows]
 
-    summary = insights.summary
+    open_work = [
+        node for node in work if node.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
+    ]
     lines = [
         header,
         "",
         (
-            f"{summary.active_count} open: {summary.in_progress_count} in progress, "
-            f"{summary.ready_count} ready, {summary.blocked_count} blocked, "
-            f"{summary.overdue_count} overdue, {summary.at_risk_count} at risk."
+            f"{len(open_work)} open: {len(in_progress)} in progress, "
+            f"{len(ready)} ready, {len(blocked)} blocked, "
+            f"{len(overdue)} overdue, {len(at_risk)} at risk."
         ),
         "",
         *_section("In progress", in_progress),
