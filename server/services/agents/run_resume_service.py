@@ -54,6 +54,10 @@ async def resume_with_follow_up(
     """
     if run.status != AgentRunStatus.WAITING_INPUT:
         raise ConflictError(f"Agent run cannot be resumed from {run.status}")
+    from services.tools import approvals
+
+    if approvals.pending_call_for_run(run.id):
+        raise ConflictError("Allow or deny the tool the agent asked to use first")
     follow_up = follow_up.strip()
     if not follow_up:
         raise ConflictError("A follow-up instruction is required to resume")

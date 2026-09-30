@@ -201,6 +201,61 @@ class CodexAPIProvider:
             ]
         }
 
+    async def tool_turn(self, *, system_prompt: str, transcript: list[dict], tools: list[dict]):
+        """One step of a tool-calling loop over the Responses API.
+
+        Nothing is stored server side (``store: false``), so each step replays
+        the whole exchange, including the previous turns' output items and
+        their encrypted reasoning.
+        """
+        from services.tools.tool_loop import AssistantTurn, ToolCallRequest, parse_arguments
+
+        items: list[dict] = []
+        for entry in transcript:
+            if entry["role"] == "assistant":
+                if entry.get("raw"):
+                    items.extend(entry["raw"])
+                else:
+                    items.extend(
+                        {
+                            "type": "function_call",
+                            "call_id": call.id,
+                            "name": call.name,
+                            "arguments": json.dumps(call.arguments),
+                        }
+                        for call in entry["tool_calls"]
+                    )
+            elif entry["role"] == "tool":
+                items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": entry["tool_call_id"],
+                        "output": entry["content"],
+                    }
+                )
+            else:
+                items.append({"role": "user", "content": entry["content"]})
+        payload = self._base_payload(input=items, include=["reasoning.encrypted_content"])
+        if system_prompt:
+            payload["instructions"] = system_prompt
+        response_tools = [t for t in (_responses_tool(tool) for tool in tools) if t is not None]
+        if response_tools:
+            payload["tools"] = response_tools
+            payload["tool_choice"] = "auto"
+            payload["parallel_tool_calls"] = False
+        response = await self._post_response(payload)
+        output = [item for item in response.get("output", []) if isinstance(item, dict)]
+        calls = [
+            ToolCallRequest(
+                id=item.get("call_id") or item.get("id") or f"call_{index}",
+                name=item["name"],
+                arguments=parse_arguments(item.get("arguments")),
+            )
+            for index, item in enumerate(output)
+            if item.get("type") == "function_call" and isinstance(item.get("name"), str)
+        ]
+        return AssistantTurn(content=_output_text(response) or None, tool_calls=calls, raw=output)
+
     async def close(self) -> None:
         if self._owns_client:
             await self.client.aclose()

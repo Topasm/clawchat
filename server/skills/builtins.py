@@ -58,7 +58,7 @@ _BUILTINS: list[SkillDef] = [
             "The document should include:\n"
             "- Executive summary\n"
             "- Key findings organized by topic\n"
-            "- Relevant references or resources\n"
+            "- Relevant references or resources (cite the URLs you used)\n"
             "- Recommended next steps\n"
             "- Open questions\n\n"
             "Format as clean markdown suitable for an Obsidian vault."
@@ -66,6 +66,7 @@ _BUILTINS: list[SkillDef] = [
         output_format="markdown",
         vault_template="{project}/Research/{title}_{date}.md",
         tags=["analysis"],
+        uses_web_search=True,
     ),
     # -- Summarize -------------------------------------------------------
     SkillDef(

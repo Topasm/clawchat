@@ -123,6 +123,12 @@ def main() -> None:
             "watchfiles",
             "--collect-submodules",
             "jose",
+            # The MCP SDK picks transports and protocol-era handlers at run
+            # time; agent tools need them in the frozen server.
+            "--collect-submodules",
+            "mcp",
+            "--collect-submodules",
+            "mcp_types",
             # ``init_db`` runs ``alembic upgrade head`` at startup, so the
             # revision scripts and env.py must travel with the binary, and
             # Alembic resolves its dialect implementations lazily.

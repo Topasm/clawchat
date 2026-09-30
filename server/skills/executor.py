@@ -19,7 +19,6 @@ from models.agent_task import AgentTask
 from models.todo import Todo
 from services.ai.ai_service import AIService
 from services.agents.agent_task_service import (
-    generate_agent_turn,
     mark_completed,
     mark_failed,
     mark_running,
@@ -27,6 +26,7 @@ from services.agents.agent_task_service import (
     update_progress,
 )
 from services.agents.run_context_service import active_execution_instruction
+from services.tools.agent_turns import generate_skill_turn
 from skills import SKILL_REGISTRY, get_skill
 from ws.manager import ConnectionManager
 
@@ -136,8 +136,11 @@ async def execute_skill_chain(
             )
             await db.commit()
 
-            result, input_request = await generate_agent_turn(
+            result, input_request = await generate_skill_turn(
+                db,
+                task,
                 ai_service,
+                skill_id=skill_id,
                 system_prompt=skill.system_prompt,
                 user_message=user_msg,
             )
