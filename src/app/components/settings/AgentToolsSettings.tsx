@@ -278,12 +278,14 @@ export default function AgentToolsSettings() {
   return (
     <SettingsSection title={t('workspaceSettings.sections.agentTools')} id="agent-tools">
       <WebSearchRow />
-      <SettingsRow
-        label={translateUi('MCP servers')}
-        sublabel={translateUi(
-          'Their tools are offered to every skill. Servers set to ask pause the run in Attention until you allow each call.',
-        )}
-      >
+      {/* A full-width block: the server list does not fit a label/control row. */}
+      <div className="cc-agent-tools__block">
+        <div className="cc-settings-row__label">{translateUi('MCP servers')}</div>
+        <div className="cc-settings-row__sublabel">
+          {translateUi(
+            'Their tools are offered to every skill. Servers set to ask pause the run in Attention until you allow each call.',
+          )}
+        </div>
         <div className="cc-agent-tools__stack">
           {servers.length > 0 && (
             <ul className="cc-agent-tools__servers">
@@ -295,16 +297,18 @@ export default function AgentToolsSettings() {
           {adding ? (
             <AddServerForm onDone={() => setAdding(false)} />
           ) : (
-            <button
-              type="button"
-              className="cc-btn cc-btn--compact"
-              onClick={() => setAdding(true)}
-            >
-              {translateUi('Add MCP server')}
-            </button>
+            <div>
+              <button
+                type="button"
+                className="cc-btn cc-btn--compact"
+                onClick={() => setAdding(true)}
+              >
+                {translateUi('Add MCP server')}
+              </button>
+            </div>
           )}
         </div>
-      </SettingsRow>
+      </div>
     </SettingsSection>
   );
 }

@@ -16,7 +16,7 @@ from services.agents.agent_task_service import (
     generate_agent_turn,
     parse_needs_input,
 )
-from services.tools import agent_mcp_endpoint, gateway
+from services.tools import agent_mcp_endpoint, approvals, gateway
 from services.tools.catalog import ToolSpec, tools_for_skill
 from services.tools.tool_loop import ToolCallRequest, run_tool_loop
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -79,7 +79,11 @@ async def generate_skill_turn(
     # The CLI's tool calls arrive on other requests, so they need their own
     # sessions on the same database.
     session_factory = async_sessionmaker(db.bind, expire_on_commit=False)
-    async with agent_mcp_endpoint.run_scope(run_id, specs, session_factory):
-        return await generate_agent_turn(
-            ai_service, system_prompt=system_prompt, user_message=user_message
-        )
+    try:
+        async with agent_mcp_endpoint.run_scope(run_id, specs, session_factory):
+            return await generate_agent_turn(
+                ai_service, system_prompt=system_prompt, user_message=user_message
+            )
+    finally:
+        # A CLI that exits or gives up leaves nothing to approve.
+        approvals.cancel_for_run(run_id)

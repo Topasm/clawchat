@@ -10,6 +10,9 @@ from services.tools.approvals import APPROVAL_TIMEOUT_SECONDS
 TOOL_TURN_TIMEOUT_SECONDS = int(APPROVAL_TIMEOUT_SECONDS + 15 * 60)
 CLAUDE_TOOL_MAX_TURNS = 16
 TOKEN_ENV = "CLAWCHAT_AGENT_TOOLS_TOKEN"
+# A call held for approval keeps the CLI's MCP request open; the CLI must not
+# give up on it before the user does.
+TOOL_CALL_TIMEOUT_SECONDS = int(APPROVAL_TIMEOUT_SECONDS + 5 * 60)
 
 
 def claude_args(access: CliToolAccess) -> list[str]:
@@ -34,6 +37,10 @@ def claude_args(access: CliToolAccess) -> list[str]:
     ]
 
 
+def claude_env(access: CliToolAccess) -> dict[str, str]:
+    return {**os.environ, "MCP_TOOL_TIMEOUT": str(TOOL_CALL_TIMEOUT_SECONDS * 1000)}
+
+
 def codex_args(access: CliToolAccess) -> list[str]:
     name = access.server_name
     return [
@@ -41,6 +48,8 @@ def codex_args(access: CliToolAccess) -> list[str]:
         f'mcp_servers.{name}.url="{access.url}"',
         "-c",
         f'mcp_servers.{name}.bearer_token_env_var="{TOKEN_ENV}"',
+        "-c",
+        f"mcp_servers.{name}.tool_timeout_sec={TOOL_CALL_TIMEOUT_SECONDS}",
     ]
 
 

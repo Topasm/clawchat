@@ -418,6 +418,18 @@
 }
 
 /* Agent tools: web search and MCP servers */
+.cc-agent-tools__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+  padding: var(--cc-space-3) var(--cc-space-2);
+  min-width: 0;
+}
+
+.cc-agent-tools__block > .cc-agent-tools__stack {
+  margin-top: var(--cc-space-2);
+}
+
 .cc-agent-tools__stack {
   display: flex;
   flex-direction: column;
@@ -459,6 +471,8 @@
 }
 
 .cc-agent-tools__target {
+  display: block;
+  min-width: 0;
   overflow-wrap: anywhere;
   color: var(--cc-text-secondary);
   font-size: 12px;

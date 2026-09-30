@@ -395,8 +395,8 @@ async def test_claude_code_gets_only_clawchats_tools(monkeypatch):
 
     captured = {}
 
-    def fake_run(cmd, timeout=120):
-        captured["cmd"], captured["timeout"] = cmd, timeout
+    def fake_run(cmd, timeout=120, env=None):
+        captured["cmd"], captured["timeout"], captured["env"] = cmd, timeout, env
         return SimpleNamespace(returncode=0, stdout="done", stderr="")
 
     monkeypatch.setattr(module, "_run_cli_sync", fake_run)
@@ -424,6 +424,8 @@ async def test_claude_code_gets_only_clawchats_tools(monkeypatch):
     }
     assert cmd[cmd.index("--allowedTools") + 1] == "mcp__clawchat"
     assert captured["timeout"] == cli_tool_args.TOOL_TURN_TIMEOUT_SECONDS
+    # A call held for approval must not time out in the CLI first.
+    assert int(captured["env"]["MCP_TOOL_TIMEOUT"]) > approvals.APPROVAL_TIMEOUT_SECONDS * 1000
 
 
 async def test_codex_gets_the_endpoint_and_the_token_by_environment(monkeypatch, tmp_path):
@@ -450,6 +452,8 @@ async def test_codex_gets_the_endpoint_and_the_token_by_environment(monkeypatch,
     assert f'mcp_servers.clawchat.bearer_token_env_var="{cli_tool_args.TOKEN_ENV}"' in cmd
     assert cmd.index("exec") > cmd.index('mcp_servers.clawchat.url="http://127.0.0.1:8000/x"')
     assert "s3cr3t-run-token" not in " ".join(cmd)
+    timeout_flag = next(arg for arg in cmd if arg.startswith("mcp_servers.clawchat.tool_timeout_sec="))
+    assert int(timeout_flag.split("=")[1]) > approvals.APPROVAL_TIMEOUT_SECONDS
     assert captured["env"][cli_tool_args.TOKEN_ENV] == "s3cr3t-run-token"
 
 
@@ -573,3 +577,24 @@ async def test_restart_closes_approvals_nothing_waits_for(db_session):
     db_session.expire_all()
     call = (await db_session.execute(select(AgentToolCall))).scalar_one()
     assert call.status == ToolCallStatus.DENIED
+
+
+async def test_a_finished_cli_turn_leaves_nothing_waiting(db_session, monkeypatch):
+    run = await _run(db_session)
+    run_id = run.id
+    server = await _mcp_server_row(db_session)
+    spec = catalog.server_specs(server)[0]
+    called = AsyncMock(return_value=("echo", False))
+    monkeypatch.setattr(mcp_client, "call_tool", called)
+    invocation = asyncio.ensure_future(
+        gateway.invoke(db_session, run_id=run_id, spec=spec, arguments={})
+    )
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if approvals.pending_call_for_run(run_id):
+            break
+
+    approvals.cancel_for_run(run_id)
+
+    assert "did not allow" in await asyncio.wait_for(invocation, 2)
+    assert called.await_count == 0 and approvals.pending_call_for_run(run_id) is None

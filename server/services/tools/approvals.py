@@ -97,6 +97,13 @@ async def request_decision(
     return decision
 
 
+def cancel_for_run(run_id: str) -> None:
+    """Deny whatever the run still waits on; its turn is over."""
+    for waiting_run_id, future in list(_waiting.values()):
+        if waiting_run_id == run_id and not future.done():
+            future.set_result(ToolDecision.DENY)
+
+
 def decide(run_id: str, call_id: str, decision: ToolDecision) -> None:
     waiting = _waiting.get(call_id)
     if waiting is None or waiting[0] != run_id or waiting[1].done():
