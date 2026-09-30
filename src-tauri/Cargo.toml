@@ -21,7 +21,7 @@ tauri-build = { version = "2", features = [] }
 atomicwrites = "0.4"
 dirs = "6"
 if-addrs = "0.15"
-keyring = { version = "3.6", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+keyring = "4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon"] }
