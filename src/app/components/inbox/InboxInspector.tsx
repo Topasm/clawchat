@@ -40,6 +40,8 @@ interface InboxInspectorProps {
     run_id: string;
   }>;
   onReturnToInbox: (taskId: string) => void;
+  /** Clears the selection; on desktop that also gives the column back to the tree. */
+  onClose?: () => void;
   onNavigate: (path: string) => void;
   /** Opens (or starts) the thread scoped to this task, where the agent works with you on it. */
   onOpenConversation?: (taskId: string) => void;
@@ -63,6 +65,7 @@ export default function InboxInspector({
   mobileTree,
   onStartExecution,
   onReturnToInbox,
+  onClose,
   onNavigate,
   onOpenConversation,
 }: InboxInspectorProps) {
@@ -74,7 +77,19 @@ export default function InboxInspector({
     >
       {task ? (
         <>
-          <span>{translateUi('Selected task')}</span>
+          <div className="cc-inbox-triage__inspector-head">
+            <span>{translateUi('Selected task')}</span>
+            {onClose && (
+              <button
+                type="button"
+                className="cc-btn cc-btn--compact cc-btn--ghost"
+                aria-label={translateUi('Close')}
+                onClick={onClose}
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            )}
+          </div>
           <h2>{task.title}</h2>
           <dl>
             <div>
@@ -160,32 +175,34 @@ export default function InboxInspector({
               onCancel={dependency.dismissPreview}
             />
           )}
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary"
-            onClick={() => onNavigate(`/tasks/${task.id}`)}
-          >
-            {translateUi('\n            Open details\n          ')}
-          </button>
-          {onOpenConversation && (
+          <div className="cc-inbox-triage__inspector-actions">
+            {onOpenConversation && (
+              <button
+                type="button"
+                className="cc-btn cc-btn--compact cc-btn--primary"
+                onClick={() => onOpenConversation(task.id)}
+              >
+                {translateUi('Discuss with agent')}
+              </button>
+            )}
             <button
               type="button"
-              className="cc-btn cc-btn--primary"
-              onClick={() => onOpenConversation(task.id)}
+              className="cc-btn cc-btn--compact cc-btn--secondary"
+              onClick={() => onNavigate(`/tasks/${task.id}`)}
             >
-              {translateUi('Discuss with agent')}
+              {translateUi('Open details')}
             </button>
-          )}
-          {task.project_id && (
-            <button
-              type="button"
-              className="cc-btn cc-btn--ghost"
-              disabled={isPlacing}
-              onClick={() => onReturnToInbox(task.id)}
-            >
-              {translateUi('\n              Return to Inbox\n            ')}
-            </button>
-          )}
+            {task.project_id && (
+              <button
+                type="button"
+                className="cc-btn cc-btn--compact cc-btn--ghost"
+                disabled={isPlacing}
+                onClick={() => onReturnToInbox(task.id)}
+              >
+                {translateUi('Return to Inbox')}
+              </button>
+            )}
+          </div>
           {mobileTree && (
             <details className="cc-inbox-triage__mobile-tree">
               <summary>{translateUi('Move to project tree')}</summary>

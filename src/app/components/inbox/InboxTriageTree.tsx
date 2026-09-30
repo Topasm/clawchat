@@ -36,6 +36,8 @@ interface InboxTriageTreeProps {
   onOpenProject?: (projectId: string) => void;
   /** Starts a new task inside the project, so the tree is not only a drop target. */
   onAddTask?: (projectId: string, rootTaskId: string | null) => void;
+  /** Where to go when there is no project to place anything in yet. */
+  onCreateProject?: () => void;
 }
 function sorted(items: TodoResponse[]) {
   return [...items].sort(
@@ -56,6 +58,7 @@ export default function InboxTriageTree({
   onPreviewDependency,
   onOpenProject,
   onAddTask,
+  onCreateProject,
 }: InboxTriageTreeProps) {
   const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
   // Open tasks that live in no project and are not in the Inbox queue either.
@@ -204,8 +207,17 @@ export default function InboxTriageTree({
           );
         })}
         {projects.length === 0 && (
-          <div className="cc-inbox-tree__empty">
-            {translateUi('Create a project before placing Inbox tasks.')}
+          <div className="cc-inbox-tree__empty cc-inbox-tree__empty--projects">
+            <span>{translateUi('Create a project before placing Inbox tasks.')}</span>
+            {onCreateProject && (
+              <button
+                type="button"
+                className="cc-btn cc-btn--compact cc-btn--secondary"
+                onClick={onCreateProject}
+              >
+                {translateUi('Create project')}
+              </button>
+            )}
           </div>
         )}
         {unfiled.length > 0 && (

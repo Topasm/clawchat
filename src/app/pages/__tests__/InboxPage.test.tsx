@@ -674,7 +674,20 @@ describe('InboxPage', () => {
     expect(within(inspector).getByLabelText('Start agent execution')).toBeInTheDocument();
   });
 
-  it('prompts for a selection when no task is chosen', () => {
+  it('gives the inspector column to the tree until a task is chosen', () => {
+    renderInbox();
+
+    expect(screen.queryByLabelText('Selected task')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Select Draft outline for placement'));
+    const inspector = screen.getByLabelText('Selected task');
+    fireEvent.click(within(inspector).getByRole('button', { name: 'Close' }));
+
+    expect(screen.queryByLabelText('Selected task')).not.toBeInTheDocument();
+  });
+
+  it('prompts for a selection on mobile, where the inspector is always shown', () => {
+    mocks.isMobile = true;
     renderInbox();
 
     expect(

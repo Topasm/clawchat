@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react';
 import TaskCard from '../shared/TaskCard';
 import type { TodoResponse } from '../../types/api';
 import {
@@ -22,7 +23,8 @@ interface InboxCapturedCardProps {
 }
 /**
  * One captured task in the triage queue. It is the drag source for both a placement
- * (single or batch) and a dependency connection.
+ * (single or batch) and a dependency connection. The whole row selects the task;
+ * the side cluster carries the batch checkbox, the prerequisite handle, and Organize.
  */
 export default function InboxCapturedCard({
   task,
@@ -38,9 +40,26 @@ export default function InboxCapturedCard({
   onDelete,
   onOrganize,
 }: InboxCapturedCardProps) {
+  const className = [
+    'cc-inbox-card',
+    'cc-inbox-card--captured',
+    isSelected ? 'cc-inbox-card--selected' : '',
+    isBatchSelected ? 'cc-inbox-card--batch-selected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(task.id);
+    }
+  };
   return (
     <div
-      className={`cc-inbox-card${isSelected ? ' cc-inbox-card--selected' : ''}${isBatchSelected ? ' cc-inbox-card--batch-selected' : ''}`}
+      className={className}
+      tabIndex={0}
+      aria-label={translateUi('Select {{title}} for placement', { title: task.title })}
       draggable={draggable}
       onDragStart={(event) => {
         if (isBatchSelected && batchTaskIds.length > 1) {
@@ -52,6 +71,7 @@ export default function InboxCapturedCard({
         onSelect(task.id);
       }}
       onClick={() => onSelect(task.id)}
+      onKeyDown={selectFromKeyboard}
     >
       <TaskCard
         task={task}
@@ -60,8 +80,11 @@ export default function InboxCapturedCard({
         onDelete={() => onDelete(task.id)}
         subTaskCount={subTaskCount}
       />
-      <div className="cc-inbox-card__actions cc-inbox-card__actions--triage">
-        <label className="cc-inbox-batch-check">
+      <div className="cc-inbox-card__side">
+        <label
+          className="cc-inbox-batch-check"
+          title={translateUi('Move together with other selected tasks')}
+        >
           <input
             type="checkbox"
             checked={isBatchSelected}
@@ -69,7 +92,6 @@ export default function InboxCapturedCard({
             onClick={(event) => event.stopPropagation()}
             onChange={() => onToggleBatch(task.id)}
           />
-          {translateUi('\n          Batch\n        ')}
         </label>
         <button
           className="cc-inbox-dependency-handle"
@@ -89,24 +111,17 @@ export default function InboxCapturedCard({
           }}
         >
           <span aria-hidden="true">↝</span>
-          {translateUi(' Prerequisite\n        ')}
         </button>
+        {/* The one action a captured card always offers. */}
         <button
-          className="cc-btn cc-btn--ghost"
+          className="cc-btn cc-btn--compact cc-btn--secondary cc-inbox-card__organize"
           type="button"
-          aria-label={translateUi('Select {{title}} for placement', { title: task.title })}
-          onClick={() => onSelect(task.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOrganize(task.id);
+          }}
         >
-          {translateUi('\n          Select\n        ')}
-        </button>
-        {/* The one action a captured card always offers. The rest are secondary
-            and stay quiet until the card is reached — see _inbox-card.css. */}
-        <button
-          className="cc-btn cc-btn--secondary cc-inbox-card__organize"
-          style={{ fontSize: 12 }}
-          onClick={() => onOrganize(task.id)}
-        >
-          {translateUi('\n          Organize\n        ')}
+          {translateUi('Organize')}
         </button>
       </div>
     </div>
