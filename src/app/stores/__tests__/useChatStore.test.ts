@@ -42,6 +42,21 @@ describe('useChatStore', () => {
     });
   });
 
+  it('shows which tool the reply is using until its text arrives', () => {
+    const store = useChatStore.getState();
+    store.addStreamingMessage(message('stream-1', ''));
+    store.setStreamingState(true, 'conv-1');
+    store.setStreamingActivity({ tool: 'notes__search', label: 'search from notes' });
+    expect(useChatStore.getState().streamingActivity?.label).toBe('search from notes');
+
+    store.appendToMessage('stream-1', 'Found it');
+    expect(useChatStore.getState().streamingActivity).toBeNull();
+
+    store.setStreamingActivity({ tool: 'web_search', label: 'web search' });
+    store.setStreamingState(false, 'conv-1');
+    expect(useChatStore.getState().streamingActivity).toBeNull();
+  });
+
   it('deduplicates messages with the same author, time, and content', () => {
     const store = useChatStore.getState();
     store.addStreamingMessage(message('stream-1'));

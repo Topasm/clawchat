@@ -29,7 +29,8 @@ SERVER_NAME = "clawchat"
 
 @dataclass(frozen=True)
 class RunToolScope:
-    run_id: str
+    # None for a chat reply: its calls are recorded without a run.
+    run_id: str | None
     specs: dict[str, ToolSpec]
     session_factory: Any
 
@@ -59,9 +60,9 @@ def endpoint_url() -> str:
 
 @asynccontextmanager
 async def run_scope(
-    run_id: str, specs: list[ToolSpec], session_factory: Any
+    run_id: str | None, specs: list[ToolSpec], session_factory: Any
 ) -> AsyncIterator[CliToolAccess]:
-    """Expose ``specs`` to the CLI for the duration of one agent turn."""
+    """Expose ``specs`` to the CLI for the duration of one agent or chat turn."""
     token = secrets.token_urlsafe(32)
     _scopes[token] = RunToolScope(run_id, {spec.name: spec for spec in specs}, session_factory)
     access = CliToolAccess(url=endpoint_url(), token=token)

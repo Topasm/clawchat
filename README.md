@@ -85,8 +85,17 @@ This starts a private [SearXNG](https://docs.searxng.org) instance with JSON out
 and press **Test**. The Research skill can then search the web; results cite their URLs.
 
 The same settings section adds **MCP servers** (a command to start, or a URL). Their tools are
-offered to every skill. A server set to *Ask before each call* pauses the run in Attention until
-you allow or deny that call; every call is recorded on the run.
+offered to every skill unless the skill's `SKILL.md` lists `mcp-servers` under `metadata` (server
+names or `server__tool` names, `none` for no tools). A server set to *Ask before each call* pauses
+the run in Attention until you allow or deny that call; every call is recorded on the run.
+
+Chat can use these tools too: web search and servers set to *Run without asking* answer questions
+directly in a conversation (the reply shows which tool it is using). Servers that ask before each
+call stay with delegated work, where the run can wait for your decision.
+
+Your own skills go in `SKILLS_DIR` (default `data/skills`), one `<name>/SKILL.md` per directory in
+the same [Agent Skills](https://agentskills.io) format as the built-ins. A skill named like a
+built-in replaces it, and OpenCode runs see the directory as well.
 
 ### Calendar sync (CalDAV)
 

@@ -215,6 +215,9 @@ class CodexAPIProvider:
             if entry["role"] == "assistant":
                 if entry.get("raw"):
                     items.extend(entry["raw"])
+                elif not entry.get("tool_calls"):
+                    # Earlier conversation turns, replayed as plain messages.
+                    items.append({"role": "assistant", "content": entry.get("content") or ""})
                 else:
                     items.extend(
                         {

@@ -152,6 +152,40 @@ async def test_research_gets_web_search_and_every_skill_gets_mcp_tools(db_sessio
     assert draft == ["my-notes__echo"]
 
 
+async def test_a_skill_file_can_limit_which_servers_and_tools_it_gets(db_session, monkeypatch):
+    from skills import SKILL_REGISTRY, SkillDef
+
+    def skill(skill_id, mcp_servers):
+        return SkillDef(id=skill_id, name=skill_id, description="", system_prompt="x",
+                        mcp_servers=mcp_servers)
+
+    monkeypatch.setitem(SKILL_REGISTRY, "notes_only", skill("notes_only", ("notes",)))
+    monkeypatch.setitem(SKILL_REGISTRY, "one_tool", skill("one_tool", ("other__echo",)))
+    monkeypatch.setitem(SKILL_REGISTRY, "no_tools", skill("no_tools", ()))
+    await _mcp_server_row(db_session, name="notes")
+    await _mcp_server_row(db_session, name="other")
+
+    async def names(skill_id):
+        return [spec.name for spec in await catalog.tools_for_skill(db_session, skill_id)]
+
+    assert await names("draft") == ["notes__echo", "other__echo"]
+    assert await names("notes_only") == ["notes__echo"]
+    assert await names("one_tool") == ["other__echo"]
+    assert await names("no_tools") == []
+
+
+async def test_chat_gets_web_search_and_only_servers_that_run_without_asking(db_session):
+    assert await catalog.tools_for_chat(db_session) == []
+    db_session.add(AgentToolSettings(id="default", searxng_url="http://searx.local"))
+    await _mcp_server_row(db_session, name="asks", trust=ToolTrust.APPROVAL)
+    await _mcp_server_row(db_session, name="reads", trust=ToolTrust.READ_ONLY)
+
+    assert [s.name for s in await catalog.tools_for_chat(db_session)] == [
+        "web_search",
+        "reads__echo",
+    ]
+
+
 # --- Gateway and approvals -----------------------------------------------------
 
 

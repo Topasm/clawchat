@@ -11,17 +11,29 @@ Only the frontmatter subset these files use is parsed -- flat keys plus one
 ClawChat's skill id is the skill's name with hyphens as underscores
 ("code-review" is ``code_review``): ids are stored on tasks, and an Agent
 Skills name allows only lowercase letters, digits and hyphens.
+
+The user's own skills live in the same layout under ``settings.skills_dir``
+(``data/skills`` by default). They load after the built-ins, so a user skill
+with a built-in's name replaces it; one that does not parse is logged and
+skipped rather than keeping the server from starting.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 
+from config import settings
 from skills import SkillDef, register_skill
 
+logger = logging.getLogger(__name__)
+
 BUILTIN_SKILLS_DIR = Path(__file__).resolve().parent / "builtin"
+# Frontmatter values meaning "every enabled MCP server" and "no MCP server".
+_ALL_SERVERS = "*"
+_NO_SERVERS = "none"
 _NAME = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
 _BLOCK_SCALARS = {"|", "|-", "|+", ">", ">-", ">+"}
 
@@ -84,6 +96,7 @@ def parse_skill_file(text: str, *, source: str = "SKILL.md") -> SkillDef:
     body = "\n".join(lines[end + 1 :]).strip()
     if not body:
         raise SkillFileError(f"{source}: the instructions after the frontmatter are empty")
+    mcp_servers = _parse_mcp_servers(metadata.get("mcp-servers"), source=source)
     return SkillDef(
         id=name.replace("-", "_"),
         name=metadata.get("display-name") or name,
@@ -93,7 +106,23 @@ def parse_skill_file(text: str, *, source: str = "SKILL.md") -> SkillDef:
         vault_template=metadata.get("vault-template") or None,
         tags=[tag.strip() for tag in metadata.get("tags", "").split(",") if tag.strip()],
         uses_web_search=metadata.get("uses-web-search") == "true",
+        mcp_servers=mcp_servers,
     )
+
+
+def _parse_mcp_servers(value: str | None, *, source: str) -> tuple[str, ...] | None:
+    """``mcp-servers``: absent or ``*`` is every server, ``none`` is no server,
+    otherwise a comma-separated list of server names or ``server__tool`` names."""
+    if value is None or value.strip() == _ALL_SERVERS:
+        return None
+    names = tuple(name.strip() for name in value.split(",") if name.strip())
+    if not names:
+        raise SkillFileError(f"{source}: mcp-servers needs names, '*' or 'none'")
+    if names == (_NO_SERVERS,):
+        return ()
+    if _ALL_SERVERS in names or _NO_SERVERS in names:
+        raise SkillFileError(f"{source}: mcp-servers mixes '*' or 'none' with names")
+    return names
 
 
 def load_skill_dir(root: Path) -> list[SkillDef]:
@@ -119,3 +148,40 @@ def register_builtins() -> None:
     for skill in skills:
         register_skill(skill)
 
+
+def user_skills_dir() -> Path | None:
+    """Where the user's own SKILL.md directories live, if configured."""
+    value = (settings.skills_dir or "").strip()
+    return Path(value).expanduser() if value else None
+
+
+def load_user_skills(root: Path) -> list[SkillDef]:
+    """The user's skills, one directory at a time so a bad file costs only itself."""
+    skills: list[SkillDef] = []
+    if not root.is_dir():
+        return skills
+    for path in sorted(root.glob("*/SKILL.md")):
+        try:
+            skill = parse_skill_file(path.read_text(encoding="utf-8"), source=str(path))
+            if skill.id.replace("_", "-") != path.parent.name:
+                raise SkillFileError(
+                    f"{path}: name must match its directory {path.parent.name!r}"
+                )
+        except (OSError, SkillFileError) as exc:
+            logger.warning("Skipping user skill: %s", exc)
+            continue
+        skills.append(skill)
+    return skills
+
+
+def register_user_skills(root: Path | None = None) -> list[SkillDef]:
+    """Register the user's skills; the built-ins they share a name with are replaced."""
+    root = root if root is not None else user_skills_dir()
+    if root is None:
+        return []
+    skills = load_user_skills(root)
+    for skill in skills:
+        register_skill(skill)
+    if skills:
+        logger.info("Loaded %d user skill(s) from %s", len(skills), root)
+    return skills

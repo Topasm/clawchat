@@ -60,8 +60,14 @@ async def run_tool_loop(
     extra_tools: list[dict[str, Any]] | None = None,
     on_extra_tool: Callable[[ToolCallRequest], Any] | None = None,
     max_steps: int = MAX_TOOL_STEPS,
+    history: list[dict[str, Any]] | None = None,
+    on_tool_call: Callable[[ToolCallRequest], Awaitable[None]] | None = None,
 ) -> tuple[str, Any]:
     """Loop until the model answers without calling tools.
+
+    ``history`` is earlier plain ``user``/``assistant`` messages of the same
+    conversation, replayed before ``user_message``. ``on_tool_call`` hears
+    each call just before it runs, for progress display.
 
     Returns ``(text, None)`` for an answer, or ``(None, value)`` when a call to
     one of ``extra_tools`` (e.g. ``ask_user``) ends the turn and
@@ -69,7 +75,12 @@ async def run_tool_loop(
     """
     by_name = {spec.name: spec for spec in specs}
     definitions = [spec.as_function() for spec in specs] + list(extra_tools or [])
-    transcript: list[dict[str, Any]] = [{"role": "user", "content": user_message}]
+    transcript: list[dict[str, Any]] = [
+        {"role": entry["role"], "content": entry.get("content") or "", "tool_calls": []}
+        for entry in history or ()
+        if entry.get("role") in ("user", "assistant") and entry.get("content")
+    ]
+    transcript.append({"role": "user", "content": user_message})
     system = system_prompt + TOOLS_INSTRUCTION
 
     for step in range(max_steps + 1):
@@ -101,6 +112,8 @@ async def run_tool_loop(
             if spec is None:
                 result = f"There is no tool named {call.name}."
             else:
+                if on_tool_call is not None:
+                    await on_tool_call(call)
                 result = await invoke(spec, call.arguments)
             transcript.append(
                 {"role": "tool", "tool_call_id": call.id, "name": call.name, "content": result}

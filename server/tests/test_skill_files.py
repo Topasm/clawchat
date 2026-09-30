@@ -99,3 +99,83 @@ def test_skill_name_must_match_its_directory(tmp_path):
     with pytest.raises(SkillFileError, match="must match its directory"):
         load_skill_dir(tmp_path)
 
+
+# --- mcp-servers allowlist ---------------------------------------------------
+
+
+def _skill(mcp_servers_line: str = "") -> str:
+    return (
+        "---\nname: notes-digest\ndescription: y\n"
+        + (f"metadata:\n  mcp-servers: {mcp_servers_line}\n" if mcp_servers_line else "")
+        + "---\nbody"
+    )
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("", None),
+        ('"*"', None),
+        ("none", ()),
+        ("notion, github__search", ("notion", "github__search")),
+    ],
+)
+def test_mcp_servers_names_whole_servers_or_single_tools(line, expected):
+    assert parse_skill_file(_skill(line)).mcp_servers == expected
+
+
+@pytest.mark.parametrize("line", ['""', '"notion, *"', '"none, notion"'])
+def test_mcp_servers_rejects_an_ambiguous_list(line):
+    with pytest.raises(SkillFileError, match="mcp-servers"):
+        parse_skill_file(_skill(line))
+
+
+def test_builtins_are_offered_every_server():
+    assert all(skill.mcp_servers is None for skill in get_all_skills())
+
+
+# --- the user's own skills ---------------------------------------------------
+
+
+def _write_skill(root, name: str, body: str = "---\nname: {name}\ndescription: y\n---\nbody"):
+    (root / name).mkdir()
+    (root / name / "SKILL.md").write_text(body.format(name=name), encoding="utf-8")
+
+
+def test_user_skills_load_one_at_a_time_and_a_bad_file_costs_only_itself(tmp_path, caplog):
+    from skills.builtins import load_user_skills
+
+    _write_skill(tmp_path, "notion-digest")
+    _write_skill(tmp_path, "broken", body="name: {name}\n")  # no frontmatter
+    _write_skill(tmp_path, "renamed", body="---\nname: other\ndescription: y\n---\nbody")
+
+    with caplog.at_level("WARNING"):
+        loaded = load_user_skills(tmp_path)
+
+    assert [skill.id for skill in loaded] == ["notion_digest"]
+    assert "broken" in caplog.text and "must match its directory" in caplog.text
+    assert load_user_skills(tmp_path / "missing") == []
+
+
+def test_user_skills_register_over_builtins_of_the_same_name(tmp_path):
+    from skills import SKILL_REGISTRY
+    from skills.builtins import register_builtins, register_user_skills
+
+    _write_skill(
+        tmp_path,
+        "draft",
+        body=(
+            "---\nname: draft\ndescription: House style\nmetadata:\n"
+            "  mcp-servers: notion\n---\nDraft it our way."
+        ),
+    )
+    try:
+        registered = register_user_skills(tmp_path)
+        assert [skill.id for skill in registered] == ["draft"]
+        draft = get_skill("draft")
+        assert draft.system_prompt == "Draft it our way."
+        assert draft.mcp_servers == ("notion",)
+        assert set(SKILL_REGISTRY) == BUILTIN_IDS
+    finally:
+        register_builtins()
+    assert get_skill("draft").system_prompt != "Draft it our way."

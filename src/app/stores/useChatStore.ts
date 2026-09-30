@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import { useToastStore } from './useToastStore';
-import { connectSSE } from '../services/sseClient';
+import { connectSSE, type ToolActivity } from '../services/sseClient';
 import apiClient from '../services/apiClient';
 import { logger } from '../services/logger';
 import type { StreamEventMeta } from '../types/api';
@@ -130,6 +130,8 @@ interface ChatState {
   currentConversationId: string | null;
   isStreaming: boolean;
   streamingConversationId: string | null;
+  /** The tool the streaming reply is using right now, until its text arrives. */
+  streamingActivity: ToolActivity | null;
   streamAbortController: AbortController | null;
   taskProgress: Record<string, TaskProgressData>;
   drafts: Record<string, string>;
@@ -146,6 +148,7 @@ interface ChatState {
   setCurrentConversationId: (id: string | null) => void;
   addStreamingMessage: (message: ChatMessage) => void;
   appendToMessage: (messageId: string, content: string) => void;
+  setStreamingActivity: (activity: ToolActivity | null) => void;
   finalizeStreamMessage: (
     messageId: string,
     fullContent: string,
@@ -178,6 +181,7 @@ export const useChatStore = create<ChatState>()(
       currentConversationId: null,
       isStreaming: false,
       streamingConversationId: null,
+      streamingActivity: null,
       streamAbortController: null,
       taskProgress: {},
       drafts: {},
@@ -211,8 +215,11 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           streamingMessages: trimMessages(dedupeMessages([message, ...state.streamingMessages])),
         })),
+      setStreamingActivity: (activity) => set({ streamingActivity: activity }),
       appendToMessage: (messageId, content) =>
         set((state) => ({
+          // Text arriving means the tool call is over.
+          streamingActivity: null,
           streamingMessages: state.streamingMessages.map((m) =>
             m._id === messageId ? { ...m, text: m.text + content } : m,
           ),
@@ -237,6 +244,7 @@ export const useChatStore = create<ChatState>()(
           streamingConversationId: streaming
             ? (conversationId ?? state.currentConversationId)
             : null,
+          streamingActivity: streaming ? state.streamingActivity : null,
         })),
       reconcileMessages: (conversationId, authoritativeIds) =>
         set((state) => ({
@@ -262,6 +270,7 @@ export const useChatStore = create<ChatState>()(
             ),
           isStreaming: false,
           streamingConversationId: null,
+          streamingActivity: null,
           streamAbortController: null,
         })),
       setDraft: (conversationId, text) =>
@@ -375,10 +384,14 @@ export const useChatStore = create<ChatState>()(
               onToken: (tokenText: string) => {
                 const targetId = streamingMessageId ?? assistantPlaceholderId;
                 set((state) => ({
+                  streamingActivity: null,
                   streamingMessages: state.streamingMessages.map((msg) =>
                     msg._id === targetId ? { ...msg, text: msg.text + tokenText } : msg,
                   ),
                 }));
+              },
+              onToolActivity: (activity) => {
+                set({ streamingActivity: activity });
               },
               onTitleGenerated: (_title: string) => {
                 // Title updates will be handled by query invalidation after stream completes
@@ -399,6 +412,7 @@ export const useChatStore = create<ChatState>()(
                   ),
                   isStreaming: false,
                   streamingConversationId: null,
+                  streamingActivity: null,
                   streamAbortController: null,
                 }));
                 void queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
@@ -416,6 +430,7 @@ export const useChatStore = create<ChatState>()(
                   ),
                   isStreaming: false,
                   streamingConversationId: null,
+                  streamingActivity: null,
                   streamAbortController: null,
                 }));
                 if (optimisticMessageId) get().markMessageFailed(optimisticMessageId);

@@ -92,6 +92,8 @@ fun streamChat(
                     obj.has("title_generated") -> trySend(SseEvent.TitleGenerated(obj.getString("title_generated")))
                     obj.has("done") -> { trySend(SseEvent.Done); close() }
                     obj.has("error") -> trySend(SseEvent.Error(obj.getString("error")))
+                    // The reply is using a tool; the answer follows as tokens.
+                    obj.has("tool_activity") -> Unit
                     else -> trySend(SseEvent.Token(data))
                 }
             } catch (_: Exception) {

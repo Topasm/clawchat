@@ -38,7 +38,7 @@ from services.agents import agent_run_service, agent_task_service, execution_hos
 from services.agents.execution_host_service import WorkspaceResolution
 from services.review import artifact_service
 from skills import get_skill
-from skills.builtins import BUILTIN_SKILLS_DIR
+from skills.builtins import BUILTIN_SKILLS_DIR, user_skills_dir
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ws.notifications import notify_module_data_changed
@@ -102,6 +102,15 @@ def run_prompt(instruction: str, skill_id: str | None) -> str:
         return instruction
     name = skill.id.replace("_", "-")
     return f"Use the `{name}` skill for this task.\n\n{instruction}"
+
+
+def _skills_paths() -> list[str]:
+    """The built-in skills, plus the user's own directory when it exists."""
+    paths = [str(BUILTIN_SKILLS_DIR)]
+    user_dir = user_skills_dir()
+    if user_dir is not None and user_dir.is_dir():
+        paths.append(str(user_dir))
+    return paths
 
 
 def _skill_id(task: AgentTask) -> str | None:
@@ -445,7 +454,7 @@ async def execute_run(
                     tools_url=tools.url if tools else None,
                     tools_token=tools.token if tools else None,
                     tool_timeout_ms=cli_tool_args.TOOL_CALL_TIMEOUT_SECONDS * 1000,
-                    skills_paths=[str(BUILTIN_SKILLS_DIR)],
+                    skills_paths=_skills_paths(),
                 )
                 server = await stack.enter_async_context(
                     adapter.serve(workspace.path or "", config=config)
