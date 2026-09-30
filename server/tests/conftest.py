@@ -48,6 +48,10 @@ async def setup_db():
     yield
     async with _test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Each test runs on its own event loop, and the pooled connection's lock
+    # binds to whichever loop first waits on it. Drop the connection so the
+    # next test opens a fresh one on its own loop.
+    await _test_engine.dispose()
 
 
 @pytest_asyncio.fixture
