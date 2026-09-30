@@ -1190,3 +1190,45 @@ async def get_graph_insights(
     raise ConflictError(
         "Task graph changed repeatedly while computing insights; retry the request"
     )
+
+
+async def project_work_insights(
+    db: AsyncSession,
+    *,
+    project_id: str,
+    root_task_id: str | None,
+    generated_at: datetime | None = None,
+) -> tuple[GraphInsightsResponse, list[GraphInsightNode]]:
+    """Insights for a project's work: every task that belongs to it.
+
+    A project's tasks usually hang under its root, but a task can belong to
+    the project without a parent (created with only ``project_id``). Scoping
+    by the root would drop those, so work is the union of the root's subtree
+    and the project's members, and the whole graph is analyzed so their
+    blockers still count.
+    """
+    member_ids = set(
+        (await db.execute(select(Todo.id).where(Todo.project_id == project_id))).scalars()
+    )
+    if root_task_id is not None:
+        # ...and everything under the root, whatever its project_id says.
+        tree = select(Todo.id.label("id")).where(Todo.id == root_task_id).cte(
+            "project_tree", recursive=True
+        )
+        tree = tree.union(select(Todo.id).join(tree, Todo.parent_id == tree.c.id))
+        member_ids |= set((await db.execute(select(tree.c.id))).scalars())
+    try:
+        insights = await get_graph_insights(db, generated_at=generated_at)
+    except ValidationError:
+        # Too large to analyze whole; fall back to the root's subtree.
+        insights = await get_graph_insights(
+            db, root_task_id=root_task_id, generated_at=generated_at
+        )
+    work = [
+        node
+        for node in insights.nodes
+        if node.task_id in member_ids
+        and node.task_id != root_task_id
+        and not node.is_container
+    ]
+    return insights, work

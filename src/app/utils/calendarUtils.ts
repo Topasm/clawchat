@@ -105,13 +105,9 @@ export function pillTime(ev: EventResponse): string {
   return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
 }
 
-/** Where a day falls within the stretch a task runs for. */
-export type TaskSegmentPosition = 'start' | 'middle' | 'end' | 'single';
-
 export interface CalendarTaskSegment {
   todo: TodoResponse;
-  position: TaskSegmentPosition;
-  /** The due date has passed, so the task shows on that day alone. */
+  /** The due date has passed. */
   isOverdue: boolean;
 }
 
@@ -120,12 +116,11 @@ function startOfDay(date: Date): Date {
 }
 
 /**
- * Spread every open task with a due date across the days it runs for.
+ * Put every open task with a due date on the day it is due.
  *
- * This workspace is task-oriented: a due date is a deadline to work towards,
- * not an appointment. So a task occupies the whole stretch left to finish it,
- * from today through its due date. An overdue task has no stretch left and
- * sits on the day it was due.
+ * A task used to run as a bar from today through its due date. On a calendar
+ * that reads as a multi-day event, and a month of them left rows of unlabelled
+ * bars, so a deadline is marked once, on its day.
  */
 export function indexTasksByDate(
   todos: TodoResponse[],
@@ -139,28 +134,13 @@ export function indexTasksByDate(
     const due = new Date(todo.due_date);
     if (Number.isNaN(due.getTime())) continue;
 
-    const dueStart = startOfDay(due);
-    const isOverdue = dueStart.getTime() < todayStart.getTime();
-    const from = isOverdue ? dueStart : todayStart;
-
-    const days: string[] = [];
-    for (const cursor = new Date(from); cursor <= dueStart; cursor.setDate(cursor.getDate() + 1)) {
-      days.push(toDateKey(cursor));
-    }
-
-    days.forEach((key, index) => {
-      let position: TaskSegmentPosition = 'middle';
-      if (days.length === 1) position = 'single';
-      else if (index === 0) position = 'start';
-      else if (index === days.length - 1) position = 'end';
-
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ todo, position, isOverdue });
-    });
+    const key = toDateKey(due);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push({ todo, isOverdue: startOfDay(due).getTime() < todayStart.getTime() });
   }
 
-  // Soonest deadline first, so the most urgent bar stays visible when a day
-  // holds more tasks than the cell can show.
+  // Soonest deadline first, so the most urgent task stays visible when a day
+  // holds more than the cell can show.
   for (const bucket of map.values()) {
     bucket.sort((a, b) => {
       const byDue = new Date(a.todo.due_date!).getTime() - new Date(b.todo.due_date!).getTime();

@@ -141,12 +141,6 @@ export default function TodayView({
         </div>
       )}
 
-      {progress.total === 0 && !isLoading && hasAnything && !isMobile && (
-        <div className="cc-today-progress">
-          <span className="cc-today-progress__label">{translateUi('No tasks for today')}</span>
-        </div>
-      )}
-
       {/* Loading state */}
       {isLoading && !hasAnything && <TodayPageSkeleton />}
 

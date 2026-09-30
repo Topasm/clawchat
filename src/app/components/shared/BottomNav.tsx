@@ -1,43 +1,48 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from '../../i18n';
-import { InboxIcon, NavCalendarIcon, TasksIcon } from './NavIcons';
-import { useTodosQuery } from '../../hooks/queries';
-import { isInboxTodo } from '../../utils/inboxState';
+import { InboxIcon, MoreIcon, NavCalendarIcon, ReviewIcon, TasksIcon } from './NavIcons';
 
 export const mobileTabs = [
-  { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon, primary: true, badge: true },
-  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon, primary: true },
-  { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon, primary: true },
+  { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
+  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
+  { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
+  // Agents stop here for answers, approvals, and reviews: it cannot hide
+  // behind a menu on the phone.
+  { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon },
+  { to: '/more', labelKey: 'nav.more', Icon: MoreIcon },
 ];
 
 interface BottomNavProps {
   tabs?: typeof mobileTabs;
+  /** Counts shown on a tab, keyed by its route. */
+  badges?: Record<string, number>;
 }
 
-export default function BottomNav({ tabs = mobileTabs }: BottomNavProps) {
+export default function BottomNav({ tabs = mobileTabs, badges = {} }: BottomNavProps) {
   const { t } = useTranslation();
-  const { data: todos = [] } = useTodosQuery();
-  const inboxCount = todos.filter(isInboxTodo).length;
 
   return (
     <nav className="cc-bottom-nav">
-      {tabs.map((tab) => (
-        <NavLink
-          key={tab.to}
-          to={tab.to}
-          className={({ isActive }) =>
-            `cc-bottom-nav__item${isActive ? ' cc-bottom-nav__item--active' : ''}${tab.primary ? ' cc-bottom-nav__item--primary' : ''}`
-          }
-        >
-          <span className="cc-bottom-nav__icon-wrap">
-            <tab.Icon />
-            {tab.badge && inboxCount > 0 && (
-              <span className="cc-bottom-nav__badge">{inboxCount > 99 ? '99+' : inboxCount}</span>
-            )}
-          </span>
-          <span>{t(tab.labelKey)}</span>
-        </NavLink>
-      ))}
+      {tabs.map((tab) => {
+        const count = badges[tab.to] ?? 0;
+        return (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            className={({ isActive }) =>
+              `cc-bottom-nav__item cc-bottom-nav__item--primary${isActive ? ' cc-bottom-nav__item--active' : ''}`
+            }
+          >
+            <span className="cc-bottom-nav__icon-wrap">
+              <tab.Icon />
+              {count > 0 && (
+                <span className="cc-bottom-nav__badge">{count > 99 ? '99+' : count}</span>
+              )}
+            </span>
+            <span>{t(tab.labelKey)}</span>
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }

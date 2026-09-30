@@ -72,6 +72,16 @@ export function AutomationsIcon({ size, className, label }: IconProps = {}) {
   );
 }
 
+export function MoreIcon({ size, className, label }: IconProps = {}) {
+  return (
+    <IconBase size={size} className={navClassName(className)} label={label}>
+      <circle cx="4" cy="9" r="1.2" />
+      <circle cx="9" cy="9" r="1.2" />
+      <circle cx="14" cy="9" r="1.2" />
+    </IconBase>
+  );
+}
+
 export function RunsIcon({ size, className, label }: IconProps = {}) {
   return (
     <IconBase size={size} className={navClassName(className)} label={label}>

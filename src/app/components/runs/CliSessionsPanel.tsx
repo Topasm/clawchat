@@ -164,6 +164,7 @@ function CliSessionsContent() {
       </header>
       <div className="cc-cli-sessions__filters">
         <select
+          className="cc-cli-sessions__select"
           aria-label={translateUi('CLI provider')}
           value={provider}
           onChange={(event) => setProvider(event.target.value)}
@@ -173,12 +174,14 @@ function CliSessionsContent() {
           <option value="claude">{translateUi('Claude Code')}</option>
         </select>
         <input
+          type="search"
+          className="cc-cli-sessions__search"
           aria-label={translateUi('Search sessions')}
           placeholder={translateUi('Search sessions')}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <label>
+        <label className="cc-cli-sessions__toggle">
           <input
             type="checkbox"
             checked={showSaved}

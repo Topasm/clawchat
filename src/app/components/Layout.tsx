@@ -41,6 +41,7 @@ import {
 } from '../hooks/queries';
 import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
+import useProjectRootIds from '../hooks/useProjectRootIds';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { HealthResponse } from '../types/api';
 import type { ColorPalette } from '../config/theme';
@@ -253,12 +254,16 @@ export default function Layout() {
     dueCount,
     total: attentionBadgeCount,
   } = useMemo(() => getAttentionBadgeCounts(todos), [todos]);
+  const projectRootIds = useProjectRootIds();
   const openTaskCount = useMemo(
     () =>
       todos.filter(
-        (todo) => isTaskTodo(todo) && (todo.status === 'pending' || todo.status === 'in_progress'),
+        (todo) =>
+          isTaskTodo(todo) &&
+          !projectRootIds.has(todo.id) &&
+          (todo.status === 'pending' || todo.status === 'in_progress'),
       ).length,
-    [todos],
+    [projectRootIds, todos],
   );
   const navBadgeCounts = useMemo<Record<string, number>>(
     () => ({
@@ -532,8 +537,16 @@ export default function Layout() {
             <div className="cc-main" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
               {mobileMainContent}
             </div>
-            <FloatingActionButton />
-            <BottomNav tabs={availableMobileTabs} />
+            {/* The chat bar sits between the page and the tabs on every page but
+                chat; the button rides above it and steps aside while it is open. */}
+            {!chatPanel.isOpen && <FloatingActionButton aboveChatBar={!onChatPage} />}
+            <BottomNav
+              tabs={availableMobileTabs}
+              badges={{
+                '/inbox': navBadgeCounts['/inbox'],
+                '/attention': navBadgeCounts['/attention'],
+              }}
+            />
           </>
         ) : (
           <PanelGroup orientation="horizontal" id="cc-layout">

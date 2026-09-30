@@ -195,3 +195,32 @@
     background: transparent;
   }
 }
+
+/* More: the pages the bottom tabs leave out */
+.cc-more-page__list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-md);
+  background: var(--cc-surface);
+  overflow: hidden;
+}
+
+.cc-more-page__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--cc-touch-target);
+  padding: 10px 14px;
+  font-size: 15px;
+  color: var(--cc-text);
+  text-decoration: none;
+}
+
+.cc-more-page__link + .cc-more-page__link {
+  border-top: 1px solid var(--cc-border);
+}
+
+.cc-more-page__link svg {
+  color: var(--cc-text-secondary);
+}

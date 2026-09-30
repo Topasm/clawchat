@@ -581,3 +581,9 @@
     min-height: 40px;
   }
 }
+
+/* The desktop page transition wraps every route; pages that fill the view
+   (chat threads) size themselves against it. */
+.cc-route-transition {
+  height: 100%;
+}

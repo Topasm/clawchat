@@ -6,7 +6,6 @@ request is over and the endpoint says so.
 """
 
 import asyncio
-import json
 from datetime import datetime, timezone
 
 from domain.agent_run import AgentRunStatus
@@ -19,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ws.notifications import notify_module_data_changed
 
 APPROVAL_TIMEOUT_SECONDS = 30 * 60.0
-_ARGUMENT_PREVIEW_CHARS = 300
 
 _waiting: dict[str, tuple[str, asyncio.Future[ToolDecision]]] = {}
 
@@ -31,11 +29,15 @@ def pending_call_for_run(run_id: str) -> str | None:
     return None
 
 
-def _preview(arguments: dict) -> str:
-    text = json.dumps(arguments, ensure_ascii=False)
-    if len(text) > _ARGUMENT_PREVIEW_CHARS:
-        text = text[:_ARGUMENT_PREVIEW_CHARS] + "…"
-    return text
+def describe_tool(tool_name: str) -> str:
+    """"notes__read_file" -> "read file from notes"; built-ins by name."""
+    if tool_name == "web_search":
+        return "web search"
+    server, _, tool = tool_name.partition("__")
+    if not tool:
+        return tool_name.replace("_", " ")
+    return f"{tool.replace('_', ' ')} from {server}"
+
 
 
 async def _set_run_waiting(
@@ -76,7 +78,7 @@ async def request_decision(
             db,
             run_id,
             waiting=True,
-            message=f"Wants to use {tool_name} with {_preview(arguments)}",
+            message=f"Wants to use {describe_tool(tool_name)}",
             event="waiting_permission",
         )
         try:
@@ -89,7 +91,10 @@ async def request_decision(
         db,
         run_id,
         waiting=False,
-        message=f"Tool {tool_name} {'allowed' if decision == ToolDecision.ALLOW else 'denied'}",
+        message=(
+            f"You {'allowed' if decision == ToolDecision.ALLOW else 'denied'} "
+            f"{describe_tool(tool_name)}"
+        ),
         event=(
             "permission_allowed" if decision == ToolDecision.ALLOW else "permission_denied"
         ),

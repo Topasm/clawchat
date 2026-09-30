@@ -488,11 +488,10 @@
   }
 }
 
-/* Task deadline bars ------------------------------------------------------
+/* Task deadlines ----------------------------------------------------------
  *
- * A task runs from today through its due date, so the bar is drawn once per
- * day and the position modifiers bleed the joining edges into the cell
- * padding. That is what turns a row of buttons into one continuous stretch.
+ * A task sits on the day it is due, as a chip set apart from events by its
+ * colour and left rule.
  */
 .cc-calendar__task-bar {
   display: flex;
@@ -500,12 +499,13 @@
   height: 16px;
   padding: 0 6px;
   border: none;
+  border-left: 2px solid var(--cc-secondary);
+  border-radius: var(--cc-radius-sm);
   cursor: pointer;
   text-align: left;
   width: 100%;
   min-width: 0;
   background: color-mix(in srgb, var(--cc-secondary) 22%, transparent);
-  border-left: 2px solid transparent;
   transition: background 0.15s ease;
 }
 
@@ -513,28 +513,7 @@
   background: color-mix(in srgb, var(--cc-secondary) 38%, transparent);
 }
 
-.cc-calendar__task-bar--start {
-  border-radius: var(--cc-radius-sm) 0 0 var(--cc-radius-sm);
-  border-left-color: var(--cc-secondary);
-  margin-right: -6px;
-}
-
-.cc-calendar__task-bar--middle {
-  margin-left: -6px;
-  margin-right: -6px;
-}
-
-.cc-calendar__task-bar--end {
-  border-radius: 0 var(--cc-radius-sm) var(--cc-radius-sm) 0;
-  margin-left: -6px;
-}
-
-.cc-calendar__task-bar--single {
-  border-radius: var(--cc-radius-sm);
-  border-left-color: var(--cc-secondary);
-}
-
-/* The due day is the point of the bar, so overdue work stays loud. */
+/* Overdue work stays loud. */
 .cc-calendar__task-bar--overdue {
   background: color-mix(in srgb, var(--cc-overdue-red) 20%, transparent);
   border-left-color: var(--cc-overdue-red);

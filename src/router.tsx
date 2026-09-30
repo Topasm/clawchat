@@ -22,6 +22,7 @@ const ReviewPage = lazy(() => import('./app/pages/ReviewPage'));
 const RunsPage = lazy(() => import('./app/pages/RunsPage'));
 const AttentionPage = lazy(() => import('./app/pages/AttentionPage'));
 const AutomationsPage = lazy(() => import('./app/pages/AutomationsPage'));
+const MorePage = lazy(() => import('./app/pages/MorePage'));
 const ChatPage = lazy(() => import('./app/pages/ChatPage'));
 const AllTasksPage = lazy(() => import('./app/pages/AllTasksPage'));
 const TaskDetailPage = lazy(() => import('./app/pages/TaskDetailPage'));
@@ -283,6 +284,16 @@ export default function AppRouter() {
             <ErrorBoundary name="RunsPage">
               <LazyRoute>
                 <RunsPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/more"
+          element={
+            <ErrorBoundary name="MorePage">
+              <LazyRoute>
+                <MorePage />
               </LazyRoute>
             </ErrorBoundary>
           }

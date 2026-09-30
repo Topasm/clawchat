@@ -159,3 +159,34 @@ test('src/app/types/schemas.ts matches the checked-in OpenAPI snapshot', () => {
     `src/app/types/schemas.ts has drifted from server/openapi.json:\n${result.errors.join('\n')}`,
   );
 });
+
+test('fails a response mirror that rejects a null the server may send', () => {
+  const spec = {
+    components: {
+      schemas: {
+        MessageResponse: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            intent: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+            summary: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          },
+        },
+      },
+    },
+  };
+  const source = `export const MessageResponseSchema = z.object({
+  id: z.string(),
+  intent: z.string().optional(),
+  summary: z
+    .string()
+    .nullable()
+    .optional(),
+});
+`;
+  withFixture(spec, source, (result) => {
+    assert.deepEqual(result.errors, [
+      'MessageResponse.intent rejects the null the server may send',
+    ]);
+  });
+});

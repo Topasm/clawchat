@@ -616,3 +616,7 @@
     font-size: 16px;
   }
 }
+.cc-project-workspace__delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cc-error) 10%, transparent);
+  color: var(--cc-error);
+}

@@ -281,16 +281,19 @@ async def build_project_overview(
     project: Project,
 ) -> ProjectOverviewResponse:
     response = await build_project_response(db, project)
-    insights = await graph_insights_service.get_graph_insights(
-        db,
-        root_task_id=project.root_task_id,
-        limit=graph_insights_service.DEFAULT_GRAPH_INSIGHT_LIMIT,
+    _insights, work_nodes = await graph_insights_service.project_work_insights(
+        db, project_id=project.id, root_task_id=project.root_task_id
     )
-    work_nodes = [
-        node
-        for node in insights.nodes
-        if node.task_id != project.root_task_id and not node.is_container
-    ]
+    # The critical path is a property of the project's own tree.
+    tree = (
+        await graph_insights_service.get_graph_insights(
+            db,
+            root_task_id=project.root_task_id,
+            limit=graph_insights_service.DEFAULT_GRAPH_INSIGHT_LIMIT,
+        )
+        if project.root_task_id
+        else None
+    )
     pending_review_count = (
         await db.execute(
             select(func.count(ReviewItem.id)).where(
@@ -320,7 +323,7 @@ async def build_project_overview(
             )
             for node in work_nodes
         ),
-        critical_path_minutes=insights.summary.critical_path_minutes,
+        critical_path_minutes=tree.summary.critical_path_minutes if tree else None,
         pending_review_count=pending_review_count,
         running_agent_count=running_agent_count,
     )

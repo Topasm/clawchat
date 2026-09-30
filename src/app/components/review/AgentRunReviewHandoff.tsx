@@ -34,11 +34,10 @@ export default function AgentRunReviewHandoff({
   if (!impact && !outcome) return null;
   const isApplied = Boolean(outcome);
   const todoId = outcome?.todo_id ?? impact?.todo_id;
-  const graphRevision = outcome?.graph_revision ?? impact?.graph_revision;
   const newlyReadyTasks = outcome?.newly_ready_tasks ?? impact?.newly_ready_tasks ?? [];
   const readyCount = newlyReadyTasks.length;
   const nextTask = readyCount === 1 ? newlyReadyTasks[0] : undefined;
-  const completedLabel = taskTitle ? `“${taskTitle}”` : 'The linked task';
+  const completedLabel = taskTitle ? `“${taskTitle}”` : translateUi('the linked task');
   return (
     <section
       className={`cc-agent-review-handoff${isApplied ? ' cc-agent-review-handoff--applied' : ''}`}
@@ -49,12 +48,6 @@ export default function AgentRunReviewHandoff({
     >
       <div className="cc-agent-review-handoff__topline">
         <span>{isApplied ? translateUi('Approval applied') : translateUi('Approval impact')}</span>
-        {graphRevision !== undefined && (
-          <span>
-            {translateUi('Graph revision ')}
-            {graphRevision}
-          </span>
-        )}
       </div>
 
       <strong>

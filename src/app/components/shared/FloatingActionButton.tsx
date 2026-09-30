@@ -92,7 +92,7 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
 }
 // Hide FAB on detail pages, settings, admin, search
 const HIDDEN_PATTERNS = [/^\/(tasks|chats|events)\/[^/]+/, /^\/(settings|admin|search)/];
-export default function FloatingActionButton() {
+export default function FloatingActionButton({ aboveChatBar = false }: { aboveChatBar?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -118,7 +118,7 @@ export default function FloatingActionButton() {
           />
         )}
       </AnimatePresence>
-      <div className="cc-fab">
+      <div className={`cc-fab${aboveChatBar ? ' cc-fab--above-chat' : ''}`}>
         <AnimatePresence>
           {expanded && (
             <div className="cc-fab__actions">

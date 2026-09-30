@@ -73,10 +73,10 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
     useChatStore.getState().setProjectPlanSelection(project.id, { view, taskId });
   const [proposalTarget, setProposalTarget] = useState<TodoResponse | null>(null);
   const { data: relationships = [] } = useTaskRelationshipsQuery();
-  const insightsQuery = useTaskGraphInsightsQuery(
-    project.root_task_id,
-    Boolean(project.root_task_id),
-  );
+  // Whole-graph insights, not the root's subtree: a task can belong to the
+  // project without hanging under its root, and readiness depends on blockers
+  // anywhere. The plan filters to its own tasks through `todos`.
+  const insightsQuery = useTaskGraphInsightsQuery(null);
   const selectedTask = todos.find((todo) => todo.id === selectedTaskId) ?? null;
   const selectedInsight = insightsQuery.data?.nodes.find((node) => node.task_id === selectedTaskId);
   const telemetryQuery = useTaskExecutionTelemetryQuery(project.id);

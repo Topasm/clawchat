@@ -71,7 +71,7 @@ describe('InboxTriageTree', () => {
     );
 
     expect(screen.getByText('Agent 42%')).toBeInTheDocument();
-    expect(screen.getByText('2 artifacts')).toBeInTheDocument();
+    expect(screen.getByText('2 files')).toBeInTheDocument();
   });
 
   it('places the selected Inbox task at the project root', () => {

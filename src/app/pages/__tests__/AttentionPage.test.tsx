@@ -192,7 +192,7 @@ describe('AttentionPage', () => {
     });
     renderPage();
 
-    expect(screen.getByText('The agent wants to use notes__read.')).toBeInTheDocument();
+    expect(screen.getByText('The agent wants to use read from notes.')).toBeInTheDocument();
     expect(screen.getByText(/"path": "a.md"/)).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Answer the agent' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));

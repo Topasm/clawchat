@@ -687,8 +687,9 @@ export const MessageResponseSchema = z.object({
   conversation_id: z.string(),
   role: z.enum(['user', 'assistant']),
   content: z.string(),
-  intent: z.string().optional(),
-  message_type: z.string().optional(),
+  // Run updates and other system-posted messages carry no intent (null).
+  intent: z.string().nullable().optional(),
+  message_type: z.string().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: z.string(),
 });
