@@ -179,6 +179,13 @@ async def delete_event_occurrence(
     await db.flush()
 
 
+def _utc(moment: datetime) -> datetime:
+    # SQLite hands back naive datetimes for values stored in UTC. Written as
+    # is, they become floating times that each client reads as its own local
+    # time, so stamp them UTC before they leave.
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
 async def export_events_ical(db: AsyncSession) -> str:
     """Export the calendar -- events and task deadlines -- as an iCalendar string."""
     q = select(Event).order_by(Event.start_time.asc())
@@ -200,9 +207,9 @@ async def export_events_ical(db: AsyncSession) -> str:
             if event.end_time:
                 vevent.add("dtend", event.end_time.date())
         else:
-            vevent.add("dtstart", event.start_time)
+            vevent.add("dtstart", _utc(event.start_time))
             if event.end_time:
-                vevent.add("dtend", event.end_time)
+                vevent.add("dtend", _utc(event.end_time))
 
         if event.description:
             vevent.add("description", event.description)
@@ -244,8 +251,8 @@ async def export_events_ical(db: AsyncSession) -> str:
             alarm.add("trigger", timedelta(minutes=-event.reminder_minutes))
             vevent.add_component(alarm)
 
-        vevent.add("created", event.created_at)
-        vevent.add("last-modified", event.updated_at)
+        vevent.add("created", _utc(event.created_at))
+        vevent.add("last-modified", _utc(event.updated_at))
 
         cal.add_component(vevent)
 
