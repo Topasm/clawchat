@@ -754,6 +754,8 @@ export const koreanUiTranslations: Record<string, string> = {
     '받은편지함 카드를 선택하거나 드래그하여 정리하세요.',
   'Select task...': '작업 선택...',
   'Select tasks to move them together': '함께 이동할 작업을 선택하세요',
+  'Move together with other selected tasks': '선택한 다른 작업과 함께 이동',
+  'Inbox view': 'Inbox 보기',
   selected: '선택된',
   'selected task': '선택한 작업',
   'Selected task': '선택한 작업',
@@ -1435,6 +1437,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'MCP endpoint URL': 'MCP 엔드포인트 URL',
   'MCP server removed': 'MCP 서버를 삭제했습니다',
   'MCP servers': 'MCP 서버',
+  'Using {{label}}…': '{{label}} 사용 중…',
   'Offered to the Research skill. Searches run on your own SearXNG instance with JSON output enabled.':
     '리서치 스킬에서 사용합니다. 검색은 JSON 출력을 켠 내 SearXNG 인스턴스에서 실행됩니다.',
   On: '켜기',

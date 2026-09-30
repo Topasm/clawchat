@@ -28,6 +28,8 @@ interface InboxQueueProps {
   isBatchPlacing: boolean;
   dependencyBusy: boolean;
   isMobile: boolean;
+  /** True while a placed task is being dragged out of the tree, so the unplace target has a job. */
+  unplaceTargetActive: boolean;
   onUnplaceTask: (taskId: string) => void;
   onUnplaceTasks: (taskIds: string[]) => void;
   onToggleComplete: (taskId: string) => void;
@@ -49,6 +51,7 @@ export default function InboxQueue({
   isBatchPlacing,
   dependencyBusy,
   isMobile,
+  unplaceTargetActive,
   onUnplaceTask,
   onUnplaceTasks,
   onToggleComplete,
@@ -91,8 +94,11 @@ export default function InboxQueue({
           </div>
         </div>
       )}
+      {/* Stays in the DOM so a drop always has a target, but only takes up space
+          while a task is actually being dragged out of the tree. */}
       <div
         className="cc-inbox-triage__inbox-target"
+        data-active={unplaceTargetActive ? 'true' : undefined}
         onDragOver={(event) => {
           if (
             transferHasType(event, INBOX_TASK_DRAG_TYPE) ||
@@ -115,7 +121,7 @@ export default function InboxQueue({
           }
         }}
       >
-        {translateUi('\n        Inbox \u00B7 drop here to unplace\n      ')}
+        {translateUi('Inbox \u00B7 drop here to unplace')}
       </div>
       {/* Planning now (classifying/planning) */}
       {processing.length > 0 && (
@@ -162,20 +168,20 @@ export default function InboxQueue({
           defaultOpen
         >
           {planReady.map((task) => (
-            <div key={task.id} className="cc-inbox-card cc-inbox-card--review">
+            <div key={task.id} className="cc-inbox-card cc-inbox-card--row cc-inbox-card--review">
               <TaskCard
                 task={task}
                 onToggle={() => onToggleComplete(task.id)}
                 onClick={() => onOpenTask(task.id)}
                 onDelete={() => onDelete(task.id)}
               />
-              <div className="cc-inbox-card__actions">
+              <div className="cc-inbox-card__side">
                 <button
-                  className="cc-btn cc-btn--primary"
-                  style={{ fontSize: 12 }}
+                  type="button"
+                  className="cc-btn cc-btn--compact cc-btn--primary"
                   onClick={() => onOpenTask(task.id)}
                 >
-                  {translateUi('\n                  Review\n                ')}
+                  {translateUi('Review')}
                 </button>
               </div>
             </div>
@@ -218,23 +224,28 @@ export default function InboxQueue({
               onApplyAndOpen={onApplyTriageAndOpen}
             />
           )}
-          {needsOrganising.map((task) => (
-            <InboxCapturedCard
-              key={task.id}
-              task={task}
-              isSelected={selection.selectedTaskId === task.id}
-              isBatchSelected={selection.batchTaskIds.includes(task.id)}
-              batchTaskIds={selection.batchTaskIds}
-              subTaskCount={childCountByParent.get(task.id) ?? 0}
-              draggable={cardsDraggable}
-              dependencyDraggable={!dependencyBusy}
-              onSelect={selection.selectTask}
-              onToggleBatch={selection.toggleBatchTask}
-              onToggleComplete={onToggleComplete}
-              onDelete={onDelete}
-              onOrganize={onOrganize}
-            />
-          ))}
+          <div
+            className="cc-inbox-triage__captured"
+            data-batching={selection.batchTaskIds.length > 0 ? 'true' : undefined}
+          >
+            {needsOrganising.map((task) => (
+              <InboxCapturedCard
+                key={task.id}
+                task={task}
+                isSelected={selection.selectedTaskId === task.id}
+                isBatchSelected={selection.batchTaskIds.includes(task.id)}
+                batchTaskIds={selection.batchTaskIds}
+                subTaskCount={childCountByParent.get(task.id) ?? 0}
+                draggable={cardsDraggable}
+                dependencyDraggable={!dependencyBusy}
+                onSelect={selection.selectTask}
+                onToggleBatch={selection.toggleBatchTask}
+                onToggleComplete={onToggleComplete}
+                onDelete={onDelete}
+                onOrganize={onOrganize}
+              />
+            ))}
+          </div>
         </SectionHeader>
       )}
 
@@ -247,20 +258,20 @@ export default function InboxQueue({
           defaultOpen={false}
         >
           {errors.map((task) => (
-            <div key={task.id} className="cc-inbox-card cc-inbox-card--error">
+            <div key={task.id} className="cc-inbox-card cc-inbox-card--row cc-inbox-card--error">
               <TaskCard
                 task={task}
                 onToggle={() => onToggleComplete(task.id)}
                 onClick={() => onOpenTask(task.id)}
                 onDelete={() => onDelete(task.id)}
               />
-              <div className="cc-inbox-card__actions">
+              <div className="cc-inbox-card__side">
                 <button
-                  className="cc-btn cc-btn--danger"
-                  style={{ fontSize: 12 }}
+                  type="button"
+                  className="cc-btn cc-btn--compact cc-btn--danger"
                   onClick={() => onRetry(task.id)}
                 >
-                  {translateUi('\n                  Retry\n                ')}
+                  {translateUi('Retry')}
                 </button>
               </div>
             </div>
