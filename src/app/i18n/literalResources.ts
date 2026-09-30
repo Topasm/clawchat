@@ -1496,4 +1496,27 @@ export const koreanUiTranslations: Record<string, string> = {
     '호스트를 내 서버 주소로 바꾸고, 설정 > 보안에서 만든 앱 비밀번호를 사용하세요.',
   'Any CalDAV server address, such as Radicale or Baikal.':
     'Radicale, Baikal 같은 CalDAV 서버 주소를 입력하세요.',
+  'Ask about this work, or start with one of these:':
+    '이 작업에 대해 물어보거나 아래 질문으로 시작해 보세요:',
+  'What should I do next?': '다음에 무엇을 하면 좋을까요?',
+  'Summarize the progress so far.': '지금까지의 진행 상황을 요약해 주세요.',
+  'What is blocking this?': '무엇이 이 작업을 막고 있나요?',
+  'the linked task': '연결된 작업',
+  'Low risk': '위험 낮음',
+  'High risk': '위험 높음',
+  'Worth a close look': '꼼꼼히 확인 필요',
+  'Document change': '문서 변경',
+  'Agent result': '에이전트 결과',
+  '· try {{attempt}}': ' · {{attempt}}번째 시도',
+  'attempt {{attempt}}': '{{attempt}}번째 시도',
+  'last heard from {{time}}': '마지막 응답 {{time}}',
+  'Web search': '웹 검색',
+  'The agent wants to use {{tool}} from {{server}}.':
+    '에이전트가 {{server}}의 {{tool}} 도구를 사용하려고 합니다.',
+  'Agent working': '에이전트 작업 중',
+  'To do': '할 일',
+  '{{done}}/{{total}} done': '{{done}}/{{total}} 완료',
+  'Agent {{progress}}%': '에이전트 {{progress}}%',
+  '{{count}} reviews': '검토 {{count}}건',
+  '1 file': '파일 1개',
 };

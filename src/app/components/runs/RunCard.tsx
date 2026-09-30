@@ -103,7 +103,7 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
           rows={2}
           value={followUp}
           onChange={(event) => setFollowUp(event.target.value)}
-          placeholder={translateUi('Add follow-up instructions before retrying')}
+          placeholder={translateUi('Answer the agent')}
           aria-label={translateUi('Answer the agent')}
         />
       )}

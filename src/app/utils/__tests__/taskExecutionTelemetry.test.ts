@@ -35,7 +35,7 @@ describe('getTaskExecutionBadges', () => {
       ),
     ).toEqual([
       { key: 'run', label: 'Agent 42%', tone: 'active' },
-      { key: 'artifact', label: '2 artifacts', tone: 'neutral' },
+      { key: 'artifact', label: '2 files', tone: 'neutral' },
     ]);
   });
 

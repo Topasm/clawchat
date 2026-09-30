@@ -4,11 +4,17 @@ import type { ReviewItemResponse } from '../../types/api';
 import { agentRunApprovalImpact, type ReviewDecision } from '../../utils/agentRunReview';
 import { translateUi } from '../../i18n';
 
+function riskLabel(level: string): string {
+  if (level === 'low') return translateUi('Low risk');
+  if (level === 'high') return translateUi('High risk');
+  return translateUi('Worth a close look');
+}
+
 export function subjectLabel(item: ReviewItemResponse): string {
   const labels: Record<string, string> = {
-    plan_proposal: translateUi('Plan proposal'),
-    artifact_revision: translateUi('Artifact revision'),
-    agent_run: translateUi('Agent run'),
+    plan_proposal: translateUi('Plan'),
+    artifact_revision: translateUi('Document change'),
+    agent_run: translateUi('Agent result'),
   };
   return labels[item.subject_type] ?? item.subject_type.replaceAll('_', ' ');
 }
@@ -41,8 +47,7 @@ export default function ReviewItemCard({
     <article className="cc-review-card">
       <div className="cc-review-card__topline">
         <span className={`cc-review-card__risk cc-review-card__risk--${item.risk_level}`}>
-          {item.risk_level}
-          {translateUi(' risk\n                  ')}
+          {riskLabel(item.risk_level)}
         </span>
         <span>{subjectLabel(item)}</span>
         {item.project_title && <span>{item.project_title}</span>}

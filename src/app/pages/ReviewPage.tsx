@@ -34,8 +34,8 @@ export default function ReviewPage() {
     <div className="cc-review-page">
       <header className="cc-page-header cc-review-page__header">
         <div>
-          <h1>{translateUi('Review')}</h1>
-          <p>
+          <h1 className="cc-page-header__title">{translateUi('Review')}</h1>
+          <p className="cc-page-header__subtitle">
             {translateUi(
               'One place to approve plans and project outputs before they change your work.',
             )}

@@ -57,6 +57,7 @@ export default function ChatPanel({
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isLoading: isLoadingMessages,
   } = useMessagesQuery(conversationId);
   const workspaceScope = getChatWorkspaceScope();
   // Merge query messages with streaming messages
@@ -195,6 +196,8 @@ export default function ChatPanel({
         hasOlderMessages={hasNextPage}
         isLoadingOlderMessages={isFetchingNextPage}
         onLoadOlderMessages={() => void fetchNextPage()}
+        isLoading={isLoadingMessages}
+        onSuggest={(text) => void handleSend(text)}
         onRetryMessage={(message) => {
           if (!conversationId || !message.idempotencyKey) return;
           updateStreamingMessageId(message._id, message._id, 'pending');

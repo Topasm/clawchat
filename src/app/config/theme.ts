@@ -43,8 +43,8 @@ export const lightColors: ColorPalette = {
   surface: '#FFFFFF',
   surfaceSecondary: '#F0F2F5',
   text: '#181A1D',
-  textSecondary: '#626872',
-  textTertiary: '#969DA7',
+  textSecondary: '#525862',
+  textTertiary: '#6B727C',
   border: '#E1E4E8',
   disabled: '#AEB4BC',
 
@@ -80,7 +80,7 @@ export const darkColors: ColorPalette = {
   surfaceSecondary: '#22262B',
   text: '#F3F4F6',
   textSecondary: '#A0A6AF',
-  textTertiary: '#6F7680',
+  textTertiary: '#858C96',
   border: '#30353B',
   disabled: '#5B626C',
 

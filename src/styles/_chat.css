@@ -222,6 +222,39 @@
   min-height: 0;
 }
 
+/* A new conversation: a nudge instead of a blank column. */
+.cc-chat-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: auto 0;
+  padding: 8px 0;
+}
+
+.cc-chat-panel__empty p {
+  margin: 0 0 4px;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+}
+
+.cc-chat-panel__empty button {
+  padding: 6px 12px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-chat-panel__empty button:hover {
+  border-color: var(--cc-primary);
+  color: var(--cc-primary);
+}
+
 .cc-chat-history__load-older {
   align-self: center;
   margin: 2px auto 8px;

@@ -21,7 +21,9 @@ export function getTaskExecutionBadges(
     case 'running':
       badges.push({
         key: 'run',
-        label: `Agent ${telemetry.latest_run_progress ?? 0}%`,
+        label: translateUi('Agent {{progress}}%', {
+          progress: telemetry.latest_run_progress ?? 0,
+        }),
         tone: 'active',
       });
       break;
@@ -49,15 +51,18 @@ export function getTaskExecutionBadges(
       key: 'review',
       label:
         telemetry.pending_review_count === 1
-          ? 'Waiting review'
-          : `${telemetry.pending_review_count} reviews`,
+          ? translateUi('Waiting review')
+          : translateUi('{{count}} reviews', { count: telemetry.pending_review_count }),
       tone: 'attention',
     });
   }
   if (telemetry.artifact_count > 0) {
     badges.push({
       key: 'artifact',
-      label: `${telemetry.artifact_count} ${telemetry.artifact_count === 1 ? 'artifact' : 'artifacts'}`,
+      label:
+        telemetry.artifact_count === 1
+          ? translateUi('1 file')
+          : translateUi('{{count}} files', { count: telemetry.artifact_count }),
       tone: 'neutral',
     });
   }

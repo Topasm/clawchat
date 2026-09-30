@@ -545,3 +545,39 @@
     transform: scale(1);
   }
 }
+
+/* --- Icon buttons ------------------------------------------- */
+/* A bare icon with a hover surface; it had no base rule, so the browser's
+   bordered button showed through. */
+.cc-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--cc-radius-sm);
+  background: transparent;
+  color: var(--cc-text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.cc-icon-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cc-text) 6%, transparent);
+  color: var(--cc-text);
+}
+
+.cc-icon-button:focus-visible {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: 1px;
+}
+
+.cc-icon-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

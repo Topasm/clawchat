@@ -15,6 +15,9 @@ interface ChatPanelMessagesProps {
   isLoadingOlderMessages?: boolean;
   onLoadOlderMessages?: () => void;
   onRetryMessage?: (message: ChatMessage) => void;
+  isLoading?: boolean;
+  /** Sends a starter question from the empty state. */
+  onSuggest?: (text: string) => void;
 }
 
 export default function ChatPanelMessages({
@@ -27,6 +30,8 @@ export default function ChatPanelMessages({
   isLoadingOlderMessages,
   onLoadOlderMessages,
   onRetryMessage,
+  isLoading = false,
+  onSuggest,
 }: ChatPanelMessagesProps) {
   const isStreaming = useChatStore(
     (s) => s.isStreaming && s.streamingConversationId === conversationId,
@@ -75,6 +80,20 @@ export default function ChatPanelMessages({
             isLoadingOlderMessages ? 'Loading earlier messages...' : 'Load earlier messages',
           )}
         </button>
+      )}
+      {!isLoading && !hasOlderMessages && messages.length === 0 && onSuggest && (
+        <div className="cc-chat-panel__empty">
+          <p>{translateUi('Ask about this work, or start with one of these:')}</p>
+          {[
+            translateUi('What should I do next?'),
+            translateUi('Summarize the progress so far.'),
+            translateUi('What is blocking this?'),
+          ].map((text) => (
+            <button key={text} type="button" onClick={() => onSuggest(text)}>
+              {text}
+            </button>
+          ))}
+        </div>
       )}
       {chronological.map((msg) => (
         <MessageBubble

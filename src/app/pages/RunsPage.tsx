@@ -38,8 +38,8 @@ export default function RunsPage() {
     <div className="cc-runs-page">
       <header className="cc-page-header cc-runs-page__header">
         <div>
-          <h1>{translateUi('Runs')}</h1>
-          <p>
+          <h1 className="cc-page-header__title">{translateUi('Runs')}</h1>
+          <p className="cc-page-header__subtitle">
             {translateUi(
               'Inspect every execution attempt, provider, heartbeat, result, and failure.',
             )}

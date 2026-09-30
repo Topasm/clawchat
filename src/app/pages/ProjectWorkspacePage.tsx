@@ -239,9 +239,13 @@ export default function ProjectWorkspacePage() {
           <ChatBubbleIcon size={15} />
           {translateUi(' Project Agent')}
         </button>
+        {/* Destructive and rare: an icon beside the primary action, not a
+            second button competing with it. It still asks first. */}
         <button
           type="button"
-          className="cc-btn cc-btn--danger"
+          className="cc-icon-button cc-project-workspace__delete"
+          aria-label={translateUi('Delete project')}
+          title={translateUi('Delete project')}
           disabled={deleteProject.isPending}
           onClick={() => {
             if (
@@ -255,8 +259,7 @@ export default function ProjectWorkspacePage() {
             }
           }}
         >
-          <TrashIcon size={15} />
-          {translateUi('Delete project')}
+          <TrashIcon size={16} />
         </button>
       </header>
 
