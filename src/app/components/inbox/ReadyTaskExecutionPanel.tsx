@@ -61,13 +61,14 @@ export default function ReadyTaskExecutionPanel({
   const selectedSkillId = skillId || assignedSkill || executableSkills[0]?.id || '';
   const selectedProviderId = providerId || project?.default_execution_provider || 'builtin';
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
-  const paseoWorkspaceReady =
-    selectedProviderId !== 'paseo' || Boolean(project?.execution_workspace_path);
+  // Providers ClawChat bridges to run in the project's own workspace.
+  const needsWorkspace = selectedProviderId === 'paseo' || selectedProviderId === 'opencode';
+  const workspaceReady = !needsWorkspace || Boolean(project?.execution_workspace_path);
   const providerReady = Boolean(
     selectedProvider?.enabled &&
     selectedProvider.available &&
     selectedProvider.connected &&
-    paseoWorkspaceReady,
+    workspaceReady,
   );
   const hasActiveRun = Boolean(
     telemetry?.latest_run_status && ACTIVE_AGENT_RUN_STATUSES.has(telemetry.latest_run_status),
@@ -135,10 +136,11 @@ export default function ReadyTaskExecutionPanel({
                 ))}
               </select>
             </label>
-            {selectedProviderId === 'paseo' && !paseoWorkspaceReady && (
+            {needsWorkspace && !workspaceReady && (
               <p>
                 {translateUi(
-                  'Configure this Project\u2019s execution workspace before using Paseo.',
+                  'Configure this Project\u2019s execution workspace before using {{provider}}.',
+                  { provider: selectedProvider?.label ?? selectedProviderId },
                 )}
               </p>
             )}

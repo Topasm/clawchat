@@ -504,6 +504,10 @@ async def decide_run(
             from services.agents.paseo_execution_service import publish_adopted_output
 
             await publish_adopted_output(db, run=run, task=task)
+        elif run.provider == "opencode":
+            from services.agents import opencode_execution_service
+
+            await opencode_execution_service.publish_adopted_output(db, run=run, task=task)
         await record_event(db, run, "approved", "Run result approved", progress=100)
         await db.flush()
         if todo is not None and before_insights is not None:

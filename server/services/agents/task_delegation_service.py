@@ -25,6 +25,7 @@ from services.agents import (
     agent_run_service,
     agent_task_service,
     execution_host_service,
+    opencode_execution_service,
     paseo_execution_service,
 )
 from services.planning import (
@@ -56,6 +57,7 @@ class DelegationRuntime:
     active_ai: Any | None
     active_ai_provider: str
     paseo_adapter: Any | None = None
+    opencode_adapter: Any | None = None
 
 
 def resolve_skill_id(body: DelegateRequest) -> str:
@@ -138,12 +140,13 @@ async def delegate_todo_to_skill(
         "worker"
         if worker_host is not None
         else (
-            "paseo"
-            if configured_provider == "paseo" and skill_id != "plan"
+            configured_provider
+            if configured_provider in ("paseo", "opencode") and skill_id != "plan"
             else active_provider
         )
     )
     paseo_adapter = None
+    opencode_adapter = None
     if provider == "paseo":
         paseo_adapter = runtime.paseo_adapter or (
             paseo_execution_service.adapter_from_settings()
@@ -179,6 +182,20 @@ async def delegate_todo_to_skill(
                 ),
                 status_code=409,
             )
+    elif provider == "opencode":
+        opencode_adapter = runtime.opencode_adapter or (
+            opencode_execution_service.adapter_from_settings()
+        )
+        if not opencode_adapter.enabled:
+            raise AppError(
+                code="OPENCODE_DISABLED",
+                message="OpenCode execution is disabled on this ClawChat server",
+                status_code=503,
+            )
+        problem = opencode_execution_service.workspace_problem(workspace)
+        if problem is not None:
+            code, message = problem
+            raise AppError(code=code, message=message, status_code=409)
     elif worker_host is None and active_ai is None:
         raise AppError(
             code="AI_UNAVAILABLE",
@@ -191,6 +208,8 @@ async def delegate_todo_to_skill(
         or (
             settings.paseo_default_provider
             if provider == "paseo"
+            else settings.opencode_model or None
+            if provider == "opencode"
             else getattr(active_ai, "model", None)
         )
     )
@@ -207,6 +226,8 @@ async def delegate_todo_to_skill(
             if paseo_adapter
             else worker_host.label
             if worker_host
+            else workspace.host.label
+            if opencode_adapter and workspace and workspace.host
             else None
         ),
         update_todo_status=skill_id != "plan" and not body.require_ready,
@@ -299,6 +320,16 @@ async def delegate_todo_to_skill(
                 run.id,
                 user_id=user_id,
                 adapter=paseo_adapter,
+            ),
+        )
+    elif provider == "opencode":
+        agent_run_service.launch_execution(
+            run.id,
+            opencode_execution_service.execute_run(
+                session_factory,
+                run.id,
+                user_id=user_id,
+                adapter=opencode_adapter,
             ),
         )
     else:

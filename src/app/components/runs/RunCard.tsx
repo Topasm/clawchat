@@ -70,14 +70,19 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
             {run.attempt > 1 ? translateUi(' · try {{attempt}}', { attempt: run.attempt }) : ''}
           </p>
           {(run.host_label ||
-            (run.provider === 'paseo' && (run.workspace_id || run.external_run_id))) && (
+            ((run.provider === 'paseo' || run.provider === 'opencode') &&
+              (run.workspace_id || run.external_run_id))) && (
             <p className="cc-run-card__external">
               {run.host_label
                 ? translateUi('on {{host}}', { host: run.host_label })
-                : translateUi('Paseo')}
+                : run.provider === 'opencode'
+                  ? translateUi('OpenCode')
+                  : translateUi('Paseo')}
               {run.workspace_id ? translateUi(' · workspace {{id}}', { id: run.workspace_id }) : ''}
               {run.external_run_id
-                ? translateUi(' · agent {{id}}', { id: run.external_run_id })
+                ? run.provider === 'opencode'
+                  ? translateUi(' · session {{id}}', { id: run.external_run_id })
+                  : translateUi(' · agent {{id}}', { id: run.external_run_id })
                 : ''}
             </p>
           )}

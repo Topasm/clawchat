@@ -14461,9 +14461,20 @@
         ]
       }
     },
-    "/api/execution-providers/paseo/test": {
+    "/api/execution-providers/{provider_id}/test": {
       "post": {
-        "operationId": "test_paseo_connection_api_execution_providers_paseo_test_post",
+        "operationId": "test_execution_provider_api_execution_providers__provider_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -14474,6 +14485,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -14481,7 +14502,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Test Paseo Connection",
+        "summary": "Test Execution Provider",
         "tags": [
           "execution-providers"
         ]

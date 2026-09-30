@@ -4,7 +4,8 @@
 in-process cancellation registry; ``agent_task_service`` owns the task rows a
 run executes; ``task_delegation_service`` is the entry point that picks a
 skill and provider and starts the run; ``paseo_execution_service`` bridges
-runs to externally supervised Paseo agents; ``task_execution_recovery_service``
+runs to externally supervised Paseo agents; ``opencode_execution_service``
+runs them in a sandboxed OpenCode server on this machine; ``task_execution_recovery_service``
 releases an unsuccessful run's task back to the graph.
 
 Depends on ``review`` (handoff and queue writes on completion), ``tasks``,
