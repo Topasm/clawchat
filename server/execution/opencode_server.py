@@ -156,6 +156,7 @@ def run_config(
     tools_url: str | None = None,
     tools_token: str | None = None,
     tool_timeout_ms: int | None = None,
+    skills_paths: list[str] | None = None,
 ) -> dict[str, Any]:
     """The configuration ClawChat pins for a run, on top of the repository's."""
     config: dict[str, Any] = {
@@ -166,6 +167,9 @@ def run_config(
     }
     if model:
         config["model"] = model
+    if skills_paths:
+        # Added to the skills OpenCode already finds in the project.
+        config["skills"] = {"paths": list(skills_paths)}
     if tools_url and tools_token:
         server: dict[str, Any] = {
             "type": "remote",

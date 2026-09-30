@@ -62,7 +62,7 @@ Server config is via environment variables (see `.env.example`). Key vars: `AI_P
   - `orchestrator.py` — Routes classified intents to appropriate service
   - `scheduler.py` — Background tasks (reminders, daily briefing, queue flush)
   - `inbox_pipeline_service.py` — Inbox classification + skill suggestion
-- **Skills** (`server/skills/`): Composable agent capabilities (registry pattern). Built-in skills: plan, research, summarize, draft, code_review, data_analysis, obsidian_sync, prioritize. Skills are chained on AgentTask and executed sequentially.
+- **Skills** (`server/skills/`): Composable agent capabilities (registry pattern). Built-in skills are Agent Skills `SKILL.md` files in `server/skills/builtin/<name>/` (plan, research, summarize, draft, code-review, data-analysis, obsidian-sync, prioritize, weekly-review): the body is the system prompt, ClawChat fields live under `metadata`, and the skill id is the name with hyphens as underscores (`code_review`). Edit the files, not Python; the same directory is handed to OpenCode runs. Skills are chained on AgentTask and executed sequentially.
   - `obsidian_cli_service.py` — Obsidian CLI wrapper (official `key=value` syntax) + write queue
   - `obsidian_context_service.py` / `obsidian_export_service.py` / `obsidian_vault_indexer.py` — Vault integration
 - **Models** (`server/models/`): SQLAlchemy async ORM models (conversation, message, todo, event, attachment, etc.)

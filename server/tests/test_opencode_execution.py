@@ -18,6 +18,7 @@ from models.artifact import Artifact
 from models.project import Project
 from models.todo import Todo
 from services.agents import agent_run_service, opencode_execution_service
+from skills.builtins import BUILTIN_SKILLS_DIR
 
 SESSION = "ses_test"
 PATCH = "--- a/app.py\n+++ b/app.py\n@@ -1 +1 @@\n-old\n+new\n"
@@ -215,6 +216,17 @@ def test_run_config_pins_permissions_and_scopes_clawchat_tools():
     assert server["timeout"] == 1000
     assert "mcp" not in run_config(model=None)
     assert "model" not in run_config(model=None)
+    assert "skills" not in run_config(model=None)
+    assert run_config(model=None, skills_paths=["/skills"])["skills"] == {"paths": ["/skills"]}
+
+
+def test_run_prompt_names_the_delegated_skill():
+    assert opencode_execution_service.run_prompt("Fix it", "code_review").startswith(
+        "Use the `code-review` skill for this task.\n\nFix it"
+    )
+    # A skill ClawChat does not know is left for OpenCode to choose.
+    assert opencode_execution_service.run_prompt("Fix it", "general") == "Fix it"
+    assert opencode_execution_service.run_prompt("Fix it", None) == "Fix it"
 
 
 def test_summarize_reply_reads_only_the_latest_prompt():
@@ -282,6 +294,8 @@ async def test_opencode_run_reaches_review_with_its_diff(db_session, tmp_path):
     workspace, config = adapter.served[0]
     assert workspace == str(tmp_path)
     assert config["model"] == "ollama/qwen3"
+    # The built-in skills travel as SKILL.md files OpenCode loads itself.
+    assert config["skills"] == {"paths": [str(BUILTIN_SKILLS_DIR)]}
     assert server.prompts == [(SESSION, persisted.instruction_snapshot)]
     # Unattended: the permission is refused, with a reason the agent can use.
     assert server.permission_replies[0][:2] == ("per_1", "reject")
