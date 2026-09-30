@@ -65,7 +65,10 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const newestMessageIdRef = useRef<string | undefined>(undefined);
   const [dismissedAnswerRunId, setDismissedAnswerRunId] = useState<string | null>(null);
-  const waitingRun = runsAwaitingInput.find((run) => run.conversation_id === conversationId);
+  // A run waiting on a tool approval takes allow/deny on its card, not text.
+  const waitingRun = runsAwaitingInput.find(
+    (run) => run.conversation_id === conversationId && !run.pending_tool_call,
+  );
   const answerRun = waitingRun?.id === dismissedAnswerRunId ? undefined : waitingRun;
   // Merge query messages with streaming messages
   // Streaming messages are newest-first, query messages are newest-first

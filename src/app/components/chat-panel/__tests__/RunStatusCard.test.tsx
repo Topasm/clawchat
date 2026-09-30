@@ -11,6 +11,7 @@ const queryMocks = vi.hoisted(() => ({
   decide: vi.fn(),
   permission: vi.fn(),
   runNext: vi.fn(),
+  decideTool: vi.fn(),
 }));
 
 vi.mock('../../../hooks/queries', () => ({
@@ -19,6 +20,7 @@ vi.mock('../../../hooks/queries', () => ({
   useResumeAgentRun: () => ({ mutate: queryMocks.resume, isPending: false }),
   useDecideReview: () => ({ mutate: queryMocks.decide, isPending: false }),
   useResolvePaseoPermission: () => ({ mutate: queryMocks.permission, isPending: false }),
+  useDecideToolCall: () => ({ mutate: queryMocks.decideTool, isPending: false }),
   useRunReadyTaskWithProjectDefaults: () => ({
     runTask: queryMocks.runNext,
     canRunTask: () => true,
@@ -209,5 +211,26 @@ describe('RunStatusCard', () => {
       true,
     );
     expect(container.querySelector('.cc-task-progress')).not.toBeInTheDocument();
+  });
+
+  it('asks for an allow or deny when the run waits on a tool, not for an answer', () => {
+    queryMocks.awaitingInput.mockReturnValue({
+      data: [
+        {
+          ...waitingRun,
+          pending_tool_call: { id: 'tcall_1', tool_name: 'notes__read_file', arguments: {} },
+        },
+      ],
+    });
+    renderCard({ action_type: 'run_update', run_id: 'run_1', status: 'waiting_input' });
+
+    expect(screen.getByText('The agent wants to use read file from notes.')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Answer the agent' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
+    expect(queryMocks.decideTool).toHaveBeenCalledWith({
+      runId: 'run_1',
+      callId: 'tcall_1',
+      decision: 'deny',
+    });
   });
 });

@@ -9,6 +9,7 @@ import {
 import useReviewDecisionHandoff from '../../hooks/useReviewDecisionHandoff';
 import { translateUi } from '../../i18n';
 import AgentRunReviewOutcomeHandoff from '../review/AgentRunReviewOutcomeHandoff';
+import ToolRequestPanel from '../runs/ToolRequestPanel';
 
 /**
  * A persisted moment in an agent run's life, written into its thread by the
@@ -53,8 +54,10 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
   const needsUser = needsReview || needsInput;
   const { data: awaitingInput = [] } = useRunsAwaitingInputQuery();
   const { data: pendingReviews = [] } = useReviewsQuery();
-  const stillWaitingForInput =
-    needsInput && Boolean(runId) && awaitingInput.some((run) => run.id === runId);
+  const liveRun = needsInput && runId ? awaitingInput.find((run) => run.id === runId) : undefined;
+  const stillWaitingForInput = Boolean(liveRun);
+  // Waiting on a tool approval: the run takes an allow or deny, not an answer.
+  const pendingTool = liveRun?.pending_tool_call ?? null;
   const pendingReview = needsReview
     ? pendingReviews.find(
         (item) => item.subject_type === 'agent_run' && item.metadata?.run_id === runId,
@@ -99,7 +102,8 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
           {error}
         </div>
       )}
-      {stillWaitingForInput && runId && (
+      {pendingTool && runId && <ToolRequestPanel runId={runId} request={pendingTool} />}
+      {stillWaitingForInput && runId && !pendingTool && (
         <div className="cc-run-status-card__reply">
           {inputOptions.length > 0 && (
             <div className="cc-run-status-card__options">

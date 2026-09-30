@@ -6,8 +6,9 @@ import {
   useReturnAgentRunToReady,
   useRetryAgentRun,
   useResumeAgentRun,
-  useDecideToolCall,
 } from '../../hooks/queries';
+import { runStatusLabel } from '../chat-panel/RunStatusCard';
+import ToolRequestPanel from './ToolRequestPanel';
 import type { AgentRunResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
 
@@ -47,7 +48,6 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
   const retry = useRetryAgentRun();
   const returnToReady = useReturnAgentRunToReady();
   const resume = useResumeAgentRun();
-  const decideTool = useDecideToolCall();
   const [followUp, setFollowUp] = useState('');
   const pendingTool = run.status === 'waiting_input' ? run.pending_tool_call : null;
   const answering = run.status === 'waiting_input' && !pendingTool;
@@ -62,14 +62,12 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
       <div className="cc-run-card__header">
         <div className="cc-run-card__identity">
           <span className={`cc-run-status cc-run-status--${run.status}`}>
-            {run.status.replaceAll('_', ' ')}
+            {runStatusLabel(run.status)}
           </span>
           <h2>{run.todo_title || run.instruction_snapshot}</h2>
           <p>
-            {run.project_title || translateUi('Unscoped')}
-            {translateUi(' · attempt ')}
-            {run.attempt} · {run.provider}
-            {run.model ? ` / ${run.model}` : ''}
+            {run.project_title || translateUi('No project')}
+            {run.attempt > 1 ? translateUi(' · try {{attempt}}', { attempt: run.attempt }) : ''}
           </p>
           {(run.host_label ||
             (run.provider === 'paseo' && (run.workspace_id || run.external_run_id))) && (
@@ -92,49 +90,14 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
       >
         <span style={{ width: `${run.progress}%` }} />
       </div>
-      <div className="cc-run-card__status-line">
-        <span>{run.progress_message || translateUi('No progress message')}</span>
-        {run.heartbeat_at && (
-          <span>
-            {translateUi('Heartbeat ')}
-            {new Date(run.heartbeat_at).toLocaleTimeString()}
-          </span>
-        )}
-      </div>
-      {run.error && <p className="cc-run-card__error">{run.error}</p>}
-      {run.result_summary && <pre className="cc-run-card__result">{run.result_summary}</pre>}
-      {pendingTool && (
-        <div
-          className="cc-run-card__tool-request"
-          role="group"
-          aria-label={translateUi('Tool request')}
-        >
-          <p>{translateUi('The agent wants to use {{tool}}.', { tool: pendingTool.tool_name })}</p>
-          <pre>{JSON.stringify(pendingTool.arguments, null, 2).slice(0, 1200)}</pre>
-          <div className="cc-run-card__actions">
-            <button
-              type="button"
-              className="cc-btn cc-btn--primary"
-              disabled={decideTool.isPending}
-              onClick={() =>
-                decideTool.mutate({ runId: run.id, callId: pendingTool.id, decision: 'allow' })
-              }
-            >
-              {translateUi('Allow')}
-            </button>
-            <button
-              type="button"
-              className="cc-btn"
-              disabled={decideTool.isPending}
-              onClick={() =>
-                decideTool.mutate({ runId: run.id, callId: pendingTool.id, decision: 'deny' })
-              }
-            >
-              {translateUi('Deny')}
-            </button>
-          </div>
+      {run.progress_message && !pendingTool && (
+        <div className="cc-run-card__status-line">
+          <span>{run.progress_message}</span>
         </div>
       )}
+      {run.error && <p className="cc-run-card__error">{run.error}</p>}
+      {run.result_summary && <pre className="cc-run-card__result">{run.result_summary}</pre>}
+      {pendingTool && <ToolRequestPanel runId={run.id} request={pendingTool} />}
       {answering && (
         <textarea
           rows={2}
@@ -203,7 +166,24 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
           </button>
         )}
       </div>
-      {expanded && <RunEventLog runId={run.id} />}
+      {expanded && (
+        <>
+          <p className="cc-run-card__external">
+            {[
+              translateUi('attempt {{attempt}}', { attempt: run.attempt }),
+              run.model ? `${run.provider} / ${run.model}` : run.provider,
+              run.heartbeat_at
+                ? translateUi('last heard from {{time}}', {
+                    time: new Date(run.heartbeat_at).toLocaleTimeString(),
+                  })
+                : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+          <RunEventLog runId={run.id} />
+        </>
+      )}
     </article>
   );
 }

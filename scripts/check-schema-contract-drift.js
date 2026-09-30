@@ -88,12 +88,12 @@ function splitTopLevelEntries(body) {
   return entries;
 }
 
-/** Collects the property names of every `z.object({...})`/`.extend({...})` literal. */
-function objectLiteralProperties(body) {
+/** Maps each property of every `z.object({...})`/`.extend({...})` literal to its zod expression. */
+function objectLiteralEntries(body) {
   // `z.object({` is often written across lines as `z\n  .object({`, and derived
   // schemas add their own fields through `<Base>Schema.extend({...})`.
   const literal = /(?:z\s*\.\s*object|\.\s*extend)\s*\(\s*\{/g;
-  const properties = new Set();
+  const properties = new Map();
   let found = false;
   let match;
 
@@ -120,7 +120,7 @@ function objectLiteralProperties(body) {
       const property = /^\s*(?:\/\/[^\n]*\n\s*)*(?:get\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*[:(]/.exec(
         entry,
       );
-      if (property) properties.add(property[1]);
+      if (property) properties.set(property[1], entry.slice(property.index + property[0].length));
     }
 
     literal.lastIndex = index;
@@ -128,6 +128,24 @@ function objectLiteralProperties(body) {
 
   return found ? properties : null;
 }
+
+/** Collects the property names of every `z.object({...})`/`.extend({...})` literal. */
+function objectLiteralProperties(body) {
+  const entries = objectLiteralEntries(body);
+  return entries ? new Set(entries.keys()) : null;
+}
+
+/** Whether an OpenAPI property admits null (OpenAPI 3.1 `anyOf` with `type: null`). */
+function openApiNullable(property) {
+  if (!property || typeof property !== 'object') return false;
+  if (property.nullable === true) return true;
+  if (Array.isArray(property.type) && property.type.includes('null')) return true;
+  return [...(property.anyOf ?? []), ...(property.oneOf ?? [])].some(
+    (option) => option && option.type === 'null',
+  );
+}
+
+const ACCEPTS_NULL = /\.nullable\(|\.nullish\(|z\s*\.\s*(?:null|unknown|any)\(/;
 
 /** Reads the values of a `z.enum([...])` literal. */
 function enumLiteralValues(body) {
@@ -269,6 +287,19 @@ function analyzeSchemaDrift({
       errors.push(`${modelName} is missing server fields: ${missing.join(', ')}`);
     }
 
+    // A response the server sends with null must parse: zod rejects null for
+    // a field that is only .optional(), and one such field fails the whole
+    // response (a thread of agent run updates once rendered empty this way).
+    if (modelName.endsWith('Response')) {
+      const expressions = objectLiteralEntries(body) ?? new Map();
+      const serverProperties = component.properties ?? {};
+      for (const [property, expression] of expressions) {
+        if (openApiNullable(serverProperties[property]) && !ACCEPTS_NULL.test(expression)) {
+          errors.push(`${modelName}.${property} rejects the null the server may send`);
+        }
+      }
+    }
+
     const extra = [...properties]
       .filter((property) => !documented.includes(property))
       .filter((property) => !ALLOWED_EXTRA_PROPERTIES.has(`${modelName}.${property}`));
@@ -313,6 +344,7 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+  openApiNullable,
   ALLOWED_EXTRA_PROPERTIES,
   analyzeSchemaDrift,
   enumLiteralValues,
