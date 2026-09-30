@@ -119,3 +119,31 @@ export {
   useObsidianFlushQueue,
   useObsidianRetryDeadLetter,
 } from './useObsidianQueries';
+export {
+  useScheduledJobsQuery,
+  useCreateScheduledJob,
+  useUpdateScheduledJob,
+  useDeleteScheduledJob,
+  useRunScheduledJobNow,
+} from './useScheduledJobQueries';
+export type { ScheduledJobInput } from './useScheduledJobQueries';
+export {
+  useAgentToolSettingsQuery,
+  useSaveSearxngUrl,
+  useTestSearxng,
+  useMcpServersQuery,
+  useCreateMcpServer,
+  useUpdateMcpServer,
+  useRefreshMcpServer,
+  useDeleteMcpServer,
+  useDecideToolCall,
+} from './useAgentToolQueries';
+export type { McpServerInput, ToolTrust } from './useAgentToolQueries';
+export {
+  useCalendarAccountsQuery,
+  useConnectCalendarAccount,
+  useDeleteCalendarAccount,
+  useSyncCalendarAccount,
+  useUpdateCalendarSource,
+} from './useCalendarSyncQueries';
+export type { CalendarAccountInput } from './useCalendarSyncQueries';

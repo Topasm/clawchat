@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, field_validator
 
@@ -48,10 +48,25 @@ class EventResponse(BaseModel):
     occurrence_date: str | None = None
     recurring_event_id: str | None = None
     tags: list[str] | None = None
+    # "remote" events come from a connected calendar and are read-only here.
+    origin: str = "local"
+    calendar_source_id: str | None = None
+    read_only: bool = False
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator(
+        "start_time", "end_time", "recurrence_end", "created_at", "updated_at", mode="after"
+    )
+    @classmethod
+    def _as_utc(cls, value: datetime | None) -> datetime | None:
+        # SQLite returns the stored UTC values without a zone. Sent as is,
+        # clients read them as local wall time and draw events hours off.
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
 
     @field_validator("tags", mode="before")
     @classmethod

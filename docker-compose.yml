@@ -37,6 +37,21 @@ services:
     networks:
       - clawchat
 
+  searxng:
+    image: searxng/searxng:latest
+    profiles:
+      - search
+    # Private to this machine; ClawChat reaches it as http://searxng:8080.
+    ports:
+      - "127.0.0.1:${SEARXNG_PORT:-8888}:8080"
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-this-searxng-secret}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
+    networks:
+      - clawchat
+
   couchdb:
     image: couchdb:3
     profiles:

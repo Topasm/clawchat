@@ -17,13 +17,12 @@ function useNetworkStatus(refresh: () => void) {
   const setConnectionStatus = useAuthStore((s) => s.setConnectionStatus);
   const flushingRef = useRef(false);
 
-  // Update pending count periodically (cheap — reads localStorage)
+  // Recount when the queue changes rather than polling, so an idle app never
+  // wakes up just to read localStorage.
   useEffect(() => {
-    setPendingCount(offlineQueue.getCount(queueScope));
-    const interval = setInterval(() => {
-      setPendingCount(offlineQueue.getCount(queueScope));
-    }, 2000);
-    return () => clearInterval(interval);
+    const recount = () => setPendingCount(offlineQueue.getCount(queueScope));
+    recount();
+    return offlineQueue.subscribe(recount);
   }, [queueScope]);
 
   useEffect(() => {

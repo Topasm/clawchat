@@ -10,18 +10,17 @@ export default function OfflineIndicator() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(() => offlineQueue.getCount(queueScope));
   useEffect(() => {
-    setPendingCount(offlineQueue.getCount(queueScope));
+    const recount = () => setPendingCount(offlineQueue.getCount(queueScope));
+    recount();
     const goOnline = () => setIsOnline(true);
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
-    const interval = setInterval(() => {
-      setPendingCount(offlineQueue.getCount(queueScope));
-    }, 3000);
+    const unsubscribe = offlineQueue.subscribe(recount);
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
-      clearInterval(interval);
+      unsubscribe();
     };
   }, [queueScope]);
   if (isOnline && pendingCount === 0) return null;

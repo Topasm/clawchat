@@ -31,6 +31,12 @@ const ListSchema = z.object({
 });
 const DetailSchema = z.object({ session: CliSessionSchema, output: z.string() });
 const key = ['cli-sessions'] as const;
+// Each listing spawns CLI processes on the host, so poll quickly only while a
+// session is doing something; otherwise a slow poll still picks up new ones.
+const ACTIVE_POLL_MS = 5000;
+const IDLE_POLL_MS = 30_000;
+const isActive = (session: Pick<CliSession, 'status'> | null | undefined) =>
+  session?.status === 'running' || session?.status === 'waiting_input';
 const path = (session: Pick<CliSession, 'provider' | 'id'>) =>
   `/cli-sessions/${session.provider}/${encodeURIComponent(session.id)}`;
 
@@ -40,7 +46,8 @@ export function useCliSessionsQuery() {
     queryKey: [...key, serverUrl],
     enabled: !!serverUrl,
     queryFn: async () => ListSchema.parse((await apiClient.get('/cli-sessions')).data),
-    refetchInterval: 5000,
+    refetchInterval: (query) =>
+      query.state.data?.sessions.some(isActive) ? ACTIVE_POLL_MS : IDLE_POLL_MS,
     retry: false,
   });
 }
@@ -51,8 +58,7 @@ export function useCliSessionDetailQuery(session: CliSession | null) {
     queryKey: [...key, serverUrl, session?.provider, session?.id],
     enabled: !!serverUrl && !!session,
     queryFn: async () => DetailSchema.parse((await apiClient.get(path(session!))).data),
-    refetchInterval:
-      session?.status === 'running' || session?.status === 'waiting_input' ? 5000 : false,
+    refetchInterval: isActive(session) ? ACTIVE_POLL_MS : false,
     retry: false,
   });
 }

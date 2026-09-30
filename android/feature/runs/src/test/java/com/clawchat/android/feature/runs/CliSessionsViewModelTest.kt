@@ -77,4 +77,19 @@ class CliSessionsViewModelTest {
         advanceUntilIdle()
         assertFalse(model.state.value.busy)
     }
+
+    @Test fun `polls quickly only while a session is active`() {
+        val idle = codex.copy(status = "idle")
+        val quiet = CliSessionsState(listing = CliSessionList(listOf(idle), emptyList()))
+        assertEquals(CLI_SESSIONS_IDLE_POLL_MS, quiet.pollIntervalMillis)
+        assertEquals(CLI_SESSIONS_IDLE_POLL_MS, CliSessionsState().pollIntervalMillis)
+        assertEquals(
+            CLI_SESSIONS_ACTIVE_POLL_MS,
+            quiet.copy(listing = CliSessionList(listOf(idle, claude), emptyList())).pollIntervalMillis,
+        )
+        assertEquals(
+            CLI_SESSIONS_ACTIVE_POLL_MS,
+            quiet.copy(selected = idle.copy(status = "waiting_input")).pollIntervalMillis,
+        )
+    }
 }

@@ -89,6 +89,71 @@ class AIService:
         except httpx.TimeoutException as exc:
             raise AIUnavailableError(f"OpenClaw timed out: {exc}") from exc
 
+    async def tool_turn(self, *, system_prompt: str, transcript: list[dict], tools: list[dict]):
+        """One step of a tool-calling loop over the chat completions API."""
+        from services.tools.tool_loop import AssistantTurn, ToolCallRequest, parse_arguments
+
+        messages: list[dict] = [{"role": "system", "content": system_prompt}]
+        for entry in transcript:
+            if entry["role"] == "assistant":
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": entry.get("content"),
+                        "tool_calls": [
+                            {
+                                "id": call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": call.name,
+                                    "arguments": json.dumps(call.arguments),
+                                },
+                            }
+                            for call in entry["tool_calls"]
+                        ],
+                    }
+                )
+            elif entry["role"] == "tool":
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": entry["tool_call_id"],
+                        "content": entry["content"],
+                    }
+                )
+            else:
+                messages.append({"role": "user", "content": entry["content"]})
+        body: dict = {"model": self.model, "messages": messages}
+        if tools:
+            body["tools"] = tools
+            body["tool_choice"] = "auto"
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/v1/chat/completions",
+                json=body,
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            raise AIUnavailableError(f"Cannot reach OpenClaw: {exc}") from exc
+        except httpx.TimeoutException as exc:
+            raise AIUnavailableError(f"OpenClaw timed out: {exc}") from exc
+        message = response.json().get("choices", [{}])[0].get("message", {})
+        calls = []
+        for index, call in enumerate(message.get("tool_calls") or []):
+            function = call.get("function") or {}
+            if not function.get("name"):
+                continue
+            calls.append(
+                ToolCallRequest(
+                    id=call.get("id") or f"call_{index}",
+                    name=function["name"],
+                    arguments=parse_arguments(function.get("arguments")),
+                )
+            )
+        content = message.get("content")
+        return AssistantTurn(content=content if isinstance(content, str) else None, tool_calls=calls)
+
     # --- Title generation ---
 
     async def generate_title(self, user_message: str) -> str:

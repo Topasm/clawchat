@@ -29,7 +29,7 @@ from schemas.graph_insights import (
     GraphInsightsResponse,
     GraphInsightSummary,
 )
-from sqlalchemy import distinct, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 DEFAULT_GRAPH_INSIGHT_LIMIT = 2_000
@@ -295,7 +295,7 @@ async def _load_snapshot(
         container_ids = set(
             (
                 await db.execute(
-                    select(distinct(Todo.parent_id)).where(Todo.parent_id.in_(task_ids))
+                    select(Todo.parent_id).distinct().where(Todo.parent_id.in_(task_ids))
                 )
             ).scalars()
         )

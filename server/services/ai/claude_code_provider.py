@@ -56,7 +56,9 @@ class ClaudeCodeError(Exception):
     recoverable: bool
 
 
-def _run_cli_sync(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess:
+def _run_cli_sync(
+    cmd: list[str], timeout: int = 120, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess:
     """Run a CLI command synchronously (safe for any event loop)."""
     return subprocess.run(
         cmd,
@@ -65,6 +67,7 @@ def _run_cli_sync(cmd: list[str], timeout: int = 120) -> subprocess.CompletedPro
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
 
 
@@ -251,19 +254,31 @@ class ClaudeCodeProvider:
         if not cli:
             raise AIUnavailableError("Claude Code CLI not found")
 
+        from services.tools import cli_tool_args
+        from services.tools.agent_mcp_endpoint import current_cli_tools
+
+        tools = current_cli_tools.get()
         cmd = [
             cli, "--print",
             "--output-format", "text",
-            "--max-turns", "1",
+            "--max-turns", str(cli_tool_args.CLAUDE_TOOL_MAX_TURNS if tools else 1),
         ]
         if self.model:
             cmd.extend(["--model", self.model])
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
+        if tools:
+            cmd.extend(cli_tool_args.claude_args(tools))
         cmd.extend(["-p", prompt])
+        timeout = cli_tool_args.TOOL_TURN_TIMEOUT_SECONDS if tools else 120
 
         try:
-            result = await asyncio.to_thread(_run_cli_sync, cmd, 120)
+            if tools:
+                result = await asyncio.to_thread(
+                    _run_cli_sync, cmd, timeout, cli_tool_args.claude_env(tools)
+                )
+            else:
+                result = await asyncio.to_thread(_run_cli_sync, cmd, timeout)
             if result.returncode != 0:
                 raise AIUnavailableError(f"Claude Code error: {result.stderr[:200]}")
             return result.stdout.strip()

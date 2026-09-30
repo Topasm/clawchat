@@ -669,6 +669,29 @@ async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunRespons
         task_type=task.task_type,
         instruction=task.instruction,
         usage=usage,
+        pending_tool_call=await _pending_tool_call(db, run),
+    )
+
+
+async def _pending_tool_call(db: AsyncSession, run: AgentRun):
+    if run.status != AgentRunStatus.WAITING_INPUT:
+        return None
+    from schemas.agent_run import PendingToolCall
+    from services.tools import approvals
+    from models.agent_tools import AgentToolCall
+
+    call_id = approvals.pending_call_for_run(run.id)
+    call = await db.get(AgentToolCall, call_id) if call_id else None
+    if call is None:
+        return None
+    try:
+        arguments = json.loads(call.arguments_json or "{}")
+    except json.JSONDecodeError:
+        arguments = {}
+    return PendingToolCall(
+        id=call.id,
+        tool_name=call.tool_name,
+        arguments=arguments if isinstance(arguments, dict) else {},
     )
 
 

@@ -101,6 +101,14 @@ localization-only baseline to 30,851 bytes and its ceiling to 31,800 bytes (3.1 
 headroom); JavaScript and renderer core ceilings stay unchanged. The Tauri renderer is
 rebuilt and measured before accepting this change.
 
+The v1.4.31 release combines React 19.3, the Automations page (scheduled AI jobs), agent tools
+settings with tool approval on run cards, and calendar sync settings. Measured on the Tauri
+renderer build of that tree: initial HTML JavaScript 342,839 bytes (109,154 gzip), all renderer
+JavaScript 2,272,480 bytes, renderer core files 2,482,569 bytes, and compressed localization
+catalogs 33,990 bytes (from 30,851 at v1.4.30, for about 120 new Korean UI messages). Each metric's
+baseline is set to that measurement with 3 percent headroom for its ceiling. The new pages load
+on demand, so the initial JavaScript growth is React 19.3's larger client.
+
 Do not raise a threshold solely to make CI pass. Measure the new output, identify which entry or
 route owns the increase, and record an intentional baseline change in the same commit.
 

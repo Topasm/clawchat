@@ -6,6 +6,7 @@ import {
   useReturnAgentRunToReady,
   useRetryAgentRun,
   useResumeAgentRun,
+  useDecideToolCall,
 } from '../../hooks/queries';
 import type { AgentRunResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
@@ -46,7 +47,10 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
   const retry = useRetryAgentRun();
   const returnToReady = useReturnAgentRunToReady();
   const resume = useResumeAgentRun();
+  const decideTool = useDecideToolCall();
   const [followUp, setFollowUp] = useState('');
+  const pendingTool = run.status === 'waiting_input' ? run.pending_tool_call : null;
+  const answering = run.status === 'waiting_input' && !pendingTool;
   const active = ACTIVE_STATUSES.has(run.status);
   const unsuccessful = isUnsuccessfulRun(run);
   const canRetry = unsuccessful && (!run.todo_id || run.todo_status === 'in_progress');
@@ -99,7 +103,39 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
       </div>
       {run.error && <p className="cc-run-card__error">{run.error}</p>}
       {run.result_summary && <pre className="cc-run-card__result">{run.result_summary}</pre>}
-      {run.status === 'waiting_input' && (
+      {pendingTool && (
+        <div
+          className="cc-run-card__tool-request"
+          role="group"
+          aria-label={translateUi('Tool request')}
+        >
+          <p>{translateUi('The agent wants to use {{tool}}.', { tool: pendingTool.tool_name })}</p>
+          <pre>{JSON.stringify(pendingTool.arguments, null, 2).slice(0, 1200)}</pre>
+          <div className="cc-run-card__actions">
+            <button
+              type="button"
+              className="cc-btn cc-btn--primary"
+              disabled={decideTool.isPending}
+              onClick={() =>
+                decideTool.mutate({ runId: run.id, callId: pendingTool.id, decision: 'allow' })
+              }
+            >
+              {translateUi('Allow')}
+            </button>
+            <button
+              type="button"
+              className="cc-btn"
+              disabled={decideTool.isPending}
+              onClick={() =>
+                decideTool.mutate({ runId: run.id, callId: pendingTool.id, decision: 'deny' })
+              }
+            >
+              {translateUi('Deny')}
+            </button>
+          </div>
+        </div>
+      )}
+      {answering && (
         <textarea
           rows={2}
           value={followUp}
@@ -131,7 +167,7 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
             {translateUi('\n            Cancel\n          ')}
           </button>
         )}
-        {run.status === 'waiting_input' && (
+        {answering && (
           <button
             type="button"
             className="cc-btn cc-btn--primary"

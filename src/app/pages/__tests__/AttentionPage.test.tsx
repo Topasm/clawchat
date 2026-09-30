@@ -12,6 +12,7 @@ const queryMocks = vi.hoisted(() => ({
   resume: vi.fn(),
   retry: vi.fn(),
   runNext: vi.fn(),
+  decideTool: vi.fn(),
 }));
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
@@ -21,6 +22,7 @@ vi.mock('../../hooks/queries', () => ({
   useAgentRunsQuery: queryMocks.runs,
   useDecideReview: () => ({ mutate: queryMocks.decide, isPending: false }),
   useResumeAgentRun: () => ({ mutate: queryMocks.resume, isPending: false }),
+  useDecideToolCall: () => ({ mutate: queryMocks.decideTool, isPending: false }),
   useRetryAgentRun: () => ({ mutate: queryMocks.retry, isPending: false }),
   useCancelAgentRun: () => ({ mutate: vi.fn(), isPending: false }),
   useReturnAgentRunToReady: () => ({ mutate: vi.fn(), isPending: false }),
@@ -105,6 +107,7 @@ describe('AttentionPage', () => {
     queryMocks.decide.mockReset();
     queryMocks.resume.mockReset();
     queryMocks.runNext.mockReset();
+    queryMocks.decideTool.mockReset();
     routerMocks.navigate.mockReset();
     queryMocks.awaitingInput.mockReturnValue({ data: [], isLoading: false });
     queryMocks.reviews.mockReturnValue({ data: [], isLoading: false });
@@ -171,6 +174,33 @@ describe('AttentionPage', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Open thread' })[0]);
     expect(routerMocks.navigate).toHaveBeenCalledWith('/chats/conv-1');
+  });
+
+  it('asks before a tool runs instead of offering a follow-up', () => {
+    queryMocks.awaitingInput.mockReturnValue({
+      data: [
+        run({
+          progress_message: 'Wants to use notes__read',
+          pending_tool_call: {
+            id: 'tcall-1',
+            tool_name: 'notes__read',
+            arguments: { path: 'a.md' },
+          },
+        }),
+      ],
+      isLoading: false,
+    });
+    renderPage();
+
+    expect(screen.getByText('The agent wants to use notes__read.')).toBeInTheDocument();
+    expect(screen.getByText(/"path": "a.md"/)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Answer the agent' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    expect(queryMocks.decideTool).toHaveBeenCalledWith({
+      runId: 'run-1',
+      callId: 'tcall-1',
+      decision: 'allow',
+    });
   });
 
   it('keeps the log and the history one click away', () => {

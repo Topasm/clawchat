@@ -58,6 +58,7 @@ def _event_to_response(row) -> EventResponse:
     resp = EventResponse.model_validate(row)
     if row.tags:
         resp.tags = deserialize_tags(row.tags)
+    resp.read_only = row.origin == "remote"
     return resp
 
 

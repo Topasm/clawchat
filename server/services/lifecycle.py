@@ -223,15 +223,24 @@ async def initialize_vault() -> None:
 
 
 async def vault_outbox_loop() -> None:
-    """Continuously deliver pending Vault sync jobs."""
-    from services.vault.vault_sync_service import process_pending_vault_sync_jobs
+    """Deliver Vault sync jobs as they come due, idling while none are."""
+    from services.vault.vault_sync_service import (
+        OUTBOX_MIN_WAIT_SECONDS,
+        process_pending_vault_sync_jobs,
+        seconds_until_next_vault_sync_job,
+        wait_for_vault_outbox,
+        watch_vault_outbox,
+    )
 
     while True:
+        watch = watch_vault_outbox()
+        wait = OUTBOX_MIN_WAIT_SECONDS
         try:
             async with async_session_factory() as vault_job_db:
                 await process_pending_vault_sync_jobs(vault_job_db)
+                wait = await seconds_until_next_vault_sync_job(vault_job_db)
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Periodic Vault outbox delivery failed")
-        await asyncio.sleep(15)
+        await wait_for_vault_outbox(watch, wait)

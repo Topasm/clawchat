@@ -82,6 +82,7 @@ def _run(
     input_text: str | None = None,
     timeout: int = 180,
     cwd: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd,
@@ -93,6 +94,7 @@ def _run(
         errors="replace",
         check=False,
         cwd=cwd,
+        env=env,
     )
 
 
@@ -135,7 +137,9 @@ class CodexCLIProvider:
         status, _ = await self.check_availability()
         return status == CodexCLIStatus.AVAILABLE
 
-    def _exec_command(self) -> list[str]:
+    def _exec_command(self, tools=None) -> list[str]:
+        from services.tools import cli_tool_args
+
         cli = self._cli_path or _find_codex_cli()
         if not cli:
             raise AIUnavailableError("Codex CLI is not installed")
@@ -144,6 +148,7 @@ class CodexCLIProvider:
             "never",
             "--sandbox",
             "read-only",
+            *(cli_tool_args.codex_args(tools) if tools else []),
             "exec",
         ]
         if self.model:
@@ -161,6 +166,10 @@ class CodexCLIProvider:
         return _command(cli, *args)
 
     async def _run_text(self, prompt: str, system_prompt: str | None = None) -> str:
+        from services.tools import cli_tool_args
+        from services.tools.agent_mcp_endpoint import current_cli_tools
+
+        tools = current_cli_tools.get()
         combined_prompt = "\n\n".join(
             part.strip() for part in (system_prompt or "", prompt) if part.strip()
         )
@@ -170,10 +179,13 @@ class CodexCLIProvider:
             )
             result = await asyncio.to_thread(
                 _run,
-                self._exec_command(),
+                self._exec_command(tools),
                 input_text=combined_prompt or "Hello",
-                timeout=self.timeout_seconds,
+                timeout=(
+                    cli_tool_args.TOOL_TURN_TIMEOUT_SECONDS if tools else self.timeout_seconds
+                ),
                 cwd=str(self._working_directory),
+                env=cli_tool_args.codex_env(tools) if tools else None,
             )
         except subprocess.TimeoutExpired as exc:
             raise AIUnavailableError("Codex CLI request timed out") from exc

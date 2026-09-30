@@ -110,4 +110,26 @@ describe('offlineQueue', () => {
     expect(request).toHaveBeenCalledOnce();
     expect(offlineQueue.getCount(scope)).toBe(2);
   });
+  it('tells subscribers when the queue changes, here or in another tab', async () => {
+    const scope = getOfflineQueueScope({
+      serverUrl: 'https://example.com',
+      token: createToken('device-1'),
+    });
+    const listener = vi.fn();
+    const unsubscribe = offlineQueue.subscribe(listener);
+
+    offlineQueue.enqueue(scope, 'post', '/todos', { title: 'A' });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await offlineQueue.flush(scope, { request: vi.fn().mockResolvedValue({}) });
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cc-offline-queue:v2' }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'unrelated' }));
+    expect(listener).toHaveBeenCalledTimes(3);
+
+    unsubscribe();
+    offlineQueue.clearAll();
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
 });

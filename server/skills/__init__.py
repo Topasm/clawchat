@@ -22,6 +22,8 @@ class SkillDef:
     output_format: str = "markdown"          # "markdown" | "json" | "checklist"
     vault_template: str | None = None        # e.g. "{project}/Plan/{date}.md"
     tags: list[str] = field(default_factory=list)
+    # Offered the web_search tool when a SearXNG instance is configured.
+    uses_web_search: bool = False
 
 
 # Central registry — populated by builtins (and future user-defined skills).

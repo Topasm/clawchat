@@ -627,6 +627,9 @@ export const EventResponseSchema = z.object({
   occurrence_date: z.string().nullable().optional(),
   recurring_event_id: z.string().nullable().optional(),
   tags: z.array(z.string()).nullable().optional(),
+  origin: z.string().optional(),
+  calendar_source_id: z.string().nullable().optional(),
+  read_only: z.boolean().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -1061,6 +1064,12 @@ export const AgentRunStatusSchema = z.enum([
   'cancelled',
 ]);
 
+export const PendingToolCallSchema = z.object({
+  id: z.string(),
+  tool_name: z.string(),
+  arguments: z.record(z.string(), z.unknown()),
+});
+
 export const AgentRunResponseSchema = z.object({
   id: z.string(),
   agent_task_id: z.string(),
@@ -1087,6 +1096,7 @@ export const AgentRunResponseSchema = z.object({
   error: z.string().nullable(),
   usage: z.record(z.string(), z.unknown()).nullable(),
   is_adopted: z.boolean(),
+  pending_tool_call: PendingToolCallSchema.nullable().optional(),
   created_at: z.string(),
   started_at: z.string().nullable(),
   heartbeat_at: z.string().nullable(),
@@ -1477,3 +1487,101 @@ export const ObsidianScanResultSchema = z.object({
 
 export type ObsidianHealth = z.infer<typeof ObsidianHealthSchema>;
 export type ObsidianScanResult = z.infer<typeof ObsidianScanResultSchema>;
+
+// Scheduled AI jobs: standing instructions the server runs on a schedule.
+export const ScheduledJobResponseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  instruction: z.string(),
+  skill_chain: z.array(z.string()),
+  project_id: z.string().nullable(),
+  project_title: z.string().nullable(),
+  include_task_snapshot: z.boolean(),
+  rrule: z.string(),
+  timezone: z.string(),
+  enabled: z.boolean(),
+  next_run_at: z.string().nullable(),
+  conversation_id: z.string().nullable(),
+  last_run_at: z.string().nullable(),
+  last_run_id: z.string().nullable(),
+  last_run_status: z.string().nullable(),
+  last_error: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const ScheduledJobListResponseSchema = z.object({
+  jobs: z.array(ScheduledJobResponseSchema),
+});
+
+export const ScheduledJobRunResponseSchema = z.object({
+  run_id: z.string(),
+  conversation_id: z.string().nullable(),
+});
+
+export type ScheduledJob = z.infer<typeof ScheduledJobResponseSchema>;
+export type ScheduledJobRunResult = z.infer<typeof ScheduledJobRunResponseSchema>;
+// Agent tools: web search through SearXNG and the user's MCP servers.
+export const AgentToolSettingsResponseSchema = z.object({
+  searxng_url: z.string().nullable(),
+});
+
+export const SearxngTestResponseSchema = z.object({
+  ok: z.boolean(),
+  result_count: z.number().int(),
+  error: z.string().nullable(),
+});
+
+export const McpToolInfoSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+});
+
+export const McpServerResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  transport: z.enum(['stdio', 'http']),
+  command: z.string().nullable(),
+  args: z.array(z.string()),
+  env_keys: z.array(z.string()),
+  url: z.string().nullable(),
+  header_keys: z.array(z.string()),
+  trust: z.enum(['read_only', 'approval']),
+  enabled: z.boolean(),
+  tools: z.array(McpToolInfoSchema),
+  tools_refreshed_at: z.string().nullable(),
+  last_error: z.string().nullable(),
+});
+
+export const McpServerListResponseSchema = z.object({
+  servers: z.array(McpServerResponseSchema),
+});
+
+export type PendingToolCall = z.infer<typeof PendingToolCallSchema>;
+export type McpServer = z.infer<typeof McpServerResponseSchema>;
+// CalDAV calendar sync.
+export const CalendarSourceResponseSchema = z.object({
+  id: z.string(),
+  display_name: z.string(),
+  color: z.string().nullable(),
+  import_enabled: z.boolean(),
+  is_write_target: z.boolean(),
+  last_synced_at: z.string().nullable(),
+});
+
+export const CalendarAccountResponseSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  server_url: z.string(),
+  username: z.string(),
+  last_sync_at: z.string().nullable(),
+  last_error: z.string().nullable(),
+  calendars: z.array(CalendarSourceResponseSchema),
+});
+
+export const CalendarAccountListResponseSchema = z.object({
+  accounts: z.array(CalendarAccountResponseSchema),
+});
+
+export type CalendarAccount = z.infer<typeof CalendarAccountResponseSchema>;
+export type CalendarSource = z.infer<typeof CalendarSourceResponseSchema>;

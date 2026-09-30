@@ -18,6 +18,9 @@ from schemas.cli_session import (
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 SessionId = Annotated[str, Path(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")]
+# One instance for the process so its short-lived listing cache is shared by
+# every client polling this host.
+_default_service = CLISessionService()
 
 
 def service(request: Request) -> CLISessionService:
@@ -26,7 +29,7 @@ def service(request: Request) -> CLISessionService:
             "CLI_SESSIONS_DISABLED", "CLI sessions are disabled on this host", 403
         )
     return (
-        getattr(request.app.state, "cli_session_service", None) or CLISessionService()
+        getattr(request.app.state, "cli_session_service", None) or _default_service
     )
 
 

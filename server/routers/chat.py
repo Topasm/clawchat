@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import noload
+from sqlalchemy.orm import raiseload
 from starlette.responses import StreamingResponse
 
 from auth.dependencies import get_current_user
@@ -120,7 +120,7 @@ async def list_conversations(
     )
     q = (
         select(Conversation, last_message_subquery.label("last_message"))
-        .options(noload(Conversation.messages))
+        .options(raiseload(Conversation.messages))
         .where(*conditions)
         .order_by(Conversation.updated_at.desc())
         .offset(offset)
