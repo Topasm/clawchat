@@ -464,6 +464,16 @@
             ],
             "title": "Model"
           },
+          "pending_tool_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingToolCall"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "progress": {
             "maximum": 100.0,
             "minimum": 0.0,
@@ -922,6 +932,16 @@
               }
             ],
             "title": "Model"
+          },
+          "pending_tool_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PendingToolCall"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "progress": {
             "maximum": 100.0,
@@ -1532,6 +1552,44 @@
           "created_at"
         ],
         "title": "AgentTaskSummary",
+        "type": "object"
+      },
+      "AgentToolSettingsResponse": {
+        "properties": {
+          "searxng_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Searxng Url"
+          }
+        },
+        "required": [
+          "searxng_url"
+        ],
+        "title": "AgentToolSettingsResponse",
+        "type": "object"
+      },
+      "AgentToolSettingsUpdate": {
+        "properties": {
+          "searxng_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Searxng Url"
+          }
+        },
+        "title": "AgentToolSettingsUpdate",
         "type": "object"
       },
       "AnswerQuestionsRequest": {
@@ -4612,6 +4670,353 @@
         "title": "LogoutRequest",
         "type": "object"
       },
+      "McpServerCreate": {
+        "properties": {
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Args",
+            "type": "array"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Env",
+            "type": "object"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "object"
+          },
+          "name": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,39}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/McpTransport"
+          },
+          "trust": {
+            "$ref": "#/components/schemas/ToolTrust",
+            "default": "approval"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "name",
+          "transport"
+        ],
+        "title": "McpServerCreate",
+        "type": "object"
+      },
+      "McpServerListResponse": {
+        "properties": {
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/McpServerResponse"
+            },
+            "title": "Servers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "servers"
+        ],
+        "title": "McpServerListResponse",
+        "type": "object"
+      },
+      "McpServerResponse": {
+        "properties": {
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "env_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Env Keys",
+            "type": "array"
+          },
+          "header_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Header Keys",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/McpToolInfo"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "tools_refreshed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools Refreshed At"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/McpTransport"
+          },
+          "trust": {
+            "$ref": "#/components/schemas/ToolTrust"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "transport",
+          "command",
+          "args",
+          "env_keys",
+          "url",
+          "header_keys",
+          "trust",
+          "enabled",
+          "tools",
+          "tools_refreshed_at",
+          "last_error"
+        ],
+        "title": "McpServerResponse",
+        "type": "object"
+      },
+      "McpServerUpdate": {
+        "properties": {
+          "args": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Args"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "env": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env"
+          },
+          "headers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headers"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,39}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "trust": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolTrust"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "McpServerUpdate",
+        "type": "object"
+      },
+      "McpToolInfo": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "McpToolInfo",
+        "type": "object"
+      },
+      "McpTransport": {
+        "enum": [
+          "stdio",
+          "http"
+        ],
+        "title": "McpTransport",
+        "type": "string"
+      },
       "MessageEditRequest": {
         "properties": {
           "content": {
@@ -5196,6 +5601,30 @@
           "host_public_key"
         ],
         "title": "PairingSessionResponse",
+        "type": "object"
+      },
+      "PendingToolCall": {
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tool_name",
+          "arguments"
+        ],
+        "title": "PendingToolCall",
         "type": "object"
       },
       "PlanApplyRequest": {
@@ -7739,6 +8168,50 @@
         "title": "SearchHit",
         "type": "object"
       },
+      "SearxngTestRequest": {
+        "properties": {
+          "url": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "SearxngTestRequest",
+        "type": "object"
+      },
+      "SearxngTestResponse": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "result_count": {
+            "default": 0,
+            "title": "Result Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "SearxngTestResponse",
+        "type": "object"
+      },
       "SendMessageRequest": {
         "properties": {
           "content": {
@@ -10105,6 +10578,148 @@
         "title": "TokenResponse",
         "type": "object"
       },
+      "ToolCallDecisionRequest": {
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ToolDecision"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "ToolCallDecisionRequest",
+        "type": "object"
+      },
+      "ToolCallListResponse": {
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCallResponse"
+            },
+            "title": "Calls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "calls"
+        ],
+        "title": "ToolCallListResponse",
+        "type": "object"
+      },
+      "ToolCallResponse": {
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "result_preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Preview"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "tool_name",
+          "arguments",
+          "status",
+          "result_preview",
+          "error",
+          "created_at",
+          "decided_at",
+          "completed_at"
+        ],
+        "title": "ToolCallResponse",
+        "type": "object"
+      },
+      "ToolDecision": {
+        "enum": [
+          "allow",
+          "deny"
+        ],
+        "title": "ToolDecision",
+        "type": "string"
+      },
+      "ToolTrust": {
+        "description": "Whether a server's tools may run without asking the user first.",
+        "enum": [
+          "read_only",
+          "approval"
+        ],
+        "title": "ToolTrust",
+        "type": "string"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -10938,6 +11553,334 @@
         "summary": "Disconnect Session",
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/api/agent-tools/mcp-servers": {
+      "get": {
+        "operationId": "list_mcp_servers_api_agent_tools_mcp_servers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Mcp Servers",
+        "tags": [
+          "agent-tools"
+        ]
+      },
+      "post": {
+        "operationId": "create_mcp_server_api_agent_tools_mcp_servers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpServerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Mcp Server",
+        "tags": [
+          "agent-tools"
+        ]
+      }
+    },
+    "/api/agent-tools/mcp-servers/{server_id}": {
+      "delete": {
+        "operationId": "delete_mcp_server_api_agent_tools_mcp_servers__server_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Mcp Server",
+        "tags": [
+          "agent-tools"
+        ]
+      },
+      "patch": {
+        "operationId": "update_mcp_server_api_agent_tools_mcp_servers__server_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpServerUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Mcp Server",
+        "tags": [
+          "agent-tools"
+        ]
+      }
+    },
+    "/api/agent-tools/mcp-servers/{server_id}/refresh": {
+      "post": {
+        "operationId": "refresh_mcp_server_api_agent_tools_mcp_servers__server_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Refresh Mcp Server",
+        "tags": [
+          "agent-tools"
+        ]
+      }
+    },
+    "/api/agent-tools/searxng/test": {
+      "post": {
+        "operationId": "test_searxng_api_agent_tools_searxng_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearxngTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearxngTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test Searxng",
+        "tags": [
+          "agent-tools"
+        ]
+      }
+    },
+    "/api/agent-tools/settings": {
+      "get": {
+        "operationId": "read_tool_settings_api_agent_tools_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentToolSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Tool Settings",
+        "tags": [
+          "agent-tools"
+        ]
+      },
+      "put": {
+        "operationId": "update_tool_settings_api_agent_tools_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentToolSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentToolSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Tool Settings",
+        "tags": [
+          "agent-tools"
         ]
       }
     },
@@ -15212,6 +16155,112 @@
           }
         ],
         "summary": "Return Run Task To Ready",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/tool-calls": {
+      "get": {
+        "operationId": "list_run_tool_calls_api_runs__run_id__tool_calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolCallListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Run Tool Calls",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/tool-calls/{call_id}/decision": {
+      "post": {
+        "operationId": "decide_tool_call_api_runs__run_id__tool_calls__call_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolCallDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Tool Call",
         "tags": [
           "runs"
         ]

@@ -344,3 +344,28 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* An agent's request to use a tool that needs the user's approval. */
+.cc-run-card__tool-request {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--cc-warning);
+  border-radius: var(--cc-radius-row);
+  background: var(--cc-surface-secondary);
+}
+
+.cc-run-card__tool-request p {
+  margin: 0 0 6px;
+  color: var(--cc-text);
+  font-size: 13px;
+}
+
+.cc-run-card__tool-request pre {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

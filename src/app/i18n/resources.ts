@@ -76,6 +76,7 @@ export const translationResources = {
         sections: {
           application: 'Application',
           ai: 'AI',
+          agentTools: 'Agent tools',
           workspace: 'Workspace',
           importExport: 'Import / Export',
           obsidianDesktop: 'Obsidian Desktop',
@@ -393,6 +394,7 @@ export const translationResources = {
         sections: {
           application: '애플리케이션',
           ai: 'AI',
+          agentTools: '에이전트 도구',
           workspace: '워크스페이스',
           importExport: '가져오기 / 내보내기',
           obsidianDesktop: 'Obsidian 데스크톱',

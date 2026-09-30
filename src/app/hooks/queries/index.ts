@@ -127,3 +127,14 @@ export {
   useRunScheduledJobNow,
 } from './useScheduledJobQueries';
 export type { ScheduledJobInput } from './useScheduledJobQueries';
+  useAgentToolSettingsQuery,
+  useSaveSearxngUrl,
+  useTestSearxng,
+  useMcpServersQuery,
+  useCreateMcpServer,
+  useUpdateMcpServer,
+  useRefreshMcpServer,
+  useDeleteMcpServer,
+  useDecideToolCall,
+} from './useAgentToolQueries';
+export type { McpServerInput, ToolTrust } from './useAgentToolQueries';

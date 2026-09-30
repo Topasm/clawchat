@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import SettingsShell from '../components/settings/SettingsShell';
 import AIModelSettings from '../components/settings/AIModelSettings';
+import AgentToolsSettings from '../components/settings/AgentToolsSettings';
 import CalendarSubscriptionCard from '../components/shared/CalendarSubscriptionCard';
 import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
@@ -520,6 +521,8 @@ export default function SettingsPage() {
             </>
           )}
         </SettingsSection>
+
+        <AgentToolsSettings />
 
         <SettingsSection title={t('workspaceSettings.sections.workspace')}>
           <SettingsRow

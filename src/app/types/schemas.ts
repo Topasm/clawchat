@@ -1061,6 +1061,12 @@ export const AgentRunStatusSchema = z.enum([
   'cancelled',
 ]);
 
+export const PendingToolCallSchema = z.object({
+  id: z.string(),
+  tool_name: z.string(),
+  arguments: z.record(z.string(), z.unknown()),
+});
+
 export const AgentRunResponseSchema = z.object({
   id: z.string(),
   agent_task_id: z.string(),
@@ -1087,6 +1093,7 @@ export const AgentRunResponseSchema = z.object({
   error: z.string().nullable(),
   usage: z.record(z.string(), z.unknown()).nullable(),
   is_adopted: z.boolean(),
+  pending_tool_call: PendingToolCallSchema.nullable().optional(),
   created_at: z.string(),
   started_at: z.string().nullable(),
   heartbeat_at: z.string().nullable(),
@@ -1511,3 +1518,41 @@ export const ScheduledJobRunResponseSchema = z.object({
 
 export type ScheduledJob = z.infer<typeof ScheduledJobResponseSchema>;
 export type ScheduledJobRunResult = z.infer<typeof ScheduledJobRunResponseSchema>;
+// Agent tools: web search through SearXNG and the user's MCP servers.
+export const AgentToolSettingsResponseSchema = z.object({
+  searxng_url: z.string().nullable(),
+});
+
+export const SearxngTestResponseSchema = z.object({
+  ok: z.boolean(),
+  result_count: z.number().int(),
+  error: z.string().nullable(),
+});
+
+export const McpToolInfoSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+});
+
+export const McpServerResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  transport: z.enum(['stdio', 'http']),
+  command: z.string().nullable(),
+  args: z.array(z.string()),
+  env_keys: z.array(z.string()),
+  url: z.string().nullable(),
+  header_keys: z.array(z.string()),
+  trust: z.enum(['read_only', 'approval']),
+  enabled: z.boolean(),
+  tools: z.array(McpToolInfoSchema),
+  tools_refreshed_at: z.string().nullable(),
+  last_error: z.string().nullable(),
+});
+
+export const McpServerListResponseSchema = z.object({
+  servers: z.array(McpServerResponseSchema),
+});
+
+export type PendingToolCall = z.infer<typeof PendingToolCallSchema>;
+export type McpServer = z.infer<typeof McpServerResponseSchema>;

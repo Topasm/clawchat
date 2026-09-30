@@ -67,6 +67,12 @@ class AgentRunRecoveryResponse(BaseModel):
     direct_blocker_ids: list[str] = Field(default_factory=list)
 
 
+class PendingToolCall(BaseModel):
+    id: str
+    tool_name: str
+    arguments: dict[str, Any]
+
+
 class AgentRunResponse(BaseModel):
     id: str
     agent_task_id: str
@@ -96,6 +102,8 @@ class AgentRunResponse(BaseModel):
     error: str | None = None
     usage: dict[str, Any] | None = None
     is_adopted: bool = False
+    # A tool call the run is paused on until the user allows or denies it.
+    pending_tool_call: PendingToolCall | None = None
     created_at: datetime
     started_at: datetime | None = None
     heartbeat_at: datetime | None = None

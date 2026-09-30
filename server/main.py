@@ -2,6 +2,8 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 
+from starlette.routing import Route
+
 from app_version import APP_VERSION
 from config import settings
 from database import async_session_factory, get_db, init_db
@@ -11,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
 from routers import note as note_router
 from routers import scheduled_jobs as scheduled_jobs_router
+from routers import agent_tools as agent_tools_router
 from routers import ai_models as ai_models_router
 from routers import agent_run as agent_run_router
 from routers import attachment as attachment_router
@@ -152,6 +155,16 @@ async def lifespan(app: FastAPI):
     else:
         app.state.scheduler = None
 
+    # Agent runs executed by the Claude Code / Codex CLIs reach their tools
+    # through this endpoint. Approvals nothing waits for anymore are closed.
+    from services.tools import agent_mcp_endpoint
+    from services.tools.tool_admin_service import expire_abandoned_approvals
+
+    async with async_session_factory() as tools_db:
+        await expire_abandoned_approvals(tools_db)
+    agent_tools_endpoint = agent_mcp_endpoint.serve()
+    await agent_tools_endpoint.__aenter__()
+
     # Outbox recovery is independent of the optional feature scheduler. This
     # also resolves jobs as succeeded when no Vault is configured.
     app.state.vault_outbox_task = asyncio.create_task(
@@ -188,6 +201,7 @@ async def lifespan(app: FastAPI):
     app.state.scheduled_job_task.cancel()
     with suppress(asyncio.CancelledError):
         await app.state.scheduled_job_task
+    await agent_tools_endpoint.__aexit__(None, None, None)
     app.state.vault_outbox_task.cancel()
     with suppress(asyncio.CancelledError):
         await app.state.vault_outbox_task
@@ -233,7 +247,18 @@ app.add_middleware(
 
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
+# Streamable HTTP MCP for CLI-run agents; a plain route, not a mount, so the
+# exact path answers without a trailing-slash redirect.
+from services.tools.agent_mcp_endpoint import PATH as AGENT_TOOLS_MCP_PATH, asgi_app  # noqa: E402
+
+app.router.routes.append(
+    Route(AGENT_TOOLS_MCP_PATH, endpoint=asgi_app(), methods=["GET", "POST", "DELETE"])
+)
 app.include_router(agent_run_router.router, prefix="/api/runs", tags=["runs"])
+app.include_router(agent_tools_router.runs_router, prefix="/api/runs", tags=["runs"])
+app.include_router(
+    agent_tools_router.router, prefix="/api/agent-tools", tags=["agent-tools"]
+)
 app.include_router(cli_session_router.router, prefix="/api/cli-sessions", tags=["cli-sessions"])
 app.include_router(chat_router.router, prefix="/api/chat", tags=["chat"])
 app.include_router(todo_router.router, prefix="/api/todos", tags=["todos"])
