@@ -39,7 +39,7 @@ export default function AIModelSettings({
     <SettingsRow
       label={translateUi('AI model')}
       sublabel={translateUi(
-        'Choose a model or enter its ID. Applies to new Agent Todo requests; existing CLI sessions keep their model.',
+        'Choose a model or enter its ID. Applies to new ClawChat requests; existing CLI sessions keep their model.',
       )}
     >
       <div>

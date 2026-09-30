@@ -2,7 +2,7 @@
   "name": "clawchat",
   "version": "1.4.32",
   "private": true,
-  "description": "Agent Todo — Privacy-first, self-hosted agentic todo app",
+  "description": "ClawChat — Privacy-first, self-hosted agentic todo app",
   "license": "MIT",
   "engines": {
     "node": ">=22.13.0",

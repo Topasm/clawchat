@@ -257,7 +257,7 @@ export default function ChatPanel({
           color: 'var(--cc-text-tertiary)',
         }}
       >
-        {translateUi('Ask Agent Todo anything...')}
+        {translateUi('Ask ClawChat anything...')}
       </div>
       <button
         type="button"
