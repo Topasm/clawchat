@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
 from routers import note as note_router
+from routers import scheduled_jobs as scheduled_jobs_router
 from routers import ai_models as ai_models_router
 from routers import agent_run as agent_run_router
 from routers import attachment as attachment_router
@@ -158,6 +159,15 @@ async def lifespan(app: FastAPI):
         name="vault-outbox",
     )
 
+    # User-created scheduled jobs run whether or not the optional feature
+    # scheduler is enabled: the user asked for each of them explicitly.
+    from services.automation.scheduled_job_service import scheduled_job_loop
+
+    app.state.scheduled_job_task = asyncio.create_task(
+        scheduled_job_loop(app.state),
+        name="scheduled-jobs",
+    )
+
     # The host initiates the relay connection outbound, so no inbound port or
     # firewall change is needed. An empty RELAY_URL keeps LAN-only behavior.
     app.state.relay_connector = None
@@ -175,6 +185,9 @@ async def lifespan(app: FastAPI):
     if app.state.scheduler:
         await app.state.scheduler.stop()
 
+    app.state.scheduled_job_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await app.state.scheduled_job_task
     app.state.vault_outbox_task.cancel()
     with suppress(asyncio.CancelledError):
         await app.state.vault_outbox_task
@@ -266,6 +279,9 @@ app.include_router(obsidian_router.router, prefix="/api/obsidian", tags=["obsidi
 app.include_router(pairing_router.router, prefix="/api/pairing", tags=["pairing"])
 app.include_router(capabilities_router.router, prefix="/api/capabilities", tags=["capabilities"])
 app.include_router(voice_router.router, prefix="/api/voice", tags=["voice"])
+app.include_router(
+    scheduled_jobs_router.router, prefix="/api/scheduled-jobs", tags=["scheduled-jobs"]
+)
 
 app.websocket("/ws")(websocket_endpoint)
 

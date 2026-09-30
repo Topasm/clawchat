@@ -1477,3 +1477,37 @@ export const ObsidianScanResultSchema = z.object({
 
 export type ObsidianHealth = z.infer<typeof ObsidianHealthSchema>;
 export type ObsidianScanResult = z.infer<typeof ObsidianScanResultSchema>;
+
+// Scheduled AI jobs: standing instructions the server runs on a schedule.
+export const ScheduledJobResponseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  instruction: z.string(),
+  skill_chain: z.array(z.string()),
+  project_id: z.string().nullable(),
+  project_title: z.string().nullable(),
+  include_task_snapshot: z.boolean(),
+  rrule: z.string(),
+  timezone: z.string(),
+  enabled: z.boolean(),
+  next_run_at: z.string().nullable(),
+  conversation_id: z.string().nullable(),
+  last_run_at: z.string().nullable(),
+  last_run_id: z.string().nullable(),
+  last_run_status: z.string().nullable(),
+  last_error: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const ScheduledJobListResponseSchema = z.object({
+  jobs: z.array(ScheduledJobResponseSchema),
+});
+
+export const ScheduledJobRunResponseSchema = z.object({
+  run_id: z.string(),
+  conversation_id: z.string().nullable(),
+});
+
+export type ScheduledJob = z.infer<typeof ScheduledJobResponseSchema>;
+export type ScheduledJobRunResult = z.infer<typeof ScheduledJobRunResponseSchema>;

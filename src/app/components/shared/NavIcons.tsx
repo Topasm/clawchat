@@ -63,6 +63,15 @@ export function ReviewIcon({ size, className, label }: IconProps = {}) {
   );
 }
 
+export function AutomationsIcon({ size, className, label }: IconProps = {}) {
+  return (
+    <IconBase size={size} className={navClassName(className)} label={label}>
+      <circle cx="9" cy="9" r="6.5" />
+      <path d="M9 5.5V9l2.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
 export function RunsIcon({ size, className, label }: IconProps = {}) {
   return (
     <IconBase size={size} className={navClassName(className)} label={label}>
