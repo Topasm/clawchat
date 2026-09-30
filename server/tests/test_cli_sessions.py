@@ -257,3 +257,43 @@ async def test_control_never_starts_a_history_server_when_daemon_is_missing(
         async with cli.codex_connection(require_live=True):
             pytest.fail("No live daemon exists")
     spawn.assert_not_called()
+
+
+class CountingListService(cli.CLISessionService):
+    def __init__(self):
+        super().__init__()
+        self.listings = 0
+        self.release = asyncio.Event()
+
+    async def _list_uncached(self):
+        self.listings += 1
+        await self.release.wait()
+        return CLISessionListResponse(sessions=[], providers=[])
+
+    async def _act(self, provider, session_id, action, message=None):
+        pass
+
+
+async def test_pollers_share_one_listing_until_it_goes_stale(monkeypatch):
+    service = CountingListService()
+    waiting = [asyncio.ensure_future(service.list()) for _ in range(3)]
+    await asyncio.sleep(0)
+    service.release.set()
+    await asyncio.gather(*waiting)
+    assert service.listings == 1
+
+    await service.list()
+    assert service.listings == 1
+
+    monkeypatch.setattr(cli, "LIST_CACHE_SECONDS", 0)
+    await service.list()
+    assert service.listings == 2
+
+
+async def test_an_action_drops_the_cached_listing():
+    service = CountingListService()
+    service.release.set()
+    await service.list()
+    await service.act("claude", "job-1", "stop")
+    await service.list()
+    assert service.listings == 2

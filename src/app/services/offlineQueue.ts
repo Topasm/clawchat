@@ -26,6 +26,12 @@ interface OfflineQueueScopeInput {
   token?: string | null;
 }
 
+const listeners = new Set<() => void>();
+
+function notifyChanged(): void {
+  listeners.forEach((listener) => listener());
+}
+
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -74,6 +80,7 @@ function writeQueue(items: QueuedAction[]): boolean {
   try {
     const payload: PersistedQueue = { version: STORAGE_VERSION, items };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    notifyChanged();
     return true;
   } catch {
     logger.warn('Offline queue: unable to persist queued actions');
@@ -246,5 +253,22 @@ export const offlineQueue = {
     } catch {
       // Storage may be unavailable in private or restricted browser contexts.
     }
+    notifyChanged();
+  },
+
+  /**
+   * Call `listener` whenever the queue may have changed, in this window or in
+   * another tab sharing the same storage. Returns an unsubscribe function.
+   */
+  subscribe(listener: () => void): () => void {
+    listeners.add(listener);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY || event.key === null) listener();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      listeners.delete(listener);
+      window.removeEventListener('storage', onStorage);
+    };
   },
 };

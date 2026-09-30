@@ -28,7 +28,24 @@ data class CliSessionsState(
     val busy: Boolean = false,
     val error: Boolean = false,
     val accepted: Boolean = false,
-)
+) {
+    /**
+     * Each refresh spawns CLI processes on the host and wakes the phone's radio,
+     * so poll quickly only while a session is doing something.
+     */
+    val pollIntervalMillis: Long
+        get() = if (listing?.sessions.orEmpty().any { it.isActive } || selected?.isActive == true) {
+            ACTIVE_POLL_INTERVAL_MS
+        } else {
+            IDLE_POLL_INTERVAL_MS
+        }
+}
+
+internal const val ACTIVE_POLL_INTERVAL_MS = 5_000L
+internal const val IDLE_POLL_INTERVAL_MS = 30_000L
+
+private val CliSession.isActive: Boolean
+    get() = status == "running" || status == "waiting_input"
 
 @HiltViewModel
 class CliSessionsViewModel @Inject constructor(

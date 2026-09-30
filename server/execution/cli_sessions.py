@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shlex
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -242,7 +243,21 @@ def claude_session(row: dict) -> CLISessionResponse | None:
     )
 
 
+# Listing spawns a CLI process per provider. Clients poll this endpoint, so
+# callers that arrive together share one listing, and a listing answers
+# everyone for a few seconds instead of each poll paying for fresh processes.
+LIST_CACHE_SECONDS = 3.0
+
+
 class CLISessionService:
+    def __init__(self) -> None:
+        self._listed: tuple[float, CLISessionListResponse] | None = None
+        self._listing: asyncio.Future[CLISessionListResponse] | None = None
+
+    def forget_listing(self) -> None:
+        """Drop the cached listing so the next read reflects a change just made."""
+        self._listed = None
+
     async def codex_sessions(self):
         async with codex_connection() as connection:
             # Include live threads even if older than the first history page.
@@ -287,6 +302,19 @@ class CLISessionService:
         )
 
     async def list(self) -> CLISessionListResponse:
+        if self._listed and time.monotonic() - self._listed[0] < LIST_CACHE_SECONDS:
+            return self._listed[1]
+        if self._listing is None:
+            self._listing = asyncio.ensure_future(self._list_uncached())
+            self._listing.add_done_callback(self._remember_listing)
+        return await asyncio.shield(self._listing)
+
+    def _remember_listing(self, listing: asyncio.Future) -> None:
+        self._listing = None
+        if not listing.cancelled() and listing.exception() is None:
+            self._listed = (time.monotonic(), listing.result())
+
+    async def _list_uncached(self) -> CLISessionListResponse:
         async def load(provider, loader):
             if not find_cli(provider):
                 return [], CLIProviderState(
@@ -357,6 +385,12 @@ class CLISessionService:
             )
 
     async def act(self, provider, session_id, action, message=None):
+        try:
+            await self._act(provider, session_id, action, message)
+        finally:
+            self.forget_listing()
+
+    async def _act(self, provider, session_id, action, message=None):
         if provider == "claude":
             session = await self._claude(session_id)
             if action == "stop" and session.can_stop:

@@ -29,7 +29,7 @@ fun CliSessionsScreen(modifier: Modifier = Modifier, viewModel: CliSessionsViewM
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) { viewModel.refresh(); delay(5_000) }
+            while (true) { viewModel.refresh(); delay(viewModel.state.value.pollIntervalMillis) }
         }
     }
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
