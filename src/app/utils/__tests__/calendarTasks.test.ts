@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { indexTasksByDate, toDateKey } from '../calendarUtils';
+import { indexTasksByDate } from '../calendarUtils';
 import type { TodoResponse } from '../../types/api';
 
 function task(overrides: Partial<TodoResponse>): TodoResponse {
@@ -16,32 +16,19 @@ function task(overrides: Partial<TodoResponse>): TodoResponse {
 const today = new Date(2026, 8, 10); // 2026-09-10, local
 
 describe('indexTasksByDate', () => {
-  it('runs a task from today through its due date', () => {
+  // A deadline is a day, not a span: painting today through the due date read
+  // as a multi-day event and filled the month with unlabelled bars.
+  it('puts a task on its due date alone', () => {
     const map = indexTasksByDate(
       [task({ due_date: new Date(2026, 8, 12, 23, 59).toISOString() })],
       today,
     );
 
-    expect([...map.keys()].sort()).toEqual(['2026-09-10', '2026-09-11', '2026-09-12']);
-    expect(map.get('2026-09-10')![0].position).toBe('start');
-    expect(map.get('2026-09-11')![0].position).toBe('middle');
-    expect(map.get('2026-09-12')![0].position).toBe('end');
+    expect([...map.keys()]).toEqual(['2026-09-12']);
+    expect(map.get('2026-09-12')![0].isOverdue).toBe(false);
   });
 
-  it('collapses a task due today onto the single day', () => {
-    const map = indexTasksByDate(
-      [task({ due_date: new Date(2026, 8, 10, 18, 0).toISOString() })],
-      today,
-    );
-
-    expect([...map.keys()]).toEqual(['2026-09-10']);
-    expect(map.get('2026-09-10')![0].position).toBe('single');
-    expect(map.get('2026-09-10')![0].isOverdue).toBe(false);
-  });
-
-  // An overdue task has no stretch left to work in, so it must not paint every
-  // day between the missed deadline and today.
-  it('shows an overdue task only on the day it was due', () => {
+  it('marks a task whose due date has passed as overdue', () => {
     const map = indexTasksByDate(
       [task({ due_date: new Date(2026, 8, 7, 23, 59).toISOString() })],
       today,
@@ -68,12 +55,12 @@ describe('indexTasksByDate', () => {
   it('puts the soonest deadline first on a shared day', () => {
     const map = indexTasksByDate(
       [
-        task({ id: 'later', due_date: new Date(2026, 8, 20).toISOString() }),
-        task({ id: 'sooner', due_date: new Date(2026, 8, 11).toISOString() }),
+        task({ id: 'later', due_date: new Date(2026, 8, 11, 18).toISOString() }),
+        task({ id: 'sooner', due_date: new Date(2026, 8, 11, 9).toISOString() }),
       ],
       today,
     );
 
-    expect(map.get(toDateKey(today))!.map((s) => s.todo.id)).toEqual(['sooner', 'later']);
+    expect(map.get('2026-09-11')!.map((s) => s.todo.id)).toEqual(['sooner', 'later']);
   });
 });

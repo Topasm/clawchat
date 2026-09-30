@@ -27,6 +27,7 @@ import {
 import { ClipboardIcon, CheckCircleIcon, CloseIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
 import { isTaskTodo } from '../../utils/inboxState';
+import useProjectRootIds from '../../hooks/useProjectRootIds';
 import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
 interface KanbanBoardProps {
   viewMode: TasksViewMode;
@@ -62,7 +63,11 @@ export default function KanbanBoard({
     },
     { enableOnFormTags: true },
   );
-  const taskTodos = useMemo(() => todos.filter(isTaskTodo), [todos]);
+  const projectRootIds = useProjectRootIds();
+  const taskTodos = useMemo(
+    () => todos.filter((todo) => isTaskTodo(todo) && !projectRootIds.has(todo.id)),
+    [projectRootIds, todos],
+  );
   const scopedTodos = useMemo(
     () => taskTodos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter)),
     [statusFilter, taskTodos],

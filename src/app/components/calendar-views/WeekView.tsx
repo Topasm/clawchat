@@ -75,9 +75,6 @@ export default function WeekView({
                 <TaskBar
                   key={segment.todo.id}
                   segment={segment}
-                  showTitle={
-                    i === 0 || segment.position === 'start' || segment.position === 'single'
-                  }
                   onClick={(e) => onTaskClick(segment.todo, e)}
                 />
               ))}

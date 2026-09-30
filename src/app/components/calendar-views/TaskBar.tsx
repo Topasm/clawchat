@@ -1,23 +1,16 @@
 import type { CalendarTaskSegment } from '../../utils/calendarUtils';
 import { translateUi } from '../../i18n';
 
-/**
- * One day of a task's run on the calendar. Consecutive days join into a single
- * bar through the position modifier, so the stretch left to finish the task
- * reads as one shape rather than a repeated pill.
- */
+/** A task's deadline on the calendar, on the day it is due. */
 export default function TaskBar({
   segment,
-  showTitle,
   onClick,
 }: {
   segment: CalendarTaskSegment;
-  /** Only the day that opens the bar (or a new week row) carries the label. */
-  showTitle: boolean;
   onClick: (e: React.MouseEvent) => void;
 }) {
-  const { todo, position, isOverdue } = segment;
-  const classes = ['cc-calendar__task-bar', `cc-calendar__task-bar--${position}`];
+  const { todo, isOverdue } = segment;
+  const classes = ['cc-calendar__task-bar'];
   if (isOverdue) classes.push('cc-calendar__task-bar--overdue');
 
   return (
@@ -31,7 +24,7 @@ export default function TaskBar({
           : `${todo.title} — ${translateUi('Due')}`
       }
     >
-      {showTitle && <span className="cc-calendar__task-bar-title">{todo.title}</span>}
+      <span className="cc-calendar__task-bar-title">{todo.title}</span>
     </button>
   );
 }

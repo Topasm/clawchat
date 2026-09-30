@@ -128,14 +128,26 @@
   background: var(--cc-text-tertiary);
 }
 
-.cc-task-list__status--active {
-  background: var(--cc-primary);
-}
 .cc-task-list__status--completed {
   background: var(--cc-success);
 }
 .cc-task-list__status--cancelled {
   background: var(--cc-text-tertiary);
+}
+.cc-task-list__status--progress {
+  background: var(--cc-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cc-primary) 25%, transparent);
+}
+.cc-task-list__status--attention {
+  background: var(--cc-warning);
+}
+.cc-task-list__status--blocked,
+.cc-task-list__status--error {
+  background: var(--cc-error);
+}
+.cc-task-list__status--active {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--cc-text-tertiary);
 }
 .cc-task-list__overdue {
   color: var(--cc-error);

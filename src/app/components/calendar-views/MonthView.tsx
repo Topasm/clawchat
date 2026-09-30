@@ -58,9 +58,6 @@ export default function MonthView({
           );
           const overflow =
             dayTasks.length + dayEvents.length - visibleTasks.length - visibleEvents.length;
-          // A bar running into this week needs its label repeated, otherwise
-          // the only labelled day may sit weeks above.
-          const opensWeekRow = idx % 7 === 0;
           let cellClass = 'cc-calendar__cell';
           if (!isCurrentMonth) cellClass += ' cc-calendar__cell--other-month';
           if (isToday) cellClass += ' cc-calendar__cell--today';
@@ -76,9 +73,6 @@ export default function MonthView({
                   <TaskBar
                     key={segment.todo.id}
                     segment={segment}
-                    showTitle={
-                      opensWeekRow || segment.position === 'start' || segment.position === 'single'
-                    }
                     onClick={(e) => onTaskClick(segment.todo, e)}
                   />
                 ))}
