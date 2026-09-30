@@ -119,3 +119,11 @@ export {
   useObsidianFlushQueue,
   useObsidianRetryDeadLetter,
 } from './useObsidianQueries';
+export {
+  useScheduledJobsQuery,
+  useCreateScheduledJob,
+  useUpdateScheduledJob,
+  useDeleteScheduledJob,
+  useRunScheduledJobNow,
+} from './useScheduledJobQueries';
+export type { ScheduledJobInput } from './useScheduledJobQueries';

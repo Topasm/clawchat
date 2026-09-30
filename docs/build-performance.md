@@ -101,6 +101,14 @@ localization-only baseline to 30,851 bytes and its ceiling to 31,800 bytes (3.1 
 headroom); JavaScript and renderer core ceilings stay unchanged. The Tauri renderer is
 rebuilt and measured before accepting this change.
 
+The 2026-09-30 Automations page (scheduled AI jobs) adds a lazily loaded route, its editor, and
+54 Korean UI messages. The compressed catalogs grow from 30,851 to 32,159 bytes (+1,308 bytes)
+and all renderer JavaScript from 2,184,964 to 2,200,558 bytes (+15,594 bytes); the initial HTML
+JavaScript is unchanged because the page loads on demand. The localization baseline is set to
+32,159 bytes with a 33,200-byte ceiling and the all-JavaScript baseline to 2,200,558 bytes with a
+2,266,600-byte ceiling (3 percent headroom each). The Tauri renderer is rebuilt and measured
+before accepting this change.
+
 Do not raise a threshold solely to make CI pass. Measure the new output, identify which entry or
 route owns the increase, and record an intentional baseline change in the same commit.
 

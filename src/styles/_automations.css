@@ -1,0 +1,201 @@
+/* Automations: scheduled AI jobs */
+.cc-automations-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-4);
+  padding: var(--cc-space-5);
+  max-width: 880px;
+}
+
+.cc-automations-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--cc-space-4);
+}
+
+.cc-automations-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-3);
+}
+
+.cc-job-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-2);
+  padding: var(--cc-space-3) var(--cc-space-2);
+  cursor: default;
+}
+
+.cc-job-card:hover {
+  background: transparent;
+}
+
+.cc-job-card--paused {
+  opacity: 0.7;
+}
+
+.cc-job-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+}
+
+.cc-job-card__title {
+  margin: 0;
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--cc-text);
+}
+
+.cc-job-card__badge {
+  padding: 1px var(--cc-space-2);
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-meta-tag-bg);
+  color: var(--cc-text-secondary);
+  font-size: 0.8em;
+}
+
+.cc-job-card__meta,
+.cc-job-card__instruction {
+  margin: 0;
+  color: var(--cc-text-secondary);
+}
+
+.cc-job-card__instruction {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cc-job-card__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cc-space-2) var(--cc-space-5);
+  margin: 0;
+  font-size: 0.9em;
+}
+
+.cc-job-card__facts dt {
+  color: var(--cc-text-tertiary);
+}
+
+.cc-job-card__facts dd {
+  margin: 0;
+  color: var(--cc-text);
+}
+
+.cc-job-card__error {
+  margin: 0;
+  color: var(--cc-warning);
+  font-size: 0.9em;
+}
+
+.cc-job-card__actions,
+.cc-job-editor__actions,
+.cc-job-editor__templates,
+.cc-job-editor__days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cc-space-2);
+}
+
+.cc-job-editor__actions {
+  justify-content: flex-end;
+}
+
+.cc-job-editor,
+.cc-job-editor:hover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-3);
+  padding: var(--cc-space-4);
+  cursor: default;
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-panel);
+}
+
+.cc-job-editor__field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--cc-space-1);
+  min-width: 0;
+  color: var(--cc-text-secondary);
+  font-size: 0.9em;
+}
+
+.cc-job-editor .cc-settings-input {
+  font-family: inherit;
+  font-size: 1em;
+}
+
+.cc-job-editor__field .cc-settings-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cc-job-editor__row > .cc-job-editor__field {
+  min-width: 200px;
+}
+
+.cc-job-editor__instruction {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.cc-job-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--cc-space-3);
+}
+
+.cc-job-editor__schedule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-space-2);
+  margin: 0;
+  padding: var(--cc-space-3);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-control);
+}
+
+.cc-job-editor__schedule legend {
+  padding: 0 var(--cc-space-1);
+  color: var(--cc-text-secondary);
+  font-size: 0.9em;
+}
+
+.cc-job-editor__inline {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-2);
+}
+
+.cc-job-editor__day-of-month {
+  width: 64px;
+}
+
+.cc-job-editor__hint {
+  margin: 0;
+  color: var(--cc-text-tertiary);
+  font-size: 0.85em;
+}
+
+.cc-job-editor__check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cc-space-2);
+  color: var(--cc-text-secondary);
+  font-size: 0.9em;
+}
+
+@media (max-width: 640px) {
+  .cc-automations-page {
+    padding: var(--cc-space-3);
+  }
+}

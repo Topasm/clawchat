@@ -35,6 +35,8 @@ export function invalidateModuleQueries(queryClient: QueryClient, module?: strin
     queryClient.invalidateQueries({ queryKey: ['notes'] });
   } else if (module === 'runs') {
     queryClient.invalidateQueries({ queryKey: ['runs'] });
+    // A job card shows how its latest run is doing.
+    queryClient.invalidateQueries({ queryKey: queryKeys.scheduledJobs });
     queryClient.invalidateQueries({ queryKey: queryKeys.projects });
     invalidateExecutionTelemetry();
   } else {

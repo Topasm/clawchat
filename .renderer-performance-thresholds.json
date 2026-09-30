@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "measuredAt": "2026-09-25",
+  "measuredAt": "2026-09-30",
   "target": "Tauri Linux renderer (Safari 13 compatibility target)",
   "metrics": {
     "initialJavaScript.rawBytes": {
@@ -12,16 +12,16 @@
       "maxBytes": 109000
     },
     "allJavaScript.rawBytes": {
-      "baselineBytes": 2133998,
-      "maxBytes": 2200000
+      "baselineBytes": 2200558,
+      "maxBytes": 2266600
     },
     "rendererCoreFiles.rawBytes": {
       "baselineBytes": 2341669,
       "maxBytes": 2413000
     },
     "localizationAssets.rawBytes": {
-      "baselineBytes": 30851,
-      "maxBytes": 31800
+      "baselineBytes": 32159,
+      "maxBytes": 33200
     }
   }
 }

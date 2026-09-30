@@ -54,6 +54,7 @@ import {
   AdminIcon,
   NavCalendarIcon,
   ReviewIcon,
+  AutomationsIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
@@ -111,7 +112,10 @@ const primaryNavItems = [
 ];
 // Runs and Review stay reachable as the log and the history; the nav offers
 // the one place that lists what has stopped for the user.
-const secondaryNavItems = [{ to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon }];
+const secondaryNavItems = [
+  { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon },
+  { to: '/automations', labelKey: 'nav.automations', Icon: AutomationsIcon },
+];
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
