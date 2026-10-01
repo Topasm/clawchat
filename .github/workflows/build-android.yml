@@ -44,9 +44,17 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
-      - name: Test, lint, and build Android artifacts
+      # The debug APK is packaged in its own invocation. Packaging debug and
+      # release in one run failed intermittently in :app:packageDebug
+      # (IncrementalSplitterRunnable) with no cause in the log; the release
+      # workflow, which never packages debug, never failed there.
+      - name: Test, lint, and build Android release artifacts
         working-directory: android
-        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease bundleRelease --warning-mode all
+        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all --stacktrace
+
+      - name: Build the installable debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --warning-mode all --stacktrace
 
       - name: Verify optimized widget callbacks
         run: bash scripts/check-android-widget-callbacks.sh android/app/build/outputs/apk/release/app-release-unsigned.apk

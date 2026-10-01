@@ -575,7 +575,7 @@ jobs:
 
       - name: Test, lint, and build signed Android artifacts
         working-directory: android
-        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all
+        run: ./gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all --stacktrace
 
       - name: Verify optimized widget callbacks
         run: bash scripts/check-android-widget-callbacks.sh android/app/build/outputs/apk/release/app-release.apk
