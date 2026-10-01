@@ -53,7 +53,7 @@ describe('useChatPanel', () => {
       result.current.open('conv-project', {
         kind: 'project',
         title: 'Project Agent',
-        subtitle: 'Agent Todo improvements',
+        subtitle: 'ClawChat improvements',
       });
     });
 
@@ -62,7 +62,7 @@ describe('useChatPanel', () => {
     expect(result.current.presentation).toEqual({
       kind: 'project',
       title: 'Project Agent',
-      subtitle: 'Agent Todo improvements',
+      subtitle: 'ClawChat improvements',
     });
 
     act(() => result.current.reset());

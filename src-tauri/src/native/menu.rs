@@ -23,7 +23,7 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(
         app,
         AppMenuCommand::ShowMain.id(),
-        "Show Agent Todo",
+        "Show ClawChat",
         true,
         None::<&str>,
     )?;
@@ -42,17 +42,17 @@ pub(super) fn setup(app: &AppHandle) -> tauri::Result<()> {
         None::<&str>,
     )?;
 
-    let application_menu = SubmenuBuilder::new(app, "Agent Todo")
+    let application_menu = SubmenuBuilder::new(app, "ClawChat")
         .about(None)
         .separator()
         .item(&settings)
         .item(&connections)
         .separator()
-        .hide_with_text("Hide Agent Todo")
+        .hide_with_text("Hide ClawChat")
         .hide_others_with_text("Hide Others")
         .show_all_with_text("Show All")
         .separator()
-        .quit_with_text("Quit Agent Todo")
+        .quit_with_text("Quit ClawChat")
         .build()?;
     let file_menu = SubmenuBuilder::new(app, "File")
         .item(&quick_capture)

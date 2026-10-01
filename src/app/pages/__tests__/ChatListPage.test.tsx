@@ -5,7 +5,7 @@ import ChatListPage from '../ChatListPage';
 
 const project = {
   id: 'project-1',
-  title: 'Agent Todo improvements',
+  title: 'ClawChat improvements',
   goal: 'Connect the workflow',
   status: 'active',
   root_task_id: 'todo-root',

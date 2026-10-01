@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Agent Todo",
-  "short_name": "Agent Todo",
+  "name": "ClawChat",
+  "short_name": "ClawChat",
   "description": "A privacy-first, self-hosted agentic todo app",
   "start_url": "/",
   "scope": "/",
