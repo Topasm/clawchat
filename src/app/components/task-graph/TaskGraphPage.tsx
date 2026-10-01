@@ -103,6 +103,7 @@ export default function TaskGraphPage({
         initialMode="execution"
         showPlanningAction={false}
         showStatusControls={false}
+        hideCompleted={statusFilter === 'active'}
       />
     </div>
   );
