@@ -10,12 +10,7 @@ export default function EventPill({
   onClick: (e: React.MouseEvent) => void;
 }) {
   return (
-    <button
-      type="button"
-      className="cc-calendar__event-pill"
-      onClick={onClick}
-      title={event.title}
-    >
+    <button type="button" className="cc-calendar__event-pill" onClick={onClick} title={event.title}>
       <span className="cc-calendar__event-pill-time">{pillTime(event)}</span>
       <span className="cc-calendar__event-pill-title">{event.title}</span>
       {event.recurrence_rule && <RepeatIcon />}

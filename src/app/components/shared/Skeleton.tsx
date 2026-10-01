@@ -16,9 +16,6 @@ export default function Skeleton({
   if (height) style.height = typeof height === 'number' ? `${height}px` : height;
 
   return (
-    <div
-      className={`cc-skeleton cc-skeleton--${variant} ${className}`.trim()}
-      style={style}
-    />
+    <div className={`cc-skeleton cc-skeleton--${variant} ${className}`.trim()} style={style} />
   );
 }

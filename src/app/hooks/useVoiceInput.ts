@@ -29,14 +29,12 @@ export default function useVoiceInput() {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const isSupported =
-    typeof window !== 'undefined' &&
-    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   const startListening = useCallback(() => {
     if (!isSupported) return;
 
-    const SpeechRecognitionClass =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionClass) return;
 
     const recognition = new SpeechRecognitionClass();

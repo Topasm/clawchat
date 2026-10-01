@@ -54,6 +54,9 @@ claw-cli/.pytest_cache/
 
 # Generated API client (Orval). The small runtime contract is checked in so CI
 # can detect drift without requiring a running backend.
+# Locale catalogs are derived from the i18n sources by vite.config.mts.
+src/app/i18n/generated/
+
 src/app/generated/*
 !src/app/generated/contracts/
 src/app/generated/contracts/*
