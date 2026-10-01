@@ -70,13 +70,13 @@ function LocationSearch() {
   return <output data-testid="location-search">{useLocation().search}</output>;
 }
 
-function renderPage(entry: string) {
+function renderPage(entry: string, statusFilter: 'active' | 'completed' | 'all' = 'all') {
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <TaskGraphPage
         viewMode="graph"
         onViewModeChange={vi.fn()}
-        statusFilter="all"
+        statusFilter={statusFilter}
         onStatusFilterChange={vi.fn()}
       />
       <LocationSearch />
@@ -117,6 +117,15 @@ describe('TaskGraphPage project scope', () => {
     expect((mocks.graphProps?.todos as Array<{ id: string }>).map((todo) => todo.id)).toEqual([
       'question-b',
     ]);
+  });
+
+  it('keeps finished tasks off the canvas only under the Active filter', () => {
+    const active = renderPage('/tasks?view=graph', 'active');
+    expect(mocks.graphProps).toMatchObject({ hideCompleted: true });
+    active.unmount();
+
+    renderPage('/tasks?view=graph', 'all');
+    expect(mocks.graphProps).toMatchObject({ hideCompleted: false });
   });
 
   it('shows all tasks until a project is explicitly selected', () => {

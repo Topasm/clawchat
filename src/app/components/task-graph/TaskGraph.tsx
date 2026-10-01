@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { TodoResponse } from '../../types/api';
 import usePlatform from '../../hooks/usePlatform';
-import { useProjectsQuery, useTaskGraphInsightsQuery } from '../../hooks/queries';
+import { useProjectsQuery, useTaskGraphInsightsQuery, useUpdateTodo } from '../../hooks/queries';
+import useInboxDependencyPreview from '../../hooks/useInboxDependencyPreview';
+import useInboxGraphRevision from '../../hooks/useInboxGraphRevision';
+import { useToastStore } from '../../stores/useToastStore';
+import InboxDependencyPreviewPanel from '../inbox/InboxDependencyPreviewPanel';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SegmentedControl from '../shared/SegmentedControl';
 import { SparkleIcon } from '../shared/Icons';
@@ -19,6 +23,7 @@ import TaskGraphView from './TaskGraphView';
 import TaskGraphProposalDialog from './TaskGraphProposalDialog';
 import { TaskGraphHealthPanel, TaskGraphNodeInsightPanel } from './TaskGraphInsightsPanel';
 import type { TaskGraphMode } from './taskGraphTypes';
+import { resolveGraphConnection } from './taskGraphConnect';
 import {
   createTaskGraphLayoutScope,
   loadTaskGraphLayout,
@@ -35,6 +40,8 @@ interface TaskGraphProps {
   fixedProjectId?: string;
   showPlanningAction?: boolean;
   showStatusControls?: boolean;
+  /** Without the status controls, whether finished tasks stay off the canvas. */
+  hideCompleted?: boolean;
   initialMode?: TaskGraphMode;
   selectedTaskId?: string | null;
   onSelectTask?: (id: string | null) => void;
@@ -51,6 +58,7 @@ export default function TaskGraph({
   fixedProjectId,
   showPlanningAction = true,
   showStatusControls = true,
+  hideCompleted: hideCompletedWithoutControls = true,
   initialMode = 'structure',
   selectedTaskId: controlledTaskId,
   onSelectTask,
@@ -74,6 +82,11 @@ export default function TaskGraph({
     [onSelectTask],
   );
   const [layoutResetVersion, setLayoutResetVersion] = useState(0);
+  const [reparent, setReparent] = useState<{ childTaskId: string; parentTaskId: string } | null>(
+    null,
+  );
+  const addToast = useToastStore((state) => state.addToast);
+  const updateTodo = useUpdateTodo();
   const projectsQuery = useProjectsQuery();
   const projectOptions = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
   const selectedProject = useMemo(
@@ -161,6 +174,85 @@ export default function TaskGraph({
     const metadataIds = new Set(metadataTodos.map((todo) => todo.id));
     return [...metadataTodos, ...scopedTodos.filter((todo) => !metadataIds.has(todo.id))];
   }, [metadataTodos, scopedTodos]);
+  const todoById = useMemo(
+    () => new Map(graphMetadataTodos.map((todo) => [todo.id, todo])),
+    [graphMetadataTodos],
+  );
+  // Drawing an edge on the canvas goes through the same preview-and-confirm
+  // step as the Inbox's ↝ drag, against the same graph revision.
+  const { placementRevision, setPlacementRevision, refreshPlacementRevision } =
+    useInboxGraphRevision(insightsQuery);
+  const dependency = useInboxDependencyPreview({
+    todoById,
+    selectedTaskId,
+    selectTask: setSelectedTaskId,
+    placementRevision,
+    setPlacementRevision,
+    refreshPlacementRevision,
+  });
+  const handleConnect = useCallback(
+    (sourceId: string, targetId: string) => {
+      const connection = resolveGraphConnection(
+        mode,
+        sourceId,
+        targetId,
+        graphMetadataTodos,
+        graphRelationships,
+      );
+      if (connection.kind === 'invalid') {
+        const child = todoById.get(targetId)?.title ?? '';
+        const parent = todoById.get(sourceId)?.title ?? '';
+        addToast(
+          'warning',
+          connection.reason === 'self'
+            ? translateUi('A task cannot wait for itself')
+            : connection.reason === 'duplicate'
+              ? translateUi('That dependency already exists')
+              : connection.reason === 'same-parent'
+                ? translateUi('“{{child}}” is already a sub-task of “{{parent}}”', {
+                    child,
+                    parent,
+                  })
+                : translateUi('A task cannot become a sub-task of its own sub-task'),
+        );
+        return;
+      }
+      if (connection.kind === 'dependency') {
+        setReparent(null);
+        void dependency.requestPreview(connection.dependentTaskId, connection.prerequisiteTaskId);
+        return;
+      }
+      dependency.dismissPreview();
+      setSelectedTaskId(connection.childTaskId);
+      setReparent({ childTaskId: connection.childTaskId, parentTaskId: connection.parentTaskId });
+    },
+    [
+      addToast,
+      dependency,
+      graphMetadataTodos,
+      graphRelationships,
+      mode,
+      setSelectedTaskId,
+      todoById,
+    ],
+  );
+  const confirmReparent = () => {
+    if (!reparent) return;
+    const child = todoById.get(reparent.childTaskId)?.title ?? '';
+    const parent = todoById.get(reparent.parentTaskId)?.title ?? '';
+    updateTodo.mutate(
+      { id: reparent.childTaskId, data: { parent_id: reparent.parentTaskId } },
+      {
+        onSuccess: () =>
+          addToast(
+            'success',
+            translateUi('“{{child}}” is now a sub-task of “{{parent}}”', { child, parent }),
+          ),
+        onError: () => addToast('error', translateUi('Could not move the task')),
+      },
+    );
+    setReparent(null);
+  };
   const toggleCollapsed = useCallback(
     (id: string) => {
       const next = new Set(collapsedIds);
@@ -187,7 +279,7 @@ export default function TaskGraph({
       buildTaskGraphElements(graphTodos, {
         mode,
         collapsedIds,
-        hideCompleted: showStatusControls ? hideCompleted : false,
+        hideCompleted: showStatusControls ? hideCompleted : hideCompletedWithoutControls,
         relationships: graphRelationships,
         metadataTodos: graphMetadataTodos,
         insightNodes: mode === 'execution' ? insightsQuery.data?.nodes : undefined,
@@ -202,6 +294,7 @@ export default function TaskGraph({
       insightsQuery.data,
       graphMetadataTodos,
       graphRelationships,
+      hideCompletedWithoutControls,
       mode,
       showStatusControls,
       toggleCollapsed,
@@ -316,7 +409,58 @@ export default function TaskGraph({
         </span>
         <span className={`cc-task-flow__legend-line cc-task-flow__legend-line--${mode}`} />
         <span>{mode === 'structure' ? translateUi('Sub-task') : translateUi('Depends on')}</span>
+        {!isMobile && (
+          <span className="cc-task-flow__hint">
+            {translateUi("Drag from a card's right edge to another card to connect them")}
+          </span>
+        )}
       </div>
+
+      {dependency.preview && (
+        <div className="cc-task-flow__confirm">
+          <InboxDependencyPreviewPanel
+            preview={dependency.preview}
+            todoById={todoById}
+            isCreating={dependency.isCreating}
+            onConfirm={() => void dependency.confirmPreview()}
+            onCancel={dependency.dismissPreview}
+          />
+        </div>
+      )}
+      {reparent && (
+        <div className="cc-task-flow__confirm">
+          <section
+            className="cc-inbox-triage__dependency-preview"
+            aria-live="polite"
+            aria-label={translateUi('Confirm sub-task')}
+          >
+            <strong>{translateUi('Make a sub-task')}</strong>
+            <p>
+              {translateUi('“{{child}}” will become a sub-task of “{{parent}}”.', {
+                child: todoById.get(reparent.childTaskId)?.title ?? '',
+                parent: todoById.get(reparent.parentTaskId)?.title ?? '',
+              })}
+            </p>
+            <div>
+              <button
+                type="button"
+                className="cc-btn cc-btn--primary"
+                disabled={updateTodo.isPending}
+                onClick={confirmReparent}
+              >
+                {translateUi('Make sub-task')}
+              </button>
+              <button
+                type="button"
+                className="cc-btn cc-btn--ghost"
+                onClick={() => setReparent(null)}
+              >
+                {translateUi('Cancel')}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {mode === 'execution' && (
         <TaskGraphHealthPanel
@@ -338,6 +482,7 @@ export default function TaskGraph({
           selectedTaskId={selectedTaskId}
           onSelectTask={setSelectedTaskId}
           persistenceScope={layoutScope}
+          onConnect={handleConnect}
         />
         {selectedInsight && insightsQuery.data && (
           <TaskGraphNodeInsightPanel

@@ -7,6 +7,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
+  type Connection,
   type Edge,
   type NodeMouseHandler,
   type OnNodeDrag,
@@ -25,6 +26,8 @@ interface TaskGraphViewProps {
   selectedTaskId?: string | null;
   onSelectTask: (taskId: string | null) => void;
   persistenceScope?: string;
+  /** Drawn from one card's right edge to another; absent, the canvas is read-only. */
+  onConnect?: (sourceId: string, targetId: string) => void;
 }
 const nodeTypes = { task: TaskGraphNode };
 function TaskGraphCanvas({
@@ -34,7 +37,14 @@ function TaskGraphCanvas({
   selectedTaskId,
   onSelectTask,
   persistenceScope,
+  onConnect,
 }: TaskGraphViewProps) {
+  const connectable = Boolean(onConnect) && !isMobile;
+  const handleConnect = (connection: Connection) => {
+    if (connection.source && connection.target && connection.source !== connection.target) {
+      onConnect?.(connection.source, connection.target);
+    }
+  };
   const savedLayout = useMemo(
     () => (persistenceScope ? loadTaskGraphLayout(persistenceScope) : undefined),
     [persistenceScope],
@@ -88,8 +98,11 @@ function TaskGraphCanvas({
       onMoveEnd={handleMoveEnd}
       onNodeClick={handleNodeClick}
       onPaneClick={() => onSelectTask(null)}
+      onConnect={handleConnect}
+      isValidConnection={(connection) => connection.source !== connection.target}
+      connectionRadius={28}
       nodesDraggable={!isMobile}
-      nodesConnectable={false}
+      nodesConnectable={connectable}
       edgesReconnectable={false}
       elementsSelectable
       panOnDrag
@@ -139,8 +152,11 @@ export default function TaskGraphView(props: TaskGraphViewProps) {
       </div>
     );
   }
+  const connectable = Boolean(props.onConnect) && !props.isMobile;
   return (
-    <div className="cc-task-flow__canvas">
+    <div
+      className={`cc-task-flow__canvas${connectable ? ' cc-task-flow__canvas--connectable' : ''}`}
+    >
       <ReactFlowProvider>
         <TaskGraphCanvas {...props} />
       </ReactFlowProvider>

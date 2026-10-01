@@ -327,6 +327,22 @@ export const koreanUiTranslations: Record<string, string> = {
   dependencies: '의존 관계',
   'Dependency execution order': '의존 관계 실행 순서',
   'Dependency impact preview': '의존 관계 영향 미리보기',
+  "Drag from a card's right edge to another card to connect them":
+    '카드 오른쪽 가장자리를 끌어 다른 카드에 놓으면 연결됩니다',
+  'A task cannot wait for itself': '작업은 자기 자신을 기다릴 수 없습니다',
+  'That dependency already exists': '이미 있는 의존 관계입니다',
+  '“{{child}}” is already a sub-task of “{{parent}}”':
+    '“{{child}}”은(는) 이미 “{{parent}}”의 하위 작업입니다',
+  'A task cannot become a sub-task of its own sub-task':
+    '작업을 자기 하위 작업 아래에 둘 수 없습니다',
+  'Confirm sub-task': '하위 작업 확인',
+  'Make a sub-task': '하위 작업으로 만들기',
+  '“{{child}}” will become a sub-task of “{{parent}}”.':
+    '“{{child}}”이(가) “{{parent}}”의 하위 작업이 됩니다.',
+  'Make sub-task': '하위 작업으로',
+  '“{{child}}” is now a sub-task of “{{parent}}”':
+    '“{{child}}”이(가) 이제 “{{parent}}”의 하위 작업입니다',
+  'Could not move the task': '작업을 옮기지 못했습니다',
   'Depends on': '선행 작업',
   'Describe the outcome that defines success': '성공을 정의하는 결과를 설명하세요.',
   Description: '설명',
