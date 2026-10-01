@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Agent Todo Theme System (ported from mobile)
+// ClawChat Theme System (ported from mobile)
 // ---------------------------------------------------------------------------
 
 export interface ColorPalette {

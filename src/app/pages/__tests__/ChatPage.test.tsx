@@ -71,7 +71,7 @@ describe('ChatPage agent answer mode', () => {
     mocks.projects = [
       {
         id: 'project-1',
-        title: 'Agent Todo improvements',
+        title: 'ClawChat improvements',
         root_task_id: 'todo-root',
         task_count: 1,
         completed_task_count: 0,
@@ -97,7 +97,7 @@ describe('ChatPage agent answer mode', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Agent Todo improvements')).toBeInTheDocument();
+    expect(screen.getByText('ClawChat improvements')).toBeInTheDocument();
     expect(screen.getByText('Task thread')).toBeInTheDocument();
     expect(screen.getAllByText('Project Agent panel').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Back to project' }));
@@ -108,7 +108,7 @@ describe('ChatPage agent answer mode', () => {
     mocks.projects = [
       {
         id: 'project-1',
-        title: 'Agent Todo improvements',
+        title: 'ClawChat improvements',
         root_task_id: 'todo-root',
         task_count: 1,
         completed_task_count: 0,
