@@ -28,10 +28,17 @@ test('gates Android compilation on generated API contract drift', () => {
 test('keeps tests, debug and release lint, installable debug output, and the release bundle in one gate', () => {
   const workflow = readWorkflow();
 
+  // Debug packaging runs in a separate invocation: packaging both variants in
+  // one Gradle run failed intermittently in :app:packageDebug.
   assert.match(
     workflow,
-    /\.\/gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease bundleRelease --warning-mode all/,
+    /\.\/gradlew testDebugUnitTest lintDebug lintRelease assembleRelease bundleRelease --warning-mode all --stacktrace/,
   );
+  assert.match(workflow, /\.\/gradlew assembleDebug --warning-mode all --stacktrace/);
+  assert.ok(
+    workflow.indexOf('./gradlew assembleDebug') > workflow.indexOf('./gradlew testDebugUnitTest'),
+  );
+  assert.doesNotMatch(workflow, /assembleDebug assembleRelease/);
   assert.match(workflow, /android\/app\/build\/outputs\/apk\/debug\/app-debug\.apk/);
   assert.match(workflow, /android\/app\/build\/outputs\/bundle\/release\/app-release\.aab/);
 });
