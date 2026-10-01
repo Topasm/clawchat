@@ -192,6 +192,9 @@ export default function TaskDetailPage() {
   const dueInfo =
     task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
   const canonicalDoc = extractCanonicalDoc(project?.description);
+  const activeSkillLabels = (task.enabled_skills ?? []).map((id) =>
+    translateUi(SKILL_LABELS[id] || id),
+  );
   return (
     <div className="cc-detail cc-exec-panel">
       {/* Top: Status + Quick Actions */}
@@ -215,52 +218,41 @@ export default function TaskDetailPage() {
         </div>
       </div>
 
-      {/* Section 1: Next Step */}
-      <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">{translateUi('Next step')}</div>
-        {hasPlan ? (
-          <PlanReviewDiff
-            plan={plan}
-            onApply={handleApplyPlan}
-            onDismiss={handleDismissPlan}
-            onRegenerate={handleRegeneratePlan}
-            applyError={applyPlanMutation.error}
-            isApplying={applyPlanMutation.isPending}
-            isDismissing={dismissPlanMutation.isPending}
-            isRegenerating={generatePlanMutation.isPending}
-          />
-        ) : nextSubtask ? (
-          <div className="cc-exec-panel__next-step">
-            <TaskCard
-              task={nextSubtask}
-              onToggle={() => handleToggle(nextSubtask.id)}
-              onClick={() => navigate(`/tasks/${nextSubtask.id}`)}
-              isSubTask
+      {/* Section 1: Next Step. A task with no plan and no sub-task is its own
+          next step, and the title already says what it is; no card for that. */}
+      {(hasPlan || nextSubtask) && (
+        <div className="cc-exec-panel__section">
+          <div className="cc-exec-panel__section-title">{translateUi('Next step')}</div>
+          {hasPlan ? (
+            <PlanReviewDiff
+              plan={plan}
+              onApply={handleApplyPlan}
+              onDismiss={handleDismissPlan}
+              onRegenerate={handleRegeneratePlan}
+              applyError={applyPlanMutation.error}
+              isApplying={applyPlanMutation.isPending}
+              isDismissing={dismissPlanMutation.isPending}
+              isRegenerating={generatePlanMutation.isPending}
             />
-            {incompleteChildren.length > 1 && (
-              <span className="cc-exec-panel__remaining">
-                +{incompleteChildren.length - 1}
-                {translateUi(' more sub-task\n                ')}
-                {incompleteChildren.length - 1 !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-        ) : (
-          <div className="cc-exec-panel__next-step-empty">
-            {isTerminalTaskStatus(task.status) ? (
-              <span className="cc-exec-panel__done-label">
-                {task.status === 'completed'
-                  ? translateUi('Task completed')
-                  : translateUi('Task cancelled')}
-              </span>
-            ) : (
-              <span className="cc-exec-panel__do-this">
-                {translateUi('This task is your next step')}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+          ) : nextSubtask ? (
+            <div className="cc-exec-panel__next-step">
+              <TaskCard
+                task={nextSubtask}
+                onToggle={() => handleToggle(nextSubtask.id)}
+                onClick={() => navigate(`/tasks/${nextSubtask.id}`)}
+                isSubTask
+              />
+              {incompleteChildren.length > 1 && (
+                <span className="cc-exec-panel__remaining">
+                  +{incompleteChildren.length - 1}
+                  {translateUi(' more sub-task\n                ')}
+                  {incompleteChildren.length - 1 !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Section 2: Due / Estimate / Recurrence / Blockers */}
       <div className="cc-exec-panel__section">
@@ -269,7 +261,6 @@ export default function TaskDetailPage() {
           <div
             className={`cc-exec-panel__info-item${dueInfo ? ` cc-exec-panel__info-item--${dueInfo.variant}` : ''}`}
           >
-            <span className="cc-exec-panel__info-label">{translateUi('Due')}</span>
             <div className="cc-exec-panel__due-editor">
               <input
                 type="date"
@@ -423,7 +414,11 @@ export default function TaskDetailPage() {
 
           {/* Skill delegate buttons */}
           <details key={`skills-${task.id}`}>
-            <summary className="cc-btn cc-btn--ghost">{translateUi('Skills:')}</summary>
+            <summary className="cc-btn cc-btn--ghost">
+              {activeSkillLabels.length
+                ? translateUi('Skills: {{skills}}', { skills: activeSkillLabels.join(' → ') })
+                : translateUi('Skills')}
+            </summary>
             <div className="cc-exec-panel__delegate">
               {SKILL_OPTIONS.map(({ id, label }) => {
                 const isActive = task.enabled_skills?.includes(id) || task.assignee === id;
