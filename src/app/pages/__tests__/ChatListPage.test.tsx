@@ -55,31 +55,22 @@ vi.mock('../../hooks/queries', () => ({
 
 vi.mock('../../hooks/usePlatform', () => ({ default: () => ({ isMobile: false }) }));
 
-function renderAt(path: string) {
+function renderPage() {
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={['/projects']}>
       <Routes>
         <Route path="/projects" element={<ChatListPage />} />
-        <Route path="/chats" element={<ChatListPage />} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
 describe('ChatListPage scopes', () => {
-  it('shows only project cards on the Projects route', () => {
-    renderAt('/projects');
+  it('lists projects first and the chats outside them below, never a project thread', () => {
+    renderPage();
 
     expect(screen.getByText(project.title)).toBeInTheDocument();
-    expect(screen.queryByText('Project-only thread')).not.toBeInTheDocument();
-    expect(screen.queryByText('Outside question')).not.toBeInTheDocument();
-  });
-
-  it('keeps project threads out of the global Chats route', () => {
-    renderAt('/chats');
-
     expect(screen.getByText('Outside question')).toBeInTheDocument();
     expect(screen.queryByText('Project-only thread')).not.toBeInTheDocument();
-    expect(screen.queryByText(project.title)).not.toBeInTheDocument();
   });
 });

@@ -165,7 +165,7 @@ export default function ChatPage() {
         <button
           type="button"
           className="cc-chat-page__back"
-          onClick={() => navigate(project ? `/projects/${project.id}` : '/chats')}
+          onClick={() => navigate(project ? `/projects/${project.id}` : '/projects')}
           aria-label={translateUi(project ? 'Back to project' : 'Back to chats')}
         >
           <ChevronLeftIcon size={16} />

@@ -760,6 +760,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Server Configuration (read-only)': '서버 구성(읽기 전용)',
   'Server configuration requires a server connection.': '서버 구성에는 서버 연결이 필요합니다.',
   'Server Info': '서버 정보',
+  Server: '서버',
   'Server management and monitoring': '서버 관리 및 모니터링',
   'Server reachable': '서버 연결 가능',
   'Server Status': '서버 상태',

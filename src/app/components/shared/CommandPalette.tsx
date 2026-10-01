@@ -56,9 +56,9 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                   <InboxIcon className="cc-cmd-palette__item-icon" />
                   {translateUi(' Inbox\n                ')}
                 </Command.Item>
-                <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/chats')}>
+                <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/projects')}>
                   <ChatIcon className="cc-cmd-palette__item-icon" />
-                  {translateUi(' Chats\n                ')}
+                  {translateUi(' Projects\n                ')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/tasks')}>
                   <TasksIcon className="cc-cmd-palette__item-icon" />

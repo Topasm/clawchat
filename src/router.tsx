@@ -29,7 +29,7 @@ const EventDetailPage = lazy(() => import('./app/pages/EventDetailPage'));
 const SettingsPage = lazy(() => import('./app/pages/SettingsPage'));
 const SystemPromptPage = lazy(() => import('./app/pages/SystemPromptPage'));
 const SearchPage = lazy(() => import('./app/pages/SearchPage'));
-const AdminPage = lazy(() => import('./app/pages/AdminPage'));
+const ServerSettingsPage = lazy(() => import('./app/pages/ServerSettingsPage'));
 const ConnectionCenterPage = lazy(() => import('./app/pages/ConnectionCenterPage'));
 const DiagnosticsPage = lazy(() => import('./app/pages/DiagnosticsPage'));
 const AppSettingsPage = lazy(() => import('./app/pages/AppSettingsPage'));
@@ -142,6 +142,18 @@ export default function AppRouter() {
             <LazyRoute>
               <DiagnosticsPage />
             </LazyRoute>
+          }
+        />
+        <Route
+          path="/settings/server"
+          element={
+            workspaceReady ? (
+              <LazyRoute>
+                <ServerSettingsPage />
+              </LazyRoute>
+            ) : (
+              <Navigate to="/settings/app" replace state={location.state} />
+            )
           }
         />
         <Route path="/settings/*" element={<Navigate to="/settings/app" replace />} />
@@ -313,16 +325,7 @@ export default function AppRouter() {
             </ErrorBoundary>
           }
         />
-        <Route
-          path="/chats"
-          element={
-            <ErrorBoundary name="ChatListPage">
-              <LazyRoute>
-                <ChatListPage />
-              </LazyRoute>
-            </ErrorBoundary>
-          }
-        />
+        <Route path="/chats" element={<Navigate to="/projects" replace />} />
         <Route
           path="/chats/:conversationId"
           element={
@@ -374,16 +377,7 @@ export default function AppRouter() {
             </ErrorBoundary>
           }
         />
-        <Route
-          path="/admin"
-          element={
-            <ErrorBoundary name="AdminPage">
-              <LazyRoute>
-                <AdminPage />
-              </LazyRoute>
-            </ErrorBoundary>
-          }
-        />
+        <Route path="/admin" element={<Navigate to="/settings/server" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -1,12 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../i18n';
-import {
-  AdminIcon,
-  AutomationsIcon,
-  ChatIcon,
-  GearIcon,
-  SearchIcon,
-} from '../components/shared/NavIcons';
+import { AutomationsIcon, ChatIcon, GearIcon, SearchIcon } from '../components/shared/NavIcons';
 
 // Everything the phone's five tabs leave out, in the desktop sidebar's order.
 const links = [
@@ -14,7 +8,6 @@ const links = [
   { to: '/automations', labelKey: 'nav.automations', Icon: AutomationsIcon },
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
-  { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },
 ];
 
 export default function MorePage() {
