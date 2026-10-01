@@ -53,7 +53,7 @@ function getActions(pathname: string, navigate: ReturnType<typeof useNavigate>):
       },
     ];
   }
-  if (pathname === '/chats') {
+  if (pathname === '/projects') {
     return [
       {
         label: translateUi('New Chat'),

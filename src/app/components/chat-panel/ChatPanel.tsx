@@ -157,7 +157,7 @@ export default function ChatPanel({
     if (conversationId) {
       navigate(`/chats/${conversationId}`);
     } else {
-      navigate('/chats');
+      navigate('/projects');
     }
   };
   const openContent = (

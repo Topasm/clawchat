@@ -52,7 +52,6 @@ import {
   TasksIcon,
   GearIcon,
   SearchIcon,
-  AdminIcon,
   NavCalendarIcon,
   ReviewIcon,
   AutomationsIcon,
@@ -120,7 +119,6 @@ const secondaryNavItems = [
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
-  { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },
 ];
 const SIDEBAR_RAIL_WIDTH = 48;
 const SIDEBAR_EXPANDED_MIN_WIDTH = 160;

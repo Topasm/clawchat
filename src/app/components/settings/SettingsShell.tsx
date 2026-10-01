@@ -10,7 +10,7 @@ import { useHostSessionStore } from '../../stores/useHostSessionStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import ToastContainer from '../shared/ToastContainer';
 
-type SettingsPane = 'general' | 'workspace' | 'connections' | 'diagnostics';
+type SettingsPane = 'general' | 'workspace' | 'connections' | 'diagnostics' | 'server';
 
 interface SettingsShellProps {
   activePane: SettingsPane;
@@ -50,6 +50,13 @@ const panes: Array<{
     path: '/diagnostics',
     labelKey: 'settingsShell.diagnostics',
     hintKey: 'settingsShell.diagnosticsHint',
+  },
+  {
+    id: 'server',
+    path: '/settings/server',
+    labelKey: 'settingsShell.server',
+    hintKey: 'settingsShell.serverHint',
+    requiresWorkspace: true,
   },
 ];
 

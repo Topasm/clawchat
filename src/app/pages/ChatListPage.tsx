@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import usePlatform from '../hooks/usePlatform';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   useConversationsQuery,
   useDeleteProject,
@@ -22,8 +22,6 @@ import { ListRow } from '../components/shared/WorkspacePrimitives';
 import { translateUi } from '../i18n';
 export default function ChatListPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const projectsOnly = location.pathname.replace(/\/+$/, '') === '/projects';
   const { data: conversations = [], isLoading: convsLoading } = useConversationsQuery();
   const { data: projects = [], isLoading: projsLoading } = useProjectsQuery();
   const { data: todos = [] } = useTodosQuery();
@@ -141,39 +139,31 @@ export default function ChatListPage() {
     <div>
       <div className="cc-projects-header">
         <div className="cc-page-header cc-page-header--flush">
-          <div className="cc-page-header__title">
-            {translateUi(projectsOnly ? 'Projects' : 'Chats')}
-          </div>
+          <div className="cc-page-header__title">{translateUi('Projects')}</div>
           {!isMobile && (
-            <div className="cc-page-header__subtitle">
-              {translateUi(
-                projectsOnly ? 'Your project workspaces' : 'Conversations outside projects',
-              )}
-            </div>
+            <div className="cc-page-header__subtitle">{translateUi('Your project workspaces')}</div>
           )}
         </div>
         <div className="cc-projects-header__actions">
-          {!projectsOnly && !isMobile && (
+          {!isMobile && (
             <button type="button" className="cc-btn" onClick={handleNewChat}>
-              {translateUi('\n              + Quick Chat\n            ')}
+              {translateUi('+ Quick Chat')}
             </button>
           )}
-          {projectsOnly && (
-            <button
-              type="button"
-              className="cc-btn cc-btn--primary"
-              onClick={() => setCreateProjectOpen(true)}
-            >
-              {translateUi('\n            + Project\n          ')}
-            </button>
-          )}
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            onClick={() => setCreateProjectOpen(true)}
+          >
+            {translateUi('+ Project')}
+          </button>
         </div>
       </div>
 
       {loading && projects.length === 0 && conversations.length === 0 && <ChatListSkeleton />}
 
       {/* Projects Section */}
-      {projectsOnly && projects.length > 0 && (
+      {projects.length > 0 && (
         <div className="cc-projects-grid">
           {projects.map((project) => {
             const meta = projectMeta[project.id];
@@ -267,18 +257,16 @@ export default function ChatListPage() {
         </div>
       )}
 
-      {/* Quick Conversations Section */}
-      {!loading && projectsOnly && projects.length === 0 ? (
+      {!loading && projects.length === 0 && (
         <EmptyState
           icon={<ChatBubbleIcon size={20} />}
           message={translateUi('No projects yet. Create one to start a workspace.')}
         />
-      ) : !projectsOnly && !loading && quickChats.length === 0 && agentChats.length === 0 ? (
-        <EmptyState
-          icon={<ChatBubbleIcon size={20} />}
-          message={translateUi('No conversations outside projects yet.')}
-        />
-      ) : !projectsOnly && quickChats.length > 0 ? (
+      )}
+
+      {/* Conversations outside any project: quick chats, then unscoped agent runs.
+          They used to have a page of their own that no nav item reached. */}
+      {quickChats.length > 0 && (
         <div className="cc-quick-chats">
           <button
             type="button"
@@ -305,9 +293,9 @@ export default function ChatListPage() {
             </div>
           )}
         </div>
-      ) : null}
+      )}
 
-      {!projectsOnly && agentChats.length > 0 && (
+      {agentChats.length > 0 && (
         <div className="cc-quick-chats">
           <button
             type="button"

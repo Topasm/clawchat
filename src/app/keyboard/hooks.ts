@@ -65,7 +65,7 @@ export function useNavigationShortcuts() {
 
   useHotkeys('g+t', () => navigate('/schedule/today'), { enableOnFormTags: false });
   useHotkeys('g+i', () => navigate('/inbox'), { enableOnFormTags: false });
-  useHotkeys('g+c', () => navigate('/chats'), { enableOnFormTags: false });
+  useHotkeys('g+c', () => navigate('/projects'), { enableOnFormTags: false });
   useHotkeys('g+a', () => navigate('/tasks'), { enableOnFormTags: false });
   useHotkeys(
     'g+s',
