@@ -209,6 +209,19 @@ class Settings(BaseSettings):
     paseo_command_timeout_seconds: float = 30.0
     paseo_reconnect_grace_seconds: float = 120.0
 
+    # Optional OpenCode execution backend. ClawChat starts one sandboxed
+    # `opencode serve` per run on this machine; skills, the tool loop and model
+    # routing stay OpenCode's. The model is "provider/model" as OpenCode names
+    # it; empty uses OpenCode's own default. Sandbox "bwrap" confines writes to
+    # the project's path (Linux); "none" relies on OpenCode's permission rules
+    # alone, which an approved shell command can escape.
+    opencode_enabled: bool = False
+    opencode_command: str = "opencode"
+    opencode_model: str = ""
+    opencode_sandbox: str = "bwrap"
+    opencode_startup_timeout_seconds: float = 30.0
+    opencode_run_timeout_seconds: float = 3600.0
+
     # File uploads
     upload_dir: str = "data/uploads"
     max_upload_size_mb: int = 10

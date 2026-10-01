@@ -96,7 +96,10 @@ export {
   useRunReadyTaskWithProjectDefaults,
 } from './useTaskExecutionQueries';
 export type { StartReadyTaskExecutionVariables } from './useTaskExecutionQueries';
-export { useExecutionProvidersQuery, useTestPaseoConnection } from './useExecutionProviderQueries';
+export {
+  useExecutionProvidersQuery,
+  useTestExecutionProvider,
+} from './useExecutionProviderQueries';
 export {
   useAdminOverviewQuery,
   useAdminAIQuery,

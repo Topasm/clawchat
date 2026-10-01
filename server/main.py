@@ -94,6 +94,10 @@ async def lifespan(app: FastAPI):
 
     app.state.paseo_adapter = paseo_execution_service.adapter_from_settings()
 
+    from services.agents import opencode_execution_service
+
+    app.state.opencode_adapter = opencode_execution_service.adapter_from_settings()
+
     claude_code = ClaudeCodeProvider(model=settings.claude_code_model)
     codex_cli = CodexCLIProvider(model=settings.codex_cli_model)
     codex_api = CodexAPIProvider(

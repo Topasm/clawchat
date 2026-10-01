@@ -61,7 +61,7 @@ vi.mock('../../hooks/queries', () => ({
   useDeleteProject: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateProject: () => ({ mutate: mocks.updateProject, isPending: false }),
   useExecutionProvidersQuery: () => ({ data: [], isLoading: false }),
-  useTestPaseoConnection: () => ({ mutate: vi.fn(), isPending: false }),
+  useTestExecutionProvider: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('../../hooks/usePlatform', () => ({ default: () => ({ isMobile: mocks.isMobile }) }));

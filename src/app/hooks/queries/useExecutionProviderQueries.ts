@@ -18,27 +18,28 @@ export function useExecutionProvidersQuery(enabled = true) {
     staleTime: 30000,
   });
 }
-export function useTestPaseoConnection() {
+/** Re-check one execution provider's health and update the cached list. */
+export function useTestExecutionProvider() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const response = await apiClient.post('/execution-providers/paseo/test');
+    mutationFn: async (providerId: string) => {
+      const response = await apiClient.post(`/execution-providers/${providerId}/test`);
       return ExecutionProviderStatusSchema.parse(response.data);
     },
     onSuccess: (status) => {
       queryClient.setQueryData(queryKeys.executionProviders, (current: unknown) => {
         const providers = z.array(ExecutionProviderStatusSchema).safeParse(current);
         if (!providers.success) return current;
-        return providers.data.map((provider) => (provider.id === 'paseo' ? status : provider));
+        return providers.data.map((provider) => (provider.id === status.id ? status : provider));
       });
-      useToastStore
-        .getState()
-        .addToast(
-          status.connected ? 'success' : 'warning',
-          translateUi(status.connected ? 'Paseo connected' : 'Paseo unavailable'),
-        );
+      useToastStore.getState().addToast(
+        status.connected ? 'success' : 'warning',
+        translateUi(status.connected ? '{{name}} connected' : '{{name}} unavailable', {
+          name: status.label,
+        }),
+      );
     },
     onError: () =>
-      useToastStore.getState().addToast('error', translateUi('Paseo connection test failed')),
+      useToastStore.getState().addToast('error', translateUi('Connection test failed')),
   });
 }

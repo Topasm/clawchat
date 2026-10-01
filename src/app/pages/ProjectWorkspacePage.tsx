@@ -5,7 +5,7 @@ import {
   useGetOrCreateProjectConversation,
   useExecutionProvidersQuery,
   useProjectQuery,
-  useTestPaseoConnection,
+  useTestExecutionProvider,
   useTodosQuery,
   useUpdateProject,
 } from '../hooks/queries';
@@ -439,10 +439,10 @@ const EXECUTION_SETTINGS_ID = 'cc-project-execution-settings';
 
 function ProjectExecutionSettings({ project }: { project: ProjectOverviewResponse }) {
   const { data: providers = [], isLoading } = useExecutionProvidersQuery();
-  const testPaseo = useTestPaseoConnection();
+  const testProvider = useTestExecutionProvider();
   const updateProject = useUpdateProject(project.id, 'Execution settings saved');
   const [provider, setProvider] = useState(project.default_execution_provider || 'builtin');
-  const [model, setModel] = useState(project.default_execution_model || 'codex');
+  const [model, setModel] = useState(project.default_execution_model || '');
   const [isolation, setIsolation] = useState<'local' | 'worktree'>(
     project.execution_workspace_isolation || 'local',
   );
@@ -452,12 +452,15 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
   );
   useEffect(() => {
     setProvider(project.default_execution_provider || 'builtin');
-    setModel(project.default_execution_model || 'codex');
+    setModel(project.default_execution_model || '');
     setIsolation(project.execution_workspace_isolation || 'local');
     setBaseBranch(project.execution_base_branch || '');
     setExecutionInstructions(project.execution_instructions || '');
   }, [project]);
   const paseo = providers.find((item) => item.id === 'paseo');
+  const opencode = providers.find((item) => item.id === 'opencode');
+  // Only a provider ClawChat bridges to has a connection worth showing.
+  const external = provider === 'paseo' ? paseo : provider === 'opencode' ? opencode : undefined;
   const paseoModels = (paseo?.providers ?? [])
     .map((item) => (typeof item.provider === 'string' ? item.provider : null))
     .filter((item): item is string => !!item);
@@ -465,7 +468,12 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
     event.preventDefault();
     updateProject.mutate({
       default_execution_provider: provider,
-      default_execution_model: provider === 'paseo' ? model.trim() || 'codex' : null,
+      default_execution_model:
+        provider === 'paseo'
+          ? model.trim() || 'codex'
+          : provider === 'opencode'
+            ? model.trim() || null
+            : null,
       execution_workspace_isolation: isolation,
       execution_base_branch: isolation === 'worktree' ? baseBranch.trim() || null : null,
       execution_instructions: executionInstructions.trim() || null,
@@ -482,26 +490,28 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
             )}
           </p>
         </div>
-        <div className="cc-project-execution-settings__health">
-          <span
-            className={`cc-settings-status cc-settings-status--${paseo?.connected ? 'success' : 'muted'}`}
-          >
-            {translateUi('\n            Paseo')}{' '}
-            {isLoading
-              ? translateUi('checking\u2026')
-              : paseo?.connected
-                ? translateUi('connected · {{host}}', { host: paseo.host ?? '' })
-                : translateUi('offline')}
-          </span>
-          <button
-            type="button"
-            className="cc-btn cc-btn--ghost"
-            disabled={testPaseo.isPending}
-            onClick={() => testPaseo.mutate()}
-          >
-            {translateUi('\n            Test connection\n          ')}
-          </button>
-        </div>
+        {(provider === 'paseo' || provider === 'opencode') && (
+          <div className="cc-project-execution-settings__health">
+            <span
+              className={`cc-settings-status cc-settings-status--${external?.connected ? 'success' : 'muted'}`}
+            >
+              {provider === 'paseo' ? translateUi('Paseo') : translateUi('OpenCode')}{' '}
+              {isLoading
+                ? translateUi('checking\u2026')
+                : external?.connected
+                  ? translateUi('connected · {{host}}', { host: external.host ?? '' })
+                  : translateUi('offline')}
+            </span>
+            <button
+              type="button"
+              className="cc-btn cc-btn--ghost"
+              disabled={testProvider.isPending}
+              onClick={() => testProvider.mutate(provider)}
+            >
+              {translateUi('Test connection')}
+            </button>
+          </div>
+        )}
       </div>
       <form className="cc-project-execution-form" onSubmit={save}>
         <label className="cc-project-execution-form__rules">
@@ -522,6 +532,10 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
             <option value="paseo" disabled={!paseo?.enabled}>
               {translateUi('\n              Paseo daemon')}
               {paseo?.enabled ? '' : translateUi(' (disabled on server)')}
+            </option>
+            <option value="opencode" disabled={!opencode?.enabled}>
+              {translateUi('OpenCode')}
+              {opencode?.enabled ? '' : translateUi(' (disabled on server)')}
             </option>
           </select>
         </label>
@@ -563,8 +577,18 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
             )}
           </>
         )}
+        {provider === 'opencode' && (
+          <label>
+            <span>{translateUi('OpenCode model')}</span>
+            <input
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              placeholder={translateUi('provider/model — empty uses the server default')}
+            />
+          </label>
+        )}
         <div className="cc-project-execution-form__actions">
-          {paseo?.error && provider === 'paseo' && <small>{paseo.error}</small>}
+          {external?.error && <small>{external.error}</small>}
           <button
             type="submit"
             className="cc-btn cc-btn--primary"

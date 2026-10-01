@@ -26,6 +26,7 @@ from services.agents import (
     agent_run_service,
     agent_task_service,
     execution_host_service,
+    opencode_execution_service,
     paseo_execution_service,
     run_resume_service,
     task_execution_recovery_service,
@@ -78,6 +79,22 @@ def _active_provider(request: Request) -> tuple[str, object, str | None]:
     return run_resume_service.active_provider(request.app.state)
 
 
+def _external_backend(request: Request, provider: str):
+    """``(label, adapter, execute_run)`` for a provider ClawChat bridges to."""
+    state = request.app.state
+    if provider == "paseo":
+        adapter = getattr(state, "paseo_adapter", None) or (
+            paseo_execution_service.adapter_from_settings()
+        )
+        return "Paseo", adapter, paseo_execution_service.execute_run
+    if provider == "opencode":
+        adapter = getattr(state, "opencode_adapter", None) or (
+            opencode_execution_service.adapter_from_settings()
+        )
+        return "OpenCode", adapter, opencode_execution_service.execute_run
+    return None
+
+
 @router.post("/{run_id}/retry", response_model=AgentRunResponse, status_code=201)
 async def retry_run(
     run_id: str,
@@ -103,12 +120,11 @@ async def retry_run(
         instruction = (
             f"{instruction}\n\nFollow-up instruction:\n{body.follow_up_instruction.strip()}"
         )
-    if provider == "paseo":
-        paseo_adapter = getattr(request.app.state, "paseo_adapter", None) or (
-            paseo_execution_service.adapter_from_settings()
-        )
-        if not paseo_adapter.enabled:
-            raise ConflictError("Paseo execution is disabled")
+    external = _external_backend(request, provider)
+    if external is not None:
+        label, adapter, execute_run = external
+        if not adapter.enabled:
+            raise ConflictError(f"{label} execution is disabled")
         await task_execution_recovery_service.claim_retryable_run(
             db,
             previous,
@@ -117,20 +133,20 @@ async def retry_run(
         run = await agent_run_service.create_run(
             db,
             task,
-            provider="paseo",
+            provider=provider,
             model=body.model or previous.model,
-            host_id=paseo_adapter.host_label,
+            host_id=adapter.host_label if provider == "paseo" else previous.host_id,
             instruction_snapshot=instruction,
         )
         await db.commit()
         session_factory = request.app.state.session_factory
         agent_run_service.launch_execution(
             run.id,
-            paseo_execution_service.execute_run(
+            execute_run(
                 session_factory,
                 run.id,
                 user_id=user_id,
-                adapter=paseo_adapter,
+                adapter=adapter,
             ),
         )
         await notify_module_data_changed("runs")
