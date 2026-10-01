@@ -1,29 +1,45 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import AgentRunReviewOutcomeHandoff from '../components/review/AgentRunReviewOutcomeHandoff';
+import ReviewHistory from '../components/review/ReviewHistory';
 import ReviewItemCard from '../components/review/ReviewItemCard';
 import RunCard, { needsRecoveryDecision } from '../components/runs/RunCard';
+import RunsLog from '../components/runs/RunsLog';
 import EmptyState from '../components/shared/EmptyState';
 import { CheckCircleIcon } from '../components/shared/Icons';
 import { useAgentRunsQuery, useReviewsQuery, useRunsAwaitingInputQuery } from '../hooks/queries';
 import useReviewDecisionHandoff from '../hooks/useReviewDecisionHandoff';
+import type { ReviewStatus } from '../types/api';
 import { translateUi } from '../i18n';
 
 const EXECUTING = new Set(['queued', 'starting', 'running']);
+type AttentionView = 'now' | 'runs' | 'history';
+const VIEWS: Array<{ value: AttentionView; label: string }> = [
+  { value: 'now', label: 'Needs you' },
+  { value: 'runs', label: 'All runs' },
+  { value: 'history', label: 'Review history' },
+];
+function parseView(value: string | null): AttentionView {
+  return value === 'runs' || value === 'history' ? value : 'now';
+}
+const REVIEW_STATUSES: ReviewStatus[] = ['pending', 'changes_requested', 'approved', 'rejected'];
 
 /**
- * Everything that has stopped for the user, in one place.
+ * Everything agents stopped on, in one place.
  *
- * The Runs log and the Review inbox used to be the two places to find out
- * that an agent was waiting. This page lists only what needs a person --
- * a question to answer, a result to review, a failed run to decide on --
- * and links each item to its thread; the log and the history stay a click
- * away for everything else.
+ * The default view lists only what needs a person -- a question to answer, a
+ * result to review, a failed run to decide on -- and lets each be acted on in
+ * place. The run log and the review history used to be pages of their own;
+ * they are the other two views here, so there is one place to look.
  */
 export default function AttentionPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectId = searchParams.get('project_id');
+  const view = parseView(searchParams.get('view'));
+  const requestedStatus = searchParams.get('status') as ReviewStatus | null;
+  const historyStatus: ReviewStatus =
+    requestedStatus && REVIEW_STATUSES.includes(requestedStatus) ? requestedStatus : 'approved';
   const { data: awaitingInput = [], isLoading: loadingInput } = useRunsAwaitingInputQuery();
   const { data: reviews = [], isLoading: loadingReviews } = useReviewsQuery('pending', projectId);
   const { data: runs = [], isLoading: loadingRuns } = useAgentRunsQuery(projectId);
@@ -50,7 +66,17 @@ export default function AttentionPage() {
 
   const toggleRun = (runId: string) =>
     setExpandedRun((current) => (current === runId ? null : runId));
-  const projectQuery = projectId ? `?project_id=${projectId}` : '';
+  const updateParams = (mutate: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(searchParams);
+    mutate(next);
+    setSearchParams(next);
+  };
+  const showView = (next: AttentionView) =>
+    updateParams((params) => {
+      if (next === 'now') params.delete('view');
+      else params.set('view', next);
+      params.delete('run_id');
+    });
 
   return (
     <div className="cc-review-page cc-attention-page">
@@ -63,33 +89,40 @@ export default function AttentionPage() {
             )}
           </p>
         </div>
-        <div className="cc-page-header__actions">
-          <button type="button" className="cc-btn" onClick={() => navigate('/runs#cli-sessions')}>
-            {translateUi('CLI sessions')}
-          </button>
-          <button type="button" className="cc-btn" onClick={() => navigate(`/runs${projectQuery}`)}>
-            {translateUi('All runs')}
-          </button>
-          <button
-            type="button"
-            className="cc-btn"
-            onClick={() =>
-              navigate(`/review?status=approved${projectId ? `&project_id=${projectId}` : ''}`)
-            }
-          >
-            {translateUi('Review history')}
-          </button>
-          {projectId && (
+        {projectId && (
+          <div className="cc-page-header__actions">
             <button
               type="button"
               className="cc-btn"
               onClick={() => navigate(`/projects/${projectId}`)}
             >
-              {translateUi('\n            Back to project\n          ')}
+              {translateUi('Back to project')}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </header>
+
+      <div
+        className="cc-attention-views"
+        role="tablist"
+        aria-label={translateUi('Attention views')}
+      >
+        {VIEWS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={view === option.value}
+            className={`cc-attention-view${view === option.value ? ' cc-attention-view--active' : ''}`}
+            onClick={() => showView(option.value)}
+          >
+            {translateUi(option.label)}
+            {option.value === 'now' && !isLoading && total > 0 && (
+              <span className="cc-section__count">{total}</span>
+            )}
+          </button>
+        ))}
+      </div>
 
       {approvedAgentRun && (
         <AgentRunReviewOutcomeHandoff
@@ -100,88 +133,117 @@ export default function AttentionPage() {
         />
       )}
 
-      {isLoading ? (
-        <div className="cc-project-workspace__loading">{translateUi('Loading…')}</div>
-      ) : total === 0 ? (
-        <EmptyState
-          icon={<CheckCircleIcon size={28} />}
-          message={
-            executingCount > 0
-              ? translateUi('Nothing needs you right now. {{count}} runs in progress.', {
-                  count: executingCount,
-                })
-              : translateUi('Nothing needs you right now.')
-          }
+      {view === 'runs' && (
+        <RunsLog
+          projectId={projectId}
+          selectedRunId={searchParams.get('run_id')}
+          onReview={() => showView('now')}
         />
-      ) : (
-        <>
-          {questions.length > 0 && (
-            <section className="cc-attention-section" aria-label={translateUi('Needs your input')}>
-              <h2 className="cc-attention-section__title">
-                {translateUi('Needs your input')}
-                <span className="cc-section__count">{questions.length}</span>
-              </h2>
-              <div className="cc-run-list">
-                {questions.map((run) => (
-                  <RunCard
-                    key={run.id}
-                    run={run}
-                    expanded={expandedRun === run.id}
-                    onToggle={() => toggleRun(run.id)}
-                    onReview={() => undefined}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {pendingReviews.length > 0 && (
-            <section className="cc-attention-section" aria-label={translateUi('Needs your review')}>
-              <h2 className="cc-attention-section__title">
-                {translateUi('Needs your review')}
-                <span className="cc-section__count">{pendingReviews.length}</span>
-              </h2>
-              <div className="cc-review-list">
-                {pendingReviews.map((item) => (
-                  <ReviewItemCard
-                    key={item.id}
-                    item={item}
-                    note={notes[item.id] ?? ''}
-                    onNoteChange={(note) =>
-                      setNotes((current) => ({ ...current, [item.id]: note }))
-                    }
-                    onDecide={(decision) => decideItem(item, decision, notes[item.id])}
-                    isDeciding={decide.isPending}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {decisions.length > 0 && (
-            <section className="cc-attention-section" aria-label={translateUi('Needs a decision')}>
-              <h2 className="cc-attention-section__title">
-                {translateUi('Needs a decision')}
-                <span className="cc-section__count">{decisions.length}</span>
-              </h2>
-              <div className="cc-run-list">
-                {decisions.map((run) => (
-                  <RunCard
-                    key={run.id}
-                    run={run}
-                    expanded={expandedRun === run.id}
-                    onToggle={() => toggleRun(run.id)}
-                    onReview={() => undefined}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-          {executingCount > 0 && (
-            <p className="cc-attention-page__footnote">
-              {translateUi('{{count}} runs in progress.', { count: executingCount })}
-            </p>
-          )}
-        </>
       )}
+
+      {view === 'history' && (
+        <ReviewHistory
+          status={historyStatus}
+          onStatusChange={(status) => updateParams((params) => params.set('status', status))}
+          projectId={projectId}
+          hiddenReviewId={approvedAgentRun?.reviewId}
+          onDecide={decideItem}
+          isDeciding={decide.isPending}
+        />
+      )}
+
+      {view === 'now' &&
+        (isLoading ? (
+          <div className="cc-project-workspace__loading">{translateUi('Loading…')}</div>
+        ) : total === 0 ? (
+          <EmptyState
+            icon={<CheckCircleIcon size={28} />}
+            message={
+              executingCount > 0
+                ? translateUi('Nothing needs you right now. {{count}} runs in progress.', {
+                    count: executingCount,
+                  })
+                : translateUi('Nothing needs you right now.')
+            }
+          />
+        ) : (
+          <>
+            {questions.length > 0 && (
+              <section
+                className="cc-attention-section"
+                aria-label={translateUi('Needs your input')}
+              >
+                <h2 className="cc-attention-section__title">
+                  {translateUi('Needs your input')}
+                  <span className="cc-section__count">{questions.length}</span>
+                </h2>
+                <div className="cc-run-list">
+                  {questions.map((run) => (
+                    <RunCard
+                      key={run.id}
+                      run={run}
+                      expanded={expandedRun === run.id}
+                      onToggle={() => toggleRun(run.id)}
+                      onReview={() => undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {pendingReviews.length > 0 && (
+              <section
+                className="cc-attention-section"
+                aria-label={translateUi('Needs your review')}
+              >
+                <h2 className="cc-attention-section__title">
+                  {translateUi('Needs your review')}
+                  <span className="cc-section__count">{pendingReviews.length}</span>
+                </h2>
+                <div className="cc-review-list">
+                  {pendingReviews.map((item) => (
+                    <ReviewItemCard
+                      key={item.id}
+                      item={item}
+                      note={notes[item.id] ?? ''}
+                      onNoteChange={(note) =>
+                        setNotes((current) => ({ ...current, [item.id]: note }))
+                      }
+                      onDecide={(decision) => decideItem(item, decision, notes[item.id])}
+                      isDeciding={decide.isPending}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {decisions.length > 0 && (
+              <section
+                className="cc-attention-section"
+                aria-label={translateUi('Needs a decision')}
+              >
+                <h2 className="cc-attention-section__title">
+                  {translateUi('Needs a decision')}
+                  <span className="cc-section__count">{decisions.length}</span>
+                </h2>
+                <div className="cc-run-list">
+                  {decisions.map((run) => (
+                    <RunCard
+                      key={run.id}
+                      run={run}
+                      expanded={expandedRun === run.id}
+                      onToggle={() => toggleRun(run.id)}
+                      onReview={() => undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {executingCount > 0 && (
+              <p className="cc-attention-page__footnote">
+                {translateUi('{{count}} runs in progress.', { count: executingCount })}
+              </p>
+            )}
+          </>
+        ))}
     </div>
   );
 }

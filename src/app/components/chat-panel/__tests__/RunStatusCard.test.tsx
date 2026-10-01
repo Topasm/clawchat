@@ -111,7 +111,7 @@ describe('RunStatusCard', () => {
     expect(screen.getByText('Already answered')).toBeInTheDocument();
     expect(screen.queryByLabelText('Answer the agent')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open run' }));
-    expect(screen.getByTestId('location')).toHaveTextContent('/runs?run_id=run_1');
+    expect(screen.getByTestId('location')).toHaveTextContent('/attention?view=runs&run_id=run_1');
   });
 
   it('decides a pending review from the thread, with the note as the follow-up', () => {

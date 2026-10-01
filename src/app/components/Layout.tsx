@@ -111,8 +111,8 @@ const primaryNavItems = [
   { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
   { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
-// Runs and Review stay reachable as the log and the history; the nav offers
-// the one place that lists what has stopped for the user.
+// Attention is the one place for everything agents stopped on; the run log and
+// the review history are views inside it rather than pages of their own.
 const secondaryNavItems = [
   { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon },
   { to: '/automations', labelKey: 'nav.automations', Icon: AutomationsIcon },

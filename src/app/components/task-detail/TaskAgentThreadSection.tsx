@@ -48,7 +48,7 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
               <button
                 type="button"
                 className="cc-btn cc-btn--ghost"
-                onClick={() => navigate(`/runs?run_id=${latest.id}`)}
+                onClick={() => navigate(`/attention?view=runs&run_id=${latest.id}`)}
               >
                 {translateUi('Open run')}
               </button>

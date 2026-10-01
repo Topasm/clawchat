@@ -139,7 +139,7 @@ export default function InboxInspector({
               providers={providers}
               isStarting={isStartingExecution}
               onStart={(request) => onStartExecution(task.id, request)}
-              onOpenRun={(runId) => onNavigate(`/runs?run_id=${runId}`)}
+              onOpenRun={(runId) => onNavigate(`/attention?view=runs&run_id=${runId}`)}
             />
           )}
           <div className="cc-inbox-triage__dependency-picker">

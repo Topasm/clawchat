@@ -5,8 +5,6 @@ import {
   AutomationsIcon,
   ChatIcon,
   GearIcon,
-  ReviewIcon,
-  RunsIcon,
   SearchIcon,
 } from '../components/shared/NavIcons';
 
@@ -14,8 +12,6 @@ import {
 const links = [
   { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
   { to: '/automations', labelKey: 'nav.automations', Icon: AutomationsIcon },
-  { to: '/runs', labelKey: 'nav.runs', Icon: RunsIcon },
-  { to: '/review', labelKey: 'nav.review', Icon: ReviewIcon },
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
   { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
   { to: '/admin', labelKey: 'nav.admin', Icon: AdminIcon },

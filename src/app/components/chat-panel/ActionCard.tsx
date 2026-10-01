@@ -143,7 +143,7 @@ export default function ActionCard({ metadata, suppressTaskProgress = false }: A
         <button
           type="button"
           className="cc-btn cc-btn--ghost cc-action-card__view-btn"
-          onClick={() => navigate(`/runs?run_id=${metadata.run_id}`)}
+          onClick={() => navigate(`/attention?view=runs&run_id=${metadata.run_id}`)}
         >
           {translateUi('Open run')}
         </button>

@@ -730,10 +730,10 @@ describe('InboxPage', () => {
     expect(within(telemetry).getByText('Average time to resume: 2m')).toBeInTheDocument();
 
     fireEvent.click(within(telemetry).getByRole('button', { name: 'Open run' }));
-    expect(mocks.navigate).toHaveBeenCalledWith('/runs?run_id=run-1');
+    expect(mocks.navigate).toHaveBeenCalledWith('/attention?view=runs&run_id=run-1');
 
     fireEvent.click(within(telemetry).getByRole('button', { name: 'Review' }));
-    expect(mocks.navigate).toHaveBeenCalledWith('/review');
+    expect(mocks.navigate).toHaveBeenCalledWith('/attention?view=history');
   });
 
   it('returns a placed task to the Inbox from the inspector', async () => {
