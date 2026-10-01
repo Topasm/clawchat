@@ -1,15 +1,14 @@
 import { useMemo } from 'react';
 import type { TodoResponse } from '../types/api';
 
-interface KanbanFilters {
+interface TaskFilters {
   searchQuery: string;
   tags: string[];
   sortField: 'title' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order';
   sortDirection: 'asc' | 'desc';
-  showSubTasks?: boolean;
 }
 
-export default function useKanbanFilters(todos: TodoResponse[], filters: KanbanFilters) {
+export default function useTaskFilters(todos: TodoResponse[], filters: TaskFilters) {
   return useMemo(() => {
     let result = [...todos];
 

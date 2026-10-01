@@ -1,6 +1,6 @@
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { focusKanbanSearch } from '../components/kanban/KanbanFilterBar';
+import { focusTaskSearch } from '../components/tasks/TaskFilterBar';
 import { settingsNavigationState } from '../services/settingsNavigation';
 
 interface KeyboardHookOptions {
@@ -33,7 +33,8 @@ export function useGlobalShortcuts({ onToggleChat, onShowHelp }: KeyboardHookOpt
   );
 }
 
-export function useKanbanShortcuts({ onNewTask }: KeyboardHookOptions) {
+/** On the Tasks page: N captures a task, / jumps to the search box. */
+export function useTasksShortcuts({ onNewTask }: KeyboardHookOptions) {
   useHotkeys(
     'n',
     (e) => {
@@ -53,7 +54,7 @@ export function useKanbanShortcuts({ onNewTask }: KeyboardHookOptions) {
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
         return;
       e.preventDefault();
-      focusKanbanSearch();
+      focusTaskSearch();
     },
     { enableOnFormTags: false },
   );

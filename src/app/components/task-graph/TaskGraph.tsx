@@ -26,7 +26,7 @@ import {
   updateTaskGraphLayout,
 } from './taskGraphPersistence';
 import { translateUi } from '../../i18n';
-import { matchesTasksStatusFilter, type TasksStatusFilter } from '../kanban/TasksHeader';
+import { matchesTasksStatusFilter, type TasksStatusFilter } from '../tasks/TasksHeader';
 interface TaskGraphProps {
   todos: TodoResponse[];
   metadataTodos?: TodoResponse[];

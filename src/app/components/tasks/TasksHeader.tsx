@@ -4,7 +4,7 @@ import usePlatform from '../../hooks/usePlatform';
 import SegmentedControl from '../shared/SegmentedControl';
 import { translateUi } from '../../i18n';
 import { matchesTasksStatusFilter, type TasksStatusFilter } from '../../utils/taskStatus';
-export type TasksViewMode = 'kanban' | 'list' | 'graph';
+export type TasksViewMode = 'list' | 'graph';
 export { matchesTasksStatusFilter, taskStatusForColumn } from '../../utils/taskStatus';
 export type { TasksColumnStatus, TasksStatusFilter } from '../../utils/taskStatus';
 export const TASK_STATUS_FILTERS: TasksStatusFilter[] = ['active', 'completed', 'all'];
@@ -17,7 +17,6 @@ interface TasksHeaderProps {
   onStatusFilterChange: (filter: TasksStatusFilter) => void;
 }
 const VIEW_OPTIONS = [
-  { label: 'Kanban', value: 'kanban' },
   { label: 'List', value: 'list' },
   { label: 'Graph', value: 'graph' },
 ];

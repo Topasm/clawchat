@@ -120,11 +120,6 @@
     display: none;
   }
 
-  /* Kanban cards — larger touch target */
-  .cc-root--mobile .cc-kanban__card {
-    min-height: 52px;
-  }
-
   /* Page headers */
   .cc-root--mobile .cc-today-header {
     display: flex;

@@ -8,14 +8,14 @@ import {
   useToggleTodoComplete,
 } from '../../hooks/queries';
 import useProjectRootIds from '../../hooks/useProjectRootIds';
-import useKanbanFilters from '../../hooks/useKanbanFilters';
+import useTaskFilters from '../../hooks/useTaskFilters';
 import { useModuleStore } from '../../stores/useModuleStore';
-import KanbanFilterBar from '../kanban/KanbanFilterBar';
+import TaskFilterBar from '../tasks/TaskFilterBar';
 import TasksHeader, {
   matchesTasksStatusFilter,
   type TasksStatusFilter,
   type TasksViewMode,
-} from '../kanban/TasksHeader';
+} from '../tasks/TasksHeader';
 import TaskListView from './TaskListView';
 import { isTaskTodo } from '../../utils/inboxState';
 import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate';
@@ -69,7 +69,7 @@ export default function TaskListPage({
     () => taskTodos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter)),
     [statusFilter, taskTodos],
   );
-  const filteredTodos = useKanbanFilters(scopedTodos, filters);
+  const filteredTodos = useTaskFilters(scopedTodos, filters);
   const toggleTodo = useToggleTodoComplete();
   const { requestStatusChange, confirmationDialog } = useExperimentCompletionGate();
   const orderedTodos = useMemo(() => {
@@ -102,7 +102,7 @@ export default function TaskListPage({
         onStatusFilterChange={onStatusFilterChange}
         subtitle={`${filteredTodos.length} task${filteredTodos.length !== 1 ? 's' : ''} in a detailed list`}
       />
-      <KanbanFilterBar showSubtaskToggle={false} />
+      <TaskFilterBar />
       <TaskListView
         todos={orderedTodos}
         projectTitles={projectTitles}

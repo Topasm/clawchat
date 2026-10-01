@@ -6,13 +6,7 @@ import {
   matchesTasksStatusFilter,
   TASK_STATUS_FILTERS,
   type TasksStatusFilter,
-} from '../../components/kanban/TasksHeader';
-
-vi.mock('../../components/kanban/KanbanBoard', () => ({
-  default: ({ statusFilter }: { statusFilter: TasksStatusFilter }) => (
-    <div data-testid="active-task-filter">{statusFilter}</div>
-  ),
-}));
+} from '../../components/tasks/TasksHeader';
 
 vi.mock('../../components/task-list/TaskListPage', () => ({
   default: ({ statusFilter }: { statusFilter: TasksStatusFilter }) => (
@@ -49,15 +43,15 @@ describe('AllTasksPage status flow', () => {
     expect(matchesTasksStatusFilter('cancelled', 'all')).toBe(true);
   });
 
-  it('migrates the old kanban default to the simpler list while keeping explicit kanban links', () => {
+  it('lands old kanban preferences and links on the list', () => {
     localStorage.setItem('clawchat.tasksView', 'kanban');
     const first = renderPage();
     expect(screen.getByText(/List/)).toBeInTheDocument();
     first.unmount();
 
     renderPage('/tasks?view=kanban');
+    expect(screen.getByText(/List/)).toBeInTheDocument();
     expect(screen.getByTestId('active-task-filter')).toHaveTextContent('active');
-    expect(screen.queryByText(/List/)).not.toBeInTheDocument();
   });
 
   it('moves through task statuses with horizontal swipes', () => {

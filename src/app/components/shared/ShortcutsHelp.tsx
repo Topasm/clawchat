@@ -7,12 +7,12 @@ interface ShortcutsHelpProps {
 }
 const SCOPE_LABELS: Record<ShortcutScope, string> = {
   GLOBAL: 'Global',
-  KANBAN: 'Kanban Board',
+  TASKS: 'Tasks',
   TODAY: 'Today Page',
   CHAT: 'Chat',
   DIALOG: 'Dialogs',
 };
-const SCOPE_ORDER: ShortcutScope[] = ['GLOBAL', 'KANBAN', 'TODAY', 'CHAT', 'DIALOG'];
+const SCOPE_ORDER: ShortcutScope[] = ['GLOBAL', 'TASKS', 'TODAY', 'CHAT', 'DIALOG'];
 interface MergedShortcut {
   description: string;
   labels: string[];
