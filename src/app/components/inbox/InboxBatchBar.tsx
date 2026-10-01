@@ -8,7 +8,7 @@ interface InboxBatchBarProps {
   onSelectAll: () => void;
   onClear: () => void;
 }
-/** The multi-select toolbar above the captured tasks. */
+/** The one-line multi-select toolbar above the captured tasks. */
 export default function InboxBatchBar({
   selectedCount,
   totalCount,
@@ -19,7 +19,11 @@ export default function InboxBatchBar({
   onClear,
 }: InboxBatchBarProps) {
   return (
-    <div className="cc-inbox-triage__batch-bar" aria-live="polite">
+    <div
+      className="cc-inbox-triage__batch-bar"
+      data-active={selectedCount > 0 ? 'true' : undefined}
+      aria-live="polite"
+    >
       <span>
         {selectedCount
           ? translateUi('{{count}} selected', { count: selectedCount })
@@ -28,25 +32,25 @@ export default function InboxBatchBar({
       <div>
         <button
           type="button"
-          className="cc-btn cc-btn--secondary"
-          disabled={suggestDisabled}
-          onClick={onSuggest}
-        >
-          {isSuggesting ? translateUi('Suggesting\u2026') : translateUi('AI suggest')}
-        </button>
-        <button
-          type="button"
-          className="cc-btn cc-btn--ghost"
+          className="cc-btn cc-btn--compact cc-btn--ghost"
           disabled={selectedCount === totalCount}
           onClick={onSelectAll}
         >
-          {translateUi('\n          Select all\n        ')}
+          {translateUi('Select all')}
         </button>
         {selectedCount > 0 && (
-          <button type="button" className="cc-btn cc-btn--ghost" onClick={onClear}>
-            {translateUi('\n            Clear\n          ')}
+          <button type="button" className="cc-btn cc-btn--compact cc-btn--ghost" onClick={onClear}>
+            {translateUi('Clear')}
           </button>
         )}
+        <button
+          type="button"
+          className="cc-btn cc-btn--compact cc-btn--primary"
+          disabled={suggestDisabled}
+          onClick={onSuggest}
+        >
+          {isSuggesting ? translateUi('Suggesting…') : translateUi('AI suggest')}
+        </button>
       </div>
     </div>
   );

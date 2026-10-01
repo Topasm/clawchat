@@ -251,6 +251,10 @@ export default function useWebSocket(): void {
       chatStore.addStreamingMessage(placeholder);
       chatStore.setStreamingState(true, d.conversation_id);
     };
+    const handleToolActivity = (data: unknown) => {
+      const d = data as { tool: string; label: string };
+      useChatStore.getState().setStreamingActivity({ tool: d.tool, label: d.label });
+    };
     const handleStreamChunk = (data: unknown) => {
       const d = data as {
         message_id: string;
@@ -408,6 +412,7 @@ export default function useWebSocket(): void {
     wsClient.on('task_progress', handleTaskProgress);
     wsClient.on('run_state_changed', handleRunStateChanged);
     wsClient.on('stream_start', handleStreamStart);
+    wsClient.on('tool_activity', handleToolActivity);
     wsClient.on('stream_chunk', handleStreamChunk);
     wsClient.on('stream_end', handleStreamEnd);
     wsClient.on('stream_error', handleStreamError);
@@ -430,6 +435,7 @@ export default function useWebSocket(): void {
       wsClient.off('task_progress', handleTaskProgress);
       wsClient.off('run_state_changed', handleRunStateChanged);
       wsClient.off('stream_start', handleStreamStart);
+      wsClient.off('tool_activity', handleToolActivity);
       wsClient.off('stream_chunk', handleStreamChunk);
       wsClient.off('stream_end', handleStreamEnd);
       wsClient.off('stream_error', handleStreamError);

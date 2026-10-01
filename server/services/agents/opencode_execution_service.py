@@ -37,6 +37,8 @@ from models.todo import Todo
 from services.agents import agent_run_service, agent_task_service, execution_host_service
 from services.agents.execution_host_service import WorkspaceResolution
 from services.review import artifact_service
+from skills import get_skill
+from skills.builtins import BUILTIN_SKILLS_DIR, user_skills_dir
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ws.notifications import notify_module_data_changed
@@ -87,6 +89,28 @@ def workspace_problem(workspace: WorkspaceResolution | None) -> tuple[str, str] 
             f"{workspace.path} does not exist on the ClawChat server",
         )
     return None
+
+
+def run_prompt(instruction: str, skill_id: str | None) -> str:
+    """The instruction, naming the skill the work was delegated with.
+
+    OpenCode would pick a skill by its description anyway; naming it keeps
+    the run doing what the person chose rather than what the model guessed.
+    """
+    skill = get_skill(skill_id) if skill_id else None
+    if skill is None:
+        return instruction
+    name = skill.id.replace("_", "-")
+    return f"Use the `{name}` skill for this task.\n\n{instruction}"
+
+
+def _skills_paths() -> list[str]:
+    """The built-in skills, plus the user's own directory when it exists."""
+    paths = [str(BUILTIN_SKILLS_DIR)]
+    user_dir = user_skills_dir()
+    if user_dir is not None and user_dir.is_dir():
+        paths.append(str(user_dir))
+    return paths
 
 
 def _skill_id(task: AgentTask) -> str | None:
@@ -278,6 +302,7 @@ async def _drive(
     todo: Todo | None,
     user_id: str,
     timeout_seconds: float,
+    prompt: str,
 ) -> None:
     """Send the instruction, follow the session to idle, and hand in the result."""
     title = todo.title if todo else task.task_type
@@ -307,7 +332,7 @@ async def _drive(
         async with asyncio.timeout(timeout_seconds):
             # Subscribe before prompting, or a quick answer finishes unseen.
             await anext(events)
-            await server.prompt(session_id, run.instruction_snapshot)
+            await server.prompt(session_id, prompt)
             async for event in events:
                 kind = event.get("type")
                 properties = event.get("properties") or {}
@@ -429,6 +454,7 @@ async def execute_run(
                     tools_url=tools.url if tools else None,
                     tools_token=tools.token if tools else None,
                     tool_timeout_ms=cli_tool_args.TOOL_CALL_TIMEOUT_SECONDS * 1000,
+                    skills_paths=_skills_paths(),
                 )
                 server = await stack.enter_async_context(
                     adapter.serve(workspace.path or "", config=config)
@@ -441,6 +467,7 @@ async def execute_run(
                     todo=todo,
                     user_id=user_id,
                     timeout_seconds=settings.opencode_run_timeout_seconds,
+                    prompt=run_prompt(run.instruction_snapshot, skill_id),
                 )
         except asyncio.CancelledError:
             raise

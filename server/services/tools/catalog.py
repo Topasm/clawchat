@@ -93,22 +93,58 @@ def server_specs(server: McpServer) -> list[ToolSpec]:
     return specs
 
 
+def _allowed(server: McpServer, spec: ToolSpec, allowed: tuple[str, ...] | None) -> bool:
+    """A skill's ``mcp-servers`` names whole servers or single ``server__tool`` names."""
+    return allowed is None or server.name in allowed or spec.name in allowed
+
+
+async def _enabled_servers(db: AsyncSession) -> list[McpServer]:
+    return list(
+        (
+            await db.execute(
+                select(McpServer).where(McpServer.enabled.is_(True)).order_by(McpServer.name)
+            )
+        ).scalars()
+    )
+
+
+def _extend_unique(specs: list[ToolSpec], more: list[ToolSpec]) -> None:
+    seen = {spec.name for spec in specs}
+    for spec in more:
+        if spec.name not in seen:
+            seen.add(spec.name)
+            specs.append(spec)
+
+
 async def tools_for_skill(db: AsyncSession, skill_id: str) -> list[ToolSpec]:
-    """Web search for skills that research; the user's MCP tools for every skill."""
+    """Web search for skills that research; the MCP tools the skill's file allows.
+
+    A skill without ``mcp-servers`` in its frontmatter gets every enabled server.
+    """
     specs: list[ToolSpec] = []
     skill = SKILL_REGISTRY.get(skill_id)
     settings = await db.get(AgentToolSettings, "default")
     if skill is not None and skill.uses_web_search and settings and settings.searxng_url:
         specs.append(web_search_spec())
-    servers = (
-        await db.execute(
-            select(McpServer).where(McpServer.enabled.is_(True)).order_by(McpServer.name)
+    allowed = skill.mcp_servers if skill is not None else None
+    for server in await _enabled_servers(db):
+        _extend_unique(
+            specs, [spec for spec in server_specs(server) if _allowed(server, spec, allowed)]
         )
-    ).scalars()
-    seen = {spec.name for spec in specs}
-    for server in servers:
-        for spec in server_specs(server):
-            if spec.name not in seen:
-                seen.add(spec.name)
-                specs.append(spec)
+    return specs
+
+
+async def tools_for_chat(db: AsyncSession) -> list[ToolSpec]:
+    """What a chat reply may call: web search, and only servers that run without asking.
+
+    A chat turn has no run to park in Attention while the user decides, so
+    servers that need approval stay with delegated work.
+    """
+    specs: list[ToolSpec] = []
+    settings = await db.get(AgentToolSettings, "default")
+    if settings and settings.searxng_url:
+        specs.append(web_search_spec())
+    for server in await _enabled_servers(db):
+        if server.trust == ToolTrust.READ_ONLY:
+            _extend_unique(specs, server_specs(server))
     return specs

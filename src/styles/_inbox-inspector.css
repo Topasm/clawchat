@@ -2,9 +2,36 @@
 .cc-inbox-triage__inspector {
   position: sticky;
   top: 12px;
-  padding: 14px;
+  padding: 10px 12px 14px;
 }
 
+.cc-inbox-triage__inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.cc-inbox-triage__inspector-head .cc-btn {
+  min-height: 24px;
+  padding: 0 6px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.cc-inbox-triage__inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.cc-inbox-triage__inspector-actions .cc-btn {
+  white-space: nowrap;
+}
+
+.cc-inbox-triage__inspector-head > span,
 .cc-inbox-triage__inspector > span {
   color: var(--cc-text-tertiary);
   font-size: 10px;
@@ -252,8 +279,9 @@
 }
 
 @media (max-width: 1100px) {
-  .cc-inbox-triage {
-    grid-template-columns: minmax(240px, 0.9fr) minmax(340px, 1.1fr);
+  .cc-inbox-triage,
+  .cc-inbox-triage[data-inspector='closed'] {
+    grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
   }
 
   .cc-inbox-triage__inspector {

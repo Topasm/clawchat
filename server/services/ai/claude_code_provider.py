@@ -71,7 +71,9 @@ def _run_cli_sync(
     )
 
 
-def _stream_cli_lines(cmd: list[str], queue: Queue, timeout: int = 180):
+def _stream_cli_lines(
+    cmd: list[str], queue: Queue, timeout: int = 180, env: dict[str, str] | None = None
+):
     """Run CLI and push stdout lines to a queue. Runs in a thread."""
     try:
         proc = subprocess.Popen(
@@ -81,6 +83,7 @@ def _stream_cli_lines(cmd: list[str], queue: Queue, timeout: int = 180):
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=env,
         )
         for line in proc.stdout:
             queue.put(("line", line.rstrip()))
@@ -152,10 +155,15 @@ class ClaudeCodeProvider:
                 recoverable=False,
             )
 
+        from services.tools import cli_tool_args
+        from services.tools.agent_mcp_endpoint import current_cli_tools
+
+        # A chat turn inside a tool scope may call ClawChat's tools, like a run.
+        tools = current_cli_tools.get()
         cmd = [
             cli, "--print",
             "--output-format", "stream-json",
-            "--max-turns", "1",
+            "--max-turns", str(cli_tool_args.CLAUDE_TOOL_MAX_TURNS if tools else 1),
             "--verbose",
         ]
 
@@ -164,11 +172,18 @@ class ClaudeCodeProvider:
 
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
+        if tools:
+            cmd.extend(cli_tool_args.claude_args(tools))
 
         cmd.extend(["-p", message])
 
         queue: Queue = Queue()
-        thread = threading.Thread(target=_stream_cli_lines, args=(cmd, queue), daemon=True)
+        thread = threading.Thread(
+            target=_stream_cli_lines,
+            args=(cmd, queue),
+            kwargs={"env": cli_tool_args.claude_env(tools) if tools else None},
+            daemon=True,
+        )
         thread.start()
 
         has_streamed = False

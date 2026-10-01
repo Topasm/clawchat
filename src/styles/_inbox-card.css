@@ -51,39 +51,6 @@
   padding: 2px 0 8px 36px;
 }
 
-/* The triage column is only ~260px wide, so without this the row squeezes
-   every control below its label width and CJK labels break one glyph per
-   line. Let the row wrap to a second line instead. */
-.cc-inbox-card__actions > * {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-/* Four controls under every captured card read as noise when only one of them —
-   Organize — is what such a card is usually for. The rest leave the layout
-   until the card is actually in play: hiding them with opacity alone kept an
-   empty wrapped row under every card. Clicking a card selects it, and a
-   keyboard user tabbing into the card reaches them through focus-within.
-   Scoped to the triage row on purpose: the review, error, and questionnaire
-   cards share the base class and their buttons (Review, Retry, Dismiss) are
-   the point of those cards. */
-.cc-inbox-card__actions--triage > *:not(.cc-inbox-card__organize) {
-  display: none;
-}
-
-.cc-inbox-card:focus-within .cc-inbox-card__actions--triage > *:not(.cc-inbox-card__organize),
-.cc-inbox-card--selected .cc-inbox-card__actions--triage > *:not(.cc-inbox-card__organize),
-.cc-inbox-card--batch-selected .cc-inbox-card__actions--triage > *:not(.cc-inbox-card__organize) {
-  display: inline-flex;
-}
-
-/* Dragging a prerequisite is a mouse gesture; touch has no HTML drag. */
-@media (hover: none) {
-  .cc-inbox-card .cc-inbox-card__actions--triage > .cc-inbox-dependency-handle {
-    display: none;
-  }
-}
-
 /* --- Inbox Questionnaire Card ------------------------------------------- */
 .cc-inbox-card--questioning {
   border-left: 3px solid var(--cc-primary);

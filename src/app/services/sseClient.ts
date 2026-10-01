@@ -6,12 +6,19 @@ import { recordDebug } from './debugLogging';
 const SSE_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 2;
 
+export interface ToolActivity {
+  tool: string;
+  label: string;
+}
+
 interface SSECallbacks {
   onMeta?: (meta: StreamEventMeta) => void;
   onToken?: (token: string) => void;
   onTitleGenerated?: (title: string) => void;
   /** The stream performed a task/calendar action; affected data is stale. */
   onModuleDataChanged?: (metadata: { module?: string }) => void;
+  /** The reply is using one of the user's tools; the answer follows. */
+  onToolActivity?: (activity: ToolActivity) => void;
   onDone?: (fullMessage: string) => void;
   onError?: (error: Error) => void;
 }
@@ -45,6 +52,7 @@ export function connectSSE(
     onToken,
     onTitleGenerated,
     onModuleDataChanged,
+    onToolActivity,
     onDone: finish,
     onError,
   } = callbacks;
@@ -148,6 +156,8 @@ export function connectSSE(
                 onTitleGenerated?.(parsed.title_generated);
               } else if (parsed.module_data_changed !== undefined) {
                 onModuleDataChanged?.(parsed.module_data_changed);
+              } else if (parsed.tool_activity !== undefined) {
+                onToolActivity?.(parsed.tool_activity);
               }
             } catch {
               // Skip malformed JSON events
@@ -183,6 +193,8 @@ export function connectSSE(
               onTitleGenerated?.(parsed.title_generated);
             } else if (parsed.module_data_changed !== undefined) {
               onModuleDataChanged?.(parsed.module_data_changed);
+            } else if (parsed.tool_activity !== undefined) {
+              onToolActivity?.(parsed.tool_activity);
             }
           } catch {
             // Skip malformed JSON events

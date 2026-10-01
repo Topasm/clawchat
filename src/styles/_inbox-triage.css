@@ -1,3 +1,52 @@
+/* --- Inbox page frame ---------------------------------------- */
+.cc-inbox-page__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cc-inbox-page__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cc-inbox-page__heading .cc-page-header__subtitle {
+  margin-top: 0;
+}
+
+.cc-inbox-page__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* Tasks / Notes is one segmented control, not two loose buttons. */
+.cc-inbox-page__tabs {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-control);
+  background: var(--cc-surface-secondary);
+}
+
+.cc-inbox-page__tabs .cc-btn {
+  min-height: 26px;
+  padding: 2px 10px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--cc-text-secondary);
+}
+
+.cc-inbox-page__tabs .cc-btn[aria-pressed='true'] {
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  box-shadow: 0 0 0 1px var(--cc-border-subtle);
+}
+
 /* --- Inbox Cards --------------------------------------------- */
 .cc-inbox-card {
   position: relative;
@@ -6,13 +55,19 @@
   transition: border-color 0.15s ease;
 }
 
+/* --- Triage layout ------------------------------------------- */
 .cc-inbox-triage {
   display: grid;
-  grid-template-columns: minmax(260px, 0.9fr) minmax(360px, 1.35fr) minmax(210px, 0.7fr);
+  grid-template-columns: minmax(340px, 1.1fr) minmax(320px, 1fr) minmax(280px, 0.8fr);
   gap: 0;
   align-items: start;
   border-top: 1px solid var(--cc-border-subtle);
   border-bottom: 1px solid var(--cc-border-subtle);
+}
+
+/* With nothing selected the inspector has nothing to say, so the tree gets its width. */
+.cc-inbox-triage[data-inspector='closed'] {
+  grid-template-columns: minmax(360px, 1.1fr) minmax(320px, 1fr);
 }
 
 .cc-inbox-triage__queue,
@@ -25,27 +80,35 @@
   background: transparent;
 }
 
-.cc-inbox-triage__inspector {
+.cc-inbox-triage__inspector,
+.cc-inbox-triage[data-inspector='closed'] .cc-inbox-tree {
   border-right: 0;
 }
 
 .cc-inbox-triage__queue {
-  padding: 10px;
+  padding: 8px 10px 8px 0;
 }
 
+/* Only visible while a placed task is being dragged out of the tree. It stays in
+   the DOM so the drop always has somewhere to land. */
 .cc-inbox-triage__inbox-target {
-  margin-bottom: 8px;
-  padding: 8px;
-  border: 1px dashed color-mix(in srgb, var(--cc-primary) 45%, var(--cc-border));
+  display: none;
+  margin: 0 0 8px;
+  padding: 10px;
+  border: 1px dashed color-mix(in srgb, var(--cc-primary) 55%, var(--cc-border));
   border-radius: var(--cc-radius-sm);
-  color: var(--cc-text-tertiary);
-  font-size: 10px;
+  background: color-mix(in srgb, var(--cc-primary) 5%, transparent);
+  color: var(--cc-primary);
+  font-size: 12px;
   text-align: center;
 }
 
+.cc-inbox-triage__inbox-target[data-active='true'] {
+  display: block;
+}
+
 .cc-inbox-triage__inbox-target:hover {
-  background: color-mix(in srgb, var(--cc-primary) 7%, transparent);
-  color: var(--cc-primary);
+  background: color-mix(in srgb, var(--cc-primary) 12%, transparent);
 }
 
 .cc-inbox-card[draggable='true'] {
@@ -63,39 +126,119 @@
   box-shadow: inset 3px 0 0 var(--cc-primary);
 }
 
+/* --- Batch toolbar ------------------------------------------- */
 .cc-inbox-triage__batch-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 7px 8px;
-  border: 1px solid var(--cc-border);
+  gap: 4px 10px;
+  margin: 0 0 4px;
+  padding: 4px 4px 4px 8px;
   border-radius: var(--cc-radius-sm);
-  background: color-mix(in srgb, var(--cc-primary) 5%, var(--cc-surface));
-  color: var(--cc-text-secondary);
-  font-size: 11px;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
+.cc-inbox-triage__batch-bar[data-active='true'] {
+  background: color-mix(in srgb, var(--cc-primary) 6%, var(--cc-surface));
+  color: var(--cc-text);
+  font-weight: 600;
 }
 
 .cc-inbox-triage__batch-bar > div {
   display: flex;
   gap: 4px;
+  margin-left: auto;
+}
+
+.cc-inbox-triage__batch-bar .cc-btn {
+  white-space: nowrap;
+}
+
+/* --- Captured card row --------------------------------------- */
+.cc-inbox-card--row,
+.cc-inbox-card--captured {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 6px;
+  border-bottom: 1px solid var(--cc-border-subtle);
+  border-radius: var(--cc-radius-row);
+}
+
+.cc-inbox-card--row > .cc-card,
+.cc-inbox-card--captured > .cc-card {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.cc-inbox-card--captured:hover {
+  background: var(--cc-hover-surface);
+}
+
+.cc-inbox-card--captured:focus-visible {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: -2px;
+}
+
+.cc-inbox-card__side {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.cc-inbox-card__side .cc-btn {
+  white-space: nowrap;
 }
 
 .cc-inbox-batch-check {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  color: var(--cc-text-secondary);
-  font-size: 11px;
+  justify-content: center;
+  width: 28px;
+  min-height: 28px;
   cursor: pointer;
 }
 
 .cc-inbox-batch-check input {
+  margin: 0;
   accent-color: var(--cc-primary);
 }
 
+/* The batch checkbox and the prerequisite connector are quiet until the row is in
+   play: hovered, focused, selected, or while any batch selection is underway. */
+.cc-inbox-card--captured .cc-inbox-batch-check,
+.cc-inbox-card--captured .cc-inbox-dependency-handle {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.cc-inbox-card--captured:hover .cc-inbox-batch-check,
+.cc-inbox-card--captured:focus-within .cc-inbox-batch-check,
+.cc-inbox-card--selected .cc-inbox-batch-check,
+.cc-inbox-card--batch-selected .cc-inbox-batch-check,
+.cc-inbox-triage__captured[data-batching='true'] .cc-inbox-batch-check,
+.cc-inbox-card--captured:hover .cc-inbox-dependency-handle,
+.cc-inbox-card--captured:focus-within .cc-inbox-dependency-handle,
+.cc-inbox-card--selected .cc-inbox-dependency-handle {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .cc-inbox-card--captured .cc-inbox-batch-check {
+    opacity: 1;
+  }
+
+  /* Dragging a prerequisite is a mouse gesture; touch has no HTML drag. */
+  .cc-inbox-card--captured .cc-inbox-dependency-handle {
+    display: none;
+  }
+}
+
+/* --- AI placement preview ------------------------------------ */
 .cc-inbox-triage__ai-preview {
   display: grid;
   gap: 8px;

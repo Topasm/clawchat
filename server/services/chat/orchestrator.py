@@ -16,6 +16,7 @@ from models.project import Project
 from models.todo import Todo
 from services.agents import agent_task_service, agent_run_service
 from services.ai.ai_service import AIService
+from services.chat.chat_tools import reply_events
 from services.chat.conversation_context import build_conversation_context
 from services.chat.intent_classifier import classify_intent
 from services.chat.intent_handlers import (
@@ -418,13 +419,28 @@ class Orchestrator:
         # Create assistant message placeholder
         assistant_msg_id = make_id("msg_")
 
-        # Stream response via WebSocket (uses the active AI provider)
+        # Stream response via WebSocket (uses the active AI provider). A reply
+        # may use the user's read-only tools; the client hears about each call.
+        async def tokens():
+            async for event in reply_events(self.session_factory, self.active_ai, messages):
+                if event.kind == "activity":
+                    await self.ws.send_json(user_id, {
+                        "type": "tool_activity",
+                        "data": {
+                            "message_id": assistant_msg_id,
+                            "conversation_id": conversation_id,
+                            **event.payload,
+                        },
+                    })
+                else:
+                    yield event.text
+
         try:
             full_content = await self.ws.stream_to_user(
                 user_id=user_id,
                 message_id=assistant_msg_id,
                 conversation_id=conversation_id,
-                token_iterator=self.active_ai.stream_completion(messages),
+                token_iterator=tokens(),
             )
         except Exception:
             # Send stream_end for the orphaned stream_start so the client doesn't hang

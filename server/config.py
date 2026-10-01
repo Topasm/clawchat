@@ -222,6 +222,11 @@ class Settings(BaseSettings):
     opencode_startup_timeout_seconds: float = 30.0
     opencode_run_timeout_seconds: float = 3600.0
 
+    # The user's own Agent Skills: one `<name>/SKILL.md` per directory, loaded
+    # after the built-ins (a matching name replaces the built-in). Empty
+    # disables user skills.
+    skills_dir: str = "data/skills"
+
     # File uploads
     upload_dir: str = "data/uploads"
     max_upload_size_mb: int = 10

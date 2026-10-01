@@ -132,6 +132,9 @@ def main() -> None:
             f"migrations{os.pathsep}migrations",
             "--add-data",
             f"alembic.ini{os.pathsep}.",
+            # Built-in skills are SKILL.md files read at import time.
+            "--add-data",
+            f"skills/builtin{os.pathsep}skills/builtin",
             "--paths",
             ".",
         ]

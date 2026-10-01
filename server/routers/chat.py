@@ -30,6 +30,7 @@ from schemas.chat import (
 )
 from schemas.common import PaginatedResponse
 from services.ai import resolve_active_ai
+from services.chat.chat_tools import reply_events
 from services.chat.conversation_context import build_conversation_context
 from services.chat.intent_classifier import classify_intent
 from utils import make_id
@@ -363,9 +364,12 @@ async def stream_chat(
                 yield f"data: {json.dumps({'module_data_changed': action_metadata})}\n\n"
         else:
             try:
-                async for token in ai_service.stream_completion(messages):
-                    accumulated += token
-                    yield f"data: {json.dumps({'token': token})}\n\n"
+                async for event in reply_events(session_factory, ai_service, messages):
+                    if event.kind == "activity":
+                        yield f"data: {json.dumps({'tool_activity': event.payload})}\n\n"
+                        continue
+                    accumulated += event.text
+                    yield f"data: {json.dumps({'token': event.text})}\n\n"
             except Exception as exc:
                 logger.exception("Chat stream error: %s", exc)
                 if not accumulated:

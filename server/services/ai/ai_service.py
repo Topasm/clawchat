@@ -96,23 +96,21 @@ class AIService:
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
         for entry in transcript:
             if entry["role"] == "assistant":
-                messages.append(
-                    {
-                        "role": "assistant",
-                        "content": entry.get("content"),
-                        "tool_calls": [
-                            {
-                                "id": call.id,
-                                "type": "function",
-                                "function": {
-                                    "name": call.name,
-                                    "arguments": json.dumps(call.arguments),
-                                },
-                            }
-                            for call in entry["tool_calls"]
-                        ],
-                    }
-                )
+                message: dict = {"role": "assistant", "content": entry.get("content")}
+                if entry.get("tool_calls"):
+                    # An empty tool_calls list is rejected by some servers.
+                    message["tool_calls"] = [
+                        {
+                            "id": call.id,
+                            "type": "function",
+                            "function": {
+                                "name": call.name,
+                                "arguments": json.dumps(call.arguments),
+                            },
+                        }
+                        for call in entry["tool_calls"]
+                    ]
+                messages.append(message)
             elif entry["role"] == "tool":
                 messages.append(
                     {

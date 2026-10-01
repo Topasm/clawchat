@@ -24,6 +24,9 @@ class SkillDef:
     tags: list[str] = field(default_factory=list)
     # Offered the web_search tool when a SearXNG instance is configured.
     uses_web_search: bool = False
+    # MCP servers (by name) or tools (``server__tool``) this skill may use.
+    # ``None`` offers every enabled server; ``()`` offers none.
+    mcp_servers: tuple[str, ...] | None = None
 
 
 # Central registry — populated by builtins (and future user-defined skills).
@@ -58,7 +61,9 @@ PERSONA_TO_SKILL: dict[str, str] = {
 }
 
 
-# Auto-register builtins on import.
+# Auto-register builtins on import, then the user's own skills over them.
 from skills.builtins import register_builtins as _register_builtins  # noqa: E402
+from skills.builtins import register_user_skills as _register_user_skills  # noqa: E402
 
 _register_builtins()
+_register_user_skills()
