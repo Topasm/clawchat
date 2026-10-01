@@ -19,7 +19,6 @@
     "src/app/stores/useUpdateStore.ts": "a6570a4e5f6559d5bb7dfcf5f9f0c4f7663f614309a64947b0048545fc4a2fc8",
     "src/app/utils/__tests__/formatters.test.ts": "73edcf1c24ab7e45d61b7a82cf3a4eb03f29f6dd31cb7195ca1a548638fb61b5",
     "src/app/utils/projectIcons.ts": "614ded62b2fb3e25de2c665b9bab4bcc33554b55d708de2026d0ee4460bc0326",
-    "src/styles/_dialog.css": "b5db20949b1d530d71bdb769528e17d335193b823d5a7763237fe0d93a2717a5",
     "src/styles/_pull-refresh.css": "d1a8badb6e3407be0440a08e224c9d75d2676b1eafb25b1a55aebacf7ca0774c",
     "src/styles/_reset.css": "6612b3b31054641b289cbc480d5195c31c2c7e5cce02d88a38c0d9af215cdb98",
     "src/styles/_toast.css": "40e58c181371d97057fc4217300249d6915d10b7159e528133120b9b99547822"
