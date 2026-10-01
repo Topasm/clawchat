@@ -286,6 +286,8 @@ class DelegateResponse(BaseModel):
     skill_id: str
     skill_chain: list[str]
     agent_type: str
+    #: Who chose the skill: the caller, the task's assignment, or the server.
+    skill_source: Literal["requested", "assigned", "auto"]
 
 
 class SkillResponse(BaseModel):

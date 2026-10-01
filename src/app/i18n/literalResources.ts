@@ -800,6 +800,12 @@ export const koreanUiTranslations: Record<string, string> = {
   Source: '출처',
   Start: '시작',
   'Start agent execution': '에이전트 실행 시작',
+  'Skill: {{skill}} (assigned)': '스킬: {{skill}} (지정됨)',
+  'Skill: chosen from the task when the run starts':
+    '스킬: 실행을 시작할 때 작업 내용을 보고 자동으로 고릅니다',
+  'Skill chosen for this run: {{skills}}': '이 실행에 고른 스킬: {{skills}}',
+  'Skill: {{skills}}': '스킬: {{skills}}',
+  'Weekly review': '주간 리뷰',
   'Start agent run': '에이전트 실행 시작',
   'Start on this computer': '이 컴퓨터에서 시작',
   'Start one approved run?': '승인된 실행을 시작하시겠습니까?',

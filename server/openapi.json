@@ -3048,6 +3048,15 @@
             "title": "Skill Id",
             "type": "string"
           },
+          "skill_source": {
+            "enum": [
+              "requested",
+              "assigned",
+              "auto"
+            ],
+            "title": "Skill Source",
+            "type": "string"
+          },
           "status": {
             "const": "delegated",
             "title": "Status",
@@ -3070,7 +3079,8 @@
           "run_id",
           "skill_id",
           "skill_chain",
-          "agent_type"
+          "agent_type",
+          "skill_source"
         ],
         "title": "DelegateResponse",
         "type": "object"

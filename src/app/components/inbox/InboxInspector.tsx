@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import type {
   ExecutionProviderStatus,
   ProjectResponse,
-  Skill,
   TaskExecutionTelemetryResponse,
   TaskGraphInsightNode,
   TaskGraphInsightsResponse,
@@ -24,7 +23,6 @@ interface InboxInspectorProps {
   telemetry?: TaskExecutionTelemetryResponse;
   summary?: TaskGraphInsightsResponse['summary'];
   project?: ProjectResponse;
-  skills: Skill[];
   providers: ExecutionProviderStatus[];
   isStartingExecution: boolean;
   dependency: InboxDependencyPreview;
@@ -53,7 +51,6 @@ export default function InboxInspector({
   telemetry,
   summary,
   project,
-  skills,
   providers,
   isStartingExecution,
   dependency,
@@ -131,7 +128,6 @@ export default function InboxInspector({
               insight={insight}
               telemetry={telemetry}
               project={project}
-              skills={skills}
               providers={providers}
               isStarting={isStartingExecution}
               onStart={(request) => onStartExecution(task.id, request)}

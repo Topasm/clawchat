@@ -9,7 +9,6 @@ import {
   useExecutionProvidersQuery,
   useGetOrCreateProjectConversation,
   useProjectsQuery,
-  useSkillsQuery,
   useStartReadyTaskExecution,
   useTaskExecutionTelemetryQuery,
   useTaskGraphInsightsQuery,
@@ -52,7 +51,6 @@ export default function InboxPage() {
   const deleteMutation = useDeleteTodo();
   const sections = useInboxSections(todos);
   const selection = useInboxSelection(sections.needsOrganising);
-  const { data: skillsData } = useSkillsQuery(Boolean(selection.selectedTaskId));
   const { data: executionProviders = [] } = useExecutionProvidersQuery(
     Boolean(selection.selectedTaskId),
   );
@@ -256,7 +254,6 @@ export default function InboxPage() {
               }
               summary={graphInsights.data?.summary}
               project={selectedProject}
-              skills={skillsData?.skills ?? []}
               providers={executionProviders}
               isStartingExecution={startReadyExecution.isPending}
               dependency={dependency}

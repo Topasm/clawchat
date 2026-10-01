@@ -17,6 +17,7 @@ from models.agent_run import AgentRun
 from models.agent_task import AgentTask
 from models.project import Project
 from models.todo import Todo
+from services.agents import task_delegation_service
 from utils import make_id
 
 
@@ -99,6 +100,89 @@ async def test_delegating_with_a_skill_id(client: AsyncClient, auth_headers, db_
     assert body["skill_chain"] == ["research"]
     # agent_type mirrors skill_id for older clients.
     assert body["agent_type"] == "research"
+
+
+async def test_without_a_skill_the_server_picks_one_from_the_task(
+    client: AsyncClient, auth_headers, db_session, monkeypatch
+):
+    todo = await _todo(db_session)
+    seen: dict = {}
+
+    async def fake_select(ai, instruction, available=None):
+        seen["instruction"] = instruction
+        seen["available"] = [skill.id for skill in available]
+        return ["research", "summarize"]
+
+    monkeypatch.setattr(task_delegation_service, "select_skills", fake_select)
+    monkeypatch.setattr(StubAI, "function_call", lambda *a, **k: None, raising=False)
+
+    resp = await client.post(f"/api/todos/{todo.id}/delegate", headers=auth_headers, json={})
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["skill_id"] == "research"
+    assert body["skill_chain"] == ["research", "summarize"]
+    assert body["skill_source"] == "auto"
+    assert todo.title in seen["instruction"]
+    assert "plan" in seen["available"]  # not ready-only, so planning is a candidate
+
+
+async def test_a_ready_run_without_a_skill_never_picks_plan(
+    client: AsyncClient, auth_headers, db_session, monkeypatch
+):
+    todo = await _todo(db_session)
+    seen: dict = {}
+
+    async def fake_select(ai, instruction, available=None):
+        seen["available"] = [skill.id for skill in available]
+        return ["plan"]  # ignored: not executable as ready work
+
+    monkeypatch.setattr(task_delegation_service, "select_skills", fake_select)
+    monkeypatch.setattr(StubAI, "function_call", lambda *a, **k: None, raising=False)
+
+    resp = await client.post(
+        f"/api/todos/{todo.id}/delegate",
+        headers=auth_headers,
+        json={"require_ready": True, "approved": True},
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert "plan" not in seen["available"]
+    assert resp.json()["skill_id"] != "plan"
+    assert resp.json()["skill_source"] == "auto"
+
+
+async def test_an_assigned_skill_wins_over_the_selector(
+    client: AsyncClient, auth_headers, db_session, monkeypatch
+):
+    todo = await _todo(db_session)
+    todo.enabled_skills = json.dumps(["draft"])
+    await db_session.commit()
+
+    async def fake_select(*args, **kwargs):  # pragma: no cover - must not be called
+        raise AssertionError("selector consulted despite an assignment")
+
+    monkeypatch.setattr(task_delegation_service, "select_skills", fake_select)
+
+    resp = await client.post(f"/api/todos/{todo.id}/delegate", headers=auth_headers, json={})
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["skill_id"] == "draft"
+    assert resp.json()["skill_source"] == "assigned"
+
+
+async def test_without_a_model_the_keyword_fallback_still_picks(
+    client: AsyncClient, auth_headers, db_session
+):
+    todo = await _todo(db_session)
+    todo.title = "Research the related work on active vision"
+    await db_session.commit()
+
+    resp = await client.post(f"/api/todos/{todo.id}/delegate", headers=auth_headers, json={})
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["skill_id"] == "research"
+    assert resp.json()["skill_source"] == "auto"
 
 
 async def test_legacy_agent_type_maps_to_a_skill(

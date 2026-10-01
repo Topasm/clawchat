@@ -10,7 +10,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -35,6 +35,7 @@ from services.tasks import (
     task_execution_service,
 )
 from skills import PERSONA_TO_SKILL, SKILL_REGISTRY
+from skills.selector import fallback_skill_chain, select_skills
 from utils import make_id
 from ws.manager import ws_manager
 from ws.notifications import notify_module_data_changed
@@ -58,6 +59,46 @@ class DelegationRuntime:
     active_ai_provider: str
     paseo_adapter: Any | None = None
     opencode_adapter: Any | None = None
+
+
+SkillSource = Literal["requested", "assigned", "auto"]
+
+
+async def choose_skill_chain(
+    body: DelegateRequest, todo: Todo, active_ai: Any | None
+) -> tuple[list[str], SkillSource]:
+    """Decide which skills a delegation runs, and who decided.
+
+    The caller may name one. Otherwise the task's own assignment wins, and
+    failing that the server reads the task and picks -- the same selector the
+    chat uses, with a keyword fallback when no model is available. A client
+    does not have to know the skill catalogue to start a run.
+    """
+    if body.skill_id or body.agent_type:
+        return [resolve_skill_id(body)], "requested"
+    executable = [
+        skill_id
+        for skill_id in SKILL_REGISTRY
+        if not (body.require_ready and skill_id == "plan")
+    ]
+    assigned = [
+        skill_id
+        for skill_id in (json.loads(todo.enabled_skills) if todo.enabled_skills else [])
+        if skill_id in executable
+    ]
+    if assigned:
+        return [assigned[0]], "assigned"
+    instruction = f"{todo.title}\n{todo.description or ''}".strip()
+    if active_ai is None or not hasattr(active_ai, "function_call"):
+        chain = fallback_skill_chain(instruction, executable)
+    else:
+        chain = await select_skills(
+            active_ai, instruction, [SKILL_REGISTRY[skill_id] for skill_id in executable]
+        )
+    chain = [skill_id for skill_id in chain if skill_id in executable]
+    if not chain:
+        chain = fallback_skill_chain(instruction, executable)
+    return chain, "auto"
 
 
 def resolve_skill_id(body: DelegateRequest) -> str:
@@ -87,11 +128,11 @@ async def delegate_todo_to_skill(
     runtime: DelegationRuntime,
     user_id: str,
 ) -> dict:
-    skill_id = resolve_skill_id(body)
-
     todo = await db.get(Todo, todo_id)
     if not todo:
         raise NotFoundError("Todo not found")
+    skill_chain, skill_source = await choose_skill_chain(body, todo, runtime.active_ai)
+    skill_id = skill_chain[0]
 
     if body.require_ready:
         await task_execution_service.validate_ready_execution(db, todo)
@@ -102,7 +143,7 @@ async def delegate_todo_to_skill(
         task_type=f"delegate_{skill_id}",
         instruction=f"Handle: {todo.title}\n{todo.description or ''}",
         todo_id=todo.id,
-        skill_chain=json.dumps([skill_id]),
+        skill_chain=json.dumps(skill_chain),
     )
     db.add(task)
     await db.flush()
@@ -344,6 +385,7 @@ async def delegate_todo_to_skill(
         "agent_task_id": task.id,
         "run_id": run.id,
         "skill_id": skill_id,
-        "skill_chain": [skill_id],
+        "skill_chain": skill_chain,
         "agent_type": skill_id,  # backward compat
+        "skill_source": skill_source,
     }

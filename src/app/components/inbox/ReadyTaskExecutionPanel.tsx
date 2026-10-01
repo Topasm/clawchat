@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   ExecutionProviderStatus,
   ProjectResponse,
-  Skill,
   TaskExecutionTelemetryResponse,
   TaskGraphInsightNode,
   TodoResponse,
@@ -16,21 +15,38 @@ const ACTIVE_AGENT_RUN_STATUSES = new Set([
   'waiting_review',
 ]);
 export interface ReadyTaskExecutionRequest {
-  skillId: string;
+  /** Only when the task was explicitly assigned one; otherwise the server picks. */
+  skillId: string | null;
   executionProvider: string;
   model?: string | null;
+}
+export interface ReadyTaskExecutionResult {
+  run_id: string;
+  skill_chain?: string[];
+  skill_source?: 'requested' | 'assigned' | 'auto';
+}
+const SKILL_LABELS: Record<string, string> = {
+  research: 'Research',
+  draft: 'Draft',
+  summarize: 'Summarize',
+  data_analysis: 'Analyze',
+  code_review: 'Review',
+  prioritize: 'Prioritize',
+  obsidian_sync: 'Sync',
+  weekly_review: 'Weekly review',
+  plan: 'Plan',
+};
+function skillLabel(skillId: string): string {
+  return translateUi(SKILL_LABELS[skillId] ?? skillId);
 }
 interface ReadyTaskExecutionPanelProps {
   task: TodoResponse;
   insight: TaskGraphInsightNode;
   telemetry?: TaskExecutionTelemetryResponse;
   project?: ProjectResponse;
-  skills: Skill[];
   providers: ExecutionProviderStatus[];
   isStarting: boolean;
-  onStart: (request: ReadyTaskExecutionRequest) => Promise<{
-    run_id: string;
-  }>;
+  onStart: (request: ReadyTaskExecutionRequest) => Promise<ReadyTaskExecutionResult>;
   onOpenRun: (runId: string) => void;
 }
 export default function ReadyTaskExecutionPanel({
@@ -38,27 +54,22 @@ export default function ReadyTaskExecutionPanel({
   insight,
   telemetry,
   project,
-  skills,
   providers,
   isStarting,
   onStart,
   onOpenRun,
 }: ReadyTaskExecutionPanelProps) {
-  const executableSkills = useMemo(() => skills.filter((skill) => skill.id !== 'plan'), [skills]);
-  const assignedSkill = task.enabled_skills?.find((skillId) =>
-    executableSkills.some((skill) => skill.id === skillId),
-  );
-  const [skillId, setSkillId] = useState('');
+  // An explicitly assigned skill is honoured; otherwise the server reads the
+  // task and chooses, so there is nothing here for the user to know.
+  const assignedSkill = task.enabled_skills?.find((skillId) => skillId !== 'plan') ?? null;
   const [providerId, setProviderId] = useState('');
   const [confirmationOpen, setConfirmationOpen] = useState(false);
-  const [startedRunId, setStartedRunId] = useState<string | null>(null);
+  const [started, setStarted] = useState<ReadyTaskExecutionResult | null>(null);
   useEffect(() => {
-    setSkillId('');
     setProviderId('');
     setConfirmationOpen(false);
-    setStartedRunId(null);
+    setStarted(null);
   }, [task.id]);
-  const selectedSkillId = skillId || assignedSkill || executableSkills[0]?.id || '';
   const selectedProviderId = providerId || project?.default_execution_provider || 'builtin';
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
   // Providers ClawChat bridges to run in the project's own workspace.
@@ -97,23 +108,11 @@ export default function ReadyTaskExecutionPanel({
         </div>
         {insight.is_ready && (
           <>
-            <label>
-              {translateUi('\n              Skill\n              ')}
-              <select
-                value={selectedSkillId}
-                disabled={isStarting}
-                onChange={(event) => {
-                  setSkillId(event.target.value);
-                  setConfirmationOpen(false);
-                }}
-              >
-                {executableSkills.map((skill) => (
-                  <option key={skill.id} value={skill.id}>
-                    {skill.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p className="cc-inbox-triage__agent-skill">
+              {assignedSkill
+                ? translateUi('Skill: {{skill}} (assigned)', { skill: skillLabel(assignedSkill) })
+                : translateUi('Skill: chosen from the task when the run starts')}
+            </p>
             <label>
               {translateUi('\n              Provider\n              ')}
               <select
@@ -148,7 +147,7 @@ export default function ReadyTaskExecutionPanel({
               <button
                 type="button"
                 className="cc-btn cc-btn--secondary"
-                disabled={!selectedSkillId || !providerReady || isStarting}
+                disabled={!providerReady || isStarting}
                 onClick={() => setConfirmationOpen(true)}
               >
                 {translateUi('\n                Review agent run\n              ')}
@@ -170,14 +169,14 @@ export default function ReadyTaskExecutionPanel({
                     onClick={async () => {
                       try {
                         const result = await onStart({
-                          skillId: selectedSkillId,
+                          skillId: assignedSkill,
                           executionProvider: selectedProviderId,
                           model:
                             selectedProviderId === project?.default_execution_provider
                               ? project.default_execution_model
                               : null,
                         });
-                        setStartedRunId(result.run_id);
+                        setStarted(result);
                         setConfirmationOpen(false);
                       } catch {
                         // The owning mutation translates the server error for the user.
@@ -200,14 +199,27 @@ export default function ReadyTaskExecutionPanel({
           </>
         )}
       </section>
-      {startedRunId && (
-        <button
-          type="button"
-          className="cc-btn cc-btn--secondary"
-          onClick={() => onOpenRun(startedRunId)}
-        >
-          {translateUi('\n          Open started run\n        ')}
-        </button>
+      {started && (
+        <>
+          {started.skill_chain && started.skill_chain.length > 0 && (
+            <p className="cc-inbox-triage__agent-skill">
+              {started.skill_source === 'auto'
+                ? translateUi('Skill chosen for this run: {{skills}}', {
+                    skills: started.skill_chain.map(skillLabel).join(' → '),
+                  })
+                : translateUi('Skill: {{skills}}', {
+                    skills: started.skill_chain.map(skillLabel).join(' → '),
+                  })}
+            </p>
+          )}
+          <button
+            type="button"
+            className="cc-btn cc-btn--secondary"
+            onClick={() => onOpenRun(started.run_id)}
+          >
+            {translateUi('Open started run')}
+          </button>
+        </>
       )}
     </>
   );

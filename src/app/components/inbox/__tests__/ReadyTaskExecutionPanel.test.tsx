@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type {
   ExecutionProviderStatus,
-  Skill,
   TaskGraphInsightNode,
   TodoResponse,
 } from '../../../types/api';
@@ -49,11 +48,6 @@ const insight: TaskGraphInsightNode = {
   due_slack_minutes: null,
 };
 
-const skills: Skill[] = [
-  { id: 'plan', name: 'Plan', description: 'Plan work', tags: [] },
-  { id: 'research', name: 'Research', description: 'Research work', tags: [] },
-];
-
 const providers: ExecutionProviderStatus[] = [
   {
     id: 'builtin',
@@ -74,7 +68,6 @@ describe('ReadyTaskExecutionPanel', () => {
       <ReadyTaskExecutionPanel
         task={task}
         insight={insight}
-        skills={skills}
         providers={providers}
         isStarting={false}
         onStart={onStart}
@@ -103,7 +96,6 @@ describe('ReadyTaskExecutionPanel', () => {
       <ReadyTaskExecutionPanel
         task={task}
         insight={{ ...insight, is_ready: false, is_blocked: true, execution_state: 'blocked' }}
-        skills={skills}
         providers={providers}
         isStarting={false}
         onStart={vi.fn()}
@@ -139,7 +131,6 @@ describe('ReadyTaskExecutionPanel', () => {
           latest_artifact_type: null,
           latest_artifact_updated_at: null,
         }}
-        skills={skills}
         providers={providers}
         isStarting={false}
         onStart={vi.fn()}

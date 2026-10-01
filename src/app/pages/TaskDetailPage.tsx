@@ -192,9 +192,6 @@ export default function TaskDetailPage() {
   const dueInfo =
     task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
   const canonicalDoc = extractCanonicalDoc(project?.description);
-  const activeSkillLabels = (task.enabled_skills ?? []).map((id) =>
-    translateUi(SKILL_LABELS[id] || id),
-  );
   return (
     <div className="cc-detail cc-exec-panel">
       {/* Top: Status + Quick Actions */}
@@ -411,41 +408,6 @@ export default function TaskDetailPage() {
               {translateUi('\n              Re-plan\n            ')}
             </button>
           )}
-
-          {/* Skill delegate buttons */}
-          <details key={`skills-${task.id}`}>
-            <summary className="cc-btn cc-btn--ghost">
-              {activeSkillLabels.length
-                ? translateUi('Skills: {{skills}}', { skills: activeSkillLabels.join(' → ') })
-                : translateUi('Skills')}
-            </summary>
-            <div className="cc-exec-panel__delegate">
-              {SKILL_OPTIONS.map(({ id, label }) => {
-                const isActive = task.enabled_skills?.includes(id) || task.assignee === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`cc-btn cc-btn--ghost cc-exec-panel__delegate-btn${isActive ? ' cc-exec-panel__delegate-btn--active' : ''}`}
-                    onClick={() => {
-                      if (isActive) {
-                        const updated = (task.enabled_skills || []).filter((s) => s !== id);
-                        persistField({
-                          enabled_skills: updated.length ? updated : null,
-                          assignee: updated[0] || null,
-                        });
-                      } else {
-                        const updated = [...(task.enabled_skills || []), id];
-                        persistField({ enabled_skills: updated, assignee: id });
-                      }
-                    }}
-                  >
-                    {translateUi(label)}
-                  </button>
-                );
-              })}
-            </div>
-          </details>
 
           {(task.enabled_skills?.length ||
             (task.assignee &&
