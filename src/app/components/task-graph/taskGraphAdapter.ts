@@ -148,6 +148,7 @@ interface TaskGraphAdapterOptions {
   hideCompleted: boolean;
   relationships: readonly GraphRelationshipLike[];
   metadataTodos?: TodoResponse[];
+  projectRootIds?: ReadonlySet<string>;
   insightNodes?: readonly TaskGraphInsightNode[];
   criticalPathTaskIds?: readonly string[];
   onToggleCollapse: (taskId: string) => void;
@@ -248,6 +249,7 @@ export function buildTaskGraphElements(
           status: todo.status,
           mode: options.mode,
           childCount: children.length,
+          isProjectRoot: options.projectRootIds?.has(todo.id) ?? false,
           completedChildCount: children.filter((child) => child.status === 'completed').length,
           dependencyCount: dependencyCountByTaskId.get(todo.id) ?? 0,
           hasVisibleChildren: (visibleChildrenById.get(todo.id)?.length ?? 0) > 0,

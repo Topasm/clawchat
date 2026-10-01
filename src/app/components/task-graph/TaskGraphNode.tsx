@@ -9,6 +9,7 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
     todo,
     status,
     childCount,
+    isProjectRoot,
     completedChildCount,
     dependencyCount,
     hasVisibleChildren,
@@ -56,9 +57,7 @@ function TaskGraphNode({ id, data }: TaskFlowNodeProps) {
         <span className={`cc-task-flow-node__status cc-task-flow-node__status--${displayStatus}`}>
           {statusLabel}
         </span>
-        {childCount > 0 && (
-          <span className="cc-task-flow-node__kind">{translateUi('Project')}</span>
-        )}
+        {isProjectRoot && <span className="cc-task-flow-node__kind">{translateUi('Project')}</span>}
         {proposalSelection && (
           <span
             className={`cc-task-flow-node__proposal-state cc-task-flow-node__proposal-state--${proposalSelection}`}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
@@ -35,6 +35,7 @@ import { extractCanonicalDoc } from '../utils/canonicalDoc';
 import useExperimentCompletionGate from '../hooks/useExperimentCompletionGate';
 import ProjectMachineLine from '../components/shared/ProjectMachineLine';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
+import Dialog from '../components/shared/Dialog';
 const SKILL_OPTIONS = [
   { id: 'plan', label: 'Plan' },
   { id: 'research', label: 'Research' },
@@ -88,7 +89,9 @@ export default function TaskDetailPage() {
     isLoading: projectLoading,
     isError: projectError,
   } = useProjectQuery(task?.project_id ?? undefined);
-  const workspaceSettings = useRef<HTMLDetailsElement>(null);
+  // Where the task runs is a project setting; it opens in the same dialog as
+  // on the project page instead of unfolding in the middle of this one.
+  const [hostsOpen, setHostsOpen] = useState(false);
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
   const generatePlanMutation = useGeneratePlanProposal();
   const applyPlanMutation = useApplyPlanProposal();
@@ -104,6 +107,7 @@ export default function TaskDetailPage() {
   const plan = latestPlanQuery.data ?? null;
   useEffect(() => {
     setDetailsOpen(false);
+    setHostsOpen(false);
   }, [taskId]);
   useEffect(() => {
     if (task) {
@@ -307,25 +311,15 @@ export default function TaskDetailPage() {
                 <Link className="cc-exec-panel__context-link" to={`/projects/${project.id}`}>
                   {project.title}
                 </Link>
-                <ProjectMachineLine
-                  project={project}
-                  onChange={() => {
-                    if (!workspaceSettings.current) return;
-                    workspaceSettings.current.open = true;
-                    workspaceSettings.current.scrollIntoView?.({
-                      behavior: 'smooth',
-                      block: 'nearest',
-                    });
-                  }}
-                />
-                <details
-                  key={`${task.id}-${project.id}`}
-                  ref={workspaceSettings}
-                  className="cc-project-settings-disclosure"
+                <ProjectMachineLine project={project} onChange={() => setHostsOpen(true)} />
+                <Dialog
+                  open={hostsOpen}
+                  onOpenChange={setHostsOpen}
+                  title={translateUi('Where this runs')}
+                  className="cc-dialog__content--wide cc-project-settings-dialog"
                 >
-                  <summary>{translateUi('Where this runs')}</summary>
                   <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
-                </details>
+                </Dialog>
               </>
             )}
             {isProject && (

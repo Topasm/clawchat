@@ -169,7 +169,7 @@ describe('ProjectPlan', () => {
       }),
     );
     expect(screen.queryByRole('button', { name: 'Run agent' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '+ Step' })).not.toBeVisible();
+    expect(screen.getByRole('button', { name: '+ Task' })).not.toBeVisible();
     const actions = screen.getByLabelText('Selected task actions');
     expect(actions.querySelectorAll('.cc-btn--primary')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Review result' }));
@@ -178,6 +178,6 @@ describe('ProjectPlan', () => {
     );
     expect(execution.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Actions'));
-    expect(screen.getByRole('button', { name: '+ Step' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '+ Task' })).toBeVisible();
   });
 });

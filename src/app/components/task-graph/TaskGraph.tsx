@@ -94,6 +94,10 @@ export default function TaskGraph({
     [projectId, projectOptions],
   );
   const projectRootTaskId = selectedProject?.root_task_id ?? null;
+  const projectRootIds = useMemo(
+    () => new Set(projectOptions.flatMap((project) => project.root_task_id ?? [])),
+    [projectOptions],
+  );
   const insightsQuery = useTaskGraphInsightsQuery(
     projectId === 'all' ? null : projectRootTaskId,
     (projectId === 'all' || projectRootTaskId !== null) &&
@@ -282,6 +286,7 @@ export default function TaskGraph({
         hideCompleted: showStatusControls ? hideCompleted : hideCompletedWithoutControls,
         relationships: graphRelationships,
         metadataTodos: graphMetadataTodos,
+        projectRootIds,
         insightNodes: mode === 'execution' ? insightsQuery.data?.nodes : undefined,
         criticalPathTaskIds:
           mode === 'execution' ? insightsQuery.data?.summary.critical_path_task_ids : undefined,
@@ -295,6 +300,7 @@ export default function TaskGraph({
       graphMetadataTodos,
       graphRelationships,
       hideCompletedWithoutControls,
+      projectRootIds,
       mode,
       showStatusControls,
       toggleCollapsed,

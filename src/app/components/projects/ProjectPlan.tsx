@@ -186,7 +186,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
           <div className="cc-project-plan__empty">
             <EmptyState
               icon={<span>✓</span>}
-              message={translateUi('No execution tasks yet. Add a first step to this project.')}
+              message={translateUi('No tasks yet. Add the first task to this project.')}
             />
             {project.root_task_id && (
               <button
@@ -198,7 +198,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
                     .open({ defaultParentId: project.root_task_id ?? undefined })
                 }
               >
-                {translateUi('Add first step')}
+                {translateUi('Add the first task')}
               </button>
             )}
           </div>
@@ -261,7 +261,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
                       useQuickCaptureStore.getState().open({ defaultParentId: selectedTask.id })
                     }
                   >
-                    {translateUi('+ Step')}
+                    {translateUi('+ Task')}
                   </button>
                   <button
                     type="button"

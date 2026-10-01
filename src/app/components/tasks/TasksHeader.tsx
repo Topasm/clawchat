@@ -68,7 +68,7 @@ export default function TasksHeader({
             className="cc-btn cc-btn--primary"
             onClick={() => useQuickCaptureStore.getState().open()}
           >
-            {translateUi('\n            + New Task\n          ')}
+            {translateUi('+ Task')}
           </button>
         )}
       </div>

@@ -8,6 +8,8 @@ type TaskGraphNodeData = {
   status: TaskStatus;
   mode: TaskGraphMode;
   childCount: number;
+  /** The task that stands for a project; the only card that earns the Project badge. */
+  isProjectRoot: boolean;
   completedChildCount: number;
   dependencyCount: number;
   hasVisibleChildren: boolean;

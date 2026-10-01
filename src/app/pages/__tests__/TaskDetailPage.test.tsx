@@ -142,10 +142,11 @@ describe('TaskDetailPage project context', () => {
       'href',
       '/projects/project-p0-r',
     );
-    expect(screen.getByText('Workspace editor: project-p0-r')).not.toBeVisible();
+    expect(screen.queryByText('Workspace editor: project-p0-r')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));
+    expect(screen.getByRole('dialog', { name: 'Where this runs' })).toBeInTheDocument();
     expect(screen.getByText('Workspace editor: project-p0-r')).toBeVisible();
-    expect(screen.getByPlaceholderText('Task title')).toBeVisible();
+    expect(screen.getByPlaceholderText('Task title')).toBeInTheDocument();
     expect(mocks.persist).not.toHaveBeenCalled();
   });
 
@@ -155,7 +156,7 @@ describe('TaskDetailPage project context', () => {
     renderPage();
     expect(screen.getByText('Not set up')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
-    expect(screen.getByText('Workspace editor: project-p0-r')).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Where this runs' })).toBeInTheDocument();
   });
 
   it('does not present a failed project lookup as an unset workspace', () => {
@@ -169,11 +170,14 @@ describe('TaskDetailPage project context', () => {
   it('refreshes the visible path and resets the editor when switching tasks', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));
+    expect(screen.getByRole('dialog', { name: 'Where this runs' })).toBeInTheDocument();
+    // The dialog is modal, so the task switch happens after it is closed.
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     mocks.projectPath = '/Users/test/new-folder';
     fireEvent.click(screen.getByRole('link', { name: 'Other task' }));
     expect(screen.getByText('/Users/test/new-folder')).toBeVisible();
     expect(screen.queryByText('/Users/test/papers')).not.toBeInTheDocument();
-    expect(screen.getByText('Workspace editor: project-p0-r')).not.toBeVisible();
+    expect(screen.queryByRole('dialog', { name: 'Where this runs' })).not.toBeInTheDocument();
   });
 
   it('collapses optional settings without hiding the next action or thread', () => {

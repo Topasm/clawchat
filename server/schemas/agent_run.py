@@ -84,6 +84,8 @@ class AgentRunResponse(BaseModel):
     #: The thread this run reports into; every run has one once it is created.
     conversation_id: str | None = None
     task_type: str
+    #: The skills this run applies, in order; None for runs older than the field.
+    skill_chain: list[str] | None = None
     instruction: str
     instruction_snapshot: str
     attempt: int = Field(ge=1)
