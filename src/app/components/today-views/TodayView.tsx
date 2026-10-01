@@ -7,7 +7,6 @@ import SectionHeader from '../shared/SectionHeader';
 import TaskCard from '../shared/TaskCard';
 import EventCard from '../shared/EventCard';
 import EmptyState from '../shared/EmptyState';
-import Badge from '../shared/Badge';
 import {
   SparkleIcon,
   ClipboardIcon,
@@ -29,7 +28,6 @@ interface TodayViewProps {
   todayTasks: TodoResponse[];
   overdueTasks: TodoResponse[];
   todayEvents: EventResponse[];
-  needsDateTasks: TodoResponse[];
   inboxCount: number;
   isLoading: boolean;
   progress: {
@@ -41,7 +39,6 @@ interface TodayViewProps {
   streakCount: number;
   briefingData: BriefingData | null;
   briefingLoading: boolean;
-  needsReviewItems: TodoResponse[];
 }
 export default function TodayView({
   greeting,
@@ -49,14 +46,12 @@ export default function TodayView({
   todayTasks,
   overdueTasks,
   todayEvents,
-  needsDateTasks,
   inboxCount,
   isLoading,
   progress,
   streakCount,
   briefingData,
   briefingLoading,
-  needsReviewItems,
 }: TodayViewProps) {
   const navigate = useNavigate();
   const toggleMutation = useToggleTodoComplete();
@@ -65,18 +60,14 @@ export default function TodayView({
   const toggleTodoComplete = useCallback(
     (id: string) => {
       // Find the task status from the props to determine the toggle direction
-      const task = [...todayTasks, ...overdueTasks, ...needsDateTasks].find((t) => t.id === id);
+      const task = [...todayTasks, ...overdueTasks].find((t) => t.id === id);
       if (task) toggleMutation.mutate({ id, currentStatus: task.status });
     },
-    [todayTasks, overdueTasks, needsDateTasks, toggleMutation],
+    [todayTasks, overdueTasks, toggleMutation],
   );
   const [briefingOpen, setBriefingOpen] = useState(false);
   const totalTasks = todayTasks.length + overdueTasks.length;
-  const hasAnything =
-    totalTasks > 0 ||
-    todayEvents.length > 0 ||
-    needsReviewItems.length > 0 ||
-    needsDateTasks.length > 0;
+  const hasAnything = totalTasks > 0 || todayEvents.length > 0;
   const visibleOverdueTasks = isMobile ? overdueTasks.slice(0, 3) : overdueTasks;
   const visibleTodayTasks = isMobile ? todayTasks.slice(0, 4) : todayTasks;
   return (
@@ -199,75 +190,13 @@ export default function TodayView({
         </SectionHeader>
       )}
 
-      {/* Section 2.5: Tasks with no due date yet — otherwise they never surface anywhere */}
-      {needsDateTasks.length > 0 && (
-        <SectionHeader
-          title={translateUi('Needs a date')}
-          count={needsDateTasks.length}
-          defaultOpen
-        >
-          {needsDateTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onToggle={() => toggleTodoComplete(task.id)}
-              onClick={() => navigate(`/tasks/${task.id}`)}
-            />
-          ))}
-        </SectionHeader>
-      )}
-
-      {/* Section 3: Needs review from Inbox */}
-      {needsReviewItems.length > 0 && (
-        <div className="cc-needs-review">
-          <div className="cc-needs-review__header">
-            <InboxTrayIcon size={16} />
-            <span className="cc-needs-review__title">{translateUi('Needs review')}</span>
-            <span className="cc-section__count">{needsReviewItems.length}</span>
-          </div>
-          <div className="cc-needs-review__list">
-            {needsReviewItems.map((item) => (
-              <div
-                key={item.id}
-                className="cc-needs-review__item"
-                onClick={() => navigate(`/tasks/${item.id}`)}
-              >
-                <div className="cc-needs-review__item-body">
-                  <span className="cc-needs-review__item-title">{item.title}</span>
-                  <Badge variant="status">
-                    {item.inbox_state === 'plan_ready'
-                      ? translateUi('Review plan')
-                      : translateUi('Review suggestion')}
-                  </Badge>
-                </div>
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--ghost cc-needs-review__action"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/tasks/${item.id}`);
-                  }}
-                >
-                  {translateUi('\n                  Review\n                ')}
-                </button>
-              </div>
-            ))}
-          </div>
-          <button type="button" className="cc-link-btn" onClick={() => navigate('/inbox')}>
-            {translateUi('\n            View all in Inbox &rarr;\n          ')}
-          </button>
-        </div>
-      )}
-
-      {/* Inbox banner (when no detailed review items but there are inbox items) */}
-      {needsReviewItems.length === 0 && inboxCount > 0 && !isMobile && (
+      {/* What waits in the Inbox is one line here, not a second copy of its queue;
+          the Inbox page is where it gets reviewed and placed. */}
+      {inboxCount > 0 && !isMobile && (
         <div className="cc-inbox-banner" onClick={() => navigate('/inbox')}>
           <InboxTrayIcon size={16} />
           <span className="cc-inbox-banner__text">
-            {inboxCount}
-            {translateUi(' item')}
-            {inboxCount !== 1 ? 's' : ''}
-            {translateUi(' in your inbox\n          ')}
+            {translateUi('{{count}} items in your inbox', { count: inboxCount })}
           </span>
         </div>
       )}
