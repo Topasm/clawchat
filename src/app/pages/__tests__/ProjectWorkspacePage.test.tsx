@@ -117,10 +117,15 @@ describe('ProjectWorkspacePage', () => {
     project.description = null;
   });
 
-  it('opens Project Agent in the shared panel and keeps the root out of the plan', async () => {
+  it('opens Project Agent only when asked and keeps the root out of the plan', async () => {
     renderPage();
 
     expect(screen.getByText('Project plan content')).toBeInTheDocument();
+    expect(mocks.planTodos.map((todo) => todo.id)).toEqual(['todo-task']);
+    await waitFor(() => expect(mocks.get).not.toHaveBeenCalled());
+    expect(mocks.openPanel).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Project Agent' }));
     await waitFor(() =>
       expect(mocks.openPanel).toHaveBeenCalledWith('conv-project', {
         projectId: project.id,
@@ -130,7 +135,6 @@ describe('ProjectWorkspacePage', () => {
       }),
     );
     expect(mocks.openPanel).toHaveBeenCalledTimes(1);
-    expect(mocks.planTodos.map((todo) => todo.id)).toEqual(['todo-task']);
   });
 
   it('restores the remembered run instead of creating a project conversation', async () => {
@@ -187,7 +191,7 @@ describe('ProjectWorkspacePage', () => {
     });
   });
 
-  it('falls back to Project Agent when the remembered conversation belongs elsewhere', async () => {
+  it('forgets a remembered conversation that belongs elsewhere instead of opening it', async () => {
     useChatStore.getState().rememberProjectConversation(project.id, 'foreign-thread', 'run');
     mocks.get.mockResolvedValue({
       data: {
@@ -198,13 +202,14 @@ describe('ProjectWorkspacePage', () => {
       },
     });
     renderPage();
+    await waitFor(() => expect(mocks.get).toHaveBeenCalled());
     await waitFor(() =>
-      expect(mocks.openPanel).toHaveBeenCalledWith(
-        'conv-project',
-        expect.objectContaining({ kind: 'project' }),
+      expect(Object.values(useChatStore.getState().activeConversationByProject)).not.toContainEqual(
+        { conversationId: 'foreign-thread', kind: 'run' },
       ),
     );
-    expect(mocks.openPanel).not.toHaveBeenCalledWith('foreign-thread', expect.anything());
+    expect(mocks.openPanel).not.toHaveBeenCalled();
+    expect(mocks.getConversation).not.toHaveBeenCalled();
   });
 
   it('uses only Plan, Activity and Files as workspace sections', () => {
@@ -212,6 +217,7 @@ describe('ProjectWorkspacePage', () => {
 
     expect(screen.queryByRole('button', { name: 'Overview' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Runs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Activity' }));
     expect(screen.getByText('Project activity content')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Files' }));
@@ -231,16 +237,13 @@ describe('ProjectWorkspacePage', () => {
     expect(screen.getByRole('button', { name: 'Open original document' })).toBeInTheDocument();
   });
 
-  it('opens the one workspace editor beside the header', () => {
-    const { container } = renderPage();
-    const details = container.querySelector<HTMLDetailsElement>(
-      'details.cc-project-settings-disclosure',
-    );
-    expect(details?.open).toBe(false);
+  it('opens the one workspace editor as a dialog from the machine line', () => {
+    renderPage();
+    expect(screen.queryByText('Workspace settings')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
 
-    expect(details?.open).toBe(true);
+    expect(screen.getByRole('dialog', { name: 'Execution settings' })).toBeInTheDocument();
     expect(screen.getAllByText('Workspace settings')).toHaveLength(1);
   });
 
@@ -253,12 +256,13 @@ describe('ProjectWorkspacePage', () => {
     expect(content).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Choose machine' }));
     expect(screen.getByText('Workspace settings')).toBeVisible();
-    expect(content).toBeVisible();
+    expect(content).toBeInTheDocument();
     expect(screen.queryByText('Project plan content')).not.toBeInTheDocument();
   });
 
   it('saves project-wide agent execution rules', () => {
     renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Execution settings' }));
 
     fireEvent.change(screen.getByLabelText('Agent execution rules'), {
       target: { value: 'Never use --force.' },

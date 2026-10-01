@@ -6,11 +6,13 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import { CheckCircleIcon, MagnifyingGlassIcon, PinIcon, ThemeIcon } from './Icons';
 import { ChatIcon, GearIcon, InboxIcon, NavCalendarIcon, TasksIcon } from './NavIcons';
 import { translateUi } from '../../i18n';
+import useThemedPortalContainer from '../../hooks/useThemedPortalContainer';
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 export default function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+  const container = useThemedPortalContainer();
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
   const setTheme = useSettingsStore((s) => s.setTheme);
@@ -25,7 +27,7 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
   };
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
-      <RadixDialog.Portal>
+      <RadixDialog.Portal container={container}>
         <RadixDialog.Overlay className="cc-dialog__overlay" />
         <RadixDialog.Content className="cc-cmd-palette" aria-label={translateUi('Command palette')}>
           <Command className="cc-cmd-palette__inner" label={translateUi('Command palette')}>

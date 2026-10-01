@@ -9,10 +9,16 @@ import {
   useTodosQuery,
   useUpdateProject,
 } from '../hooks/queries';
-import { ChatBubbleIcon, ChevronLeftIcon, EditIcon, TrashIcon } from '../components/shared/Icons';
+import {
+  ChatBubbleIcon,
+  ChevronLeftIcon,
+  EditIcon,
+  SettingsIcon,
+  TrashIcon,
+} from '../components/shared/Icons';
+import Dialog from '../components/shared/Dialog';
 import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
-import InboxNotesPanel from '../components/inbox/InboxNotesPanel';
 import ProjectActivity from '../components/projects/ProjectActivity';
 import ProjectPlan from '../components/projects/ProjectPlan';
 import type { ProjectOverviewResponse } from '../types/api';
@@ -28,7 +34,7 @@ import { getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import apiClient from '../services/apiClient';
 import { ConversationResponseSchema } from '../types/schemas';
 
-type ProjectSection = 'plan' | 'activity' | 'files' | 'notes';
+type ProjectSection = 'plan' | 'activity' | 'files';
 
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams<{
@@ -38,13 +44,14 @@ export default function ProjectWorkspacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = searchParams.get('section');
   const section: ProjectSection =
-    requestedSection === 'notes'
-      ? 'notes'
-      : requestedSection === 'activity'
-        ? 'activity'
-        : requestedSection === 'files' || requestedSection === 'artifacts'
-          ? 'files'
-          : 'plan';
+    requestedSection === 'activity'
+      ? 'activity'
+      : requestedSection === 'files' || requestedSection === 'artifacts'
+        ? 'files'
+        : 'plan';
+  // Hosts, provider and rules live in a dialog: they are set once per project
+  // and were pushing the plan below the fold while open.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { data: project, isLoading, isError } = useProjectQuery(projectId);
   const { data: todos = [], isLoading: areTodosLoading } = useTodosQuery();
   const { mutateAsync: getOrCreateConversation, isPending: isOpeningConversation } =
@@ -121,6 +128,8 @@ export default function ProjectWorkspacePage() {
     },
     [addToast, getOrCreateConversation, openChatPanel, project, beginSelection],
   );
+  // Restore the thread the user last had open for this project. A project with
+  // no remembered thread opens with the plan alone; the agent is a click away.
   useEffect(() => {
     if (!project || areTodosLoading || autoOpenedProjectId.current === project.id) return;
     autoOpenedProjectId.current = project.id;
@@ -130,10 +139,7 @@ export default function ProjectWorkspacePage() {
       useChatStore.getState().activeConversationByProject[
         JSON.stringify([getChatWorkspaceScope(), project.id])
       ];
-    if (!savedId) {
-      if (!isMobile) void openProjectAgent();
-      return;
-    }
+    if (!savedId) return;
     const isCurrentSelection = beginSelection?.() ?? (() => true);
     void (async () => {
       try {
@@ -172,12 +178,10 @@ export default function ProjectWorkspacePage() {
           return;
         }
       }
-      if (lifecycleGeneration.current === generation && !isMobile) void openProjectAgent();
     })();
   }, [
     isMobile,
     areTodosLoading,
-    openProjectAgent,
     openChatPanel,
     project,
     projectTasks,
@@ -208,13 +212,7 @@ export default function ProjectWorkspacePage() {
       />
     );
   }
-  // Execution settings are shared by all tabs, immediately below the header.
-  const revealWhereItRuns = () => {
-    const details = document.getElementById(EXECUTION_SETTINGS_ID);
-    if (!(details instanceof HTMLDetailsElement)) return;
-    details.open = true;
-    details.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-  };
+  const revealWhereItRuns = () => setSettingsOpen(true);
   return (
     <div className="cc-project-workspace">
       <header className="cc-project-workspace__header">
@@ -238,6 +236,15 @@ export default function ProjectWorkspacePage() {
         >
           <ChatBubbleIcon size={15} />
           {translateUi(' Project Agent')}
+        </button>
+        <button
+          type="button"
+          className="cc-icon-button"
+          aria-label={translateUi('Execution settings')}
+          title={translateUi('Execution settings')}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <SettingsIcon size={16} />
         </button>
         {/* Destructive and rare: an icon beside the primary action, not a
             second button competing with it. It still asks first. */}
@@ -263,15 +270,15 @@ export default function ProjectWorkspacePage() {
         </button>
       </header>
 
-      <details
-        key={project.id}
-        className="cc-project-settings-disclosure"
-        id={EXECUTION_SETTINGS_ID}
+      <Dialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        title={translateUi('Execution settings')}
+        className="cc-dialog__content--wide cc-project-settings-dialog"
       >
-        <summary>{translateUi('Execution settings')}</summary>
         <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
         <ProjectExecutionSettings project={project} />
-      </details>
+      </Dialog>
 
       <div
         className="cc-project-workspace__tabs"
@@ -301,19 +308,10 @@ export default function ProjectWorkspacePage() {
         >
           {translateUi('Files')}
         </button>
-        <button
-          type="button"
-          className={`cc-project-workspace__tab${section === 'notes' ? ' cc-project-workspace__tab--active' : ''}`}
-          onClick={() => setSearchParams({ section: 'notes' })}
-        >
-          {translateUi('Notes')}
-        </button>
       </div>
 
       {section === 'files' ? (
         <ProjectArtifacts projectId={project.id} />
-      ) : section === 'notes' ? (
-        <InboxNotesPanel projectId={project.id} projects={[project]} />
       ) : section === 'activity' ? (
         <ProjectActivity project={project} todos={projectTasks} />
       ) : (
@@ -434,8 +432,6 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
     </div>
   );
 }
-
-const EXECUTION_SETTINGS_ID = 'cc-project-execution-settings';
 
 function ProjectExecutionSettings({ project }: { project: ProjectOverviewResponse }) {
   const { data: providers = [], isLoading } = useExecutionProvidersQuery();

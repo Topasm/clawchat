@@ -29,6 +29,12 @@
   outline: none;
 }
 
+/* Forms with a textarea and a few selects need more than the confirm width. */
+.cc-dialog__content--wide {
+  width: min(680px, calc(100vw - 32px));
+  max-width: 680px;
+}
+
 .cc-dialog__header {
   display: flex;
   align-items: center;
@@ -54,7 +60,9 @@
   align-items: center;
   justify-content: center;
   color: var(--cc-text-tertiary, #999);
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .cc-dialog__close:hover {
@@ -78,8 +86,12 @@
 
 /* Animations */
 @keyframes cc-dialog-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes cc-dialog-zoom-in {
