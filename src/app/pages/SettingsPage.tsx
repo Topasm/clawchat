@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import SettingsShell from '../components/settings/SettingsShell';
+import SystemPromptSection from '../components/settings/SystemPromptSection';
 import AIModelSettings from '../components/settings/AIModelSettings';
 import AgentToolsSettings from '../components/settings/AgentToolsSettings';
 import CalendarSyncSettings from '../components/settings/CalendarSyncSettings';
@@ -19,7 +19,6 @@ import usePlatform from '../hooks/usePlatform';
 import { useTranslation, translateUi } from '../i18n';
 import { platformApi } from '../platform';
 import apiClient from '../services/apiClient';
-import { settingsNavigationState } from '../services/settingsNavigation';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useToastStore } from '../stores/useToastStore';
@@ -115,9 +114,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDesktop } = usePlatform();
-  const token = useAuthStore((state) => state.token);
   const serverUrl = useAuthStore((state) => state.serverUrl);
-  const logout = useAuthStore((state) => state.logout);
   const addToast = useToastStore((state) => state.addToast);
   const isHost = useWorkspaceStore((state) => state.activeWorkspaceId === LOCAL_WORKSPACE_ID);
   const workerEnabled = useSettingsStore((state) => state.workerEnabled);
@@ -312,23 +309,7 @@ export default function SettingsPage() {
     >
       <div className="cc-settings-page">
         <SettingsSection title={t('workspaceSettings.sections.ai')}>
-          <SettingsRow label={t('workspaceSettings.ai.systemPrompt')}>
-            <button
-              type="button"
-              className="cc-btn cc-btn--secondary cc-btn--compact"
-              onClick={() =>
-                navigate('/settings/system-prompt', {
-                  state: settingsNavigationState(
-                    location.pathname,
-                    location.search,
-                    location.state,
-                  ),
-                })
-              }
-            >
-              {t('workspaceSettings.actions.edit')}
-            </button>
-          </SettingsRow>
+          <SystemPromptSection />
           {aiProviderLoadFailed && (
             <div className="cc-settings-inline-notice" role="alert">
               <span>{t('settingsShell.providerLoadError')}</span>
@@ -691,40 +672,6 @@ export default function SettingsPage() {
                 {t('workspaceSettings.actions.open')}
               </button>
             </SettingsRow>
-          </SettingsSection>
-        )}
-
-        {!isDesktop && (
-          <SettingsSection title={t('workspaceSettings.sections.serverConnection')}>
-            <SettingsRow
-              label={t('workspaceSettings.serverConnection.server')}
-              sublabel={serverUrl ?? t('workspaceSettings.serverConnection.unknown')}
-            >
-              <span className="cc-settings-status cc-settings-status--success">
-                {t('connection.connected')}
-              </span>
-            </SettingsRow>
-            <SettingsRow
-              label={t('workspaceSettings.serverConnection.logout')}
-              sublabel={t('workspaceSettings.serverConnection.logoutHint')}
-            >
-              <button
-                type="button"
-                className="cc-btn cc-btn--danger"
-                onClick={() => {
-                  void logout();
-                  navigate('/login');
-                }}
-              >
-                {t('workspaceSettings.actions.logout')}
-              </button>
-            </SettingsRow>
-          </SettingsSection>
-        )}
-
-        {isDesktop && isHost && token && (
-          <SettingsSection title={t('workspaceSettings.sections.connectMobile')}>
-            <PairingCodeDisplay />
           </SettingsSection>
         )}
       </div>

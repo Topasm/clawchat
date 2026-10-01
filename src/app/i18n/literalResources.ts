@@ -360,6 +360,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Durable project context with reviewed version history.':
     '버전 기록을 검토한 내구성 있는 프로젝트 컨텍스트입니다.',
   Edit: '편집',
+  Hide: '숨기기',
   'Edit message': '메시지 편집',
   'Edit message...': '메시지 편집...',
   Enabled: '활성화',
@@ -810,6 +811,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Suggested Times': '권장 시간',
   'Suggesting…': '제안 중…',
   Syncing: '동기화 중',
+  'System prompt': '시스템 프롬프트',
   'System Prompt': '시스템 프롬프트',
   Tags: '태그',
   task: '작업',

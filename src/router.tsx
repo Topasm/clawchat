@@ -27,7 +27,6 @@ const AllTasksPage = lazy(() => import('./app/pages/AllTasksPage'));
 const TaskDetailPage = lazy(() => import('./app/pages/TaskDetailPage'));
 const EventDetailPage = lazy(() => import('./app/pages/EventDetailPage'));
 const SettingsPage = lazy(() => import('./app/pages/SettingsPage'));
-const SystemPromptPage = lazy(() => import('./app/pages/SystemPromptPage'));
 const SearchPage = lazy(() => import('./app/pages/SearchPage'));
 const ServerSettingsPage = lazy(() => import('./app/pages/ServerSettingsPage'));
 const ConnectionCenterPage = lazy(() => import('./app/pages/ConnectionCenterPage'));
@@ -118,15 +117,7 @@ export default function AppRouter() {
         />
         <Route
           path="/settings/system-prompt"
-          element={
-            workspaceReady ? (
-              <LazyRoute>
-                <SystemPromptPage />
-              </LazyRoute>
-            ) : (
-              <Navigate to="/settings/app" replace state={location.state} />
-            )
-          }
+          element={<Navigate to="/settings/workspace" replace state={location.state} />}
         />
         <Route
           path="/connections"
