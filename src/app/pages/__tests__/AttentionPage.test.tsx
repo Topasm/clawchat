@@ -35,6 +35,10 @@ vi.mock('../../hooks/queries', () => ({
   }),
 }));
 
+vi.mock('../../components/runs/CliSessionsPanel', () => ({
+  default: () => <section aria-label="CLI sessions" />,
+}));
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useNavigate: () => routerMocks.navigate };
@@ -203,11 +207,18 @@ describe('AttentionPage', () => {
     });
   });
 
-  it('keeps the log and the history one click away', () => {
+  it('keeps the log and the history as views of the same page', () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'All runs' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Review history' }));
-    expect(routerMocks.navigate).toHaveBeenNthCalledWith(1, '/runs');
-    expect(routerMocks.navigate).toHaveBeenNthCalledWith(2, '/review?status=approved');
+    fireEvent.click(screen.getByRole('tab', { name: 'All runs' }));
+    expect(screen.getByRole('region', { name: 'CLI sessions' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Run filters')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Review history' }));
+    expect(screen.getByLabelText('Review status filters')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Approved' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Needs you/ }));
+    expect(screen.getByText('Nothing needs you right now.')).toBeInTheDocument();
+    expect(routerMocks.navigate).not.toHaveBeenCalled();
   });
 });

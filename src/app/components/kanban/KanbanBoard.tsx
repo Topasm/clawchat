@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import type { TodoResponse } from '../../types/api';
 import { useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useModuleStore } from '../../stores/useModuleStore';
@@ -73,9 +74,17 @@ export default function KanbanBoard({
     [statusFilter, taskTodos],
   );
   const filteredTodos = useKanbanFilters(scopedTodos, kanbanFilters);
+  // A placed task's parent is its project's root, which the board never shows,
+  // so such a task is top-level here. Treating it as a sub-task hid every
+  // project task behind the Sub-tasks toggle and left the board empty.
+  const boardIds = useMemo(() => new Set(taskTodos.map((todo) => todo.id)), [taskTodos]);
+  const isTopLevel = useCallback(
+    (todo: TodoResponse) => !todo.parent_id || !boardIds.has(todo.parent_id),
+    [boardIds],
+  );
   const visibleTodos = kanbanFilters.showSubTasks
     ? filteredTodos
-    : filteredTodos.filter((t) => !t.parent_id);
+    : filteredTodos.filter(isTopLevel);
   const activeTasks = useMemo(
     () => visibleTodos.filter((t) => t.status === 'pending' || t.status === 'in_progress'),
     [visibleTodos],
@@ -128,7 +137,7 @@ export default function KanbanBoard({
       const columnTodos = taskTodos
         .filter(
           (t) =>
-            !t.parent_id &&
+            isTopLevel(t) &&
             (columnStatus === 'active'
               ? t.status === 'pending' || t.status === 'in_progress'
               : t.status === columnStatus),
@@ -144,7 +153,7 @@ export default function KanbanBoard({
       });
       reorderMutation.mutate({ updates });
     },
-    [taskTodos, reorderMutation],
+    [isTopLevel, taskTodos, reorderMutation],
   );
   const handleSetParent = useCallback(
     (childId: string, parentId: string) => {

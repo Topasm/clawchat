@@ -114,7 +114,7 @@ export default function ProjectActivity({
                   const runId = review.metadata?.run_id;
                   if (review.subject_type === 'agent_run' && typeof runId === 'string') {
                     void openRunThread(runId, review.subject_title ?? undefined);
-                  } else navigate(`/review?project_id=${project.id}`);
+                  } else navigate(`/attention?view=history&project_id=${project.id}`);
                 }}
               >
                 <span>

@@ -61,7 +61,7 @@ export default function InboxExecutionTelemetryPanel({
           <button
             type="button"
             className="cc-btn cc-btn--ghost"
-            onClick={() => onNavigate(`/runs?run_id=${telemetry.latest_run_id}`)}
+            onClick={() => onNavigate(`/attention?view=runs&run_id=${telemetry.latest_run_id}`)}
           >
             {translateUi('\n            Open run\n          ')}
           </button>
@@ -70,7 +70,9 @@ export default function InboxExecutionTelemetryPanel({
           <button
             type="button"
             className="cc-btn cc-btn--ghost"
-            onClick={() => onNavigate(`/review${projectId ? `?project_id=${projectId}` : ''}`)}
+            onClick={() =>
+              onNavigate(`/attention?view=history${projectId ? `&project_id=${projectId}` : ''}`)
+            }
           >
             {translateUi('\n            Review\n          ')}
           </button>

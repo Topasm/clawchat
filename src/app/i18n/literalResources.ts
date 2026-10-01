@@ -1230,6 +1230,8 @@ export const koreanUiTranslations: Record<string, string> = {
     '에이전트의 질문, 검토할 결과, 결정이 필요한 실행을 한곳에서 봅니다.',
   'All runs': '모든 실행',
   'Review history': '검토 기록',
+  'Needs you': '확인 필요',
+  'Attention views': '확인 필요 보기',
   'Loading…': '불러오는 중…',
   'Nothing needs you right now.': '지금 확인할 것이 없습니다.',
   'Nothing needs you right now. {{count}} runs in progress.':

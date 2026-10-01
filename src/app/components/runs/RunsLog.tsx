@@ -1,17 +1,13 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import RunCard, { isUnsuccessfulRun } from '../components/runs/RunCard';
-import CliSessionsPanel from '../components/runs/CliSessionsPanel';
-import EmptyState from '../components/shared/EmptyState';
-import { SpinArrowsIcon } from '../components/shared/Icons';
-import { useAgentRunsQuery } from '../hooks/queries';
-import type { AgentRunResponse } from '../types/api';
-import { translateUi } from '../i18n';
+import RunCard, { isUnsuccessfulRun } from './RunCard';
+import CliSessionsPanel from './CliSessionsPanel';
+import EmptyState from '../shared/EmptyState';
+import { SpinArrowsIcon } from '../shared/Icons';
+import { useAgentRunsQuery } from '../../hooks/queries';
+import type { AgentRunResponse } from '../../types/api';
+import { translateUi } from '../../i18n';
 type RunFilter = 'all' | 'active' | 'review' | 'failed';
-const FILTERS: Array<{
-  value: RunFilter;
-  label: string;
-}> = [
+const FILTERS: Array<{ value: RunFilter; label: string }> = [
   { value: 'all', label: 'All runs' },
   { value: 'active', label: 'Active' },
   { value: 'review', label: 'Waiting review' },
@@ -24,42 +20,20 @@ function matchesFilter(run: AgentRunResponse, filter: RunFilter) {
   if (filter === 'review') return run.status === 'waiting_review';
   return isUnsuccessfulRun(run);
 }
-/** The full execution log. What needs the user now lives on the Attention page. */
-export default function RunsPage() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const projectId = searchParams.get('project_id');
-  const selectedRunId = searchParams.get('run_id');
+interface RunsLogProps {
+  projectId: string | null;
+  /** The run to open on arrival, from a `run_id` deep link. */
+  selectedRunId: string | null;
+  onReview: (run: AgentRunResponse) => void;
+}
+/** The full execution log: CLI sessions plus every run attempt, filterable. */
+export default function RunsLog({ projectId, selectedRunId, onReview }: RunsLogProps) {
   const { data: runs = [], isLoading } = useAgentRunsQuery(projectId);
   const [filter, setFilter] = useState<RunFilter>('all');
   const [expandedRun, setExpandedRun] = useState<string | null>(selectedRunId);
   const filtered = useMemo(() => runs.filter((run) => matchesFilter(run, filter)), [filter, runs]);
   return (
-    <div className="cc-runs-page">
-      <header className="cc-page-header cc-runs-page__header">
-        <div>
-          <h1 className="cc-page-header__title">{translateUi('Runs')}</h1>
-          <p className="cc-page-header__subtitle">
-            {translateUi(
-              'Inspect every execution attempt, provider, heartbeat, result, and failure.',
-            )}
-          </p>
-        </div>
-        <div className="cc-page-header__actions">
-          <button type="button" className="cc-btn" onClick={() => navigate('/attention')}>
-            {translateUi('Attention')}
-          </button>
-          {projectId && (
-            <button
-              type="button"
-              className="cc-btn"
-              onClick={() => navigate(`/projects/${projectId}`)}
-            >
-              {translateUi('\n            Back to project\n          ')}
-            </button>
-          )}
-        </div>
-      </header>
+    <>
       <CliSessionsPanel />
       <div className="cc-review-filters" aria-label={translateUi('Run filters')}>
         {FILTERS.map((option) => (
@@ -88,13 +62,11 @@ export default function RunsPage() {
               run={run}
               expanded={expandedRun === run.id}
               onToggle={() => setExpandedRun((current) => (current === run.id ? null : run.id))}
-              onReview={() =>
-                navigate(`/attention${run.project_id ? `?project_id=${run.project_id}` : ''}`)
-              }
+              onReview={() => onReview(run)}
             />
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

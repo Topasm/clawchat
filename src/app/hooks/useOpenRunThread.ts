@@ -25,7 +25,7 @@ export default function useOpenRunThread() {
     if (!mounted.current || location.key !== locationKey.current) return;
     const request = ++generation.current;
     if (!panel) {
-      navigate(`/runs?run_id=${runId}`);
+      navigate(`/attention?view=runs&run_id=${runId}`);
       return;
     }
     const isCurrentSelection = panel.beginSelection?.() ?? (() => true);
@@ -45,6 +45,7 @@ export default function useOpenRunThread() {
     } catch {
       // Keep the successfully started run accessible when thread lookup fails.
     }
-    if (request === generation.current && isCurrentSelection()) navigate(`/runs?run_id=${runId}`);
+    if (request === generation.current && isCurrentSelection())
+      navigate(`/attention?view=runs&run_id=${runId}`);
   };
 }

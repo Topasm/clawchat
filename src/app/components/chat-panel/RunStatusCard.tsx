@@ -161,7 +161,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
             <button
               type="button"
               className="cc-btn cc-btn--ghost"
-              onClick={() => navigate(`/runs?run_id=${runId}`)}
+              onClick={() => navigate(`/attention?view=runs&run_id=${runId}`)}
             >
               {translateUi('Open run')}
             </button>
@@ -226,7 +226,7 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
           <button
             type="button"
             className="cc-btn cc-btn--ghost"
-            onClick={() => navigate(`/runs?run_id=${runId}`)}
+            onClick={() => navigate(`/attention?view=runs&run_id=${runId}`)}
           >
             {translateUi('Open run')}
           </button>

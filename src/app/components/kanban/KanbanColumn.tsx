@@ -65,8 +65,11 @@ export default function KanbanColumn({
     });
   };
 
-  // Build render list: parent tasks, optionally with children inline
-  const rootTasks = tasks.filter((t) => !t.parent_id);
+  // Build render list: parent tasks, optionally with children inline. A task
+  // whose parent is not on the board (a project's root task never is) is a
+  // parent here, not a sub-task.
+  const boardIds = new Set(allTodos.map((t) => t.id));
+  const rootTasks = tasks.filter((t) => !t.parent_id || !boardIds.has(t.parent_id));
   const getChildren = (parentId: string) => allTodos.filter((t) => t.parent_id === parentId);
   const getSubTaskCount = (parentId: string) =>
     allTodos.filter((t) => t.parent_id === parentId).length;

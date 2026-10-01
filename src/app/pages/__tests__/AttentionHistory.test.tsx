@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ReviewDecisionResult } from '../../hooks/queries';
 import type { ReviewItemResponse } from '../../types/api';
-import ReviewPage from '../ReviewPage';
+import AttentionPage from '../AttentionPage';
 
 const queryMocks = vi.hoisted(() => ({
   decide: vi.fn(),
@@ -15,6 +15,8 @@ const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
 
 vi.mock('../../hooks/queries', () => ({
   useReviewsQuery: queryMocks.reviews,
+  useRunsAwaitingInputQuery: () => ({ data: [], isLoading: false }),
+  useAgentRunsQuery: () => ({ data: [], isLoading: false }),
   useDecideReview: () => ({ mutate: queryMocks.decide, isPending: false }),
   useRunReadyTaskWithProjectDefaults: () => ({
     runTask: queryMocks.runNext,
@@ -75,7 +77,7 @@ const decisionResult: ReviewDecisionResult = {
   },
 };
 
-describe('ReviewPage Agent Run handoff', () => {
+describe('Attention review history Agent Run handoff', () => {
   beforeEach(() => {
     queryMocks.decide.mockReset();
     queryMocks.reviews.mockReset();
@@ -91,8 +93,8 @@ describe('ReviewPage Agent Run handoff', () => {
 
   it('shows approval impact, then keeps the applied handoff available after approval', () => {
     render(
-      <MemoryRouter initialEntries={['/review']}>
-        <ReviewPage />
+      <MemoryRouter initialEntries={['/attention?view=history&status=pending']}>
+        <AttentionPage />
       </MemoryRouter>,
     );
 
@@ -128,8 +130,8 @@ describe('ReviewPage Agent Run handoff', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/review?status=changes_requested']}>
-        <ReviewPage />
+      <MemoryRouter initialEntries={['/attention?view=history&status=changes_requested']}>
+        <AttentionPage />
       </MemoryRouter>,
     );
 

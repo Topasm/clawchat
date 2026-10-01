@@ -99,7 +99,7 @@ export default function TaskProgressCard({ taskId, runId, isMultiAgent }: TaskPr
             <button
               type="button"
               className="cc-btn cc-btn--primary"
-              onClick={() => navigate(`/runs?run_id=${activeRunId}`)}
+              onClick={() => navigate(`/attention?view=runs&run_id=${activeRunId}`)}
             >
               {translateUi('Reply to agent')}
             </button>
@@ -108,7 +108,7 @@ export default function TaskProgressCard({ taskId, runId, isMultiAgent }: TaskPr
             <button
               type="button"
               className="cc-btn cc-btn--ghost"
-              onClick={() => navigate(`/runs?run_id=${activeRunId}`)}
+              onClick={() => navigate(`/attention?view=runs&run_id=${activeRunId}`)}
             >
               {translateUi('Open run')}
             </button>
