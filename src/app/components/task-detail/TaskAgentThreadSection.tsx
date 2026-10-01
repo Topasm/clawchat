@@ -9,7 +9,8 @@ import { translateUi } from '../../i18n';
  *
  * The task page used to know nothing about runs: the only path from a task to
  * its execution went through the Inbox inspector. This is the short version --
- * the latest attempt's state and two links -- not another run monitor.
+ * the latest attempt's state and two links -- not another run monitor. A task
+ * that has never run gets no section: "no runs yet" is not news.
  */
 export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
   const navigate = useNavigate();
@@ -21,41 +22,38 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
         .sort((a, b) => b.created_at.localeCompare(a.created_at))[0],
     [runs, taskId],
   );
+  if (!latest) return null;
   return (
     <div className="cc-exec-panel__section" data-testid="task-agent-thread">
       <div className="cc-exec-panel__section-title">{translateUi('Agent thread')}</div>
-      {!latest ? (
-        <div className="cc-exec-panel__next-step-empty">{translateUi('No agent runs yet.')}</div>
-      ) : (
-        <div className="cc-exec-panel__info-grid">
-          <div className="cc-exec-panel__info-item">
-            <span className="cc-exec-panel__info-label">{translateUi('Latest run')}</span>
-            <span className={`cc-run-status cc-run-status--${latest.status}`}>
-              {runStatusLabel(latest.status)}
-            </span>
-          </div>
-          <div className="cc-exec-panel__info-item">
-            <span className="cc-task-progress__actions">
-              {latest.conversation_id && (
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--secondary"
-                  onClick={() => navigate(`/chats/${latest.conversation_id}`)}
-                >
-                  {translateUi('Open thread')}
-                </button>
-              )}
+      <div className="cc-exec-panel__info-grid">
+        <div className="cc-exec-panel__info-item">
+          <span className="cc-exec-panel__info-label">{translateUi('Latest run')}</span>
+          <span className={`cc-run-status cc-run-status--${latest.status}`}>
+            {runStatusLabel(latest.status)}
+          </span>
+        </div>
+        <div className="cc-exec-panel__info-item">
+          <span className="cc-task-progress__actions">
+            {latest.conversation_id && (
               <button
                 type="button"
-                className="cc-btn cc-btn--ghost"
-                onClick={() => navigate(`/attention?view=runs&run_id=${latest.id}`)}
+                className="cc-btn cc-btn--secondary"
+                onClick={() => navigate(`/chats/${latest.conversation_id}`)}
               >
-                {translateUi('Open run')}
+                {translateUi('Open thread')}
               </button>
-            </span>
-          </div>
+            )}
+            <button
+              type="button"
+              className="cc-btn cc-btn--ghost"
+              onClick={() => navigate(`/attention?view=runs&run_id=${latest.id}`)}
+            >
+              {translateUi('Open run')}
+            </button>
+          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 }

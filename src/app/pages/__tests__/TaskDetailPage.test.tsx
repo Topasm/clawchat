@@ -182,7 +182,7 @@ describe('TaskDetailPage project context', () => {
     expect(screen.getByRole('button', { name: 'Discuss with agent' })).toBeVisible();
     expect(screen.queryByText('Repeat')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Research' })).not.toBeVisible();
-    fireEvent.click(screen.getByText('Skills:'));
+    fireEvent.click(screen.getByText('Skills'));
     fireEvent.click(screen.getByRole('button', { name: 'Research' }));
     expect(mocks.persist).toHaveBeenCalledWith({
       enabled_skills: ['research'],

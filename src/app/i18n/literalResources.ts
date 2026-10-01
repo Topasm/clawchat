@@ -774,7 +774,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'Sign out and remove remote workspace profiles. Tasks stored on this device are not deleted.':
     '로그아웃하고 원격 작업 영역 프로필을 제거합니다. 이 기기에 저장된 작업은 삭제되지 않습니다.',
   Skill: '스킬',
-  'Skills:': '스킬:',
+  Skills: '스킬',
+  'Skills: {{skills}}': '스킬: {{skills}}',
   Skip: '건너뛰기',
   'Skip for now': '지금은 건너뛰세요',
   'Skipping questions, planning...': '질문을 건너뛰고 계획 중...',
@@ -815,7 +816,6 @@ export const koreanUiTranslations: Record<string, string> = {
   Tags: '태그',
   task: '작업',
   Task: '작업',
-  'Task cancelled': '작업 취소',
   'Task completed': '작업 완료',
   'Task execution activity': '작업 실행 활동',
   'Task graph': '작업 그래프',
@@ -854,7 +854,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'This page remains available even when no workspace server can be reached.':
     '이 페이지는 Workspace 서버에 연결할 수 없는 경우에도 계속 사용할 수 있습니다.',
   'This project could not be loaded.': '이 프로젝트를 로드할 수 없습니다.',
-  'This task is your next step': '이 작업이 다음 단계입니다',
   'This usually takes a few seconds': '이 작업은 일반적으로 몇 초 정도 걸립니다.',
   'This will rebuild all full-text search indexes. Existing search data will be temporarily unavailable.':
     '그러면 모든 전체 텍스트 검색 색인이 다시 작성됩니다. 기존 검색 데이터를 일시적으로 사용할 수 없습니다.',
@@ -1214,7 +1213,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'Open thread': '스레드 열기',
   'Agent thread': '에이전트 스레드',
   'Latest run': '최근 실행',
-  'No agent runs yet.': '아직 에이전트 실행이 없습니다.',
   'Answer the agent': '에이전트에게 답하기',
   'Send answer': '답변 보내기',
   'Already answered': '답변 완료',
