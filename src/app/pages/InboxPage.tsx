@@ -120,17 +120,6 @@ export default function InboxPage() {
   const selectedProject = selectedTask?.project_id
     ? projects.find((project) => project.id === selectedTask.project_id)
     : undefined;
-  const dependencyCandidates = useMemo(() => {
-    if (!selectedTask) return [];
-    const projectRoots = new Set(projects.flatMap((project) => project.root_task_id ?? []));
-    return todos
-      .filter((todo) => todo.id !== selectedTask.id && !projectRoots.has(todo.id))
-      .sort((left, right) => {
-        const leftSameProject = left.project_id === selectedTask.project_id ? 0 : 1;
-        const rightSameProject = right.project_id === selectedTask.project_id ? 0 : 1;
-        return leftSameProject - rightSameProject || left.title.localeCompare(right.title);
-      });
-  }, [projects, selectedTask, todos]);
   const treeProps = {
     projects,
     todos,
@@ -271,8 +260,6 @@ export default function InboxPage() {
               providers={executionProviders}
               isStartingExecution={startReadyExecution.isPending}
               dependency={dependency}
-              dependencyCandidates={dependencyCandidates}
-              graphRevisionReady={placementRevision != null}
               isPlacing={placement.isPlacing}
               mobileTree={
                 isMobile ? <InboxTriageTree {...treeProps} disabled={treeBusy} /> : undefined

@@ -225,7 +225,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'checking...': '확인 중...',
   'checking…': '확인 중…',
   'Checking…': '확인 중…',
-  'Choose a prerequisite…': '전제조건을 선택하세요…',
   "Choose the workspace to view and manage this device's local server separately.":
     '이 장치의 로컬 서버를 별도로 보고 관리하려면 작업 공간을 선택하세요.',
   'Choose where delegated tasks run. Plan generation continues to use ClawChat.':
@@ -331,8 +330,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'Depends on': '선행 작업',
   'Describe the outcome that defines success': '성공을 정의하는 결과를 설명하세요.',
   Description: '설명',
-  'Desktop: drag ↝ from the dependent task onto its prerequisite.':
-    '데스크탑: ↝을 종속 작업에서 필수 작업으로 드래그합니다.',
   Details: '세부정보',
   Diagnostics: '진단',
   'Diagnostics & Recovery': '진단 및 복구',
@@ -512,7 +509,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'Move to project tree': '프로젝트 트리로 이동',
   'Move to tomorrow': '내일로 이동',
   'Multi-Agent Task': '멀티 에이전트 작업',
-  'Must wait for': '대기 대상',
   Name: '이름',
   'Needs a date': '날짜 미정',
   'Needs organizing': '정리가 필요함',

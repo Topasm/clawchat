@@ -28,8 +28,6 @@ interface InboxInspectorProps {
   providers: ExecutionProviderStatus[];
   isStartingExecution: boolean;
   dependency: InboxDependencyPreview;
-  dependencyCandidates: TodoResponse[];
-  graphRevisionReady: boolean;
   isPlacing: boolean;
   /** Rendered inside the mobile disclosure; omitted on desktop, where the tree is a column. */
   mobileTree?: ReactNode;
@@ -59,8 +57,6 @@ export default function InboxInspector({
   providers,
   isStartingExecution,
   dependency,
-  dependencyCandidates,
-  graphRevisionReady,
   isPlacing,
   mobileTree,
   onStartExecution,
@@ -142,30 +138,6 @@ export default function InboxInspector({
               onOpenRun={(runId) => onNavigate(`/attention?view=runs&run_id=${runId}`)}
             />
           )}
-          <div className="cc-inbox-triage__dependency-picker">
-            <label htmlFor="inbox-prerequisite-select">{translateUi('Must wait for')}</label>
-            <select
-              id="inbox-prerequisite-select"
-              value=""
-              disabled={!graphRevisionReady || dependency.isPreviewing || dependency.isCreating}
-              onChange={(event) => {
-                const prerequisiteTaskId = event.target.value;
-                if (prerequisiteTaskId) {
-                  void dependency.requestPreview(task.id, prerequisiteTaskId);
-                }
-              }}
-            >
-              <option value="">{translateUi('Choose a prerequisite\u2026')}</option>
-              {dependencyCandidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.title}
-                </option>
-              ))}
-            </select>
-            <small>
-              {translateUi('Desktop: drag \u219D from the dependent task onto its prerequisite.')}
-            </small>
-          </div>
           {dependency.preview && (
             <InboxDependencyPreviewPanel
               preview={dependency.preview}

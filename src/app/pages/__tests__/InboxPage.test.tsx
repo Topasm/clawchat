@@ -369,10 +369,10 @@ describe('InboxPage', () => {
     expect(transfer.getData('application/x-clawchat-task-dependency')).toBe('captured-1');
   });
 
-  it('previews and confirms a dependency chosen from the inspector', async () => {
+  it('previews and confirms a dependency made by clicking a tree connector', async () => {
     const preview: TaskDependencyPreviewResponse = {
       dependent_task_id: 'captured-1',
-      prerequisite_task_id: 'captured-2',
+      prerequisite_task_id: 'placed-1',
       base_graph_revision: 7,
       affected_task_ids: ['captured-1'],
       insights_delta: { ready_count: -1, blocked_count: 1, critical_path_minutes: 10 },
@@ -382,12 +382,16 @@ describe('InboxPage', () => {
     renderInbox();
 
     fireEvent.click(screen.getByLabelText('Select Draft outline for placement'));
-    fireEvent.change(screen.getByLabelText('Must wait for'), { target: { value: 'captured-2' } });
+    fireEvent.click(
+      screen.getByLabelText(
+        'Dependency connector for Figures. Drag to a prerequisite or drop a dependent here.',
+      ),
+    );
 
     await waitFor(() =>
       expect(mocks.previewDependency).toHaveBeenCalledWith({
         dependent_task_id: 'captured-1',
-        prerequisite_task_id: 'captured-2',
+        prerequisite_task_id: 'placed-1',
         expected_graph_revision: 7,
       }),
     );
@@ -400,37 +404,13 @@ describe('InboxPage', () => {
     await waitFor(() =>
       expect(mocks.createDependency).toHaveBeenCalledWith({
         dependent_task_id: 'captured-1',
-        prerequisite_task_id: 'captured-2',
+        prerequisite_task_id: 'placed-1',
         expected_graph_revision: 7,
       }),
     );
     await waitFor(() =>
-      expect(addToast).toHaveBeenCalledWith(
-        'success',
-        '“Draft outline” now waits for “Collect references”',
-      ),
+      expect(addToast).toHaveBeenCalledWith('success', '“Draft outline” now waits for “Figures”'),
     );
-  });
-
-  it('excludes project roots and the selected task from the prerequisite options', () => {
-    renderInbox();
-
-    fireEvent.click(screen.getByLabelText('Select Draft outline for placement'));
-    const select = screen.getByLabelText('Must wait for');
-    const options = within(select)
-      .getAllByRole('option')
-      .map((option) => option.textContent);
-
-    expect(options).toEqual([
-      'Choose a prerequisite…',
-      'Ambiguous task',
-      'Broken task',
-      'Collect references',
-      'Finished task',
-      'Planned task',
-      'Thinking task',
-      'Figures',
-    ]);
   });
 
   it('previews AI triage and applies the selected suggestions as placement groups', async () => {
