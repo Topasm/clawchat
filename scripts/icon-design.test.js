@@ -110,7 +110,7 @@ test('keeps web, mobile, and tray branding synchronized with platform-safe asset
   const manifest = JSON.parse(
     fs.readFileSync(path.join(repositoryRoot, 'public', 'manifest.webmanifest'), 'utf8'),
   );
-  assert.equal(manifest.name, 'Agent Todo');
+  assert.equal(manifest.name, 'ClawChat');
   assert.equal(manifest.display, 'standalone');
   assert.deepEqual(
     manifest.icons.map(({ src, sizes, purpose }) => ({ src, sizes, purpose })),

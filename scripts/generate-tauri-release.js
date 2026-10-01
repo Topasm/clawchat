@@ -52,6 +52,23 @@ function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
+/**
+ * The name an artifact gets as a GitHub release asset.
+ *
+ * GitHub replaces whitespace in an uploaded asset's name with dots, so a
+ * product name with a space ("Agent Todo") produced a manifest URL
+ * (`Agent%20Todo.app.tar.gz`) that no asset answered to: every updater got a
+ * 404. Apply the same rewrite before staging so the staged name, the checksum
+ * line and the manifest URL are the name the asset will actually have.
+ */
+function releaseAssetName(name) {
+  const asset = name.replace(/\s+/g, '.');
+  if (!/^[A-Za-z0-9._-]+$/.test(asset)) {
+    throw new Error(`release asset name has characters GitHub would rewrite: ${name}`);
+  }
+  return asset;
+}
+
 function validateAndroidChecksum(apk, checksum) {
   const lines = fs
     .readFileSync(checksum, 'utf8')
@@ -161,7 +178,7 @@ function generateTauriRelease({
     const staged = releaseNames.get(file);
     if (staged) return staged;
 
-    const releaseName = `${platform}-${path.basename(file)}`;
+    const releaseName = releaseAssetName(`${platform}-${path.basename(file)}`);
     const destination = path.join(outputDir, releaseName);
     if (fs.existsSync(destination)) {
       throw new Error(`duplicate release artifact name: ${releaseName}`);
@@ -179,7 +196,7 @@ function generateTauriRelease({
     copyArtifact(platform, updater.signature);
   }
   for (const file of Object.values(android)) {
-    const releaseName = path.basename(file);
+    const releaseName = releaseAssetName(path.basename(file));
     const destination = path.join(outputDir, releaseName);
     if (fs.existsSync(destination)) {
       throw new Error(`duplicate release artifact name: ${releaseName}`);
@@ -249,6 +266,7 @@ if (require.main === module) {
 module.exports = {
   PLATFORM_DIRECTORIES,
   generateTauriRelease,
+  releaseAssetName,
   validateAndroidChecksum,
   validateReleaseIdentity,
 };

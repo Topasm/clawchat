@@ -486,7 +486,7 @@ function ProjectExecutionSettings({ project }: { project: ProjectOverviewRespons
           <h2>{translateUi('Execution provider')}</h2>
           <p>
             {translateUi(
-              'Choose where delegated tasks run. Plan generation continues to use Agent Todo.',
+              'Choose where delegated tasks run. Plan generation continues to use ClawChat.',
             )}
           </p>
         </div>

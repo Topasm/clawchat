@@ -1,13 +1,13 @@
-# Agent Todo
+# ClawChat
 
 **A privacy-first, self-hosted agentic todo app.**
 
-Agent Todo (formerly ClawChat) goes beyond storing todos: it helps turn captured work into structured
+ClawChat goes beyond storing todos: it helps turn captured work into structured
 plans, finds the next ready task, runs approved work with AI agents, and routes the
 result back to you for review. Tasks, projects, dependency graphs, calendar,
 documents, and chat stay connected in one workspace.
 
-You keep control of the workflow and the data. Agent Todo can run on your own FastAPI
+You keep control of the workflow and the data. ClawChat can run on your own FastAPI
 server and SQLite database, with shared web and Tauri clients plus a native Android
 app. Android can also start as a standalone, on-device todo workspace with no
 server account or PIN, then connect to a server later when you want shared projects

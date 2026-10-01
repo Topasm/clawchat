@@ -8,7 +8,7 @@ describe('pairingClaim', () => {
     vi.unstubAllGlobals();
   });
 
-  it('parses only complete Agent Todo pairing payloads', () => {
+  it('parses only complete ClawChat pairing payloads', () => {
     expect(
       parsePairingQrPayload({
         type: 'clawchat_pair',

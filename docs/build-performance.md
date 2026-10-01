@@ -93,7 +93,7 @@ recorded from the ES2022 web build rather than `build:tauri-renderer`, so they u
 output CI actually measures; they are now taken from `build:tauri-renderer` as this document
 requires.
 
-The 2026-09-25 Agent Todo update adds Korean UI messages for Inbox notes, external CLI
+The 2026-09-25 ClawChat update adds Korean UI messages for Inbox notes, external CLI
 sessions, and model selection, and updates the product name. The two compressed catalogs
 increase from 29,574 bytes at v1.4.30 to 30,851 bytes (+1,277 bytes). The catalogs still use
 level-9 gzip and the existing locale loader. This intentional feature content sets the
