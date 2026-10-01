@@ -5,7 +5,11 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { PLATFORM_DIRECTORIES, generateTauriRelease } = require('./generate-tauri-release');
+const {
+  PLATFORM_DIRECTORIES,
+  generateTauriRelease,
+  releaseAssetName,
+} = require('./generate-tauri-release');
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clawchat-release-'));
@@ -186,5 +190,45 @@ test('rejects empty signatures, duplicate artifacts, stale output, and mismatche
     assert.throws(() => generate(badAndroidDigest), /Android APK checksum does not match/);
   } finally {
     badAndroidDigest.cleanup();
+  }
+});
+
+test('a product name with a space is staged under the name GitHub will give the asset', () => {
+  // v1.4.31 and v1.4.32 shipped a manifest pointing at `Agent%20Todo...`;
+  // GitHub had renamed the uploads to `Agent.Todo...`, so updates got 404s.
+  assert.equal(
+    releaseAssetName('darwin-aarch64-Agent Todo.app.tar.gz'),
+    'darwin-aarch64-Agent.Todo.app.tar.gz',
+  );
+  assert.equal(
+    releaseAssetName('linux-ClawChat_1.2.3_amd64.AppImage'),
+    'linux-ClawChat_1.2.3_amd64.AppImage',
+  );
+  assert.throws(() => releaseAssetName('windows-Agent/Todo.exe'), /would rewrite/);
+
+  const project = fixture();
+  try {
+    const macos = path.join(project.artifactsDir, PLATFORM_DIRECTORIES.macos);
+    for (const name of ['ClawChat.app.tar.gz', 'ClawChat.app.tar.gz.sig', 'ClawChat.dmg']) {
+      fs.renameSync(
+        path.join(macos, name),
+        path.join(macos, name.replace('ClawChat', 'Agent Todo')),
+      );
+    }
+    const { manifest, releaseFiles } = generate(project);
+    const names = releaseFiles.map((file) => path.basename(file));
+    assert.ok(names.includes('darwin-aarch64-Agent.Todo.app.tar.gz'), names.join(', '));
+    assert.ok(
+      names.every((name) => !/\s/.test(name)),
+      names.join(', '),
+    );
+    assert.equal(
+      manifest.platforms['darwin-aarch64'].url,
+      'https://github.com/example/clawchat/releases/download/clawchat-v1.2.3/darwin-aarch64-Agent.Todo.app.tar.gz',
+    );
+    const checksums = fs.readFileSync(path.join(project.outputDir, 'checksums.txt'), 'utf8');
+    assert.match(checksums, /  darwin-aarch64-Agent\.Todo\.app\.tar\.gz$/m);
+  } finally {
+    project.cleanup();
   }
 });

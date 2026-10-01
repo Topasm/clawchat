@@ -677,6 +677,9 @@ jobs:
           test -s "release-artifacts/ClawChat-${{ needs.preflight.outputs.version }}.aab"
           test -s "release-artifacts/ClawChat-${{ needs.preflight.outputs.version }}.apk.sha256"
           test "$(find release-artifacts -maxdepth 1 -type f | wc -l)" -eq 13
+          # GitHub rewrites whitespace in asset names to dots; a name that
+          # differs from the manifest URL means every updater gets a 404.
+          test -z "$(find release-artifacts -maxdepth 1 -type f -name '* *')"
           node -e "const p=require('./release-artifacts/latest.json').platforms; for (const k of ['linux-x86_64','darwin-aarch64','windows-x86_64']) if (!p[k]) throw new Error('missing '+k)"
           (cd release-artifacts && sha256sum --check checksums.txt)
 
