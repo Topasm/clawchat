@@ -37,7 +37,8 @@ export default function useTodayBriefing() {
   useEffect(() => {
     if (!serverUrl) return;
     setBriefingLoading(true);
-    apiClient.get('/today/briefing')
+    apiClient
+      .get('/today/briefing')
       .then((res) => setBriefingData(res.data ?? null))
       .catch(() => setBriefingData(null))
       .finally(() => setBriefingLoading(false));

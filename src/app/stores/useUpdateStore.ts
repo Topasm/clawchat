@@ -14,9 +14,9 @@ export type UpdateStatus =
 
 export type UpdateErrorAction = 'check' | 'download' | 'install';
 
-export type UpdateLifecyclePatch = Partial<Pick<UpdateStore,
-  'status' | 'info' | 'progress' | 'error' | 'errorAction'
->>;
+export type UpdateLifecyclePatch = Partial<
+  Pick<UpdateStore, 'status' | 'info' | 'progress' | 'error' | 'errorAction'>
+>;
 
 interface UpdateStore {
   status: UpdateStatus;

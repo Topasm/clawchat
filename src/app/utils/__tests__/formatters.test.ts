@@ -132,7 +132,6 @@ describe('formatters', () => {
       // isOverdue compares with start of today, so today's date is not overdue
       expect(isOverdue('2026-02-22T08:00:00.000Z')).toBe(false);
     });
-
   });
 
   describe('formatDueDate', () => {

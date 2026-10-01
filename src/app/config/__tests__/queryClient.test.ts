@@ -46,11 +46,14 @@ describe('query cache persistence', () => {
 
   it('rejects a payload whose embedded scope does not match', () => {
     const storageKey = getQueryCacheStorageKey('host:alpha');
-    localStorage.setItem(storageKey, JSON.stringify({
-      version: 2,
-      scope: 'host:beta',
-      entries: [{ queryKey: ['todos'], data: ['wrong'], updatedAt: Date.now() }],
-    }));
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        version: 2,
+        scope: 'host:beta',
+        entries: [{ queryKey: ['todos'], data: ['wrong'], updatedAt: Date.now() }],
+      }),
+    );
 
     restoreQueryCache('host:alpha');
 
@@ -70,9 +73,9 @@ describe('query cache persistence', () => {
   });
 
   it('prefers stable host identity and normalizes server URLs', () => {
-    expect(getQueryCacheScope({ hostId: ' host-1 ', serverUrl: 'HTTPS://A/' }))
-      .toBe('host:host-1');
-    expect(getQueryCacheScope({ serverUrl: 'HTTPS://Example.COM/' }))
-      .toBe('server:https://example.com');
+    expect(getQueryCacheScope({ hostId: ' host-1 ', serverUrl: 'HTTPS://A/' })).toBe('host:host-1');
+    expect(getQueryCacheScope({ serverUrl: 'HTTPS://Example.COM/' })).toBe(
+      'server:https://example.com',
+    );
   });
 });

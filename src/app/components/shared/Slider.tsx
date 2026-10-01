@@ -19,9 +19,7 @@ export default function Slider({ value, min, max, step = 1, onChange, formatValu
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      <span className="cc-slider__value">
-        {formatValue ? formatValue(value) : value}
-      </span>
+      <span className="cc-slider__value">{formatValue ? formatValue(value) : value}</span>
     </div>
   );
 }

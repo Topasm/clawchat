@@ -35,10 +35,16 @@ export default function EventBlock({
     >
       <span className="cc-calendar__event-block-title">
         {event.title}
-        {event.recurrence_rule && <> <RepeatIcon /></>}
+        {event.recurrence_rule && (
+          <>
+            {' '}
+            <RepeatIcon />
+          </>
+        )}
       </span>
       <span className="cc-calendar__event-block-time">
-        {fmtTime(start.getHours(), start.getMinutes())} - {fmtTime(end.getHours(), end.getMinutes())}
+        {fmtTime(start.getHours(), start.getMinutes())} -{' '}
+        {fmtTime(end.getHours(), end.getMinutes())}
       </span>
     </button>
   );

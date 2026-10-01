@@ -5,7 +5,12 @@ interface SegmentedControlProps {
   onChange: (value: string) => void;
 }
 
-export default function SegmentedControl({ ariaLabel, options, value, onChange }: SegmentedControlProps) {
+export default function SegmentedControl({
+  ariaLabel,
+  options,
+  value,
+  onChange,
+}: SegmentedControlProps) {
   return (
     <div className="cc-segmented" role="group" aria-label={ariaLabel}>
       {options.map((opt) => (

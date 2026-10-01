@@ -80,11 +80,12 @@ export function persistQueryCache(scope: string | null): void {
     const entries = queryClient
       .getQueryCache()
       .getAll()
-      .filter((query) => (
-        query.state.status === 'success'
-        && query.state.data != null
-        && isPersistedQueryKey(query.queryKey)
-      ))
+      .filter(
+        (query) =>
+          query.state.status === 'success' &&
+          query.state.data != null &&
+          isPersistedQueryKey(query.queryKey),
+      )
       .map((query) => ({
         queryKey: query.queryKey,
         data: query.state.data,
@@ -117,9 +118,9 @@ export function restoreQueryCache(scope: string | null): void {
     if (!raw) return;
     const payload = JSON.parse(raw) as Partial<PersistedCache>;
     if (
-      payload.version !== CACHE_VERSION
-      || payload.scope !== scope
-      || !Array.isArray(payload.entries)
+      payload.version !== CACHE_VERSION ||
+      payload.scope !== scope ||
+      !Array.isArray(payload.entries)
     ) {
       removeStorageItem(cacheStorageKey(scope));
       return;
@@ -128,11 +129,11 @@ export function restoreQueryCache(scope: string | null): void {
     const now = Date.now();
     for (const entry of payload.entries) {
       if (
-        !entry
-        || !Array.isArray(entry.queryKey)
-        || !isPersistedQueryKey(entry.queryKey)
-        || typeof entry.updatedAt !== 'number'
-        || now - entry.updatedAt > CACHE_MAX_AGE_MS
+        !entry ||
+        !Array.isArray(entry.queryKey) ||
+        !isPersistedQueryKey(entry.queryKey) ||
+        typeof entry.updatedAt !== 'number' ||
+        now - entry.updatedAt > CACHE_MAX_AGE_MS
       ) {
         continue;
       }

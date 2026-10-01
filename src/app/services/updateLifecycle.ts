@@ -100,9 +100,9 @@ export function initializeUpdateLifecycle() {
   const checkAfterResume = () => {
     const store = useUpdateStore.getState();
     if (
-      document.visibilityState === 'visible'
-      && store.automaticChecksEnabled
-      && Date.now() - lastCheckAt >= FOCUS_CHECK_THROTTLE_MS
+      document.visibilityState === 'visible' &&
+      store.automaticChecksEnabled &&
+      Date.now() - lastCheckAt >= FOCUS_CHECK_THROTTLE_MS
     ) {
       void checkForAppUpdate(false);
     }
@@ -138,10 +138,12 @@ export function checkForAppUpdate(interactive = true): Promise<void> {
     setLifecycle({ status: 'checking', error: null, errorAction: null });
   }
 
-  checkRequest = platformApi.updater.checkForUpdates()
+  checkRequest = platformApi.updater
+    .checkForUpdates()
     .then((info) => {
       lastCheckAt = Date.now();
-      if (info && useUpdateStore.getState().status !== 'ready') showAvailable(info, interactiveCheck);
+      if (info && useUpdateStore.getState().status !== 'ready')
+        showAvailable(info, interactiveCheck);
       else if (interactiveCheck && useUpdateStore.getState().status === 'checking') showUpToDate();
     })
     .catch((error) => {
@@ -169,7 +171,8 @@ export function downloadAppUpdate(): Promise<void> {
     error: null,
     errorAction: null,
   });
-  downloadRequest = platformApi.updater.downloadUpdate()
+  downloadRequest = platformApi.updater
+    .downloadUpdate()
     .then(() => {
       setLifecycle({ status: 'ready', progress: null, error: null, errorAction: null });
     })
@@ -189,7 +192,8 @@ export function installAppUpdate(): Promise<void> {
   }
 
   setLifecycle({ status: 'restarting', error: null, errorAction: null });
-  installRequest = platformApi.updater.installUpdate()
+  installRequest = platformApi.updater
+    .installUpdate()
     .catch((error) => showError('install', error))
     .finally(() => {
       installRequest = null;

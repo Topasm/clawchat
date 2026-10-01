@@ -6,7 +6,10 @@ import { TAURI_COMMANDS } from '../tauriCommands';
 const repositoryRoot = process.cwd();
 const buildSource = readFileSync(resolve(repositoryRoot, 'src-tauri/build.rs'), 'utf8');
 const handlerSource = readFileSync(resolve(repositoryRoot, 'src-tauri/src/lib.rs'), 'utf8');
-const adapterSource = readFileSync(resolve(repositoryRoot, 'src/app/platform/tauriPlatformApi.ts'), 'utf8');
+const adapterSource = readFileSync(
+  resolve(repositoryRoot, 'src/app/platform/tauriPlatformApi.ts'),
+  'utf8',
+);
 const capability = JSON.parse(
   readFileSync(resolve(repositoryRoot, 'src-tauri/capabilities/main-window.json'), 'utf8'),
 ) as { permissions: string[] };
@@ -46,9 +49,7 @@ const handlerCommands = collect(
 const capabilityPermissions = capability.permissions.filter((permission) =>
   permission.startsWith('allow-'),
 );
-const expectedPermissions = commandValues.map(
-  (command) => `allow-${command.replaceAll('_', '-')}`,
-);
+const expectedPermissions = commandValues.map((command) => `allow-${command.replaceAll('_', '-')}`);
 const adapterCommandKeys = collect(adapterSource, /TAURI_COMMANDS\.([A-Za-z0-9_]+)/gu);
 
 describe('Tauri command registry parity', () => {

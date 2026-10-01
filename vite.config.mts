@@ -1,7 +1,19 @@
 /// <reference types="vitest" />
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import packageJson from './package.json' with { type: 'json' };
+
+// The locale catalogs under src/app/i18n/generated are build output, not
+// source: they are derived from resources.ts and literalResources.ts and used
+// to be committed as gzip, which made every two PRs that touched a translation
+// conflict on a binary. Regenerating them here covers dev, build and vitest.
+execFileSync(
+  process.execPath,
+  [fileURLToPath(new URL('./scripts/generate-korean-catalog.js', import.meta.url))],
+  { stdio: ['ignore', 'ignore', 'inherit'] },
+);
 
 const tauriPlatform = process.env.TAURI_ENV_PLATFORM;
 const isTauriDebug = process.env.TAURI_ENV_DEBUG === 'true';

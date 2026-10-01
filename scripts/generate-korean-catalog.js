@@ -57,6 +57,7 @@ async function main() {
     if (!process.exitCode) console.log('Generated i18n catalog is current.');
     return;
   }
+  fs.mkdirSync(path.dirname(koreanOutputPath), { recursive: true });
 
   fs.mkdirSync(path.dirname(englishOutputPath), { recursive: true });
   fs.writeFileSync(englishOutputPath, englishGzip);
