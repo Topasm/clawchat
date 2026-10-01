@@ -11,20 +11,20 @@ import { useTodosQuery } from './useModuleQueries';
 import { useProjectsQuery } from './useChatQueries';
 export interface StartReadyTaskExecutionVariables {
   todoId: string;
-  skillId: string;
+  /** Omitted, the server reads the task and picks the skill itself. */
+  skillId?: string | null;
   executionProvider: string;
   model?: string | null;
 }
 
+/** The skill a task was explicitly assigned, if any; the server chooses otherwise. */
 export function resolveExecutionSkillId(
   task: Pick<TodoResponse, 'enabled_skills'>,
   skills: Skill[],
 ): string | null {
   const executableSkills = skills.filter((skill) => skill.id !== 'plan');
   return (
-    task.enabled_skills?.find((id) => executableSkills.some((skill) => skill.id === id)) ??
-    executableSkills[0]?.id ??
-    null
+    task.enabled_skills?.find((id) => executableSkills.some((skill) => skill.id === id)) ?? null
   );
 }
 
@@ -75,7 +75,7 @@ export function useStartReadyTaskExecution() {
       model,
     }: StartReadyTaskExecutionVariables) => {
       const response = await apiClient.post(`/todos/${todoId}/delegate`, {
-        skill_id: skillId,
+        ...(skillId ? { skill_id: skillId } : {}),
         execution_provider: executionProvider,
         model: model || null,
         require_ready: true,
@@ -112,7 +112,6 @@ export function useRunReadyTaskWithProjectDefaults(enabled = true) {
     const project = executionProject(task, projectsQuery.data ?? [], fallbackProjectId);
     if (!project) return null;
     const skillId = resolveExecutionSkillId(task, skillsQuery.data?.skills ?? []);
-    if (!skillId) return null;
     return { task, project, skillId };
   };
 

@@ -124,6 +124,11 @@ async def select_skills(
         return _fallback(instruction, available_ids)
 
 
+def fallback_skill_chain(instruction: str, available_ids: list[str]) -> list[str]:
+    """The keyword choice used when no model can be asked."""
+    return _fallback(instruction, available_ids)
+
+
 def _fallback(instruction: str, available_ids: list[str]) -> list[str]:
     """Simple keyword fallback when LLM selection fails."""
     lower = instruction.lower()

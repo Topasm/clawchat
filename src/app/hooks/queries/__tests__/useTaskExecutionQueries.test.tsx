@@ -55,6 +55,35 @@ describe('Ready task execution queries', () => {
     expect(apiMocks.get).not.toHaveBeenCalled();
   });
 
+  it('leaves the skill to the server when the task has none assigned', async () => {
+    apiMocks.post.mockResolvedValue({
+      data: {
+        status: 'delegated',
+        task_id: 'agent-task-2',
+        todo_id: 'todo-2',
+        agent_task_id: 'agent-task-2',
+        run_id: 'run-2',
+        skill_id: 'research',
+        skill_chain: ['research', 'summarize'],
+        agent_type: 'research',
+        skill_source: 'auto',
+      },
+    });
+    const { wrapper } = createHarness();
+    const { result } = renderHook(() => useStartReadyTaskExecution(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ todoId: 'todo-2', executionProvider: 'builtin' });
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/todos/todo-2/delegate', {
+      execution_provider: 'builtin',
+      model: null,
+      require_ready: true,
+      approved: true,
+    });
+  });
+
   it('sends an explicit Ready-only approval and invalidates execution state', async () => {
     apiMocks.post.mockResolvedValue({
       data: {
@@ -66,6 +95,7 @@ describe('Ready task execution queries', () => {
         skill_id: 'research',
         skill_chain: ['research'],
         agent_type: 'research',
+        skill_source: 'requested',
       },
     });
     const { queryClient, wrapper } = createHarness();

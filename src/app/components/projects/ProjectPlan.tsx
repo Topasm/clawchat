@@ -9,7 +9,6 @@ import {
   useTaskExecutionTelemetryQuery,
 } from '../../hooks/queries';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
-import { useToastStore } from '../../stores/useToastStore';
 import type { ProjectOverviewResponse, TaskGraphInsightNode, TodoResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
 import { ChevronRightIcon, SparkleIcon } from '../shared/Icons';
@@ -58,7 +57,6 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
   const navigate = useNavigate();
   const openRunThread = useOpenRunThread();
   const panel = useOptionalChatPanelController();
-  const addToast = useToastStore((state) => state.addToast);
   const selectionKey = JSON.stringify([getChatWorkspaceScope(), project.id]);
   const selection = useChatStore((state) => state.projectPlanSelections[selectionKey]);
   const view = selection?.view === 'flow' ? 'flow' : 'outline';
@@ -102,10 +100,6 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
   const runSelectedTask = async () => {
     if (!selectedTask || primaryAction?.kind !== 'run') return;
     const skillId = resolveExecutionSkillId(selectedTask, skillsData?.skills ?? []);
-    if (!skillId) {
-      addToast('warning', translateUi('No execution skill is available for this task.'));
-      return;
-    }
     if (
       !window.confirm(
         translateUi('Run “{{title}}” with the project defaults?', { title: selectedTask.title }),

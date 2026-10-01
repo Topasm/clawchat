@@ -1341,6 +1341,7 @@ export const DelegateResponseSchema = z.object({
   skill_id: z.string(),
   skill_chain: z.array(z.string()),
   agent_type: z.string(),
+  skill_source: z.enum(['requested', 'assigned', 'auto']),
 });
 
 export const PlanApplyResponseSchema = z.object({
