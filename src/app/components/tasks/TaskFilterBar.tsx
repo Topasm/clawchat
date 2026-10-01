@@ -10,17 +10,14 @@ const SORT_OPTIONS = [
   { value: 'updated_at', label: 'Last Updated' },
   { value: 'sort_order', label: 'Manual Order' },
 ] as const;
-interface KanbanFilterBarProps {
-  showSubtaskToggle?: boolean;
-}
-export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilterBarProps) {
+/** Search, tag and sort controls shared by the List and Graph views. */
+export default function TaskFilterBar() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filters = useModuleStore((s) => s.kanbanFilters);
   const setSearch = useModuleStore((s) => s.setKanbanSearchQuery);
   const toggleTag = useModuleStore((s) => s.toggleKanbanTagFilter);
   const setSort = useModuleStore((s) => s.setKanbanSort);
   const clearFilters = useModuleStore((s) => s.clearKanbanFilters);
-  const toggleSubTasks = useModuleStore((s) => s.toggleShowSubTasks);
   const { data: todos = [] } = useTodosQuery();
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -90,16 +87,6 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
         ))}
       </select>
 
-      {showSubtaskToggle && (
-        <button
-          className={`cc-kanban-filter__chip${filters.showSubTasks ? ' cc-kanban-filter__chip--active' : ''}`}
-          aria-pressed={filters.showSubTasks}
-          onClick={toggleSubTasks}
-        >
-          {translateUi('\n          Sub-tasks\n        ')}
-        </button>
-      )}
-
       {hasActiveFilters && (
         <button className="cc-kanban-filter__clear" onClick={clearFilters}>
           {translateUi('\n          Clear\n        ')}
@@ -108,7 +95,7 @@ export default function KanbanFilterBar({ showSubtaskToggle = true }: KanbanFilt
     </div>
   );
 }
-export function focusKanbanSearch() {
+export function focusTaskSearch() {
   const el = document.querySelector<HTMLInputElement>('.cc-kanban-filter__search-input');
   el?.focus();
 }

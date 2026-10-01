@@ -22,11 +22,20 @@
   border-color: var(--cc-border-subtle);
 }
 
-/* Kanban cards remain bounded because their drag affordance needs a surface. */
-.cc-kanban__card > .cc-card {
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
-  background: var(--cc-surface);
+/* A sub-task card sits indented under its parent with a short connector. */
+.cc-kanban__card--subtask {
+  margin-left: 20px;
+  position: relative;
+}
+
+.cc-kanban__card--subtask::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: var(--cc-border);
 }
 
 .cc-card--task {

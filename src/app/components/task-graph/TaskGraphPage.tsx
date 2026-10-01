@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProjectsQuery, useTaskRelationshipsQuery, useTodosQuery } from '../../hooks/queries';
-import useKanbanFilters from '../../hooks/useKanbanFilters';
+import useTaskFilters from '../../hooks/useTaskFilters';
 import { useModuleStore } from '../../stores/useModuleStore';
-import KanbanFilterBar from '../kanban/KanbanFilterBar';
+import TaskFilterBar from '../tasks/TaskFilterBar';
 import TasksHeader, {
   matchesTasksStatusFilter,
   type TasksStatusFilter,
   type TasksViewMode,
-} from '../kanban/TasksHeader';
+} from '../tasks/TasksHeader';
 import TaskGraph from './TaskGraph';
 import { expandTaskGraphContext } from './taskGraphAdapter';
 import { isTaskTodo } from '../../utils/inboxState';
@@ -50,7 +50,7 @@ export default function TaskGraphPage({
     () => graphScopeTodos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter)),
     [graphScopeTodos, statusFilter],
   );
-  const filteredTodos = useKanbanFilters(scopedTodos, filters);
+  const filteredTodos = useTaskFilters(scopedTodos, filters);
   const hasExternalFilter = Boolean(filters.searchQuery || filters.tags.length);
 
   // When a filter matches a child, retain its ancestors and visible
@@ -71,7 +71,7 @@ export default function TaskGraphPage({
         onStatusFilterChange={onStatusFilterChange}
         subtitle={`${graphTodos.length} task${graphTodos.length !== 1 ? 's' : ''} mapped by project and dependency`}
       />
-      <KanbanFilterBar showSubtaskToggle={false} />
+      <TaskFilterBar />
       <div className="cc-task-flow__project-picker">
         <label>
           <span>{translateUi('Project')}</span>

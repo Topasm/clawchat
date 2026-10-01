@@ -10,7 +10,6 @@
     "src/app/components/shared/__tests__/FileDropZone.test.tsx": "1c7775f260db8fbe9a90cd77cd39e0e8b24c770615219888df606c77ee76cb65",
     "src/app/config/__tests__/queryClient.test.ts": "924107eb59225cf0a90e8a0eae3c45582a7d1fd378dbadd85437d64ca8ea6f2f",
     "src/app/config/queryClient.ts": "dd7aa69e497942878f2993163ef2a8c08cf3be3d6c4d32a4dd3c58a94b3ba7fd",
-    "src/app/hooks/useKanbanKeyboardNav.ts": "34e48b1a8e742c8627ec0134f9023419893189ed609c74841c936a61b0c945c5",
     "src/app/hooks/useTodayBriefing.ts": "98d4e04f2d8eab8f50d0a3af7aa8482e9c7ea7aa6ae472e3efc92172886d892a",
     "src/app/hooks/useVoiceInput.ts": "c9e3d6c708afc949c973490165faf145b025fe6c40c65add4d2981739a4e6333",
     "src/app/platform/__tests__/tauriCommandParity.test.ts": "99655878478ce862863ffc1c6fcb5c6f2f536a2f7d3a88a810278dc2a974d090",

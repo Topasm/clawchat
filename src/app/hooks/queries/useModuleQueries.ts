@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { useModuleStore } from '../../stores/useModuleStore';
 import { useToastStore } from '../../stores/useToastStore';
 import {
   TodoResponseSchema,
@@ -643,7 +642,6 @@ export function useBulkUpdateTodos() {
       await apiClient.patch('/todos/bulk', data);
     },
     onSuccess: () => {
-      useModuleStore.setState({ selectedTodoIds: new Set<string>() });
       useToastStore.getState().addToast('success', translateUi('Bulk operation completed'));
     },
     onError: () => {

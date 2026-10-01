@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import KanbanBoard from '../components/kanban/KanbanBoard';
 import {
   TASK_STATUS_FILTERS,
   type TasksStatusFilter,
   type TasksViewMode,
-} from '../components/kanban/TasksHeader';
+} from '../components/tasks/TasksHeader';
+import { useTasksShortcuts } from '../keyboard';
+import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import TaskListPage from '../components/task-list/TaskListPage';
 import TaskGraphPage from '../components/task-graph/TaskGraphPage';
 
@@ -16,28 +17,24 @@ export default function AllTasksPage() {
   const [statusFilter, setStatusFilter] = useState<TasksStatusFilter>('active');
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  // The Kanban board is gone; links and saved preferences that name it land on the list.
   const [viewMode, setViewMode] = useState<TasksViewMode>(() => {
     const requested = searchParams.get('view');
-    if (requested === 'graph' || requested === 'list' || requested === 'kanban') {
-      return requested;
-    }
+    if (requested === 'graph' || requested === 'list') return requested;
+    if (requested === 'kanban') return 'list';
     try {
       const stored = localStorage.getItem(TASKS_VIEW_STORAGE_KEY);
-      if (stored === 'graph' || stored === 'list') return stored;
-      return 'list';
+      return stored === 'graph' ? 'graph' : 'list';
     } catch {
       return 'list';
     }
   });
+  useTasksShortcuts({ onNewTask: () => useQuickCaptureStore.getState().open() });
 
   useEffect(() => {
     const requested = searchParams.get('view');
-    if (
-      (requested === 'graph' || requested === 'list' || requested === 'kanban') &&
-      requested !== viewMode
-    ) {
-      setViewMode(requested);
-    }
+    const next = requested === 'kanban' ? 'list' : requested;
+    if ((next === 'graph' || next === 'list') && next !== viewMode) setViewMode(next);
   }, [searchParams, viewMode]);
 
   const handleViewModeChange = (mode: TasksViewMode) => {
@@ -59,22 +56,12 @@ export default function AllTasksPage() {
     onStatusFilterChange: setStatusFilter,
   };
   const content =
-    viewMode === 'graph' ? (
-      <TaskGraphPage {...sharedProps} />
-    ) : viewMode === 'list' ? (
-      <TaskListPage {...sharedProps} />
-    ) : (
-      <KanbanBoard {...sharedProps} />
-    );
+    viewMode === 'graph' ? <TaskGraphPage {...sharedProps} /> : <TaskListPage {...sharedProps} />;
 
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     event.stopPropagation();
     const target = event.target as HTMLElement;
-    if (
-      target.closest(
-        'input, textarea, button, [role="button"], [contenteditable="true"], .cc-swipe-actions',
-      )
-    ) {
+    if (target.closest('input, textarea, button, [role="button"], [contenteditable="true"]')) {
       touchStartX.current = null;
       touchStartY.current = null;
       return;

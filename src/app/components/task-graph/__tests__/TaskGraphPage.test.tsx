@@ -50,9 +50,9 @@ vi.mock('../../../stores/useModuleStore', () => ({
   useModuleStore: (selector: (state: unknown) => unknown) =>
     selector({ kanbanFilters: { searchQuery: '', tags: [] } }),
 }));
-vi.mock('../../../hooks/useKanbanFilters', () => ({ default: (todos: unknown[]) => todos }));
-vi.mock('../../kanban/KanbanFilterBar', () => ({ default: () => null }));
-vi.mock('../../kanban/TasksHeader', () => ({
+vi.mock('../../../hooks/useTaskFilters', () => ({ default: (todos: unknown[]) => todos }));
+vi.mock('../../tasks/TaskFilterBar', () => ({ default: () => null }));
+vi.mock('../../tasks/TasksHeader', () => ({
   default: () => null,
   matchesTasksStatusFilter: (status: string, filter: string) =>
     filter === 'all' ||

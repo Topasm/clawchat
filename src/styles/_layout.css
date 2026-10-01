@@ -569,14 +569,6 @@
     padding: 7px 10px;
   }
 
-  .cc-root--compact .cc-kanban {
-    gap: 8px;
-  }
-
-  .cc-root--compact .cc-kanban__header {
-    padding: 9px 11px 8px;
-  }
-
   .cc-root--compact .cc-task-list__row {
     min-height: 40px;
   }
