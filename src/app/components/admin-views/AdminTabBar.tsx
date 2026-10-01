@@ -1,10 +1,9 @@
-export type AdminTab = 'overview' | 'ai' | 'database' | 'activity' | 'sessions' | 'config' | 'data';
+export type AdminTab = 'overview' | 'database' | 'activity' | 'sessions' | 'config' | 'data';
 
 import { translateUi } from '../../i18n';
 
 const TABS: { key: AdminTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
-  { key: 'ai', label: 'AI Config' },
   { key: 'database', label: 'Database' },
   { key: 'activity', label: 'Activity' },
   { key: 'sessions', label: 'Sessions' },

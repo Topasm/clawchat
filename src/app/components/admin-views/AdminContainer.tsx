@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import AdminTabBar, { type AdminTab } from './AdminTabBar';
 import OverviewTab from './OverviewTab';
-import AITab from './AITab';
 import DatabaseTab from './DatabaseTab';
 import ActivityTab from './ActivityTab';
 import SessionsTab from './SessionsTab';
@@ -25,7 +24,6 @@ export default function AdminContainer({ embedded = false }: { embedded?: boolea
       <AdminTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab === 'overview' && <OverviewTab />}
-      {activeTab === 'ai' && <AITab />}
       {activeTab === 'database' && <DatabaseTab />}
       {activeTab === 'activity' && <ActivityTab />}
       {activeTab === 'sessions' && <SessionsTab />}

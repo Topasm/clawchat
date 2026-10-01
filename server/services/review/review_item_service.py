@@ -152,7 +152,7 @@ async def build_review_response(
             href = (
                 f"/chats/{task.conversation_id}"
                 if task.conversation_id
-                else f"/runs?run_id={run.id}"
+                else f"/attention?view=runs&run_id={run.id}"
             )
             approval_impact = (
                 await agent_review_handoff_service.build_approval_impact(db, todo)

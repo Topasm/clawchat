@@ -624,6 +624,16 @@ async def list_runs(
     return [await build_run_response(db, run) for run in runs]
 
 
+def _skill_chain(task: AgentTask) -> list[str] | None:
+    if not task.skill_chain:
+        return None
+    try:
+        chain = json.loads(task.skill_chain)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return [skill for skill in chain if isinstance(skill, str)] or None
+
+
 async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunResponse:
     task = await db.get(AgentTask, run.agent_task_id)
     if task is None:
@@ -671,6 +681,7 @@ async def build_run_response(db: AsyncSession, run: AgentRun) -> AgentRunRespons
         todo_title=todo.title if todo else None,
         todo_status=TaskStatus(todo.status) if todo else None,
         task_type=task.task_type,
+        skill_chain=_skill_chain(task),
         instruction=task.instruction,
         usage=usage,
         pending_tool_call=await _pending_tool_call(db, run),

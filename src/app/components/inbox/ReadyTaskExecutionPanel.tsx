@@ -7,6 +7,7 @@ import type {
   TodoResponse,
 } from '../../types/api';
 import { translateUi } from '../../i18n';
+import { skillChainLabel, skillLabel } from '../../utils/skillLabels';
 const ACTIVE_AGENT_RUN_STATUSES = new Set([
   'queued',
   'starting',
@@ -24,20 +25,6 @@ export interface ReadyTaskExecutionResult {
   run_id: string;
   skill_chain?: string[];
   skill_source?: 'requested' | 'assigned' | 'auto';
-}
-const SKILL_LABELS: Record<string, string> = {
-  research: 'Research',
-  draft: 'Draft',
-  summarize: 'Summarize',
-  data_analysis: 'Analyze',
-  code_review: 'Review',
-  prioritize: 'Prioritize',
-  obsidian_sync: 'Sync',
-  weekly_review: 'Weekly review',
-  plan: 'Plan',
-};
-function skillLabel(skillId: string): string {
-  return translateUi(SKILL_LABELS[skillId] ?? skillId);
 }
 interface ReadyTaskExecutionPanelProps {
   task: TodoResponse;
@@ -205,10 +192,10 @@ export default function ReadyTaskExecutionPanel({
             <p className="cc-inbox-triage__agent-skill">
               {started.skill_source === 'auto'
                 ? translateUi('Skill chosen for this run: {{skills}}', {
-                    skills: started.skill_chain.map(skillLabel).join(' → '),
+                    skills: skillChainLabel(started.skill_chain),
                   })
                 : translateUi('Skill: {{skills}}', {
-                    skills: started.skill_chain.map(skillLabel).join(' → '),
+                    skills: skillChainLabel(started.skill_chain),
                   })}
             </p>
           )}

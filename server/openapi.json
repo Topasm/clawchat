@@ -539,6 +539,20 @@
             ],
             "title": "Result Summary"
           },
+          "skill_chain": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Chain"
+          },
           "started_at": {
             "anyOf": [
               {
@@ -996,6 +1010,20 @@
               }
             ],
             "title": "Result Summary"
+          },
+          "skill_chain": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Chain"
           },
           "started_at": {
             "anyOf": [

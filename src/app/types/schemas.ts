@@ -1081,6 +1081,7 @@ export const AgentRunResponseSchema = z.object({
   todo_status: TaskStatusSchema.nullable(),
   conversation_id: z.string().nullable().optional(),
   task_type: z.string(),
+  skill_chain: z.array(z.string()).nullable().optional(),
   instruction: z.string(),
   instruction_snapshot: z.string(),
   attempt: z.number().int().positive(),

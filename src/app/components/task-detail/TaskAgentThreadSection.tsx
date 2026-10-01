@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAgentRunsQuery } from '../../hooks/queries';
 import { runStatusLabel } from '../chat-panel/RunStatusCard';
 import { translateUi } from '../../i18n';
+import { skillChainLabel } from '../../utils/skillLabels';
 
 /**
  * Where this task's agent work is right now, and the thread it reports into.
@@ -32,6 +33,9 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
           <span className={`cc-run-status cc-run-status--${latest.status}`}>
             {runStatusLabel(latest.status)}
           </span>
+          {latest.skill_chain?.length ? (
+            <span className="cc-exec-panel__info-value">{skillChainLabel(latest.skill_chain)}</span>
+          ) : null}
         </div>
         <div className="cc-exec-panel__info-item">
           <span className="cc-task-progress__actions">

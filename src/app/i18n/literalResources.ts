@@ -118,7 +118,6 @@ export const koreanUiTranslations: Record<string, string> = {
   '+ Add dependency': '+ 의존성 추가',
   '+ Add sub-task': '+ 하위 작업 추가',
   '+ New': '+ 신규',
-  '+ New Task': '+ 새 작업',
   '+ Project': '+ 프로젝트',
   '+ Quick Chat': '+ 빠른 채팅',
   '✅ All done!': '✅ 모두 완료!',
@@ -157,6 +156,9 @@ export const koreanUiTranslations: Record<string, string> = {
   'AI proposed Workstream': 'AI가 제안하는 워크스트림',
   'AI Provider': 'AI 제공자',
   'AI Status': 'AI 상태',
+  'Add the first task': '첫 작업 추가',
+  'No tasks yet. Add the first task to this project.':
+    '아직 작업이 없습니다. 이 프로젝트에 첫 작업을 추가하세요.',
   'AI suggest': 'AI 제안',
   'AI task graph proposal': 'AI 작업 그래프 제안',
   'AI:': 'AI:',
@@ -1293,10 +1295,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Project plan view': '프로젝트 계획 보기',
   Outline: '아웃라인',
   Flow: '흐름',
-  'No execution tasks yet. Add a first step to this project.':
-    '아직 실행 작업이 없습니다. 프로젝트의 첫 단계를 추가하세요.',
   'Selected task actions': '선택한 작업 동작',
-  '+ Step': '+ 단계',
   Expand: '확장',
   Discuss: '대화',
   'Run with the project defaults': '프로젝트 기본 설정으로 실행',
@@ -1325,7 +1324,6 @@ export const koreanUiTranslations: Record<string, string> = {
   Recorded: '기록함',
   Later: '나중에',
   'Could not record the missing-verdict comment': '판정 미기록 코멘트를 남기지 못했습니다.',
-  'Add first step': '첫 단계 추가',
   'No projects yet. Create one to start a workspace.':
     '아직 프로젝트가 없습니다. 프로젝트를 만들어 작업공간을 시작하세요.',
   'No conversations outside projects yet.': '아직 프로젝트 밖의 대화가 없습니다.',

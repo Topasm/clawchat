@@ -11,6 +11,7 @@ import { runStatusLabel } from '../chat-panel/RunStatusCard';
 import ToolRequestPanel from './ToolRequestPanel';
 import type { AgentRunResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
+import { skillChainLabel } from '../../utils/skillLabels';
 
 const ACTIVE_STATUSES = new Set(['queued', 'starting', 'running', 'waiting_input']);
 
@@ -67,6 +68,7 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
           <h2>{run.todo_title || run.instruction_snapshot}</h2>
           <p>
             {run.project_title || translateUi('No project')}
+            {run.skill_chain?.length ? ` · ${skillChainLabel(run.skill_chain)}` : ''}
             {run.attempt > 1 ? translateUi(' · try {{attempt}}', { attempt: run.attempt }) : ''}
           </p>
           {(run.host_label ||
