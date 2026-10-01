@@ -159,6 +159,10 @@ async def test_connecting_finds_the_event_calendars(db_session, dav):
 
 async def test_imported_events_show_count_as_busy_and_stay_read_only(db_session, dav):
     start = (NOW + timedelta(days=2)).replace(hour=10, minute=0, second=0)
+    # The free-slot search skips weekends, so the day under test must be a
+    # weekday; otherwise this failed every Thursday and Friday (UTC).
+    while start.weekday() >= 5:
+        start += timedelta(days=1)
     dav.add("work", "standup.ics", vevent("standup", "Standup", start, start + timedelta(hours=1),
                                           extra="RRULE:FREQ=DAILY;COUNT=3\r\n"))
     await _connect(db_session)
