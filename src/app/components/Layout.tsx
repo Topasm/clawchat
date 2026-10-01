@@ -290,9 +290,7 @@ export default function Layout() {
   );
   const canSwipeTabs = isMobile && !onChatPage && activeMobileTabIndex >= 0;
   const isDetailPage =
-    isMobile &&
-    (/^\/(tasks|chats|events|projects)\/[^/]+/.test(location.pathname) ||
-      location.pathname === '/settings/system-prompt');
+    isMobile && /^\/(tasks|chats|events|projects)\/[^/]+/.test(location.pathname);
   const handleSidebarToggle = useCallback(() => {
     const panel = sidebarPanelRef.current;
     if (!panel) return;
