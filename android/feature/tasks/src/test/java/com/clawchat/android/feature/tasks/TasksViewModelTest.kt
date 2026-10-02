@@ -83,6 +83,7 @@ class TasksViewModelTest {
             relationshipRepository,
             conversationRepository,
             taskCommentRepository,
+            mockk(relaxed = true),
         )
     }
 

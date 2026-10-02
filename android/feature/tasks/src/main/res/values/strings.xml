@@ -35,6 +35,10 @@
     <string name="tasks_details_expanded">Expanded</string>
     <string name="tasks_details_collapsed">Collapsed</string>
     <string name="tasks_discuss_with_agent">Discuss with agent</string>
+    <string name="tasks_run_with_agent">Run with agent</string>
+    <string name="tasks_run_confirm">Hand “%1$s” to an agent? It plans and works on the task and reports back in the task thread.</string>
+    <string name="tasks_run_confirm_action">Run</string>
+    <string name="tasks_run_cancel">Cancel</string>
     <string name="tasks_links_title">Task links</string>
     <string name="tasks_links_subtitle">Dependencies and related work from the shared task graph.</string>
     <string name="tasks_links_loading">Loading task links…</string>

@@ -77,6 +77,11 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +96,20 @@ fun TodayScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showQuickAdd by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val deletedMessage = stringResource(R.string.today_deleted)
+    val undoLabel = stringResource(R.string.today_undo)
+    LaunchedEffect(state.pendingDeletion?.token) {
+        val pending = state.pendingDeletion ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = deletedMessage,
+            actionLabel = undoLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(pending.token)
+    }
 
     val totalTasks = state.todayTodos.size + state.overdueTodos.size + state.needsDateTodos.size
     val completedTasks = (state.todayTodos + state.overdueTodos + state.needsDateTodos).count {
@@ -105,6 +124,7 @@ fun TodayScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },

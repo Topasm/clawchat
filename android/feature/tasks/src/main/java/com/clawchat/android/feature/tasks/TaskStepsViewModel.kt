@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
+import com.clawchat.android.core.sync.SyncManager
 
 data class TaskStepsState(
     val items: List<Todo> = emptyList(),
@@ -27,9 +28,17 @@ data class TaskStepsState(
 class TaskStepsViewModel @Inject constructor(
     private val repository: TodoRepository,
     private val savedState: SavedStateHandle,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
     private val states = MutableStateFlow<Map<String, TaskStepsState>>(emptyMap())
     val steps = states.asStateFlow()
+
+    init {
+        // Steps an agent adds or completes show up without reopening the task.
+        viewModelScope.launch {
+            syncManager.todoChanged.collect { states.value.keys.forEach(::load) }
+        }
+    }
     private fun restored(id: String) = TaskStepsState(draft = savedState["step:$id"] ?: "")
     private fun current(id: String) = states.value[id] ?: restored(id)
     private fun update(id: String, change: (TaskStepsState) -> TaskStepsState) {

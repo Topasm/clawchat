@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 
 private const val TAG = "TodayViewModel"
 
@@ -40,7 +41,11 @@ data class TodayUiState(
     /** True while the screen is showing the last synced day instead of live data. */
     val isOffline: Boolean = false,
     val error: String? = null,
+    val pendingDeletion: TodayPendingDeletion? = null,
 )
+
+/** A row swiped away and not yet deleted on the server. */
+data class TodayPendingDeletion(val token: Long, val todoId: String)
 
 sealed interface TodayAction {
     data class ToggleComplete(val todoId: String) : TodayAction
@@ -115,10 +120,10 @@ class TodayViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             greeting = today.greeting,
-                            todayTodos = today.todayTodos,
-                            overdueTodos = today.overdueTodos,
+                            todayTodos = today.todayTodos.filterNot { todo -> todo.id == it.pendingDeletion?.todoId },
+                            overdueTodos = today.overdueTodos.filterNot { todo -> todo.id == it.pendingDeletion?.todoId },
                             todayEvents = today.todayEvents,
-                            needsDateTodos = today.needsDateTodos,
+                            needsDateTodos = today.needsDateTodos.filterNot { todo -> todo.id == it.pendingDeletion?.todoId },
                             inboxCount = today.inboxCount,
                             inboxPreview = inboxPreviewItems,
                             isRefreshing = false,
@@ -203,32 +208,47 @@ class TodayViewModel @Inject constructor(
     }
 
     private fun doDelete(todoId: String) {
+        _uiState.value.pendingDeletion?.let { commitDelete(it.token) }
+        val pending = TodayPendingDeletion(token = ++deletionToken, todoId = todoId)
+        _uiState.update { state ->
+            state.copy(
+                todayTodos = state.todayTodos.filter { it.id != todoId },
+                overdueTodos = state.overdueTodos.filter { it.id != todoId },
+                needsDateTodos = state.needsDateTodos.filter { it.id != todoId },
+                pendingDeletion = pending,
+            )
+        }
+        deletionCommitJob = viewModelScope.launch {
+            delay(DELETE_UNDO_WINDOW_MS)
+            commitDelete(pending.token)
+        }
+    }
+
+    private var deletionToken = 0L
+    private var deletionCommitJob: Job? = null
+
+    /** The row leaves at once; the server call waits for the undo window. */
+    fun undoDelete(token: Long) {
+        if (_uiState.value.pendingDeletion?.token != token) return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
+        _uiState.update { it.copy(pendingDeletion = null) }
+        doRefresh()
+    }
+
+    fun commitDelete(token: Long) {
+        val pending = _uiState.value.pendingDeletion?.takeIf { it.token == token } ?: return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
+        _uiState.update { it.copy(pendingDeletion = null) }
         viewModelScope.launch {
-            val originalToday = _uiState.value.todayTodos
-            val originalOverdue = _uiState.value.overdueTodos
-            val originalNeedsDate = _uiState.value.needsDateTodos
-            try {
-                _uiState.optimistic(
-                    update = { state ->
-                        state.copy(
-                            todayTodos = state.todayTodos.filter { it.id != todoId },
-                            overdueTodos = state.overdueTodos.filter { it.id != todoId },
-                            needsDateTodos = state.needsDateTodos.filter { it.id != todoId },
-                        )
-                    },
-                    rollback = { state ->
-                        state.copy(
-                            todayTodos = originalToday,
-                            overdueTodos = originalOverdue,
-                            needsDateTodos = originalNeedsDate,
-                        )
-                    },
-                ) {
-                    val result = todoRepository.deleteTodo(todoId)
-                    if (result is ApiResult.Error) throw Exception(result.message)
+            when (val result = todoRepository.deleteTodo(pending.todoId)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(error = result.message) }
+                    doRefresh()
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Optimistic update failed", e)
+                is ApiResult.Loading -> Unit
             }
         }
     }
@@ -307,3 +327,5 @@ class TodayViewModel @Inject constructor(
         }
     }
 }
+
+private const val DELETE_UNDO_WINDOW_MS = 5_000L

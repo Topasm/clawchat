@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
+import com.clawchat.android.core.data.repository.ProjectPlanRepository
 
 private const val TAG = "TasksViewModel"
 
@@ -67,6 +68,7 @@ class TasksViewModel @Inject constructor(
     private val relationshipRepository: TaskRelationshipRepository,
     private val conversationRepository: ConversationRepository,
     private val taskCommentRepository: TaskCommentRepository,
+    private val projectPlanRepository: ProjectPlanRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TasksUiState())
@@ -82,6 +84,17 @@ class TasksViewModel @Inject constructor(
      */
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    /** Hand the task to an agent, then open its thread, where the run reports back. */
+    fun runWithAgent(todoId: String) {
+        viewModelScope.launch {
+            when (val result = projectPlanRepository.run(todoId)) {
+                is ApiResult.Success -> openTaskThread(todoId)
+                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+                ApiResult.Loading -> Unit
+            }
+        }
     }
 
     fun openTaskThread(todoId: String) {

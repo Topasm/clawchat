@@ -211,6 +211,7 @@ fun TasksScreen(
                 },
                 onDelete = { viewModel.deleteTask(selectedTask.id) },
                 onDiscuss = { viewModel.openTaskThread(selectedTask.id) },
+                onRunWithAgent = { viewModel.runWithAgent(selectedTask.id) },
                 notes = if (allowTaskNotes) notesByTask[noteTaskId] ?: TaskNotesState() else null,
                 onNoteChange = { text -> noteTaskId?.let { notesViewModel.edit(it, text) } },
                 onSendNote = { noteTaskId?.let(notesViewModel::send) },
@@ -673,10 +674,29 @@ private fun TaskDetailView(
     onSetDueDate: (String) -> Unit,
     onDelete: () -> Unit,
     onDiscuss: () -> Unit = {},
+    onRunWithAgent: () -> Unit = {},
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     var showDatePicker by rememberSaveable(task.id) { mutableStateOf(false) }
     var detailsOpen by rememberSaveable(task.id) { mutableStateOf(false) }
+    var confirmRun by rememberSaveable(task.id) { mutableStateOf(false) }
+    if (confirmRun) {
+        AlertDialog(
+            onDismissRequest = { confirmRun = false },
+            title = { Text(stringResource(R.string.tasks_run_with_agent)) },
+            text = { Text(stringResource(R.string.tasks_run_confirm, task.title)) },
+            confirmButton = {
+                TextButton(onClick = { confirmRun = false; onRunWithAgent() }) {
+                    Text(stringResource(R.string.tasks_run_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRun = false }) {
+                    Text(stringResource(R.string.tasks_run_cancel))
+                }
+            },
+        )
+    }
     val detailsState = stringResource(if (detailsOpen) R.string.tasks_details_expanded else R.string.tasks_details_collapsed)
     val checkboxDescription = stringResource(
         if (isCompleted) R.string.tasks_mark_incomplete else R.string.tasks_mark_complete,
@@ -782,8 +802,15 @@ private fun TaskDetailView(
                         }
                     }
                     // The thread about this task: steps and delegated runs start there.
-                    TextButton(onClick = onDiscuss) {
-                        Text(stringResource(R.string.tasks_discuss_with_agent))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = onDiscuss) {
+                            Text(stringResource(R.string.tasks_discuss_with_agent))
+                        }
+                        if (task.syncStatus != "local" && !isCompleted) {
+                            TextButton(onClick = { confirmRun = true }) {
+                                Text(stringResource(R.string.tasks_run_with_agent))
+                            }
+                        }
                     }
                     TextButton(
                         onClick = { detailsOpen = !detailsOpen },

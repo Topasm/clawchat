@@ -15,6 +15,8 @@
     <string name="week_status_in_progress">진행 중</string>
     <string name="week_recurring">반복</string>
     <string name="week_mark_complete">%1$s 완료로 표시</string>
+    <string name="week_deleted">작업을 삭제했습니다</string>
+    <string name="week_undo">실행 취소</string>
     <plurals name="week_active_tasks">
         <item quantity="other">활성 작업 %1$d개</item>
     </plurals>
