@@ -19,7 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 atomicwrites = "0.4"
-dirs = "6"
+dirs = "7"
 if-addrs = "0.15"
 keyring = "4"
 serde = { version = "1", features = ["derive"] }
