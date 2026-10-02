@@ -80,6 +80,10 @@ import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.model.RunUpdate
 import com.clawchat.android.core.data.model.TaskDelegation
+import com.clawchat.android.core.ui.ClawCrossfade
+import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.ClawLetterTile
+import com.clawchat.android.core.ui.ClawLoadingState
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.SwipeToDismissCard
@@ -186,45 +190,50 @@ fun ChatScreen(
         }
     }
 
-    if (state.selectedConversationId != null) {
-        val conversationId = requireNotNull(state.selectedConversationId)
-        key(state.selectedConversationId) {
-            ChatDetailView(
-                inputText = draftWorkspace?.let { drafts[ChatDraftKey(it, conversationId).storageKey] }.orEmpty(),
-                draftStorage = draftStorage,
-                onRetryDraft = draftViewModel::retry,
-                onInputChange = { draftViewModel.edit(draftWorkspace, conversationId, it) },
-                showProjectPlanReturn = showProjectPlanReturn,
-                focusComposerOnOpen = focusComposerOnOpen,
-                title = contextTitle ?: state.conversations.firstOrNull { it.id == state.selectedConversationId }?.title,
-                messages = state.messages,
-                streamingText = state.streamingText,
-                isStreaming = state.isStreaming,
-                isLoadingMessages = state.isLoadingMessages || draftWorkspace == null || !draftStorage.ready,
-                onSend = viewModel::sendMessage,
-                onStop = viewModel::stopStreaming,
-                onResumeRun = viewModel::resumeRun,
-                onResolvePermission = viewModel::resolvePermission,
-                onDecideReview = viewModel::decideReview,
-                onBack = leaveConversation,
-                plans = state.plans,
-                planChanges = state.planChanges,
-                pendingPlans = state.pendingPlans,
-                onPlanAction = viewModel::planAction,
+    ClawCrossfade(
+        targetState = state.selectedConversationId,
+        forward = { _, target -> target != null },
+        label = "chat",
+    ) { conversationId ->
+        if (conversationId != null) {
+            key(conversationId) {
+                ChatDetailView(
+                    inputText = draftWorkspace?.let { drafts[ChatDraftKey(it, conversationId).storageKey] }.orEmpty(),
+                    draftStorage = draftStorage,
+                    onRetryDraft = draftViewModel::retry,
+                    onInputChange = { draftViewModel.edit(draftWorkspace, conversationId, it) },
+                    showProjectPlanReturn = showProjectPlanReturn,
+                    focusComposerOnOpen = focusComposerOnOpen,
+                    title = contextTitle ?: state.conversations.firstOrNull { it.id == conversationId }?.title,
+                    messages = state.messages,
+                    streamingText = state.streamingText,
+                    isStreaming = state.isStreaming,
+                    isLoadingMessages = state.isLoadingMessages || draftWorkspace == null || !draftStorage.ready,
+                    onSend = viewModel::sendMessage,
+                    onStop = viewModel::stopStreaming,
+                    onResumeRun = viewModel::resumeRun,
+                    onResolvePermission = viewModel::resolvePermission,
+                    onDecideReview = viewModel::decideReview,
+                    onBack = leaveConversation,
+                    plans = state.plans,
+                    planChanges = state.planChanges,
+                    pendingPlans = state.pendingPlans,
+                    onPlanAction = viewModel::planAction,
+                )
+            }
+        } else if (initialConversationId != null) {
+            // Do not flash the unrelated global conversation list while binding a project thread.
+            ClawLoadingState()
+        } else {
+            ConversationListView(
+                conversations = state.conversations,
+                isLoading = state.isLoadingConversations,
+                onOpenSearch = onOpenSearch,
+                onSelect = viewModel::selectConversation,
+                onCreate = { viewModel.createConversation(newConversationTitle) },
+                onDelete = viewModel::deleteConversation,
             )
         }
-    } else if (initialConversationId != null) {
-        // Do not flash the unrelated global conversation list while binding a project thread.
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-    } else {
-        ConversationListView(
-            conversations = state.conversations,
-            isLoading = state.isLoadingConversations,
-            onOpenSearch = onOpenSearch,
-            onSelect = viewModel::selectConversation,
-            onCreate = { viewModel.createConversation(newConversationTitle) },
-            onDelete = viewModel::deleteConversation,
-        )
     }
 }
 
@@ -272,34 +281,18 @@ private fun ConversationListView(
             )
         },
         floatingActionButton = {
-            SmallFloatingActionButton(
-                modifier = Modifier.size(48.dp),
+            ClawFab(
                 onClick = onCreate,
-                shape = MaterialTheme.shapes.medium,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = stringResource(R.string.chat_new_chat),
-                )
-            }
+                contentDescription = stringResource(R.string.chat_new_chat),
+            )
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (isLoading && conversations.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.chat_loading_conversations),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            ClawLoadingState(
+                modifier = Modifier.padding(padding),
+                message = stringResource(R.string.chat_loading_conversations),
+            )
         } else if (conversations.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -331,11 +324,13 @@ private fun ConversationListView(
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 items(regularConversations, key = { it.id }) { convo ->
-                    SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
-                        ConversationCard(
-                            conversation = convo,
-                            onClick = { onSelect(convo.id) },
-                        )
+                    Box(Modifier.animateItem()) {
+                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                            ConversationCard(
+                                conversation = convo,
+                                onClick = { onSelect(convo.id) },
+                            )
+                        }
                     }
                 }
                 if (taskThreadConversations.isNotEmpty()) {
@@ -348,11 +343,13 @@ private fun ConversationListView(
                         )
                     }
                     items(taskThreadConversations, key = { "thread-${it.id}" }) { convo ->
-                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
-                            ConversationCard(
-                                conversation = convo,
-                                onClick = { onSelect(convo.id) },
-                            )
+                        Box(Modifier.animateItem()) {
+                            SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                                ConversationCard(
+                                    conversation = convo,
+                                    onClick = { onSelect(convo.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -366,11 +363,13 @@ private fun ConversationListView(
                         )
                     }
                     items(agentRunConversations, key = { "agent-${it.id}" }) { convo ->
-                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
-                            ConversationCard(
-                                conversation = convo,
-                                onClick = { onSelect(convo.id) },
-                            )
+                        Box(Modifier.animateItem()) {
+                            SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                                ConversationCard(
+                                    conversation = convo,
+                                    onClick = { onSelect(convo.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -395,21 +394,7 @@ private fun ConversationCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                modifier = Modifier.size(36.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = conversation.title.firstOrNull()?.uppercase(locale) ?: "?",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+            ClawLetterTile(text = conversation.title.firstOrNull()?.uppercase(locale) ?: "?")
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(1.dp),
@@ -576,18 +561,10 @@ private fun ChatDetailView(
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (isLoadingMessages && messages.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.chat_loading_messages),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            ClawLoadingState(
+                modifier = Modifier.padding(padding),
+                message = stringResource(R.string.chat_loading_messages),
+            )
         } else {
             LazyColumn(
                 modifier = Modifier

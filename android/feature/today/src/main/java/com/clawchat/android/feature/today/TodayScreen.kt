@@ -58,6 +58,8 @@ import com.clawchat.android.core.data.model.BriefingSuggestion
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.ClawIconTile
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListSection
 import com.clawchat.android.core.ui.ClawListItemSurface
@@ -123,18 +125,10 @@ fun TodayScreen(
             )
         },
         floatingActionButton = {
-            SmallFloatingActionButton(
-                modifier = Modifier.size(48.dp),
+            ClawFab(
                 onClick = { showQuickAdd = true },
-                shape = MaterialTheme.shapes.medium,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = stringResource(R.string.today_cd_capture_task),
-                )
-            }
+                contentDescription = stringResource(R.string.today_cd_capture_task),
+            )
         },
     ) { padding ->
         PullToRefreshBox(
@@ -583,19 +577,7 @@ private fun EventRow(event: Event) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                modifier = Modifier.size(36.dp),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        ClawIcons.Today,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
+            ClawIconTile(icon = ClawIcons.Today)
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -648,19 +630,7 @@ private fun InboxPreviewSection(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Surface(
-                            modifier = Modifier.size(40.dp),
-                            shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    ClawIcons.Inbox,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
+                        ClawIconTile(icon = ClawIcons.Inbox, size = 40.dp)
                         Column(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(2.dp),

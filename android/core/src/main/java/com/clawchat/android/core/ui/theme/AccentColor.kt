@@ -7,7 +7,7 @@ enum class AccentColor(
     val lightPrimary: Long,
     val darkPrimary: Long,
 ) {
-    System("system", "System", 0xFF6C5CE7, 0, 0),
+    System("system", "System", 0xFF2F67E8, 0, 0),
     Purple("purple", "Purple", 0xFF6C5CE7, 0xFF6C5CE7, 0xFFA29BFE),
     Blue("blue", "Blue", 0xFF1976D2, 0xFF1976D2, 0xFF42A5F5),
     Teal("teal", "Teal", 0xFF00897B, 0xFF00897B, 0xFF4DB6AC),

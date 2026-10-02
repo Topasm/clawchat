@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ClawChat" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Painted before Compose draws its first frame; matches ClawChatTheme's background. -->
+    <style name="Theme.ClawChat" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFF7F8FA</item>
+    </style>
 </resources>
