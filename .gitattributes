@@ -1,0 +1,12 @@
+# Check out text files with LF everywhere. The Windows CI runner used to get
+# CRLF from git autocrlf, and plain `prettier --check` (endOfLine lf) then
+# flagged every file; the retired Prettier baseline had hidden that by
+# normalising line endings before comparing.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+*.gz binary
+*.jks binary
+*.keystore binary
