@@ -6,6 +6,7 @@ from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
 from domain.task import TaskStatus
 from utils.vault_paths import normalize_vault_relative_path
+from schemas._utc import UtcDatetime
 
 
 def _normalize_source_id(value: str | None) -> str | None:
@@ -96,8 +97,8 @@ class ProjectTodoResponse(BaseModel):
     project_id: str | None = None
     status: TaskStatus
     priority: str
-    due_date: datetime | None = None
-    completed_at: datetime | None = None
+    due_date: UtcDatetime | None = None
+    completed_at: UtcDatetime | None = None
     tags: list[str] | None = None
     parent_id: str | None = None
     sort_order: int = 0
@@ -113,8 +114,8 @@ class ProjectTodoResponse(BaseModel):
         description="Deprecated compatibility shadow; use /api/task-relationships instead",
         json_schema_extra={"deprecated": True},
     )
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     conversation_id: str | None = None
     subtask_count: int = 0
     completed_subtask_count: int = 0
@@ -150,8 +151,8 @@ class TodoResponse(BaseModel):
     project_id: str | None = None
     status: TaskStatus
     priority: str
-    due_date: datetime | None = None
-    completed_at: datetime | None = None
+    due_date: UtcDatetime | None = None
+    completed_at: UtcDatetime | None = None
     tags: list[str] | None = None
     parent_id: str | None = None
     sort_order: int = 0
@@ -166,14 +167,14 @@ class TodoResponse(BaseModel):
         description="Deprecated compatibility shadow; use /api/task-relationships instead",
         json_schema_extra={"deprecated": True},
     )
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     clarification_questions: list[str] | None = None
     clarification_answers: dict[str, str] | None = None
 
     # Legacy fields retained for client/database compatibility; no task spawning.
     recurrence_rule: str | None = None
-    recurrence_end: datetime | None = None
+    recurrence_end: UtcDatetime | None = None
     is_recurring: bool = False
     recurring_source_id: str | None = None
 

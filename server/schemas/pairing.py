@@ -1,11 +1,11 @@
-from datetime import datetime
 
 from pydantic import BaseModel
+from schemas._utc import UtcDatetime
 
 
 class PairingSessionResponse(BaseModel):
     code: str
-    expires_at: datetime
+    expires_at: UtcDatetime
     qr_payload: str  # JSON string with host info + code for QR encoding
     host_id: str
     host_public_key: str
@@ -36,8 +36,8 @@ class PairedDeviceResponse(BaseModel):
     id: str
     name: str
     device_type: str
-    paired_at: datetime
-    last_seen: datetime
+    paired_at: UtcDatetime
+    last_seen: UtcDatetime
     is_active: bool
 
     model_config = {"from_attributes": True}

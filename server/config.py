@@ -257,6 +257,10 @@ class Settings(BaseSettings):
     # Scheduler
     enable_scheduler: bool = False
     briefing_time: str = "08:00"
+    #: IANA zone the briefing and weekly review times are read in; empty means
+    #: the server's own local zone, which for the bundled desktop server is the
+    #: user's. The times used to be UTC, so 08:00 arrived at 17:00 in Seoul.
+    schedule_timezone: str = ""
     reminder_check_interval: int = 5
 
     # Agent run watchdog: a run whose heartbeat stops is failed so it can be

@@ -1,6 +1,6 @@
-from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from schemas._utc import UtcDatetime
 
 
 class NoteCreate(BaseModel):
@@ -33,5 +33,5 @@ class NoteResponse(BaseModel):
     id: str
     content: str
     project_id: str | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime

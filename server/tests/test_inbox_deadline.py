@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
@@ -28,8 +29,8 @@ def test_dates_are_anchored_to_capture_week_not_refresh(text, expected):
         now=datetime(2026, 9, 20, tzinfo=timezone.utc),
     )
     assert result.local_date.isoformat() == expected
-    assert result.due_date.hour == 23
-    assert result.due_date.tzinfo is None
+    assert result.due_date.tzinfo == timezone.utc
+    assert result.due_date.astimezone(ZoneInfo("Asia/Seoul")).hour == 23
     assert result.is_past == (expected < "2026-09-20")
 
 

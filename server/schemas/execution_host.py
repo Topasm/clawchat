@@ -1,11 +1,11 @@
 """API contracts for execution hosts and the paths projects have on them."""
 
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from models.execution_host import EXECUTION_HOST_KINDS
+from schemas._utc import UtcDatetime
 
 _KIND_PATTERN = f"^({'|'.join(EXECUTION_HOST_KINDS)})$"
 
@@ -35,9 +35,9 @@ class ExecutionHostResponse(BaseModel):
     target: str | None = None
     platform: str | None = None
     is_enabled: bool
-    last_seen_at: datetime | None = None
-    created_at: datetime
-    updated_at: datetime
+    last_seen_at: UtcDatetime | None = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -63,7 +63,7 @@ class ProjectHostPathResponse(BaseModel):
     host_id: str
     path: str
     #: When the worker on that host last sent what the folder says about itself.
-    context_updated_at: datetime | None = None
+    context_updated_at: UtcDatetime | None = None
     #: Relative paths the folder snapshot was assembled from.
     context_files: list[str] = []
 
@@ -89,7 +89,7 @@ class HostProjectPathResponse(BaseModel):
 
     project_id: str
     path: str
-    context_updated_at: datetime | None = None
+    context_updated_at: UtcDatetime | None = None
 
 
 class ProjectWorkspaceResponse(BaseModel):
@@ -107,7 +107,7 @@ class ProjectWorkspaceResponse(BaseModel):
     #: Every machine this project has a path on.
     paths: list[ProjectHostPathResponse] = []
     #: Folder snapshot on the chosen machine, if its worker has sent one.
-    context_updated_at: datetime | None = None
+    context_updated_at: UtcDatetime | None = None
     context_files: list[str] = []
 
 

@@ -4,6 +4,8 @@ import json
 from uuid import uuid4
 
 import pytest
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from sqlalchemy import select, func
 
 from main import app
@@ -93,7 +95,13 @@ async def test_capture_preview_defer_restore_approve_follow_up_and_undo(
         )
         assert applied.status_code == 200, applied.text
         assert applied.json()["todo"]["parent_id"] == branch.id
-        assert applied.json()["todo"]["due_date"] == "2026-09-04T23:59:59"
+        # The end of 09-04 in the device zone, as a UTC instant.
+        expected_due = (
+            datetime(2026, 9, 4, 23, 59, 59, tzinfo=ZoneInfo(device_zone))
+            .astimezone(timezone.utc)
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
+        assert applied.json()["todo"]["due_date"] == expected_due
         assert (
             await client.get("/api/todos/placements/review-state", headers=auth_headers)
         ).json()["items"] == []

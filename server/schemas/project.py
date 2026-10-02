@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from domain.project import ProjectStatus
+from schemas._utc import UtcDatetime
 
 
 class ProjectCreate(BaseModel):
@@ -46,7 +47,7 @@ class ProjectResponse(BaseModel):
     description: str | None = None
     execution_instructions: str | None = None
     status: ProjectStatus
-    deadline: datetime | None = None
+    deadline: UtcDatetime | None = None
     root_task_id: str | None = None
     graph_revision: int = Field(ge=0)
     default_execution_provider: str | None = None
@@ -54,8 +55,8 @@ class ProjectResponse(BaseModel):
     execution_workspace_path: str | None = None
     execution_workspace_isolation: str = "local"
     execution_base_branch: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     task_count: int = Field(default=0, ge=0)
     completed_task_count: int = Field(default=0, ge=0)
     conversation_id: str | None = None

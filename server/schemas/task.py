@@ -14,6 +14,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from schemas._utc import UtcDatetime
 
 
 class AgentTaskResponse(BaseModel):
@@ -35,9 +36,9 @@ class AgentTaskResponse(BaseModel):
     payload: dict | None = None
     conversation_id: str | None = None
     message_id: str | None = None
-    created_at: datetime
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
+    created_at: UtcDatetime
+    started_at: UtcDatetime | None = None
+    completed_at: UtcDatetime | None = None
     sub_tasks: list["AgentTaskResponse"] | None = None
 
     model_config = {"from_attributes": True}
@@ -224,7 +225,7 @@ class PlanResponse(BaseModel):
     suggested_skills: list[str] | None = None  # new
     suggested_project_title: str | None = None
     subtasks: list[PlanSubtask] = Field(default_factory=list)
-    created_at: datetime
+    created_at: UtcDatetime
 
     # Computed display fields
     subtask_count: int = 0

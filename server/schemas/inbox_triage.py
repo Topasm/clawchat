@@ -1,11 +1,12 @@
 """Revision-bound AI suggestions for placing Inbox tasks."""
 
-from datetime import date, datetime
+from datetime import date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from schemas.common import TodoIdList
+from schemas._utc import UtcDatetime
 
 
 class InboxTriagePreviewRequest(BaseModel):
@@ -25,7 +26,7 @@ class InboxTriagePreviewRequest(BaseModel):
 
 class InboxDeadlineSuggestion(BaseModel):
     task_id: str
-    due_date: datetime
+    due_date: UtcDatetime
     local_date: date
     timezone: str
     source_text: str

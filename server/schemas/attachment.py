@@ -1,6 +1,6 @@
-from datetime import datetime
 
 from pydantic import BaseModel
+from schemas._utc import UtcDatetime
 
 
 class AttachmentResponse(BaseModel):
@@ -11,6 +11,6 @@ class AttachmentResponse(BaseModel):
     size_bytes: int
     todo_id: str | None = None
     url: str
-    created_at: datetime
+    created_at: UtcDatetime
 
     model_config = {"from_attributes": True}

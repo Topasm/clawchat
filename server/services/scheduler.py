@@ -3,7 +3,8 @@
 import asyncio
 import logging
 import os
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -39,6 +40,51 @@ def _is_watchable_vault_path(vault_path: str, path: str) -> bool:
     ):
         return False
     return os.path.isdir(path) or filename.endswith(".md") or "." not in filename
+
+
+def schedule_zone() -> tzinfo:
+    """The zone the daily briefing and weekly review clock times are read in.
+
+    ``settings.schedule_timezone`` names it; empty means the server's local
+    zone, which for the desktop app's bundled server is the user's own.
+    """
+    name = (settings.schedule_timezone or "").strip()
+    if name:
+        try:
+            return ZoneInfo(name)
+        except (ZoneInfoNotFoundError, ValueError):
+            logger.warning("Unknown SCHEDULE_TIMEZONE %r; using the local zone", name)
+    local = datetime.now().astimezone().tzinfo
+    return local if local is not None else timezone.utc
+
+
+def next_daily_occurrence(now: datetime, clock: str, zone: tzinfo) -> datetime:
+    """The next ``HH:MM`` on the wall clock of ``zone`` at or after ``now``."""
+    parts = clock.split(":")
+    hour = int(parts[0]) if parts and parts[0] else 9
+    minute = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+    local_now = now.astimezone(zone)
+    target = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if target <= local_now:
+        target = (local_now + timedelta(days=1)).replace(
+            hour=hour, minute=minute, second=0, microsecond=0
+        )
+    return target
+
+
+def next_weekly_occurrence(now: datetime, weekday: int, clock: str, zone: tzinfo) -> datetime:
+    """The next ``weekday`` (Monday=0) at ``HH:MM`` on the wall clock of ``zone``."""
+    parts = clock.split(":")
+    hour = int(parts[0]) if parts and parts[0] else 9
+    minute = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+    local_now = now.astimezone(zone)
+    days_ahead = (weekday - local_now.weekday()) % 7
+    target = (local_now + timedelta(days=days_ahead)).replace(
+        hour=hour, minute=minute, second=0, microsecond=0
+    )
+    if target <= local_now:
+        target += timedelta(days=7)
+    return target
 
 
 def _parse_quiet_hours(quiet_str: str) -> tuple[int, int]:
@@ -144,20 +190,12 @@ class Scheduler:
             logger.debug("Reminder loop cancelled")
 
     async def _briefing_loop(self) -> None:
-        logger.info("Briefing loop started (target: %s UTC)", settings.briefing_time)
+        zone = schedule_zone()
+        logger.info("Briefing loop started (target: %s %s)", settings.briefing_time, zone)
         try:
             while True:
                 now = datetime.now(timezone.utc)
-                # Parse briefing_time setting (HH:MM)
-                parts = settings.briefing_time.split(":")
-                target_time = time(int(parts[0]), int(parts[1]), tzinfo=timezone.utc)
-                target = datetime.combine(now.date(), target_time)
-
-                if target <= now:
-                    # Already past today's briefing time, schedule for tomorrow
-                    target = datetime.combine(
-                        now.date() + timedelta(days=1), target_time
-                    )
+                target = next_daily_occurrence(now, settings.briefing_time, zone)
 
                 sleep_seconds = (target - now).total_seconds()
                 logger.debug("Briefing scheduled in %.0fs", sleep_seconds)
@@ -201,34 +239,24 @@ class Scheduler:
 
     async def _weekly_review_loop(self) -> None:
         """Run weekly on configured day/time to generate a GTD review."""
+        zone = schedule_zone()
         logger.info(
-            "Weekly review loop started (day: %s, time: %s UTC)",
+            "Weekly review loop started (day: %s, time: %s %s)",
             settings.weekly_review_day,
             settings.weekly_review_time,
+            zone,
         )
         day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
         target_weekday = 6  # default sunday
         if settings.weekly_review_day.lower() in day_names:
             target_weekday = day_names.index(settings.weekly_review_day.lower())
 
-        parts = settings.weekly_review_time.split(":")
-        target_hour = int(parts[0]) if parts else 9
-        target_minute = int(parts[1]) if len(parts) > 1 else 0
-
         try:
             while True:
                 now = datetime.now(timezone.utc)
-                # Calculate next target day/time
-                days_ahead = (target_weekday - now.weekday()) % 7
-                if days_ahead == 0:
-                    target = now.replace(hour=target_hour, minute=target_minute, second=0, microsecond=0)
-                    if target <= now:
-                        days_ahead = 7
-                        target += timedelta(days=7)
-                else:
-                    target = (now + timedelta(days=days_ahead)).replace(
-                        hour=target_hour, minute=target_minute, second=0, microsecond=0
-                    )
+                target = next_weekly_occurrence(
+                    now, target_weekday, settings.weekly_review_time, zone
+                )
 
                 sleep_seconds = (target - now).total_seconds()
                 logger.debug("Weekly review scheduled in %.0fs", sleep_seconds)

@@ -1,6 +1,6 @@
-from datetime import datetime
 
 from pydantic import BaseModel
+from schemas._utc import UtcDatetime
 
 
 class SearchHit(BaseModel):
@@ -9,4 +9,4 @@ class SearchHit(BaseModel):
     title: str | None = None
     preview: str
     rank: float
-    created_at: datetime
+    created_at: UtcDatetime

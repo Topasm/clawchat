@@ -61,15 +61,16 @@ def suggest_deadline(
         )
     except ValueError:
         return None
-    # Existing task/calendar APIs represent date-only deadlines as local wall time.
-    # SQLite drops DateTime offsets, so storing UTC here would move the visible
-    # calendar day in negative-offset zones. Keep the local date, not an instant.
-    due = datetime.combine(local_date, time(23, 59, 59))
+    # The deadline is the end of that day in the user's zone, as an instant:
+    # due dates are UTC instants everywhere else (the date picker sends one,
+    # the Today window is computed in UTC against the client offset), and
+    # responses now carry their zone, so the calendar day survives the trip.
+    due = datetime.combine(local_date, time(23, 59, 59), tzinfo=zone).astimezone(timezone.utc)
     return InboxDeadlineSuggestion(
         task_id=task_id,
         due_date=due,
         local_date=local_date,
         timezone=timezone_name,
         source_text=match.group(0),
-        is_past=due.replace(tzinfo=zone) < (now or datetime.now(timezone.utc)),
+        is_past=due < (now or datetime.now(timezone.utc)),
     )
