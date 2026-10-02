@@ -4,7 +4,6 @@ import asyncio
 import logging
 import os
 from datetime import datetime, time, timedelta, timezone, tzinfo
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -14,6 +13,7 @@ from services.notifications import (
     briefing_service,
     reminder_service,
     nudge_service,
+    schedule_settings,
     weekly_review_service,
 )
 from services.ai.ai_service import AIService
@@ -43,48 +43,17 @@ def _is_watchable_vault_path(vault_path: str, path: str) -> bool:
 
 
 def schedule_zone() -> tzinfo:
-    """The zone the daily briefing and weekly review clock times are read in.
+    """The zone the briefing and weekly review clock times are read in.
 
-    ``settings.schedule_timezone`` names it; empty means the server's local
-    zone, which for the desktop app's bundled server is the user's own.
+    ``SCHEDULE_TIMEZONE`` names the default; the Settings page can override it.
+    Empty means the server's local zone, which for the desktop app's bundled
+    server is the user's own.
     """
-    name = (settings.schedule_timezone or "").strip()
-    if name:
-        try:
-            return ZoneInfo(name)
-        except (ZoneInfoNotFoundError, ValueError):
-            logger.warning("Unknown SCHEDULE_TIMEZONE %r; using the local zone", name)
-    local = datetime.now().astimezone().tzinfo
-    return local if local is not None else timezone.utc
+    return schedule_settings.resolve_zone(settings.schedule_timezone)
 
 
-def next_daily_occurrence(now: datetime, clock: str, zone: tzinfo) -> datetime:
-    """The next ``HH:MM`` on the wall clock of ``zone`` at or after ``now``."""
-    parts = clock.split(":")
-    hour = int(parts[0]) if parts and parts[0] else 9
-    minute = int(parts[1]) if len(parts) > 1 and parts[1] else 0
-    local_now = now.astimezone(zone)
-    target = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if target <= local_now:
-        target = (local_now + timedelta(days=1)).replace(
-            hour=hour, minute=minute, second=0, microsecond=0
-        )
-    return target
-
-
-def next_weekly_occurrence(now: datetime, weekday: int, clock: str, zone: tzinfo) -> datetime:
-    """The next ``weekday`` (Monday=0) at ``HH:MM`` on the wall clock of ``zone``."""
-    parts = clock.split(":")
-    hour = int(parts[0]) if parts and parts[0] else 9
-    minute = int(parts[1]) if len(parts) > 1 and parts[1] else 0
-    local_now = now.astimezone(zone)
-    days_ahead = (weekday - local_now.weekday()) % 7
-    target = (local_now + timedelta(days=days_ahead)).replace(
-        hour=hour, minute=minute, second=0, microsecond=0
-    )
-    if target <= local_now:
-        target += timedelta(days=7)
-    return target
+next_daily_occurrence = schedule_settings.next_daily_occurrence
+next_weekly_occurrence = schedule_settings.next_weekly_occurrence
 
 
 def _parse_quiet_hours(quiet_str: str) -> tuple[int, int]:
@@ -136,11 +105,10 @@ class Scheduler:
             asyncio.create_task(self._run_watchdog_loop(), name="scheduler-run-watchdog"),
         ]
 
-        # Weekly review loop
-        if settings.enable_weekly_review:
-            self._tasks.append(
-                asyncio.create_task(self._weekly_review_loop(), name="scheduler-weekly-review")
-            )
+        # Weekly review loop: idles while disabled, so it can be switched on later.
+        self._tasks.append(
+            asyncio.create_task(self._weekly_review_loop(), name="scheduler-weekly-review")
+        )
 
         # Nudge loop (proactive task reminders)
         if settings.enable_nudges:
@@ -189,17 +157,31 @@ class Scheduler:
         except asyncio.CancelledError:
             logger.debug("Reminder loop cancelled")
 
+    async def _schedule(self) -> schedule_settings.ScheduleSettings:
+        try:
+            async with self.session_factory() as db:
+                return await schedule_settings.load(db)
+        except Exception:
+            logger.exception("Could not read the schedule settings; using the environment")
+            return schedule_settings.defaults_from_env()
+
     async def _briefing_loop(self) -> None:
-        zone = schedule_zone()
-        logger.info("Briefing loop started (target: %s %s)", settings.briefing_time, zone)
+        logger.info("Briefing loop started")
+        changed = schedule_settings.subscribe()
         try:
             while True:
+                changed.clear()
+                plan = await self._schedule()
+                if not plan.briefing_enabled:
+                    logger.info("Daily briefing is off; waiting for it to be switched on")
+                    await schedule_settings.wait_for_change(changed, None)
+                    continue
                 now = datetime.now(timezone.utc)
-                target = next_daily_occurrence(now, settings.briefing_time, zone)
-
+                target = next_daily_occurrence(now, plan.briefing_time, plan.zone)
                 sleep_seconds = (target - now).total_seconds()
-                logger.debug("Briefing scheduled in %.0fs", sleep_seconds)
-                await asyncio.sleep(sleep_seconds)
+                logger.debug("Briefing scheduled in %.0fs (%s)", sleep_seconds, target)
+                if await schedule_settings.wait_for_change(changed, sleep_seconds):
+                    continue  # the time or zone changed: plan again
 
                 try:
                     async with self.session_factory() as db:
@@ -218,6 +200,8 @@ class Scheduler:
                     logger.exception("Error generating daily briefing")
         except asyncio.CancelledError:
             logger.debug("Briefing loop cancelled")
+        finally:
+            schedule_settings.unsubscribe(changed)
 
     async def _midnight_reset_loop(self) -> None:
         logger.info("Midnight reset loop started")
@@ -238,29 +222,28 @@ class Scheduler:
             logger.debug("Midnight reset loop cancelled")
 
     async def _weekly_review_loop(self) -> None:
-        """Run weekly on configured day/time to generate a GTD review."""
-        zone = schedule_zone()
-        logger.info(
-            "Weekly review loop started (day: %s, time: %s %s)",
-            settings.weekly_review_day,
-            settings.weekly_review_time,
-            zone,
-        )
-        day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        target_weekday = 6  # default sunday
-        if settings.weekly_review_day.lower() in day_names:
-            target_weekday = day_names.index(settings.weekly_review_day.lower())
-
+        """Run weekly on the configured day/time to generate a GTD review."""
+        logger.info("Weekly review loop started")
+        changed = schedule_settings.subscribe()
         try:
             while True:
+                changed.clear()
+                plan = await self._schedule()
+                if not plan.weekly_review_enabled:
+                    logger.debug("Weekly review is off; waiting for it to be switched on")
+                    await schedule_settings.wait_for_change(changed, None)
+                    continue
                 now = datetime.now(timezone.utc)
                 target = next_weekly_occurrence(
-                    now, target_weekday, settings.weekly_review_time, zone
+                    now,
+                    schedule_settings.WEEKDAYS.index(plan.weekly_review_day),
+                    plan.weekly_review_time,
+                    plan.zone,
                 )
-
                 sleep_seconds = (target - now).total_seconds()
-                logger.debug("Weekly review scheduled in %.0fs", sleep_seconds)
-                await asyncio.sleep(sleep_seconds)
+                logger.debug("Weekly review scheduled in %.0fs (%s)", sleep_seconds, target)
+                if await schedule_settings.wait_for_change(changed, sleep_seconds):
+                    continue
 
                 try:
                     async with self.session_factory() as db:
@@ -276,6 +259,8 @@ class Scheduler:
                     logger.exception("Error generating weekly review")
         except asyncio.CancelledError:
             logger.debug("Weekly review loop cancelled")
+        finally:
+            schedule_settings.unsubscribe(changed)
 
     async def _run_watchdog_loop(self) -> None:
         """Fail runs whose heartbeat lapsed; remind about runs waiting for input."""
