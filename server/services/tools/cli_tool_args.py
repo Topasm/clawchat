@@ -50,6 +50,13 @@ def codex_args(access: CliToolAccess) -> list[str]:
         f'mcp_servers.{name}.bearer_token_env_var="{TOKEN_ENV}"',
         "-c",
         f"mcp_servers.{name}.tool_timeout_sec={TOOL_CALL_TIMEOUT_SECONDS}",
+        # Codex has its own per-tool approval gate for MCP servers. A delegated
+        # run is unattended (`--ask-for-approval never`), so without this every
+        # call ends in "MCP tool call requires approval, but approval policy is
+        # never". ClawChat already holds approval-required calls at its own
+        # endpoint, so Codex may pass them straight through.
+        "-c",
+        f'mcp_servers.{name}.default_tools_approval_mode="approve"',
     ]
 
 

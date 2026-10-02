@@ -489,6 +489,9 @@ async def test_codex_gets_the_endpoint_and_the_token_by_environment(monkeypatch,
     timeout_flag = next(arg for arg in cmd if arg.startswith("mcp_servers.clawchat.tool_timeout_sec="))
     assert int(timeout_flag.split("=")[1]) > approvals.APPROVAL_TIMEOUT_SECONDS
     assert captured["env"][cli_tool_args.TOKEN_ENV] == "s3cr3t-run-token"
+    # Codex's own MCP approval gate must be off: the run is unattended and
+    # ClawChat already holds approval-required calls at its endpoint.
+    assert 'mcp_servers.clawchat.default_tools_approval_mode="approve"' in cmd
 
 
 # --- Management API -----------------------------------------------------------------
