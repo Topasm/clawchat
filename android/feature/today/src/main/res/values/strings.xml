@@ -62,6 +62,8 @@
 
     <string name="today_status_cancelled">Cancelled</string>
     <string name="today_task_mark_complete">Mark %1$s complete</string>
+    <string name="today_deleted">Task deleted</string>
+    <string name="today_undo">Undo</string>
     <string name="today_task_mark_incomplete">Mark %1$s incomplete</string>
 
     <string name="today_calendar_title">Calendar</string>

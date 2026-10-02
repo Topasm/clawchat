@@ -62,11 +62,16 @@ import com.clawchat.android.core.ui.localizedErrorMessage
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeekScreen(
     viewModel: WeekViewModel = hiltViewModel(),
+    onOpenTask: (String) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val locale = LocalLocale.current.platformLocale
@@ -74,13 +79,28 @@ fun WeekScreen(
         weekRange(LocalDate.now(), WeekFields.of(locale).firstDayOfWeek)
     }
     var showCreateSheet by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(currentWeek) {
         viewModel.show(currentWeek)
     }
 
+    val deletedMessage = stringResource(R.string.week_deleted)
+    val undoLabel = stringResource(R.string.week_undo)
+    LaunchedEffect(state.pendingDeletion?.token) {
+        val pending = state.pendingDeletion ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = deletedMessage,
+            actionLabel = undoLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(pending.token)
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
@@ -206,6 +226,7 @@ private fun WeekContent(
                     onToggle = onToggle,
                     onDelete = onDelete,
                     onSetDueToday = onSetDueToday,
+                    onOpen = onOpenTask,
                 )
             }
         }
@@ -218,6 +239,7 @@ private fun WeekContent(
                     onToggle = onToggle,
                     onDelete = onDelete,
                     onSetDueToday = onSetDueToday,
+                    onOpen = onOpenTask,
                 )
             }
         }
@@ -258,6 +280,7 @@ private fun WeekTaskSection(
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
+    onOpen: (String) -> Unit,
 ) {
     ClawListSection(
         tone = tone,
@@ -269,7 +292,7 @@ private fun WeekTaskSection(
                     onDelete = { onDelete(task.id) },
                     onSetDueToday = { onSetDueToday(task.id) },
                 ) {
-                    WeekTaskRow(task = task, onToggle = { onToggle(task.id) })
+                    WeekTaskRow(task = task, onToggle = { onToggle(task.id) }, onOpen = { onOpen(task.id) })
                 }
             }
         }
@@ -278,11 +301,11 @@ private fun WeekTaskSection(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun WeekTaskRow(task: Todo, onToggle: () -> Unit) {
+private fun WeekTaskRow(task: Todo, onToggle: () -> Unit, onOpen: () -> Unit) {
     val view = LocalView.current
     val checkboxDescription = stringResource(R.string.week_mark_complete, task.title)
 
-    ClawListItemSurface {
+    ClawListItemSurface(onClick = onOpen) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,

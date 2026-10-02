@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 data class WeekUiState(
     val range: WeekRange? = null,
@@ -31,7 +33,11 @@ data class WeekUiState(
     val isLoading: Boolean = false,
     val isOffline: Boolean = false,
     val error: String? = null,
+    val pendingDeletion: WeekPendingDeletion? = null,
 )
+
+/** A row swiped away and not yet deleted on the server. */
+data class WeekPendingDeletion(val token: Long, val todoId: String)
 
 @HiltViewModel
 class WeekViewModel @Inject constructor(
@@ -74,10 +80,40 @@ class WeekViewModel @Inject constructor(
 
     fun deleteTask(todoId: String) {
         if (findTask(todoId) == null) return
+        _uiState.value.pendingDeletion?.let { commitDelete(it.token) }
+        val pending = WeekPendingDeletion(token = ++deletionToken, todoId = todoId)
+        removeTask(todoId)
+        _uiState.update { it.copy(pendingDeletion = pending) }
+        deletionCommitJob = viewModelScope.launch {
+            delay(DELETE_UNDO_WINDOW_MS)
+            commitDelete(pending.token)
+        }
+    }
+
+    private var deletionToken = 0L
+    private var deletionCommitJob: Job? = null
+
+    /** The row leaves at once; the server call waits for the undo window. */
+    fun undoDelete(token: Long) {
+        if (_uiState.value.pendingDeletion?.token != token) return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
+        _uiState.update { it.copy(pendingDeletion = null) }
+        refresh()
+    }
+
+    fun commitDelete(token: Long) {
+        val pending = _uiState.value.pendingDeletion?.takeIf { it.token == token } ?: return
+        deletionCommitJob?.cancel()
+        deletionCommitJob = null
+        _uiState.update { it.copy(pendingDeletion = null) }
         viewModelScope.launch {
-            when (val result = todoRepository.deleteTodo(todoId)) {
-                is ApiResult.Success -> removeTask(todoId)
-                is ApiResult.Error -> _uiState.update { it.copy(error = result.message) }
+            when (val result = todoRepository.deleteTodo(pending.todoId)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(error = result.message) }
+                    refresh()
+                }
                 is ApiResult.Loading -> Unit
             }
         }
@@ -202,7 +238,9 @@ class WeekViewModel @Inject constructor(
     }
 
     private fun applySnapshot(tasks: List<Todo>, range: WeekRange) {
-        val groups = groupWeekTasks(tasks, range, zoneProvider.current())
+        val pendingId = _uiState.value.pendingDeletion?.todoId
+        val visible = if (pendingId == null) tasks else tasks.filterNot { it.id == pendingId }
+        val groups = groupWeekTasks(visible, range, zoneProvider.current())
         _uiState.update {
             it.copy(
                 range = range,
@@ -238,3 +276,5 @@ class WeekViewModel @Inject constructor(
         const val MAX_PAGES = 25
     }
 }
+
+private const val DELETE_UNDO_WINDOW_MS = 5_000L

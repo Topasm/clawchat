@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.launch
+import com.clawchat.android.core.ui.LocalAttentionCount
 import com.clawchat.android.core.ui.LocalOpenNavigationMenu
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -169,9 +170,10 @@ fun ClawChatNavGraph(
         navController.navigate(NavRoute.Search.route)
     }
 
-    CompositionLocalProvider(LocalOpenNavigationMenu provides {
-        drawerScope.launch { drawer.open() }
-    }) {
+    CompositionLocalProvider(
+        LocalOpenNavigationMenu provides { drawerScope.launch { drawer.open() } },
+        LocalAttentionCount provides attentionCount,
+    ) {
     ModalNavigationDrawer(
         drawerState = drawer,
         // Button opens the drawer. Do not steal Android's edge-back or planner swipes.
@@ -350,8 +352,10 @@ fun ClawChatNavGraph(
                         onOpenSearch = navigateToSearch,
                         onOpenReview = { reviewId -> navigateToReview(reviewId) },
                         onOpenRun = { runId ->
+                            // Review and Runs link to each other; keep one of each on the stack.
                             navController.navigate(NavRoute.Runs.destination(runId)) {
                                 launchSingleTop = true
+                                popUpTo(NavRoute.Runs.routePattern) { inclusive = true }
                             }
                         },
                         onOpenTask = { todoId ->
@@ -417,8 +421,10 @@ fun ClawChatNavGraph(
                             navController.navigate(destination) { launchSingleTop = true }
                         },
                         onOpenRun = { runId ->
+                            // Review and Runs link to each other; keep one of each on the stack.
                             navController.navigate(NavRoute.Runs.destination(runId)) {
                                 launchSingleTop = true
+                                popUpTo(NavRoute.Runs.routePattern) { inclusive = true }
                             }
                         },
                     )
@@ -441,7 +447,10 @@ fun ClawChatNavGraph(
                     AgentRunsScreen(
                         onBack = { navController.popBackStack() },
                         onOpenReview = { run ->
-                            navController.navigate(NavRoute.Review.forRun(run.id)) { launchSingleTop = true }
+                            navController.navigate(NavRoute.Review.forRun(run.id)) {
+                                launchSingleTop = true
+                                popUpTo(NavRoute.Review.routePattern) { inclusive = true }
+                            }
                         },
                         initialRunId = entry.arguments?.getString(NavRoute.Runs.ARG_RUN_ID),
                     )
