@@ -70,6 +70,7 @@ import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
 import com.clawchat.android.core.ui.icons.ClawIcons
+import com.clawchat.android.core.ui.localizedErrorMessage
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -86,6 +87,7 @@ fun TodayScreen(
     onNavigateToReview: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onOpenTask: (String) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showQuickAdd by remember { mutableStateOf(false) }
@@ -156,6 +158,11 @@ fun TodayScreen(
                         )
                     }
                 }
+                state.error?.let { error ->
+                    item {
+                        ClawStatusChip(text = localizedErrorMessage(error), tone = ClawTone.Error)
+                    }
+                }
 
                 item {
                     TodayHeroCard(
@@ -195,6 +202,7 @@ fun TodayScreen(
                             onToggle = viewModel::toggleComplete,
                             onDelete = viewModel::deleteTask,
                             onSetDueToday = viewModel::setDueToday,
+                            onOpen = onOpenTask,
                         )
                     }
                 }
@@ -209,6 +217,7 @@ fun TodayScreen(
                             onToggle = viewModel::toggleComplete,
                             onDelete = viewModel::deleteTask,
                             onSetDueToday = viewModel::setDueToday,
+                            onOpen = onOpenTask,
                         )
                     }
                 }
@@ -223,6 +232,7 @@ fun TodayScreen(
                             onToggle = viewModel::toggleComplete,
                             onDelete = viewModel::deleteTask,
                             onSetDueToday = viewModel::setDueToday,
+                            onOpen = onOpenTask,
                         )
                     }
                 }
@@ -239,6 +249,7 @@ fun TodayScreen(
                             todos = state.inboxPreview,
                             totalInboxCount = state.inboxCount,
                             onNavigateToInbox = onNavigateToInbox,
+                            onOpenTask = onOpenTask,
                         )
                     }
                 }
@@ -446,6 +457,7 @@ private fun TodoSectionCard(
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
+    onOpen: (String) -> Unit,
 ) {
     ClawListSection(
         tone = tone,
@@ -464,6 +476,7 @@ private fun TodoSectionCard(
                     onToggle = { onToggle(todo.id) },
                     onDelete = { onDelete(todo.id) },
                     onSetDueToday = { onSetDueToday(todo.id) },
+                    onOpen = { onOpen(todo.id) },
                 )
             }
         }
@@ -476,9 +489,10 @@ private fun SwipeableTodoCard(
     onToggle: () -> Unit,
     onDelete: () -> Unit,
     onSetDueToday: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
-        TodoRow(todo = todo, onToggle = onToggle)
+        TodoRow(todo = todo, onToggle = onToggle, onOpen = onOpen)
     }
 }
 
@@ -487,6 +501,7 @@ private fun SwipeableTodoCard(
 private fun TodoRow(
     todo: Todo,
     onToggle: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     val isCompleted = todo.status == TaskStatus.COMPLETED
     val view = LocalView.current
@@ -495,7 +510,7 @@ private fun TodoRow(
         todo.title,
     )
 
-    ClawListItemSurface {
+    ClawListItemSurface(onClick = onOpen) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -608,6 +623,7 @@ private fun InboxPreviewSection(
     todos: List<Todo>,
     totalInboxCount: Int,
     onNavigateToInbox: () -> Unit,
+    onOpenTask: (String) -> Unit,
 ) {
     ClawListSection(
         tone = ClawTone.Warning,
@@ -623,7 +639,7 @@ private fun InboxPreviewSection(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
             todos.forEach { todo ->
-                ClawListItemSurface {
+                ClawListItemSurface(onClick = { onOpenTask(todo.id) }) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(),

@@ -82,6 +82,7 @@ fun PlannerScreen(
                     onNavigateToReview = onNavigateToReview,
                     onNavigateToRuns = onNavigateToRuns,
                     onNavigateToSearch = onNavigateToSearch,
+                    onOpenTask = onOpenTask,
                 )
                 PlannerPage.WEEK -> WeekScreen()
                 PlannerPage.MONTH -> CalendarScreen(onOpenTask = onOpenTask)

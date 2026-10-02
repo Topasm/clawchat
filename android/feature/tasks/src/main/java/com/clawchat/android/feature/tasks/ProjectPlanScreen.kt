@@ -73,7 +73,7 @@ fun ProjectPlanScreen(
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.refresh()
-            while (isActive) { delay(10_000); viewModel.refresh() }
+            while (isActive) { delay(10_000); viewModel.refresh(silent = true) }
         }
     }
     LaunchedEffect(state.openConversation, state.openRun) {

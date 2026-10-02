@@ -29,6 +29,8 @@
     <string name="settings_account">계정</string>
     <string name="settings_account_description">화면 설정은 유지하고 로그아웃합니다.</string>
     <string name="settings_log_out">로그아웃</string>
+    <string name="settings_log_out_confirm_title">이 서버에서 로그아웃할까요?</string>
+    <string name="settings_log_out_confirm_message">이 기기에서 연결 정보를 지웁니다. 설정 화면에서 언제든 다시 페어링할 수 있습니다.</string>
     <string name="settings_diagnostics_copied">진단 정보를 복사했습니다</string>
 
     <string name="settings_connection_diagnostics">연결 진단</string>

@@ -80,6 +80,18 @@ class TasksViewModel @Inject constructor(
      * Open (creating if needed) the thread about this task, where what the
      * agent creates becomes steps of the task and delegated work runs it.
      */
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
     fun openTaskThread(todoId: String) {
         viewModelScope.launch {
             when (val result = conversationRepository.getOrCreateForTodo(todoId)) {
