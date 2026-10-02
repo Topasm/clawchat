@@ -249,4 +249,9 @@ interface ClawChatApi {
 
     @PUT("api/settings")
     suspend fun saveSettings(@Body payload: Map<String, @JvmSuppressWildcards Any>): SettingsResponse
+
+    // --- Push ---
+
+    @POST("api/notifications/register-token")
+    suspend fun registerPushToken(@Body body: RegisterPushTokenRequest): RegisterPushTokenResponse
 }

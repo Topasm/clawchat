@@ -47,6 +47,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Push: token rotation and foreground messages from the paired server -->
+        <service
+            android:name=".notification.ClawChatMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Widget: Todo Tracking -->
         <receiver
             android:name="com.clawchat.android.widget.tracking.TodoTrackingWidgetReceiver"
