@@ -5,6 +5,7 @@ import SystemPromptSection from '../components/settings/SystemPromptSection';
 import AIModelSettings from '../components/settings/AIModelSettings';
 import AgentToolsSettings from '../components/settings/AgentToolsSettings';
 import CalendarSyncSettings from '../components/settings/CalendarSyncSettings';
+import ScheduleSettings from '../components/settings/ScheduleSettings';
 import CalendarSubscriptionCard from '../components/shared/CalendarSubscriptionCard';
 import ObsidianStatusCard from '../components/shared/ObsidianStatusCard';
 import SegmentedControl from '../components/shared/SegmentedControl';
@@ -505,6 +506,8 @@ export default function SettingsPage() {
         </SettingsSection>
 
         <AgentToolsSettings />
+
+        <ScheduleSettings />
 
         <SettingsSection title={t('workspaceSettings.sections.workspace')}>
           <SettingsRow

@@ -7997,6 +7997,151 @@
         "title": "ReviewSubjectType",
         "type": "string"
       },
+      "ScheduleSettingsResponse": {
+        "description": "When the daily briefing and the weekly review fire, in the user's zone.",
+        "properties": {
+          "briefing_enabled": {
+            "title": "Briefing Enabled",
+            "type": "boolean"
+          },
+          "briefing_time": {
+            "description": "HH:MM on the wall clock of `timezone`.",
+            "title": "Briefing Time",
+            "type": "string"
+          },
+          "effective_timezone": {
+            "description": "The zone actually in use.",
+            "title": "Effective Timezone",
+            "type": "string"
+          },
+          "next_briefing_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Briefing At"
+          },
+          "next_weekly_review_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Weekly Review At"
+          },
+          "timezone": {
+            "description": "IANA zone; empty means the server's local zone.",
+            "title": "Timezone",
+            "type": "string"
+          },
+          "weekly_review_day": {
+            "description": "monday … sunday",
+            "title": "Weekly Review Day",
+            "type": "string"
+          },
+          "weekly_review_enabled": {
+            "title": "Weekly Review Enabled",
+            "type": "boolean"
+          },
+          "weekly_review_time": {
+            "title": "Weekly Review Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "briefing_enabled",
+          "briefing_time",
+          "weekly_review_enabled",
+          "weekly_review_day",
+          "weekly_review_time",
+          "timezone",
+          "effective_timezone"
+        ],
+        "title": "ScheduleSettingsResponse",
+        "type": "object"
+      },
+      "ScheduleSettingsUpdate": {
+        "description": "A partial update; omitted fields keep their value.",
+        "properties": {
+          "briefing_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Briefing Enabled"
+          },
+          "briefing_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Briefing Time"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "weekly_review_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Review Day"
+          },
+          "weekly_review_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Review Enabled"
+          },
+          "weekly_review_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Review Time"
+          }
+        },
+        "title": "ScheduleSettingsUpdate",
+        "type": "object"
+      },
       "ScheduledJobCreate": {
         "properties": {
           "enabled": {
@@ -17180,6 +17325,80 @@
           }
         ],
         "summary": "Save Settings",
+        "tags": [
+          "settings",
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/schedule": {
+      "get": {
+        "description": "The briefing and weekly review schedule in effect for this user.",
+        "operationId": "get_schedule_api_settings_schedule_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Schedule",
+        "tags": [
+          "settings",
+          "settings"
+        ]
+      },
+      "put": {
+        "description": "Change the schedule; the scheduler picks it up immediately.",
+        "operationId": "save_schedule_api_settings_schedule_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save Schedule",
         "tags": [
           "settings",
           "settings"

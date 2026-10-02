@@ -1542,4 +1542,28 @@ export const koreanUiTranslations: Record<string, string> = {
   'Agent {{progress}}%': '에이전트 {{progress}}%',
   '{{count}} reviews': '검토 {{count}}건',
   '1 file': '파일 1개',
+  Briefings: '브리핑',
+  'Daily briefing': '일일 브리핑',
+  'Next: {{when}}': '다음: {{when}}',
+  'A morning summary of what is due today, delivered to chat.':
+    '오늘 할 일을 아침에 요약해 채팅으로 보내 드립니다.',
+  'Briefing time': '브리핑 시간',
+  'A look back at the week and what to carry forward.':
+    '한 주를 돌아보고 다음 주로 가져갈 일을 정리합니다.',
+  'Review day': '리뷰 요일',
+  'Review time': '리뷰 시간',
+  'Time zone': '시간대',
+  'Times above are read in {{zone}}.': '위 시간은 {{zone}} 기준입니다.',
+  "Times above are read in the server's zone, {{zone}}.":
+    '위 시간은 서버 시간대({{zone}}) 기준입니다.',
+  'Use {{zone}}': '{{zone}} 사용',
+  'Could not load the briefing schedule.': '브리핑 일정을 불러오지 못했습니다.',
+  'Could not save the schedule.': '일정을 저장하지 못했습니다.',
+  Monday: '월요일',
+  Tuesday: '화요일',
+  Wednesday: '수요일',
+  Thursday: '목요일',
+  Friday: '금요일',
+  Saturday: '토요일',
+  Sunday: '일요일',
 };

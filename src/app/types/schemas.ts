@@ -771,6 +771,18 @@ export const SettingsResponseSchema = z.object({
   updated_at: z.string(),
 });
 
+export const ScheduleSettingsResponseSchema = z.object({
+  briefing_enabled: z.boolean(),
+  briefing_time: z.string(),
+  weekly_review_enabled: z.boolean(),
+  weekly_review_day: z.string(),
+  weekly_review_time: z.string(),
+  timezone: z.string(),
+  effective_timezone: z.string(),
+  next_briefing_at: z.string().nullable().optional(),
+  next_weekly_review_at: z.string().nullable().optional(),
+});
+
 // -- Health -----------------------------------------------------------------
 
 export const HealthResponseSchema = z.object({
@@ -907,6 +919,7 @@ export type TodayResponse = z.infer<typeof TodayResponseSchema>;
 
 export type SettingsPayload = z.infer<typeof SettingsPayloadSchema>;
 export type SettingsResponse = z.infer<typeof SettingsResponseSchema>;
+export type ScheduleSettingsResponse = z.infer<typeof ScheduleSettingsResponseSchema>;
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 export type CapabilitiesResponse = z.infer<typeof CapabilitiesResponseSchema>;
 export type TagsResponse = z.infer<typeof TagsResponseSchema>;
