@@ -1,10 +1,10 @@
 """Contracts for durable, versioned project artifacts."""
 
-from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from domain.review import ArtifactRevisionStatus, ArtifactType
+from schemas._utc import UtcDatetime
 
 
 class ArtifactCreate(BaseModel):
@@ -34,8 +34,8 @@ class ArtifactResponse(BaseModel):
     current_version: int = Field(ge=1)
     source: str
     created_by: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -49,7 +49,7 @@ class ArtifactRevisionResponse(BaseModel):
     source: str
     created_by: str | None = None
     status: ArtifactRevisionStatus
-    created_at: datetime
-    reviewed_at: datetime | None = None
+    created_at: UtcDatetime
+    reviewed_at: UtcDatetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

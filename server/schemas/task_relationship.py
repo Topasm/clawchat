@@ -1,12 +1,12 @@
 """API schemas for normalized task relationships."""
 
-from datetime import datetime
 from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from domain.task_relationship import TaskRelationshipType
+from schemas._utc import UtcDatetime
 
 NonBlankString = Annotated[
     str,
@@ -73,8 +73,8 @@ class TaskRelationshipResponse(BaseModel):
     label: str | None = None
     created_by: str
     proposal_id: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
     model_config = {"from_attributes": True}
 

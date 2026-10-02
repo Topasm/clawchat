@@ -1,6 +1,6 @@
-from datetime import datetime
 
 from pydantic import BaseModel, Field
+from schemas._utc import UtcDatetime
 
 
 class ScheduledJobCreate(BaseModel):
@@ -44,14 +44,14 @@ class ScheduledJobResponse(BaseModel):
     rrule: str
     timezone: str
     enabled: bool
-    next_run_at: datetime | None
+    next_run_at: UtcDatetime | None
     conversation_id: str | None
-    last_run_at: datetime | None
+    last_run_at: UtcDatetime | None
     last_run_id: str | None
     last_run_status: str | None
     last_error: str | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class ScheduledJobListResponse(BaseModel):

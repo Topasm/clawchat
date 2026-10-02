@@ -72,19 +72,21 @@ async def request_decision(
 ) -> ToolDecision:
     """Park the run until the user decides; a timeout counts as a denial."""
     future: asyncio.Future[ToolDecision] = asyncio.get_running_loop().create_future()
+    # The run is committed as waiting before the call is listed as pending:
+    # a reader that found the pending call first (the run response, a test)
+    # would otherwise reach the session in the middle of that commit.
+    await _set_run_waiting(
+        db,
+        run_id,
+        waiting=True,
+        message=f"Wants to use {describe_tool(tool_name)}",
+        event="waiting_permission",
+    )
     _waiting[call_id] = (run_id, future)
     try:
-        await _set_run_waiting(
-            db,
-            run_id,
-            waiting=True,
-            message=f"Wants to use {describe_tool(tool_name)}",
-            event="waiting_permission",
-        )
-        try:
-            decision = await asyncio.wait_for(asyncio.shield(future), timeout)
-        except TimeoutError:
-            decision = ToolDecision.DENY
+        decision = await asyncio.wait_for(asyncio.shield(future), timeout)
+    except TimeoutError:
+        decision = ToolDecision.DENY
     finally:
         _waiting.pop(call_id, None)
     await _set_run_waiting(

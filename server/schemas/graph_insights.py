@@ -1,6 +1,5 @@
 """Named API contracts for deterministic task-graph insights."""
 
-from datetime import datetime
 
 from domain.graph_insights import (
     GraphDueRisk,
@@ -11,6 +10,7 @@ from domain.graph_insights import (
 )
 from domain.task import TaskStatus
 from pydantic import BaseModel, Field
+from schemas._utc import UtcDatetime
 
 
 class GraphInsightScope(BaseModel):
@@ -37,7 +37,7 @@ class GraphInsightNode(BaseModel):
     scope_role: GraphScopeRole
     execution_state: GraphExecutionState
     estimated_minutes: int | None = None
-    due_date: datetime | None = None
+    due_date: UtcDatetime | None = None
     dependency_ids: list[str] = Field(default_factory=list)
     direct_blocker_ids: list[str] = Field(default_factory=list)
     transitive_blocker_ids: list[str] = Field(default_factory=list)
@@ -102,7 +102,7 @@ class GraphInsightSummary(BaseModel):
 
 class GraphInsightsResponse(BaseModel):
     graph_revision: int = Field(ge=0)
-    generated_at: datetime
+    generated_at: UtcDatetime
     scope: GraphInsightScope
     nodes: list[GraphInsightNode]
     summary: GraphInsightSummary

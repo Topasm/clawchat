@@ -1,6 +1,6 @@
-from datetime import datetime
 
 from pydantic import BaseModel, Field
+from schemas._utc import UtcDatetime
 
 
 class CalendarSourceResponse(BaseModel):
@@ -9,7 +9,7 @@ class CalendarSourceResponse(BaseModel):
     color: str | None
     import_enabled: bool
     is_write_target: bool
-    last_synced_at: datetime | None
+    last_synced_at: UtcDatetime | None
 
 
 class CalendarAccountResponse(BaseModel):
@@ -17,7 +17,7 @@ class CalendarAccountResponse(BaseModel):
     label: str
     server_url: str
     username: str
-    last_sync_at: datetime | None
+    last_sync_at: UtcDatetime | None
     last_error: str | None
     calendars: list[CalendarSourceResponse]
 

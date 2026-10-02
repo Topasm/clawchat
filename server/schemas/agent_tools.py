@@ -1,9 +1,9 @@
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from domain.agent_tools import McpTransport, ToolDecision, ToolTrust
+from schemas._utc import UtcDatetime
 
 SERVER_NAME_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,39}$"
 
@@ -44,7 +44,7 @@ class McpServerResponse(BaseModel):
     trust: ToolTrust
     enabled: bool
     tools: list[McpToolInfo]
-    tools_refreshed_at: datetime | None
+    tools_refreshed_at: UtcDatetime | None
     last_error: str | None
 
 
@@ -84,9 +84,9 @@ class ToolCallResponse(BaseModel):
     status: str
     result_preview: str | None
     error: str | None
-    created_at: datetime
-    decided_at: datetime | None
-    completed_at: datetime | None
+    created_at: UtcDatetime
+    decided_at: UtcDatetime | None
+    completed_at: UtcDatetime | None
 
 
 class ToolCallListResponse(BaseModel):

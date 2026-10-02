@@ -1,6 +1,5 @@
 """API contracts for durable agent execution attempts."""
 
-from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -8,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from domain.agent_run import AgentRunStatus
 from domain.graph_insights import GraphExecutionState
 from domain.task import TaskStatus
+from schemas._utc import UtcDatetime
 
 
 class AgentRunRetryRequest(BaseModel):
@@ -106,12 +106,12 @@ class AgentRunResponse(BaseModel):
     is_adopted: bool = False
     # A tool call the run is paused on until the user allows or denies it.
     pending_tool_call: PendingToolCall | None = None
-    created_at: datetime
-    started_at: datetime | None = None
-    heartbeat_at: datetime | None = None
-    completed_at: datetime | None = None
-    cancel_requested_at: datetime | None = None
-    updated_at: datetime
+    created_at: UtcDatetime
+    started_at: UtcDatetime | None = None
+    heartbeat_at: UtcDatetime | None = None
+    completed_at: UtcDatetime | None = None
+    cancel_requested_at: UtcDatetime | None = None
+    updated_at: UtcDatetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -134,6 +134,6 @@ class AgentRunEventResponse(BaseModel):
     message: str | None = None
     progress: int | None = Field(default=None, ge=0, le=100)
     payload: dict[str, Any] | None = None
-    created_at: datetime
+    created_at: UtcDatetime
 
     model_config = ConfigDict(from_attributes=True)

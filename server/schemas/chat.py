@@ -1,7 +1,7 @@
 import json as _json
-from datetime import datetime
 
 from pydantic import BaseModel, model_validator
+from schemas._utc import UtcDatetime
 
 
 class CreateConversationRequest(BaseModel):
@@ -13,8 +13,8 @@ class CreateConversationRequest(BaseModel):
 class ConversationResponse(BaseModel):
     id: str
     title: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     is_archived: bool
     last_message: str | None = None
     project_id: str | None = None
@@ -60,7 +60,7 @@ class MessageResponse(BaseModel):
     message_type: str
     intent: str | None = None
     metadata: dict | None = None
-    created_at: datetime
+    created_at: UtcDatetime
 
     model_config = {"from_attributes": True}
 
@@ -119,8 +119,8 @@ class MessageEditRequest(BaseModel):
 class ConversationDetailResponse(BaseModel):
     id: str
     title: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     is_archived: bool
     project_id: str | None = None
     project_todo_id: str | None = None

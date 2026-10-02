@@ -1,12 +1,12 @@
 """Contracts for the unified review inbox."""
 
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
 from domain.task import TaskStatus
+from schemas._utc import UtcDatetime
 
 
 class ReviewDecisionRequest(BaseModel):
@@ -36,8 +36,8 @@ class ReviewItemResponse(BaseModel):
     status: ReviewStatus
     summary: str
     risk_level: ReviewRiskLevel
-    requested_at: datetime
-    reviewed_at: datetime | None = None
+    requested_at: UtcDatetime
+    reviewed_at: UtcDatetime | None = None
     review_note: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 

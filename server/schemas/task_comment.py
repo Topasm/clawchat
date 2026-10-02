@@ -1,10 +1,10 @@
 """API schemas for user-authored task comment threads."""
 
-from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
+from schemas._utc import UtcDatetime
 
 NonBlankComment = Annotated[
     str,
@@ -29,7 +29,7 @@ class TaskCommentResponse(BaseModel):
     todo_id: str
     content: str
     created_by: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
     model_config = {"from_attributes": True}
