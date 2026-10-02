@@ -160,24 +160,6 @@ fun TasksScreen(
         }
     }
 
-    // A failed load, save or "Discuss with agent" used to vanish into state.error.
-    val errorText = state.error?.let { localizedErrorMessage(it) }
-    LaunchedEffect(errorText) {
-        if (errorText != null) {
-            snackbarHostState.showSnackbar(message = errorText, withDismissAction = true)
-            viewModel.clearError()
-        }
-    }
-
-    // A failed load, save or "Discuss with agent" used to vanish into state.error.
-    val errorText = state.error?.let { localizedErrorMessage(it) }
-    LaunchedEffect(errorText) {
-        if (errorText != null) {
-            snackbarHostState.showSnackbar(message = errorText, withDismissAction = true)
-            viewModel.clearError()
-        }
-    }
-
     LaunchedEffect(initialTodoId) {
         if (initialSelectionConsumed || initialTodoId == null) return@LaunchedEffect
         initialSelectionConsumed = true

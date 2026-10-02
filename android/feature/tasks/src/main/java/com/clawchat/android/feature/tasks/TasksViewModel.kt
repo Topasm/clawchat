@@ -84,14 +84,6 @@ class TasksViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 
-    fun clearError() {
-        _uiState.update { it.copy(error = null) }
-    }
-
-    fun clearError() {
-        _uiState.update { it.copy(error = null) }
-    }
-
     fun openTaskThread(todoId: String) {
         viewModelScope.launch {
             when (val result = conversationRepository.getOrCreateForTodo(todoId)) {
