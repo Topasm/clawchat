@@ -99,7 +99,7 @@ class TaskStepsViewModelTest {
 
     @Test fun `restored draft survives load failure and blank add does nothing`() = runTest {
         coEvery { repository.listTodos(any()) } returns ApiResult.Error("Offline")
-        val vm = TaskStepsViewModel(repository, SavedStateHandle(mapOf("step:parent" to "Saved")))
+        val vm = TaskStepsViewModel(repository, SavedStateHandle(mapOf("step:parent" to "Saved")), syncManager)
         vm.load(parent.id)
         advanceUntilIdle()
         assertEquals("Saved", vm.steps.value.getValue(parent.id).draft)
