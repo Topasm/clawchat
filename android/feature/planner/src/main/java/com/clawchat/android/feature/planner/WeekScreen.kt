@@ -135,6 +135,7 @@ fun WeekScreen(
                 onToggle = viewModel::toggleComplete,
                 onDelete = viewModel::deleteTask,
                 onSetDueToday = viewModel::setDueToday,
+                onOpenTask = onOpenTask,
                 onCreate = { showCreateSheet = true },
             )
         }
@@ -159,6 +160,7 @@ private fun WeekContent(
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
+    onOpenTask: (String) -> Unit,
     onCreate: () -> Unit,
 ) {
     val range = state.range
