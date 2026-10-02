@@ -48,6 +48,13 @@ android {
             "UPDATE_REPOSITORY",
             "\"${project.findProperty("UPDATE_REPOSITORY") as? String ?: "Topasm/clawchat"}\"",
         )
+
+        // Push notifications: Firebase settings come from Gradle properties or the
+        // environment instead of a google-services.json, so the build never depends
+        // on a file that is not checked in. All empty = push off (see gradle.properties).
+        for (name in listOf("FIREBASE_PROJECT_ID", "FIREBASE_APP_ID", "FIREBASE_API_KEY", "FIREBASE_SENDER_ID")) {
+            buildConfigField("String", name, "\"${releaseSigningProperty(name) ?: ""}\"")
+        }
     }
 
     signingConfigs {
@@ -147,6 +154,10 @@ dependencies {
 
     // AndroidX
     implementation(libs.androidx.core.ktx)
+
+    // Push (Firebase Cloud Messaging), configured at build time; see PushMessaging.kt
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     // Testing
     testImplementation(libs.junit)
