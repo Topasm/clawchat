@@ -93,6 +93,10 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import com.clawchat.android.core.ui.localizedErrorMessage
 
 @Composable
 private fun formatRelativeTime(isoTimestamp: String): String {
@@ -183,6 +187,22 @@ fun ChatScreen(
     }
     BackHandler(enabled = state.selectedConversationId != null, onBack = leaveConversation)
     val lifecycleOwner = LocalLifecycleOwner.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    // Failed sends, deletes and loads used to vanish into state.error.
+    val errorText = state.error?.let { localizedErrorMessage(it) }
+    LaunchedEffect(errorText) {
+        if (errorText != null) {
+            snackbarHostState.showSnackbar(message = errorText, withDismissAction = true)
+            viewModel.clearError()
+        }
+    }
+    // New task threads and agent-run conversations appear when the list is
+    // shown again, not only when the ViewModel is recreated.
+    LaunchedEffect(state.selectedConversationId == null, lifecycleOwner) {
+        if (state.selectedConversationId == null) lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.loadConversations(silent = true)
+        }
+    }
     LaunchedEffect(state.selectedConversationId, lifecycleOwner) {
         if (state.selectedConversationId != null) lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             // Revalidate on return; skip overlapping loads and user actions in the ViewModel.
@@ -215,6 +235,7 @@ fun ChatScreen(
                     onResolvePermission = viewModel::resolvePermission,
                     onDecideReview = viewModel::decideReview,
                     onBack = leaveConversation,
+                    snackbarHostState = snackbarHostState,
                     plans = state.plans,
                     planChanges = state.planChanges,
                     pendingPlans = state.pendingPlans,
@@ -232,6 +253,8 @@ fun ChatScreen(
                 onSelect = viewModel::selectConversation,
                 onCreate = { viewModel.createConversation(newConversationTitle) },
                 onDelete = viewModel::deleteConversation,
+                onRefresh = { viewModel.loadConversations() },
+                snackbarHostState = snackbarHostState,
             )
         }
     }
@@ -246,6 +269,8 @@ private fun ConversationListView(
     onSelect: (String) -> Unit,
     onCreate: () -> Unit,
     onDelete: (String) -> Unit,
+    onRefresh: () -> Unit,
+    snackbarHostState: SnackbarHostState,
 ) {
     // Threads about a task or project sit in their own group; the flat list
     // keeps only unscoped chats, as on the web.
@@ -259,6 +284,7 @@ private fun ConversationListView(
         conversations.filter(Conversation::isAgentRun)
     }
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 navigationIcon = { com.clawchat.android.core.ui.NavigationMenuButton() },
@@ -288,61 +314,43 @@ private fun ConversationListView(
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        if (isLoading && conversations.isEmpty()) {
-            ClawLoadingState(
-                modifier = Modifier.padding(padding),
-                message = stringResource(R.string.chat_loading_conversations),
-            )
-        } else if (conversations.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                ClawEmptyState(
-                    title = stringResource(R.string.chat_no_conversations),
-                    description = stringResource(R.string.chat_no_conversations_description),
-                    icon = {
-                        Icon(
-                            ClawIcons.Chat,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                    actionLabel = stringResource(R.string.chat_start_chatting),
-                    onActionClick = onCreate,
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 72.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp),
-            ) {
-                items(regularConversations, key = { it.id }) { convo ->
-                    Box(Modifier.animateItem()) {
-                        SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
-                            ConversationCard(
-                                conversation = convo,
-                                onClick = { onSelect(convo.id) },
+        PullToRefreshBox(
+            isRefreshing = isLoading && conversations.isNotEmpty(),
+            onRefresh = onRefresh,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            if (isLoading && conversations.isEmpty()) {
+                ClawLoadingState(message = stringResource(R.string.chat_loading_conversations))
+            } else if (conversations.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ClawEmptyState(
+                        title = stringResource(R.string.chat_no_conversations),
+                        description = stringResource(R.string.chat_no_conversations_description),
+                        icon = {
+                            Icon(
+                                ClawIcons.Chat,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
                             )
-                        }
-                    }
+                        },
+                        actionLabel = stringResource(R.string.chat_start_chatting),
+                        onActionClick = onCreate,
+                    )
                 }
-                if (taskThreadConversations.isNotEmpty()) {
-                    item(key = "task-thread-conversations-heading") {
-                        Text(
-                            text = stringResource(R.string.chat_task_threads),
-                            modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    items(taskThreadConversations, key = { "thread-${it.id}" }) { convo ->
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 72.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                ) {
+                    items(regularConversations, key = { it.id }) { convo ->
                         Box(Modifier.animateItem()) {
                             SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
                                 ConversationCard(
@@ -352,23 +360,43 @@ private fun ConversationListView(
                             }
                         }
                     }
-                }
-                if (agentRunConversations.isNotEmpty()) {
-                    item(key = "agent-run-conversations-heading") {
-                        Text(
-                            text = stringResource(R.string.chat_agent_run_conversations),
-                            modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    if (taskThreadConversations.isNotEmpty()) {
+                        item(key = "task-thread-conversations-heading") {
+                            Text(
+                                text = stringResource(R.string.chat_task_threads),
+                                modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        items(taskThreadConversations, key = { "thread-${it.id}" }) { convo ->
+                            Box(Modifier.animateItem()) {
+                                SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                                    ConversationCard(
+                                        conversation = convo,
+                                        onClick = { onSelect(convo.id) },
+                                    )
+                                }
+                            }
+                        }
                     }
-                    items(agentRunConversations, key = { "agent-${it.id}" }) { convo ->
-                        Box(Modifier.animateItem()) {
-                            SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
-                                ConversationCard(
-                                    conversation = convo,
-                                    onClick = { onSelect(convo.id) },
-                                )
+                    if (agentRunConversations.isNotEmpty()) {
+                        item(key = "agent-run-conversations-heading") {
+                            Text(
+                                text = stringResource(R.string.chat_agent_run_conversations),
+                                modifier = Modifier.padding(start = 2.dp, top = 16.dp, bottom = 4.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        items(agentRunConversations, key = { "agent-${it.id}" }) { convo ->
+                            Box(Modifier.animateItem()) {
+                                SwipeToDismissCard(onDelete = { onDelete(convo.id) }) {
+                                    ConversationCard(
+                                        conversation = convo,
+                                        onClick = { onSelect(convo.id) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -447,6 +475,7 @@ private fun ChatDetailView(
     onResolvePermission: (String, Boolean) -> Unit,
     onDecideReview: (String, ReviewDecision, String?) -> Unit,
     onBack: () -> Unit,
+    snackbarHostState: SnackbarHostState,
 ) {
     val listState = rememberLazyListState()
     val locale = LocalLocale.current.platformLocale
@@ -475,6 +504,7 @@ private fun ChatDetailView(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {

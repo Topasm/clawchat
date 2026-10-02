@@ -29,6 +29,8 @@
     <string name="settings_account">Account</string>
     <string name="settings_account_description">Sign out while keeping your visual preferences.</string>
     <string name="settings_log_out">Log Out</string>
+    <string name="settings_log_out_confirm_title">Log out of this server?</string>
+    <string name="settings_log_out_confirm_message">This phone forgets the connection. You can pair again from the setup screen at any time.</string>
     <string name="settings_diagnostics_copied">Diagnostics copied</string>
 
     <string name="settings_connection_diagnostics">Connection diagnostics</string>

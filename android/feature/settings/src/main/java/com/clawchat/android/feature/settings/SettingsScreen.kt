@@ -84,6 +84,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val diagnosticsCopiedMessage = stringResource(R.string.settings_diagnostics_copied)
     var showLocalModeConfirmation by remember { mutableStateOf(false) }
+    var showLogoutConfirmation by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -217,10 +218,7 @@ fun SettingsScreen(
                     ) {
                         TextButton(
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = {
-                                viewModel.logout()
-                                onLoggedOut()
-                            },
+                            onClick = { showLogoutConfirmation = true },
                             colors = ButtonDefaults.textButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error,
                             ),
@@ -235,6 +233,31 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (showLogoutConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmation = false },
+            title = { Text(stringResource(R.string.settings_log_out_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_log_out_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutConfirmation = false
+                        viewModel.logout()
+                        onLoggedOut()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text(stringResource(R.string.settings_log_out))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirmation = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
     }
 
     if (showLocalModeConfirmation) {

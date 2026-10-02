@@ -61,9 +61,14 @@ class ChatViewModel @Inject constructor(
         loadConversations()
     }
 
-    fun loadConversations() {
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
+    /** [silent] revalidates without the loading state, for returns to the list. */
+    fun loadConversations(silent: Boolean = false) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingConversations = true) }
+            if (!silent) _uiState.update { it.copy(isLoadingConversations = true) }
             when (val result = conversationRepository.listConversations()) {
                 is ApiResult.Success -> _uiState.update { it.copy(conversations = result.data.items, isLoadingConversations = false) }
                 is ApiResult.Error -> _uiState.update { it.copy(isLoadingConversations = false, error = result.message) }

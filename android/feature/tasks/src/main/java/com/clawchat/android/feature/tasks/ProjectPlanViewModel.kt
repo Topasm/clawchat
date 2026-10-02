@@ -52,12 +52,18 @@ class ProjectPlanViewModel @Inject constructor(
 
     init { refresh() }
 
-    fun refresh() {
+    /**
+     * [silent] revalidates in the background: the progress bar stays hidden and
+     * the action buttons stay enabled, so the 10 s poll does not flash the screen.
+     */
+    fun refresh(silent: Boolean = false) {
         if (state.value.busy || load?.isActive == true) return
         val selected = state.value.project
         load?.cancel()
         val token = ++generation
-        state.update { it.copy(loading = true, error = null, runsAvailable = false) }
+        state.update {
+            if (silent) it else it.copy(loading = true, error = null, runsAvailable = false)
+        }
         load = viewModelScope.launch {
             if (selected == null) {
                 when (val result = repository.list()) {
