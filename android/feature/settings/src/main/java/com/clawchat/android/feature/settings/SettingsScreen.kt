@@ -616,7 +616,7 @@ private fun ThemeModeOption(
     Surface(
         modifier = modifier,
         onClick = onClick,
-        shape = RoundedCornerShape(6.dp),
+        shape = MaterialTheme.shapes.medium,
         color = containerColor,
         border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
         tonalElevation = 0.dp,

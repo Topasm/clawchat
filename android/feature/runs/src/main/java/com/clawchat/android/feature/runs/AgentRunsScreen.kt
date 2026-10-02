@@ -60,6 +60,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunEvent
 import com.clawchat.android.core.data.model.AgentRunStatus
+import com.clawchat.android.core.ui.ClawCrossfade
+import com.clawchat.android.core.ui.ClawSegmentedToggle
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawMetricPill
@@ -137,9 +139,6 @@ fun AgentRunsScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = { showCliSessions = !showCliSessions }) {
-                        Text(stringResource(if (showCliSessions) R.string.runs_title else R.string.cli_sessions_title))
-                    }
                     IconButton(onClick = viewModel::refresh) {
                         Icon(
                             Icons.Default.Refresh,
@@ -151,67 +150,80 @@ fun AgentRunsScreen(
             )
         },
     ) { padding ->
-        if (showCliSessions) {
-            CliSessionsScreen(modifier = Modifier.padding(padding))
-            return@Scaffold
-        }
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::refresh,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            when {
-                state.isLoading && state.runs.isEmpty() -> RunsLoadingState()
-                else -> LazyColumn(
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            ClawSegmentedToggle(
+                options = listOf(stringResource(R.string.runs_title), stringResource(R.string.cli_sessions_title)),
+                selectedIndex = if (showCliSessions) 1 else 0,
+                onSelect = { showCliSessions = it == 1 },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+            ClawCrossfade(
+                targetState = showCliSessions,
+                modifier = Modifier.weight(1f),
+                forward = { _, cli -> cli },
+                label = "runs",
+            ) { cli ->
+                if (cli) {
+                    CliSessionsScreen(modifier = Modifier.fillMaxSize())
+                } else PullToRefreshBox(
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = viewModel::refresh,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = 12.dp,
-                        end = 12.dp,
-                        top = 4.dp,
-                        bottom = 24.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    item {
-                        RunSummaryCard(state)
-                    }
+                    when {
+                        state.isLoading && state.runs.isEmpty() -> RunsLoadingState()
+                        else -> LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = 4.dp,
+                                bottom = 24.dp,
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            item {
+                                RunSummaryCard(state)
+                            }
 
-                    item {
-                        RunFilters(
-                            selected = state.filter,
-                            onSelect = viewModel::setFilter,
-                        )
-                    }
+                            item {
+                                RunFilters(
+                                    selected = state.filter,
+                                    onSelect = viewModel::setFilter,
+                                )
+                            }
 
-                    errorMessage?.let { message ->
-                        item {
-                            ClawStatusChip(text = message, tone = ClawTone.Error)
-                        }
-                    }
+                            errorMessage?.let { message ->
+                                item {
+                                    ClawStatusChip(text = message, tone = ClawTone.Error)
+                                }
+                            }
 
-                    noticeMessage?.let { message ->
-                        item {
-                            ClawStatusChip(text = message, tone = ClawTone.Success)
-                        }
-                    }
+                            noticeMessage?.let { message ->
+                                item {
+                                    ClawStatusChip(text = message, tone = ClawTone.Success)
+                                }
+                            }
 
-                    if (state.visibleRuns.isEmpty()) {
-                        item {
-                            ClawEmptyState(
-                                title = stringResource(R.string.runs_empty_title),
-                                description = stringResource(R.string.runs_empty_description),
-                                actionLabel = stringResource(R.string.runs_refresh_action),
-                                onActionClick = viewModel::refresh,
-                            )
-                        }
-                    } else {
-                        items(state.visibleRuns, key = AgentRun::id) { run ->
-                            AgentRunListItem(
-                                run = run,
-                                onClick = { viewModel.selectRun(run.id) },
-                            )
+                            if (state.visibleRuns.isEmpty()) {
+                                item {
+                                    ClawEmptyState(
+                                        title = stringResource(R.string.runs_empty_title),
+                                        description = stringResource(R.string.runs_empty_description),
+                                        actionLabel = stringResource(R.string.runs_refresh_action),
+                                        onActionClick = viewModel::refresh,
+                                    )
+                                }
+                            } else {
+                                items(state.visibleRuns, key = AgentRun::id) { run ->
+                                    Box(Modifier.animateItem()) {
+                                        AgentRunListItem(
+                                            run = run,
+                                            onClick = { viewModel.selectRun(run.id) },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

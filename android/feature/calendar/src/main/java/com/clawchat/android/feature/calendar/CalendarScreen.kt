@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.Event
+import com.clawchat.android.core.ui.ClawFab
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawSectionCard
@@ -113,18 +114,10 @@ fun CalendarScreen(
             )
         },
         floatingActionButton = {
-            SmallFloatingActionButton(
-                modifier = Modifier.size(48.dp),
+            ClawFab(
                 onClick = { editing = EditorTarget(null) },
-                shape = MaterialTheme.shapes.medium,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = stringResource(R.string.calendar_new_entry),
-                )
-            }
+                contentDescription = stringResource(R.string.calendar_new_entry),
+            )
         },
     ) { padding ->
         LazyColumn(

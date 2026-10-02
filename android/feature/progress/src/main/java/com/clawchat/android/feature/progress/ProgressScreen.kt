@@ -250,20 +250,22 @@ private fun ProgressContent(
                 )
             }
             items(state.attentionItems, key = NowItem::stableId) { item ->
-                NowAttentionRow(
-                    item = item,
-                    onClick = {
-                        if (item.canHandleOnDevice) {
-                            onSelectAction(item)
-                        } else {
-                            when (item.source) {
-                                NowSource.TODO -> item.todoId?.let(onOpenTask)
-                                NowSource.REVIEW -> onOpenReview(item.sourceId)
-                                NowSource.AGENT_RUN -> onOpenRun(item.sourceId)
+                Box(Modifier.animateItem()) {
+                    NowAttentionRow(
+                        item = item,
+                        onClick = {
+                            if (item.canHandleOnDevice) {
+                                onSelectAction(item)
+                            } else {
+                                when (item.source) {
+                                    NowSource.TODO -> item.todoId?.let(onOpenTask)
+                                    NowSource.REVIEW -> onOpenReview(item.sourceId)
+                                    NowSource.AGENT_RUN -> onOpenRun(item.sourceId)
+                                }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
             }
         }
 

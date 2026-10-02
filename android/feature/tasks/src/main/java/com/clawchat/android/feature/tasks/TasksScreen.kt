@@ -24,6 +24,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import com.clawchat.android.core.ui.ClawCrossfade
+import com.clawchat.android.core.ui.ClawExpand
+import com.clawchat.android.core.ui.ClawFab
+import com.clawchat.android.core.ui.ClawLoadingState
 import com.clawchat.android.core.ui.ClawComposer
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -166,68 +170,75 @@ fun TasksScreen(
         }
     }
 
-    if (state.selectedTask != null) {
-        TaskDetailView(
-            task = state.selectedTask!!,
-            relationships = state.relationships,
-            isLoadingRelationships = state.isLoadingRelationships,
-            relationshipError = state.relationshipError,
-            taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
-            snackbarHostState = snackbarHostState,
-            onBack = returnFromDetail,
-            onToggle = {
-                state.selectedTask?.let { task ->
+    ClawCrossfade(
+        targetState = state.selectedTask,
+        contentKey = { it?.id },
+        forward = { _, target -> target != null },
+        label = "tasks",
+    ) { selectedTask ->
+        if (selectedTask != null) {
+            TaskDetailView(
+                task = selectedTask,
+                relationships = state.relationships,
+                isLoadingRelationships = state.isLoadingRelationships,
+                relationshipError = state.relationshipError,
+                taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
+                snackbarHostState = snackbarHostState,
+                onBack = returnFromDetail,
+                onToggle = {
+                    state.selectedTask?.let { task ->
+                        val status = if (task.status == TaskStatus.COMPLETED) {
+                            TaskStatus.PENDING
+                        } else {
+                            TaskStatus.COMPLETED
+                        }
+                        requestStatusChange(task, status)
+                    }
+                },
+                onSetDueDate = { date ->
+                    state.selectedTask?.let { task ->
+                        viewModel.updateTask(task.id, TodoUpdate(dueDate = date))
+                    }
+                },
+                onDelete = { viewModel.deleteTask(selectedTask.id) },
+                onDiscuss = { viewModel.openTaskThread(selectedTask.id) },
+                notes = if (allowTaskNotes) notesByTask[noteTaskId] ?: TaskNotesState() else null,
+                onNoteChange = { text -> noteTaskId?.let { notesViewModel.edit(it, text) } },
+                onSendNote = { noteTaskId?.let(notesViewModel::send) },
+                onReloadNotes = { noteTaskId?.let(notesViewModel::load) },
+                steps = stepsByTask[noteTaskId] ?: TaskStepsState(),
+                onOpenStep = { step ->
+                    noteTaskId?.let { parentTrail = parentTrail + it }
+                    viewModel.selectTaskById(step.id)
+                },
+                onStepEdit = { text -> noteTaskId?.let { stepsViewModel.edit(it, text) } },
+                onStepAdd = { state.selectedTask?.let(stepsViewModel::add) },
+                onStepsReload = { noteTaskId?.let(stepsViewModel::load) },
+            )
+        } else {
+            TaskListView(
+                tasks = state.tasks,
+                isLoading = state.isLoading,
+                snackbarHostState = snackbarHostState,
+                onOpenSearch = onOpenSearch,
+                onOpenProjects = onOpenProjects,
+                onSelect = { task ->
+                    parentTrail = emptyList()
+                    viewModel.selectTask(task)
+                },
+                onToggle = { task ->
                     val status = if (task.status == TaskStatus.COMPLETED) {
                         TaskStatus.PENDING
                     } else {
                         TaskStatus.COMPLETED
                     }
                     requestStatusChange(task, status)
-                }
-            },
-            onSetDueDate = { date ->
-                state.selectedTask?.let { task ->
-                    viewModel.updateTask(task.id, TodoUpdate(dueDate = date))
-                }
-            },
-            onDelete = { viewModel.deleteTask(state.selectedTask!!.id) },
-            onDiscuss = { viewModel.openTaskThread(state.selectedTask!!.id) },
-            notes = if (allowTaskNotes) notesByTask[noteTaskId] ?: TaskNotesState() else null,
-            onNoteChange = { text -> noteTaskId?.let { notesViewModel.edit(it, text) } },
-            onSendNote = { noteTaskId?.let(notesViewModel::send) },
-            onReloadNotes = { noteTaskId?.let(notesViewModel::load) },
-            steps = stepsByTask[noteTaskId] ?: TaskStepsState(),
-            onOpenStep = { step ->
-                noteTaskId?.let { parentTrail = parentTrail + it }
-                viewModel.selectTaskById(step.id)
-            },
-            onStepEdit = { text -> noteTaskId?.let { stepsViewModel.edit(it, text) } },
-            onStepAdd = { state.selectedTask?.let(stepsViewModel::add) },
-            onStepsReload = { noteTaskId?.let(stepsViewModel::load) },
-        )
-    } else {
-        TaskListView(
-            tasks = state.tasks,
-            isLoading = state.isLoading,
-            snackbarHostState = snackbarHostState,
-            onOpenSearch = onOpenSearch,
-            onOpenProjects = onOpenProjects,
-            onSelect = { task ->
-                parentTrail = emptyList()
-                viewModel.selectTask(task)
-            },
-            onToggle = { task ->
-                val status = if (task.status == TaskStatus.COMPLETED) {
-                    TaskStatus.PENDING
-                } else {
-                    TaskStatus.COMPLETED
-                }
-                requestStatusChange(task, status)
-            },
-            onDelete = viewModel::deleteTask,
-            onSetDueToday = viewModel::setDueToday,
-            onCreate = viewModel::createTask,
-        )
+                },
+                onDelete = viewModel::deleteTask,
+                onSetDueToday = viewModel::setDueToday,
+                onCreate = viewModel::createTask,
+            )
+        }
     }
 
     pendingExperimentCompletionId?.let { todoId ->
@@ -307,18 +318,10 @@ private fun TaskListView(
             )
         },
         floatingActionButton = {
-            SmallFloatingActionButton(
-                modifier = Modifier.size(48.dp),
+            ClawFab(
                 onClick = { showCreateSheet = true },
-                shape = MaterialTheme.shapes.medium,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = stringResource(R.string.tasks_cd_new_task),
-                )
-            }
+                contentDescription = stringResource(R.string.tasks_cd_new_task),
+            )
         },
     ) { padding ->
         TaskStatusPage(
@@ -356,16 +359,7 @@ private fun TaskStatusPage(
     onCreate: () -> Unit,
 ) {
     if (isLoading && tasks.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = stringResource(R.string.tasks_loading),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ClawLoadingState(modifier = modifier, message = stringResource(R.string.tasks_loading))
     } else if (tasks.isEmpty()) {
         Box(
             modifier = modifier
@@ -398,6 +392,7 @@ private fun TaskStatusPage(
         ) {
             items(sections.active, key = { it.id }) { task ->
                 SwipeableTaskRow(
+                    modifier = Modifier.animateItem(),
                     task = task,
                     onToggle = { onToggle(task) },
                     onDelete = { onDelete(task.id) },
@@ -418,6 +413,7 @@ private fun TaskStatusPage(
             if (showFinished) {
                 items(sections.completed, key = { it.id }) { task ->
                     SwipeableTaskRow(
+                        modifier = Modifier.animateItem(),
                         task = task,
                         onToggle = { onToggle(task) },
                         onDelete = { onDelete(task.id) },
@@ -431,6 +427,7 @@ private fun TaskStatusPage(
                     }
                     items(sections.cancelled, key = { it.id }) { task ->
                         SwipeableTaskRow(
+                            modifier = Modifier.animateItem(),
                             task = task,
                             onToggle = { onToggle(task) },
                             onDelete = { onDelete(task.id) },
@@ -524,9 +521,12 @@ private fun SwipeableTaskRow(
     onDelete: () -> Unit,
     onSetDueToday: () -> Unit,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
-        TaskRow(task = task, onToggle = onToggle, onClick = onClick)
+    Box(modifier) {
+        SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
+            TaskRow(task = task, onToggle = onToggle, onClick = onClick)
+        }
     }
 }
 
@@ -786,7 +786,7 @@ private fun TaskDetailView(
                         )
                         Text(stringResource(R.string.tasks_details_title))
                     }
-                    if (detailsOpen) {
+                    ClawExpand(visible = detailsOpen) {
                         task.description?.takeIf { it.isNotBlank() }?.let { description ->
                             ClawSectionHeader(title = stringResource(R.string.tasks_description_title))
                             Text(text = description, style = MaterialTheme.typography.bodyMedium)

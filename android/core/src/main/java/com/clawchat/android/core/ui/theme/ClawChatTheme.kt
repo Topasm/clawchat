@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -179,15 +180,15 @@ private val ClawTypography = Typography(
     ),
 )
 
-// Compact shapes shared with the desktop design language. Large rounding is
-// reserved for transient surfaces such as dialogs and sheets; everyday rows
-// and controls stay visually flat.
+// Shapes shared with the desktop design language: rows and controls are only
+// gently rounded, and the larger radii are reserved for transient surfaces
+// such as dialogs and sheets.
 private val ClawShapes = Shapes(
-    extraSmall = RoundedCornerShape(2.dp),
-    small = RoundedCornerShape(4.dp),
-    medium = RoundedCornerShape(6.dp),
-    large = RoundedCornerShape(8.dp),
-    extraLarge = RoundedCornerShape(12.dp),
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(8.dp),
+    large = RoundedCornerShape(12.dp),
+    extraLarge = RoundedCornerShape(16.dp),
 )
 
 @Composable
@@ -216,7 +217,15 @@ fun ClawChatTheme(
         else -> {
             val base = if (darkTheme) DarkColorScheme else LightColorScheme
             val primary = Color(if (darkTheme) accent.darkPrimary else accent.lightPrimary)
-            base.copy(primary = primary)
+            // Selected tabs and icon circles use the container pair; derive it
+            // from the accent too, or they stay blue beside an orange accent.
+            base.copy(
+                primary = primary,
+                primaryContainer = primary
+                    .copy(alpha = if (darkTheme) 0.28f else 0.14f)
+                    .compositeOver(base.surface),
+                onPrimaryContainer = if (darkTheme) primary else Color(accent.lightPrimary),
+            )
         }
     }
 

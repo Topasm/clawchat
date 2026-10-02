@@ -58,6 +58,7 @@ import com.clawchat.android.core.data.model.AgentRunStatus
 import com.clawchat.android.core.data.model.ReviewItem
 import com.clawchat.android.core.data.model.ReviewRiskLevel
 import com.clawchat.android.core.data.model.ReviewSubjectType
+import com.clawchat.android.core.ui.ClawCrossfade
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawSectionCard
@@ -177,25 +178,32 @@ fun ReviewInboxScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            if (selected != null) {
-                ReviewDetail(
-                    state = state,
-                    item = selected,
-                    note = state.note,
-                    isSubmitting = state.isSubmitting,
-                    onNoteChange = { viewModel.onAction(ReviewInboxAction.UpdateNote(it)) },
-                    onDecision = { viewModel.onAction(ReviewInboxAction.Decide(it)) },
-                    onReloadDetail = { viewModel.onAction(ReviewInboxAction.ReloadDetail) },
-                    // Preserve the original contract object: subjectId and
-                    // subjectHref must survive native/mobile navigation.
-                    onOpenSubject = { onOpenSubject(selected) },
-                )
-            } else {
-                ReviewList(
-                    state = state,
-                    onRefresh = viewModel::refresh,
-                    onSelect = { viewModel.onAction(ReviewInboxAction.Select(it)) },
-                )
+            ClawCrossfade(
+                targetState = selected,
+                contentKey = { it?.id },
+                forward = { _, target -> target != null },
+                label = "review",
+            ) { item ->
+                if (item != null) {
+                    ReviewDetail(
+                        state = state,
+                        item = item,
+                        note = state.note,
+                        isSubmitting = state.isSubmitting,
+                        onNoteChange = { viewModel.onAction(ReviewInboxAction.UpdateNote(it)) },
+                        onDecision = { viewModel.onAction(ReviewInboxAction.Decide(it)) },
+                        onReloadDetail = { viewModel.onAction(ReviewInboxAction.ReloadDetail) },
+                        // Preserve the original contract object: subjectId and
+                        // subjectHref must survive native/mobile navigation.
+                        onOpenSubject = { onOpenSubject(item) },
+                    )
+                } else {
+                    ReviewList(
+                        state = state,
+                        onRefresh = viewModel::refresh,
+                        onSelect = { viewModel.onAction(ReviewInboxAction.Select(it)) },
+                    )
+                }
             }
 
             feedback?.let { message ->
@@ -257,7 +265,9 @@ private fun ReviewList(
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 items(state.items, key = ReviewItem::id) { item ->
-                    ReviewRow(item = item, onClick = { onSelect(item.id) })
+                    Box(Modifier.animateItem()) {
+                        ReviewRow(item = item, onClick = { onSelect(item.id) })
+                    }
                 }
             }
         }

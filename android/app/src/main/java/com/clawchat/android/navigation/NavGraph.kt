@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.clawchat.android.core.ui.ClawMobileLayout
+import com.clawchat.android.core.ui.ClawMotion
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -224,6 +225,10 @@ fun ClawChatNavGraph(
                 .fillMaxSize()
                 .padding(rootPadding)
                 .consumeWindowInsets(rootPadding),
+            enterTransition = { ClawMotion.navEnter() },
+            exitTransition = { ClawMotion.navExit() },
+            popEnterTransition = { ClawMotion.navPopEnter() },
+            popExitTransition = { ClawMotion.navPopExit() },
         ) {
             composable(NavRoute.Onboarding.route) {
                 OnboardingScreen(

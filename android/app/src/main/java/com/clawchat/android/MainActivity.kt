@@ -10,9 +10,13 @@ import android.graphics.Color
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -163,32 +167,35 @@ class MainActivity : ComponentActivity() {
                 themeModeKey = themeMode,
                 accentColorKey = accentColor,
             ) {
-                runtimeState?.let { state ->
-                    // ViewModels cache workspace-shaped data. Recreate the
-                    // graph when its identity changes so local and server UI
-                    // state can never bleed across a mode switch.
-                    key(state.workspaceKey ?: state.mode.name) {
-                        ClawChatNavGraph(
-                            isLoggedIn = state.mode == WorkspaceMode.SERVER && state.activeSession != null,
-                            onboardingSkipped = state.mode == WorkspaceMode.LOCAL,
-                            workspaceMode = state.mode,
-                            deepLinkRoute = reminderNavigation
-                                ?.takeIf { it.workspaceKey == state.workspaceKey }
-                                ?.route,
-                            onDeepLinkHandled = { pendingReminderRoute.value = null },
-                            attentionCount = attentionBadge.count.takeIf {
-                                attentionBadge.workspaceKey == state.workspaceKey
-                            } ?: 0,
-                        )
+                // Themed from the first frame: nothing to draw yet must not mean a bare window.
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    runtimeState?.let { state ->
+                        // ViewModels cache workspace-shaped data. Recreate the
+                        // graph when its identity changes so local and server UI
+                        // state can never bleed across a mode switch.
+                        key(state.workspaceKey ?: state.mode.name) {
+                            ClawChatNavGraph(
+                                isLoggedIn = state.mode == WorkspaceMode.SERVER && state.activeSession != null,
+                                onboardingSkipped = state.mode == WorkspaceMode.LOCAL,
+                                workspaceMode = state.mode,
+                                deepLinkRoute = reminderNavigation
+                                    ?.takeIf { it.workspaceKey == state.workspaceKey }
+                                    ?.route,
+                                onDeepLinkHandled = { pendingReminderRoute.value = null },
+                                attentionCount = attentionBadge.count.takeIf {
+                                    attentionBadge.workspaceKey == state.workspaceKey
+                                } ?: 0,
+                            )
+                        }
                     }
+                    AppUpdatePrompt(
+                        state = updateState,
+                        onDownload = updateManager::downloadUpdate,
+                        onInstall = updateManager::installUpdate,
+                        onSkip = updateManager::skipPendingVersion,
+                        onDismiss = updateManager::dismissPrompt,
+                    )
                 }
-                AppUpdatePrompt(
-                    state = updateState,
-                    onDownload = updateManager::downloadUpdate,
-                    onInstall = updateManager::installUpdate,
-                    onSkip = updateManager::skipPendingVersion,
-                    onDismiss = updateManager::dismissPrompt,
-                )
             }
         }
     }

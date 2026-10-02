@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
+import com.clawchat.android.core.ui.ClawFab
 import com.clawchat.android.core.ui.ClawEmptyState
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawListSection
@@ -94,18 +95,10 @@ fun WeekScreen(
             )
         },
         floatingActionButton = {
-            SmallFloatingActionButton(
-                modifier = Modifier.size(48.dp),
+            ClawFab(
                 onClick = { showCreateSheet = true },
-                shape = MaterialTheme.shapes.medium,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = stringResource(R.string.week_cd_capture_task),
-                )
-            }
+                contentDescription = stringResource(R.string.week_cd_capture_task),
+            )
         },
     ) { padding ->
         PullToRefreshBox(
