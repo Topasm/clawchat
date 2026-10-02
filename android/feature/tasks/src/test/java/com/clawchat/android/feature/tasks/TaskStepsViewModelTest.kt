@@ -6,12 +6,15 @@ import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -27,6 +30,9 @@ import org.junit.Assert.*
 class TaskStepsViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val repository = mockk<TodoRepository>()
+    private val syncManager = mockk<SyncManager> {
+        every { todoChanged } returns MutableSharedFlow(extraBufferCapacity = 1)
+    }
     private val parent = Todo(id = "parent", title = "Paper", projectId = "project")
     private val child = Todo(id = "child", title = "Figure", parentId = parent.id)
     @Before fun setup() { Dispatchers.setMain(dispatcher) }
@@ -35,7 +41,7 @@ class TaskStepsViewModelTest {
     @Test fun `add binds parent and project and blocks duplicate clicks`() = runTest {
         val reply = CompletableDeferred<ApiResult<Todo>>()
         coEvery { repository.createTodo(any()) } coAnswers { reply.await() }
-        val vm = TaskStepsViewModel(repository, SavedStateHandle())
+        val vm = TaskStepsViewModel(repository, SavedStateHandle(), syncManager)
         vm.edit(parent.id, " Figure ")
         vm.add(parent)
         vm.add(parent)
@@ -54,7 +60,7 @@ class TaskStepsViewModelTest {
     @Test fun `failed add retains draft and retries with same operation key`() = runTest {
         val requests = mutableListOf<TodoCreate>()
         coEvery { repository.createTodo(capture(requests)) } returnsMany listOf(ApiResult.Error("Offline"), ApiResult.Success(child))
-        val vm = TaskStepsViewModel(repository, SavedStateHandle())
+        val vm = TaskStepsViewModel(repository, SavedStateHandle(), syncManager)
         vm.edit(parent.id, "Figure")
         vm.add(parent)
         advanceUntilIdle()
@@ -71,7 +77,7 @@ class TaskStepsViewModelTest {
             ApiResult.Success(PaginatedResponse(listOf(child), total = 2))
         coEvery { repository.listTodos(match { it["parent_id"] == parent.id && it["page"] == "2" }) } returns
             ApiResult.Success(PaginatedResponse(listOf(second), total = 2))
-        val vm = TaskStepsViewModel(repository, SavedStateHandle())
+        val vm = TaskStepsViewModel(repository, SavedStateHandle(), syncManager)
         vm.load(parent.id)
         advanceUntilIdle()
         assertEquals(listOf(child, second), vm.steps.value.getValue(parent.id).items)
@@ -80,7 +86,7 @@ class TaskStepsViewModelTest {
     @Test fun `late parent response does not overwrite another task draft`() = runTest {
         val reply = CompletableDeferred<ApiResult<Todo>>()
         coEvery { repository.createTodo(any()) } coAnswers { reply.await() }
-        val vm = TaskStepsViewModel(repository, SavedStateHandle())
+        val vm = TaskStepsViewModel(repository, SavedStateHandle(), syncManager)
         vm.edit(parent.id, "Figure")
         vm.add(parent)
         runCurrent()
