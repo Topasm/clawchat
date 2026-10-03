@@ -97,6 +97,16 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import com.clawchat.android.core.ui.localizedErrorMessage
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 @Composable
 private fun formatRelativeTime(isoTimestamp: String): String {
@@ -495,8 +505,8 @@ private fun ChatDetailView(
         }
     }
 
-    LaunchedEffect(messages.size, streamingText) {
-        val extraItem = if (streamingText.isNotBlank()) 1 else 0
+    LaunchedEffect(messages.size, streamingText, isStreaming) {
+        val extraItem = if (streamingText.isNotBlank() || isStreaming) 1 else 0
         val total = messages.size + extraItem
         if (total > 0) {
             listState.animateScrollToItem(total - 1)
@@ -627,16 +637,25 @@ private fun ChatDetailView(
                 }
 
                 itemsIndexed(messages, key = { _, message -> message.id }) { _, message ->
-                    MessageBubble(
-                        plans = plans,
-                        planChanges = planChanges,
-                        pendingPlans = pendingPlans,
-                        onPlanAction = onPlanAction,
-                        message = message,
-                        onResumeRun = onResumeRun,
-                        onResolvePermission = onResolvePermission,
-                        onDecideReview = onDecideReview,
-                    )
+                    Box(Modifier.animateItem()) {
+                        MessageBubble(
+                            plans = plans,
+                            planChanges = planChanges,
+                            pendingPlans = pendingPlans,
+                            onPlanAction = onPlanAction,
+                            message = message,
+                            onResumeRun = onResumeRun,
+                            onResolvePermission = onResolvePermission,
+                            onDecideReview = onDecideReview,
+                        )
+                    }
+                }
+
+                // Between "send" and the first streamed words, show that the reply is coming.
+                if (isStreaming && streamingText.isBlank()) {
+                    item(key = "typing") {
+                        TypingIndicator(Modifier.animateItem())
+                    }
                 }
 
                 if (streamingText.isNotBlank()) {
@@ -924,6 +943,42 @@ private fun TaskDelegationCard(delegation: TaskDelegation) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** Three dots pulsing in turn, in an assistant-style bubble. */
+@Composable
+private fun TypingIndicator(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "typing")
+    val description = stringResource(R.string.chat_assistant_responding)
+    Surface(
+        modifier = modifier.semantics { contentDescription = description },
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(3) { index ->
+                val alpha by transition.animateFloat(
+                    initialValue = 0.25f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 480, delayMillis = index * 160),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "dot$index",
+                )
+                Box(
+                    Modifier
+                        .size(7.dp)
+                        .alpha(alpha)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape),
+                )
+            }
         }
     }
 }

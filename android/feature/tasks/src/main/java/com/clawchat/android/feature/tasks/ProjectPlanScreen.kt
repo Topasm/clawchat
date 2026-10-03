@@ -34,6 +34,11 @@ import com.clawchat.android.core.data.model.ProjectNode
 import com.clawchat.android.core.data.model.ProjectPlan
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import com.clawchat.android.core.ui.ClawEmptyState
+import com.clawchat.android.core.ui.ClawListItemSurface
+import com.clawchat.android.core.ui.ClawStatusChip
+import com.clawchat.android.core.ui.ClawTone
+import com.clawchat.android.core.ui.localizedErrorMessage
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -170,10 +175,17 @@ fun ProjectPlanScreen(
     }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-            state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
+            state.error?.let { error ->
+                item { ClawStatusChip(text = localizedErrorMessage(error), tone = ClawTone.Error) }
+            }
             val project = state.project
             if (project == null) {
-                if (!state.loading && state.projects.isEmpty()) item { Text(stringResource(R.string.projects_empty)) }
+                if (!state.loading && state.projects.isEmpty()) item {
+                    ClawEmptyState(
+                        title = stringResource(R.string.projects_empty),
+                        icon = { Icon(ClawIcons.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    )
+                }
                 items(state.projects, key = { it.id }) { entry ->
                     Card(Modifier.fillMaxWidth().clickable { viewModel.select(entry) }) {
                         Row(Modifier.padding(ClawMobileLayout.PageInset), horizontalArrangement = Arrangement.spacedBy(ClawMobileLayout.ItemGap)) {
@@ -194,10 +206,31 @@ fun ProjectPlanScreen(
                     Text("${stringResource(R.string.projects_ready)} · ${state.nodes.count { it.isReady }}", style = MaterialTheme.typography.titleMedium)
                 }
                 val ready = state.nodes.filter { it.isReady }
-                if (!state.loading && ready.isEmpty()) item { Text(stringResource(R.string.projects_no_ready)) }
+                if (!state.loading && ready.isEmpty()) item {
+                    Text(
+                        stringResource(R.string.projects_no_ready),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 items(ready.take(3), key = { "ready:${it.id}" }) { node ->
-                    TextButton(onClick = { selectedId = node.id }, enabled = !state.busy) {
-                        Text(node.title)
+                    ClawListItemSurface(
+                        modifier = Modifier.animateItem(),
+                        onClick = { if (!state.busy) selectedId = node.id },
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(ClawMobileLayout.ItemGap),
+                        ) {
+                            ClawStatusChip(text = stringResource(R.string.projects_ready), tone = ClawTone.Success)
+                            Text(
+                                node.title,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
                 item {

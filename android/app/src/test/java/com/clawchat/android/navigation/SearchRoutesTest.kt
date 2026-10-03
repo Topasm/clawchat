@@ -14,6 +14,15 @@ class SearchRoutesTest {
     }
 
     @Test
+    fun `a task hit opens that task and a message hit its conversation`() {
+        assertEquals(NavRoute.Tasks.destination("todo_1"), searchHitRoute("todo", "todo_1"))
+        assertEquals(
+            NavRoute.Chat.destination("conv_1"),
+            searchHitRoute("message", "msg_1", conversationId = "conv_1"),
+        )
+    }
+
+    @Test
     fun `the plural filter value is not a hit type`() {
         // The request filter says "todos"; a hit says "todo". Mixing them up
         // would silently route nowhere.

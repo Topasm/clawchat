@@ -126,3 +126,18 @@ async def test_description_is_previewed_when_present(fts):
     hits, _ = await search_service.search(fts, "milk")
 
     assert hits[0].preview == "Remember the oat milk"
+
+
+async def test_a_message_hit_names_its_conversation(fts):
+    from models.conversation import Conversation
+    from models.message import Message
+
+    conversation = Conversation(id="conv_search", title="Trip planning")
+    fts.add(conversation)
+    await fts.flush()
+    fts.add(Message(conversation_id=conversation.id, role="user", content="Book the ferry to Jeju"))
+    await fts.commit()
+
+    hits, _total = await search_service.search(fts, "ferry")
+
+    assert [(hit.type, hit.conversation_id) for hit in hits] == [("message", "conv_search")]

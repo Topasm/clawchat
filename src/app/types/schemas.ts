@@ -721,6 +721,7 @@ export const SearchHitSchema = z.object({
   preview: z.string(),
   rank: z.number(),
   created_at: z.string(),
+  conversation_id: z.string().nullable().optional(),
 });
 
 export const SearchResponseSchema = z.object({

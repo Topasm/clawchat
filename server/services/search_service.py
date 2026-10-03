@@ -37,7 +37,8 @@ async def search(
     if "messages" in enabled:
         rows = (await db.execute(
             text("""
-                SELECT f.id, f.content, bm25(messages_fts) AS rank, m.created_at
+                SELECT f.id, f.content, bm25(messages_fts) AS rank, m.created_at,
+                       m.conversation_id
                 FROM messages_fts f
                 JOIN messages m ON m.id = f.id
                 WHERE messages_fts MATCH :q
@@ -54,6 +55,7 @@ async def search(
                 preview=preview,
                 rank=r.rank,
                 created_at=_parse_dt(r.created_at),
+                conversation_id=r.conversation_id,
             ))
 
     if "todos" in enabled:

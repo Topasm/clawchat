@@ -217,6 +217,8 @@ data class SearchHit(
     val preview: String = "",
     val rank: Double = 0.0,
     @SerialName("created_at") val createdAt: String = "",
+    /** For a message hit, the conversation it belongs to. */
+    @SerialName("conversation_id") val conversationId: String? = null,
 )
 
 // --- Conversations ---

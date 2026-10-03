@@ -10,3 +10,5 @@ class SearchHit(BaseModel):
     preview: str
     rank: float
     created_at: UtcDatetime
+    # For a message hit, the conversation to open it in.
+    conversation_id: str | None = None
