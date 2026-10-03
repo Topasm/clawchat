@@ -13,13 +13,12 @@ class SearchRoutesTest {
         assertEquals(NavRoute.Chat.route, searchHitRoute("message"))
     }
 
+    // Routes that carry an id go through android.net.Uri.encode, which plain JVM
+    // tests cannot run; a message without a conversation falls back to the list.
     @Test
-    fun `a task hit opens that task and a message hit its conversation`() {
-        assertEquals(NavRoute.Tasks.destination("todo_1"), searchHitRoute("todo", "todo_1"))
-        assertEquals(
-            NavRoute.Chat.destination("conv_1"),
-            searchHitRoute("message", "msg_1", conversationId = "conv_1"),
-        )
+    fun `a message hit without a conversation opens the chat list`() {
+        assertEquals(NavRoute.Chat.route, searchHitRoute("message", "msg_1", conversationId = null))
+        assertEquals(NavRoute.Chat.route, searchHitRoute("message", "msg_1", conversationId = ""))
     }
 
     @Test
