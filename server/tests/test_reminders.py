@@ -297,3 +297,46 @@ def test_delivery_key_unifies_upcoming_and_overdue_todo_occurrence():
 
     assert upcoming == overdue
     assert upcoming == "delivery:v2:todo:todo-1:1788224523"
+
+
+# --- push -----------------------------------------------------------------
+
+
+class _RecordingPush:
+    enabled = True
+
+    def __init__(self):
+        self.sent: list[dict] = []
+
+    async def send_to_all_devices(self, _db, title="", body="", data=None, *, data_only=False):
+        self.sent.append({"data": data, "data_only": data_only})
+        return 1
+
+
+async def test_each_reminder_is_pushed_with_its_delivery_key(db_session, session_factory, ws):
+    """Not a "You have N reminders" digest: the phone shows the same reminder
+    once whether it arrives by push, socket or its own worker, because all of
+    them claim this key."""
+    start = datetime.now(timezone.utc) + timedelta(minutes=10)
+    db_session.add(
+        Event(id="evt_push", title="Standup", start_time=start, reminder_minutes=30)
+    )
+    await db_session.commit()
+    push = _RecordingPush()
+    async with session_factory() as scheduler_db:
+        sent = await reminder_service.run_all_checks(scheduler_db, ws, "user", push)
+
+    assert sent == 1
+    assert len(push.sent) == 1
+    data = push.sent[0]["data"]
+    assert push.sent[0]["data_only"] is True
+    assert (data["type"], data["reminder_type"], data["item_id"]) == ("reminder", "event", "evt_push")
+    assert data["delivery_key"] == ws.sent[0]["data"]["delivery_key"]
+    assert "Standup" in data["body"]
+
+
+async def test_no_reminders_means_no_push(session_factory, ws):
+    push = _RecordingPush()
+    async with session_factory() as scheduler_db:
+        await reminder_service.run_all_checks(scheduler_db, ws, "user", push)
+    assert push.sent == []
