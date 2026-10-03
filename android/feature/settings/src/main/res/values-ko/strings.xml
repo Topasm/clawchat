@@ -103,4 +103,16 @@
     <string name="settings_report_checked">확인 시각: %1$s</string>
     <string name="settings_report_unknown">알 수 없음</string>
     <string name="settings_report_none">없음</string>
+    <string name="settings_pair_again">다른 서버와 페어링</string>
+    <string name="settings_pair_again_description">컴퓨터의 ClawChat에서 QR 코드를 스캔하거나 페어링 코드를 입력합니다.</string>
+    <string name="settings_push_title">알림</string>
+    <string name="settings_push_description">앱이 닫혀 있어도 나를 기다리는 에이전트 실행과 리마인더를 받습니다.</string>
+    <string name="settings_push_active">푸시 켜짐</string>
+    <string name="settings_push_active_hint">ClawChat이 닫혀 있어도 나를 기다리는 실행을 이 폰에서 알려 줍니다.</string>
+    <string name="settings_push_registering">푸시 연결 중…</string>
+    <string name="settings_push_registering_hint">앱이 푸시 토큰을 서버에 등록하고 있습니다.</string>
+    <string name="settings_push_server_disabled">서버가 푸시를 보낼 수 없음</string>
+    <string name="settings_push_server_disabled_hint">서버에 FIREBASE_CREDENTIALS_PATH로 Firebase 서비스 계정을 지정하세요. 그 전까지는 앱을 열었을 때만 변경 사항이 보입니다.</string>
+    <string name="settings_push_not_configured">이 빌드에서는 푸시가 꺼져 있음</string>
+    <string name="settings_push_not_configured_hint">FIREBASE_PROJECT_ID, FIREBASE_APP_ID, FIREBASE_API_KEY, FIREBASE_SENDER_ID를 넣어 빌드하면 푸시가 켜집니다. docs/android-release.md를 참고하세요.</string>
 </resources>

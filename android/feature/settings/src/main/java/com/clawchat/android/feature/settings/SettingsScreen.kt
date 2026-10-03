@@ -69,6 +69,9 @@ import com.clawchat.android.core.ui.theme.AccentColor
 import com.clawchat.android.core.ui.update.AppUpdateSection
 import com.clawchat.android.core.ui.theme.ThemeMode
 import com.clawchat.android.core.ui.icons.ClawIcons
+import com.clawchat.android.core.notification.PushStatus
+import com.clawchat.android.core.ui.ClawStatusChip
+import com.clawchat.android.core.ui.ClawTone
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -76,6 +79,7 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
     onLoggedOut: () -> Unit = {},
     onSetupServer: () -> Unit = {},
+    pushStatus: PushStatus = PushStatus.NOT_CONFIGURED,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -139,6 +143,10 @@ fun SettingsScreen(
                         onSelect = viewModel::setAccentColor,
                     )
                 }
+            }
+
+            if (state.workspaceMode == WorkspaceMode.SERVER) {
+                item { PushStatusSection(pushStatus) }
             }
 
             if (state.workspaceMode == WorkspaceMode.SERVER) {
@@ -365,13 +373,24 @@ private fun WorkspaceModeSection(
                 },
             )
 
-            WorkspaceMode.SERVER -> WorkspaceActionRow(
-                icon = ClawIcons.PhoneAndroid,
-                title = stringResource(R.string.settings_switch_to_device_mode),
-                description = stringResource(R.string.settings_switch_to_device_mode_description),
-                enabled = !state.isSwitchingWorkspace,
-                onClick = onSwitchToLocal,
-            )
+            WorkspaceMode.SERVER -> {
+                // Pairing used to be reachable only from the first-run screen.
+                WorkspaceActionRow(
+                    icon = ClawIcons.Cloud,
+                    title = stringResource(R.string.settings_pair_again),
+                    description = stringResource(R.string.settings_pair_again_description),
+                    enabled = !state.isSwitchingWorkspace,
+                    onClick = onConnectWorkspace,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                WorkspaceActionRow(
+                    icon = ClawIcons.PhoneAndroid,
+                    title = stringResource(R.string.settings_switch_to_device_mode),
+                    description = stringResource(R.string.settings_switch_to_device_mode_description),
+                    enabled = !state.isSwitchingWorkspace,
+                    onClick = onSwitchToLocal,
+                )
+            }
         }
     }
 }
@@ -969,4 +988,28 @@ private fun ConnectionDiagnostics.toLocalizedSafeReport(context: Context): Strin
     )
     appendLine(context.getString(R.string.settings_report_last_error, lastError ?: none))
     append(context.getString(R.string.settings_report_checked, java.time.Instant.ofEpochMilli(checkedAtEpochMillis)))
+}
+
+/** Whether this phone gets push notifications, and what is missing when it does not. */
+@Composable
+private fun PushStatusSection(status: PushStatus) {
+    val (tone, label, hint) = when (status) {
+        PushStatus.ACTIVE -> Triple(ClawTone.Success, R.string.settings_push_active, R.string.settings_push_active_hint)
+        PushStatus.REGISTERING -> Triple(ClawTone.Default, R.string.settings_push_registering, R.string.settings_push_registering_hint)
+        PushStatus.SERVER_DISABLED -> Triple(ClawTone.Warning, R.string.settings_push_server_disabled, R.string.settings_push_server_disabled_hint)
+        PushStatus.NOT_CONFIGURED -> Triple(ClawTone.Default, R.string.settings_push_not_configured, R.string.settings_push_not_configured_hint)
+    }
+    SettingsSection(
+        title = stringResource(R.string.settings_push_title),
+        subtitle = stringResource(R.string.settings_push_description),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ClawStatusChip(text = stringResource(label), tone = tone)
+            Text(
+                text = stringResource(hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }

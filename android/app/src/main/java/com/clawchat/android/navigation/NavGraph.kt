@@ -53,6 +53,7 @@ import com.clawchat.android.feature.search.SearchScreen
 import com.clawchat.android.R
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.SearchType
+import com.clawchat.android.core.notification.PushStatus
 
 internal fun plannerPrimaryRoute(currentRoute: String?): String? =
     when (currentRoute) {
@@ -89,6 +90,7 @@ fun ClawChatNavGraph(
     deepLinkRoute: String? = null,
     onDeepLinkHandled: () -> Unit = {},
     attentionCount: Int = 0,
+    pushStatus: PushStatus = PushStatus.NOT_CONFIGURED,
 ) {
     val navController = rememberNavController()
     val startDestination = NavigationCapabilities.startRoute(workspaceMode)
@@ -490,6 +492,7 @@ fun ClawChatNavGraph(
                         }
                     },
                     onSetupServer = openConnectionSetup,
+                    pushStatus = pushStatus,
                 )
             }
         }

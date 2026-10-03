@@ -149,6 +149,40 @@ A fork publishing its own releases points the updater at its own repository:
 ./gradlew assembleRelease -PUPDATE_REPOSITORY=your-org/your-fork
 ```
 
+## Push notifications (optional)
+
+The app can be told by the paired server when an agent run needs the user
+(waiting for input, waiting for review, failed) and about due reminders, even
+while ClawChat is closed. It uses Firebase Cloud Messaging and stays off until
+both halves are configured; **Settings → Notifications** on the phone shows
+which half is missing.
+
+1. **Firebase project.** In the Firebase console, add an Android app with the
+   package `com.clawchat.android`. You do not need to download
+   `google-services.json`; the build reads four values instead.
+2. **App build.** Give the build these values, as Gradle properties
+   (`android/gradle.properties` or `-P…`) or environment variables. For
+   releases, set them as repository **variables** (they identify the project
+   and are not secrets); `release-tauri.yml` passes them to the Android job.
+
+   | Name                  | Firebase console                          |
+   | --------------------- | ----------------------------------------- |
+   | `FIREBASE_PROJECT_ID` | Project settings → Project ID             |
+   | `FIREBASE_APP_ID`     | Your apps → Android → App ID (`1:…:android:…`) |
+   | `FIREBASE_API_KEY`    | Your apps → Android → Web API key         |
+   | `FIREBASE_SENDER_ID`  | Cloud Messaging → Sender ID               |
+
+3. **Server.** Create a service-account key (Project settings → Service
+   accounts → Generate new private key), store the JSON on the server, and set
+   `FIREBASE_CREDENTIALS_PATH` to its path. The server needs `firebase-admin`
+   installed.
+
+After pairing, the app registers its token with the server; Settings then
+reads **Push is on**. Pushes are data-only, so the app writes the notification
+in the phone's language and a tap opens the run or task. Reminders carry the
+same delivery key on every channel, so a reminder shows once whether it
+arrives by push, by the live connection or from the app's own reminder check.
+
 ## Related
 
 Widget completion smoke check before shipping:
