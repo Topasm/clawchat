@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/useSettingsStore';
-import CodeEditor from '../shared/CodeEditor';
 import SettingsRow from '../shared/SettingsRow';
 import { translateUi } from '../../i18n';
 
 const MAX_LENGTH = 4000;
+
+// CodeMirror is most of the settings bundle (~1.3 MB of source) and only this
+// editor uses it, so it loads when the editor is about to open, not with the page.
+const loadCodeEditor = () => import('../shared/CodeEditor');
+const CodeEditor = lazy(loadCodeEditor);
 
 /**
  * The system prompt editor, inline in the AI section. It used to be a page of
@@ -31,20 +35,30 @@ export default function SystemPromptSection() {
           className="cc-btn cc-btn--secondary cc-btn--compact"
           aria-expanded={open}
           onClick={toggle}
+          onPointerEnter={() => void loadCodeEditor()}
+          onFocus={() => void loadCodeEditor()}
         >
           {open ? translateUi('Hide') : translateUi('Edit')}
         </button>
       </SettingsRow>
       {open && (
         <div className="cc-sysprompt" aria-label={translateUi('System prompt')}>
-          <CodeEditor
-            value={draft}
-            onChange={setDraft}
-            language="markdown"
-            maxLength={MAX_LENGTH}
-            height="240px"
-            placeholder={translateUi('Enter your system prompt...')}
-          />
+          <Suspense
+            fallback={
+              <div className="cc-sysprompt__loading" role="status">
+                {translateUi('Loading…')}
+              </div>
+            }
+          >
+            <CodeEditor
+              value={draft}
+              onChange={setDraft}
+              language="markdown"
+              maxLength={MAX_LENGTH}
+              height="240px"
+              placeholder={translateUi('Enter your system prompt...')}
+            />
+          </Suspense>
           <div className="cc-sysprompt__footer">
             <span className="cc-sysprompt__counter">
               {draft.length} / {MAX_LENGTH}

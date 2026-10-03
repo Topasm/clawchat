@@ -19,3 +19,15 @@
   display: flex;
   gap: 8px;
 }
+
+.cc-sysprompt__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 240px;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-control);
+  background: var(--cc-surface-secondary);
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+}
