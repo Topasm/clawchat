@@ -272,7 +272,7 @@ fun ChatScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ConversationListView(
+internal fun ConversationListView(
     conversations: List<Conversation>,
     isLoading: Boolean,
     onOpenSearch: () -> Unit,
@@ -463,7 +463,7 @@ private fun ConversationCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatDetailView(
+internal fun ChatDetailView(
     draftStorage: DraftStorageState,
     onRetryDraft: () -> Unit,
     inputText: String,
