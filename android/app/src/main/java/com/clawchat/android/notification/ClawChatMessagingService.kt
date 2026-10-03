@@ -1,5 +1,6 @@
 package com.clawchat.android.notification
 
+import android.app.ActivityManager
 import com.clawchat.android.R
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.notification.ReminderNotificationHelper
@@ -11,9 +12,13 @@ import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 /**
- * Receives pushes from the paired server while the app is in the foreground
- * (in the background Android shows FCM notification messages itself) and
- * re-registers the token when Firebase rotates it.
+ * Receives pushes from the paired server and re-registers the token when
+ * Firebase rotates it.
+ *
+ * Agent-run pushes (`type = run_state`) are data-only: this service builds the
+ * notification in the user's language and points it at the run. Reminder
+ * pushes carry a notification block, which Android shows itself while the app
+ * is in the background; in the foreground they arrive here.
  */
 @AndroidEntryPoint
 class ClawChatMessagingService : FirebaseMessagingService() {
@@ -28,18 +33,55 @@ class ClawChatMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
-        val title = message.notification?.title ?: data["title"] ?: getString(R.string.app_name)
-        val body = message.notification?.body ?: data["body"] ?: return
         // The notification needs the workspace it belongs to so a tap routes safely.
         val workspaceKey = runBlocking { sessionStore.runtimeState.first().workspaceKey } ?: return
+        if (data["type"] == "run_state") {
+            showRunState(data, workspaceKey)
+            return
+        }
+        val title = message.notification?.title ?: data["title"] ?: getString(R.string.app_name)
+        val body = message.notification?.body ?: data["body"] ?: return
         ReminderNotificationHelper.showReminderNotification(
             context = this,
-            reminderType = data["type"] ?: "reminder",
+            reminderType = data["reminder_type"] ?: data["type"] ?: "reminder",
             itemId = data["item_id"] ?: data["id"] ?: message.messageId ?: "push",
             title = title,
             message = body,
             workspaceKey = workspaceKey,
             deduplicate = false,
         )
+    }
+
+    private fun showRunState(data: Map<String, String>, workspaceKey: String) {
+        // With the app open, the live screen already shows the change (toast,
+        // badge, chat card); a second system notification would only repeat it.
+        if (isInForeground()) return
+        val runId = data["run_id"] ?: return
+        val status = data["status"] ?: return
+        val headline = when (status) {
+            "waiting_input" -> getString(R.string.push_run_waiting_input)
+            "waiting_review" -> getString(R.string.push_run_waiting_review)
+            "failed" -> getString(R.string.push_run_failed)
+            else -> return
+        }
+        val task = data["title"]?.takeIf(String::isNotBlank) ?: getString(R.string.push_run_untitled)
+        val body = data["detail"]?.takeIf { status == "failed" && it.isNotBlank() }
+            ?.let { getString(R.string.push_run_failed_body, task, it) }
+            ?: task
+        ReminderNotificationHelper.showReminderNotification(
+            context = this,
+            reminderType = "run",
+            itemId = runId,
+            title = headline,
+            message = body,
+            workspaceKey = workspaceKey,
+            deliveryKey = "run:$runId:$status",
+        )
+    }
+
+    private fun isInForeground(): Boolean {
+        val state = ActivityManager.RunningAppProcessInfo()
+        ActivityManager.getMyMemoryState(state)
+        return state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
 }

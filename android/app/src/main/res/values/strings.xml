@@ -58,4 +58,9 @@
     <string name="share_delivery_failed_title">Shared capture needs attention</string>
     <string name="share_delivery_failed_message">ClawChat could not deliver this capture. Its files remain stored securely until you discard them.</string>
     <string name="share_discard_action">Discard</string>
+    <string name="push_run_waiting_input">An agent needs your input</string>
+    <string name="push_run_waiting_review">An agent finished and needs your review</string>
+    <string name="push_run_failed">An agent run failed</string>
+    <string name="push_run_untitled">Agent run</string>
+    <string name="push_run_failed_body">%1$s: %2$s</string>
 </resources>

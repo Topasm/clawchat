@@ -216,7 +216,10 @@ class MainActivity : ComponentActivity() {
             ?: return
         val workspaceKey = intent.getStringExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY)
             ?: return
-        val route = reminderRoute(reminderType) ?: return
+        val route = reminderRoute(
+            reminderType,
+            intent.getStringExtra(ReminderNotificationHelper.EXTRA_ITEM_ID),
+        ) ?: return
         if (intent.hasExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID)) {
             val notificationId = intent.getIntExtra(
                 ReminderNotificationHelper.EXTRA_NOTIFICATION_ID,

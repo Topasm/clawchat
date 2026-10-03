@@ -137,6 +137,9 @@ async def lifespan(app: FastAPI):
     from services.notifications.push_service import PushService
     push_service = PushService(settings.firebase_credentials_path)
     app.state.push_service = push_service
+    from services.notifications import run_push
+
+    run_push.configure(push_service, async_session_factory)
 
     recovered_paseo_runs = await paseo_execution_service.recover_active_runs(
         async_session_factory,

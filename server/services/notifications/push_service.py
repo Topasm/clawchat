@@ -52,11 +52,17 @@ class PushService:
     async def send_push(
         self,
         token: str,
-        title: str,
-        body: str,
+        title: str = "",
+        body: str = "",
         data: dict[str, str] | None = None,
+        *,
+        data_only: bool = False,
     ) -> bool:
         """Send a push notification to a single device token.
+
+        ``data_only`` sends no notification block: the app receives the data
+        even in the background and builds a localized, routable notification
+        itself. High priority so Android delivers it promptly.
 
         Returns True on success, False on failure.
         """
@@ -64,9 +70,10 @@ class PushService:
             return False
 
         message = _messaging.Message(
-            notification=_messaging.Notification(title=title, body=body),
+            notification=None if data_only else _messaging.Notification(title=title, body=body),
             token=token,
             data=data or {},
+            android=_messaging.AndroidConfig(priority="high") if data_only else None,
         )
 
         try:
@@ -80,9 +87,11 @@ class PushService:
     async def send_to_all_devices(
         self,
         db: AsyncSession,
-        title: str,
-        body: str,
+        title: str = "",
+        body: str = "",
         data: dict[str, str] | None = None,
+        *,
+        data_only: bool = False,
     ) -> int:
         """Send a push notification to all registered device tokens.
 
@@ -109,7 +118,7 @@ class PushService:
 
         sent = 0
         for token in tokens:
-            if await self.send_push(token, title, body, data):
+            if await self.send_push(token, title, body, data, data_only=data_only):
                 sent += 1
 
         logger.info("Sent push to %d/%d devices", sent, len(tokens))
