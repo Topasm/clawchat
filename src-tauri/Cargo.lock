@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "clawchat-tauri"
-version = "1.4.39"
+version = "1.4.40"
 dependencies = [
  "atomicwrites",
  "dirs 7.0.0",
