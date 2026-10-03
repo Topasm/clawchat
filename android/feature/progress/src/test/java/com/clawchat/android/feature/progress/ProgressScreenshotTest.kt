@@ -1,6 +1,8 @@
 package com.clawchat.android.feature.progress
 
 import com.clawchat.android.core.data.model.AgentRun
+import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import com.clawchat.android.core.data.model.AgentRunStatus
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -45,6 +47,7 @@ class ProgressScreenshotTest {
     private fun capture(theme: String, locale: String?) {
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
+                Surface(color = MaterialTheme.colorScheme.background) {
                 ProgressContent(
                     state = state,
                     onOpenReview = {},
@@ -53,6 +56,7 @@ class ProgressScreenshotTest {
                     onSelectAction = {},
                     onRetryPending = {},
                 )
+            }
             }
         }
         composeRule.onRoot().captureRoboImage(shot("now", theme, locale))

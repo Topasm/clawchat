@@ -1,6 +1,7 @@
 package com.clawchat.android.feature.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,7 @@ class SettingsScreenshotTest {
         )
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
+                Surface(color = MaterialTheme.colorScheme.background) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -64,6 +66,7 @@ class SettingsScreenshotTest {
                     ThemeModeCard(selectedKey = theme, onSelect = {})
                     AccentColorCard(selectedKey = "system", onSelect = {})
                 }
+            }
             }
         }
         composeRule.onRoot().captureRoboImage(shot("sections", theme, locale))

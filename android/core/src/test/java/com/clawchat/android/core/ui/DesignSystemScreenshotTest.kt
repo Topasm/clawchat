@@ -1,6 +1,7 @@
 package com.clawchat.android.core.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,9 @@ class DesignSystemScreenshotTest {
     private fun capture(theme: String) {
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
+                Surface(color = MaterialTheme.colorScheme.background) {
                 Gallery()
+            }
             }
         }
         composeRule.onRoot().captureRoboImage("build/outputs/roborazzi/core_design_system_$theme.png")

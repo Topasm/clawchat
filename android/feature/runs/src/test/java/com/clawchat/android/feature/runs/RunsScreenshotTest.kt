@@ -1,6 +1,7 @@
 package com.clawchat.android.feature.runs
 
 import androidx.compose.foundation.background
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +53,7 @@ class RunsScreenshotTest {
         val state = AgentRunsUiState(runs = runs, isLoading = false)
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
+                Surface(color = MaterialTheme.colorScheme.background) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -63,6 +65,7 @@ class RunsScreenshotTest {
                     RunFilters(selected = AgentRunFilter.ALL, onSelect = {})
                     state.visibleRuns.forEach { AgentRunListItem(run = it, onClick = {}) }
                 }
+            }
             }
         }
         composeRule.onRoot().captureRoboImage(shot("list", theme, locale))
