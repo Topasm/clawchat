@@ -3,13 +3,19 @@ import logging
 from auth.dependencies import AuthPrincipal, get_current_principal
 from database import get_db
 from exceptions import NotFoundError
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from models.paired_device import PairedDevice
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["notifications"])
+
+
+def _push_enabled(request: Request) -> bool:
+    """Whether this server can send pushes at all (FIREBASE_CREDENTIALS_PATH set)."""
+    push_service = getattr(request.app.state, "push_service", None)
+    return bool(getattr(push_service, "enabled", False))
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +28,7 @@ class RegisterTokenRequest(BaseModel):
 @router.post("/register-token")
 async def register_push_token(
     data: RegisterTokenRequest,
+    request: Request,
     principal: AuthPrincipal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db),
 ):
@@ -36,7 +43,7 @@ async def register_push_token(
         # Nothing to attach the token to, so it would be unreachable. Say so
         # rather than reporting success.
         logger.warning("Push token registration without a device to attach it to")
-        return {"status": "ignored", "reason": "no_device"}
+        return {"status": "ignored", "reason": "no_device", "push_enabled": _push_enabled(request)}
 
     device = (
         await db.execute(select(PairedDevice).where(PairedDevice.id == device_id))
@@ -49,4 +56,4 @@ async def register_push_token(
         await db.commit()
         logger.info("Registered push token for device %s", device_id)
 
-    return {"status": "registered", "device_id": device_id}
+    return {"status": "registered", "device_id": device_id, "push_enabled": _push_enabled(request)}

@@ -44,7 +44,7 @@ async def test_a_device_registers_its_own_token(
     )
 
     assert resp.status_code == 200
-    assert resp.json() == {"status": "registered", "device_id": device_id}
+    assert resp.json() == {"status": "registered", "device_id": device_id, "push_enabled": False}
     assert await _stored_token(db_session, device_id) == "fcm-abc"
 
 

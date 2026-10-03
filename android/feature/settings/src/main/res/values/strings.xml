@@ -104,4 +104,16 @@
     <string name="settings_report_checked">Checked: %1$s</string>
     <string name="settings_report_unknown">unknown</string>
     <string name="settings_report_none">none</string>
+    <string name="settings_pair_again">Pair with another server</string>
+    <string name="settings_pair_again_description">Scan a QR code or enter a pairing code from ClawChat on your computer.</string>
+    <string name="settings_push_title">Notifications</string>
+    <string name="settings_push_description">Agent runs that need you and reminders, delivered while the app is closed.</string>
+    <string name="settings_push_active">Push is on</string>
+    <string name="settings_push_active_hint">This phone hears about runs waiting for you even when ClawChat is closed.</string>
+    <string name="settings_push_registering">Connecting push…</string>
+    <string name="settings_push_registering_hint">The app is handing its push token to the server.</string>
+    <string name="settings_push_server_disabled">Server cannot send push</string>
+    <string name="settings_push_server_disabled_hint">Set FIREBASE_CREDENTIALS_PATH on the server to a Firebase service account. Until then you only see updates with the app open.</string>
+    <string name="settings_push_not_configured">Push is off in this build</string>
+    <string name="settings_push_not_configured_hint">Builds with FIREBASE_PROJECT_ID, FIREBASE_APP_ID, FIREBASE_API_KEY and FIREBASE_SENDER_ID enable push. See docs/android-release.md.</string>
 </resources>

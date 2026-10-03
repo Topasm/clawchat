@@ -19,6 +19,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.clawchat.android.core.notification.PushStatus
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 private const val TAG = "PushMessaging"
 
@@ -75,6 +79,13 @@ class PushTokenRegistrar @Inject constructor(
 
     @Volatile private var latestToken: String? = null
 
+    private val _status = MutableStateFlow(
+        if (PushConfig.enabled) PushStatus.REGISTERING else PushStatus.NOT_CONFIGURED,
+    )
+
+    /** Shown in Settings so a missing piece of the push setup is visible. */
+    val status: StateFlow<PushStatus> = _status.asStateFlow()
+
     /** The (workspace, token) pair the server last accepted. */
     @Volatile private var registered: Pair<String, String>? = null
 
@@ -111,6 +122,7 @@ class PushTokenRegistrar @Inject constructor(
             val response = api.registerPushToken(RegisterPushTokenRequest(token))
             if (response.status == "registered") {
                 registered = workspaceKey to token
+                _status.value = if (response.pushEnabled == false) PushStatus.SERVER_DISABLED else PushStatus.ACTIVE
                 Log.i(TAG, "Push token registered for device ${response.deviceId}")
             } else {
                 Log.w(TAG, "Push token not registered: ${response.reason}")

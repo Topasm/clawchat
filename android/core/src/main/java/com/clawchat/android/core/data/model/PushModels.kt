@@ -14,4 +14,6 @@ data class RegisterPushTokenResponse(
     val status: String,
     @SerialName("device_id") val deviceId: String? = null,
     val reason: String? = null,
+    /** False when the server has no FCM credentials; null from older servers. */
+    @SerialName("push_enabled") val pushEnabled: Boolean? = null,
 )

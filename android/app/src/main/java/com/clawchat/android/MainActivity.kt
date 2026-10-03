@@ -38,6 +38,7 @@ import com.clawchat.android.share.ShareIntentParseResult
 import com.clawchat.android.share.ShareIntentParser
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import com.clawchat.android.notification.PushTokenRegistrar
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var updateManager: AppUpdateManager
     @Inject lateinit var shareCaptureCoordinator: ShareCaptureCoordinator
     @Inject lateinit var attentionNotifications: AttentionNotificationCoordinator
+    @Inject lateinit var pushTokenRegistrar: PushTokenRegistrar
 
     private data class PendingReminderNavigation(
         val route: String,
@@ -89,6 +91,7 @@ class MainActivity : ComponentActivity() {
             val updateState by updateManager.state.collectAsStateWithLifecycle()
             val reminderNavigation by pendingReminderRoute.collectAsStateWithLifecycle()
             val attentionBadge by attentionNotifications.badgeState.collectAsStateWithLifecycle()
+            val pushStatus by pushTokenRegistrar.status.collectAsStateWithLifecycle()
             val notificationPermissionRequested by sessionStore
                 .notificationPermissionRequested
                 .collectAsStateWithLifecycle(initialValue = true)
@@ -185,6 +188,7 @@ class MainActivity : ComponentActivity() {
                                 attentionCount = attentionBadge.count.takeIf {
                                     attentionBadge.workspaceKey == state.workspaceKey
                                 } ?: 0,
+                                pushStatus = pushStatus,
                             )
                         }
                     }
