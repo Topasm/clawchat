@@ -111,6 +111,52 @@ fun TodayScreen(
         if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete(pending.token)
     }
 
+    TodayContent(
+        state = state,
+        showAgentFeatures = showAgentFeatures,
+        snackbarHostState = snackbarHostState,
+        onNavigateToInbox = onNavigateToInbox,
+        onNavigateToReview = onNavigateToReview,
+        onNavigateToRuns = onNavigateToRuns,
+        onNavigateToSearch = onNavigateToSearch,
+        onOpenTask = onOpenTask,
+        onRefresh = viewModel::refresh,
+        onToggle = viewModel::toggleComplete,
+        onDelete = viewModel::deleteTask,
+        onSetDueToday = viewModel::setDueToday,
+        onQuickAdd = { showQuickAdd = true },
+    )
+
+    if (showQuickAdd) {
+        TaskCreateSheet(
+            onDismiss = { showQuickAdd = false },
+            initialDueDate = java.time.LocalDate.now().toString(),
+            onCreate = { data ->
+                viewModel.createTask(data)
+                showQuickAdd = false
+            },
+        )
+    }
+}
+
+/** Today's screen for a given state; [TodayScreen] wires it to the ViewModel. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TodayContent(
+    state: TodayUiState,
+    showAgentFeatures: Boolean,
+    snackbarHostState: SnackbarHostState,
+    onNavigateToInbox: () -> Unit,
+    onNavigateToReview: () -> Unit,
+    onNavigateToRuns: () -> Unit,
+    onNavigateToSearch: () -> Unit,
+    onOpenTask: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetDueToday: (String) -> Unit,
+    onQuickAdd: () -> Unit,
+) {
     val totalTasks = state.todayTodos.size + state.overdueTodos.size + state.needsDateTodos.size
     val completedTasks = (state.todayTodos + state.overdueTodos + state.needsDateTodos).count {
         it.status == TaskStatus.COMPLETED
@@ -148,14 +194,14 @@ fun TodayScreen(
         },
         floatingActionButton = {
             ClawFab(
-                onClick = { showQuickAdd = true },
+                onClick = { onQuickAdd() },
                 contentDescription = stringResource(R.string.today_cd_capture_task),
             )
         },
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::refresh,
+            onRefresh = onRefresh,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -193,7 +239,7 @@ fun TodayScreen(
                         inboxCount = if (showAgentFeatures) state.inboxCount else 0,
                         showInbox = showAgentFeatures,
                         onNavigateToInbox = onNavigateToInbox,
-                        onQuickAdd = { showQuickAdd = true },
+                        onQuickAdd = { onQuickAdd() },
                     )
                 }
 
@@ -219,9 +265,9 @@ fun TodayScreen(
                             subtitle = stringResource(R.string.today_overdue_subtitle),
                             todos = state.overdueTodos,
                             tone = ClawTone.Error,
-                            onToggle = viewModel::toggleComplete,
-                            onDelete = viewModel::deleteTask,
-                            onSetDueToday = viewModel::setDueToday,
+                            onToggle = onToggle,
+                            onDelete = onDelete,
+                            onSetDueToday = onSetDueToday,
                             onOpen = onOpenTask,
                         )
                     }
@@ -234,9 +280,9 @@ fun TodayScreen(
                             subtitle = stringResource(R.string.today_focus_subtitle),
                             todos = state.todayTodos,
                             tone = ClawTone.Primary,
-                            onToggle = viewModel::toggleComplete,
-                            onDelete = viewModel::deleteTask,
-                            onSetDueToday = viewModel::setDueToday,
+                            onToggle = onToggle,
+                            onDelete = onDelete,
+                            onSetDueToday = onSetDueToday,
                             onOpen = onOpenTask,
                         )
                     }
@@ -249,9 +295,9 @@ fun TodayScreen(
                             subtitle = stringResource(R.string.today_needs_date_subtitle),
                             todos = state.needsDateTodos,
                             tone = ClawTone.Warning,
-                            onToggle = viewModel::toggleComplete,
-                            onDelete = viewModel::deleteTask,
-                            onSetDueToday = viewModel::setDueToday,
+                            onToggle = onToggle,
+                            onDelete = onDelete,
+                            onSetDueToday = onSetDueToday,
                             onOpen = onOpenTask,
                         )
                     }
@@ -293,23 +339,12 @@ fun TodayScreen(
                                 )
                             },
                             actionLabel = stringResource(R.string.today_empty_action),
-                            onActionClick = { showQuickAdd = true },
+                            onActionClick = { onQuickAdd() },
                         )
                     }
                 }
             }
         }
-    }
-
-    if (showQuickAdd) {
-        TaskCreateSheet(
-            onDismiss = { showQuickAdd = false },
-            initialDueDate = java.time.LocalDate.now().toString(),
-            onCreate = { data ->
-                viewModel.createTask(data)
-                showQuickAdd = false
-            },
-        )
     }
 }
 

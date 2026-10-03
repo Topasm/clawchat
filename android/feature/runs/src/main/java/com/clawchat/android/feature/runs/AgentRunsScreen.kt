@@ -267,7 +267,7 @@ private fun RunsLoadingState() {
 }
 
 @Composable
-private fun RunSummaryCard(state: AgentRunsUiState) {
+internal fun RunSummaryCard(state: AgentRunsUiState) {
     ClawSectionCard(tone = if (state.attentionCount > 0) ClawTone.Warning else ClawTone.Primary) {
         ClawSectionHeader(
             title = stringResource(R.string.runs_overview_title),
@@ -305,7 +305,7 @@ private fun RunSummaryCard(state: AgentRunsUiState) {
 }
 
 @Composable
-private fun RunFilters(
+internal fun RunFilters(
     selected: AgentRunFilter,
     onSelect: (AgentRunFilter) -> Unit,
 ) {
@@ -326,7 +326,7 @@ private fun RunFilters(
 }
 
 @Composable
-private fun AgentRunListItem(
+internal fun AgentRunListItem(
     run: AgentRun,
     onClick: () -> Unit,
 ) {

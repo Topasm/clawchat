@@ -501,6 +501,13 @@ fun ClawSegmentedToggle(
                 selected = index == selectedIndex,
                 onClick = { onSelect(index) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                // The default active colour is the secondary (green) container,
+                // which clashes with the accent everywhere else.
+                colors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    activeBorderColor = MaterialTheme.colorScheme.outline,
+                ),
                 icon = {},
             ) {
                 Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
