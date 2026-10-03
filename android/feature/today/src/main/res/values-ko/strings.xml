@@ -19,9 +19,6 @@
     <string name="today_empty_description">ClawChat에 계획을 요청하거나 새 작업을 추가해 보세요.</string>
     <string name="today_empty_description_local">할 일이 생기면 작업을 추가하세요. 이 기기에만 저장됩니다.</string>
     <string name="today_empty_action">작업 추가</string>
-
-    <string name="today_agent_activity_title">에이전트 활동</string>
-    <string name="today_agent_activity_subtitle">결정을 검토하거나 실행 중인 작업을 확인하세요.</string>
     <string name="today_review_queue">검토 대기열</string>
     <string name="today_agent_runs">에이전트 실행</string>
 
@@ -47,7 +44,6 @@
     </plurals>
     <string name="today_metrics_format">%1$s · %2$s · %3$s</string>
     <string name="today_metrics_without_inbox_format">%1$s · %2$s</string>
-    <string name="today_quick_capture">빠른 추가</string>
     <string name="today_open_inbox">받은 편지함 열기</string>
     <plurals name="today_progress_accessibility">
         <item quantity="other">오늘 진행도: 작업 %2$d개 중 %1$d개 완료</item>

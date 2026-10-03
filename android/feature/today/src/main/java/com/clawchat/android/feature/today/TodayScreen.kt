@@ -82,6 +82,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -238,8 +240,6 @@ internal fun TodayContent(
                         eventCount = state.todayEvents.size,
                         inboxCount = if (showAgentFeatures) state.inboxCount else 0,
                         showInbox = showAgentFeatures,
-                        onNavigateToInbox = onNavigateToInbox,
-                        onQuickAdd = { onQuickAdd() },
                     )
                 }
 
@@ -348,39 +348,34 @@ internal fun TodayContent(
     }
 }
 
+/**
+ * Where agent work is reviewed and followed. Two quiet chips instead of a
+ * titled section: what needs the user is already badged on the menu and
+ * listed in Now, so Today only offers the way in.
+ */
 @Composable
 private fun AgentControlCard(
     onNavigateToReview: () -> Unit,
     onNavigateToRuns: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ClawSectionHeader(
-            title = stringResource(R.string.today_agent_activity_title),
-            subtitle = stringResource(R.string.today_agent_activity_subtitle),
+        AssistChip(
+            onClick = onNavigateToReview,
+            label = { Text(stringResource(R.string.today_review_queue)) },
+            leadingIcon = {
+                Icon(ClawIcons.Checklist, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
+            },
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TextButton(
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToReview,
-            ) {
-                Text(stringResource(R.string.today_review_queue))
-            }
-            TextButton(
-                modifier = Modifier.weight(1f),
-                onClick = onNavigateToRuns,
-            ) {
-                Text(stringResource(R.string.today_agent_runs))
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        AssistChip(
+            onClick = onNavigateToRuns,
+            label = { Text(stringResource(R.string.today_agent_runs)) },
+            leadingIcon = {
+                Icon(ClawIcons.Chat, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
+            },
+        )
     }
 }
 
@@ -392,8 +387,6 @@ private fun TodayHeroCard(
     eventCount: Int,
     inboxCount: Int,
     showInbox: Boolean,
-    onNavigateToInbox: () -> Unit,
-    onQuickAdd: () -> Unit,
 ) {
     val summary = when {
         totalTasks > 0 -> pluralStringResource(
@@ -480,26 +473,8 @@ private fun TodayHeroCard(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TextButton(
-                modifier = Modifier.weight(1f),
-                onClick = onQuickAdd,
-            ) {
-                Text(stringResource(R.string.today_quick_capture))
-            }
-            if (showInbox) {
-                TextButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToInbox,
-                ) {
-                    Text(stringResource(R.string.today_open_inbox))
-                }
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        // Capture is the FAB and the inbox has its own section with an
+        // "Open inbox" action, so the hero no longer repeats them as buttons.
     }
 }
 
