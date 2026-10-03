@@ -271,16 +271,11 @@ fun ClawChatNavGraph(
                     },
                     onBack = { navController.popBackStack() },
                     onOpenHit = { hit ->
-                        searchHitRoute(hit.type, hit.id)?.let { route ->
+                        searchHitRoute(hit.type, hit.id, hit.conversationId)?.let { route ->
                             if (!NavigationCapabilities.canOpen(workspaceMode, route)) return@let
                             if (route == NavRoute.Calendar.route) plannerPage = PlannerPage.MONTH
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+                            // Pushed on top of Search, so Back returns to the results.
+                            navController.navigate(route) { launchSingleTop = true }
                         }
                     },
                 )
