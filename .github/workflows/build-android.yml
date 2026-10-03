@@ -56,6 +56,20 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --warning-mode all --stacktrace
 
+      # Robolectric renders the screens and Roborazzi saves them as PNGs, so a
+      # UI change can be looked at without a device (see the screenshots artifact).
+      - name: Record screenshots
+        working-directory: android
+        run: ./gradlew recordRoborazziDebug --warning-mode all --stacktrace
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-screenshots
+          path: android/**/build/outputs/roborazzi/*.png
+          if-no-files-found: warn
+
       - name: Verify optimized widget callbacks
         run: bash scripts/check-android-widget-callbacks.sh android/app/build/outputs/apk/release/app-release-unsigned.apk
 

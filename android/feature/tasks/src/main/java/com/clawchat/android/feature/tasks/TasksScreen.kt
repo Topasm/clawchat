@@ -282,7 +282,7 @@ fun TasksScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TaskListView(
+internal fun TaskListView(
     onOpenProjects: (() -> Unit)?,
     tasks: List<Todo>,
     isLoading: Boolean,
@@ -653,7 +653,7 @@ private fun inboxStateLabel(inboxState: String?): String? = when (inboxState) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun TaskDetailView(
+internal fun TaskDetailView(
     steps: TaskStepsState,
     onOpenStep: (Todo) -> Unit,
     onStepEdit: (String) -> Unit,
