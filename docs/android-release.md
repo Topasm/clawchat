@@ -149,6 +149,25 @@ A fork publishing its own releases points the updater at its own repository:
 ./gradlew assembleRelease -PUPDATE_REPOSITORY=your-org/your-fork
 ```
 
+## Screenshots
+
+Key screens are rendered on the JVM (Robolectric) and compared with the
+baselines in each module's `src/test/screenshots/` on every Android build
+(`verifyRoborazziDebug`). A difference fails the build; the
+`android-screenshots` artifact holds the new image and a `_compare` image
+that highlights what changed.
+
+When a change is intended, re-record the baselines: run the **Record Android
+screenshots** workflow on your branch (Actions → Record Android screenshots →
+Run workflow), which commits the new images to that branch, or locally:
+
+```bash
+cd android && ./gradlew recordRoborazziDebug
+```
+
+Screens whose content depends on the clock pin it in the test (UTC, times
+relative to now) so the baselines do not drift.
+
 ## Push notifications (optional)
 
 The app can be told by the paired server when an agent run needs the user

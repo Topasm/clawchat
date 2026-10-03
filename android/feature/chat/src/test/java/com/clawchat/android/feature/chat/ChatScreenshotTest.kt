@@ -8,6 +8,10 @@ import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.time.Duration
+import java.time.Instant
+import java.util.TimeZone
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,10 +27,17 @@ class ChatScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    @Before
+    fun pinTimeZone() {
+        // Baseline images must not depend on the machine's zone.
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
     private val conversations = listOf(
-        Conversation(id = "c1", title = "Weekly planning", updatedAt = "2026-10-03T09:00:00Z"),
-        Conversation(id = "c2", title = "Offsite logistics", updatedAt = "2026-10-02T16:30:00Z"),
-        Conversation(id = "c3", title = "Paper figures", updatedAt = "2026-10-01T11:15:00Z", projectTodoId = "t1"),
+        // Relative to now, so "just now / 14 hours ago / 2 days ago" stay the same in the baseline.
+        Conversation(id = "c1", title = "Weekly planning", updatedAt = ago(Duration.ZERO)),
+        Conversation(id = "c2", title = "Offsite logistics", updatedAt = ago(Duration.ofHours(14).plusMinutes(10))),
+        Conversation(id = "c3", title = "Paper figures", updatedAt = ago(Duration.ofDays(2).plusHours(1)), projectTodoId = "t1"),
     )
 
     private val messages = listOf(
@@ -70,7 +81,7 @@ class ChatScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage(
-            "build/outputs/roborazzi/chat_list_${theme}${locale?.let { "_$it" } ?: ""}.png",
+            "src/test/screenshots/chat_list_${theme}${locale?.let { "_$it" } ?: ""}.png",
         )
     }
 
@@ -108,7 +119,9 @@ class ChatScreenshotTest {
         }
         composeRule.mainClock.advanceTimeBy(600)
         composeRule.onRoot().captureRoboImage(
-            "build/outputs/roborazzi/chat_thread_${theme}${locale?.let { "_$it" } ?: ""}.png",
+            "src/test/screenshots/chat_thread_${theme}${locale?.let { "_$it" } ?: ""}.png",
         )
     }
 }
+
+private fun ago(duration: Duration): String = Instant.now().minus(duration).toString()
