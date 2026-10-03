@@ -8,6 +8,8 @@ import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.util.TimeZone
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,6 +24,12 @@ class TasksScreenshotTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Before
+    fun pinTimeZone() {
+        // Baseline images must not depend on the machine's zone.
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
 
     private val tasks = listOf(
         Todo(id = "t1", title = "Draft the quarterly report", dueDate = "2026-10-03", priority = "high", syncStatus = "synced"),
@@ -55,7 +63,7 @@ class TasksScreenshotTest {
     fun taskDetailDarkKorean() = captureDetail("dark", "ko")
 
     private fun name(kind: String, theme: String, locale: String?) =
-        "build/outputs/roborazzi/tasks_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
+        "src/test/screenshots/tasks_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
 
     private fun captureList(theme: String, locale: String?) {
         composeRule.setContent {

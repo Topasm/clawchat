@@ -19,6 +19,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clawchat.android.core.ui.icons.ClawIcons
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.util.TimeZone
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +42,12 @@ class DesignSystemScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    @Before
+    fun pinTimeZone() {
+        // Baseline images must not depend on the machine's zone.
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
     @Test
     fun designSystemLight() = capture("light")
 
@@ -54,7 +62,7 @@ class DesignSystemScreenshotTest {
             }
             }
         }
-        composeRule.onRoot().captureRoboImage("build/outputs/roborazzi/core_design_system_$theme.png")
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/core_design_system_$theme.png")
     }
 }
 

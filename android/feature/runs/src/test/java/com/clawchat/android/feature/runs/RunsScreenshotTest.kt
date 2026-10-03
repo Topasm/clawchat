@@ -16,6 +16,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.util.TimeZone
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,8 +33,14 @@ class RunsScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    @Before
+    fun pinTimeZone() {
+        // Baseline images must not depend on the machine's zone.
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
     private fun shot(kind: String, theme: String, locale: String?) =
-        "build/outputs/roborazzi/runs_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
+        "src/test/screenshots/runs_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
 
     private val runs = listOf(
         run("r1", "Pick a venue for the offsite", AgentRunStatus.WAITING_INPUT, message = "Which city should I search in?"),

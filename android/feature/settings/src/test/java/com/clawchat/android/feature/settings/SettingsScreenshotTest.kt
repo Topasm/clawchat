@@ -15,6 +15,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import java.util.TimeZone
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,8 +32,14 @@ class SettingsScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    @Before
+    fun pinTimeZone() {
+        // Baseline images must not depend on the machine's zone.
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
     private fun shot(kind: String, theme: String, locale: String?) =
-        "build/outputs/roborazzi/settings_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
+        "src/test/screenshots/settings_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
 
     @Test
     fun settingsLight() = capture("light", null, PushStatus.ACTIVE)
