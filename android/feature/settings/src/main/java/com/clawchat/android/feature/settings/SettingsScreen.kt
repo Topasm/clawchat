@@ -293,7 +293,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun WorkspaceModeSection(
+internal fun WorkspaceModeSection(
     state: SettingsUiState,
     onConnectWorkspace: () -> Unit,
     onActivateSavedServer: () -> Unit,
@@ -611,7 +611,7 @@ private fun ConnectionDiagnosticsCard(
 }
 
 @Composable
-private fun ThemeModeCard(
+internal fun ThemeModeCard(
     selectedKey: String,
     onSelect: (String) -> Unit,
 ) {
@@ -700,7 +700,7 @@ private fun ThemeModeOption(
 }
 
 @Composable
-private fun AccentColorCard(
+internal fun AccentColorCard(
     selectedKey: String,
     onSelect: (String) -> Unit,
 ) {
@@ -776,7 +776,7 @@ private fun AccentSwatch(
 }
 
 @Composable
-private fun ServerInfoCard(
+internal fun ServerInfoCard(
     version: String?,
     aiProvider: String?,
     aiModel: String?,
@@ -992,7 +992,7 @@ private fun ConnectionDiagnostics.toLocalizedSafeReport(context: Context): Strin
 
 /** Whether this phone gets push notifications, and what is missing when it does not. */
 @Composable
-private fun PushStatusSection(status: PushStatus) {
+internal fun PushStatusSection(status: PushStatus) {
     val (tone, label, hint) = when (status) {
         PushStatus.ACTIVE -> Triple(ClawTone.Success, R.string.settings_push_active, R.string.settings_push_active_hint)
         PushStatus.REGISTERING -> Triple(ClawTone.Default, R.string.settings_push_registering, R.string.settings_push_registering_hint)

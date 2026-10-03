@@ -162,7 +162,7 @@ fun ProgressScreen(
 }
 
 @Composable
-private fun ProgressContent(
+internal fun ProgressContent(
     state: ProgressUiState,
     onOpenReview: (String) -> Unit,
     onOpenRun: (String) -> Unit,

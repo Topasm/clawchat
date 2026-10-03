@@ -4,7 +4,7 @@
     <string name="settings_back">뒤로</string>
     <string name="settings_appearance">화면</string>
     <string name="settings_appearance_description">이 기기에서 ClawChat이 표시되는 방식을 선택합니다.</string>
-    <string name="settings_workspace">Workspace</string>
+    <string name="settings_workspace">워크스페이스</string>
     <string name="settings_workspace_description">작업을 저장하고 실행할 위치를 선택합니다.</string>
     <string name="settings_workspace_this_device">이 기기에서 사용</string>
     <string name="settings_workspace_local_description">로컬 전용 · 동기화 안 됨</string>

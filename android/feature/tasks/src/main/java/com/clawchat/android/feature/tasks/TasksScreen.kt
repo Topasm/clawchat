@@ -559,82 +559,81 @@ private fun TaskRow(
         label = "task_alpha",
     )
 
+    val tags = task.tags.orEmpty().filter(String::isNotBlank)
+    val inboxLabel = inboxStateLabel(task.inboxState)
     ClawListItemSurface(onClick = onClick) {
-        Column(
+        // The checkbox sits centred against the text block, and the chips go
+        // under the title: a separate chip row used to start at the left edge,
+        // under the checkbox, and left a tall empty gap in every row.
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(completionAlpha),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Checkbox(
-                    checked = isCompleted,
-                    modifier = Modifier.semantics {
-                        contentDescription = checkboxDescription
-                    },
-                    onCheckedChange = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                        } else {
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        }
-                        onToggle()
-                    },
-                )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = task.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
+            Checkbox(
+                checked = isCompleted,
+                modifier = Modifier.semantics {
+                    contentDescription = checkboxDescription
+                },
+                onCheckedChange = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    } else {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                     }
-                    val description = task.description
-                    if (!description.isNullOrBlank()) {
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    onToggle()
+                },
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                task.tags.orEmpty().filter(String::isNotBlank).forEach { tag ->
-                    ClawStatusChip(
-                        text = taskTagLabel(tag),
-                        tone = ClawTone.Default,
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val description = task.description
+                if (!description.isNullOrBlank()) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                task.dueDate?.let {
-                    ClawStatusChip(
-                        text = localizedDateLabel(it),
-                        tone = ClawTone.Warning,
-                    )
-                }
-                inboxStateLabel(task.inboxState)?.let { label ->
-                    ClawStatusChip(
-                        text = label,
-                        tone = if (task.inboxState == "error") ClawTone.Error else ClawTone.Default,
-                    )
+                if (tags.isNotEmpty() || task.dueDate != null || inboxLabel != null) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        task.dueDate?.let {
+                            ClawStatusChip(
+                                text = localizedDateLabel(it),
+                                tone = ClawTone.Warning,
+                            )
+                        }
+                        tags.forEach { tag ->
+                            ClawStatusChip(
+                                text = taskTagLabel(tag),
+                                tone = ClawTone.Default,
+                            )
+                        }
+                        inboxLabel?.let { label ->
+                            ClawStatusChip(
+                                text = label,
+                                tone = if (task.inboxState == "error") ClawTone.Error else ClawTone.Default,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -761,13 +760,10 @@ internal fun TaskDetailView(
         ) {
             item {
                 ClawSectionCard {
-                    Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    // The checkbox belongs to the title, like in the list; on a
+                    // line of its own it read as a stray control.
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Checkbox(
@@ -777,12 +773,19 @@ internal fun TaskDetailView(
                             },
                             onCheckedChange = { onToggle() },
                         )
-                        if (task.status == TaskStatus.CANCELLED) {
-                            Text(
-                                text = stringResource(R.string.tasks_status_cancelled),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
+                        Text(
+                            text = task.title,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                        )
+                    }
+                    if (task.status == TaskStatus.CANCELLED) {
+                        ClawStatusChip(
+                            text = stringResource(R.string.tasks_status_cancelled),
+                            tone = ClawTone.Default,
+                        )
                     }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

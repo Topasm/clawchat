@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -267,7 +268,7 @@ private fun RunsLoadingState() {
 }
 
 @Composable
-private fun RunSummaryCard(state: AgentRunsUiState) {
+internal fun RunSummaryCard(state: AgentRunsUiState) {
     ClawSectionCard(tone = if (state.attentionCount > 0) ClawTone.Warning else ClawTone.Primary) {
         ClawSectionHeader(
             title = stringResource(R.string.runs_overview_title),
@@ -305,7 +306,7 @@ private fun RunSummaryCard(state: AgentRunsUiState) {
 }
 
 @Composable
-private fun RunFilters(
+internal fun RunFilters(
     selected: AgentRunFilter,
     onSelect: (AgentRunFilter) -> Unit,
 ) {
@@ -320,13 +321,18 @@ private fun RunFilters(
                 selected = selected == filter,
                 onClick = { onSelect(filter) },
                 label = { Text(filter.localizedLabel()) },
+                // Material's selected default is the green secondary container.
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
             )
         }
     }
 }
 
 @Composable
-private fun AgentRunListItem(
+internal fun AgentRunListItem(
     run: AgentRun,
     onClick: () -> Unit,
 ) {
@@ -375,30 +381,46 @@ private fun AgentRunListItem(
             overflow = TextOverflow.Ellipsis,
         )
 
-        LinearProgressIndicator(
-            progress = { run.progress.coerceIn(0, 100) / 100f },
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = run.progressMessage ?: when (run.status) {
-                    AgentRunStatus.WAITING_INPUT -> stringResource(R.string.runs_waiting_follow_up)
-                    AgentRunStatus.WAITING_REVIEW -> stringResource(R.string.runs_ready_for_review)
-                    else -> stringResource(R.string.runs_progress_complete, run.progress)
-                },
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        // Progress only means something while the run works; a finished or
+        // failed run used to show an empty bar and "0% complete".
+        val executing = run.status.isExecuting
+        if (executing) {
+            LinearProgressIndicator(
+                progress = { run.progress.coerceIn(0, 100) / 100f },
+                modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "${run.progress}%",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-            )
+        }
+        val detail = when {
+            executing -> run.progressMessage ?: stringResource(R.string.runs_progress_complete, run.progress)
+            run.status == AgentRunStatus.WAITING_INPUT ->
+                run.progressMessage ?: stringResource(R.string.runs_waiting_follow_up)
+            run.status == AgentRunStatus.WAITING_REVIEW -> stringResource(R.string.runs_ready_for_review)
+            run.status == AgentRunStatus.FAILED -> run.error
+            else -> run.resultSummary
+        }?.takeIf(String::isNotBlank)
+        if (detail != null || executing) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = detail.orEmpty(),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (run.status == AgentRunStatus.FAILED) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (executing) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${run.progress}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
         }
     }
 }
