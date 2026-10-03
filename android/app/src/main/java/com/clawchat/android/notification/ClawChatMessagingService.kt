@@ -39,16 +39,47 @@ class ClawChatMessagingService : FirebaseMessagingService() {
             showRunState(data, workspaceKey)
             return
         }
+        val itemId = data["item_id"]
+        val reminderType = data["reminder_type"]
+        if (data["type"] == "reminder" && message.notification == null && itemId != null && reminderType != null) {
+            showReminder(data, itemId, reminderType, workspaceKey)
+            return
+        }
+        // An older server's digest push ("You have N reminders").
         val title = message.notification?.title ?: data["title"] ?: getString(R.string.app_name)
         val body = message.notification?.body ?: data["body"] ?: return
         ReminderNotificationHelper.showReminderNotification(
             context = this,
-            reminderType = data["reminder_type"] ?: data["type"] ?: "reminder",
-            itemId = data["item_id"] ?: data["id"] ?: message.messageId ?: "push",
+            reminderType = reminderType ?: data["type"] ?: "reminder",
+            itemId = itemId ?: data["id"] ?: message.messageId ?: "push",
             title = title,
             message = body,
             workspaceKey = workspaceKey,
             deduplicate = false,
+        )
+    }
+
+    /**
+     * One reminder, data-only. It carries the server's delivery key, the same
+     * one the WebSocket message has and the on-device reminder worker derives,
+     * so whichever channel arrives first shows it and the others are dropped.
+     */
+    private fun showReminder(
+        data: Map<String, String>,
+        itemId: String,
+        reminderType: String,
+        workspaceKey: String,
+    ) {
+        val title = data["title"]?.takeIf(String::isNotBlank) ?: getString(R.string.app_name)
+        val body = data["body"]?.takeIf(String::isNotBlank) ?: title
+        ReminderNotificationHelper.showReminderNotification(
+            context = this,
+            reminderType = reminderType,
+            itemId = itemId,
+            title = title,
+            message = body,
+            workspaceKey = workspaceKey,
+            deliveryKey = data["delivery_key"],
         )
     }
 

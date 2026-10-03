@@ -230,25 +230,62 @@ async def check_overdue_todos(
     return sent
 
 
+#: At most this many reminders go out as pushes per check; the phone's own
+#: reminder worker catches anything beyond it on its next pass.
+MAX_REMINDER_PUSHES_PER_CHECK = 5
+
+
+class _RecordingSockets:
+    """Forwards to the WebSocket manager and keeps the reminders it carried."""
+
+    def __init__(self, ws_manager: ConnectionManager) -> None:
+        self._ws_manager = ws_manager
+        self.reminders: list[dict] = []
+
+    async def send_json(self, user_id: str, payload: dict) -> None:
+        if payload.get("type") == "reminder" and isinstance(payload.get("data"), dict):
+            self.reminders.append(payload["data"])
+        await self._ws_manager.send_json(user_id, payload)
+
+
+def reminder_push_data(reminder: dict) -> dict[str, str] | None:
+    """The FCM data for one reminder, or None when it cannot be routed."""
+    item_id = reminder.get("item_id")
+    reminder_type = reminder.get("reminder_type")
+    if not item_id or not reminder_type:
+        return None
+    data = {
+        "type": "reminder",
+        "reminder_type": str(reminder_type),
+        "item_id": str(item_id),
+        "title": str(reminder.get("title") or "")[:200],
+        "body": str(reminder.get("message") or "")[:300],
+    }
+    if reminder.get("delivery_key"):
+        data["delivery_key"] = str(reminder["delivery_key"])
+    return data
+
+
 async def run_all_checks(
     db: AsyncSession,
     ws_manager: ConnectionManager,
     user_id: str,
     push_service=None,
 ) -> int:
+    sockets = _RecordingSockets(ws_manager)
     total = 0
-    total += await check_event_reminders(db, ws_manager, user_id)
-    total += await check_todo_reminders(db, ws_manager, user_id)
-    total += await check_overdue_todos(db, ws_manager, user_id)
+    total += await check_event_reminders(db, sockets, user_id)
+    total += await check_todo_reminders(db, sockets, user_id)
+    total += await check_overdue_todos(db, sockets, user_id)
 
-    # Also send via push notifications if service is available and reminders were sent
-    if total > 0 and push_service and push_service.enabled:
-        await push_service.send_to_all_devices(
-            db,
-            title="ClawChat Reminder",
-            body=f"You have {total} upcoming reminder{'s' if total != 1 else ''}",
-            data={"type": "reminder", "reminder_type": "reminder"},
-        )
+    # One data-only push per reminder, carrying the same delivery key as the
+    # WebSocket message. The phone also finds due reminders itself, and every
+    # path claims that key before it notifies, so each reminder shows once.
+    if sockets.reminders and push_service and push_service.enabled:
+        for reminder in sockets.reminders[:MAX_REMINDER_PUSHES_PER_CHECK]:
+            data = reminder_push_data(reminder)
+            if data is not None:
+                await push_service.send_to_all_devices(db, data=data, data_only=True)
 
     return total
 
