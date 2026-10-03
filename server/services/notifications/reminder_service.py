@@ -247,7 +247,7 @@ async def run_all_checks(
             db,
             title="ClawChat Reminder",
             body=f"You have {total} upcoming reminder{'s' if total != 1 else ''}",
-            data={"type": "reminder"},
+            data={"type": "reminder", "reminder_type": "reminder"},
         )
 
     return total

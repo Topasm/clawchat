@@ -25,6 +25,7 @@ from models.todo import Todo
 from schemas.agent_run import AgentRunEventResponse, AgentRunResponse
 from schemas.review import AgentRunReviewOutcome
 from services.agents import execution_host_service, run_thread_service
+from services.notifications import run_push
 from services.review import (
     agent_review_handoff_service,
     artifact_service,
@@ -130,6 +131,8 @@ async def notify_run_state(
         user_id,
         send_json=ws_manager.send_json,
     )
+    # A phone without an open socket still hears about runs that need the user.
+    run_push.schedule(db, payload)
     if task is not None:
         await run_thread_service.post_run_update(
             db, run, task, review_id=review_id, user_id=user_id

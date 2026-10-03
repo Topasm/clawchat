@@ -14,6 +14,23 @@ class ReminderRoutesTest {
     }
 
     @Test
+    fun `a task reminder with an id opens that task`() {
+        assertEquals(NavRoute.Tasks.destination("todo_1"), reminderRoute("todo", "todo_1"))
+        assertEquals(NavRoute.Tasks.route, reminderRoute("todo", ""))
+    }
+
+    @Test
+    fun `a run push opens that run`() {
+        assertEquals(NavRoute.Runs.destination("run_1"), reminderRoute("run", "run_1"))
+        assertEquals(NavRoute.Runs.route, reminderRoute("run"))
+    }
+
+    @Test
+    fun `a server reminder digest opens today`() {
+        assertEquals(NavRoute.Today.route, reminderRoute("reminder", "push"))
+    }
+
+    @Test
     fun `attention digest opens now`() {
         assertEquals(NavRoute.Progress.route, reminderRoute("attention"))
     }
