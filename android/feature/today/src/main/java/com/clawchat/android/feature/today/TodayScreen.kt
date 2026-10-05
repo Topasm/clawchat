@@ -353,25 +353,28 @@ internal fun TodayContent(
  * titled section: what needs the user is already badged on the menu and
  * listed in Now, so Today only offers the way in.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AgentControlCard(
     onNavigateToReview: () -> Unit,
     onNavigateToRuns: () -> Unit,
 ) {
-    Row(
+    // A flow row, so at large font sizes the second chip moves to the next
+    // line instead of squeezing its label onto two.
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         AssistChip(
             onClick = onNavigateToReview,
-            label = { Text(stringResource(R.string.today_review_queue)) },
+            label = { Text(stringResource(R.string.today_review_queue), maxLines = 1) },
             leadingIcon = {
                 Icon(ClawIcons.Checklist, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
             },
         )
         AssistChip(
             onClick = onNavigateToRuns,
-            label = { Text(stringResource(R.string.today_agent_runs)) },
+            label = { Text(stringResource(R.string.today_agent_runs), maxLines = 1) },
             leadingIcon = {
                 Icon(ClawIcons.Chat, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
             },
