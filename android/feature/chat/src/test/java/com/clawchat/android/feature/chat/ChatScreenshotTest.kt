@@ -1,6 +1,11 @@
 package com.clawchat.android.feature.chat
 
 import androidx.compose.material3.SnackbarHostState
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.buildJsonObject
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -48,7 +53,19 @@ class ChatScreenshotTest {
             content = "Sure. I will group it by project and keep it to 30 minutes.",
             createdAt = "2026-10-03T09:00:05Z",
         ),
-        Message(id = "m3", role = "user", content = "Add the offsite budget too.", createdAt = "2026-10-03T09:01:00Z"),
+        Message(
+            id = "m3",
+            role = "assistant",
+            content = "I need one answer before I continue.",
+            createdAt = "2026-10-03T09:00:30Z",
+            metadata = buildJsonObject {
+                put("action_type", "run_update")
+                put("run_id", "run_1")
+                put("status", "waiting_input")
+                put("title", "Draft the Monday agenda")
+            },
+        ),
+        Message(id = "m4", role = "user", content = "Add the offsite budget too.", createdAt = "2026-10-03T09:01:00Z"),
     )
 
     @Test
@@ -64,6 +81,9 @@ class ChatScreenshotTest {
     @Test
     @Config(qualifiers = "+ko")
     fun threadWaitingForReplyDarkKorean() = captureThread("dark", locale = "ko")
+
+    @Test
+    fun threadLargeFont() = captureThread("light", locale = "large", largeFont = true)
 
     private fun captureList(theme: String, locale: String?) {
         composeRule.setContent {
@@ -89,32 +109,35 @@ class ChatScreenshotTest {
      * The typing indicator is an infinite animation, which never lets Compose
      * go idle; drive the clock by hand and capture a frame mid-pulse.
      */
-    private fun captureThread(theme: String, locale: String?) {
+    private fun captureThread(theme: String, locale: String?, largeFont: Boolean = false) {
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
-                ChatDetailView(
-                    draftStorage = DraftStorageState(ready = true),
-                    onRetryDraft = {},
-                    inputText = "",
-                    onInputChange = {},
-                    title = "Weekly planning",
-                    plans = emptyMap(),
-                    planChanges = emptyMap(),
-                    pendingPlans = emptySet(),
-                    onPlanAction = { _, _ -> },
-                    messages = messages,
-                    streamingText = "",
-                    isStreaming = true,
-                    isLoadingMessages = false,
-                    onSend = {},
-                    onStop = {},
-                    onResumeRun = { _, _ -> },
-                    onResolvePermission = { _, _ -> },
-                    onDecideReview = { _, _, _ -> },
-                    onBack = {},
-                    snackbarHostState = SnackbarHostState(),
-                )
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides if (largeFont) Density(density.density, fontScale = 2f) else density) {
+                    ChatDetailView(
+                        draftStorage = DraftStorageState(ready = true),
+                        onRetryDraft = {},
+                        inputText = "",
+                        onInputChange = {},
+                        title = "Weekly planning",
+                        plans = emptyMap(),
+                        planChanges = emptyMap(),
+                        pendingPlans = emptySet(),
+                        onPlanAction = { _, _ -> },
+                        messages = messages,
+                        streamingText = "",
+                        isStreaming = true,
+                        isLoadingMessages = false,
+                        onSend = {},
+                        onStop = {},
+                        onResumeRun = { _, _ -> },
+                        onResolvePermission = { _, _ -> },
+                        onDecideReview = { _, _, _ -> },
+                        onBack = {},
+                        snackbarHostState = SnackbarHostState(),
+                    )
+                }
             }
         }
         composeRule.mainClock.advanceTimeBy(600)

@@ -1,6 +1,9 @@
 package com.clawchat.android.feature.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,7 +51,10 @@ class SettingsScreenshotTest {
     @Config(qualifiers = "+ko")
     fun settingsDarkKorean() = capture("dark", "ko", PushStatus.SERVER_DISABLED)
 
-    private fun capture(theme: String, locale: String?, push: PushStatus) {
+    @Test
+    fun settingsLargeFont() = capture("light", "large", PushStatus.NOT_CONFIGURED, largeFont = true)
+
+    private fun capture(theme: String, locale: String?, push: PushStatus, largeFont: Boolean = false) {
         val state = SettingsUiState(
             workspaceMode = WorkspaceMode.SERVER,
             hostName = "studio-desktop",
@@ -57,24 +63,27 @@ class SettingsScreenshotTest {
         )
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    WorkspaceModeSection(
-                        state = state,
-                        onConnectWorkspace = {},
-                        onActivateSavedServer = {},
-                        onSwitchToLocal = {},
-                    )
-                    PushStatusSection(push)
-                    ThemeModeCard(selectedKey = theme, onSelect = {})
-                    AccentColorCard(selectedKey = "system", onSelect = {})
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides if (largeFont) Density(density.density, fontScale = 2f) else density) {
+                    Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                    ) {
+                        WorkspaceModeSection(
+                            state = state,
+                            onConnectWorkspace = {},
+                            onActivateSavedServer = {},
+                            onSwitchToLocal = {},
+                        )
+                        PushStatusSection(push)
+                        ThemeModeCard(selectedKey = theme, onSelect = {})
+                        AccentColorCard(selectedKey = "system", onSelect = {})
+                    }
                 }
-            }
+                }
             }
         }
         composeRule.onRoot().captureRoboImage(shot("sections", theme, locale))

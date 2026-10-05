@@ -21,7 +21,7 @@ import com.clawchat.android.core.ui.icons.ClawIcons
 @Composable
 internal fun InboxPlacementSection(
     state: InboxPlacementState,
-    viewModel: InboxPlacementViewModel,
+    viewModel: InboxPlacementActions,
     onOpenPlacement: (String, String?) -> Unit,
 ) {
     val tasks = state.snapshot?.tasks.orEmpty()

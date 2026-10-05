@@ -1,6 +1,9 @@
 package com.clawchat.android.feature.today
 
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
 import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.Todo
@@ -59,24 +62,30 @@ class TodayScreenshotTest {
     @Config(qualifiers = "+ko")
     fun todayDarkKorean() = capture("dark", "ko")
 
-    private fun capture(theme: String, locale: String?) {
+    @Test
+    fun todayLargeFont() = capture("light", "large", largeFont = true)
+
+    private fun capture(theme: String, locale: String?, largeFont: Boolean = false) {
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
-                TodayContent(
-                    state = state,
-                    showAgentFeatures = true,
-                    snackbarHostState = SnackbarHostState(),
-                    onNavigateToInbox = {},
-                    onNavigateToReview = {},
-                    onNavigateToRuns = {},
-                    onNavigateToSearch = {},
-                    onOpenTask = {},
-                    onRefresh = {},
-                    onToggle = {},
-                    onDelete = {},
-                    onSetDueToday = {},
-                    onQuickAdd = {},
-                )
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides if (largeFont) Density(density.density, fontScale = 2f) else density) {
+                    TodayContent(
+                        state = state,
+                        showAgentFeatures = true,
+                        snackbarHostState = SnackbarHostState(),
+                        onNavigateToInbox = {},
+                        onNavigateToReview = {},
+                        onNavigateToRuns = {},
+                        onNavigateToSearch = {},
+                        onOpenTask = {},
+                        onRefresh = {},
+                        onToggle = {},
+                        onDelete = {},
+                        onSetDueToday = {},
+                        onQuickAdd = {},
+                    )
+                }
             }
         }
         composeRule.onRoot().captureRoboImage(shot("screen", theme, locale))

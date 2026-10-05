@@ -217,7 +217,7 @@ fun CalendarScreen(
 private data class EditorTarget(val event: Event?)
 
 @Composable
-private fun MonthGrid(
+internal fun MonthGrid(
     locale: Locale,
     month: YearMonth,
     selectedDate: LocalDate,

@@ -66,6 +66,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.ui.text.style.TextOverflow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,7 +155,7 @@ fun WeekScreen(
 }
 
 @Composable
-private fun WeekContent(
+internal fun WeekContent(
     state: WeekUiState,
     locale: java.util.Locale,
     onToggle: (String) -> Unit,
@@ -308,10 +309,12 @@ private fun WeekTaskRow(task: Todo, onToggle: () -> Unit, onOpen: () -> Unit) {
     val checkboxDescription = stringResource(R.string.week_mark_complete, task.title)
 
     ClawListItemSurface(onClick = onOpen) {
+        // Centred like the task list rows (#133): top-aligned, the title sat
+        // above the checkbox with an empty strip under it.
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Checkbox(
                 checked = false,
@@ -326,15 +329,19 @@ private fun WeekTaskRow(task: Todo, onToggle: () -> Unit, onOpen: () -> Unit) {
                 },
             )
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                FlowRow(
+                if (task.status == TaskStatus.IN_PROGRESS || task.isRecurring) FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {

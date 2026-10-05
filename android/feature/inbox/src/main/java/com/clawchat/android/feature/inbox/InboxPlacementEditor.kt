@@ -22,7 +22,7 @@ import com.clawchat.android.core.ui.ClawActionLabel
 internal fun InboxPlacementEditor(
     state: InboxPlacementState,
     task: Todo,
-    viewModel: InboxPlacementViewModel,
+    viewModel: InboxPlacementActions,
     onDismiss: () -> Unit,
 ) {
     val snapshot = state.snapshot ?: return

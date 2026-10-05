@@ -90,7 +90,7 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun WelcomeStep(
+internal fun WelcomeStep(
     isSelectingLocalMode: Boolean,
     error: OnboardingError?,
     onScanQr: () -> Unit,
@@ -392,7 +392,7 @@ private fun ServerStep(
 }
 
 @Composable
-private fun PairingStep(
+internal fun PairingStep(
     code: String,
     isPairing: Boolean,
     error: OnboardingError?,
