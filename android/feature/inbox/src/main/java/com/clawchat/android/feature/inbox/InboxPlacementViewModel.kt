@@ -33,11 +33,22 @@ data class InboxPlacementState(
     val captureSaved: Boolean = false,
 )
 
+/** What the placement section asks of its owner; the ViewModel in the app, a stub in screenshots. */
+interface InboxPlacementActions {
+    fun refresh()
+    fun undo()
+    fun approve(taskId: String)
+    fun defer(taskId: String)
+    fun resumeDeferred()
+    fun changePage(delta: Int)
+    fun editPlacement(taskId: String, choice: PlacementChoice, includeDeadline: Boolean, expectedRevision: Long, onSaved: () -> Unit)
+}
+
 @HiltViewModel
 class InboxPlacementViewModel @Inject constructor(
     private val repository: InboxPlacementRepository,
     private val sync: SyncManager,
-) : ViewModel() {
+) : ViewModel(), InboxPlacementActions {
     private val state = MutableStateFlow(InboxPlacementState())
     val uiState = state.asStateFlow()
     private var scope: ExpectedSessionScope? = null
@@ -95,7 +106,7 @@ class InboxPlacementViewModel @Inject constructor(
         }
     }
 
-    fun refresh() {
+    override fun refresh() {
         val owner = scope ?: return
         if (state.value.busy) { refreshPending = true; return }
         job?.cancel()
@@ -156,7 +167,7 @@ class InboxPlacementViewModel @Inject constructor(
         }
     }
 
-    fun editPlacement(taskId: String, choice: PlacementChoice, includeDeadline: Boolean, expectedRevision: Long, onSaved: () -> Unit) {
+    override fun editPlacement(taskId: String, choice: PlacementChoice, includeDeadline: Boolean, expectedRevision: Long, onSaved: () -> Unit) {
         val current = state.value
         val snapshot = current.snapshot ?: return
         if (snapshot.graph.revision != expectedRevision) return
@@ -186,12 +197,12 @@ class InboxPlacementViewModel @Inject constructor(
         }
     }
 
-    fun defer(taskId: String) {
+    override fun defer(taskId: String) {
         if (state.value.busy || state.value.loading) return
         saveReview(taskId, InboxReviewUpdate(deferred = true)) { it.copy(deferred = it.deferred + taskId) }
     }
 
-    fun resumeDeferred() {
+    override fun resumeDeferred() {
         if (state.value.busy || state.value.loading) return
         saveReview(null, InboxReviewUpdate()) { it.copy(deferred = emptySet()) }
     }
@@ -218,7 +229,7 @@ class InboxPlacementViewModel @Inject constructor(
         }
     }
 
-    fun changePage(delta: Int) {
+    override fun changePage(delta: Int) {
         if (state.value.busy || state.value.loading) return
         val last = ((state.value.snapshot?.total ?: 0) + 49) / 50
         val page = (state.value.page + delta).coerceIn(1, last.coerceAtLeast(1))
@@ -226,7 +237,7 @@ class InboxPlacementViewModel @Inject constructor(
         refresh()
     }
 
-    fun approve(taskId: String) {
+    override fun approve(taskId: String) {
         val current = state.value
         val owner = scope ?: return
         if (current.busy || current.loading || current.stale || taskId in current.deferred) return
@@ -241,7 +252,7 @@ class InboxPlacementViewModel @Inject constructor(
         }
     }
 
-    fun undo() {
+    override fun undo() {
         val owner = scope ?: return
         val applied = state.value.applied ?: return
         if (state.value.busy) return

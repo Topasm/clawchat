@@ -154,7 +154,7 @@ fun WeekScreen(
 }
 
 @Composable
-private fun WeekContent(
+internal fun WeekContent(
     state: WeekUiState,
     locale: java.util.Locale,
     onToggle: (String) -> Unit,

@@ -1,6 +1,9 @@
 package com.clawchat.android.feature.tasks
 
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -56,7 +59,13 @@ class TasksScreenshotTest {
     fun taskListDarkKorean() = captureList("dark", "ko")
 
     @Test
+    fun taskListLargeFont() = captureList("light", "large", largeFont = true)
+
+    @Test
     fun taskDetailLight() = captureDetail("light", null)
+
+    @Test
+    fun taskDetailLargeFont() = captureDetail("light", "large", largeFont = true)
 
     @Test
     @Config(qualifiers = "+ko")
@@ -65,61 +74,67 @@ class TasksScreenshotTest {
     private fun name(kind: String, theme: String, locale: String?) =
         "src/test/screenshots/tasks_${kind}_${theme}${locale?.let { "_$it" } ?: ""}.png"
 
-    private fun captureList(theme: String, locale: String?) {
+    private fun captureList(theme: String, locale: String?, largeFont: Boolean = false) {
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
-                TaskListView(
-                    onOpenProjects = {},
-                    tasks = tasks,
-                    isLoading = false,
-                    snackbarHostState = SnackbarHostState(),
-                    onOpenSearch = {},
-                    onSelect = {},
-                    onToggle = {},
-                    onDelete = {},
-                    onSetDueToday = {},
-                    onCreate = {},
-                )
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides if (largeFont) Density(density.density, fontScale = 2f) else density) {
+                    TaskListView(
+                        onOpenProjects = {},
+                        tasks = tasks,
+                        isLoading = false,
+                        snackbarHostState = SnackbarHostState(),
+                        onOpenSearch = {},
+                        onSelect = {},
+                        onToggle = {},
+                        onDelete = {},
+                        onSetDueToday = {},
+                        onCreate = {},
+                    )
+                }
             }
         }
         composeRule.onRoot().captureRoboImage(name("list", theme, locale))
     }
 
-    private fun captureDetail(theme: String, locale: String?) {
+    private fun captureDetail(theme: String, locale: String?, largeFont: Boolean = false) {
         composeRule.setContent {
             ClawChatTheme(themeModeKey = theme) {
-                TaskDetailView(
-                    steps = TaskStepsState(
-                        items = listOf(
-                            Todo(id = "s1", title = "Pull the revenue numbers", parentId = "t1", syncStatus = "synced"),
-                            Todo(
-                                id = "s2",
-                                title = "Write the hiring section",
-                                parentId = "t1",
-                                status = TaskStatus.COMPLETED,
-                                syncStatus = "synced",
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides if (largeFont) Density(density.density, fontScale = 2f) else density) {
+                    TaskDetailView(
+                        steps = TaskStepsState(
+                            items = listOf(
+                                Todo(id = "s1", title = "Pull the revenue numbers", parentId = "t1", syncStatus = "synced"),
+                                Todo(
+                                    id = "s2",
+                                    title = "Write the hiring section",
+                                    parentId = "t1",
+                                    status = TaskStatus.COMPLETED,
+                                    syncStatus = "synced",
+                                ),
                             ),
                         ),
-                    ),
-                    onOpenStep = {},
-                    onStepEdit = {},
-                    onStepAdd = {},
-                    onStepsReload = {},
-                    notes = null,
-                    onNoteChange = {},
-                    onSendNote = {},
-                    onReloadNotes = {},
-                    task = detailTask,
-                    relationships = emptyList(),
-                    isLoadingRelationships = false,
-                    relationshipError = null,
-                    taskTitles = emptyMap(),
-                    snackbarHostState = SnackbarHostState(),
-                    onBack = {},
-                    onToggle = {},
-                    onSetDueDate = {},
-                    onDelete = {},
-                )
+                        onOpenStep = {},
+                        onStepEdit = {},
+                        onStepAdd = {},
+                        onStepsReload = {},
+                        notes = null,
+                        onNoteChange = {},
+                        onSendNote = {},
+                        onReloadNotes = {},
+                        task = detailTask,
+                        relationships = emptyList(),
+                        isLoadingRelationships = false,
+                        relationshipError = null,
+                        taskTitles = emptyMap(),
+                        snackbarHostState = SnackbarHostState(),
+                        onBack = {},
+                        onToggle = {},
+                        onSetDueDate = {},
+                        onDelete = {},
+                    )
+                }
             }
         }
         composeRule.onRoot().captureRoboImage(name("detail", theme, locale))
