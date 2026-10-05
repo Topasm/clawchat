@@ -68,3 +68,7 @@ src/app/generated/contracts/*
 .coverage.*
 coverage.xml
 htmlcov/
+
+# Web screenshot runs
+e2e/visual/.data/
+e2e/visual/test-results/

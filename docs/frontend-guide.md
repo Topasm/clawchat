@@ -427,3 +427,21 @@ npm run check:api-contract # Verify generated TS/Kotlin values
 ```
 
 Demo mode activates automatically when no server URL is configured — all pages show seeded sample data.
+
+## Screenshots
+
+Key web screens (Inbox, Tasks, a task page, a project, Attention, light and
+dark) are rendered against a seeded backend and compared with the baselines in
+`e2e/visual/__screenshots__/` on every pull request (the **Web screenshots**
+workflow). The desktop app ships the same renderer, so this covers it too.
+
+- `e2e/visual/seed.py` builds the fixture with fixed March 2030 timestamps, and
+  the spec pins the browser clock to the same morning, so relative dates never
+  drift.
+- Locally: `npm run build:web && npm run test:visual` (needs `uv` and
+  `npx playwright install chromium`). Local fonts differ from CI, so compare
+  against baselines recorded in CI.
+- After an intended UI change, run **Record web screenshots** on your branch
+  (Actions → Record web screenshots → Run workflow); it commits the new
+  baselines there. A failing run uploads the new image and a diff as the
+  `web-screenshots` artifact.
