@@ -248,6 +248,10 @@ class Settings(BaseSettings):
     obsidian_cli_command: str = ""
     obsidian_sync_mode: str = "filesystem"  # "livesync", "filesystem", or "disabled"
     obsidian_project_todo_filename: str = "TODO.md"
+    # Vault-relative folder whose subfolders are all projects, with or without
+    # a TODO.md (e.g. "01_Projects"). Empty: only folders holding a TODO.md.
+    # Settings can override it at runtime.
+    obsidian_project_root: str = ""
     obsidian_companion_node_required: bool = False
     obsidian_scan_interval_minutes: int = 5
     obsidian_watch_enabled: bool = False  # opt-in: event watcher with polling fallback

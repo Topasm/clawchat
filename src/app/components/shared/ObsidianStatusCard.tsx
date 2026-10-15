@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  queryKeys,
+  useObsidianCreateProjectTodo,
   useObsidianHealthQuery,
+  useObsidianProjectsQuery,
+  useObsidianSetProjectRoot,
   useObsidianSync,
   useObsidianReindex,
   useObsidianScan,
@@ -13,10 +18,11 @@ import SettingsRow from './SettingsRow';
 /**
  * Obsidian vault status card for the Settings page.
  *
- * Shows: vault connection, CLI availability, companion node status,
- * sync mode, project count, write queue, dead letter queue,
- * CLI errors, stuck scan warnings, and bidirectional sync status.
- * Provides actions: export, reindex, scan, flush queue, retry dead letter.
+ * Shows: vault connection, CLI availability and mode, companion node status,
+ * sync mode, project count, background indexing, write queue, dead letter
+ * queue, CLI errors, stuck scan warnings, and bidirectional sync status.
+ * Provides actions: export, reindex, scan, flush queue, retry dead letter,
+ * set the project root folder, and create a TODO.md for a project without one.
  */
 export default function ObsidianStatusCard() {
   const { t, i18n } = useTranslation();
@@ -28,6 +34,21 @@ export default function ObsidianStatusCard() {
   const flushMutation = useObsidianFlushQueue();
   const retryDeadLetterMutation = useObsidianRetryDeadLetter();
   const [showErrors, setShowErrors] = useState(false);
+  const queryClient = useQueryClient();
+  const vaultAvailable = health?.vault_available ?? false;
+  const { data: projectList } = useObsidianProjectsQuery(vaultAvailable);
+  const setProjectRootMutation = useObsidianSetProjectRoot();
+  const createTodoMutation = useObsidianCreateProjectTodo();
+  const savedProjectRoot = health?.project_root ?? projectList?.project_root ?? '';
+  const [projectRootDraft, setProjectRootDraft] = useState<string | null>(null);
+  const projectRoot = projectRootDraft ?? savedProjectRoot;
+  const indexState = health?.index_state;
+  useEffect(() => {
+    // The list fetched while the startup scan ran may be empty.
+    if (indexState === 'ready') {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.obsidianProjects });
+    }
+  }, [indexState, queryClient]);
   if (isLoading) {
     return (
       <div className="cc-settings-section">
@@ -65,6 +86,19 @@ export default function ObsidianStatusCard() {
   const queueAge = health.queue_age_seconds;
   const scanStuck = health.scan_stuck ?? false;
   const lastCliError = health.last_cli_error;
+  const projectsWithoutTodo = (projectList?.projects ?? []).filter((project) => !project.has_todo);
+  const saveProjectRoot = () => {
+    setProjectRootMutation.mutate(projectRoot.trim(), {
+      onSuccess: (data) => {
+        setProjectRootDraft(null);
+        addToast(
+          'success',
+          t('workspaceSettings.obsidian.projectRootSaved', { count: data.project_count }),
+        );
+      },
+      onError: () => addToast('error', t('workspaceSettings.obsidian.projectRootFailed')),
+    });
+  };
   return (
     <div className="cc-settings-section">
       <div className="cc-settings-section__title">{t('workspaceSettings.obsidian.title')}</div>
@@ -82,13 +116,21 @@ export default function ObsidianStatusCard() {
         </span>
       </SettingsRow>
 
+      {indexState === 'scanning' && (
+        <SettingsRow label="">
+          <span data-testid="obsidian-indexing" style={{ fontSize: 11, opacity: 0.7 }}>
+            {t('workspaceSettings.obsidian.indexing')}
+          </span>
+        </SettingsRow>
+      )}
+
       <SettingsRow
         label={t('workspaceSettings.obsidian.cli')}
-        sublabel={
+        sublabel={`${
           health.cli_available
             ? t('workspaceSettings.obsidian.available')
             : t('workspaceSettings.obsidian.notAvailable')
-        }
+        }${health.mode ? ` · ${t('workspaceSettings.obsidian.mode', { mode: health.mode })}` : ''}`}
       >
         <span
           style={{
@@ -126,6 +168,74 @@ export default function ObsidianStatusCard() {
             {t('workspaceSettings.obsidian.scanStuck')}
           </span>
         </SettingsRow>
+      )}
+
+      {health.vault_available && (
+        <SettingsRow
+          label={t('workspaceSettings.obsidian.projectRoot')}
+          sublabel={t('workspaceSettings.obsidian.projectRootHint')}
+        >
+          <form
+            style={{ display: 'flex', gap: 6 }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveProjectRoot();
+            }}
+          >
+            <input
+              className="cc-settings-input cc-settings-input--compact"
+              aria-label={t('workspaceSettings.obsidian.projectRoot')}
+              placeholder={t('workspaceSettings.obsidian.projectRootPlaceholder')}
+              value={projectRoot}
+              onChange={(event) => setProjectRootDraft(event.target.value)}
+            />
+            <button
+              type="submit"
+              className="cc-btn cc-btn--secondary"
+              disabled={setProjectRootMutation.isPending || projectRoot.trim() === savedProjectRoot}
+              style={{ fontSize: 11, padding: '3px 8px' }}
+            >
+              {translateUi('Save')}
+            </button>
+          </form>
+        </SettingsRow>
+      )}
+
+      {projectsWithoutTodo.length > 0 && (
+        <div data-testid="obsidian-missing-todo">
+          <SettingsRow label={t('workspaceSettings.obsidian.missingTodo')}>
+            <span style={{ fontSize: 12, opacity: 0.7 }}>{projectsWithoutTodo.length}</span>
+          </SettingsRow>
+          {projectsWithoutTodo.map((project) => {
+            const creating =
+              createTodoMutation.isPending && createTodoMutation.variables === project.folder;
+            return (
+              <SettingsRow key={project.folder} label={project.name} sublabel={project.folder}>
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--secondary"
+                  disabled={createTodoMutation.isPending}
+                  onClick={() => {
+                    createTodoMutation.mutate(project.folder, {
+                      onSuccess: () =>
+                        addToast(
+                          'success',
+                          t('workspaceSettings.obsidian.todoCreated', { folder: project.folder }),
+                        ),
+                      onError: () =>
+                        addToast('error', t('workspaceSettings.obsidian.todoCreateFailed')),
+                    });
+                  }}
+                  style={{ fontSize: 11, padding: '3px 8px' }}
+                >
+                  {creating
+                    ? t('workspaceSettings.obsidian.creatingTodo')
+                    : t('workspaceSettings.obsidian.createTodo')}
+                </button>
+              </SettingsRow>
+            );
+          })}
+        </div>
       )}
 
       <SettingsRow label={t('workspaceSettings.obsidian.lastScan')}>

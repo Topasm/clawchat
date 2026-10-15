@@ -50,8 +50,9 @@ from services.chat.orchestrator import Orchestrator
 from services.lifecycle import (
     configure_ai_state,
     initialize_host_identity,
-    initialize_vault,
     probe_optional_ai,
+    restore_vault_state,
+    start_vault_index_build,
     vault_outbox_loop,
 )
 from services.scheduler import Scheduler
@@ -131,9 +132,10 @@ async def lifespan(app: FastAPI):
         name="optional-ai-probe",
     )
 
-    # Vault recovery remains part of durable-data startup, but it does not
-    # contact an AI provider or require a remote server.
-    await initialize_vault()
+    # The saved Obsidian options and the CLI write queue are quick reads that
+    # must land before anything writes to the Vault. The index scan is not:
+    # on a large vault it took ~20 s, so it runs once the server answers.
+    await restore_vault_state()
 
     # Initialize push notification service (no-op if not configured)
     from services.notifications.push_service import PushService
@@ -208,7 +210,14 @@ async def lifespan(app: FastAPI):
         app.state.relay_connector = relay_connector
         app.state.relay_task = asyncio.create_task(relay_connector.run_forever())
 
+    app.state.vault_index_task = start_vault_index_build()
+
     yield
+
+    if not app.state.vault_index_task.done():
+        app.state.vault_index_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await app.state.vault_index_task
 
     # Stop scheduler before closing AI service
     if app.state.scheduler:

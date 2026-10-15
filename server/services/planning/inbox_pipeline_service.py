@@ -373,10 +373,14 @@ async def _classify_todo(ai_service: AIService, todo: Todo) -> dict:
     if settings.obsidian_vault_path:
         try:
             folders = await asyncio.to_thread(
-                list_project_folders, settings.obsidian_vault_path
+                list_project_folders,
+                settings.obsidian_vault_path,
+                "",
+                settings.obsidian_project_root,
             )
             if folders:
-                parts.append(f"Known project folders: {', '.join(folders)}")
+                names = ", ".join(folder["folder"] for folder in folders)
+                parts.append(f"Known project folders: {names}")
         except Exception:  # noqa: BLE001 - optional vault context must not block capture
             logger.debug("Could not list Obsidian project folders")
 

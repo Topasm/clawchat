@@ -1313,7 +1313,11 @@ retain the legacy delegation behavior.
 All require JWT authentication.
 
 ```
+GET    /api/obsidian/status                  # Availability (same fields as health) + export status
 GET    /api/obsidian/health                  # Vault status, CLI availability, write queue
+GET    /api/obsidian/projects                # Project folders, with has_todo per folder
+PUT    /api/obsidian/project-root            # Set the folder whose subfolders are projects
+POST   /api/obsidian/projects/todo           # Create TODO.md in a project-root folder lacking one
 GET    /api/obsidian/index                   # Vault file index (cached)
 POST   /api/obsidian/index/refresh           # Trigger re-index
 GET    /api/obsidian/cli-commands            # List available Obsidian CLI commands
@@ -1325,12 +1329,22 @@ DELETE /api/obsidian/queue                   # Clear the write queue
 
 #### `GET /api/obsidian/health`
 
+`/status` and `/health` read availability from one place
+(`services/vault/obsidian_status.py`), so `vault_available`, `cli_available`
+(the CLI answered `version`; cached for a minute), `companion_online` and
+`mode` always agree. `index_state` is `scanning` while the startup index build
+runs in the background.
+
 ```json
 // Response 200
 {
   "vault_path": "/path/to/vault",
-  "vault_accessible": true,
+  "vault_available": true,
   "cli_available": true,
+  "companion_online": false,
+  "mode": "cli",
+  "project_root": "01_Projects",
+  "index_state": "ready",
   "sync_mode": "filesystem",
   "write_queue": {
     "pending": 0

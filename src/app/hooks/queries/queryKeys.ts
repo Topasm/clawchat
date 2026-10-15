@@ -45,4 +45,5 @@ export const queryKeys = {
   capabilities: ['capabilities'] as const,
   obsidianHealth: ['obsidian', 'health'] as const,
   obsidianQueue: ['obsidian', 'queue'] as const,
+  obsidianProjects: ['obsidian', 'projects'] as const,
 };
