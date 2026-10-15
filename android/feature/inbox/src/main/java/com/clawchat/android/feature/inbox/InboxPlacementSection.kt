@@ -12,9 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import com.clawchat.android.core.data.model.Todo
 import androidx.compose.ui.text.style.TextOverflow
 import com.clawchat.android.core.ui.ClawListItemSurface
 import com.clawchat.android.core.ui.ClawActionLabel
+import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.localizedErrorMessage
 import com.clawchat.android.core.ui.icons.ClawIcons
 
@@ -23,9 +25,12 @@ internal fun InboxPlacementSection(
     state: InboxPlacementState,
     viewModel: InboxPlacementActions,
     onOpenPlacement: (String, String?) -> Unit,
+    deleting: Set<String> = emptySet(),
+    onDelete: (String) -> Unit = {},
+    onLongPress: (Todo) -> Unit = {},
 ) {
     val tasks = state.snapshot?.tasks.orEmpty()
-    val visibleTasks = tasks.filterNot { it.id in state.deferred }
+    val visibleTasks = tasks.filterNot { it.id in state.deferred || it.id in deleting }
     val locale = LocalConfiguration.current.locales[0]
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.inbox_placement_count, visibleTasks.size), style = MaterialTheme.typography.titleMedium)
@@ -62,32 +67,34 @@ internal fun InboxPlacementSection(
                 parent != null && parent.id != project?.rootTaskId -> "${project?.title.orEmpty()} › ${parent.title}"
                 else -> project?.title.orEmpty()
             }
-            ClawListItemSurface {
-                Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                InboxPlacementDetail(
-                    when {
-                        choice == null -> ClawIcons.Inbox
-                        choice.projectId == null -> ClawIcons.Checklist
-                        else -> ClawIcons.Folder
-                    },
-                    destination,
-                )
-                task.dueDate?.let {
-                    InboxPlacementDetail(ClawIcons.Today, stringResource(R.string.inbox_placement_due, inboxDisplayDate(it, locale)))
-                }
-                state.deadlines[task.id]?.takeUnless { task.id in state.excludedDeadlines }?.let { deadline ->
-                    InboxPlacementDetail(ClawIcons.Today, stringResource(R.string.inbox_placement_due, inboxDisplayDate(deadline.localDate, locale)))
-                    if (deadline.isPast) Text(stringResource(R.string.inbox_deadline_past), color = MaterialTheme.colorScheme.error)
-                }
-                FlowRow {
-                    FilledTonalButton(
-                        onClick = { viewModel.approve(task.id) },
-                        enabled = choice != null && !state.loading && !state.busy && !state.stale,
-                    ) { ClawActionLabel(Icons.Default.Check, stringResource(R.string.inbox_placement_approve)) }
-                    TextButton(onClick = { choosing = true }, enabled = state.snapshot != null && !state.loading && !state.busy && !state.stale) {
-                        ClawActionLabel(Icons.Default.Edit, stringResource(R.string.inbox_placement_edit))
+            SwipeToDismissCard(onDelete = { onDelete(task.id) }) {
+                ClawListItemSurface(onLongClick = { onLongPress(task) }) {
+                    Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    InboxPlacementDetail(
+                        when {
+                            choice == null -> ClawIcons.Inbox
+                            choice.projectId == null -> ClawIcons.Checklist
+                            else -> ClawIcons.Folder
+                        },
+                        destination,
+                    )
+                    task.dueDate?.let {
+                        InboxPlacementDetail(ClawIcons.Today, stringResource(R.string.inbox_placement_due, inboxDisplayDate(it, locale)))
                     }
-                    TextButton(onClick = { viewModel.defer(task.id) }, enabled = !state.busy && !state.loading) { Text(stringResource(R.string.inbox_placement_defer)) }
+                    state.deadlines[task.id]?.takeUnless { task.id in state.excludedDeadlines }?.let { deadline ->
+                        InboxPlacementDetail(ClawIcons.Today, stringResource(R.string.inbox_placement_due, inboxDisplayDate(deadline.localDate, locale)))
+                        if (deadline.isPast) Text(stringResource(R.string.inbox_deadline_past), color = MaterialTheme.colorScheme.error)
+                    }
+                    FlowRow {
+                        FilledTonalButton(
+                            onClick = { viewModel.approve(task.id) },
+                            enabled = choice != null && !state.loading && !state.busy && !state.stale,
+                        ) { ClawActionLabel(Icons.Default.Check, stringResource(R.string.inbox_placement_approve)) }
+                        TextButton(onClick = { choosing = true }, enabled = state.snapshot != null && !state.loading && !state.busy && !state.stale) {
+                            ClawActionLabel(Icons.Default.Edit, stringResource(R.string.inbox_placement_edit))
+                        }
+                        TextButton(onClick = { viewModel.defer(task.id) }, enabled = !state.busy && !state.loading) { Text(stringResource(R.string.inbox_placement_defer)) }
+                    }
                 }
             }
             if (choosing) InboxPlacementEditor(state, task, viewModel) { choosing = false }

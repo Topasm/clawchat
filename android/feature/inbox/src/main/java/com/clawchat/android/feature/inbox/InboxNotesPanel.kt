@@ -41,6 +41,7 @@ fun InboxNotesPanel(viewModel: InboxNotesViewModel = hiltViewModel()) {
 @Composable
 private fun NotesContent(state: InboxNotesState, viewModel: InboxNotesViewModel) {
     var editing by remember { mutableStateOf<Note?>(null) }
+    var deleting by remember { mutableStateOf<Note?>(null) }
     val destinations = listOf(ProjectPlan("", stringResource(R.string.inbox_note_unfiled))) + state.projects
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.inbox_note_drag_hint), style = MaterialTheme.typography.bodySmall)
@@ -60,7 +61,7 @@ private fun NotesContent(state: InboxNotesState, viewModel: InboxNotesViewModel)
                 Text(stringResource(if (state.loading) R.string.inbox_loading else R.string.inbox_note_empty))
             }
             items(visible, key = { it.id }) { note ->
-                NoteCard(note, state, destinations, { editing = note }, viewModel::move)
+                NoteCard(note, state, destinations, { editing = note }, { deleting = note }, viewModel::move)
             }
         }
         OutlinedTextField(
@@ -71,6 +72,14 @@ private fun NotesContent(state: InboxNotesState, viewModel: InboxNotesViewModel)
         Button(onClick = viewModel::create, enabled = !state.busy && state.draft.isNotBlank(), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Text(stringResource(R.string.inbox_note_add))
         }
+    }
+    deleting?.let { note ->
+        InboxDeleteDialog(
+            heading = stringResource(R.string.inbox_note_delete_confirm),
+            body = note.content.lineSequence().first(),
+            onConfirm = { viewModel.delete(note.id) { deleting = null } },
+            onDismiss = { deleting = null },
+        )
     }
     editing?.let { original ->
         var content by remember(original.id) { mutableStateOf(original.content) }
@@ -126,7 +135,7 @@ private fun NoteProjectTarget(project: ProjectPlan, state: InboxNotesState, view
 }
 
 @Composable
-private fun NoteCard(note: Note, state: InboxNotesState, destinations: List<ProjectPlan>, onEdit: () -> Unit, onMove: (String, String?) -> Unit) {
+private fun NoteCard(note: Note, state: InboxNotesState, destinations: List<ProjectPlan>, onEdit: () -> Unit, onDelete: () -> Unit, onMove: (String, String?) -> Unit) {
     var menu by remember { mutableStateOf(false) }
     val drag = if (state.busy || state.workspace == null) Modifier else Modifier.dragAndDropSource { _ ->
         DragAndDropTransferData(
@@ -140,14 +149,19 @@ private fun NoteCard(note: Note, state: InboxNotesState, destinations: List<Proj
             note.content.substringAfter('\n', "").takeIf { it.isNotBlank() }?.let {
                 Text(it, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
             }
-            Box {
-                TextButton(onClick = { menu = true }, enabled = !state.busy) { Text(stringResource(R.string.inbox_note_move)) }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    destinations.forEach { project ->
-                        DropdownMenuItem(text = { Text(project.title) }, onClick = {
-                            menu = false; onMove(note.id, project.id.ifEmpty { null })
-                        })
+            Row {
+                Box {
+                    TextButton(onClick = { menu = true }, enabled = !state.busy) { Text(stringResource(R.string.inbox_note_move)) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        destinations.forEach { project ->
+                            DropdownMenuItem(text = { Text(project.title) }, onClick = {
+                                menu = false; onMove(note.id, project.id.ifEmpty { null })
+                            })
+                        }
                     }
+                }
+                TextButton(onClick = onDelete, enabled = !state.busy) {
+                    Text(stringResource(R.string.inbox_delete), color = MaterialTheme.colorScheme.error)
                 }
             }
         }

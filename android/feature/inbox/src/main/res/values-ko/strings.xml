@@ -64,4 +64,6 @@
     <string name="inbox_state_attention">확인 필요</string>
     <string name="inbox_state_suggestion">제안</string>
     <string name="inbox_state_captured">수집됨</string>
+    <string name="inbox_delete">삭제</string>
+    <string name="inbox_delete_confirm">이 할 일을 삭제할까요?</string>
 </resources>

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,6 +56,7 @@ import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
+import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.icons.ClawIcons
 import com.clawchat.android.core.ui.localizedErrorMessage
 
@@ -67,6 +70,7 @@ fun InboxScreen(
     placementViewModel: InboxPlacementViewModel = hiltViewModel(),
 ) {
     var showNotes by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf<Todo?>(null) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val placement by placementViewModel.uiState.collectAsStateWithLifecycle()
     val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
@@ -158,7 +162,14 @@ fun InboxScreen(
 
                             if (placement.server) {
                                 item {
-                                    InboxPlacementSection(placement, placementViewModel, onOpenPlacement)
+                                    InboxPlacementSection(
+                                        placement,
+                                        placementViewModel,
+                                        onOpenPlacement,
+                                        deleting = state.deleting,
+                                        onDelete = viewModel::delete,
+                                        onLongPress = { confirmDelete = it },
+                                    )
                                 }
                             }
 
@@ -177,6 +188,8 @@ fun InboxScreen(
                                         isError = false,
                                         showSpinner = true,
                                         onTaskClick = onTaskClick,
+                                        onDelete = viewModel::delete,
+                                        onLongPress = { confirmDelete = it },
                                     )
                                 }
                             }
@@ -196,6 +209,8 @@ fun InboxScreen(
                                         isError = false,
                                         showSpinner = false,
                                         onTaskClick = onTaskClick,
+                                        onDelete = viewModel::delete,
+                                        onLongPress = { confirmDelete = it },
                                         secondaryActionLabel = stringResource(R.string.inbox_action_today),
                                         onSecondaryAction = viewModel::moveToToday,
                                     )
@@ -217,6 +232,8 @@ fun InboxScreen(
                                         isError = false,
                                         showSpinner = false,
                                         onTaskClick = onTaskClick,
+                                        onDelete = viewModel::delete,
+                                        onLongPress = { confirmDelete = it },
                                         secondaryActionLabel = stringResource(R.string.inbox_action_today),
                                         onSecondaryAction = viewModel::moveToToday,
                                     )
@@ -238,6 +255,8 @@ fun InboxScreen(
                                         isError = true,
                                         showSpinner = false,
                                         onTaskClick = onTaskClick,
+                                        onDelete = viewModel::delete,
+                                        onLongPress = { confirmDelete = it },
                                     )
                                 }
                             }
@@ -273,6 +292,35 @@ fun InboxScreen(
             }
         }
     }
+
+    confirmDelete?.let { todo ->
+        InboxDeleteDialog(
+            heading = stringResource(R.string.inbox_delete_confirm),
+            body = todo.title,
+            onConfirm = {
+                viewModel.delete(todo.id)
+                confirmDelete = null
+            },
+            onDismiss = { confirmDelete = null },
+        )
+    }
+}
+
+@Composable
+internal fun InboxDeleteDialog(heading: String, body: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(heading) },
+        text = { Text(body, maxLines = 3, overflow = TextOverflow.Ellipsis) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.inbox_delete), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.inbox_note_cancel)) }
+        },
+    )
 }
 
 private fun isEmpty(state: InboxUiState): Boolean =
@@ -343,6 +391,8 @@ private fun InboxSectionCard(
     isError: Boolean,
     showSpinner: Boolean,
     onTaskClick: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onLongPress: (Todo) -> Unit,
     secondaryActionLabel: String? = null,
     onSecondaryAction: ((String) -> Unit)? = null,
 ) {
@@ -373,6 +423,8 @@ private fun InboxSectionCard(
             items.forEach { todo ->
                 InboxItemCard(
                     todo = todo,
+                    onDelete = { onDelete(todo.id) },
+                    onLongClick = { onLongPress(todo) },
                     showSpinner = showSpinner,
                     actionLabel = actionLabel,
                     onAction = if (actionLabel != null && onAction != null) {
@@ -399,6 +451,8 @@ private fun InboxSectionCard(
 @Composable
 private fun InboxItemCard(
     todo: Todo,
+    onDelete: () -> Unit,
+    onLongClick: () -> Unit,
     showSpinner: Boolean = false,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
@@ -407,84 +461,86 @@ private fun InboxItemCard(
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
 ) {
-    ClawListItemSurface(onClick = onClick) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top,
+    SwipeToDismissCard(onDelete = onDelete) {
+        ClawListItemSurface(onClick = onClick, onLongClick = onLongClick) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (showSpinner) {
-                    ClawStatusChip(
-                        text = stringResource(R.string.inbox_state_working),
-                        tone = ClawTone.Primary,
-                    )
-                } else {
-                    ClawStatusChip(
-                        text = when {
-                            isError -> stringResource(R.string.inbox_state_attention)
-                            todo.inboxState == "plan_ready" -> stringResource(R.string.inbox_state_suggestion)
-                            else -> stringResource(R.string.inbox_state_captured)
-                        },
-                        tone = if (isError) ClawTone.Error else ClawTone.Warning,
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = todo.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val summary = todo.planSummary ?: todo.nextAction
-                    if (!summary.isNullOrBlank()) {
-                        Text(
-                            text = summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    val automationError = todo.automationError
-                    if (isError && !automationError.isNullOrBlank()) {
-                        Text(
-                            text = automationError,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-
-            if (actionLabel != null && onAction != null) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    if (secondaryActionLabel != null && onSecondaryAction != null) {
-                        TextButton(onClick = onSecondaryAction) {
-                            Text(secondaryActionLabel)
+                    if (showSpinner) {
+                        ClawStatusChip(
+                            text = stringResource(R.string.inbox_state_working),
+                            tone = ClawTone.Primary,
+                        )
+                    } else {
+                        ClawStatusChip(
+                            text = when {
+                                isError -> stringResource(R.string.inbox_state_attention)
+                                todo.inboxState == "plan_ready" -> stringResource(R.string.inbox_state_suggestion)
+                                else -> stringResource(R.string.inbox_state_captured)
+                            },
+                            tone = if (isError) ClawTone.Error else ClawTone.Warning,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = todo.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        val summary = todo.planSummary ?: todo.nextAction
+                        if (!summary.isNullOrBlank()) {
+                            Text(
+                                text = summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        val automationError = todo.automationError
+                        if (isError && !automationError.isNullOrBlank()) {
+                            Text(
+                                text = automationError,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
-                    FilledTonalButton(onClick = onAction) {
-                        if (isError) {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.size(6.dp))
+                }
+
+                if (actionLabel != null && onAction != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        if (secondaryActionLabel != null && onSecondaryAction != null) {
+                            TextButton(onClick = onSecondaryAction) {
+                                Text(secondaryActionLabel)
+                            }
                         }
-                        Text(actionLabel)
+                        FilledTonalButton(onClick = onAction) {
+                            if (isError) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(Modifier.size(6.dp))
+                            }
+                            Text(actionLabel)
+                        }
                     }
                 }
             }
