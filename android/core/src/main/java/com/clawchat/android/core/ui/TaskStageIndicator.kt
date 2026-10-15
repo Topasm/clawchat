@@ -145,18 +145,18 @@ fun TaskStageBar(
     val current = currentMarkColor(state, accent = scheme.primary)
     FlowRow(
         modifier = modifier.clearAndSetSemantics { contentDescription = summary },
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         TaskStage.entries.forEach { step ->
             val position = state.position(step)
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (step.ordinal > 0) {
-                    Box(Modifier.width(12.dp).height(1.dp).background(scheme.outline))
+                    Box(Modifier.width(8.dp).height(1.dp).background(scheme.outline))
                 }
                 val mark = Modifier.size(18.dp)
                 val showCheck = position == StepPosition.PAST ||
@@ -185,7 +185,7 @@ fun TaskStageBar(
                 }
                 Text(
                     text = stringResource(step.labelRes()),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = if (position == StepPosition.CURRENT) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (position == StepPosition.NEXT) scheme.onSurfaceVariant else scheme.onSurface,
                 )

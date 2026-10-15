@@ -756,7 +756,11 @@ internal fun TaskDetailView(
     onDiscuss: () -> Unit = {},
     onRunWithAgent: () -> Unit = {},
     storageLocation: ItemStorageLocation? = null,
-    stage: TaskStageState = taskStage(taskStatus = task.status, inboxState = task.inboxState),
+    stage: TaskStageState = taskStage(
+        taskStatus = task.status,
+        inboxState = task.inboxState,
+        hasSubtasks = steps.items.isNotEmpty(),
+    ),
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     var showDatePicker by rememberSaveable(task.id) { mutableStateOf(false) }
