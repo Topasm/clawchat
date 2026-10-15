@@ -25,6 +25,7 @@ const coordinatorMocks = vi.hoisted(() => ({
   connectPairedWorkspace: vi.fn(),
 }));
 const routerMocks = vi.hoisted(() => ({ navigate: vi.fn() }));
+const platformState = vi.hoisted(() => ({ worker: null as object | null }));
 
 vi.mock('../../platform', () => ({
   platformApi: {
@@ -34,6 +35,9 @@ vi.mock('../../platform', () => ({
     server: serverMocks,
     system: { openCameraSettings: vi.fn() },
     secureStorage: null,
+    get worker() {
+      return platformState.worker;
+    },
   },
 }));
 vi.mock('../../services/apiClient', () => ({ default: apiMocks }));
@@ -79,10 +83,10 @@ function freshConfig(): ServerConfig {
   };
 }
 
-function renderWizard(state?: { returnTo: string }) {
+function renderWizard(state?: { returnTo: string }, search = '') {
   return render(
     <ThemeProvider>
-      <MemoryRouter initialEntries={[{ pathname: '/onboarding', state }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/onboarding', search, state }]}>
         <OnboardingPage />
       </MemoryRouter>
     </ThemeProvider>,
@@ -119,6 +123,7 @@ function skipStep() {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  platformState.worker = null;
   config = freshConfig();
   serverMocks.getConfig.mockImplementation(async () => config);
   serverMocks.getStatus.mockResolvedValue(running);
@@ -296,6 +301,36 @@ describe('first-run setup wizard', () => {
       await screen.findByText(/Home uses the vault configured on that server/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Choose vault folder' })).not.toBeInTheDocument();
+    // Without the desktop worker there is nothing to share this vault with.
+    expect(
+      screen.queryByRole('button', { name: "Share this computer's vault" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers to share this computer's vault with a remote workspace", async () => {
+    platformState.worker = {};
+    useAuthStore.setState({ token: 'remote-token', serverUrl: 'https://home.example' });
+    useWorkspaceStore.getState().upsertRemote('Home', 'https://home.example');
+    renderWizard();
+    next();
+    skipStep();
+
+    expect(
+      await screen.findByText(/share the vault on this computer through Home/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: "Share this computer's vault" }));
+
+    expect(routerMocks.navigate).toHaveBeenCalledWith('/settings/workspace#share-this-machine', {
+      state: { settingsReturnTo: '/onboarding?step=obsidian' },
+    });
+  });
+
+  it('comes back from settings on the step it left', async () => {
+    useAuthStore.setState({ token: 'remote-token', serverUrl: 'https://home.example' });
+    useWorkspaceStore.getState().upsertRemote('Home', 'https://home.example');
+    renderWizard(undefined, '?step=obsidian');
+
+    expect(await screen.findByText('Connect your Obsidian vault')).toBeInTheDocument();
   });
 
   it('requires a new PIN before opening the local server to phones', async () => {

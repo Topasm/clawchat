@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { translateUi } from '../../i18n';
 import { platformApi } from '../../platform';
+import { DATA_SHARING_SECTION_ID } from '../settings/DataSharingSettings';
 import { useWorkspaceRuntimeStore } from '../../stores/useWorkspaceRuntimeStore';
 import { SetupStatus, SetupStepActions } from './SetupStepChrome';
 
@@ -9,7 +11,8 @@ import { SetupStatus, SetupStepActions } from './SetupStepChrome';
  *
  * A server on this computer reads the vault path from the desktop server
  * config, the same setting as Settings → Obsidian. A remote server reads
- * its own vault, so there is nothing to choose here.
+ * its own vault; this computer's vault can only be shared through it as a
+ * read-only data source, from Settings → "Share this machine's data".
  */
 export default function ObsidianStep({
   runsLocally,
@@ -23,6 +26,7 @@ export default function ObsidianStep({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const navigate = useNavigate();
   const config = useWorkspaceRuntimeStore((state) => state.config);
   const initialize = useWorkspaceRuntimeStore((state) => state.initialize);
   const updateLocalServerPolicy = useWorkspaceRuntimeStore(
@@ -61,6 +65,13 @@ export default function ObsidianStep({
     }
     if (folder) await saveVault(folder);
   };
+
+  const server = serverName ?? translateUi('The server');
+  const openDataSharing = () =>
+    navigate(`/settings/workspace#${DATA_SHARING_SECTION_ID}`, {
+      // Settings' Done button comes back to this step rather than step one.
+      state: { settingsReturnTo: '/onboarding?step=obsidian' },
+    });
 
   return (
     <div className="cc-onboarding__card">
@@ -111,12 +122,30 @@ export default function ObsidianStep({
           </div>
         </>
       ) : (
-        <p className="cc-onboarding__card-description">
-          {translateUi(
-            '{{server}} uses the vault configured on that server. Notes on this computer stay here; sharing them with another server is not available in this version.',
-            { server: serverName ?? translateUi('The server') },
+        <>
+          <p className="cc-onboarding__card-description">
+            {translateUi('{{server}} uses the vault configured on that server.', { server })}
+          </p>
+          {platformApi.worker && (
+            <>
+              <p className="cc-onboarding__card-description">
+                {translateUi(
+                  'You can also share the vault on this computer through {{server}}, so your phone and other devices can open and search it. Notes stay on this computer and can be read only while this app is open.',
+                  { server },
+                )}
+              </p>
+              <div className="cc-onboarding__form-actions">
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--secondary"
+                  onClick={openDataSharing}
+                >
+                  {translateUi("Share this computer's vault")}
+                </button>
+              </div>
+            </>
           )}
-        </p>
+        </>
       )}
 
       <SetupStepActions

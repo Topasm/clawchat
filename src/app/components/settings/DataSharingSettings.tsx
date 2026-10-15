@@ -13,6 +13,9 @@ import SegmentedControl from '../shared/SegmentedControl';
 import SettingsRow from '../shared/SettingsRow';
 import SettingsSection from '../shared/SettingsSection';
 
+/** Anchor of the section, so first-run setup can open it directly. */
+export const DATA_SHARING_SECTION_ID = 'share-this-machine';
+
 function sameServer(a: string | null, b: string): boolean {
   return !!a && a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
 }
@@ -118,7 +121,7 @@ function SharedSourceCard({ source }: { source: SharedSourceSetting }) {
           className="cc-settings-input"
           rows={3}
           value={include}
-          placeholder="01_Projects"
+          placeholder={translateUi('01_Projects')}
           onChange={(event) => setInclude(event.target.value)}
           onBlur={() => update(source.id, { includeFolders: parseFolders(include) })}
         />
@@ -129,7 +132,7 @@ function SharedSourceCard({ source }: { source: SharedSourceSetting }) {
           className="cc-settings-input"
           rows={2}
           value={exclude}
-          placeholder="02_Resources/Private"
+          placeholder={translateUi('02_Resources/Private')}
           onChange={(event) => setExclude(event.target.value)}
           onBlur={() => update(source.id, { excludeFolders: parseFolders(exclude) })}
         />
@@ -181,7 +184,7 @@ export default function DataSharingSettings() {
   };
 
   return (
-    <SettingsSection title={translateUi("Share this machine's data")}>
+    <SettingsSection id={DATA_SHARING_SECTION_ID} title={translateUi("Share this machine's data")}>
       <p className="cc-data-sharing__hint">
         {translateUi(
           'Your other devices can list, read and search these folders through this workspace while this app is open. Files stay on this machine; the workspace keeps only their names and dates. Read-only.',
