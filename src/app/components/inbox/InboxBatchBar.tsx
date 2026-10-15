@@ -45,11 +45,11 @@ export default function InboxBatchBar({
         )}
         <button
           type="button"
-          className="cc-btn cc-btn--compact cc-btn--primary"
+          className="cc-btn cc-btn--compact cc-btn--secondary"
           disabled={suggestDisabled}
           onClick={onSuggest}
         >
-          {isSuggesting ? translateUi('Suggesting…') : translateUi('AI suggest')}
+          {isSuggesting ? translateUi('Suggesting…') : translateUi('Suggest placement')}
         </button>
       </div>
     </div>

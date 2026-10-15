@@ -20,11 +20,9 @@
 
 .cc-inbox-tree__header strong {
   display: block;
-  color: var(--cc-text-secondary);
-  font-size: 12px;
+  color: var(--cc-text);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
 }
 
 .cc-inbox-tree__header div,
@@ -89,20 +87,32 @@
   background: transparent;
 }
 
-.cc-inbox-tree__project-target:has(button:hover),
 .cc-inbox-tree__project-target:hover {
-  background: color-mix(in srgb, var(--cc-primary) 13%, var(--cc-surface));
+  background: var(--cc-hover-surface);
 }
 
-.cc-inbox-tree__project-target button,
+.cc-inbox-tree__project-target strong {
+  color: var(--cc-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Placing is offered on every project and row at once, so none of them is the
+   one primary action: they stay as quiet as "+ Task". */
 .cc-inbox-tree__place-button {
-  border: 0;
+  border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius-sm);
-  padding: 4px 7px;
-  background: var(--cc-primary);
-  color: #fff;
+  padding: 3px 7px;
+  background: transparent;
+  color: var(--cc-text-secondary);
   font-size: 11px;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.cc-inbox-tree__place-button:hover:not(:disabled) {
+  border-color: var(--cc-text-tertiary);
+  color: var(--cc-text);
 }
 
 .cc-inbox-tree__add-task {
@@ -117,8 +127,8 @@
 }
 
 .cc-inbox-tree__add-task:hover:not(:disabled) {
-  border-color: var(--cc-primary);
-  color: var(--cc-primary);
+  border-color: var(--cc-text-tertiary);
+  color: var(--cc-text);
 }
 
 .cc-inbox-tree__placement-actions {
@@ -200,7 +210,7 @@
 
 .cc-inbox-tree__node:hover {
   border-color: transparent;
-  background: color-mix(in srgb, var(--cc-primary) 6%, transparent);
+  background: var(--cc-hover-surface);
 }
 
 .cc-inbox-tree__node--selected {
@@ -248,35 +258,27 @@
   width: max-content;
   max-width: 100%;
   overflow: hidden;
-  border-radius: var(--cc-radius-pill);
-  padding: 2px 6px;
-  background: color-mix(in srgb, var(--cc-text-tertiary) 12%, transparent);
-  color: var(--cc-text-secondary);
+  color: var(--cc-text-tertiary);
   font-size: 11px;
-  font-weight: 600;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cc-inbox-tree__telemetry-badge[data-tone='active'] {
-  background: color-mix(in srgb, var(--cc-primary) 13%, transparent);
-  color: var(--cc-primary);
+.cc-inbox-tree__telemetry-badge + .cc-inbox-tree__telemetry-badge::before {
+  content: '· ';
 }
 
+/* Running, done and file counts stay grey; only an answer to give or a
+   failure is coloured. */
 .cc-inbox-tree__telemetry-badge[data-tone='attention'] {
-  background: color-mix(in srgb, var(--cc-warning) 13%, transparent);
   color: var(--cc-warning);
-}
-
-.cc-inbox-tree__telemetry-badge[data-tone='success'] {
-  background: color-mix(in srgb, var(--cc-success) 13%, transparent);
-  color: var(--cc-success);
+  font-weight: 600;
 }
 
 .cc-inbox-tree__telemetry-badge[data-tone='error'] {
-  background: color-mix(in srgb, var(--cc-error) 13%, transparent);
   color: var(--cc-error);
+  font-weight: 600;
 }
 
 .cc-inbox-tree__node small {

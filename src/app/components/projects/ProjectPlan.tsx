@@ -9,11 +9,18 @@ import {
   useTaskExecutionTelemetryQuery,
 } from '../../hooks/queries';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
-import type { ProjectOverviewResponse, TaskGraphInsightNode, TodoResponse } from '../../types/api';
+import type {
+  ProjectOverviewResponse,
+  TaskExecutionTelemetryResponse,
+  TaskGraphInsightNode,
+  TodoResponse,
+} from '../../types/api';
 import { translateUi } from '../../i18n';
 import { ChevronRightIcon } from '../shared/Icons';
 import EmptyState from '../shared/EmptyState';
 import SegmentedControl from '../shared/SegmentedControl';
+import TaskStageIndicator from '../shared/TaskStageIndicator';
+import { describeTaskState } from '../task-list/TaskListView';
 import TaskGraph from '../task-graph/TaskGraph';
 import TaskGraphProposalDialog from '../task-graph/TaskGraphProposalDialog';
 import useOpenRunThread from '../../hooks/useOpenRunThread';
@@ -27,12 +34,6 @@ interface ProjectPlanProps {
   project: ProjectOverviewResponse;
   todos: TodoResponse[];
   onDiscussTask: (task: TodoResponse, breadcrumb: string) => Promise<void>;
-}
-
-function statusLabel(status: TodoResponse['status']): string {
-  if (status === 'completed') return translateUi('Done');
-  if (status === 'cancelled') return translateUi('Cancelled');
-  return '';
 }
 
 function taskBreadcrumb(
@@ -89,13 +90,9 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
     () => new Map((insightsQuery.data?.nodes ?? []).map((node) => [node.task_id, node])),
     [insightsQuery.data?.nodes],
   );
-  const readyTasks = useMemo(
-    () =>
-      todos.filter((todo) => {
-        const insight = insightById.get(todo.id);
-        return insight?.is_ready && !insight.is_container;
-      }),
-    [insightById, todos],
+  const telemetryByTaskId = useMemo(
+    () => new Map((telemetryQuery.data ?? []).map((item) => [item.task_id, item])),
+    [telemetryQuery.data],
   );
   const runSelectedTask = async () => {
     if (!selectedTask || primaryAction?.kind !== 'run') return;
@@ -128,33 +125,6 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
 
   return (
     <>
-      <section className="cc-project-ready" aria-label={translateUi('Ready now')}>
-        <div className="cc-project-workspace__section-header">
-          <div>
-            <h2>{translateUi('Ready now')}</h2>
-            <p>{translateUi('Tasks that can start without waiting on another task.')}</p>
-          </div>
-          <strong>{readyTasks.length}</strong>
-        </div>
-        {readyTasks.length > 0 ? (
-          <div className="cc-project-ready__list">
-            {readyTasks.slice(0, 1).map((task) => (
-              <button
-                type="button"
-                key={task.id}
-                className="cc-project-ready__item"
-                onClick={() => setSelectedTaskId(task.id)}
-              >
-                <span>{task.title}</span>
-                <span>{translateUi('Ready')}</span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="cc-project-ready__empty">{translateUi('No tasks are ready right now.')}</p>
-        )}
-      </section>
-
       <section
         className="cc-project-workspace__section cc-project-plan"
         aria-label={translateUi('Plan')}
@@ -207,6 +177,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
             todos={todos}
             rootTaskId={project.root_task_id}
             insightById={insightById}
+            telemetryByTaskId={telemetryByTaskId}
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
           />
@@ -310,12 +281,14 @@ function ProjectOutline({
   todos,
   rootTaskId,
   insightById,
+  telemetryByTaskId,
   selectedTaskId,
   onSelectTask,
 }: {
   todos: TodoResponse[];
   rootTaskId: string | null | undefined;
   insightById: ReadonlyMap<string, TaskGraphInsightNode>;
+  telemetryByTaskId: ReadonlyMap<string, TaskExecutionTelemetryResponse>;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
 }) {
@@ -348,8 +321,16 @@ function ProjectOutline({
     const children = childrenByParent.get(task.id) ?? [];
     const collapsed = collapsedIds.has(task.id);
     const insight = insightById.get(task.id);
-    const displayStatus = task.status === 'in_progress' ? 'pending' : task.status;
-    const taskStatusLabel = statusLabel(task.status);
+    const { state, label } = describeTaskState(
+      task,
+      Boolean(insight?.is_blocked),
+      telemetryByTaskId.get(task.id),
+    );
+    // A task nothing waits on reads "Ready", in the same grey as every other step.
+    const stageLabel =
+      insight?.is_ready && state.stage === 'capture' && !state.exception
+        ? translateUi('Ready')
+        : label;
     return (
       <div key={task.id} className="cc-project-outline__branch">
         <div
@@ -384,21 +365,10 @@ function ProjectOutline({
             className="cc-project-outline__task"
             onClick={() => onSelectTask(task.id)}
           >
-            <span
-              className={`cc-project-task-row__state cc-project-task-row__state--${displayStatus}`}
-            />
             <span className="cc-project-outline__copy">
               <strong>{task.title}</strong>
-              {taskStatusLabel && <small>{taskStatusLabel}</small>}
             </span>
-            {insight?.is_ready && (
-              <span className="cc-project-outline__badge">{translateUi('Ready')}</span>
-            )}
-            {insight?.is_blocked && (
-              <span className="cc-project-outline__badge cc-project-outline__badge--blocked">
-                {translateUi('Blocked')}
-              </span>
-            )}
+            <TaskStageIndicator state={state} label={stageLabel} />
           </button>
         </div>
         {!collapsed && children.map((child) => renderNode(child, depth + 1))}

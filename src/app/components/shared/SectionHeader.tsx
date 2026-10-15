@@ -4,7 +4,8 @@ import { ChevronRightIcon } from './Icons';
 interface SectionHeaderProps {
   title: string;
   count?: number;
-  variant?: 'default' | 'warning' | 'accent' | 'success';
+  /** Colour is kept for the two exceptions: `warning` needs input, `error` failed. */
+  variant?: 'default' | 'warning' | 'error';
   defaultOpen?: boolean;
   children: React.ReactNode;
 }

@@ -147,7 +147,7 @@ export default function InboxInspector({
             {onOpenConversation && (
               <button
                 type="button"
-                className="cc-btn cc-btn--compact cc-btn--primary"
+                className="cc-btn cc-btn--compact cc-btn--secondary"
                 onClick={() => onOpenConversation(task.id)}
               >
                 {translateUi('Discuss with agent')}

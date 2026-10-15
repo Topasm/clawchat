@@ -78,13 +78,13 @@ export default function InboxTriageTree({
     <Pane as="section" className="cc-inbox-tree" aria-label={translateUi('Project work tree')}>
       <header className="cc-inbox-tree__header">
         <div>
-          <strong>{translateUi('Project / Work Tree')}</strong>
+          <strong>{translateUi('Projects')}</strong>
           <span>
             {batchTaskIds.length > 1
-              ? translateUi('{{count}} tasks selected for one atomic move', {
+              ? translateUi('{{count}} tasks selected to move together', {
                   count: batchTaskIds.length,
                 })
-              : translateUi('Drop a card to place the same task')}
+              : translateUi('Drag a task onto a project to place it')}
           </span>
         </div>
       </header>
@@ -155,6 +155,7 @@ export default function InboxTriageTree({
                 {(selectedTaskId || batchTaskIds.length > 1) && (
                   <button
                     type="button"
+                    className="cc-inbox-tree__place-button"
                     aria-label={
                       batchTaskIds.length > 1
                         ? translateUi('Place {{count}} selected tasks in {{title}}', {

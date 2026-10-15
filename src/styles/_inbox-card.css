@@ -33,11 +33,6 @@
   }
 }
 
-.cc-inbox-card--review {
-  border-left: 3px solid var(--cc-primary);
-  padding-left: 2px;
-}
-
 .cc-inbox-card--error {
   border-left: 3px solid var(--cc-error);
   padding-left: 2px;
@@ -53,8 +48,8 @@
 
 /* --- Inbox Questionnaire Card ------------------------------------------- */
 .cc-inbox-card--questioning {
-  border-left: 3px solid var(--cc-primary);
   padding: 12px 14px;
+  border-bottom: 1px solid var(--cc-border-subtle);
   margin-bottom: 6px;
 }
 

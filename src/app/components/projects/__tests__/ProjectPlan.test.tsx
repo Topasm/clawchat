@@ -165,7 +165,7 @@ describe('ProjectPlan', () => {
     );
     fireEvent.click(
       within(screen.getByRole('region', { name: 'Plan' })).getByRole('button', {
-        name: /^Review task\s*Ready$/,
+        name: /^Review task\s*Review$/,
       }),
     );
     expect(screen.queryByRole('button', { name: 'Run agent' })).not.toBeInTheDocument();
