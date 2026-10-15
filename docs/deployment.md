@@ -194,7 +194,14 @@ For the mobile app to reach the server on a local network:
 1. **Find the server's local IP**: Run `ip addr` (Linux) or `ipconfig` (Windows) on the host machine
 2. **Configure the firewall**: Allow inbound TCP on port 8000
 3. **Enter the URL in the app**: `http://192.168.x.x:8000` (use the actual IP)
-4. **For HTTPS** (recommended): Place a reverse proxy (Nginx, Caddy) in front of the server with a self-signed or Let's Encrypt certificate
+4. **For HTTPS** (recommended): Place a reverse proxy (Nginx, Caddy) in front of the server with a self-signed or Let's Encrypt certificate. A server reachable from the internet over plain HTTP sends the PIN and every token in the clear.
+
+What an exposed server refuses on its own:
+
+- **The default PIN from another machine.** While `PIN` is still `123456`, sign-in with it works only from the server's own machine; every other caller gets `403` with reason `default_pin_remote_login`. Devices that were already paired keep working. Set `PIN` to something else.
+- **The API description.** `/docs`, `/redoc` and `/openapi.json` are served only with `DEBUG=true`.
+- **Details in `/api/health`.** Without a token it reports only what a client needs to recognise the server and compare versions; the AI model and CLI versions are for signed-in clients.
+- **Repeated wrong PINs.** Five failures in five minutes lock that caller out, for longer each time (`LOGIN_MAX_FAILURES`, `LOGIN_LOCKOUT_SECONDS`).
 
 ### Caddy Reverse Proxy Example
 

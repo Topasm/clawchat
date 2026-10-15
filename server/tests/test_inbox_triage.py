@@ -287,5 +287,5 @@ async def test_stale_preview_is_rejected_before_calling_ai(
 
     assert response.status_code == 409, response.text
     assert fake.calls == []
-    openapi = (await client.get("/openapi.json")).json()
+    openapi = app.openapi()
     assert "/api/todos/placements/triage-preview" in openapi["paths"]

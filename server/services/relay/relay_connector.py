@@ -148,6 +148,9 @@ class RelayHostConnector:
                 for key, value in (payload.get("headers") or {}).items()
                 if key.lower() in {"authorization", "accept", "content-type"}
             }
+            # The relay reaches this server over loopback; say so, or the
+            # request would pass for one made on this machine.
+            headers["x-forwarded-for"] = "relay"
             body = base64.b64decode(payload.get("body", "")) if payload.get("body") else b""
             response = await self._http.request(
                 str(payload.get("method", "GET")).upper(),

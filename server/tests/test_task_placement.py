@@ -1,6 +1,7 @@
 """Atomic Inbox/Tree task placement coverage."""
 
 import pytest
+from main import app
 from datetime import datetime, timezone
 from exceptions import ConflictError, ValidationError
 from models.todo import Todo
@@ -356,7 +357,7 @@ async def test_placement_http_contract_and_undo(client, auth_headers, db_session
     assert undone.json()["todo"]["project_id"] is None
     assert undone.json()["reverted"] is True
 
-    openapi = (await client.get("/openapi.json")).json()
+    openapi = app.openapi()
     assert "/api/todos/{todo_id}/placement" in openapi["paths"]
     assert "/api/todos/placements/batch" in openapi["paths"]
 
@@ -452,7 +453,7 @@ async def test_grouped_placement_applies_multiple_destinations_with_one_undo(
     assert first.parent_id is second.parent_id is None
     assert first.inbox_state == second.inbox_state == "captured"
 
-    openapi = (await client.get("/openapi.json")).json()
+    openapi = app.openapi()
     assert "/api/todos/placements/groups" in openapi["paths"]
 
 

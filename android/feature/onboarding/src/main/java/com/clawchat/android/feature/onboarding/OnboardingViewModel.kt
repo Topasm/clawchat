@@ -19,6 +19,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import retrofit2.HttpException
 import javax.inject.Inject
 
 enum class OnboardingStep { WELCOME, SCAN_QR, SERVER, PAIRING, MANUAL_LOGIN, READY }
@@ -28,6 +29,7 @@ enum class OnboardingError {
     CANNOT_REACH_SERVER,
     PAIRING_FAILED,
     LOGIN_FAILED,
+    DEFAULT_PIN_REFUSED,
     HOST_IDENTITY_MISMATCH,
     HOST_ID_MISMATCH,
 }
@@ -199,10 +201,15 @@ class OnboardingViewModel @Inject constructor(
                     apiBaseUrl = url,
                 )
                 _uiState.update { it.copy(isLoggingIn = false, step = OnboardingStep.READY) }
-            } catch (_: Exception) {
-                _uiState.update {
-                    it.copy(isLoggingIn = false, error = OnboardingError.LOGIN_FAILED)
+            } catch (error: Exception) {
+                // 403 is the server refusing its still-default PIN from
+                // another device; retrying the same PIN cannot help.
+                val reason = if (error is HttpException && error.code() == 403) {
+                    OnboardingError.DEFAULT_PIN_REFUSED
+                } else {
+                    OnboardingError.LOGIN_FAILED
                 }
+                _uiState.update { it.copy(isLoggingIn = false, error = reason) }
             }
         }
     }

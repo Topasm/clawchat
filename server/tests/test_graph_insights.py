@@ -805,7 +805,9 @@ async def test_graph_insight_http_contract_and_root_validation(
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "NOT_FOUND"
 
-    openapi = (await client.get("/openapi.json")).json()
+    from main import app
+
+    openapi = app.openapi()
     operation = openapi["paths"]["/api/todos/graph/insights"]["get"]
     response_schema = operation["responses"]["200"]["content"][
         "application/json"

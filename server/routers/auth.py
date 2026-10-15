@@ -11,8 +11,9 @@ from auth.jwt import (
     hash_refresh_token_id,
     verify_pin,
 )
+from config import DEFAULT_PIN
 from database import get_db
-from exceptions import UnauthorizedError
+from exceptions import ForbiddenError, UnauthorizedError
 from fastapi import APIRouter, Depends, Request
 from models.refresh_session import RefreshSession
 from schemas.auth import (
@@ -22,7 +23,7 @@ from schemas.auth import (
     TokenResponse,
     WebSocketTicketResponse,
 )
-from services.rate_limiter import client_key, login_limiter
+from services.rate_limiter import client_key, is_local_request, login_limiter
 from services.relay.host_identity import get_or_create_host_identity
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,6 +43,15 @@ async def login(
         await login_limiter.record_failure(throttle_key)
         raise UnauthorizedError("Invalid PIN")
     await login_limiter.reset(throttle_key)
+    if body.pin == DEFAULT_PIN and not is_local_request(request):
+        # The shipped PIN is public knowledge. It stays usable on this machine
+        # so a fresh install can be set up, but anyone else must not be able
+        # to walk in with it. Paired devices keep their own tokens.
+        raise ForbiddenError(
+            "This server still uses the default PIN. Change PIN on the server "
+            "before signing in from another device.",
+            details={"reason": "default_pin_remote_login"},
+        )
     session_id = str(uuid.uuid4())
     token_id = create_refresh_token_id()
     refresh_token = create_refresh_token(

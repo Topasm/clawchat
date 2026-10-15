@@ -39,6 +39,7 @@
     <string name="onboarding_error_cannot_reach_server">서버에 연결할 수 없습니다. 주소와 연결 상태를 확인한 후 다시 시도하세요.</string>
     <string name="onboarding_error_pairing_failed">기기를 페어링하지 못했습니다. 코드를 확인하고 다시 시도하세요.</string>
     <string name="onboarding_error_login_failed">로그인하지 못했습니다. PIN을 확인하고 다시 시도하세요.</string>
+    <string name="onboarding_error_default_pin_refused">이 서버는 아직 기본 PIN을 쓰고 있어 다른 기기에서 로그인할 수 없습니다. 서버에서 PIN을 먼저 바꾸세요.</string>
     <string name="onboarding_error_host_identity_mismatch">서버 정보가 스캔한 QR 코드와 일치하지 않습니다.</string>
     <string name="onboarding_error_host_id_mismatch">서버 ID가 스캔한 QR 코드와 일치하지 않습니다.</string>
 </resources>
