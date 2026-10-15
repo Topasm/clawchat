@@ -19,6 +19,7 @@ import {
   removeRemoteWorkspace,
   updateLocalServerPolicyForSession,
 } from '../../services/workspaceSessionCoordinator';
+import { isValidLocalPin } from '../../services/localServerPin';
 import { translateUi } from '../../i18n';
 function statusLabel(status: ServerStatus | null): string {
   if (!status) return translateUi('Preparing');
@@ -179,7 +180,7 @@ export default function WorkspaceConnectionsSection() {
       localPinInputRef.current?.focus();
     });
   };
-  const validLocalPin = /^\d{6,32}$/.test(localPin);
+  const validLocalPin = isValidLocalPin(localPin);
   const handleLanAccessToggle = (enabled: boolean) => {
     setLocalSecurityError('');
     if (!enabled) {

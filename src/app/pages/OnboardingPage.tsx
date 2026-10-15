@@ -1,678 +1,204 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import AiCheckStep, { type AiCheckResult } from '../components/first-run/AiCheckStep';
+import ConnectStep from '../components/first-run/ConnectStep';
+import ObsidianStep from '../components/first-run/ObsidianStep';
+import PhoneStep from '../components/first-run/PhoneStep';
+import { SetupStepActions } from '../components/first-run/SetupStepChrome';
+import { AI_PROVIDER_LABELS } from '../components/settings/aiProviderStatus';
+import { useTheme } from '../config/ThemeContext';
+import { themeCssVars } from '../config/themeCssVars';
+import { translateUi } from '../i18n';
 import { useAuthStore } from '../stores/useAuthStore';
-import { platformApi } from '../platform';
-import { IS_DESKTOP } from '../types/platform';
-import { DEFAULT_SERVER_URL, DEFAULT_SERVER_URL_PLACEHOLDER } from '../config/constants';
-import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
-import QRScanner from '../components/shared/QRScanner';
+import { useFirstRunStore, type FirstRunOutcome } from '../stores/useFirstRunStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
+import { useHostSessionStore } from '../stores/useHostSessionStore';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useWorkspaceRuntimeStore } from '../stores/useWorkspaceRuntimeStore';
-import { verifyClawChatHealth } from '../services/workspaceHealth';
-import { claimPairingSession, parsePairingQrPayload } from '../services/pairingClaim';
-import { translateUi } from '../i18n';
-type Step = 'welcome' | 'role' | 'server' | 'claude' | 'pairing' | 'ready';
-type ServerStatus = 'checking' | 'online' | 'offline' | 'error';
-type ClaudeStatus = 'checking' | 'ready' | 'not-installed' | 'not-authenticated' | 'unavailable';
-function getSteps(isDesktop: boolean, chosenRole: 'host' | 'client' | null): Step[] {
-  if (!isDesktop) {
-    return ['welcome', 'server', 'claude', 'pairing', 'ready'];
+import { IS_DESKTOP } from '../types/platform';
+
+type StepId = 'connect' | 'ai' | 'obsidian' | 'phone' | 'done';
+
+const STEPS: StepId[] = ['connect', 'ai', 'obsidian', 'phone', 'done'];
+
+function stepLabel(step: StepId): string {
+  switch (step) {
+    case 'connect':
+      return translateUi('Server');
+    case 'ai':
+      return translateUi('AI');
+    case 'obsidian':
+      return translateUi('Obsidian');
+    case 'phone':
+      return translateUi('Phone');
+    case 'done':
+      return translateUi('Done');
   }
-  if (chosenRole === 'client') {
-    return ['welcome', 'role', 'server', 'ready'];
-  }
-  // Host or not yet chosen
-  return ['welcome', 'role', 'server', 'claude', 'pairing', 'ready'];
 }
+
+/**
+ * First-run setup: where the server runs, whether its AI answers, the
+ * Obsidian vault, and an optional phone.
+ *
+ * The router shows it on a desktop profile that has not finished or skipped
+ * it yet, and Settings opens it again at `/onboarding`.
+ */
 export default function OnboardingPage() {
   const navigate = useNavigate();
-  const token = useAuthStore((s) => s.token);
-  const serverUrl = useAuthStore((s) => s.serverUrl);
+  const location = useLocation();
+  const { colors } = useTheme();
+  const fontSize = useSettingsStore((state) => state.fontSize);
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? '/';
+  const outcome = useFirstRunStore((state) => state.outcome);
+  const begin = useFirstRunStore((state) => state.begin);
+  const finish = useFirstRunStore((state) => state.finish);
+  const token = useAuthStore((state) => state.token);
+  const serverUrl = useAuthStore((state) => state.serverUrl);
+  const hostPhase = useHostSessionStore((state) => state.phase);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
-  const upsertRemote = useWorkspaceStore((state) => state.upsertRemote);
-  const updateLocalServerPolicy = useWorkspaceRuntimeStore(
-    (state) => state.updateLocalServerPolicy,
-  );
-  const [chosenRole, setChosenRole] = useState<'host' | 'client' | null>(null);
-  const [currentStep, setCurrentStep] = useState<Step>('welcome');
-  const [serverStatus, setServerStatus] = useState<ServerStatus>('checking');
-  const [embeddedServerStatus, setEmbeddedServerStatus] = useState<string>('unknown');
-  const [manualServerUrl, setManualServerUrl] = useState(DEFAULT_SERVER_URL);
-  const [claudeStatus, setClaudeStatus] = useState<ClaudeStatus>('checking');
-  const [pairingComplete, setPairingComplete] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-  const steps = getSteps(IS_DESKTOP, chosenRole);
-  const currentIndex = steps.indexOf(currentStep);
-  // The onboarding choice selects the workspace to view. Hosting remains an
-  // independent policy and defaults to enabled on desktop.
-  useEffect(() => {
-    if (IS_DESKTOP && chosenRole === null) {
-      setChosenRole(activeWorkspaceId === LOCAL_WORKSPACE_ID ? 'host' : 'client');
-    }
-  }, [activeWorkspaceId, chosenRole]);
-  // Redirect if already logged in
-  useEffect(() => {
-    if (token) {
-      navigate('/', { replace: true });
-    }
-  }, [token, navigate]);
-  // Check the embedded server status through the active desktop adapter.
-  const checkEmbeddedServer = useCallback(async () => {
-    if (!IS_DESKTOP) return;
-    try {
-      const status = await platformApi.server.getStatus();
-      setEmbeddedServerStatus(status.state);
-      if (status.state === 'running') {
-        setServerStatus('online');
-      } else if (status.state === 'starting') {
-        setServerStatus('checking');
-      } else {
-        setServerStatus('offline');
-      }
-    } catch {
-      setServerStatus('error');
-    }
-  }, []);
-  // Check server health via HTTP
-  const checkServerHealth = useCallback(
-    async (url?: string) => {
-      const targetUrl = (url ?? manualServerUrl).replace(/\/+$/, '');
-      if (!targetUrl) {
-        setServerStatus('offline');
-        return;
-      }
-      setServerStatus('checking');
-      try {
-        await verifyClawChatHealth(targetUrl);
-        setServerStatus('online');
-      } catch {
-        setServerStatus('offline');
-      }
-    },
-    [manualServerUrl],
-  );
-  // Auto-check server when entering the server step
-  useEffect(() => {
-    if (currentStep !== 'server') return;
-    if (IS_DESKTOP && chosenRole === 'host') {
-      checkEmbeddedServer();
-      const unsub = platformApi.server.onStatusChange((status) => {
-        setEmbeddedServerStatus(status.state);
-        if (status.state === 'running') {
-          setServerStatus('online');
-        } else if (status.state === 'starting') {
-          setServerStatus('checking');
-        } else {
-          setServerStatus('offline');
-        }
-      });
-      return unsub;
-    } else {
-      // Client mode (desktop or non-desktop): check remote server health
-      checkServerHealth();
-    }
-  }, [currentStep, chosenRole, checkEmbeddedServer, checkServerHealth]);
-  // Auto-retry the embedded server check while it is starting.
-  useEffect(() => {
-    if (
-      currentStep !== 'server' ||
-      !IS_DESKTOP ||
-      chosenRole !== 'host' ||
-      serverStatus !== 'checking'
-    )
-      return;
-    const interval = setInterval(checkEmbeddedServer, 2000);
-    return () => clearInterval(interval);
-  }, [currentStep, chosenRole, serverStatus, checkEmbeddedServer]);
-  // Check Claude Code availability
-  const checkClaudeCode = useCallback(async () => {
-    setClaudeStatus('checking');
-    const baseUrl = IS_DESKTOP
-      ? (serverUrl ?? DEFAULT_SERVER_URL)
-      : manualServerUrl.replace(/\/+$/, '');
-    try {
-      const response = await fetch(`${baseUrl}/api/health`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!response.ok) {
-        setClaudeStatus('unavailable');
-        return;
-      }
-      const data = await response.json();
-      if (data.claude_code === 'authenticated' || data.claudeCode === 'authenticated') {
-        setClaudeStatus('ready');
-      } else if (
-        data.claude_code === 'not_authenticated' ||
-        data.claudeCode === 'not_authenticated'
-      ) {
-        setClaudeStatus('not-authenticated');
-      } else if (data.claude_code === 'not_installed' || data.claudeCode === 'not_installed') {
-        setClaudeStatus('not-installed');
-      } else {
-        setClaudeStatus('ready');
-      }
-    } catch {
-      setClaudeStatus('unavailable');
-    }
-  }, [serverUrl, manualServerUrl]);
-  useEffect(() => {
-    if (currentStep === 'claude') {
-      checkClaudeCode();
-    }
-  }, [currentStep, checkClaudeCode]);
-  const goNext = () => {
-    const nextIndex = currentIndex + 1;
-    if (nextIndex < steps.length) {
-      setCurrentStep(steps[nextIndex]);
-    }
-  };
-  const goBack = () => {
-    const prevIndex = currentIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStep(steps[prevIndex]);
-    }
-  };
-  const enterApp = () => {
-    try {
-      localStorage.setItem('cc-onboarding-complete', 'true');
-    } catch {
-      /* localStorage may be unavailable */
-    }
-    navigate('/login', { replace: true });
-  };
-  const handleRoleSelect = async (role: 'host' | 'client') => {
-    setChosenRole(role);
-    if (IS_DESKTOP && role === 'host') {
-      await updateLocalServerPolicy({ localServerEnabled: true });
-      setActiveWorkspace(LOCAL_WORKSPACE_ID);
-    }
-    // Advance to next step (server)
-    const nextSteps = getSteps(IS_DESKTOP, role);
-    const roleIndex = nextSteps.indexOf('role');
-    if (roleIndex >= 0 && roleIndex + 1 < nextSteps.length) {
-      setCurrentStep(nextSteps[roleIndex + 1]);
-    }
-  };
-  const handleQRScan = async (data: string) => {
-    setShowScanner(false);
-    try {
-      const parsed = JSON.parse(data);
-      const pairingPayload = parsePairingQrPayload(parsed);
-      if (pairingPayload) {
-        const pairUrl = pairingPayload.server_url.replace(/\/+$/, '');
-        setManualServerUrl(pairUrl);
-        setServerStatus('checking');
-        try {
-          const session = await claimPairingSession(pairingPayload, {
-            name: IS_DESKTOP ? 'Desktop Client' : 'Device',
-            type: IS_DESKTOP ? 'web' : 'android',
-          });
-          // Store device token
-          useAuthStore.setState({
-            token: session.token,
-            refreshToken: null,
-            serverUrl: session.serverUrl,
-            hostId: session.hostId,
-            hostPublicKey: session.hostPublicKey,
-            relayUrl: session.relayUrl,
-            isLoading: false,
-          });
-          upsertRemote(
-            'Remote workspace',
-            session.serverUrl,
-            session.hostId
-              ? {
-                  hostId: session.hostId,
-                  hostPublicKey: session.hostPublicKey,
-                  apiVersion: '1',
-                }
-              : undefined,
-          );
-          setServerStatus('online');
-        } catch (err) {
-          console.error('QR pairing failed:', err);
-          setServerStatus('error');
-        }
-      } else if (parsed.serverUrl) {
-        setManualServerUrl(parsed.serverUrl);
-        checkServerHealth(parsed.serverUrl);
-      }
-    } catch {
-      // Not valid JSON / QR
-    }
-  };
-  // ── Step renderers ──────────────────────────────────────────
-  const renderStepDot = (index: number) => {
-    let className = 'cc-onboarding__step-dot';
-    if (index === currentIndex) {
-      className += ' cc-onboarding__step-dot--active';
-    } else if (index < currentIndex) {
-      className += ' cc-onboarding__step-dot--completed';
-    }
-    return (
-      <div key={`dot-${index}`} className={className}>
-        {index < currentIndex ? '\u2713' : index + 1}
-      </div>
-    );
-  };
-  const renderStepLine = (index: number) => {
-    let className = 'cc-onboarding__step-line';
-    if (index < currentIndex) {
-      className += ' cc-onboarding__step-line--completed';
-    }
-    return <div key={`line-${index}`} className={className} />;
-  };
-  const renderStepper = () => {
-    const elements: React.ReactNode[] = [];
-    steps.forEach((_, i) => {
-      elements.push(renderStepDot(i));
-      if (i < steps.length - 1) {
-        elements.push(renderStepLine(i));
-      }
-    });
-    return <div className="cc-onboarding__stepper">{elements}</div>;
-  };
-  const getServerStatusDot = () => {
-    switch (serverStatus) {
-      case 'checking':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--spin';
-      case 'online':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--green';
-      case 'offline':
-      case 'error':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--red';
-    }
-  };
-  const getServerStatusLabel = () => {
-    if (IS_DESKTOP && chosenRole === 'host') {
-      switch (serverStatus) {
-        case 'checking':
-          return translateUi('Starting embedded server...');
-        case 'online':
-          return translateUi('Server is running');
-        case 'offline':
-          return translateUi('Server is {{status}}', { status: embeddedServerStatus });
-        case 'error':
-          return translateUi('Failed to start server');
-      }
-    }
-    switch (serverStatus) {
-      case 'checking':
-        return translateUi('Checking server...');
-      case 'online':
-        return translateUi('Server is reachable');
-      case 'offline':
-        return translateUi('Server is unreachable');
-      case 'error':
-        return translateUi('Connection error');
-    }
-  };
-  const getClaudeStatusDot = () => {
-    switch (claudeStatus) {
-      case 'checking':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--spin';
-      case 'ready':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--green';
-      case 'not-authenticated':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--yellow';
-      case 'not-installed':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--red';
-      case 'unavailable':
-        return 'cc-onboarding__status-dot cc-onboarding__status-dot--gray';
-    }
-  };
-  const renderWelcome = () => (
-    <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">{translateUi('Welcome to ClawChat')}</h2>
-      <p className="cc-onboarding__card-description">
-        {translateUi(
-          '\n        ClawChat is your personal productivity hub with AI-powered chat, tasks, calendar, and notes\n        &mdash; all in one place. This wizard will help you get everything set up in a few quick\n        steps.\n      ',
-        )}
-      </p>
-      <div className="cc-onboarding__actions">
-        <span />
-        <div className="cc-onboarding__actions-right">
-          <button className="cc-btn cc-btn--primary" onClick={goNext}>
-            {translateUi('\n            Get Started\n          ')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-  const renderRole = () => (
-    <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">{translateUi('Choose where to start')}</h2>
-      <p className="cc-onboarding__card-description">
-        {translateUi(
-          '\n        You can use the private workspace on this computer or connect to an existing ClawChat. This\n        can be changed at any time.\n      ',
-        )}
-      </p>
+  const profiles = useWorkspaceStore((state) => state.profiles);
+  const vaultPath = useWorkspaceRuntimeStore((state) => state.config?.obsidianVaultPath ?? '');
 
-      <div className="cc-onboarding__role-grid">
-        <div
-          className={`cc-onboarding__role-card${chosenRole === 'host' ? ' cc-onboarding__role-card--selected' : ''}`}
-          onClick={() => handleRoleSelect('host')}
-        >
-          <div className="cc-onboarding__role-icon">{'\uD83D\uDDA5'}</div>
-          <div className="cc-onboarding__role-content">
-            <div className="cc-onboarding__role-title">{translateUi('Start on this computer')}</div>
-            <p className="cc-onboarding__role-description">
-              {translateUi(
-                '\n              Start with the private workspace on this computer. Other devices can connect to its\n              local server later.\n            ',
-              )}
+  const [step, setStep] = useState<StepId>('connect');
+  const [aiResult, setAiResult] = useState<AiCheckResult | null>(null);
+  const [phonePaired, setPhonePaired] = useState(false);
+
+  useEffect(() => {
+    begin();
+  }, [begin]);
+
+  const runsLocally = IS_DESKTOP && activeWorkspaceId === LOCAL_WORKSPACE_ID;
+  const signedIn = !!token && (!runsLocally || hostPhase === 'connected');
+  const activeProfile = profiles.find((profile) => profile.id === activeWorkspaceId);
+  const connectedTo = !signedIn
+    ? null
+    : runsLocally
+      ? translateUi('This computer')
+      : (activeProfile?.name ?? serverUrl);
+
+  const index = STEPS.indexOf(step);
+  const goTo = (offset: number) => setStep(STEPS[index + offset] ?? step);
+  const next = () => goTo(1);
+  const back = () => goTo(-1);
+
+  const leave = (result: FirstRunOutcome) => {
+    // Closing a wizard reopened from Settings must not turn a finished setup
+    // into a skipped one.
+    if (outcome === null || result === 'completed') finish(result);
+    navigate(returnTo, { replace: true });
+  };
+
+  const renderStep = () => {
+    switch (step) {
+      case 'connect':
+        return <ConnectStep connectedTo={connectedTo} onNext={next} />;
+      case 'ai':
+        return (
+          <AiCheckStep
+            signedIn={signedIn}
+            result={aiResult}
+            onResult={setAiResult}
+            onBack={back}
+            onNext={next}
+          />
+        );
+      case 'obsidian':
+        return (
+          <ObsidianStep
+            runsLocally={runsLocally}
+            serverName={connectedTo}
+            onBack={back}
+            onNext={next}
+          />
+        );
+      case 'phone':
+        return (
+          <PhoneStep
+            signedIn={signedIn}
+            runsLocally={runsLocally}
+            paired={phonePaired}
+            onPaired={() => setPhonePaired(true)}
+            onBack={back}
+            onNext={next}
+          />
+        );
+      case 'done':
+        return (
+          <div className="cc-onboarding__card">
+            <h2 className="cc-onboarding__card-title">{translateUi('ClawChat is ready')}</h2>
+            <dl className="cc-onboarding__summary">
+              <dt>{translateUi('Server')}</dt>
+              <dd>{connectedTo ?? translateUi('Not connected')}</dd>
+              <dt>{translateUi('AI')}</dt>
+              <dd>
+                {aiResult?.kind === 'pass'
+                  ? translateUi('{{provider}} is working', {
+                      provider: AI_PROVIDER_LABELS[aiResult.provider] ?? aiResult.provider,
+                    })
+                  : aiResult?.kind === 'fail'
+                    ? translateUi('{{provider}} is not working', {
+                        provider: AI_PROVIDER_LABELS[aiResult.provider] ?? aiResult.provider,
+                      })
+                    : translateUi('Not tested')}
+              </dd>
+              <dt>{translateUi('Obsidian')}</dt>
+              <dd>
+                {runsLocally
+                  ? vaultPath || translateUi('No vault selected')
+                  : translateUi('Set on the server')}
+              </dd>
+              <dt>{translateUi('Phone')}</dt>
+              <dd>{phonePaired ? translateUi('Phone paired') : translateUi('Not paired')}</dd>
+            </dl>
+            <p className="cc-onboarding__card-description">
+              {translateUi('You can run this setup again from Settings → General.')}
             </p>
+            <SetupStepActions
+              onBack={back}
+              onNext={() => leave('completed')}
+              nextLabel={translateUi('Open ClawChat')}
+            />
           </div>
-        </div>
-
-        <div
-          className={`cc-onboarding__role-card${chosenRole === 'client' ? ' cc-onboarding__role-card--selected' : ''}`}
-          onClick={() => handleRoleSelect('client')}
-        >
-          <div className="cc-onboarding__role-icon">{'\uD83D\uDD17'}</div>
-          <div className="cc-onboarding__role-content">
-            <div className="cc-onboarding__role-title">
-              {translateUi('Connect to an existing ClawChat')}
-            </div>
-            <p className="cc-onboarding__role-description">
-              {translateUi(
-                '\n              View an ClawChat workspace running on another device. This computer can still keep its\n              own local server available.\n            ',
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="cc-onboarding__actions">
-        <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-          {translateUi('\n          Back\n        ')}
-        </button>
-        <span />
-      </div>
-    </div>
-  );
-  const renderServer = () => {
-    const isDesktopHost = IS_DESKTOP && chosenRole === 'host';
-    const showUrlInput = !isDesktopHost;
-    return (
-      <div className="cc-onboarding__card">
-        <h2 className="cc-onboarding__card-title">
-          {isDesktopHost ? translateUi('Server Status') : translateUi('Connect to Host')}
-        </h2>
-        <p className="cc-onboarding__card-description">
-          {isDesktopHost
-            ? translateUi('ClawChat includes an embedded server. It should start automatically.')
-            : translateUi(
-                'Connect to your ClawChat host by scanning a QR code or entering the server URL.',
-              )}
-        </p>
-
-        <div className="cc-onboarding__status-row">
-          <div className={getServerStatusDot()} />
-          <div>
-            <div className="cc-onboarding__status-label">{getServerStatusLabel()}</div>
-            {isDesktopHost && serverStatus === 'checking' && (
-              <div className="cc-onboarding__status-sublabel">
-                {translateUi('This usually takes a few seconds')}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {showUrlInput && (
-          <>
-            <div className="cc-onboarding__input-group">
-              <label className="cc-onboarding__input-label">{translateUi('Server URL')}</label>
-              <input
-                type="url"
-                className="cc-onboarding__input"
-                value={manualServerUrl}
-                onChange={(e) => setManualServerUrl(e.target.value)}
-                onBlur={() => checkServerHealth()}
-                placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
-              />
-              <div className="cc-onboarding__input-hint">
-                {translateUi(
-                  '\n                Enter the URL where your ClawChat host is running, or scan a QR code from the host.\n              ',
-                )}
-              </div>
-            </div>
-
-            <button
-              className="cc-btn cc-btn--secondary"
-              onClick={() => setShowScanner(true)}
-              style={{ marginBottom: 8 }}
-            >
-              {translateUi('\n              Scan QR Code\n            ')}
-            </button>
-          </>
-        )}
-
-        {isDesktopHost && serverStatus === 'offline' && (
-          <button
-            className="cc-btn cc-btn--secondary"
-            onClick={checkEmbeddedServer}
-            style={{ marginTop: 8 }}
-          >
-            {translateUi('\n            Retry\n          ')}
-          </button>
-        )}
-
-        {showUrlInput && (serverStatus === 'offline' || serverStatus === 'error') && (
-          <button
-            className="cc-btn cc-btn--secondary"
-            onClick={() => checkServerHealth()}
-            style={{ marginTop: 8 }}
-          >
-            {translateUi('\n            Retry\n          ')}
-          </button>
-        )}
-
-        <div className="cc-onboarding__actions">
-          <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-            {translateUi('\n            Back\n          ')}
-          </button>
-          <div className="cc-onboarding__actions-right">
-            <button className="cc-btn cc-btn--primary" onClick={goNext}>
-              {serverStatus === 'online' ? translateUi('Next') : translateUi('Skip')}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  const renderClaudeCode = () => (
-    <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">{translateUi('Claude Code')}</h2>
-      <p className="cc-onboarding__card-description">
-        {translateUi(
-          '\n        ClawChat can use Claude Code for AI-powered features like smart task suggestions, natural\n        language chat, and more. This is optional &mdash; all non-AI features work without it.\n      ',
-        )}
-      </p>
-
-      <div className="cc-onboarding__status-row">
-        <div className={getClaudeStatusDot()} />
-        <div>
-          <div className="cc-onboarding__status-label">
-            {claudeStatus === 'checking' && translateUi('Checking Claude Code...')}
-            {claudeStatus === 'ready' && translateUi('Claude Code is installed and authenticated')}
-            {claudeStatus === 'not-installed' && translateUi('Claude Code is not installed')}
-            {claudeStatus === 'not-authenticated' &&
-              translateUi('Claude Code is not authenticated')}
-            {claudeStatus === 'unavailable' && translateUi('Could not check Claude Code status')}
-          </div>
-        </div>
-      </div>
-
-      {claudeStatus === 'not-installed' && (
-        <div
-          style={{
-            marginTop: 12,
-            fontSize: 13,
-            color: 'var(--cc-text-secondary)',
-            lineHeight: 1.6,
-          }}
-        >
-          {translateUi('\n          Install Claude Code from')}{' '}
-          <a
-            href="https://docs.anthropic.com/en/docs/claude-code"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="cc-onboarding__link"
-          >
-            {translateUi('\n            docs.anthropic.com\n          ')}
-          </a>
-          {translateUi('\n          , then return here and click Retry.\n        ')}
-        </div>
-      )}
-
-      {claudeStatus === 'not-authenticated' && (
-        <div
-          style={{
-            marginTop: 12,
-            fontSize: 13,
-            color: 'var(--cc-text-secondary)',
-            lineHeight: 1.6,
-          }}
-        >
-          {translateUi('\n          Run ')}
-          <code className="cc-onboarding__code">{translateUi('claude login')}</code>
-          {translateUi(' in your terminal to\n          authenticate, then click Retry.\n        ')}
-        </div>
-      )}
-
-      {(claudeStatus === 'not-installed' ||
-        claudeStatus === 'not-authenticated' ||
-        claudeStatus === 'unavailable') && (
-        <button
-          className="cc-btn cc-btn--secondary"
-          onClick={checkClaudeCode}
-          style={{ marginTop: 8 }}
-        >
-          {translateUi('\n          Retry\n        ')}
-        </button>
-      )}
-
-      <div className="cc-onboarding__actions">
-        <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-          {translateUi('\n          Back\n        ')}
-        </button>
-        <div className="cc-onboarding__actions-right">
-          {claudeStatus !== 'ready' && (
-            <button className="cc-btn cc-btn--ghost" onClick={goNext}>
-              {translateUi('\n              Skip for now\n            ')}
-            </button>
-          )}
-          <button className="cc-btn cc-btn--primary" onClick={goNext}>
-            {translateUi('\n            Next\n          ')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-  const renderPairing = () => (
-    <div className="cc-onboarding__card">
-      <h2 className="cc-onboarding__card-title">{translateUi('Mobile Pairing')}</h2>
-      <p className="cc-onboarding__card-description">
-        {translateUi(
-          '\n        Optionally pair a mobile device to access ClawChat on the go. You can always set this up\n        later in Settings.\n      ',
-        )}
-      </p>
-
-      {serverStatus === 'online' && token ? (
-        <PairingCodeDisplay compact onPaired={() => setPairingComplete(true)} />
-      ) : (
-        <>
-          <div className="cc-onboarding__qr-placeholder">
-            <span>
-              {translateUi('\n              Log in to the server first\n              ')}
-              <br />
-              {translateUi('\n              to generate a pairing code\n            ')}
-            </span>
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: 'var(--cc-text-tertiary)',
-              textAlign: 'center',
-              marginTop: 8,
-            }}
-          >
-            {translateUi(
-              '\n            You can pair devices later from Settings after logging in.\n          ',
-            )}
-          </div>
-        </>
-      )}
-
-      <div className="cc-onboarding__actions">
-        <button className="cc-btn cc-btn--ghost" onClick={goBack}>
-          {translateUi('\n          Back\n        ')}
-        </button>
-        <div className="cc-onboarding__actions-right">
-          {!pairingComplete && (
-            <button className="cc-btn cc-btn--ghost" onClick={goNext}>
-              {translateUi('\n              Skip\n            ')}
-            </button>
-          )}
-          <button className="cc-btn cc-btn--primary" onClick={goNext}>
-            {translateUi('\n            Next\n          ')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-  const renderReady = () => (
-    <div className="cc-onboarding__card" style={{ textAlign: 'center' }}>
-      <div className="cc-onboarding__ready-icon">
-        <span>{'\u2713'}</span>
-      </div>
-      <h2 className="cc-onboarding__card-title" style={{ textAlign: 'center' }}>
-        {translateUi('\n        You&apos;re all set!\n      ')}
-      </h2>
-      <p className="cc-onboarding__card-description" style={{ textAlign: 'center' }}>
-        {IS_DESKTOP && chosenRole === 'host'
-          ? translateUi('Your ClawChat host is running. Other devices can connect to this machine.')
-          : translateUi('ClawChat is ready to use.')}{' '}
-        {translateUi(
-          '\n        You can adjust any of these settings later from the Settings page.\n      ',
-        )}
-      </p>
-      <div className="cc-onboarding__actions" style={{ justifyContent: 'center' }}>
-        <button
-          className="cc-btn cc-btn--primary"
-          onClick={enterApp}
-          style={{ padding: '12px 32px', fontSize: 15 }}
-        >
-          {translateUi('\n          Enter ClawChat\n        ')}
-        </button>
-      </div>
-    </div>
-  );
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 'welcome':
-        return renderWelcome();
-      case 'role':
-        return renderRole();
-      case 'server':
-        return renderServer();
-      case 'claude':
-        return renderClaudeCode();
-      case 'pairing':
-        return renderPairing();
-      case 'ready':
-        return renderReady();
+        );
     }
   };
+
   return (
-    <div className="cc-onboarding">
+    // Outside the app layout, so the theme variables have to be applied here.
+    <div className="cc-onboarding" style={themeCssVars(colors, fontSize)}>
       <div className="cc-onboarding__container">
-        {renderStepper()}
-        {renderCurrentStep()}
+        <div className="cc-onboarding__header">
+          <span className="cc-onboarding__eyebrow">{translateUi('Set up ClawChat')}</span>
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost cc-btn--compact"
+            onClick={() => leave('skipped')}
+          >
+            {outcome === null ? translateUi('Skip setup') : translateUi('Close')}
+          </button>
+        </div>
+        <ol className="cc-onboarding__stepper" aria-label={translateUi('Setup steps')}>
+          {STEPS.map((candidate, position) => (
+            <li
+              key={candidate}
+              className={`cc-onboarding__step${
+                position === index
+                  ? ' cc-onboarding__step--active'
+                  : position < index
+                    ? ' cc-onboarding__step--completed'
+                    : ''
+              }`}
+              aria-current={position === index ? 'step' : undefined}
+            >
+              <span className="cc-onboarding__step-dot">
+                {position < index ? '✓' : position + 1}
+              </span>
+              <span className="cc-onboarding__step-label">{stepLabel(candidate)}</span>
+            </li>
+          ))}
+        </ol>
+        {renderStep()}
       </div>
-      {showScanner && <QRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />}
     </div>
   );
 }

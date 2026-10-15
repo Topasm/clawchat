@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { claimPairingSession, type PairingQrPayload } from './pairingClaim';
 import { verifyClawChatHealth } from './workspaceHealth';
 import {
   loadWorkspaceSession,
@@ -176,6 +177,64 @@ export async function connectRemoteWorkspace(
     return profile;
   } catch (error) {
     markWorkspaceRollback(input.remoteUrl, previousWorkspace.activeWorkspaceId);
+    restoreAuthSession(previousAuth);
+    useWorkspaceStore.setState({
+      profiles: previousWorkspace.profiles,
+      activeWorkspaceId: previousWorkspace.activeWorkspaceId,
+    });
+    throw error;
+  } finally {
+    endWorkspaceTransition();
+  }
+}
+
+/**
+ * Connect to another server with a pairing code instead of its PIN.
+ *
+ * Same guarantees as `connectRemoteWorkspace`: the previous session is only
+ * replaced once the claim succeeded and the new session is stored.
+ */
+export async function connectPairedWorkspace(
+  payload: PairingQrPayload,
+  device: { name: string; type: string },
+): Promise<WorkspaceProfile> {
+  const previousAuth = captureAuthSession();
+  const previousWorkspace = useWorkspaceStore.getState();
+  beginWorkspaceTransition(payload.server_url, 'preflight');
+  try {
+    const session = await claimPairingSession(payload, device);
+    useAuthStore.setState({
+      token: session.token,
+      refreshToken: null,
+      serverUrl: session.serverUrl,
+      hostId: session.hostId,
+      hostPublicKey: session.hostPublicKey,
+      relayUrl: session.relayUrl,
+      isLoading: false,
+    });
+    const profile = useWorkspaceStore
+      .getState()
+      .upsertRemote(
+        '',
+        session.serverUrl,
+        session.hostId
+          ? { hostId: session.hostId, hostPublicKey: session.hostPublicKey, apiVersion: '1' }
+          : undefined,
+      );
+    if (profile.credentialRef) {
+      await saveWorkspaceSession(profile.credentialRef, {
+        token: session.token,
+        refreshToken: null,
+        serverUrl: session.serverUrl,
+        hostId: session.hostId,
+        hostPublicKey: session.hostPublicKey,
+        relayUrl: session.relayUrl,
+      });
+    }
+    useHostSessionStore.getState().deactivate();
+    return profile;
+  } catch (error) {
+    markWorkspaceRollback(payload.server_url, previousWorkspace.activeWorkspaceId);
     restoreAuthSession(previousAuth);
     useWorkspaceStore.setState({
       profiles: previousWorkspace.profiles,

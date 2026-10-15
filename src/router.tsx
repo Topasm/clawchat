@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './app/stores/useAuthStore';
 import { useHostSessionStore } from './app/stores/useHostSessionStore';
+import { useFirstRunStore } from './app/stores/useFirstRunStore';
 import { useAutoLogin } from './app/hooks/useAutoLogin';
 import ErrorBoundary from './app/components/shared/ErrorBoundary';
 import { markStartupPhaseAfterPaint } from './app/services/startupPerformance';
@@ -76,6 +77,7 @@ export default function AppRouter() {
   const healthOK = useAuthStore((s) => s.healthOK);
   const isLoading = useAuthStore((s) => s.isLoading);
   const hostPhase = useHostSessionStore((s) => s.phase);
+  const firstRunPending = useFirstRunStore((s) => s.outcome === null);
 
   // Auto-login when the packaged Tauri host server is available.
   useAutoLogin();
@@ -156,6 +158,17 @@ export default function AppRouter() {
   // Show nothing while rehydrating from localStorage
   if (isLoading) return null;
 
+  // A new desktop profile starts in setup rather than on a server that may
+  // not even be running. The wizard opens its own session as it goes, so it
+  // comes before the host handshake and the sign-in screen.
+  if (location.pathname === '/onboarding' || (IS_DESKTOP && firstRunPending)) {
+    return (
+      <LazyRoute>
+        <OnboardingPage />
+      </LazyRoute>
+    );
+  }
+
   // Do not mount the workspace with credentials restored from a previous
   // local-server process.  Re-authenticate the invisible local session first,
   // otherwise every eager TODO/calendar query fails once before the refresh
@@ -181,14 +194,6 @@ export default function AppRouter() {
             </LazyRoute>
           }
         />
-        <Route
-          path="/onboarding"
-          element={
-            <LazyRoute>
-              <OnboardingPage />
-            </LazyRoute>
-          }
-        />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -201,14 +206,6 @@ export default function AppRouter() {
         element={
           <LazyRoute>
             <LoginPage />
-          </LazyRoute>
-        }
-      />
-      <Route
-        path="/onboarding"
-        element={
-          <LazyRoute>
-            <OnboardingPage />
           </LazyRoute>
         }
       />

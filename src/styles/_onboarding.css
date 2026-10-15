@@ -18,13 +18,36 @@
   gap: 24px;
 }
 
-/* --- Stepper / Progress ---------------------------------- */
-.cc-onboarding__stepper {
+/* --- Header / Stepper ------------------------------------ */
+.cc-onboarding__header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 0 16px;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cc-onboarding__eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cc-text-secondary);
+}
+
+.cc-onboarding__stepper {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cc-onboarding__step {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .cc-onboarding__step-dot {
@@ -46,29 +69,26 @@
     color 0.2s ease;
 }
 
-.cc-onboarding__step-dot--active {
+.cc-onboarding__step-label {
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
+}
+
+.cc-onboarding__step--active .cc-onboarding__step-dot {
   border-color: var(--cc-primary);
   background: var(--cc-primary);
   color: #fff;
 }
 
-.cc-onboarding__step-dot--completed {
+.cc-onboarding__step--active .cc-onboarding__step-label {
+  color: var(--cc-text);
+  font-weight: 600;
+}
+
+.cc-onboarding__step--completed .cc-onboarding__step-dot {
   border-color: var(--cc-success);
   background: var(--cc-success);
   color: #fff;
-}
-
-.cc-onboarding__step-line {
-  flex: 1;
-  height: 2px;
-  background: var(--cc-border);
-  min-width: 16px;
-  max-width: 48px;
-  transition: background 0.2s ease;
-}
-
-.cc-onboarding__step-line--completed {
-  background: var(--cc-success);
 }
 
 /* --- Step Card ------------------------------------------- */
@@ -191,42 +211,6 @@
   margin-top: 4px;
 }
 
-.cc-onboarding__qr-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 160px;
-  height: 160px;
-  margin: 12px auto;
-  background: var(--cc-surface-secondary);
-  border: 2px dashed var(--cc-border);
-  border-radius: var(--cc-radius-lg);
-  color: var(--cc-text-tertiary);
-  font-size: 12px;
-  text-align: center;
-}
-
-/* --- Claude Code link ------------------------------------ */
-.cc-onboarding__link {
-  color: var(--cc-primary);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.cc-onboarding__link:hover {
-  text-decoration: underline;
-}
-
-.cc-onboarding__code {
-  display: inline-block;
-  padding: 2px 8px;
-  background: var(--cc-surface-secondary);
-  border-radius: var(--cc-radius-xs);
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 12px;
-  color: var(--cc-text);
-}
-
 /* --- Navigation Buttons ---------------------------------- */
 .cc-onboarding__actions {
   display: flex;
@@ -242,18 +226,41 @@
   margin-left: auto;
 }
 
-/* --- Ready Screen ---------------------------------------- */
-.cc-onboarding__ready-icon {
+/* --- Forms / Summary ------------------------------------ */
+.cc-onboarding__form {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--cc-success) 12%, transparent);
-  color: var(--cc-success);
-  font-size: 28px;
-  margin: 0 auto 16px;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0 10px;
+}
+
+.cc-onboarding__form .cc-onboarding__input-group {
+  margin-bottom: 0;
+}
+
+.cc-onboarding__form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cc-onboarding__summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 0 0 20px;
+  font-size: 14px;
+}
+
+.cc-onboarding__summary dt {
+  color: var(--cc-text-secondary);
+}
+
+.cc-onboarding__summary dd {
+  margin: 0;
+  color: var(--cc-text);
+  overflow-wrap: anywhere;
 }
 
 /* --- Role Selection Cards -------------------------------- */
@@ -261,10 +268,15 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-bottom: 10px;
 }
 
 .cc-onboarding__role-card {
   display: flex;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   align-items: flex-start;
   gap: 14px;
   padding: 16px;
@@ -277,7 +289,12 @@
     background 0.15s ease;
 }
 
-.cc-onboarding__role-card:hover {
+.cc-onboarding__role-card:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.cc-onboarding__role-card:hover:not(:disabled) {
   border-color: var(--cc-primary);
   background: color-mix(in srgb, var(--cc-primary) 4%, var(--cc-surface-secondary));
 }
@@ -285,19 +302,6 @@
 .cc-onboarding__role-card--selected {
   border-color: var(--cc-primary);
   background: color-mix(in srgb, var(--cc-primary) 8%, var(--cc-surface));
-}
-
-.cc-onboarding__role-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--cc-radius-lg);
-  background: color-mix(in srgb, var(--cc-primary) 10%, transparent);
-  color: var(--cc-primary);
-  font-size: 20px;
-  flex-shrink: 0;
 }
 
 .cc-onboarding__role-content {
@@ -332,11 +336,6 @@
   .cc-onboarding__card-title {
     font-size: 20px;
   }
-
-  .cc-onboarding__qr-placeholder {
-    width: 140px;
-    height: 140px;
-  }
 }
 
 @media (max-width: 380px) {
@@ -348,9 +347,5 @@
     width: 24px;
     height: 24px;
     font-size: 11px;
-  }
-
-  .cc-onboarding__step-line {
-    min-width: 12px;
   }
 }
