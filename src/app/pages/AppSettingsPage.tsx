@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import SettingsShell from '../components/settings/SettingsShell';
 import SettingsRow from '../components/shared/SettingsRow';
 import SettingsSection from '../components/shared/SettingsSection';
@@ -25,6 +26,7 @@ export default function AppSettingsPage() {
   const updateStatus = useUpdateStore((state) => state.status);
   const updateInfo = useUpdateStore((state) => state.info);
   const automaticChecksEnabled = useUpdateStore((state) => state.automaticChecksEnabled);
+  const navigate = useNavigate();
   return (
     <SettingsShell
       activePane="general"
@@ -106,6 +108,25 @@ export default function AppSettingsPage() {
             <Toggle checked={settings.reminderSound} onChange={settings.setReminderSound} />
           </SettingsRow>
         </SettingsSection>
+
+        {isDesktop && (
+          <SettingsSection title={translateUi('Setup')}>
+            <SettingsRow
+              label={translateUi('Setup assistant')}
+              sublabel={translateUi(
+                'Choose where the server runs, test the AI, connect Obsidian and pair a phone.',
+              )}
+            >
+              <button
+                type="button"
+                className="cc-btn cc-btn--secondary cc-btn--compact"
+                onClick={() => navigate('/onboarding', { state: { returnTo: '/settings/app' } })}
+              >
+                {translateUi('Run setup again')}
+              </button>
+            </SettingsRow>
+          </SettingsSection>
+        )}
 
         <SettingsSection title={translateUi('Reset')}>
           <SettingsRow label={translateUi('Reset application preferences')}>

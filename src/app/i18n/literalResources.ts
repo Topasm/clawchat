@@ -146,7 +146,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Agent approval outcome': '에이전트 승인 결과',
   'Agent result approved': '에이전트 결과 승인됨',
   'Agent Task History': '에이전트 작업 기록',
-  AI: '일체 포함',
+  AI: 'AI',
   'AI configuration requires a server connection.': 'AI 구성에는 서버 연결이 필요합니다.',
   'AI did not return any actionable tasks. Add more guidance and regenerate.':
     'AI가 실행 가능한 작업을 반환하지 않았습니다. 더 많은 안내를 추가하고 재생성하세요.',
@@ -1624,4 +1624,80 @@ export const koreanUiTranslations: Record<string, string> = {
   'Not read': '읽지 못함',
   Refused: '거부됨',
   'Timed out': '시간 초과',
+  'Install Claude Code on the server machine and run claude login there, then test again.':
+    '서버 컴퓨터에 Claude Code를 설치하고 그곳에서 claude login을 실행한 뒤 다시 테스트하세요.',
+  'Install the Codex CLI on the server machine and run codex login there, then test again.':
+    '서버 컴퓨터에 Codex CLI를 설치하고 그곳에서 codex login을 실행한 뒤 다시 테스트하세요.',
+  'Add a Codex API key in workspace settings, then test again.':
+    '워크스페이스 설정에서 Codex API 키를 추가한 뒤 다시 테스트하세요.',
+  'Check that Ollama or your OpenAI-compatible server is running at the address in AI_BASE_URL.':
+    'Ollama 또는 OpenAI 호환 서버가 AI_BASE_URL 주소에서 실행 중인지 확인하세요.',
+  'The provider did not answer.': '프로바이더가 응답하지 않았습니다.',
+  'Test the AI connection': 'AI 연결 테스트',
+  'Choose which AI the server uses for chat and agents, then check that it answers. Tasks, calendar and notes work without AI.':
+    '서버가 채팅과 에이전트에 사용할 AI를 고른 뒤 응답하는지 확인하세요. 작업, 캘린더, 노트는 AI 없이도 동작합니다.',
+  'Connect to a server first to test its AI.': 'AI를 테스트하려면 먼저 서버에 연결하세요.',
+  'Could not read the AI settings.': 'AI 설정을 읽지 못했습니다.',
+  'Checking AI providers…': 'AI 프로바이더 확인 중…',
+  'AI provider': 'AI 프로바이더',
+  'Testing…': '테스트 중…',
+  '{{provider}} is working': '{{provider}} 정상 동작',
+  'Answered in {{ms}} ms': '{{ms}}ms 만에 응답',
+  '{{provider}} is not working': '{{provider}} 동작하지 않음',
+  'Where should ClawChat run?': 'ClawChat을 어디에서 실행할까요?',
+  'ClawChat keeps your tasks, AI and notes on a server you control. Run one on this computer, or connect this app to one you already have.':
+    'ClawChat은 작업, AI, 노트를 직접 관리하는 서버에 보관합니다. 이 컴퓨터에서 서버를 실행하거나, 이미 있는 서버에 이 앱을 연결하세요.',
+  'Run a server on this machine': '이 컴퓨터에서 서버 실행',
+  'Starts the bundled server. Your data stays on this computer, and phones can pair with it later.':
+    '내장 서버를 시작합니다. 데이터는 이 컴퓨터에 남고, 나중에 휴대폰을 페어링할 수 있습니다.',
+  'Connect to another server': '다른 서버에 연결',
+  'Use a ClawChat server running on another computer or at home, with its PIN or a pairing code.':
+    '다른 컴퓨터나 집에서 실행 중인 ClawChat 서버를 PIN 또는 페어링 코드로 사용합니다.',
+  'Sign in with': '로그인 방법',
+  'Pairing code': '페어링 코드',
+  'Open Connections on the other server to show a pairing code, then enter it here.':
+    '다른 서버에서 연결 화면을 열어 페어링 코드를 표시한 뒤 여기에 입력하세요.',
+  'Starting the server on this computer…': '이 컴퓨터에서 서버를 시작하는 중…',
+  'Could not connect': '연결하지 못했습니다',
+  'Connected to {{name}}': '{{name}}에 연결됨',
+  'Connect your Obsidian vault': 'Obsidian 보관함 연결',
+  'Pick the folder of your Obsidian vault. ClawChat searches your notes and can save results there. You can skip this if you do not use Obsidian.':
+    'Obsidian 보관함 폴더를 선택하세요. ClawChat이 노트를 검색하고 결과를 그곳에 저장할 수 있습니다. Obsidian을 쓰지 않으면 건너뛰어도 됩니다.',
+  'Vault connected': '보관함 연결됨',
+  'No vault selected': '선택한 보관함 없음',
+  'Could not save the vault': '보관함을 저장하지 못했습니다',
+  'Choose another folder': '다른 폴더 선택',
+  'Choose vault folder': '보관함 폴더 선택',
+  '{{server}} uses the vault configured on that server. Notes on this computer stay here; sharing them with another server is not available in this version.':
+    '{{server}}은(는) 해당 서버에 설정된 보관함을 사용합니다. 이 컴퓨터의 노트는 여기에 남으며, 다른 서버와 공유하는 기능은 이 버전에서 제공되지 않습니다.',
+  'The server': '서버',
+  'Pair a phone': '휴대폰 페어링',
+  'Optional. Scan the code with the ClawChat Android app to use the same tasks on your phone. You can do this later from Connections.':
+    '선택 사항입니다. ClawChat Android 앱으로 코드를 스캔하면 휴대폰에서 같은 작업을 사용할 수 있습니다. 나중에 연결 화면에서 해도 됩니다.',
+  'Connect to a server first to pair a phone.': '휴대폰을 페어링하려면 먼저 서버에 연결하세요.',
+  'Phones need local network access': '휴대폰은 로컬 네트워크 접근이 필요합니다',
+  'New PIN for this server': '이 서버의 새 PIN',
+  'The default PIN 123456 cannot be used on the network. Choose 6 to 32 digits; other computers sign in with it.':
+    '기본 PIN 123456은 네트워크에서 사용할 수 없습니다. 6~32자리 숫자를 정하세요. 다른 컴퓨터는 이 PIN으로 로그인합니다.',
+  'Phone paired': '휴대폰 페어링됨',
+  'Skip this step': '이 단계 건너뛰기',
+  Setup: '설정 도우미',
+  'Setup assistant': '설정 도우미',
+  'Choose where the server runs, test the AI, connect Obsidian and pair a phone.':
+    '서버를 실행할 위치를 정하고, AI를 테스트하고, Obsidian을 연결하고, 휴대폰을 페어링합니다.',
+  'Run setup again': '설정 다시 실행',
+  Obsidian: 'Obsidian',
+  Phone: '휴대폰',
+  'This computer': '이 컴퓨터',
+  'ClawChat is ready': 'ClawChat 준비 완료',
+  'Not connected': '연결 안 됨',
+  'Not tested': '테스트 안 함',
+  'Set on the server': '서버에서 설정',
+  'Not paired': '페어링 안 함',
+  'You can run this setup again from Settings → General.':
+    '설정 → 일반에서 이 설정을 다시 실행할 수 있습니다.',
+  'Open ClawChat': 'ClawChat 열기',
+  'Set up ClawChat': 'ClawChat 설정',
+  'Skip setup': '설정 건너뛰기',
+  'Setup steps': '설정 단계',
 };
