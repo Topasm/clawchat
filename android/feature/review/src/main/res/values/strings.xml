@@ -36,7 +36,7 @@
     <string name="review_original_instruction">Original instruction</string>
     <string name="review_result">Result</string>
     <string name="review_no_full_result">No authoritative full result was provided.</string>
-    <string name="review_run_status">Status %1$s · attempt %2$d · %3$s</string>
+    <string name="review_run_attempt">Attempt %1$d · %2$s</string>
     <string name="review_run_detail_unavailable">Run detail is not available.</string>
     <string name="review_approval_impact">Approval impact</string>
     <string name="review_graph_revision">Graph revision %1$d</string>
@@ -46,7 +46,6 @@
     <string name="review_event_with_message">%1$s: %2$s</string>
     <string name="review_metadata_project">Project</string>
     <string name="review_metadata_provider">Provider</string>
-    <string name="review_metadata_run">Run</string>
     <string name="review_metadata_attempt">Attempt</string>
     <string name="review_metadata_version">Version</string>
 
@@ -61,14 +60,6 @@
     <string name="review_risk_medium">Medium</string>
     <string name="review_risk_high">High</string>
 
-    <string name="review_status_queued">Queued</string>
-    <string name="review_status_starting">Starting</string>
-    <string name="review_status_running">Running</string>
-    <string name="review_status_waiting_input">Needs input</string>
-    <string name="review_status_waiting_review">Ready to review</string>
-    <string name="review_status_completed">Completed</string>
-    <string name="review_status_failed">Failed</string>
-    <string name="review_status_cancelled">Cancelled</string>
 
     <string name="review_event_approved">Approved</string>
     <string name="review_event_cancelled">Cancelled</string>

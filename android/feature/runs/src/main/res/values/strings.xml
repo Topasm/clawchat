@@ -54,14 +54,6 @@
     <string name="runs_retry_started_notice">New agent attempt started</string>
     <string name="runs_resumed_notice">Agent run resumed</string>
 
-    <string name="runs_status_queued">Queued</string>
-    <string name="runs_status_starting">Starting</string>
-    <string name="runs_status_running">Running</string>
-    <string name="runs_status_waiting_input">Needs input</string>
-    <string name="runs_status_waiting_review">Ready to review</string>
-    <string name="runs_status_completed">Completed</string>
-    <string name="runs_status_failed">Failed</string>
-    <string name="runs_status_cancelled">Cancelled</string>
 
     <string name="runs_event_approved">Approved</string>
     <string name="runs_event_cancelled">Cancelled</string>

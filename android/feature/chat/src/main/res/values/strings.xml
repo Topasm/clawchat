@@ -31,12 +31,6 @@
     <string name="chat_you">You</string>
     <string name="chat_assistant">Assistant</string>
     <string name="chat_run_update_label">Agent run</string>
-    <string name="chat_run_status_waiting_input">Needs your input</string>
-    <string name="chat_run_status_waiting_review">Waiting for review</string>
-    <string name="chat_run_status_completed">Complete</string>
-    <string name="chat_run_status_cancelled">Cancelled</string>
-    <string name="chat_run_status_failed">Failed</string>
-    <string name="chat_run_status_running">Running</string>
     <string name="chat_run_needs_you_hint">Answer or review it from the Progress tab.</string>
     <string name="chat_agent_answer_placeholder">Answer the agent…</string>
     <string name="chat_agent_send_answer">Send answer</string>

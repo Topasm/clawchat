@@ -99,4 +99,14 @@
     <string name="update_error_install_permission_detail">Could not open the Android install-permission screen. Details: %1$s</string>
     <string name="update_error_install_launch">Could not open the Android package installer.</string>
     <string name="update_error_install_launch_detail">Could not open the Android package installer. Details: %1$s</string>
+    <!-- The five steps a task walks through; mirror the web's taskStage labels. -->
+    <string name="task_stage_capture">Captured</string>
+    <string name="task_stage_plan">Plan</string>
+    <string name="task_stage_run">Run</string>
+    <string name="task_stage_review">Review</string>
+    <string name="task_stage_done">Done</string>
+    <string name="task_stage_needs_input">Needs input</string>
+    <string name="task_stage_failed">Failed</string>
+    <string name="task_stage_cancelled">Cancelled</string>
+    <string name="task_stage_summary">Step %1$d of 5: %2$s</string>
 </resources>

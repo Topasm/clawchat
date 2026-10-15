@@ -56,10 +56,13 @@ interface ClawChatApi {
     suspend fun getProjectGraph(@Query("root_task_id") rootId: String, @Tag expectedScope: ExpectedSessionScope): ProjectGraph
 
     @GET("api/todos/execution-telemetry")
-    suspend fun getProjectTaskRuns(@Query("project_id") projectId: String, @Tag expectedScope: ExpectedSessionScope): List<ProjectTaskRun>
+    suspend fun getProjectTaskRuns(@Query("project_id") projectId: String?, @Tag expectedScope: ExpectedSessionScope): List<ProjectTaskRun>
 
     @POST("api/todos/{id}/delegate")
     suspend fun runReadyTask(@Path("id") id: String, @Body body: ReadyRunRequest, @Tag expectedScope: ExpectedSessionScope): ReadyRunResult
+
+    @GET("api/todos/{todoId}/plan/latest")
+    suspend fun getLatestPlan(@Path("todoId") todoId: String, @Tag expectedScope: ExpectedSessionScope): ChatPlanProposal
 
     @GET("api/todos/{todoId}/plan/proposals/{proposalId}")
     suspend fun getChatPlan(@Path("todoId") todoId: String, @Path("proposalId") proposalId: String): ChatPlanProposal

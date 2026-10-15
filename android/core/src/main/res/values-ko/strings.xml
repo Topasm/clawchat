@@ -94,4 +94,13 @@
     <string name="update_error_install_permission_detail">Android 설치 권한 화면을 열지 못했습니다. 세부 정보: %1$s</string>
     <string name="update_error_install_launch">Android 패키지 설치 프로그램을 열지 못했습니다.</string>
     <string name="update_error_install_launch_detail">Android 패키지 설치 프로그램을 열지 못했습니다. 세부 정보: %1$s</string>
+    <string name="task_stage_capture">받기</string>
+    <string name="task_stage_plan">계획</string>
+    <string name="task_stage_run">실행</string>
+    <string name="task_stage_review">검토</string>
+    <string name="task_stage_done">완료</string>
+    <string name="task_stage_needs_input">답변 필요</string>
+    <string name="task_stage_failed">실패</string>
+    <string name="task_stage_cancelled">취소</string>
+    <string name="task_stage_summary">5단계 중 %1$d단계: %2$s</string>
 </resources>

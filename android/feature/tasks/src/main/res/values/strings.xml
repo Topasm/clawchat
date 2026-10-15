@@ -14,10 +14,6 @@
 
     <string name="tasks_status_completed">Completed</string>
     <string name="tasks_status_cancelled">Cancelled</string>
-    <string name="tasks_inbox_planning">Planning</string>
-    <string name="tasks_inbox_review">Review</string>
-    <string name="tasks_inbox_organize">Organize</string>
-    <string name="tasks_inbox_failed">Failed</string>
 
     <string name="tasks_detail_title">Task detail</string>
     <string name="tasks_cd_back">Back</string>

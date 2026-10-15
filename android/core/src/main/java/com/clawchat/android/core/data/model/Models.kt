@@ -263,6 +263,7 @@ data class Message(
                         ?.mapNotNull { it.jsonPrimitive.contentOrNull }
                         .orEmpty(),
                     hasPendingPermissions = data["permissions"]?.jsonArray?.isNotEmpty() == true,
+                    isAdopted = data["is_adopted"]?.jsonPrimitive?.booleanOrNull == true,
                 )
             }
 
@@ -286,9 +287,17 @@ data class RunUpdate(
     val reviewId: String?,
     val inputOptions: List<String>,
     val hasPendingPermissions: Boolean,
+    val isAdopted: Boolean = false,
 ) {
     val needsUser: Boolean
         get() = status == "waiting_input" || status == "waiting_review"
+
+    /** Which of the five steps the run is at; an unknown status reads as running. */
+    val stage: TaskStageState
+        get() = runStage(
+            AgentRunStatus.entries.firstOrNull { it.name.equals(status, ignoreCase = true) } ?: AgentRunStatus.RUNNING,
+            isAdopted,
+        )
 }
 
 data class TaskDelegation(

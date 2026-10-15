@@ -53,14 +53,6 @@
     <string name="runs_retry_started_notice">새 에이전트 시도를 시작했습니다</string>
     <string name="runs_resumed_notice">에이전트 실행을 재개했습니다</string>
 
-    <string name="runs_status_queued">대기 중</string>
-    <string name="runs_status_starting">시작 중</string>
-    <string name="runs_status_running">실행 중</string>
-    <string name="runs_status_waiting_input">입력 필요</string>
-    <string name="runs_status_waiting_review">검토 준비됨</string>
-    <string name="runs_status_completed">완료</string>
-    <string name="runs_status_failed">실패</string>
-    <string name="runs_status_cancelled">취소됨</string>
 
     <string name="runs_event_approved">승인됨</string>
     <string name="runs_event_cancelled">취소됨</string>

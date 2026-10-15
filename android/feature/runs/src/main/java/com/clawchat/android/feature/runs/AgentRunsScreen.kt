@@ -61,6 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunEvent
 import com.clawchat.android.core.data.model.AgentRunStatus
+import com.clawchat.android.core.data.model.agentName
+import com.clawchat.android.core.data.model.stage
 import com.clawchat.android.core.ui.ClawCrossfade
 import com.clawchat.android.core.ui.ClawSegmentedToggle
 import com.clawchat.android.core.ui.ClawEmptyState
@@ -71,6 +73,8 @@ import com.clawchat.android.core.ui.ClawSectionHeader
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
+import com.clawchat.android.core.ui.TaskStageBar
+import com.clawchat.android.core.ui.TaskStageDots
 import com.clawchat.android.core.ui.localizedErrorMessage
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
@@ -342,10 +346,7 @@ internal fun AgentRunListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ClawStatusChip(
-                text = run.status.localizedLabel(),
-                tone = run.status.tone(),
-            )
+            TaskStageDots(run.stage)
             Text(
                 text = stringResource(R.string.runs_attempt, run.attempt),
                 style = MaterialTheme.typography.labelMedium,
@@ -372,7 +373,7 @@ internal fun AgentRunListItem(
             text = buildString {
                 append(run.projectTitle ?: unscoped)
                 append(" · ")
-                append(run.provider)
+                append(agentName(run.provider) ?: run.provider)
                 run.model?.takeIf { it.isNotBlank() }?.let { append(" / $it") }
             },
             style = MaterialTheme.typography.bodySmall,
@@ -468,13 +469,13 @@ private fun AgentRunDetailSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                ClawStatusChip(text = run.status.localizedLabel(), tone = run.status.tone())
                 Text(
                     text = stringResource(R.string.runs_attempt, run.attempt),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            TaskStageBar(run.stage)
 
             Text(
                 text = run.localizedDisplayTitle(),
@@ -487,7 +488,7 @@ private fun AgentRunDetailSheet(
                 text = buildString {
                     append(run.projectTitle ?: unscoped)
                     append(" · ")
-                    append(run.provider)
+                    append(agentName(run.provider) ?: run.provider)
                     run.model?.let { append(" / $it") }
                 },
                 style = MaterialTheme.typography.bodyMedium,
@@ -756,20 +757,6 @@ private fun AgentRunEventRow(event: AgentRunEvent) {
     }
 }
 
-private fun AgentRunStatus.tone(): ClawTone = when (this) {
-    AgentRunStatus.QUEUED -> ClawTone.Default
-    AgentRunStatus.STARTING,
-    AgentRunStatus.RUNNING,
-    -> ClawTone.Primary
-    AgentRunStatus.WAITING_INPUT,
-    AgentRunStatus.WAITING_REVIEW,
-    -> ClawTone.Warning
-    AgentRunStatus.COMPLETED -> ClawTone.Success
-    AgentRunStatus.FAILED,
-    AgentRunStatus.CANCELLED,
-    -> ClawTone.Error
-}
-
 @Composable
 private fun AgentRunFilter.localizedLabel(): String = stringResource(
     when (this) {
@@ -777,20 +764,6 @@ private fun AgentRunFilter.localizedLabel(): String = stringResource(
         AgentRunFilter.ACTIVE -> R.string.runs_filter_active
         AgentRunFilter.ATTENTION -> R.string.runs_filter_attention
         AgentRunFilter.RECENT -> R.string.runs_filter_recent
-    },
-)
-
-@Composable
-private fun AgentRunStatus.localizedLabel(): String = stringResource(
-    when (this) {
-        AgentRunStatus.QUEUED -> R.string.runs_status_queued
-        AgentRunStatus.STARTING -> R.string.runs_status_starting
-        AgentRunStatus.RUNNING -> R.string.runs_status_running
-        AgentRunStatus.WAITING_INPUT -> R.string.runs_status_waiting_input
-        AgentRunStatus.WAITING_REVIEW -> R.string.runs_status_waiting_review
-        AgentRunStatus.COMPLETED -> R.string.runs_status_completed
-        AgentRunStatus.FAILED -> R.string.runs_status_failed
-        AgentRunStatus.CANCELLED -> R.string.runs_status_cancelled
     },
 )
 

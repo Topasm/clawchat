@@ -14,10 +14,6 @@
 
     <string name="tasks_status_completed">완료</string>
     <string name="tasks_status_cancelled">취소됨</string>
-    <string name="tasks_inbox_planning">계획 중</string>
-    <string name="tasks_inbox_review">검토</string>
-    <string name="tasks_inbox_organize">정리</string>
-    <string name="tasks_inbox_failed">실패</string>
 
     <string name="tasks_detail_title">작업 상세</string>
     <string name="tasks_cd_back">뒤로</string>

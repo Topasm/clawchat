@@ -24,7 +24,10 @@ class ProjectPlanRepository @Inject constructor(
     suspend fun list() = request { api.listProjects(it) }
     suspend fun project(id: String) = request { api.getProject(id, it) }
     suspend fun graph(rootId: String) = request { api.getProjectGraph(rootId, it) }
-    suspend fun taskRuns(projectId: String) = request { api.getProjectTaskRuns(projectId, it) }
+    /** Each task's latest run and pending reviews; every task's when [projectId] is null. */
+    suspend fun taskRuns(projectId: String? = null) = request { api.getProjectTaskRuns(projectId, it) }
+    /** The task's newest plan proposal; the server answers 404 when it has none. */
+    suspend fun latestPlan(taskId: String) = request { api.getLatestPlan(taskId, it) }
     suspend fun run(taskId: String) = request {
         // Send both flags explicitly even when Retrofit's Json omits default values.
         api.runReadyTask(taskId, ReadyRunRequest(requireReady = true, approved = true), it)
