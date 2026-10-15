@@ -149,7 +149,7 @@ export default function ChatInput({
           isEditing
             ? translateUi('Edit message...')
             : modeLabel
-              ? translateUi('Answer the agent...')
+              ? translateUi('Your answer…')
               : placeholder
         }
         rows={1}

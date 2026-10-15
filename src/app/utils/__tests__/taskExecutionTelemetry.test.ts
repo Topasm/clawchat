@@ -34,7 +34,7 @@ describe('getTaskExecutionBadges', () => {
         telemetry({ latest_run_status: 'running', latest_run_progress: 42, artifact_count: 2 }),
       ),
     ).toEqual([
-      { key: 'run', label: 'Agent 42%', tone: 'active' },
+      { key: 'run', label: 'Run', tone: 'active' },
       { key: 'artifact', label: '2 files', tone: 'neutral' },
     ]);
   });
@@ -44,7 +44,7 @@ describe('getTaskExecutionBadges', () => {
       getTaskExecutionBadges(
         telemetry({ latest_run_status: 'waiting_review', pending_review_count: 1 }),
       ),
-    ).toEqual([{ key: 'run', label: 'Waiting review', tone: 'attention' }]);
+    ).toEqual([{ key: 'run', label: 'Review', tone: 'attention' }]);
   });
 
   it('keeps additional pending reviews visible', () => {
@@ -53,7 +53,7 @@ describe('getTaskExecutionBadges', () => {
         telemetry({ latest_run_status: 'waiting_review', pending_review_count: 2 }),
       ),
     ).toEqual([
-      { key: 'run', label: 'Waiting review', tone: 'attention' },
+      { key: 'run', label: 'Review', tone: 'attention' },
       { key: 'review', label: '2 reviews', tone: 'attention' },
     ]);
   });

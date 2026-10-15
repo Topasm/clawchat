@@ -118,18 +118,6 @@ export function CheckCircleIcon({ size = ICON_SIZE.feature, className, label }: 
   );
 }
 
-export function SparkleIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
-  return (
-    <IconBase size={size} className={className} label={label}>
-      <path
-        d="M9 2v2.5M9 13.5V16M2 9h2.5M13.5 9H16M4.1 4.1l1.8 1.8M12.1 12.1l1.8 1.8M13.9 4.1l-1.8 1.8M5.9 12.1l-1.8 1.8"
-        strokeLinecap="round"
-      />
-      <circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none" />
-    </IconBase>
-  );
-}
-
 export function ChatBubbleIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
   return (
     <IconBase size={size} className={className} label={label}>
@@ -139,23 +127,6 @@ export function ChatBubbleIcon({ size = ICON_SIZE.feature, className, label }: I
         strokeLinejoin="round"
       />
       <path d="M6 7h6M6 10h3" strokeLinecap="round" />
-    </IconBase>
-  );
-}
-
-export function FlameIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
-  return (
-    <IconBase size={size} className={className} label={label}>
-      <path
-        d="M9 1.5c0 3-3 4.5-3 7.5a4.5 4.5 0 009 0c0-3.5-2.5-5-3-7.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 16.5a2 2 0 01-2-2c0-1.5 2-3 2-3s2 1.5 2 3a2 2 0 01-2 2z"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </IconBase>
   );
 }
@@ -256,15 +227,6 @@ export function PlugIcon({ size = ICON_SIZE.feature, className, label }: IconPro
   return (
     <IconBase size={size} className={className} label={label}>
       <path d="M6 2.5v4M12 2.5v4M4.5 6.5h9v1A4.5 4.5 0 019 12v3.5M6.5 15.5h5" />
-    </IconBase>
-  );
-}
-
-export function RobotIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
-  return (
-    <IconBase size={size} className={className} label={label}>
-      <rect x="3" y="5.5" width="12" height="9" rx="2" />
-      <path d="M9 2v3.5M6.5 9h.01M11.5 9h.01M6.5 12h5" />
     </IconBase>
   );
 }

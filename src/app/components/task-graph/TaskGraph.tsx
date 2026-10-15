@@ -9,7 +9,6 @@ import { useToastStore } from '../../stores/useToastStore';
 import InboxDependencyPreviewPanel from '../inbox/InboxDependencyPreviewPanel';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SegmentedControl from '../shared/SegmentedControl';
-import { SparkleIcon } from '../shared/Icons';
 import {
   augmentTaskGraphTodos,
   buildTaskGraphElements,
@@ -350,8 +349,7 @@ export default function TaskGraph({
                   : translateUi('Generate a task graph proposal')
               }
             >
-              <SparkleIcon size={14} />
-              {translateUi(' AI plan\n          ')}
+              {translateUi('Propose plan')}
             </button>
           )}
           {!fixedProjectId && projectOptions.length > 0 && (

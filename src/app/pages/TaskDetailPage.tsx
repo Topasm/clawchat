@@ -16,6 +16,7 @@ import {
   useDismissPlanProposal,
   useGetOrCreateProjectConversation,
   useProjectQuery,
+  useTaskExecutionTelemetryQuery,
   queryKeys,
 } from '../hooks/queries';
 import apiClient from '../services/apiClient';
@@ -27,9 +28,11 @@ import RelationshipsSection from '../components/task-relationships/Relationships
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
 import TaskAgentThreadSection from '../components/task-detail/TaskAgentThreadSection';
+import TaskStageIndicator from '../components/shared/TaskStageIndicator';
+import { getTaskStage } from '../utils/taskStage';
 import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
-import { getTaskStatusLabel, isTerminalTaskStatus } from '../utils/taskStatus';
+import { isTerminalTaskStatus } from '../utils/taskStatus';
 import { translateUi } from '../i18n';
 import CanonicalDocumentButton from '../components/shared/CanonicalDocumentButton';
 import { extractCanonicalDoc } from '../utils/canonicalDoc';
@@ -98,6 +101,7 @@ export default function TaskDetailPage() {
   const applyPlanMutation = useApplyPlanProposal();
   const dismissPlanMutation = useDismissPlanProposal();
   const getConversation = useGetOrCreateProjectConversation();
+  const { data: telemetry = [] } = useTaskExecutionTelemetryQuery();
   const childTasks = todos.filter((t) => t.parent_id === taskId);
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
   const incompleteChildren = childTasks.filter((t) => !isTerminalTaskStatus(t.status));
@@ -197,6 +201,18 @@ export default function TaskDetailPage() {
   const dueInfo =
     task.due_date && !isTerminalTaskStatus(task.status) ? getDueCountdown(task.due_date) : null;
   const canonicalDoc = extractCanonicalDoc(project?.description);
+  const taskTelemetry = telemetry.find((item) => item.task_id === task.id);
+  const stage = getTaskStage({
+    taskStatus: task.status,
+    inboxState: task.inbox_state,
+    planStatus: plan?.status,
+    runStatus: taskTelemetry?.latest_run_status,
+    pendingReviewCount: taskTelemetry?.pending_review_count,
+    hasSubtasks: isPlanned,
+  });
+  // The next step is planning only while the task is still just captured;
+  // past that, planning again is a side action, not the thing to press.
+  const planIsNext = stage.stage === 'capture' && !stage.exception;
   return (
     <div className="cc-detail cc-exec-panel">
       {/* Top: Status + Quick Actions */}
@@ -210,13 +226,8 @@ export default function TaskDetailPage() {
             placeholder={translateUi('Task title')}
           />
         </div>
-        <div className="cc-exec-panel__badges">
-          {(task.status === 'completed' || task.status === 'cancelled') && (
-            <Badge variant="status">{getTaskStatusLabel(task.status)}</Badge>
-          )}
-          {task.inbox_state && task.inbox_state !== 'none' && (
-            <Badge variant="status">{task.inbox_state}</Badge>
-          )}
+        <div className="cc-exec-panel__stage">
+          <TaskStageIndicator state={stage} variant="bar" />
         </div>
         <StorageLocationBadge item={task} variant="line" />
       </div>
@@ -356,8 +367,7 @@ export default function TaskDetailPage() {
         <div className="cc-exec-panel__action-bar">
           <button
             type="button"
-            className="cc-btn cc-btn--primary"
-            style={{ fontSize: 12 }}
+            className="cc-btn cc-btn--secondary"
             disabled={getConversation.isPending}
             onClick={async () => {
               try {
@@ -373,8 +383,7 @@ export default function TaskDetailPage() {
           {!isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
             <button
               type="button"
-              className="cc-btn cc-btn--secondary"
-              style={{ fontSize: 12 }}
+              className={`cc-btn ${planIsNext ? 'cc-btn--primary' : 'cc-btn--secondary'}`}
               onClick={async () => {
                 try {
                   await apiClient.post(`/todos/${taskId}/organize`);
@@ -391,7 +400,6 @@ export default function TaskDetailPage() {
             <button
               type="button"
               className="cc-btn cc-btn--secondary"
-              style={{ fontSize: 12 }}
               onClick={async () => {
                 try {
                   await apiClient.post(`/todos/${taskId}/organize`);

@@ -70,7 +70,7 @@ describe('InboxTriageTree', () => {
       />,
     );
 
-    expect(screen.getByText('Agent 42%')).toBeInTheDocument();
+    expect(screen.getByText('Run')).toBeInTheDocument();
     expect(screen.getByText('2 files')).toBeInTheDocument();
   });
 

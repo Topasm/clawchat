@@ -21,7 +21,7 @@ describe('projectTaskAction', () => {
       );
       expect(result.kind).toBe('thread');
       expect(result.runId).toBe('run');
-      if (status === 'waiting_review') expect(result.label).toBe('Review result');
+      if (status === 'waiting_review') expect(result.label).toBe('Check result');
     },
   );
   it('only offers execution when readiness and telemetry are known', () => {

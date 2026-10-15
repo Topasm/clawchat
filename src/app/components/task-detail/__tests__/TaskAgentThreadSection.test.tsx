@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({ runs: [] as unknown[] }));
 
 vi.mock('../../../hooks/queries', () => ({
   useAgentRunsQuery: () => ({ data: mocks.runs }),
+  useRetryAgentRun: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 function renderSection() {

@@ -1,5 +1,6 @@
 import type { TaskExecutionTelemetryResponse } from '../types/api';
 import { translateUi } from '../i18n';
+import { describeTaskStage, getTaskStage } from './taskStage';
 type TaskExecutionBadgeTone = 'active' | 'attention' | 'success' | 'error' | 'neutral';
 export interface TaskExecutionBadge {
   key: 'run' | 'review' | 'artifact';
@@ -11,37 +12,27 @@ export function getTaskExecutionBadges(
 ): TaskExecutionBadge[] {
   if (!telemetry) return [];
   const badges: TaskExecutionBadge[] = [];
-  switch (telemetry.latest_run_status) {
-    case 'queued':
-      badges.push({ key: 'run', label: translateUi('Agent queued'), tone: 'active' });
-      break;
-    case 'starting':
-      badges.push({ key: 'run', label: translateUi('Agent starting'), tone: 'active' });
-      break;
-    case 'running':
-      badges.push({
-        key: 'run',
-        label: translateUi('Agent {{progress}}%', {
-          progress: telemetry.latest_run_progress ?? 0,
-        }),
-        tone: 'active',
-      });
-      break;
-    case 'waiting_input':
-      badges.push({ key: 'run', label: translateUi('Needs input'), tone: 'attention' });
-      break;
-    case 'waiting_review':
-      badges.push({ key: 'run', label: translateUi('Waiting review'), tone: 'attention' });
-      break;
-    case 'completed':
-      badges.push({ key: 'run', label: translateUi('Agent done'), tone: 'success' });
-      break;
-    case 'failed':
-      badges.push({ key: 'run', label: translateUi('Run failed'), tone: 'error' });
-      break;
-    case 'cancelled':
-      badges.push({ key: 'run', label: translateUi('Run cancelled'), tone: 'neutral' });
-      break;
+  const runStatus = telemetry.latest_run_status;
+  if (runStatus) {
+    // The run's step, in the same words as the task list and the run card.
+    const stage =
+      runStatus === 'completed' || runStatus === 'cancelled'
+        ? { stage: 'done' as const, exception: null, cancelled: runStatus === 'cancelled' }
+        : getTaskStage({ runStatus });
+    badges.push({
+      key: 'run',
+      label: describeTaskStage(stage),
+      tone:
+        stage.exception === 'failed'
+          ? 'error'
+          : stage.exception === 'needs_input' || stage.stage === 'review'
+            ? 'attention'
+            : stage.stage === 'run'
+              ? 'active'
+              : stage.cancelled
+                ? 'neutral'
+                : 'success',
+    });
   }
   if (
     telemetry.pending_review_count > 0 &&
@@ -51,7 +42,7 @@ export function getTaskExecutionBadges(
       key: 'review',
       label:
         telemetry.pending_review_count === 1
-          ? translateUi('Waiting review')
+          ? translateUi('Review')
           : translateUi('{{count}} reviews', { count: telemetry.pending_review_count }),
       tone: 'attention',
     });

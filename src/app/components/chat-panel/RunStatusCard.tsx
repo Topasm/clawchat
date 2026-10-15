@@ -144,8 +144,8 @@ export default function RunStatusCard({ metadata }: RunStatusCardProps) {
             rows={2}
             value={answer}
             onChange={(event) => setAnswer(event.target.value)}
-            placeholder={translateUi('Answer the agent')}
-            aria-label={translateUi('Answer the agent')}
+            placeholder={translateUi('Your answer')}
+            aria-label={translateUi('Your answer')}
           />
           <div className="cc-task-progress__actions">
             <button

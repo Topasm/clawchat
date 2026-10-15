@@ -55,10 +55,10 @@ describe('PlanReviewDiff', () => {
 
     fireEvent.click(checkboxes[0]);
     checkboxes.forEach((checkbox) => expect(checkbox).not.toBeChecked());
-    expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Approve plan/ })).toBeDisabled();
 
     fireEvent.click(checkboxes[1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Apply (2/3)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve plan (2/3)' }));
 
     expect(props.onApply).toHaveBeenCalledWith([0, 1]);
   });
@@ -74,7 +74,7 @@ describe('PlanReviewDiff', () => {
       />,
     );
     fireEvent.click(screen.getAllByRole('checkbox')[2]);
-    expect(screen.getByRole('button', { name: 'Apply (2/3)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Approve plan (2/3)' })).toBeEnabled();
 
     const reparsed = {
       ...proposal,
@@ -89,7 +89,7 @@ describe('PlanReviewDiff', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Apply (2/3)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve plan (2/3)' }));
     expect(onApply).toHaveBeenCalledWith([0, 1]);
   });
 
@@ -98,7 +98,7 @@ describe('PlanReviewDiff', () => {
     renderReview({ ...proposal, status: 'stale' }, { onRegenerate });
 
     expect(screen.getByRole('alert')).toHaveTextContent('task graph changed');
-    expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Approve plan/ })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
     expect(onRegenerate).toHaveBeenCalledOnce();
   });
@@ -123,6 +123,6 @@ describe('PlanReviewDiff', () => {
       '3 tasks to add',
     );
     expect(screen.getByRole('alert')).toHaveTextContent('The proposal contains a cycle');
-    expect(screen.getByRole('button', { name: /Apply/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Approve plan/ })).toBeDisabled();
   });
 });

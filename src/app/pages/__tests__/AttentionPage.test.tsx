@@ -158,10 +158,10 @@ describe('AttentionPage', () => {
       'on ubuntu-lab',
     );
 
-    fireEvent.change(screen.getByLabelText('Answer the agent'), {
+    fireEvent.change(screen.getByLabelText('Your answer'), {
       target: { value: 'Yes, include used' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Resume with follow-up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send answer' }));
     expect(queryMocks.resume).toHaveBeenCalledWith({
       runId: 'run-1',
       followUp: 'Yes, include used',
@@ -198,7 +198,7 @@ describe('AttentionPage', () => {
 
     expect(screen.getByText('The agent wants to use read from notes.')).toBeInTheDocument();
     expect(screen.getByText(/"path": "a.md"/)).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Answer the agent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Your answer' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
     expect(queryMocks.decideTool).toHaveBeenCalledWith({
       runId: 'run-1',

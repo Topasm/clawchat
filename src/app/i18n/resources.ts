@@ -306,7 +306,7 @@ export const translationResources = {
         pairing: {
           generating: 'Generating pairing code...',
           generateFailed: 'Failed to generate pairing code',
-          paired: 'Paired!',
+          paired: 'Paired',
           connected: 'Device successfully connected',
           title: 'Pair a Mobile Device',
           subtitle: 'Scan the QR code with the ClawChat mobile app, or enter the code manually',
@@ -639,7 +639,7 @@ export const translationResources = {
         pairing: {
           generating: '페어링 코드 생성 중...',
           generateFailed: '페어링 코드를 만들지 못했습니다',
-          paired: '페어링 완료!',
+          paired: '페어링 완료',
           connected: '기기가 성공적으로 연결되었습니다',
           title: '모바일 기기 페어링',
           subtitle: 'ClawChat 모바일 앱으로 QR 코드를 스캔하거나 코드를 직접 입력하세요',

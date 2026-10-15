@@ -31,7 +31,7 @@ import QuickCaptureModal from './shared/QuickCaptureModal';
 import OfflineIndicator from './shared/OfflineIndicator';
 import FloatingActionButton from './shared/FloatingActionButton';
 import PullToRefresh from './shared/PullToRefresh';
-import { ChevronLeftIcon, ChevronRightIcon, CollapseIcon } from './shared/Icons';
+import { ChevronLeftIcon, ChevronRightIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import {
   useCapabilitiesQuery,
@@ -45,28 +45,17 @@ import useProjectRootIds from '../hooks/useProjectRootIds';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
 // --- SVG icon components ---
-import {
-  InboxIcon,
-  ChatIcon,
-  TasksIcon,
-  GearIcon,
-  SearchIcon,
-  NavCalendarIcon,
-  ReviewIcon,
-  AutomationsIcon,
-  DevicesIcon,
-} from './shared/NavIcons';
+import { InboxIcon, ChatIcon, TasksIcon, NavCalendarIcon, ReviewIcon } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
 import { getAttentionBadgeCounts } from '../utils/attentionBadge';
 import UpdateNotification from './shared/UpdateNotification';
-import WorkspaceStatusHeader from './shared/WorkspaceStatusHeader';
 import { useServerHealthStore } from '../stores/useServerHealthStore';
 import { useServerHealthPolling } from '../hooks/useServerHealth';
 import { workspaceAddressLabel } from '../utils/workspaceLocation';
 import { platformApi } from '../platform';
-import { settingsNavigationState } from '../services/settingsNavigation';
 import WorkerStatusLine from './shared/WorkerStatusLine';
+import WorkspaceMenu from './shared/WorkspaceMenu';
 
 const SimpleMode = lazy(() => import('./SimpleMode'));
 // Keep the injected theme tokens declared in this runtime root. The design
@@ -113,17 +102,11 @@ const primaryNavItems = [
   { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
   { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
 ];
-// Attention is the one place for everything agents stopped on; the run log and
-// the review history are views inside it rather than pages of their own.
-const secondaryNavItems = [
-  { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon },
-  { to: '/automations', labelKey: 'nav.automations', Icon: AutomationsIcon },
-  { to: '/devices', labelKey: 'nav.devices', Icon: DevicesIcon },
-];
-const utilityNavItems = [
-  { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
-  { to: '/settings/app', labelKey: 'nav.settings', Icon: GearIcon },
-];
+// Attention is the one place for everything agents stopped on. It joins the
+// four places only while something waits there; the run log and review history
+// stay reachable from a task's run, and search, settings, devices and
+// automations live in the workspace menu at the sidebar's foot.
+const attentionNavItem = { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon };
 const SIDEBAR_RAIL_WIDTH = 48;
 const SIDEBAR_EXPANDED_MIN_WIDTH = 160;
 const DEFAULT_SIDEBAR_SIZE = 18;
@@ -133,7 +116,6 @@ export default function Layout() {
   const fontSize = useSettingsStore((state) => state.fontSize);
   const compactMode = useSettingsStore((state) => state.compactMode);
   const simpleMode = useSettingsStore((state) => state.simpleMode);
-  const setSimpleMode = useSettingsStore((state) => state.setSimpleMode);
   const location = useLocation();
   const navigate = useNavigate();
   const chatPanel = useChatPanel();
@@ -166,7 +148,6 @@ export default function Layout() {
       return true;
     });
   }, [capabilities, serverUrl]);
-  const filteredSecondaryNavItems = secondaryNavItems;
   const availableMobileTabs = useMemo(
     () =>
       !serverUrl || capabilities?.features.inbox_pipeline === false
@@ -274,21 +255,16 @@ export default function Layout() {
     if (panel.isCollapsed()) panel.expand();
     else panel.collapse();
   }, [sidebarPanelRef]);
+  const attentionCount = navBadgeCounts['/attention'];
+  const showAttention = attentionCount > 0 || location.pathname.startsWith('/attention');
+  const sidebarNavItems = showAttention
+    ? [...filteredPrimaryNavItems, attentionNavItem]
+    : filteredPrimaryNavItems;
   const sidebar = (
     <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
       <div className="cc-sidebar__header">
         <span className="cc-sidebar__title">{t('common.appName')}</span>
         <span className="cc-sidebar__header-actions">
-          {!sidebarCollapsed && (
-            <button
-              className="cc-sidebar-toggle"
-              onClick={() => setSimpleMode(true)}
-              title={translateUi('Switch to simple mode')}
-              aria-label={translateUi('Switch to simple mode')}
-            >
-              <CollapseIcon size={16} className="cc-nav-icon" />
-            </button>
-          )}
           <button
             className="cc-sidebar-toggle"
             onClick={handleSidebarToggle}
@@ -303,23 +279,7 @@ export default function Layout() {
           </button>
         </span>
       </div>
-      <WorkspaceStatusHeader
-        name={activeWorkspaceName}
-        address={workspaceAddressLabel(serverUrl)}
-        connectionStatus={connectionStatus}
-        connectionLabel={connectionLabel}
-        pendingCount={pendingCount}
-        pendingLabel={t('connection.pending', { count: pendingCount })}
-        health={healthData}
-        aiOfflineLabel={t('connection.aiOffline')}
-        onClick={() =>
-          navigate('/connections', {
-            state: settingsNavigationState(location.pathname, location.search, location.state),
-          })
-        }
-      />
-      <WorkerStatusLine />
-      {filteredPrimaryNavItems.map((item) => (
+      {sidebarNavItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -331,44 +291,30 @@ export default function Layout() {
           <item.Icon />
           <span className="cc-sidebar__label">{t(item.labelKey)}</span>
           {navBadgeCounts[item.to] > 0 && (
-            <span className="cc-nav-badge">{navBadgeCounts[item.to]}</span>
-          )}
-        </NavLink>
-      ))}
-      <div className="cc-sidebar__divider" />
-      {filteredSecondaryNavItems.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          className={({ isActive }) => `cc-nav-item${isActive ? ' cc-nav-item--active' : ''}`}
-          title={sidebarCollapsed ? t(item.labelKey) : undefined}
-        >
-          <item.Icon />
-          <span className="cc-sidebar__label">{t(item.labelKey)}</span>
-          {navBadgeCounts[item.to] > 0 && (
-            <span className="cc-nav-badge">{navBadgeCounts[item.to]}</span>
+            <span
+              className={`cc-nav-badge${item.to === '/attention' ? ' cc-nav-badge--attention' : ''}`}
+            >
+              {navBadgeCounts[item.to]}
+            </span>
           )}
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />
-      {utilityNavItems.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          state={
-            item.to === '/settings/app'
-              ? settingsNavigationState(location.pathname, location.search, location.state)
-              : undefined
-          }
-          className={({ isActive }) =>
-            `cc-nav-item cc-nav-item--utility${isActive ? ' cc-nav-item--active' : ''}`
-          }
-          title={sidebarCollapsed ? t(item.labelKey) : undefined}
-        >
-          <item.Icon />
-          <span className="cc-sidebar__label">{t(item.labelKey)}</span>
-        </NavLink>
-      ))}
+      <WorkerStatusLine />
+      <WorkspaceMenu
+        workspaceName={activeWorkspaceName}
+        connectionStatus={connectionStatus}
+        connectionLabel={connectionLabel}
+        address={workspaceAddressLabel(serverUrl)}
+        aiLabel={
+          healthData
+            ? `${translateUi('AI: ')}${healthData.aiConnected ? healthData.aiModel : t('connection.aiOffline')}`
+            : null
+        }
+        pendingCount={pendingCount}
+        collapsed={sidebarCollapsed}
+        onOpenSearch={() => commandPalette.setIsOpen(true)}
+      />
     </nav>
   );
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {

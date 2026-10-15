@@ -54,7 +54,7 @@ describe('ChatPage agent answer mode', () => {
     );
 
     expect(screen.getByText('Answering the agent')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('Answer the agent...'), {
+    fireEvent.change(screen.getByPlaceholderText('Your answer…'), {
       target: { value: 'Use the concise option' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));

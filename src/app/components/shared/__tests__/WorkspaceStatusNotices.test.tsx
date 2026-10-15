@@ -1,13 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { useServerHealthStore } from '../../../stores/useServerHealthStore';
 import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
 import AiSetupBanner from '../AiSetupBanner';
 import ServerVersionNotice from '../ServerVersionNotice';
 import StorageLocationBadge from '../StorageLocationBadge';
-import WorkspaceStatusHeader from '../WorkspaceStatusHeader';
+import WorkspaceMenu from '../WorkspaceMenu';
 
 const SERVER = 'https://home.example:8443';
 
@@ -36,50 +36,50 @@ afterEach(() => {
   useAuthStore.setState({ serverUrl: null });
 });
 
-describe('WorkspaceStatusHeader', () => {
+describe('WorkspaceMenu', () => {
   it('keeps the workspace name, address and connection state in view', () => {
-    const onClick = vi.fn();
     render(
-      <WorkspaceStatusHeader
-        name="Home"
-        address="home.example:8443"
-        connectionStatus="reconnecting"
-        connectionLabel="Reconnecting"
-        pendingCount={2}
-        pendingLabel="2 pending"
-        health={health(true)}
-        aiOfflineLabel="AI offline"
-        onClick={onClick}
-      />,
+      <MemoryRouter>
+        <WorkspaceMenu
+          workspaceName="Home"
+          address="home.example:8443"
+          connectionStatus="reconnecting"
+          connectionLabel="Reconnecting"
+          aiLabel="AI: llama3.2"
+          pendingCount={2}
+          collapsed={false}
+          onOpenSearch={() => {}}
+        />
+      </MemoryRouter>,
     );
 
-    const button = screen.getByRole('button', { name: 'Switch workspace. Current: Home' });
+    const button = screen.getByRole('button', { name: 'Workspace menu. Current: Home' });
     expect(button).toHaveClass('cc-connection-status--reconnecting');
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByTestId('workspace-address')).toHaveTextContent('home.example:8443');
-    expect(screen.getByText('Reconnecting')).toBeInTheDocument();
-    expect(screen.getByTitle('2 pending')).toHaveTextContent('2');
+    expect(button).toHaveTextContent('Reconnecting');
     expect(button).toHaveAttribute(
       'title',
       'Home · home.example:8443 · Reconnecting · AI: llama3.2',
     );
     fireEvent.click(button);
-    expect(onClick).toHaveBeenCalledOnce();
+    expect(screen.getByRole('menuitem', { name: 'Switch workspace' })).toBeInTheDocument();
   });
 
   it('says the private workspace lives on this device', () => {
     render(
-      <WorkspaceStatusHeader
-        name="This device"
-        address={null}
-        connectionStatus="connected"
-        connectionLabel="Connected"
-        pendingCount={0}
-        pendingLabel=""
-        health={null}
-        aiOfflineLabel="AI offline"
-        onClick={() => {}}
-      />,
+      <MemoryRouter>
+        <WorkspaceMenu
+          workspaceName="This device"
+          address={null}
+          connectionStatus="connected"
+          connectionLabel="Connected"
+          aiLabel={null}
+          pendingCount={0}
+          collapsed={false}
+          onOpenSearch={() => {}}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByTestId('workspace-address')).toHaveTextContent('On this device');
   });

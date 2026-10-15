@@ -374,11 +374,9 @@ export default function useWebSocket(): void {
       const d = data as {
         content?: string;
       };
-      useToastStore
-        .getState()
-        .addToast('info', translateUi('Weekly review is ready! Check your chat.'), {
-          duration: 15000,
-        });
+      useToastStore.getState().addToast('info', translateUi('Weekly review is in chat'), {
+        duration: 15000,
+      });
       const settings = useSettingsStore.getState();
       if (settings.notificationsEnabled) {
         void notify('Weekly Review', d.content?.slice(0, 100) ?? 'Your weekly review is ready');
@@ -390,11 +388,11 @@ export default function useWebSocket(): void {
       };
       useToastStore
         .getState()
-        .addToast('info', translateUi('Morning briefing is ready!'), { duration: 10000 });
+        .addToast('info', translateUi("Today's summary is ready"), { duration: 10000 });
       queryClient.invalidateQueries({ queryKey: queryKeys.today });
       const settings = useSettingsStore.getState();
       if (settings.notificationsEnabled) {
-        void notify('Daily Briefing', d.content?.slice(0, 100) ?? 'Your daily briefing is ready');
+        void notify("Today's summary", d.content?.slice(0, 100) ?? "Today's summary is ready");
       }
     };
     // Server liveness signals — wsClient already tracked lastMessageTime; ignore here

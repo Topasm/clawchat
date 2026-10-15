@@ -172,7 +172,7 @@ describe('ProjectPlan', () => {
     expect(screen.getByRole('button', { name: '+ Task' })).not.toBeVisible();
     const actions = screen.getByLabelText('Selected task actions');
     expect(actions.querySelectorAll('.cc-btn--primary')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Review result' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check result' }));
     await waitFor(() =>
       expect(execution.open).toHaveBeenCalledWith('review-run', `${project.title} › Review task`),
     );

@@ -48,6 +48,7 @@ vi.mock('../../hooks/queries', () => ({
   useDeleteTodo: () => ({ mutate: mocks.deleteTodo }),
   useToggleTodoComplete: () => ({ mutate: mocks.toggleTodo }),
   useLatestPlanProposalQuery: () => ({ data: null }),
+  useTaskExecutionTelemetryQuery: () => ({ data: [] }),
   useGeneratePlanProposal: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
   useApplyPlanProposal: () => ({ mutateAsync: vi.fn(), reset: vi.fn() }),
   useDismissPlanProposal: () => ({ mutateAsync: vi.fn() }),
