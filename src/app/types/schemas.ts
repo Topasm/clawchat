@@ -1448,6 +1448,10 @@ export const ObsidianHealthSchema = z.object({
   vault_path: z.string(),
   cli_available: z.boolean(),
   companion_online: z.boolean(),
+  // Older servers omit these three.
+  mode: z.enum(['cli', 'filesystem', 'disabled']).optional(),
+  project_root: z.string().optional(),
+  index_state: z.enum(['disabled', 'pending', 'scanning', 'ready', 'error']).optional(),
   sync_mode: z.string(),
   project_count: z.number(),
   last_scan: z.number().nullable(),
@@ -1502,7 +1506,26 @@ export const ObsidianScanResultSchema = z.object({
   duration_ms: z.number(),
 });
 
+export const ObsidianProjectSchema = z.object({
+  folder: z.string(),
+  name: z.string(),
+  // Older servers list only folders holding a TODO.md.
+  has_todo: z.boolean().default(true),
+  todo_md_preview: z.string(),
+  doc_count: z.number(),
+  last_modified: z.number().nullable(),
+});
+
+export const ObsidianProjectListSchema = z.object({
+  projects: z.array(ObsidianProjectSchema),
+  total: z.number(),
+  project_root: z.string().optional(),
+  index_age_seconds: z.number().nullable(),
+});
+
 export type ObsidianHealth = z.infer<typeof ObsidianHealthSchema>;
+export type ObsidianProject = z.infer<typeof ObsidianProjectSchema>;
+export type ObsidianProjectList = z.infer<typeof ObsidianProjectListSchema>;
 export type ObsidianScanResult = z.infer<typeof ObsidianScanResultSchema>;
 
 // Scheduled AI jobs: standing instructions the server runs on a schedule.

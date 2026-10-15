@@ -336,10 +336,11 @@ class Scheduler:
         )
 
         try:
-            from services.vault.obsidian_vault_indexer import refresh_index
+            from services.vault.obsidian_vault_indexer import ensure_fresh
             from services.vault.vault_watcher_service import scan_vault
 
-            await asyncio.to_thread(refresh_index)
+            # Startup builds the index in the background; reuse it if fresh.
+            await asyncio.to_thread(ensure_fresh)
             async with self.session_factory() as db:
                 await scan_vault(db)
             logger.info("Initial vault index built")

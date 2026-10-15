@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 
 from config import settings
 from database import async_session_factory
@@ -190,8 +191,19 @@ async def probe_optional_ai(
         logger.exception("Optional AI provider probe failed; continuing in local mode")
 
 
-async def initialize_vault() -> None:
-    """Restore the Vault index, CLI queue, and pending durable sync jobs."""
+async def restore_vault_state() -> None:
+    """Restore the saved Obsidian options and the persisted CLI write queue.
+
+    Both are quick reads, and they must land before anything writes to the
+    Vault: the queue load replaces the in-memory queue.
+    """
+    try:
+        from services.vault.obsidian_settings import apply_saved_project_root
+
+        async with async_session_factory() as settings_db:
+            await apply_saved_project_root(settings_db)
+    except Exception:
+        logger.exception("Could not load saved Obsidian settings")
     if settings.obsidian_vault_path:
         try:
             from services.vault.obsidian_cli_service import load_queue
@@ -200,26 +212,41 @@ async def initialize_vault() -> None:
             logger.info("Obsidian CLI write queue loaded")
         except Exception:
             logger.debug("Could not load Obsidian CLI write queue")
-        try:
-            from services.vault.obsidian_vault_indexer import refresh_index
 
-            index = await asyncio.to_thread(refresh_index)
-            logger.info(
-                "Obsidian vault index: %d projects (CLI=%s, companion=%s)",
-                len(index.projects),
-                index.cli_available,
-                index.companion_online,
-            )
-        except Exception:
-            logger.debug("Could not build initial vault index")
 
+async def build_vault_index() -> None:
+    """Build the Vault index; runs after the server already answers.
+
+    Scanning a large vault through the CLI takes tens of seconds, so startup
+    never waits for it. Until it finishes, ``/api/obsidian/status`` reports
+    ``index_state: scanning``. Pending Vault sync jobs are resumed by
+    ``vault_outbox_loop``, which starts with the server.
+    """
+    if not settings.obsidian_vault_path:
+        return
+    from services.vault.obsidian_vault_indexer import ensure_fresh
+
+    logger.info("Startup: building Obsidian vault index in the background")
+    started = time.monotonic()
     try:
-        from services.vault.vault_sync_service import process_pending_vault_sync_jobs
-
-        async with async_session_factory() as vault_job_db:
-            await process_pending_vault_sync_jobs(vault_job_db)
+        index = await asyncio.to_thread(ensure_fresh)
+    except asyncio.CancelledError:
+        raise
     except Exception:
-        logger.exception("Could not resume pending Vault sync jobs")
+        logger.exception("Could not build initial vault index")
+        return
+    logger.info(
+        "Startup: Obsidian vault index ready after %.1fs: %d projects (CLI=%s, companion=%s)",
+        time.monotonic() - started,
+        len(index.projects),
+        index.cli_available,
+        index.companion_online,
+    )
+
+
+def start_vault_index_build() -> asyncio.Task:
+    """Schedule ``build_vault_index`` without waiting for it."""
+    return asyncio.create_task(build_vault_index(), name="vault-index-build")
 
 
 async def vault_outbox_loop() -> None:

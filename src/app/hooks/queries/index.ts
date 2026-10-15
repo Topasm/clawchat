@@ -121,6 +121,9 @@ export {
   useObsidianScan,
   useObsidianFlushQueue,
   useObsidianRetryDeadLetter,
+  useObsidianProjectsQuery,
+  useObsidianSetProjectRoot,
+  useObsidianCreateProjectTodo,
 } from './useObsidianQueries';
 export {
   useScheduledJobsQuery,

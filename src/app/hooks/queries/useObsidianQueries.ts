@@ -1,8 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/apiClient';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { ObsidianHealthSchema, ObsidianScanResultSchema } from '../../types/schemas';
-import type { ObsidianHealth, ObsidianScanResult } from '../../types/schemas';
+import {
+  ObsidianHealthSchema,
+  ObsidianProjectListSchema,
+  ObsidianProjectSchema,
+  ObsidianScanResultSchema,
+} from '../../types/schemas';
+import type {
+  ObsidianHealth,
+  ObsidianProject,
+  ObsidianProjectList,
+  ObsidianScanResult,
+} from '../../types/schemas';
 import { queryKeys } from './queryKeys';
 import { invalidateTaskDerivedQueries } from './invalidateTaskDerivedQueries';
 
@@ -21,7 +31,22 @@ export function useObsidianHealthQuery(enabled = true) {
     },
     enabled: !!serverUrl && enabled,
     staleTime: 15_000,
-    refetchInterval: 60_000,
+    // The startup index build runs in the background; follow it closely.
+    refetchInterval: (query) => (query.state.data?.index_state === 'scanning' ? 3_000 : 60_000),
+  });
+}
+
+export function useObsidianProjectsQuery(enabled = true) {
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+
+  return useQuery<ObsidianProjectList>({
+    queryKey: queryKeys.obsidianProjects,
+    queryFn: async () => {
+      const res = await apiClient.get('/obsidian/projects');
+      return ObsidianProjectListSchema.parse(res.data);
+    },
+    enabled: !!serverUrl && enabled,
+    staleTime: 15_000,
   });
 }
 
@@ -51,6 +76,43 @@ export function useObsidianReindex() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.obsidianHealth });
+      qc.invalidateQueries({ queryKey: queryKeys.obsidianProjects });
+    },
+  });
+}
+
+export function useObsidianSetProjectRoot() {
+  const qc = useQueryClient();
+  return useMutation<{ project_root: string; project_count: number }, Error, string>({
+    mutationFn: async (projectRoot) => {
+      // Both act on the vault now; a replay after reconnecting would surprise.
+      const res = await apiClient.put(
+        '/obsidian/project-root',
+        { project_root: projectRoot },
+        { queueOfflineMutation: false },
+      );
+      return res.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.obsidianHealth });
+      qc.invalidateQueries({ queryKey: queryKeys.obsidianProjects });
+    },
+  });
+}
+
+export function useObsidianCreateProjectTodo() {
+  const qc = useQueryClient();
+  return useMutation<ObsidianProject, Error, string>({
+    mutationFn: async (folder) => {
+      const res = await apiClient.post(
+        '/obsidian/projects/todo',
+        { folder },
+        { queueOfflineMutation: false },
+      );
+      return ObsidianProjectSchema.parse(res.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.obsidianProjects });
     },
   });
 }

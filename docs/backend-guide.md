@@ -215,6 +215,10 @@ obsidian command id=<command_id>              # Execute plugin command
 
 **Sync modes** (`OBSIDIAN_SYNC_MODE`): `filesystem` (direct file access), `livesync` (CouchDB + LiveSync plugin), or `disabled`.
 
+**Projects**: a folder holding a `TODO.md` is a project. With a project root set (`OBSIDIAN_PROJECT_ROOT`, or Settings → Obsidian), every folder directly under it is one too; those without a `TODO.md` are listed with `has_todo: false` and Settings offers to create one.
+
+**Startup**: the saved Obsidian options and the CLI write queue load before the server answers; the vault index (tens of seconds on a large vault behind the CLI) is built in the background afterwards, so `/api/health` is not held up by it.
+
 ### Inbox Pipeline & Skill-Based Agents
 
 New todos captured via quick-capture enter the inbox pipeline (`inbox_pipeline_service.py`):
@@ -297,6 +301,7 @@ OBSIDIAN_VAULT_PATH=                        # Absolute path to vault
 OBSIDIAN_CLI_COMMAND=                       # Path to obsidian CLI binary
 OBSIDIAN_SYNC_MODE=filesystem               # "livesync", "filesystem", or "disabled"
 OBSIDIAN_PROJECT_TODO_FILENAME=TODO.md      # Filename to scan for project todos
+OBSIDIAN_PROJECT_ROOT=                      # Folder whose subfolders are all projects (Settings overrides)
 OBSIDIAN_SCAN_INTERVAL_MINUTES=5            # Polling fallback interval
 ```
 

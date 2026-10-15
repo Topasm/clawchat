@@ -6444,6 +6444,33 @@
         "title": "NoteUpdate",
         "type": "object"
       },
+      "ObsidianProjectRootUpdate": {
+        "properties": {
+          "project_root": {
+            "default": "",
+            "maxLength": 512,
+            "title": "Project Root",
+            "type": "string"
+          }
+        },
+        "title": "ObsidianProjectRootUpdate",
+        "type": "object"
+      },
+      "ObsidianProjectTodoCreate": {
+        "properties": {
+          "folder": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "title": "ObsidianProjectTodoCreate",
+        "type": "object"
+      },
       "PaginatedResponse_AgentTaskResponse_": {
         "properties": {
           "items": {
@@ -16593,6 +16620,51 @@
         ]
       }
     },
+    "/api/obsidian/project-root": {
+      "put": {
+        "description": "Set the folder whose subfolders all count as projects, then reindex.",
+        "operationId": "update_project_root_api_obsidian_project_root_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObsidianProjectRootUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Project Root",
+        "tags": [
+          "obsidian"
+        ]
+      }
+    },
     "/api/obsidian/projects": {
       "get": {
         "description": "List project folders with cached metadata from the vault index.",
@@ -16613,6 +16685,51 @@
           }
         ],
         "summary": "List Projects",
+        "tags": [
+          "obsidian"
+        ]
+      }
+    },
+    "/api/obsidian/projects/todo": {
+      "post": {
+        "description": "Create a starter TODO.md in a project-root folder that has none.",
+        "operationId": "create_project_todo_api_obsidian_projects_todo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObsidianProjectTodoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Project Todo",
         "tags": [
           "obsidian"
         ]

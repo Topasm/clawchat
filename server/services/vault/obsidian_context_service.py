@@ -28,6 +28,8 @@ _EXCLUDED_NAMES: set[str] = {
     "Dailies",
 }
 
+TODO_FILENAME = "TODO.md"
+
 _MAX_DOC_BYTES = 4096
 _MAX_RELATED_DOCS = 3
 
@@ -40,20 +42,74 @@ _MAX_RELATED_DOCS = 3
 def list_project_folders(
     vault_path: str,
     cli_command: str = "",
-) -> list[dict[str, str]]:
-    """Return folders that contain a ``TODO.md`` file.
+    project_root: str = "",
+) -> list[dict]:
+    """Return project folders: those holding a ``TODO.md``, plus every folder
+    directly under *project_root* whether or not it has one yet.
 
-    Each entry is ``{"folder": <relative_path>, "name": <folder_name>}``.
-    If *cli_command* is set, the CLI is tried first; on failure we fall back
-    to the filesystem.
+    Each entry is ``{"folder": <relative_path>, "name": <folder_name>,
+    "has_todo": <bool>}``. If *cli_command* is set, the CLI is tried first for
+    the ``TODO.md`` search; on failure we fall back to the filesystem.
     """
+    results: list[dict] | None = None
     if cli_command:
-        result = _list_via_cli(vault_path, cli_command)
-        if result is not None:
-            return result
-        logger.debug("CLI listing failed or returned nothing; falling back to filesystem")
+        results = _list_via_cli(vault_path, cli_command)
+        if results is None:
+            logger.debug("CLI listing failed or returned nothing; falling back to filesystem")
+    if results is None:
+        results = _list_via_filesystem(vault_path)
 
-    return _list_via_filesystem(vault_path)
+    if project_root:
+        seen = {entry["folder"] for entry in results}
+        for entry in list_project_root_children(vault_path, project_root):
+            if entry["folder"] not in seen:
+                results.append(entry)
+        results.sort(key=lambda d: d["folder"].lower())
+    return results
+
+
+def list_project_root_children(vault_path: str, project_root: str) -> list[dict]:
+    """List the folders directly under *project_root*, each one a project."""
+    try:
+        root_rel = normalize_vault_relative_path(project_root)
+        abs_root = resolve_vault_path(vault_path, root_rel)
+    except VaultPathError as exc:
+        logger.warning("Ignoring project root outside the vault: %s", exc)
+        return []
+    if not os.path.isdir(abs_root):
+        return []
+
+    results: list[dict] = []
+    try:
+        with os.scandir(abs_root) as entries:
+            for entry in entries:
+                if not entry.is_dir(follow_symlinks=False):
+                    continue
+                if _is_excluded_name(entry.name):
+                    continue
+                folder_rel = f"{root_rel}/{entry.name}"
+                results.append({
+                    "folder": folder_rel,
+                    "name": entry.name,
+                    "has_todo": os.path.isfile(os.path.join(entry.path, TODO_FILENAME)),
+                })
+    except OSError:
+        logger.exception("Failed to scan project root: %s", abs_root)
+    results.sort(key=lambda d: d["name"].lower())
+    return results
+
+
+def is_project_root_child(folder: str, project_root: str) -> bool:
+    """Return True if *folder* sits directly under *project_root*."""
+    if not project_root:
+        return False
+    try:
+        folder = normalize_vault_relative_path(folder)
+        root = normalize_vault_relative_path(project_root)
+    except VaultPathError:
+        return False
+    parent, _, name = folder.rpartition("/")
+    return parent == root and bool(name) and not _is_excluded_name(name)
 
 
 def read_project_context(
@@ -128,7 +184,7 @@ def read_project_context(
     return {"todo_md": todo_md, "related_docs": related_docs}
 
 
-def _list_via_cli(vault_path: str, cli_command: str) -> list[dict[str, str]] | None:
+def _list_via_cli(vault_path: str, cli_command: str) -> list[dict] | None:
     """Use the configured CLI to list files, then filter for TODO.md entries."""
     try:
         proc = subprocess.run(
@@ -166,7 +222,9 @@ def _list_via_cli(vault_path: str, cli_command: str) -> list[dict[str, str]] | N
             except VaultPathError:
                 continue
             seen.add(folder_rel)
-            results.append({"folder": folder_rel, "name": path.parent.name})
+            results.append(
+                {"folder": folder_rel, "name": path.parent.name, "has_todo": True}
+            )
 
         return results if results else None
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -216,9 +274,9 @@ def _list_files_via_cli(
 # ---------------------------------------------------------------------------
 
 
-def _list_via_filesystem(vault_path: str) -> list[dict[str, str]]:
+def _list_via_filesystem(vault_path: str) -> list[dict]:
     """Walk the vault at depth 1 and return folders containing TODO.md."""
-    results: list[dict[str, str]] = []
+    results: list[dict] = []
 
     if not os.path.isdir(vault_path):
         logger.warning("Vault path does not exist: %s", vault_path)
@@ -238,7 +296,7 @@ def _list_via_filesystem(vault_path: str) -> list[dict[str, str]]:
                 continue
             todo_file = os.path.join(entry.path, "TODO.md")
             if os.path.isfile(todo_file):
-                results.append({"folder": entry.name, "name": entry.name})
+                results.append({"folder": entry.name, "name": entry.name, "has_todo": True})
 
     results.sort(key=lambda d: d["name"].lower())
     return results

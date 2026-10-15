@@ -6,6 +6,8 @@ write queue management, dead letter queue, CLI error log, and reindexing.
 
 import asyncio
 import logging
+import os
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
@@ -15,7 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.dependencies import get_current_user
 from config import settings
 from database import get_db
+from exceptions import ConflictError, NotFoundError, ValidationError
 from models.todo import Todo
+from schemas.obsidian import ObsidianProjectRootUpdate, ObsidianProjectTodoCreate
+from services.vault import obsidian_settings
 from services.vault.obsidian_export_service import (
     export_all_todos,
     get_last_export_time,
@@ -66,24 +71,19 @@ async def get_status(
     _user: str = Depends(get_current_user),
 ):
     """Return current Obsidian export status."""
-    vault_path = settings.obsidian_vault_path
-    enabled = bool(vault_path)
+    from services.vault.obsidian_status import get_availability
 
     stmt = select(func.count(Todo.id))
     db_task_count = (await db.execute(stmt)).scalar() or 0
 
     last_export = get_last_export_time()
-
-    cli_command = settings.obsidian_cli_command
-    cli_available = bool(cli_command)
+    availability = await asyncio.to_thread(get_availability)
 
     return {
-        "enabled": enabled,
-        "vault_path": vault_path,
+        **availability.as_dict(),
+        "enabled": availability.vault_configured,
         "last_sync": last_export.isoformat() if last_export else None,
         "db_task_count": db_task_count,
-        "cli_available": cli_available,
-        "mode": "cli" if cli_available else ("filesystem" if enabled else "disabled"),
     }
 
 
@@ -119,25 +119,89 @@ async def list_projects(
     from services.vault.obsidian_vault_indexer import ensure_fresh
 
     idx = await asyncio.to_thread(ensure_fresh)
-    projects = []
-    for entry in sorted(idx.projects.values(), key=lambda e: e.name.lower()):
-        projects.append({
-            "folder": entry.folder,
-            "name": entry.name,
-            "todo_md_preview": entry.todo_md_preview,
-            "doc_count": len(entry.doc_summaries),
-            "last_modified": entry.last_modified or None,
-        })
+    projects = [
+        _project_payload(entry)
+        for entry in sorted(idx.projects.values(), key=lambda e: e.name.lower())
+    ]
 
     return {
         "projects": projects,
         "total": len(projects),
+        "project_root": settings.obsidian_project_root,
         "index_age_seconds": (
-            round((__import__("time").time() - idx.last_full_scan), 1)
+            round((time.time() - idx.last_full_scan), 1)
             if idx.last_full_scan
             else None
         ),
     }
+
+
+def _project_payload(entry) -> dict:
+    return {
+        "folder": entry.folder,
+        "name": entry.name,
+        "has_todo": entry.has_todo,
+        "todo_md_preview": entry.todo_md_preview,
+        "doc_count": len(entry.doc_summaries),
+        "last_modified": entry.last_modified or None,
+    }
+
+
+@router.put("/project-root")
+async def update_project_root(
+    body: ObsidianProjectRootUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Set the folder whose subfolders all count as projects, then reindex."""
+    from services.vault.obsidian_vault_indexer import refresh_index
+    from utils.vault_paths import VaultPathError, resolve_vault_path
+
+    try:
+        project_root = obsidian_settings.normalize_project_root(body.project_root)
+    except VaultPathError as exc:
+        raise ValidationError(
+            "Project root must be a folder inside the vault.",
+            details={"reason": "invalid_project_root"},
+        ) from exc
+    vault_path = settings.obsidian_vault_path
+    if project_root and vault_path and os.path.isdir(vault_path):
+        try:
+            abs_root = resolve_vault_path(vault_path, project_root, must_exist=True)
+        except VaultPathError as exc:
+            raise ValidationError(
+                "No such folder in the vault.",
+                details={"reason": "project_root_missing"},
+            ) from exc
+        if not os.path.isdir(abs_root):
+            raise ValidationError(
+                "Project root must be a folder.",
+                details={"reason": "project_root_not_folder"},
+            )
+
+    await obsidian_settings.save_project_root(db, project_root)
+    idx = await asyncio.to_thread(refresh_index)
+    return {"project_root": project_root, "project_count": len(idx.projects)}
+
+
+@router.post("/projects/todo", status_code=201)
+async def create_project_todo(
+    body: ObsidianProjectTodoCreate,
+    _user: str = Depends(get_current_user),
+):
+    """Create a starter TODO.md in a project-root folder that has none."""
+    from services.vault import obsidian_vault_indexer as indexer
+
+    try:
+        entry = await asyncio.to_thread(indexer.create_project_todo, body.folder)
+    except indexer.ProjectTodoError as exc:
+        details = {"reason": exc.reason}
+        if exc.reason == "todo_exists":
+            raise ConflictError(str(exc), details=details) from exc
+        if exc.reason == "folder_missing":
+            raise NotFoundError(str(exc)) from exc
+        raise ValidationError(str(exc), details=details) from exc
+    return _project_payload(entry)
 
 
 # ---------------------------------------------------------------------------

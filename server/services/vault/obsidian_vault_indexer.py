@@ -1,8 +1,9 @@
 """Cached vault index — maintains an in-memory project-folder map with document
 summaries and staleness tracking.
 
-The indexer scans the Obsidian vault for project folders (identified by a
-configurable TODO file, default ``TODO.md``) and caches metadata such as
+The indexer scans the Obsidian vault for project folders (folders holding a
+``TODO.md``, plus every folder under the configured project root) and caches
+metadata such as
 folder paths, document summaries, and modification times.  The inbox pipeline
 and planning service use this index for fast lookups instead of hitting the
 filesystem on every request.
@@ -17,7 +18,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from config import settings
+from services.vault import obsidian_status
 from services.vault.obsidian_context_service import (
+    TODO_FILENAME,
+    is_project_root_child,
     list_project_folders,
     read_project_context,
 )
@@ -30,12 +34,12 @@ from utils.vault_paths import (
 logger = logging.getLogger(__name__)
 
 
-
 @dataclass
 class ProjectEntry:
     """Cached metadata for a single project folder."""
     folder: str          # vault-relative path
     name: str            # human-readable folder name
+    has_todo: bool = True  # False for a project-root folder awaiting its TODO.md
     todo_md_hash: str = ""
     todo_md_preview: str = ""  # first 200 chars
     doc_summaries: list[dict[str, str]] = field(default_factory=list)
@@ -60,6 +64,7 @@ class VaultIndex:
 # Module-level singleton
 _index = VaultIndex()
 _index_lock = threading.RLock()
+_scanning = False
 
 
 # ---------------------------------------------------------------------------
@@ -75,14 +80,34 @@ def is_stale(max_age_seconds: int | None = None) -> bool:
     return (time.time() - _index.last_full_scan) > threshold
 
 
+def index_state() -> str:
+    """Where the index is: ``disabled``, ``pending``, ``scanning``, ``ready``
+    or ``error``."""
+    if _scanning:
+        return "scanning"
+    if not settings.obsidian_vault_path:
+        return "disabled"
+    if _index.error:
+        return "error"
+    if _index.last_full_scan:
+        return "ready"
+    return "pending"
+
+
 def refresh_index() -> VaultIndex:
     """Re-scan the vault and rebuild the in-memory index.
 
-    This is a synchronous operation because vault scanning is filesystem I/O
-    that runs quickly for typical vault sizes (< 1000 folders).
+    Blocking filesystem and CLI I/O: a large vault behind the CLI takes tens
+    of seconds, so callers on the event loop run it in a worker thread, and
+    startup runs it in the background (see ``services.lifecycle``).
     """
+    global _scanning
     with _index_lock:
-        return _refresh_index_locked()
+        _scanning = True
+        try:
+            return _refresh_index_locked()
+        finally:
+            _scanning = False
 
 
 def _refresh_index_locked() -> VaultIndex:
@@ -102,7 +127,9 @@ def _refresh_index_locked() -> VaultIndex:
     start = time.monotonic()
 
     try:
-        folders = list_project_folders(vault_path, cli_command)
+        folders = list_project_folders(
+            vault_path, cli_command, settings.obsidian_project_root
+        )
     except Exception as exc:
         logger.exception("Failed to list project folders during index refresh")
         _index.error = str(exc)
@@ -119,6 +146,7 @@ def _refresh_index_locked() -> VaultIndex:
                 folder_rel,
                 folder_info["name"],
                 cli_command,
+                has_todo=folder_info.get("has_todo", True),
             )
         except Exception:
             logger.warning(
@@ -127,25 +155,9 @@ def _refresh_index_locked() -> VaultIndex:
 
     elapsed_ms = (time.monotonic() - start) * 1000
 
-    # Check CLI availability
-    cli_ok = False
-    if cli_command:
-        import subprocess
-        try:
-            proc = subprocess.run(
-                [cli_command, "version"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=5,
-            )
-            cli_ok = proc.returncode == 0
-        except (OSError, subprocess.TimeoutExpired):
-            cli_ok = False
-
-    # Check companion node (always check for accurate health reporting)
-    companion_online = _check_companion_online(vault_path, cli_command)
+    # A full refresh re-probes, so a reindex picks up a CLI fixed meanwhile.
+    cli_ok = obsidian_status.probe_cli(force=True)
+    companion_online = obsidian_status.check_companion_online(vault_path)
 
     _index = VaultIndex(
         projects=projects,
@@ -194,6 +206,7 @@ def _refresh_changed_paths_locked(
     projects = dict(_index.projects)
     known_folders = sorted(projects, key=len, reverse=True)
     todo_filename = settings.obsidian_project_todo_filename
+    project_root = settings.obsidian_project_root
 
     for changed_path in changed_paths:
         absolute = (
@@ -224,6 +237,10 @@ def _refresh_changed_paths_locked(
             folder = os.path.dirname(relative).replace(os.sep, "/")
             if folder:
                 affected_folders.add(folder)
+        elif is_project_root_child(relative, project_root):
+            affected_folders.add(relative)
+        elif is_project_root_child(os.path.dirname(relative), project_root):
+            affected_folders.add(os.path.dirname(relative))
         elif os.path.isdir(absolute):
             try:
                 candidate = resolve_vault_path(
@@ -240,7 +257,12 @@ def _refresh_changed_paths_locked(
         except VaultPathError:
             projects.pop(folder, None)
             continue
-        if not os.path.isfile(todo_path):
+        has_todo = os.path.isfile(todo_path)
+        # A folder under the project root stays a project until it is removed.
+        in_root = is_project_root_child(folder, project_root) and os.path.isdir(
+            os.path.dirname(todo_path)
+        )
+        if not has_todo and not in_root:
             projects.pop(folder, None)
             continue
         try:
@@ -249,6 +271,7 @@ def _refresh_changed_paths_locked(
                 folder,
                 Path(folder).name,
                 settings.obsidian_cli_command,
+                has_todo=has_todo,
             )
         except Exception:
             logger.warning(
@@ -270,8 +293,10 @@ def get_health_summary() -> dict:
     )
     from services.vault.vault_watcher_service import is_scan_stuck
 
-    # Ensure the index is populated on first health check
-    idx = ensure_fresh()
+    # Populate the index on first health check, but never wait behind a scan
+    # already running (startup's): report it as ``index_state: scanning``.
+    idx = ensure_fresh(wait=False)
+    availability = obsidian_status.get_availability()
 
     # Queue age
     queue = get_queue_status()
@@ -285,10 +310,14 @@ def get_health_summary() -> dict:
     last_cli_error = error_log[0] if error_log else None
 
     return {
-        "vault_available": idx.is_available,
-        "vault_path": idx.vault_path,
-        "cli_available": idx.cli_available,
-        "companion_online": idx.companion_online,
+        # Availability comes from the same place as /api/obsidian/status.
+        "vault_available": availability.vault_available,
+        "vault_path": availability.vault_path,
+        "cli_available": availability.cli_available,
+        "companion_online": availability.companion_online,
+        "mode": availability.mode,
+        "project_root": availability.project_root,
+        "index_state": availability.index_state,
         "sync_mode": settings.obsidian_sync_mode,
         "project_count": len(idx.projects),
         "last_scan": idx.last_full_scan or None,
@@ -306,11 +335,73 @@ def get_health_summary() -> dict:
     }
 
 
-def ensure_fresh(max_age_seconds: int | None = None) -> VaultIndex:
-    """Refresh the index if it is stale, then return it."""
-    if is_stale(max_age_seconds):
+def ensure_fresh(
+    max_age_seconds: int | None = None, *, wait: bool = True
+) -> VaultIndex:
+    """Refresh the index if it is stale, then return it.
+
+    With ``wait=False`` a scan already running elsewhere is not waited for;
+    the current (possibly empty) index is returned instead.
+    """
+    if not is_stale(max_age_seconds):
+        return _index
+    if not _index_lock.acquire(blocking=wait):
+        return _index
+    try:
+        # A scan that held the lock meanwhile may have refreshed it already.
+        if not is_stale(max_age_seconds):
+            return _index
         return refresh_index()
-    return _index
+    finally:
+        _index_lock.release()
+
+
+class ProjectTodoError(ValueError):
+    """Why a ``TODO.md`` could not be created; ``reason`` is a stable code."""
+
+    def __init__(self, reason: str, message: str):
+        super().__init__(message)
+        self.reason = reason
+
+
+def create_project_todo(folder: str) -> ProjectEntry:
+    """Create a starter ``TODO.md`` in a project-root folder that has none.
+
+    Only folders directly under the project root qualify: those are the ones
+    listed as projects before they have a ``TODO.md``. An existing file is
+    never overwritten.
+    """
+    vault_path = settings.obsidian_vault_path
+    if not vault_path or not os.path.isdir(vault_path):
+        raise ProjectTodoError("vault_unavailable", "Obsidian vault is not available")
+    if not is_project_root_child(folder, settings.obsidian_project_root):
+        raise ProjectTodoError(
+            "not_in_project_root", "Folder is not directly under the project root"
+        )
+    try:
+        folder = normalize_vault_relative_path(folder)
+        abs_folder = resolve_vault_path(vault_path, folder)
+        todo_path = resolve_vault_path(vault_path, f"{folder}/{TODO_FILENAME}")
+    except VaultPathError as exc:
+        raise ProjectTodoError("invalid_folder", str(exc)) from exc
+    if not os.path.isdir(abs_folder):
+        raise ProjectTodoError("folder_missing", "Project folder does not exist")
+
+    name = Path(folder).name
+    try:
+        # "x" refuses to replace a TODO.md that appeared in the meantime.
+        with open(todo_path, "x", encoding="utf-8", newline="") as handle:
+            handle.write(f"# {name}\n\n")
+    except FileExistsError as exc:
+        raise ProjectTodoError("todo_exists", f"{TODO_FILENAME} already exists") from exc
+
+    index = refresh_changed_paths({todo_path})
+    entry = index.projects.get(folder)
+    if entry is None:
+        entry = _build_project_entry(
+            vault_path, folder, name, settings.obsidian_cli_command
+        )
+    return entry
 
 
 # ---------------------------------------------------------------------------
@@ -323,10 +414,13 @@ def _build_project_entry(
     folder_rel: str,
     folder_name: str,
     cli_command: str,
+    *,
+    has_todo: bool = True,
 ) -> ProjectEntry:
     entry = ProjectEntry(
         folder=folder_rel,
         name=folder_name,
+        has_todo=has_todo,
         scanned_at=time.time(),
     )
     ctx = read_project_context(vault_path, folder_rel, cli_command)
@@ -356,45 +450,3 @@ def _build_project_entry(
     if mtimes:
         entry.last_modified = max(mtimes)
     return entry
-
-
-def _check_companion_online(vault_path: str, cli_command: str) -> bool:
-    """Heuristic check for whether the companion node is online.
-
-    - In ``livesync`` mode: checks if the LiveSync plugin is configured
-      (``data.json`` exists in the plugin directory) as a proxy for CouchDB
-      connectivity.  Requires ``cli_command`` to be set.
-    - In ``filesystem`` mode: checks if ``.obsidian/workspace.json`` was
-      modified recently (within 10 minutes), suggesting an active Obsidian
-      instance.  Does NOT require the CLI.
-    """
-    obsidian_dir = os.path.join(vault_path, ".obsidian")
-    if not os.path.isdir(obsidian_dir):
-        return False
-
-    # LiveSync mode: check for LiveSync plugin configuration
-    if settings.obsidian_sync_mode == "livesync":
-        livesync_data = os.path.join(
-            obsidian_dir, "plugins", "obsidian-livesync", "data.json"
-        )
-        if os.path.isfile(livesync_data):
-            try:
-                mtime = os.path.getmtime(livesync_data)
-                age = time.time() - mtime
-                # LiveSync config exists and was touched in last hour
-                return age < 3600
-            except OSError:
-                pass
-        return False
-
-    # Filesystem mode: check workspace.json recency
-    try:
-        workspace_file = os.path.join(obsidian_dir, "workspace.json")
-        if os.path.isfile(workspace_file):
-            mtime = os.path.getmtime(workspace_file)
-            age = time.time() - mtime
-            return age < 600  # 10 minutes
-    except OSError:
-        pass
-
-    return False
