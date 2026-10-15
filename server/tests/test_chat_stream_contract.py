@@ -195,6 +195,45 @@ async def test_repeated_send_with_same_key_stores_one_message(
     assert len(chat_runtime.dispatched) == 1
 
 
+async def test_message_history_returns_each_messages_own_metadata(
+    client: AsyncClient, auth_headers, db_session
+):
+    """Regression: ``Message.metadata`` is SQLAlchemy's ``MetaData`` registry.
+
+    Before 1.4.43 the listing validated that class attribute instead of the
+    ``metadata_json`` column and answered 500 for every conversation.
+    """
+    conversation_id = await _create_conversation(client, auth_headers)
+    db_session.add_all(
+        [
+            Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content="with metadata",
+                metadata_json=json.dumps({"action_type": "task_delegated"}),
+                created_at=datetime(2026, 1, 1, 0, 0, 1, tzinfo=timezone.utc),
+            ),
+            Message(
+                conversation_id=conversation_id,
+                role="user",
+                content="without metadata",
+                created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    response = await client.get(
+        f"/api/chat/conversations/{conversation_id}/messages",
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    items = {item["content"]: item for item in response.json()["items"]}
+    assert items["with metadata"]["metadata"] == {"action_type": "task_delegated"}
+    assert items["without metadata"]["metadata"] is None
+
+
 async def test_message_history_page_starts_with_the_latest_messages(
     client: AsyncClient, auth_headers, db_session
 ):
