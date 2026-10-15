@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import apiClient from '../../services/apiClient';
+import { isOfflineQueuedResponse } from '../../services/offlineQueuedResponse';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useToastStore } from '../../stores/useToastStore';
 import {
@@ -72,6 +74,15 @@ export function useEventsQuery() {
 // ---------------------------------------------------------------------------
 // Mutation hooks — optimistic updates in query cache
 // ---------------------------------------------------------------------------
+// Results of creates that were queued offline instead of reaching the server.
+const queuedCreateResults = new WeakSet<object>();
+function activeWorkspaceName(): string {
+  const workspace = useWorkspaceStore.getState();
+  return (
+    workspace.profiles.find((profile) => profile.id === workspace.activeWorkspaceId)?.name ??
+    translateUi('This device')
+  );
+}
 export function useCreateTodo() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -81,6 +92,11 @@ export function useCreateTodo() {
         idempotency_key: data.idempotency_key ?? crypto.randomUUID(),
       };
       const response = await apiClient.post('/todos', payload, { queueOfflineMutation: true });
+      if (isOfflineQueuedResponse(response)) {
+        const placeholder = {} as TodoResponse;
+        queuedCreateResults.add(placeholder);
+        return placeholder;
+      }
       return response.data as TodoResponse;
     },
     onMutate: async (newTodo) => {
@@ -114,7 +130,20 @@ export function useCreateTodo() {
       }
       useToastStore.getState().addToast('error', translateUi('Failed to create task'));
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
+      if (queuedCreateResults.has(created)) {
+        // Say where the task is: only here until the workspace is reachable.
+        useToastStore.getState().addToast(
+          'info',
+          translateUi(
+            'Saved on this device. It will sync to {{workspace}} when you are back online.',
+            {
+              workspace: activeWorkspaceName(),
+            },
+          ),
+        );
+        return;
+      }
       useToastStore.getState().addToast('success', translateUi('Task created'));
     },
     onSettled: () => {

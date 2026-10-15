@@ -16,6 +16,8 @@ export interface NativeEventPayloadMap {
   'open-settings': void;
   'notification:action': NativeNotificationAction;
   navigate: string;
+  /** The window was closed but only hidden; ClawChat keeps running in the tray or menu bar. */
+  'main-window-hidden': void;
 }
 
 export type NativeEventChannel = keyof NativeEventPayloadMap;

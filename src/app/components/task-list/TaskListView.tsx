@@ -1,4 +1,5 @@
 import type { TaskExecutionTelemetryResponse, TodoResponse } from '../../types/api';
+import StorageLocationBadge from '../shared/StorageLocationBadge';
 import { formatDueDate } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
 interface TaskListViewProps {
@@ -122,6 +123,7 @@ export default function TaskListView({
               />
               {depth > 0 && <i className="cc-task-list__branch" aria-hidden="true" />}
               <strong>{todo.title}</strong>
+              <StorageLocationBadge item={todo} />
             </span>
             <span role="cell">
               <i className={`cc-task-list__status cc-task-list__status--${state.tone}`} />

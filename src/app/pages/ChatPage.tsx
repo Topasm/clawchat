@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
+import AiSetupBanner from '../components/shared/AiSetupBanner';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../stores/useChatStore';
 import {
@@ -175,6 +176,7 @@ export default function ChatPage() {
         )}
         <span className="cc-chat-page__title">{convo?.title || translateUi('Chat')}</span>
       </div>
+      <AiSetupBanner />
 
       {project && (
         <div

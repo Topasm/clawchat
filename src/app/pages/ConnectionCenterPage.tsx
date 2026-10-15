@@ -6,6 +6,8 @@ import SettingsRow from '../components/shared/SettingsRow';
 import PairingCodeDisplay from '../components/pairing/PairingCodeDisplay';
 import { PropertyRow } from '../components/shared/WorkspacePrimitives';
 import usePlatform from '../hooks/usePlatform';
+import { useServerHealth } from '../hooks/useServerHealth';
+import ServerVersionNotice from '../components/shared/ServerVersionNotice';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
@@ -26,6 +28,10 @@ export default function ConnectionCenterPage() {
   const logout = useAuthStore((state) => state.logout);
   const addToast = useToastStore((state) => state.addToast);
   const isHost = useWorkspaceStore((state) => state.activeWorkspaceId === LOCAL_WORKSPACE_ID);
+  const activeWorkspaceName = useWorkspaceStore(
+    (state) => state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name,
+  );
+  const health = useServerHealth();
   const resetConnections = async () => {
     await resetWorkspaceConnections();
     addToast(
@@ -40,6 +46,9 @@ export default function ConnectionCenterPage() {
       description={t('settingsShell.connectionsDescription')}
     >
       <div className="cc-settings-page">
+        {token && (
+          <ServerVersionNotice serverVersion={health?.version} serverName={activeWorkspaceName} />
+        )}
         <WorkspaceConnectionsSection />
 
         {!isDesktop && token && (

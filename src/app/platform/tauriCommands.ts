@@ -34,6 +34,7 @@ export const TAURI_EVENTS = {
   openSettings: 'open-settings',
   notificationAction: 'notification:action',
   navigate: 'navigate',
+  mainWindowHidden: 'main-window-hidden',
   updateAvailable: 'update-available',
   updateNotAvailable: 'update-not-available',
   updateDownloadProgress: 'update-download-progress',

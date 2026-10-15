@@ -236,7 +236,7 @@ export default function SettingsPage() {
       description={t('settingsShell.workspaceDescription')}
     >
       <div className="cc-settings-page">
-        <SettingsSection title={t('workspaceSettings.sections.ai')}>
+        <SettingsSection id="ai" title={t('workspaceSettings.sections.ai')}>
           <SystemPromptSection />
           {aiProviderLoadFailed && (
             <div className="cc-settings-inline-notice" role="alert">

@@ -258,6 +258,34 @@
   font-weight: 400;
 }
 
+.cc-connection-status__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cc-connection-status__name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cc-text);
+}
+
+.cc-connection-status__address,
+.cc-connection-status__state {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-connection-status__address {
+  font-family: ui-monospace, monospace;
+  font-weight: 400;
+}
+
 /* What this machine is doing as a worker: idle, busy (pulsing), or not yet checked in. */
 .cc-worker-status {
   border-top: 0;
