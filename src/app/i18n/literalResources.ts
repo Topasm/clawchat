@@ -1724,4 +1724,6 @@ export const koreanUiTranslations: Record<string, string> = {
   'Setup complete': '설정 완료',
   Captured: '받기',
   'Approve plan ({{selected}}/{{total}})': '계획 승인 ({{selected}}/{{total}})',
+  '01_Projects': '01_Projects',
+  '02_Resources/Private': '02_Resources/개인',
 };
