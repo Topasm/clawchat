@@ -195,7 +195,7 @@ export default function PlanReviewDiff({
         >
           {isApplying
             ? translateUi('Applying\u2026')
-            : translateUi('Apply ({{selected}}/{{total}})', {
+            : translateUi('Approve plan ({{selected}}/{{total}})', {
                 selected: selected.size,
                 total: subtasks.length,
               })}

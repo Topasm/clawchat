@@ -18,15 +18,24 @@
   --cc-control-height: 36px;
   --cc-touch-target: 44px;
   --cc-row-height: 44px;
-  --cc-border-subtle: color-mix(in srgb, var(--cc-border) 72%, transparent);
-  --cc-border-strong: color-mix(in srgb, var(--cc-border) 78%, var(--cc-text-tertiary));
-  --cc-hover-surface: color-mix(in srgb, var(--cc-text) 4%, var(--cc-surface));
-  --cc-selected-surface: color-mix(in srgb, var(--cc-primary) 9%, var(--cc-surface));
   --cc-shadow-content: none;
   --cc-shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.16);
   --cc-shadow-drag: 0 8px 20px rgba(0, 0, 0, 0.14);
   --cc-transition-fast: 120ms ease;
   --cc-transition-base: 160ms ease;
+}
+
+/* Colours mixed from theme colours. The theme's own colours are inline custom
+   properties on .cc-root (and the settings shell), so these must be declared
+   there too: declared on :root, var(--cc-border) does not exist yet and every
+   rule using them silently drops its border or background. */
+:root,
+.cc-root,
+.cc-settings-shell {
+  --cc-border-subtle: color-mix(in srgb, var(--cc-border) 72%, transparent);
+  --cc-border-strong: color-mix(in srgb, var(--cc-border) 78%, var(--cc-text-tertiary));
+  --cc-hover-surface: color-mix(in srgb, var(--cc-text) 4%, var(--cc-surface));
+  --cc-selected-surface: color-mix(in srgb, var(--cc-primary) 9%, var(--cc-surface));
 }
 
 /* --- Root ------------------------------------------------- */

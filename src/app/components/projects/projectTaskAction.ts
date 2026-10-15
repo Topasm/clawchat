@@ -21,7 +21,7 @@ export function projectTaskAction(
       runId: telemetry.latest_run_id,
       label:
         status === 'waiting_review'
-          ? 'Review result'
+          ? 'Check result'
           : status === 'waiting_input'
             ? 'Needs input'
             : 'Open run',

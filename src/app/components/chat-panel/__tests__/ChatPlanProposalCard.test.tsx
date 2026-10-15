@@ -93,7 +93,7 @@ describe('chat graph proposal card', () => {
 
     expect(await screen.findByText('Add two focused steps')).toBeInTheDocument();
     expect(apiMocks.get).toHaveBeenCalledWith('/todos/todo-1/plan/proposals/proposal-1');
-    fireEvent.click(screen.getByRole('button', { name: 'Apply (2/2)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve plan (2/2)' }));
 
     await waitFor(() =>
       expect(apiMocks.post).toHaveBeenCalledWith(

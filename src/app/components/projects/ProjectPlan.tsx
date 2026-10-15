@@ -11,7 +11,7 @@ import {
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
 import type { ProjectOverviewResponse, TaskGraphInsightNode, TodoResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
-import { ChevronRightIcon, SparkleIcon } from '../shared/Icons';
+import { ChevronRightIcon } from '../shared/Icons';
 import EmptyState from '../shared/EmptyState';
 import SegmentedControl from '../shared/SegmentedControl';
 import TaskGraph from '../task-graph/TaskGraph';
@@ -268,8 +268,7 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
                     className="cc-btn"
                     onClick={() => setProposalTarget(selectedTask)}
                   >
-                    <SparkleIcon size={14} />
-                    {translateUi(' Expand')}
+                    {translateUi('Expand')}
                   </button>
                   <button
                     type="button"

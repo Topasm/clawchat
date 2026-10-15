@@ -94,7 +94,7 @@ describe('RunStatusCard', () => {
     renderCard({ action_type: 'run_update', status: 'waiting_input', run_id: 'run_1' });
 
     expect(screen.getByText('Needs your input')).toBeInTheDocument();
-    const answer = screen.getByLabelText('Answer the agent');
+    const answer = screen.getByLabelText('Your answer');
     const send = screen.getByRole('button', { name: 'Send answer' });
     expect(send).toBeDisabled();
     fireEvent.change(answer, { target: { value: 'Casual tone' } });
@@ -109,7 +109,7 @@ describe('RunStatusCard', () => {
     renderCard({ action_type: 'run_update', status: 'waiting_input', run_id: 'run_1' });
 
     expect(screen.getByText('Already answered')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Answer the agent')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Your answer')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open run' }));
     expect(screen.getByTestId('location')).toHaveTextContent('/attention?view=runs&run_id=run_1');
   });
@@ -225,7 +225,7 @@ describe('RunStatusCard', () => {
     renderCard({ action_type: 'run_update', run_id: 'run_1', status: 'waiting_input' });
 
     expect(screen.getByText('The agent wants to use read file from notes.')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Answer the agent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Your answer' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
     expect(queryMocks.decideTool).toHaveBeenCalledWith({
       runId: 'run_1',

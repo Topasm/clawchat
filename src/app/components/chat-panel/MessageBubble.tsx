@@ -1,13 +1,6 @@
 import type { ChatMessage } from '../../stores/useChatStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import {
-  CopyIcon,
-  EditIcon,
-  SparkleIcon,
-  SpinArrowsIcon,
-  TrashIcon,
-  UserIcon,
-} from '../shared/Icons';
+import { CopyIcon, EditIcon, SpinArrowsIcon, TrashIcon, UserIcon } from '../shared/Icons';
 import ActionCard from './ActionCard';
 import { translateUi } from '../../i18n';
 const INTENT_LABELS: Record<string, string> = {
@@ -60,13 +53,9 @@ export default function MessageBubble({
   const intentLabel = intent && intent !== 'general_chat' ? INTENT_LABELS[intent] : null;
   return (
     <div className={`cc-bubble-row cc-bubble-row--${role}`}>
-      {!isUser && showAvatars && (
+      {!isUser && showAvatars && projectIcon && (
         <div className="cc-avatar cc-avatar--assistant">
-          {projectIcon ? (
-            <span style={{ fontSize: 16, lineHeight: 1 }}>{projectIcon}</span>
-          ) : (
-            <SparkleIcon size={16} />
-          )}
+          <span style={{ fontSize: 16, lineHeight: 1 }}>{projectIcon}</span>
         </div>
       )}
       <div className={`cc-bubble cc-bubble--${role}`}>

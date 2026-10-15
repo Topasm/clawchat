@@ -7,11 +7,13 @@ import {
   useRetryAgentRun,
   useResumeAgentRun,
 } from '../../hooks/queries';
-import { runStatusLabel } from '../chat-panel/RunStatusCard';
 import ToolRequestPanel from './ToolRequestPanel';
 import type { AgentRunResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
 import { skillChainLabel } from '../../utils/skillLabels';
+import { relativeTime } from '../../utils/formatters';
+import { agentName, getRunStage } from '../../utils/taskStage';
+import TaskStageIndicator from '../shared/TaskStageIndicator';
 
 const ACTIVE_STATUSES = new Set(['queued', 'starting', 'running', 'waiting_input']);
 
@@ -58,46 +60,53 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
   const canReturnToReady = Boolean(
     unsuccessful && run.todo_id && run.todo_status === 'in_progress',
   );
+  const updatedAt = run.updated_at ?? run.created_at;
+  const stage = getRunStage(run);
+  const details = [
+    run.project_title || translateUi('No project'),
+    run.skill_chain?.length ? skillChainLabel(run.skill_chain) : null,
+    translateUi('attempt {{attempt}}', { attempt: run.attempt }),
+    run.host_label ? translateUi('on {{host}}', { host: run.host_label }) : null,
+    run.model ? `${run.provider} / ${run.model}` : run.provider,
+    run.workspace_id ? translateUi('workspace {{id}}', { id: run.workspace_id }) : null,
+    run.external_run_id
+      ? run.provider === 'opencode'
+        ? translateUi('session {{id}}', { id: run.external_run_id })
+        : translateUi('agent {{id}}', { id: run.external_run_id })
+      : null,
+    run.heartbeat_at
+      ? translateUi('last heard from {{time}}', {
+          time: new Date(run.heartbeat_at).toLocaleTimeString(),
+        })
+      : null,
+  ].filter(Boolean);
   return (
     <article className={`cc-run-card cc-run-card--${run.status}`}>
       <div className="cc-run-card__header">
         <div className="cc-run-card__identity">
-          <span className={`cc-run-status cc-run-status--${run.status}`}>
-            {runStatusLabel(run.status)}
-          </span>
           <h2>{run.todo_title || run.instruction_snapshot}</h2>
           <p>
-            {run.project_title || translateUi('No project')}
-            {run.skill_chain?.length ? ` · ${skillChainLabel(run.skill_chain)}` : ''}
-            {run.attempt > 1 ? translateUi(' · try {{attempt}}', { attempt: run.attempt }) : ''}
-          </p>
-          {(run.host_label ||
-            ((run.provider === 'paseo' || run.provider === 'opencode') &&
-              (run.workspace_id || run.external_run_id))) && (
-            <p className="cc-run-card__external">
-              {run.host_label
-                ? translateUi('on {{host}}', { host: run.host_label })
-                : run.provider === 'opencode'
-                  ? translateUi('OpenCode')
-                  : translateUi('Paseo')}
-              {run.workspace_id ? translateUi(' · workspace {{id}}', { id: run.workspace_id }) : ''}
-              {run.external_run_id
-                ? run.provider === 'opencode'
-                  ? translateUi(' · session {{id}}', { id: run.external_run_id })
-                  : translateUi(' · agent {{id}}', { id: run.external_run_id })
+            <TaskStageIndicator state={stage} />
+            <span className="cc-run-card__fact">
+              {agentName(run.provider)}
+              {/* Where a failed run ran is part of deciding what to do about it. */}
+              {stage.exception === 'failed' && run.host_label
+                ? ` ${translateUi('on {{host}}', { host: run.host_label })}`
                 : ''}
-            </p>
-          )}
+              {` · ${relativeTime(updatedAt)}`}
+            </span>
+          </p>
         </div>
-        {run.is_adopted && <span className="cc-run-card__adopted">{translateUi('Adopted')}</span>}
       </div>
-      <div
-        className="cc-run-progress"
-        aria-label={translateUi('{{progress}}% complete', { progress: run.progress })}
-      >
-        <span style={{ width: `${run.progress}%` }} />
-      </div>
-      {run.progress_message && !pendingTool && (
+      {run.status === 'running' && (
+        <div
+          className="cc-run-progress"
+          aria-label={translateUi('{{progress}}% complete', { progress: run.progress })}
+        >
+          <span style={{ width: `${run.progress}%` }} />
+        </div>
+      )}
+      {run.progress_message && !pendingTool && active && (
         <div className="cc-run-card__status-line">
           <span>{run.progress_message}</span>
         </div>
@@ -110,33 +119,11 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
           rows={2}
           value={followUp}
           onChange={(event) => setFollowUp(event.target.value)}
-          placeholder={translateUi('Answer the agent')}
-          aria-label={translateUi('Answer the agent')}
+          placeholder={translateUi('Your answer')}
+          aria-label={translateUi('Your answer')}
         />
       )}
       <div className="cc-run-card__actions">
-        <button type="button" className="cc-btn" onClick={onToggle}>
-          {expanded ? translateUi('Hide log') : translateUi('Event log')}
-        </button>
-        {run.conversation_id && (
-          <button
-            type="button"
-            className="cc-btn"
-            onClick={() => navigate(`/chats/${run.conversation_id}`)}
-          >
-            {translateUi('Open thread')}
-          </button>
-        )}
-        {active && run.status !== 'waiting_input' && (
-          <button
-            type="button"
-            className="cc-btn cc-btn--danger"
-            disabled={cancel.isPending}
-            onClick={() => cancel.mutate(run.id)}
-          >
-            {translateUi('\n            Cancel\n          ')}
-          </button>
-        )}
         {answering && (
           <button
             type="button"
@@ -144,7 +131,12 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
             disabled={resume.isPending || !followUp.trim()}
             onClick={() => resume.mutate({ runId: run.id, followUp })}
           >
-            {translateUi('\n            Resume with follow-up\n          ')}
+            {translateUi('Send answer')}
+          </button>
+        )}
+        {run.status === 'waiting_review' && (
+          <button type="button" className="cc-btn cc-btn--primary" onClick={onReview}>
+            {translateUi('Check result')}
           </button>
         )}
         {canRetry && (
@@ -154,40 +146,50 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
             disabled={retry.isPending}
             onClick={() => retry.mutate({ runId: run.id })}
           >
-            {translateUi('\n            Retry\n          ')}
+            {translateUi('Retry')}
+          </button>
+        )}
+        {run.conversation_id && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            onClick={() => navigate(`/chats/${run.conversation_id}`)}
+          >
+            {translateUi('Open thread')}
           </button>
         )}
         {canReturnToReady && (
           <button
             type="button"
-            className="cc-btn"
+            className="cc-btn cc-btn--ghost"
             disabled={returnToReady.isPending}
             onClick={() => returnToReady.mutate(run.id)}
           >
-            {translateUi('\n            Return task to queue\n          ')}
+            {translateUi('Return task to queue')}
           </button>
         )}
-        {run.status === 'waiting_review' && (
-          <button type="button" className="cc-btn cc-btn--primary" onClick={onReview}>
-            {translateUi('\n            Review result\n          ')}
+        {active && run.status !== 'waiting_input' && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            disabled={cancel.isPending}
+            onClick={() => cancel.mutate(run.id)}
+          >
+            {translateUi('Cancel')}
           </button>
         )}
+        <button
+          type="button"
+          className="cc-btn cc-btn--ghost"
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
+          {translateUi('Details')}
+        </button>
       </div>
       {expanded && (
         <>
-          <p className="cc-run-card__external">
-            {[
-              translateUi('attempt {{attempt}}', { attempt: run.attempt }),
-              run.model ? `${run.provider} / ${run.model}` : run.provider,
-              run.heartbeat_at
-                ? translateUi('last heard from {{time}}', {
-                    time: new Date(run.heartbeat_at).toLocaleTimeString(),
-                  })
-                : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
+          <p className="cc-run-card__external">{details.join(' · ')}</p>
           <RunEventLog runId={run.id} />
         </>
       )}

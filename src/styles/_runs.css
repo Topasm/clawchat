@@ -141,21 +141,12 @@
 .cc-run-card:last-child {
   border-bottom: 0;
 }
-.cc-run-card--running,
-.cc-run-card--starting,
-.cc-run-card--queued {
-  border-left-color: var(--cc-primary);
-}
-.cc-run-card--waiting_review,
+/* Only the two exceptions get a colour; every other state reads from its step. */
 .cc-run-card--waiting_input {
   border-left-color: var(--cc-warning);
 }
-.cc-run-card--failed,
-.cc-run-card--cancelled {
+.cc-run-card--failed {
   border-left-color: var(--cc-error);
-}
-.cc-run-card--completed {
-  border-left-color: var(--cc-success);
 }
 .cc-run-card__header,
 .cc-run-card__status-line,
@@ -180,10 +171,15 @@
 .cc-run-card__status-line {
   margin: 0;
   color: var(--cc-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
-.cc-run-status,
-.cc-run-card__adopted {
+.cc-run-card__identity p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cc-space-3);
+}
+.cc-run-status {
   display: inline-flex;
   padding: 2px 7px;
   border-radius: var(--cc-radius-pill);
@@ -192,10 +188,6 @@
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-}
-.cc-run-card__adopted {
-  background: color-mix(in srgb, var(--cc-success) 12%, transparent);
-  color: var(--cc-success);
 }
 .cc-run-progress {
   height: 4px;

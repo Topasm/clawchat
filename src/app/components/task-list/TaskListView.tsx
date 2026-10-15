@@ -2,6 +2,9 @@ import type { TaskExecutionTelemetryResponse, TodoResponse } from '../../types/a
 import StorageLocationBadge from '../shared/StorageLocationBadge';
 import { formatDueDate } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
+import { describeTaskStage, getTaskStage } from '../../utils/taskStage';
+import type { TaskStageState } from '../../utils/taskStage';
+import TaskStageIndicator from '../shared/TaskStageIndicator';
 interface TaskListViewProps {
   todos: TodoResponse[];
   onOpenTask: (taskId: string) => void;
@@ -13,36 +16,26 @@ interface TaskListViewProps {
   telemetryByTaskId?: Map<string, TaskExecutionTelemetryResponse>;
 }
 
-type RowTone =
-  'active' | 'progress' | 'attention' | 'blocked' | 'error' | 'completed' | 'cancelled';
-
 /**
- * What a task is actually doing, in the order the user would act on it: an
- * agent waiting on them first, then a failed run, a blocked task, and only
- * then the plain status.
+ * Where a task is among the five steps, from the task itself and the latest
+ * run. A blocked task keeps its step but says why nothing is moving.
  */
 export function describeTaskState(
   todo: TodoResponse,
   blocked: boolean,
   telemetry: TaskExecutionTelemetryResponse | undefined,
-): { label: string; tone: RowTone } {
-  if (todo.status === 'completed') return { label: translateUi('Done'), tone: 'completed' };
-  if (todo.status === 'cancelled') return { label: translateUi('Cancelled'), tone: 'cancelled' };
-  switch (telemetry?.latest_run_status) {
-    case 'waiting_input':
-      return { label: translateUi('Needs input'), tone: 'attention' };
-    case 'waiting_review':
-      return { label: translateUi('Waiting review'), tone: 'attention' };
-    case 'queued':
-    case 'starting':
-    case 'running':
-      return { label: translateUi('Agent working'), tone: 'progress' };
-    case 'failed':
-      return { label: translateUi('Run failed'), tone: 'error' };
-  }
-  if (blocked) return { label: translateUi('Blocked'), tone: 'blocked' };
-  if (todo.status === 'in_progress') return { label: translateUi('In progress'), tone: 'progress' };
-  return { label: translateUi('To do'), tone: 'active' };
+): { state: TaskStageState; label: string } {
+  const state = getTaskStage({
+    taskStatus: todo.status,
+    inboxState: todo.inbox_state,
+    runStatus: telemetry?.latest_run_status,
+    pendingReviewCount: telemetry?.pending_review_count,
+  });
+  const label =
+    blocked && !state.exception && state.stage !== 'done'
+      ? translateUi('Blocked')
+      : describeTaskStage(state);
+  return { state, label };
 }
 function getTaskDepth(todo: TodoResponse, todoById: Map<string, TodoResponse>) {
   let depth = 0;
@@ -81,7 +74,7 @@ export default function TaskListView({
       </div>
       {todos.map((todo) => {
         const status = todo.status;
-        const state = describeTaskState(
+        const { state, label } = describeTaskState(
           todo,
           blockedIds?.has(todo.id) ?? false,
           telemetryByTaskId?.get(todo.id),
@@ -95,7 +88,7 @@ export default function TaskListView({
         return (
           <div
             key={todo.id}
-            className={`cc-task-list__row cc-task-list__row--${state.tone}`}
+            className={`cc-task-list__row cc-task-list__row--${state.stage}`}
             role="row"
             tabIndex={0}
             onClick={() => onOpenTask(todo.id)}
@@ -126,8 +119,7 @@ export default function TaskListView({
               <StorageLocationBadge item={todo} />
             </span>
             <span role="cell">
-              <i className={`cc-task-list__status cc-task-list__status--${state.tone}`} />
-              {state.label}
+              <TaskStageIndicator state={state} label={label} />
             </span>
             <span role="cell" title={context ?? undefined}>
               {context || '—'}

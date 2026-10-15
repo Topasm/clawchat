@@ -21,12 +21,11 @@
   flex-wrap: wrap;
 }
 
+/* Sections are separated by a rule, not boxed: borders and shadows are for popovers. */
 .cc-exec-panel__section {
-  margin-bottom: 16px;
-  padding: 14px;
-  background: var(--cc-surface);
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-lg);
+  margin: 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--cc-border-subtle);
 }
 
 .cc-exec-panel__section-title {
@@ -36,6 +35,16 @@
   letter-spacing: 0.5px;
   color: var(--cc-text-secondary);
   margin-bottom: 10px;
+}
+
+.cc-exec-panel__run-fact {
+  margin: 0 0 var(--cc-space-2);
+  font-size: 13px;
+  color: var(--cc-text-secondary);
+}
+
+.cc-exec-panel__stage {
+  margin-top: var(--cc-space-3);
 }
 
 .cc-exec-panel__section-heading {
@@ -82,14 +91,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 12px;
-  border-radius: var(--cc-radius-md);
-  background: var(--cc-surface-secondary);
   min-width: 100px;
-}
-
-.cc-exec-panel__info-item--overdue {
-  background: color-mix(in srgb, var(--cc-error) 10%, transparent);
 }
 
 .cc-exec-panel__info-item--overdue .cc-exec-panel__info-value {
@@ -97,7 +99,8 @@
 }
 
 .cc-exec-panel__info-item--today .cc-exec-panel__info-value {
-  color: var(--cc-primary);
+  color: var(--cc-text);
+  font-weight: 600;
 }
 
 .cc-exec-panel__info-label {
@@ -238,7 +241,7 @@
 }
 
 .cc-exec-panel__details-toggle {
-  margin-top: 12px;
+  border-top: 1px solid var(--cc-border-subtle);
 }
 
 .cc-exec-panel__details-btn {
@@ -246,9 +249,9 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius-md);
+  padding: 12px 0;
+  border: 0;
+  border-radius: var(--cc-radius-panel);
   background: transparent;
   color: var(--cc-text-secondary);
   font-size: 13px;
@@ -280,8 +283,7 @@
 
 @media (max-width: 768px) {
   .cc-exec-panel__section {
-    padding: 10px 12px;
-    margin-bottom: 12px;
+    padding: 12px 0;
   }
 
   .cc-exec-panel__info-grid {

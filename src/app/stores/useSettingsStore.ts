@@ -25,11 +25,6 @@ export interface SharedSourceSetting {
   remoteId?: string;
 }
 
-interface StreakData {
-  lastCompletedDate: string;
-  currentStreak: number;
-}
-
 interface SettingsState {
   // Chat
   fontSize: number;
@@ -73,9 +68,6 @@ interface SettingsState {
   /** Folders on this machine offered to one workspace for reading. Desktop only. */
   sharedSources: SharedSourceSetting[];
 
-  // Streak
-  streak: StreakData;
-
   // Setters
   setFontSize: (v: number) => void;
   setMessageBubbleStyle: (v: string) => void;
@@ -103,7 +95,6 @@ interface SettingsState {
   addSharedSource: (source: SharedSourceSetting) => void;
   updateSharedSource: (id: string, changes: Partial<SharedSourceSetting>) => void;
   removeSharedSource: (id: string) => void;
-  setStreak: (v: StreakData) => void;
 
   // Actions
   resetApplicationPreferences: () => void;
@@ -143,8 +134,6 @@ const APPLICATION_DEFAULT_SETTINGS = {
   workerProvider: 'claude',
   // Nothing on this disk is offered to anyone until the user picks a folder.
   sharedSources: [] as SharedSourceSetting[],
-
-  streak: { lastCompletedDate: '', currentStreak: 0 },
 } as const;
 
 const WORKSPACE_DEFAULT_SETTINGS = {
@@ -258,7 +247,6 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({
           sharedSources: state.sharedSources.filter((source) => source.id !== id),
         })),
-      setStreak: (streak) => set({ streak }),
 
       resetApplicationPreferences: () => set({ ...APPLICATION_DEFAULT_SETTINGS }),
 

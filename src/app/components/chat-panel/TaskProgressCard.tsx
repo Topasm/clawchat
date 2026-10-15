@@ -92,7 +92,7 @@ export default function TaskProgressCard({ taskId, runId, isMultiAgent }: TaskPr
               className="cc-btn cc-btn--primary"
               onClick={() => navigate('/attention')}
             >
-              {translateUi('Review result')}
+              {translateUi('Check result')}
             </button>
           )}
           {needsInput && activeRunId && (

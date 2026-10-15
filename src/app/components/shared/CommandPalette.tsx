@@ -4,7 +4,17 @@ import * as RadixDialog from '@radix-ui/react-dialog';
 import { useTodosQuery } from '../../hooks/queries';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { CheckCircleIcon, MagnifyingGlassIcon, PinIcon, ThemeIcon } from './Icons';
-import { ChatIcon, GearIcon, InboxIcon, NavCalendarIcon, TasksIcon } from './NavIcons';
+import {
+  AutomationsIcon,
+  ChatIcon,
+  DevicesIcon,
+  GearIcon,
+  InboxIcon,
+  NavCalendarIcon,
+  ReviewIcon,
+  SearchIcon,
+  TasksIcon,
+} from './NavIcons';
 import { translateUi } from '../../i18n';
 import useThemedPortalContainer from '../../hooks/useThemedPortalContainer';
 interface CommandPaletteProps {
@@ -63,6 +73,22 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/tasks')}>
                   <TasksIcon className="cc-cmd-palette__item-icon" />
                   {translateUi(' Tasks\n                ')}
+                </Command.Item>
+                <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/attention')}>
+                  <ReviewIcon className="cc-cmd-palette__item-icon" />
+                  {translateUi('Attention')}
+                </Command.Item>
+                <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/search')}>
+                  <SearchIcon className="cc-cmd-palette__item-icon" />
+                  {translateUi('Search everything')}
+                </Command.Item>
+                <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/devices')}>
+                  <DevicesIcon className="cc-cmd-palette__item-icon" />
+                  {translateUi('Devices')}
+                </Command.Item>
+                <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/automations')}>
+                  <AutomationsIcon className="cc-cmd-palette__item-icon" />
+                  {translateUi('Automations')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/settings')}>
                   <GearIcon className="cc-cmd-palette__item-icon" />

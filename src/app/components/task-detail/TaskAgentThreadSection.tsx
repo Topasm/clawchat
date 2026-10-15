@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAgentRunsQuery } from '../../hooks/queries';
-import { runStatusLabel } from '../chat-panel/RunStatusCard';
+import { useAgentRunsQuery, useRetryAgentRun } from '../../hooks/queries';
 import { translateUi } from '../../i18n';
-import { skillChainLabel } from '../../utils/skillLabels';
+import { relativeTime } from '../../utils/formatters';
+import { agentName, describeTaskStage, getRunStage } from '../../utils/taskStage';
 
 /**
  * Where this task's agent work is right now, and the thread it reports into.
  *
- * The task page used to know nothing about runs: the only path from a task to
- * its execution went through the Inbox inspector. This is the short version --
- * the latest attempt's state and two links -- not another run monitor. A task
+ * One line of fact -- which agent, where it got to, when -- and at most one
+ * highlighted button: the thing the run is waiting on the user for. A task
  * that has never run gets no section: "no runs yet" is not news.
  */
 export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
   const navigate = useNavigate();
+  const retry = useRetryAgentRun();
   const { data: runs = [] } = useAgentRunsQuery();
   const latest = useMemo(
     () =>
@@ -24,40 +24,54 @@ export default function TaskAgentThreadSection({ taskId }: { taskId: string }) {
     [runs, taskId],
   );
   if (!latest) return null;
+  const openRun = () => navigate(`/attention?view=runs&run_id=${latest.id}`);
+  const stage = getRunStage(latest);
+  const updatedAt = latest.updated_at ?? latest.created_at;
   return (
     <div className="cc-exec-panel__section" data-testid="task-agent-thread">
-      <div className="cc-exec-panel__section-title">{translateUi('Agent thread')}</div>
-      <div className="cc-exec-panel__info-grid">
-        <div className="cc-exec-panel__info-item">
-          <span className="cc-exec-panel__info-label">{translateUi('Latest run')}</span>
-          <span className={`cc-run-status cc-run-status--${latest.status}`}>
-            {runStatusLabel(latest.status)}
-          </span>
-          {latest.skill_chain?.length ? (
-            <span className="cc-exec-panel__info-value">{skillChainLabel(latest.skill_chain)}</span>
-          ) : null}
-        </div>
-        <div className="cc-exec-panel__info-item">
-          <span className="cc-task-progress__actions">
-            {latest.conversation_id && (
-              <button
-                type="button"
-                className="cc-btn cc-btn--secondary"
-                onClick={() => navigate(`/chats/${latest.conversation_id}`)}
-              >
-                {translateUi('Open thread')}
-              </button>
-            )}
-            <button
-              type="button"
-              className="cc-btn cc-btn--ghost"
-              onClick={() => navigate(`/attention?view=runs&run_id=${latest.id}`)}
-            >
-              {translateUi('Open run')}
-            </button>
-          </span>
-        </div>
-      </div>
+      <div className="cc-exec-panel__section-title">{translateUi('Agent run')}</div>
+      <p className="cc-exec-panel__run-fact">
+        {agentName(latest.provider)} · {describeTaskStage(stage)}
+        {updatedAt ? ` · ${relativeTime(updatedAt)}` : ''}
+      </p>
+      <span className="cc-task-progress__actions">
+        {latest.status === 'waiting_input' && (
+          <button type="button" className="cc-btn cc-btn--primary" onClick={openRun}>
+            {translateUi('Answer')}
+          </button>
+        )}
+        {latest.status === 'waiting_review' && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            onClick={() => navigate('/attention')}
+          >
+            {translateUi('Check result')}
+          </button>
+        )}
+        {latest.status === 'failed' && latest.todo_status === 'in_progress' && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--primary"
+            disabled={retry.isPending}
+            onClick={() => retry.mutate({ runId: latest.id })}
+          >
+            {translateUi('Retry')}
+          </button>
+        )}
+        {latest.conversation_id && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--ghost"
+            onClick={() => navigate(`/chats/${latest.conversation_id}`)}
+          >
+            {translateUi('Open thread')}
+          </button>
+        )}
+        <button type="button" className="cc-btn cc-btn--ghost" onClick={openRun}>
+          {translateUi('Open run')}
+        </button>
+      </span>
     </div>
   );
 }
