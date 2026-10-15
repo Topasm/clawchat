@@ -68,4 +68,6 @@
     <string name="inbox_state_attention">Attention</string>
     <string name="inbox_state_suggestion">Suggestion</string>
     <string name="inbox_state_captured">Captured</string>
+    <string name="inbox_delete">Delete</string>
+    <string name="inbox_delete_confirm">Delete this task?</string>
 </resources>

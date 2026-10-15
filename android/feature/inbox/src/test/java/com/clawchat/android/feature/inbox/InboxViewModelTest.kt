@@ -218,6 +218,42 @@ class InboxViewModelTest {
     }
 
     @Test
+    fun `delete removes item and hides it while the server catches up`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(capturedTodo, planReadyTodo), total = 2))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Success(Unit)
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.delete("1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.needsOrganizing.size)
+        assertEquals(1, viewModel.uiState.value.reviewSuggestion.size)
+        assertEquals(setOf("1"), viewModel.uiState.value.deleting)
+        assertNull(viewModel.uiState.value.error)
+        coVerify(exactly = 1) { todoRepository.deleteTodo("1") }
+    }
+
+    @Test
+    fun `failed delete brings the item back with the error`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns
+            ApiResult.Success(PaginatedResponse(items = listOf(capturedTodo), total = 1))
+        coEvery { todoRepository.deleteTodo("1") } returns ApiResult.Error("Delete failed")
+
+        viewModel = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.delete("1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf(capturedTodo), viewModel.uiState.value.needsOrganizing)
+        assertEquals(emptySet<String>(), viewModel.uiState.value.deleting)
+        assertEquals("Delete failed", viewModel.uiState.value.error)
+    }
+
+    @Test
     fun `retryOrganize delegates to organize`() = runTest {
         coEvery { todoRepository.listTodos(any()) } returns
             ApiResult.Success(PaginatedResponse(items = listOf(errorTodo), total = 1))

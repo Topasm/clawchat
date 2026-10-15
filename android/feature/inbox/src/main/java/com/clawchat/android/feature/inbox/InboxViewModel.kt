@@ -24,6 +24,8 @@ data class InboxUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val error: String? = null,
+    /** Deleted here but maybe still in a placement snapshot loaded before the delete. */
+    val deleting: Set<String> = emptySet(),
 )
 
 sealed interface InboxAction {
@@ -31,6 +33,7 @@ sealed interface InboxAction {
     data class Organize(val todoId: String) : InboxAction
     data class RetryOrganize(val todoId: String) : InboxAction
     data class MoveToToday(val todoId: String) : InboxAction
+    data class Delete(val todoId: String) : InboxAction
 }
 
 @HiltViewModel
@@ -53,6 +56,7 @@ class InboxViewModel @Inject constructor(
             is InboxAction.Organize -> doOrganize(action.todoId)
             is InboxAction.RetryOrganize -> doOrganize(action.todoId)
             is InboxAction.MoveToToday -> doMoveToToday(action.todoId)
+            is InboxAction.Delete -> doDelete(action.todoId)
         }
     }
 
@@ -61,15 +65,16 @@ class InboxViewModel @Inject constructor(
     fun organize(todoId: String) = onAction(InboxAction.Organize(todoId))
     fun retryOrganize(todoId: String) = onAction(InboxAction.RetryOrganize(todoId))
     fun moveToToday(todoId: String) = onAction(InboxAction.MoveToToday(todoId))
+    fun delete(todoId: String) = onAction(InboxAction.Delete(todoId))
 
     private fun doRefresh() {
         _uiState.update { it.copy(isRefreshing = true) }
         doLoadInbox()
     }
 
-    private fun doLoadInbox() {
+    private fun doLoadInbox(error: String? = null) {
         viewModelScope.launch {
-            _uiState.update { it.copy(error = null) }
+            _uiState.update { it.copy(error = error) }
             when (val result = todoRepository.listTodos(mapOf("limit" to "200"))) {
                 is ApiResult.Success -> {
                     val inboxItems = result.data.items.filter { todo ->
@@ -130,6 +135,30 @@ class InboxViewModel @Inject constructor(
                 }
                 is ApiResult.Error -> {
                     _uiState.update { it.copy(error = result.message) }
+                }
+                is ApiResult.Loading -> { /* not used here */ }
+            }
+        }
+    }
+
+    private fun doDelete(todoId: String) {
+        if (todoId in _uiState.value.deleting) return
+        _uiState.update { state ->
+            state.copy(
+                planningNow = state.planningNow.filter { it.id != todoId },
+                reviewSuggestion = state.reviewSuggestion.filter { it.id != todoId },
+                needsOrganizing = state.needsOrganizing.filter { it.id != todoId },
+                failed = state.failed.filter { it.id != todoId },
+                deleting = state.deleting + todoId,
+                error = null,
+            )
+        }
+        viewModelScope.launch {
+            when (val result = todoRepository.deleteTodo(todoId)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Error -> {
+                    _uiState.update { it.copy(deleting = it.deleting - todoId) }
+                    doLoadInbox(error = result.message)
                 }
                 is ApiResult.Loading -> { /* not used here */ }
             }
