@@ -3,7 +3,7 @@
 from auth.dependencies import get_current_user
 from database import get_db
 from exceptions import NotFoundError, ValidationError
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from models.execution_host import ExecutionHost, ProjectHostPath
 from schemas.execution_host import (
     ClaimedJobResponse,
@@ -13,7 +13,9 @@ from schemas.execution_host import (
     HostProjectPathResponse,
     WorkerRegistration,
 )
+from schemas.data_source import ClaimedDataQuery, DataQueryAnswer
 from services.agents import execution_host_service
+from services.data_sources import service as data_source_service
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -209,3 +211,39 @@ async def claim_next_job(
     job = await execution_host_service.claim_next_job(db, host)
     await db.commit()
     return job
+
+
+@router.post("/{host_id}/data-queries/claim", response_model=ClaimedDataQuery | None)
+async def claim_next_data_query(
+    host_id: str,
+    wait: float = Query(default=0, ge=0, le=25),
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Take the next request for a data source this machine holds, or nothing.
+
+    Kept apart from ``jobs/claim``: a run can keep that loop busy for minutes,
+    and a desktop app older than data sources must never be handed a request
+    it would mistake for a run. With ``wait`` the call is held open until a
+    request arrives, so answers do not wait for the next poll. Asking keeps
+    the machine's sources online without making it look ready to run work.
+    """
+    host = await db.get(ExecutionHost, host_id)
+    if host is None:
+        raise NotFoundError("Execution host not found")
+    return await data_source_service.claim_next_query(db, host, wait_seconds=wait)
+
+
+@router.post("/{host_id}/data-queries/{query_id}/answer", status_code=204)
+async def answer_data_query(
+    host_id: str,
+    query_id: str,
+    body: DataQueryAnswer,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Hand back what the machine found. Dropped if nobody is waiting any more."""
+    host = await db.get(ExecutionHost, host_id)
+    if host is None:
+        raise NotFoundError("Execution host not found")
+    await data_source_service.submit_answer(db, host, query_id, body)

@@ -359,6 +359,21 @@ def is_scan_stuck(timeout_seconds: int = _STUCK_TIMEOUT) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def parse_todo_markdown(text: str) -> list[dict]:
+    """The checklist items of a ``TODO.md`` given as text.
+
+    Takes the text rather than a path so a file read on another machine --
+    a device data source -- is understood the same way as one in this
+    server's own vault.
+    """
+    items: list[dict] = []
+    for line in text.splitlines():
+        parsed = _parse_todo_line(line)
+        if parsed.get("title"):
+            items.append(parsed)
+    return items
+
+
 def _parse_todo_line(line: str) -> dict:
     """Parse a markdown todo line into a dict of field values."""
     result: dict = {}

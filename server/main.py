@@ -25,6 +25,7 @@ from routers import calendar as calendar_router
 from routers import capabilities as capabilities_router
 from routers import change_set as change_set_router
 from routers import chat as chat_router
+from routers import data_source as data_source_router
 from routers import execution_host as execution_host_router
 from routers import execution_provider as execution_provider_router
 from routers import cli_session as cli_session_router
@@ -302,6 +303,11 @@ app.include_router(
     execution_host_router.router,
     prefix="/api/execution-hosts",
     tags=["execution-hosts"],
+)
+app.include_router(
+    data_source_router.router,
+    prefix="/api/data-sources",
+    tags=["data-sources"],
 )
 app.include_router(
     execution_provider_router.router,
