@@ -36,6 +36,8 @@
     "allow-updater-download",
     "allow-updater-install",
     "allow-worker-run",
-    "allow-worker-read-context"
+    "allow-worker-read-context",
+    "allow-worker-query-source",
+    "allow-worker-index-source"
   ]
 }
