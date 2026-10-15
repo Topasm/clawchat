@@ -11,7 +11,7 @@ interface InboxTriagePreviewPanelProps {
   onApply: () => void;
   onApplyAndOpen: () => void;
 }
-/** The reviewable AI placement plan: proposed Workstreams, per-task suggestions, apply. */
+/** The reviewable placement plan: proposed Workstreams, per-task suggestions, apply. */
 export default function InboxTriagePreviewPanel({
   preview,
   projects,
@@ -33,7 +33,7 @@ export default function InboxTriagePreviewPanel({
     <div className="cc-inbox-triage__ai-preview" aria-live="polite">
       <div className="cc-inbox-triage__ai-preview-header">
         <div>
-          <strong>{translateUi('AI placement preview')}</strong>
+          <strong>{translateUi('Suggested placement')}</strong>
           <span>
             {preview.suggestions.length}
             {translateUi(' suggested\n            ')}
@@ -68,7 +68,7 @@ export default function InboxTriagePreviewPanel({
               title: workstream.title,
             })}
           >
-            <span>{translateUi('AI proposed Workstream')}</span>
+            <span>{translateUi('New workstream')}</span>
             <strong>{workstream.title}</strong>
             <small>
               {project?.title ?? workstream.project_id}

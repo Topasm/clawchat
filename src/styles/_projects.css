@@ -266,13 +266,8 @@
 }
 
 .cc-project-card__status {
-  color: var(--cc-primary);
-  background: transparent;
-  padding: 0;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
 }
 
 /* --- First-class Project workspace ----------------------- */
@@ -347,11 +342,15 @@
   gap: 6px;
 }
 .cc-project-workspace__status {
-  color: var(--cc-primary);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
+/* Ready, blocked, running and to-review counts as one grey line. */
+.cc-project-workspace__summary {
+  margin: 0;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
 }
 
 .cc-project-workspace__tabs {
@@ -376,19 +375,11 @@
   font-weight: 600;
 }
 
-.cc-project-ready {
-  border-top: 1px solid var(--cc-border-subtle);
-  border-bottom: 1px solid var(--cc-border-subtle);
-  border-radius: var(--cc-radius-panel);
-}
-
-.cc-project-ready__list,
 .cc-project-activity__list {
   display: flex;
   flex-direction: column;
 }
 
-.cc-project-ready__item,
 .cc-project-activity__list > button {
   display: flex;
   align-items: center;
@@ -404,29 +395,18 @@
   cursor: pointer;
 }
 
-.cc-project-ready__item:last-child,
 .cc-project-activity__list > button:last-child {
   border-bottom: 0;
 }
 
-.cc-project-ready__item:hover,
 .cc-project-activity__list > button:hover {
-  background: var(--cc-surface-secondary);
+  background: var(--cc-hover-surface);
 }
 
-.cc-project-ready__item > span:last-child,
 .cc-project-activity__list > button > span:last-child {
-  color: var(--cc-primary);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.cc-project-ready__empty {
-  margin: 0;
-  padding: 14px 16px;
-  color: var(--cc-text-tertiary);
+  color: var(--cc-text-secondary);
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .cc-project-outline {
@@ -441,7 +421,7 @@
 }
 
 .cc-project-outline__row--selected {
-  background: var(--cc-primary-light);
+  background: var(--cc-selected-surface);
 }
 
 .cc-project-outline__toggle {
@@ -487,6 +467,7 @@
 .cc-project-activity__list strong {
   overflow: hidden;
   font-size: 13px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -497,14 +478,10 @@
   font-size: 11px;
 }
 
-.cc-project-outline__badge {
-  color: var(--cc-success);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.cc-project-outline__badge--blocked {
-  color: var(--cc-warning);
+/* The step sits at the row's end in a fixed column so the dots line up. */
+.cc-project-outline__task .cc-stage-dots {
+  flex: 0 0 120px;
+  font-size: 12px;
 }
 
 .cc-project-task-actions {

@@ -238,15 +238,15 @@
   }
 }
 
-/* --- AI placement preview ------------------------------------ */
+/* --- Placement preview ------------------------------------ */
 .cc-inbox-triage__ai-preview {
   display: grid;
   gap: 8px;
   margin-bottom: 10px;
   padding: 10px;
   border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--cc-primary) 35%, var(--cc-border));
-  border-bottom: 1px solid color-mix(in srgb, var(--cc-primary) 35%, var(--cc-border));
+  border-top: 1px solid var(--cc-border-subtle);
+  border-bottom: 1px solid var(--cc-border-subtle);
   border-radius: var(--cc-radius-panel);
   background: transparent;
 }
@@ -292,18 +292,13 @@
 .cc-inbox-triage__ai-workstream {
   display: grid;
   gap: 2px;
-  padding: 9px;
-  border: 1px dashed color-mix(in srgb, var(--cc-primary) 65%, var(--cc-border));
-  border-radius: var(--cc-radius-sm);
-  background: color-mix(in srgb, var(--cc-primary) 7%, transparent);
+  padding: 7px;
+  border-bottom: 1px solid var(--cc-border-subtle);
 }
 
 .cc-inbox-triage__ai-workstream > span {
-  color: var(--cc-primary);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  color: var(--cc-text-tertiary);
+  font-size: 10px;
 }
 
 .cc-inbox-triage__ai-workstream strong {

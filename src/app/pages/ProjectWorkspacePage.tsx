@@ -21,6 +21,7 @@ import EmptyState from '../components/shared/EmptyState';
 import ProjectArtifacts from '../components/projects/ProjectArtifacts';
 import ProjectActivity from '../components/projects/ProjectActivity';
 import ProjectPlan from '../components/projects/ProjectPlan';
+import { projectStatusLabel } from '../components/projects/projectStatus';
 import type { ProjectOverviewResponse } from '../types/api';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
 import ProjectMachineLine from '../components/shared/ProjectMachineLine';
@@ -213,6 +214,21 @@ export default function ProjectWorkspacePage() {
     );
   }
   const revealWhereItRuns = () => setSettingsOpen(true);
+  // One grey line instead of a strip of four numbers; a zero says nothing.
+  const overview = [
+    project.ready_count > 0 ? translateUi('{{count}} ready', { count: project.ready_count }) : null,
+    project.blocked_count > 0
+      ? translateUi('{{count}} blocked', { count: project.blocked_count })
+      : null,
+    project.running_agent_count > 0
+      ? translateUi('{{count}} running', { count: project.running_agent_count })
+      : null,
+    project.pending_review_count > 0
+      ? translateUi('{{count}} to review', { count: project.pending_review_count })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <div className="cc-project-workspace">
       <header className="cc-project-workspace__header">
@@ -316,24 +332,7 @@ export default function ProjectWorkspacePage() {
         <ProjectActivity project={project} todos={projectTasks} />
       ) : (
         <>
-          <section className="cc-project-metrics" aria-label={translateUi('Project overview')}>
-            <div className="cc-project-metric">
-              <span>{translateUi('Ready now')}</span>
-              <strong>{project.ready_count}</strong>
-            </div>
-            <div className="cc-project-metric">
-              <span>{translateUi('Blocked')}</span>
-              <strong>{project.blocked_count}</strong>
-            </div>
-            <div className="cc-project-metric">
-              <span>{translateUi('Running agents')}</span>
-              <strong>{project.running_agent_count}</strong>
-            </div>
-            <div className="cc-project-metric">
-              <span>{translateUi('Waiting review')}</span>
-              <strong>{project.pending_review_count}</strong>
-            </div>
-          </section>
+          {overview && <p className="cc-project-workspace__summary">{overview}</p>}
 
           <ProjectActivity project={project} todos={projectTasks} attentionOnly />
           <ProjectPlan project={project} todos={projectTasks} onDiscussTask={openTaskAgent} />
@@ -353,6 +352,7 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(project.title);
   const [goal, setGoal] = useState(project.goal ?? '');
+  const statusLabel = projectStatusLabel(project.status);
   useEffect(() => {
     if (!editing) {
       setTitle(project.title);
@@ -410,11 +410,13 @@ function ProjectIdentity({ project }: { project: ProjectOverviewResponse }) {
   }
   return (
     <div className="cc-project-workspace__identity">
-      <span
-        className={`cc-project-workspace__status cc-project-workspace__status--${project.status}`}
-      >
-        {project.status}
-      </span>
+      {statusLabel && (
+        <span
+          className={`cc-project-workspace__status cc-project-workspace__status--${project.status}`}
+        >
+          {statusLabel}
+        </span>
+      )}
       <div className="cc-project-workspace__title-row">
         <h1>{project.title}</h1>
         <button

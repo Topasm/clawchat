@@ -268,37 +268,6 @@
   width: 100%;
 }
 
-.cc-project-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  border-top: 1px solid var(--cc-border-subtle);
-  border-bottom: 1px solid var(--cc-border-subtle);
-}
-.cc-project-metric {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 10px;
-  border: 0;
-  border-right: 1px solid var(--cc-border-subtle);
-  border-radius: var(--cc-radius-panel);
-  background: transparent;
-}
-.cc-project-metric:last-child {
-  border-right: 0;
-}
-.cc-project-metric span {
-  color: var(--cc-text-tertiary);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.cc-project-metric strong {
-  color: var(--cc-text);
-  font-size: 20px;
-}
-
 .cc-project-workspace__section {
   border-top: 1px solid var(--cc-border-subtle);
   border-bottom: 1px solid var(--cc-border-subtle);
@@ -320,44 +289,6 @@
   color: var(--cc-text);
   font-size: 15px;
 }
-.cc-project-task-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 11px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--cc-border);
-  background: transparent;
-  color: var(--cc-text);
-  text-align: left;
-  cursor: pointer;
-}
-.cc-project-task-row:last-child {
-  border-bottom: 0;
-}
-.cc-project-task-row:hover {
-  background: var(--cc-surface-secondary);
-}
-.cc-project-task-row__state {
-  width: 8px;
-  height: 8px;
-  border: 2px solid var(--cc-text-tertiary);
-  border-radius: 50%;
-}
-.cc-project-task-row__state--in_progress {
-  border-color: var(--cc-primary);
-  background: var(--cc-primary);
-}
-.cc-project-task-row__state--completed {
-  border-color: var(--cc-success);
-  background: var(--cc-success);
-}
-.cc-project-task-row time {
-  color: var(--cc-text-tertiary);
-  font-size: 10px;
-}
-
 .cc-project-card__progress-track {
   height: 4px;
   background: var(--cc-surface-secondary);
@@ -379,14 +310,6 @@
   right: 14px;
   transform: translateY(-50%);
   flex-shrink: 0;
-}
-
-/* --- Mobile ----------------------------------------------- */
-
-@media (max-width: 768px) {
-  .cc-project-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 /* An agent's request to use a tool that needs the user's approval. */

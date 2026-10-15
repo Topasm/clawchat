@@ -70,9 +70,9 @@ export default function InboxQueue({
       {triage.applied && (
         <div className="cc-inbox-card" role="status">
           <strong>
-            {translateUi('Applied {{count}} AI placement suggestions', {
-              count: triage.applied.count,
-            })}
+            {triage.applied.count === 1
+              ? translateUi('Placed 1 task')
+              : translateUi('Placed {{count}} tasks', { count: triage.applied.count })}
           </strong>
           <div className="cc-inbox-card__actions">
             <button
@@ -125,12 +125,7 @@ export default function InboxQueue({
       </div>
       {/* Planning now (classifying/planning) */}
       {processing.length > 0 && (
-        <SectionHeader
-          title={translateUi('Planning now')}
-          count={processing.length}
-          variant="default"
-          defaultOpen
-        >
+        <SectionHeader title={translateUi('Planning now')} count={processing.length} defaultOpen>
           {processing.map((task) => (
             <div key={task.id} className="cc-inbox-card cc-inbox-card--planning">
               <div className="cc-inbox-card__spinner" />
@@ -150,7 +145,7 @@ export default function InboxQueue({
         <SectionHeader
           title={translateUi('Answer questions')}
           count={questioning.length}
-          variant="accent"
+          variant="warning"
           defaultOpen
         >
           {questioning.map((task) => (
@@ -164,7 +159,6 @@ export default function InboxQueue({
         <SectionHeader
           title={translateUi('Review suggestion')}
           count={planReady.length}
-          variant="accent"
           defaultOpen
         >
           {planReady.map((task) => (
@@ -178,7 +172,7 @@ export default function InboxQueue({
               <div className="cc-inbox-card__side">
                 <button
                   type="button"
-                  className="cc-btn cc-btn--compact cc-btn--primary"
+                  className="cc-btn cc-btn--compact cc-btn--secondary"
                   onClick={() => onOpenTask(task.id)}
                 >
                   {translateUi('Review')}
@@ -194,7 +188,6 @@ export default function InboxQueue({
         <SectionHeader
           title={translateUi('Needs organizing')}
           count={needsOrganising.length}
-          variant="accent"
           defaultOpen
         >
           <InboxBatchBar
@@ -254,7 +247,7 @@ export default function InboxQueue({
         <SectionHeader
           title={translateUi('Failed')}
           count={errors.length}
-          variant="warning"
+          variant="error"
           defaultOpen={false}
         >
           {errors.map((task) => (

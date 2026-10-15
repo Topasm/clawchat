@@ -82,7 +82,7 @@ export default function useInboxAiTriage({
       setTriagePreview(preview);
       setSelectedTriageTaskIds(preview.suggestions.map((suggestion) => suggestion.task_id));
       if (preview.suggestions.length === 0) {
-        addToast('info', translateUi('AI could not confidently place the selected tasks'));
+        addToast('info', translateUi('No confident place found for the selected tasks'));
       }
     } catch (error) {
       setTriagePreview(null);
@@ -138,7 +138,9 @@ export default function useInboxAiTriage({
       setApplied(receipt);
       addToast(
         'success',
-        translateUi('Applied {{count}} AI placement suggestions', { count: suggestions.length }),
+        suggestions.length === 1
+          ? translateUi('Placed 1 task')
+          : translateUi('Placed {{count}} tasks', { count: suggestions.length }),
         {
           duration: 6000,
           action: {
@@ -151,12 +153,12 @@ export default function useInboxAiTriage({
                   setApplied((current) =>
                     current?.changeSetId === result.change_set_id ? null : current,
                   );
-                  addToast('info', translateUi('AI placements reverted'));
+                  addToast('info', translateUi('Placement undone'));
                 })
                 .catch((error: unknown) => {
                   addToast(
                     'error',
-                    inboxErrorMessage(error, translateUi('Could not undo AI placements')),
+                    inboxErrorMessage(error, translateUi('Could not undo the placement')),
                   );
                 });
             },

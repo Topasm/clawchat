@@ -250,13 +250,11 @@
   }
 
   .cc-section__title {
-    font-size: 11px;
-    letter-spacing: 0.3px;
+    font-size: 12px;
   }
 
   .cc-section__count {
-    font-size: 10px;
-    padding: 0 5px;
+    font-size: 11px;
   }
 
   .cc-section__body {
@@ -266,30 +264,6 @@
 
 .cc-section__header:hover {
   background: var(--cc-surface-secondary);
-}
-
-.cc-section__header--warning {
-  background: transparent;
-  border-color: transparent;
-}
-.cc-section__header--warning:hover {
-  background: var(--cc-hover-surface);
-}
-
-.cc-section__header--accent {
-  background: transparent;
-  border-color: transparent;
-}
-.cc-section__header--accent:hover {
-  background: var(--cc-hover-surface);
-}
-
-.cc-section__header--success {
-  background: transparent;
-  border-color: transparent;
-}
-.cc-section__header--success:hover {
-  background: var(--cc-hover-surface);
 }
 
 .cc-section__chevron {
@@ -305,31 +279,24 @@
 }
 
 .cc-section__title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--cc-text-secondary);
+  color: var(--cc-text);
   flex: 1;
 }
 
+/* Colour only when something waits on an answer (amber) or has failed (red). */
 .cc-section__header--warning .cc-section__title {
   color: var(--cc-warning);
 }
-.cc-section__header--accent .cc-section__title {
-  color: var(--cc-primary);
-}
-.cc-section__header--success .cc-section__title {
-  color: var(--cc-success);
+.cc-section__header--error .cc-section__title {
+  color: var(--cc-error);
 }
 
+/* A count is a plain number beside the title, not a badge. */
 .cc-section__count {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 0 6px;
-  border-radius: var(--cc-radius-pill);
-  background: color-mix(in srgb, var(--cc-text-secondary) 15%, transparent);
-  color: var(--cc-text-secondary);
+  font-size: 12px;
+  color: var(--cc-text-tertiary);
 }
 
 .cc-section__body {

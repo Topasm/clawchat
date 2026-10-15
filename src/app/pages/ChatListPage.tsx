@@ -20,6 +20,7 @@ import { getProjectIcon } from '../utils/projectIcons';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
 import { ListRow } from '../components/shared/WorkspacePrimitives';
 import { translateUi } from '../i18n';
+import { projectStatusLabel } from '../components/projects/projectStatus';
 export default function ChatListPage() {
   const navigate = useNavigate();
   const { data: conversations = [], isLoading: convsLoading } = useConversationsQuery();
@@ -222,7 +223,11 @@ export default function ChatListPage() {
                       </span>
                     )}
                     {meta?.nextDue && <Badge variant="due" dueDate={meta.nextDue} />}
-                    <span className="cc-project-card__status">{project.status}</span>
+                    {projectStatusLabel(project.status) && (
+                      <span className="cc-project-card__status">
+                        {projectStatusLabel(project.status)}
+                      </span>
+                    )}
                     {project.execution_host_label && (
                       <span
                         className={`cc-project-card__host cc-project-card__host--${project.execution_host_online ? 'online' : 'offline'}`}

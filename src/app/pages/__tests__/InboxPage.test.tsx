@@ -454,7 +454,7 @@ describe('InboxPage', () => {
     renderInbox();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
-    fireEvent.click(screen.getByRole('button', { name: 'AI suggest' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest placement' }));
 
     await waitFor(() =>
       expect(mocks.previewTriage).toHaveBeenCalledWith({
@@ -463,7 +463,7 @@ describe('InboxPage', () => {
       }),
     );
 
-    expect(await screen.findByText('AI placement preview')).toBeInTheDocument();
+    expect(await screen.findByText('Suggested placement')).toBeInTheDocument();
     expect(screen.getByText('2 suggested · 1 new Workstream · ollama')).toBeInTheDocument();
     expect(screen.getByLabelText('Proposed Workstream Outline')).toBeInTheDocument();
     expect(screen.getByText('No confident location: 1 task')).toBeInTheDocument();
@@ -493,7 +493,7 @@ describe('InboxPage', () => {
     await waitFor(() =>
       expect(addToast).toHaveBeenCalledWith(
         'success',
-        'Applied 2 AI placement suggestions',
+        'Placed 2 tasks',
         expect.objectContaining({ duration: 6000 }),
       ),
     );
@@ -520,8 +520,8 @@ describe('InboxPage', () => {
       mocks.placeGroups.mockResolvedValue({ graph_revision: 10, change_set_id: 'single-change' });
       renderInbox();
       fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
-      fireEvent.click(screen.getByRole('button', { name: 'AI suggest' }));
-      await screen.findByText('AI placement preview');
+      fireEvent.click(screen.getByRole('button', { name: 'Suggest placement' }));
+      await screen.findByText('Suggested placement');
       fireEvent.click(
         screen.getByRole('button', {
           name: immediate ? 'Apply & Open Project' : 'Apply selected (1)',
@@ -562,12 +562,12 @@ describe('InboxPage', () => {
     mocks.placeGroups.mockRejectedValue(new Error('Offline'));
     renderInbox();
     fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
-    fireEvent.click(screen.getByRole('button', { name: 'AI suggest' }));
-    await screen.findByText('AI placement preview');
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest placement' }));
+    await screen.findByText('Suggested placement');
     fireEvent.click(screen.getByRole('button', { name: 'Apply & Open Project' }));
     await waitFor(() => expect(addToast).toHaveBeenCalledWith('error', expect.any(String)));
     expect(mocks.navigate).not.toHaveBeenCalled();
-    expect(screen.queryByText('Applied 1 AI placement suggestions')).not.toBeInTheDocument();
+    expect(screen.queryByText('Placed 1 task')).not.toBeInTheDocument();
   });
 
   it('drops the AI preview when the graph revision moves on', async () => {
@@ -581,8 +581,8 @@ describe('InboxPage', () => {
     const { rerender } = renderInbox();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
-    fireEvent.click(screen.getByRole('button', { name: 'AI suggest' }));
-    expect(await screen.findByText('AI placement preview')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest placement' }));
+    expect(await screen.findByText('Suggested placement')).toBeInTheDocument();
 
     mocks.graphInsights = {
       data: { ...graphInsights, graph_revision: 11 },
@@ -594,7 +594,7 @@ describe('InboxPage', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.queryByText('AI placement preview')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Suggested placement')).not.toBeInTheDocument());
   });
 
   it('submits questionnaire answers and refreshes the todo list', async () => {
