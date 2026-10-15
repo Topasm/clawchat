@@ -10,7 +10,7 @@ import com.clawchat.android.core.data.WorkspaceMode
 internal object NavigationCapabilities {
     fun drawerRoutes(mode: WorkspaceMode): List<String> = when (mode) {
         WorkspaceMode.SERVER -> listOf(NavRoute.Inbox.route, NavRoute.Projects.route, NavRoute.Today.route,
-            NavRoute.Tasks.route, NavRoute.Chat.route, NavRoute.Progress.route, NavRoute.Search.route, NavRoute.Settings.route)
+            NavRoute.Tasks.route, NavRoute.Chat.route, NavRoute.Progress.route, NavRoute.Devices.route, NavRoute.Search.route, NavRoute.Settings.route)
         WorkspaceMode.LOCAL -> listOf(NavRoute.Tasks.route, NavRoute.Today.route, NavRoute.Search.route, NavRoute.Settings.route)
         WorkspaceMode.UNCONFIGURED -> emptyList()
     }
@@ -34,6 +34,7 @@ internal object NavigationCapabilities {
 
     private val serverSecondaryRoutes = listOf(
         NavRoute.Progress.route,
+        NavRoute.Devices.route,
         NavRoute.Search.route,
         NavRoute.Settings.route,
     )

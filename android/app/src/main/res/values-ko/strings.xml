@@ -2,6 +2,7 @@
 <resources>
     <string name="nav_inbox">받은 편지함</string>
     <string name="nav_projects">프로젝트</string>
+    <string name="nav_devices">기기</string>
     <string name="nav_search">전체 검색</string>
     <string name="nav_settings">설정</string>
     <string name="nav_menu_title">ClawChat</string>

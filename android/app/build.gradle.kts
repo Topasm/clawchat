@@ -121,6 +121,7 @@ dependencies {
     implementation(project(":feature:tasks"))
     implementation(project(":feature:inbox"))
     implementation(project(":feature:search"))
+    implementation(project(":feature:devices"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:runs"))
     implementation(project(":feature:review"))

@@ -23,6 +23,7 @@ internal val allDrawerDestinations = listOf(
     DrawerDestination(NavRoute.Chat.route, R.string.nav_chat, ClawIcons.Chat),
     DrawerDestination(NavRoute.Inbox.route, R.string.nav_inbox, ClawIcons.Inbox),
     DrawerDestination(NavRoute.Projects.route, R.string.nav_projects, ClawIcons.Folder),
+    DrawerDestination(NavRoute.Devices.route, R.string.nav_devices, ClawIcons.PhoneAndroid),
     DrawerDestination(NavRoute.Search.route, R.string.nav_search, Icons.Default.Search),
     DrawerDestination(NavRoute.Settings.route, R.string.nav_settings, Icons.Default.Settings),
 )

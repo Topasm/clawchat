@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="devices_title">Devices</string>
+    <string name="devices_cd_back">Back</string>
+    <string name="devices_cd_refresh">Refresh</string>
+    <string name="devices_empty_title">No shared folders yet</string>
+    <string name="devices_empty_description">In the desktop app, open Settings and choose a folder under Share this machine’s data.</string>
+    <string name="devices_search_placeholder">Search %1$s</string>
+    <string name="devices_online">Online on %1$s</string>
+    <string name="devices_offline_since">Offline · last seen %1$s</string>
+    <string name="devices_offline_never">Offline · never connected</string>
+    <string name="devices_asking">Asking %1$s…</string>
+    <string name="devices_retry">Try again</string>
+    <string name="devices_error_offline">This file is on %1$s, which is offline. Its contents are kept nowhere else, so it opens once %1$s is back.</string>
+    <string name="devices_error_timeout">%1$s did not answer in time.</string>
+    <string name="devices_error_not_shared">This part of %1$s is not shared.</string>
+    <string name="devices_error_not_found">Nothing exists at that path any more.</string>
+    <string name="devices_cache_offline">Showing the last list it sent</string>
+    <string name="devices_cache_timeout">%1$s did not answer in time. Showing the last list it sent.</string>
+    <string name="devices_cache_search">%1$s is not answering, so only file names were searched.</string>
+    <string name="devices_no_matches">Nothing matched.</string>
+    <string name="devices_folder_empty">This folder is empty.</string>
+    <string name="devices_file_truncated">The file is long; only its beginning is shown.</string>
+</resources>

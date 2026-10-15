@@ -254,4 +254,17 @@ interface ClawChatApi {
 
     @POST("api/notifications/register-token")
     suspend fun registerPushToken(@Body body: RegisterPushTokenRequest): RegisterPushTokenResponse
+
+    // --- Device data sources ---
+
+    @GET("api/data-sources")
+    suspend fun listDataSources(@Tag expectedScope: ExpectedSessionScope): List<DataSource>
+
+    /** Waits for the machine that holds the data; the server gives it 15 seconds. */
+    @POST("api/data-sources/{id}/query")
+    suspend fun queryDataSource(
+        @Path("id") id: String,
+        @Body body: DataSourceQueryRequest,
+        @Tag expectedScope: ExpectedSessionScope,
+    ): DataSourceQueryResult
 }
