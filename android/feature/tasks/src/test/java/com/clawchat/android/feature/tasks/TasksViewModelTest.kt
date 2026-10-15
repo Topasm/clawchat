@@ -14,6 +14,7 @@ import com.clawchat.android.core.data.model.TodoUpdate
 import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.TaskComment
 import com.clawchat.android.core.data.repository.ConversationRepository
+import com.clawchat.android.core.data.repository.ProjectPlanRepository
 import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
@@ -51,6 +52,7 @@ class TasksViewModelTest {
     private lateinit var relationshipRepository: TaskRelationshipRepository
     private lateinit var conversationRepository: ConversationRepository
     private lateinit var taskCommentRepository: TaskCommentRepository
+    private lateinit var projectPlanRepository: ProjectPlanRepository
     private lateinit var syncManager: SyncManager
     private lateinit var todoChanged: MutableSharedFlow<Unit>
     private lateinit var storageContext: MutableStateFlow<WorkspaceStorageContext>
@@ -75,12 +77,17 @@ class TasksViewModelTest {
         relationshipRepository = mockk()
         conversationRepository = mockk()
         taskCommentRepository = mockk()
+        projectPlanRepository = mockk(relaxed = true)
+        coEvery { projectPlanRepository.taskRuns(any()) } returns ApiResult.Success(emptyList())
+        coEvery { projectPlanRepository.latestPlan(any()) } returns ApiResult.Error("Not found")
         syncManager = mockk(relaxed = true)
         todoChanged = MutableSharedFlow(extraBufferCapacity = 1)
         every { syncManager.todoChanged } returns todoChanged
         storageContext = MutableStateFlow(WorkspaceStorageContext(mode = WorkspaceMode.SERVER, workspaceName = "Home"))
         itemStorageLocator = mockk()
         every { itemStorageLocator.storageContext } returns storageContext
+        every { syncManager.runChanged } returns MutableSharedFlow()
+        every { syncManager.reviewChanged } returns MutableSharedFlow()
         coEvery { relationshipRepository.listForTask(any()) } returns ApiResult.Success(emptyList())
     }
 
@@ -102,7 +109,7 @@ class TasksViewModelTest {
             relationshipRepository,
             conversationRepository,
             taskCommentRepository,
-            mockk(relaxed = true),
+            projectPlanRepository,
             itemStorageLocator,
         )
     }

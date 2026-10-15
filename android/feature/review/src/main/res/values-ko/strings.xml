@@ -35,7 +35,7 @@
     <string name="review_original_instruction">원래 지시</string>
     <string name="review_result">결과</string>
     <string name="review_no_full_result">확정된 전체 결과가 제공되지 않았습니다.</string>
-    <string name="review_run_status">상태 %1$s · 시도 %2$d · %3$s</string>
+    <string name="review_run_attempt">시도 %1$d · %2$s</string>
     <string name="review_run_detail_unavailable">실행 세부 정보를 사용할 수 없습니다.</string>
     <string name="review_approval_impact">승인 영향</string>
     <string name="review_graph_revision">그래프 리비전 %1$d</string>
@@ -45,7 +45,6 @@
     <string name="review_event_with_message">%1$s: %2$s</string>
     <string name="review_metadata_project">프로젝트</string>
     <string name="review_metadata_provider">제공자</string>
-    <string name="review_metadata_run">실행</string>
     <string name="review_metadata_attempt">시도</string>
     <string name="review_metadata_version">버전</string>
 
@@ -60,14 +59,6 @@
     <string name="review_risk_medium">보통</string>
     <string name="review_risk_high">높음</string>
 
-    <string name="review_status_queued">대기 중</string>
-    <string name="review_status_starting">시작 중</string>
-    <string name="review_status_running">실행 중</string>
-    <string name="review_status_waiting_input">입력 필요</string>
-    <string name="review_status_waiting_review">검토 준비됨</string>
-    <string name="review_status_completed">완료</string>
-    <string name="review_status_failed">실패</string>
-    <string name="review_status_cancelled">취소됨</string>
 
     <string name="review_event_approved">승인됨</string>
     <string name="review_event_cancelled">취소됨</string>

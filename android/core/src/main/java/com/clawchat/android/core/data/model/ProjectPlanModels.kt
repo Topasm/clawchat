@@ -23,6 +23,7 @@ data class ProjectTaskRun(
     @SerialName("task_id") val taskId: String,
     @SerialName("latest_run_id") val runId: String? = null,
     @SerialName("latest_run_status") val status: AgentRunStatus? = null,
+    @SerialName("pending_review_count") val pendingReviewCount: Int = 0,
 )
 
 @Serializable

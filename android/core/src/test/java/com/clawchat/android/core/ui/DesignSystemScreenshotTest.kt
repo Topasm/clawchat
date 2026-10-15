@@ -16,6 +16,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.clawchat.android.core.data.model.TaskStage
+import com.clawchat.android.core.data.model.TaskStageException
+import com.clawchat.android.core.data.model.TaskStageState
 import com.clawchat.android.core.ui.icons.ClawIcons
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -86,6 +89,12 @@ private fun Gallery() {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ClawMetricPill(label = "Ready now", value = "4")
             ClawMetricPill(label = "Running", value = "1")
+        }
+        TaskStageBar(TaskStageState(TaskStage.RUN, TaskStageException.NEEDS_INPUT))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            TaskStageDots(TaskStageState(TaskStage.PLAN))
+            TaskStageDots(TaskStageState(TaskStage.RUN, TaskStageException.FAILED))
+            TaskStageDots(TaskStageState(TaskStage.DONE))
         }
         ClawListSection(header = { ClawSectionHeader(title = "Needs your input") }) {
             ClawListItemSurface(onClick = {}) {

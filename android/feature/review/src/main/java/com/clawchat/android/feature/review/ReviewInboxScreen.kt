@@ -54,7 +54,8 @@ import com.clawchat.android.core.data.model.ReviewDecision
 import com.clawchat.android.core.data.model.AgentRun
 import com.clawchat.android.core.data.model.AgentRunApprovalImpact
 import com.clawchat.android.core.data.model.AgentRunEvent
-import com.clawchat.android.core.data.model.AgentRunStatus
+import com.clawchat.android.core.data.model.agentName
+import com.clawchat.android.core.data.model.stage
 import com.clawchat.android.core.data.model.ReviewItem
 import com.clawchat.android.core.data.model.ReviewRiskLevel
 import com.clawchat.android.core.data.model.ReviewSubjectType
@@ -65,6 +66,7 @@ import com.clawchat.android.core.ui.ClawSectionCard
 import com.clawchat.android.core.ui.ClawStatusChip
 import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
+import com.clawchat.android.core.ui.TaskStageBar
 import com.clawchat.android.core.ui.localizedErrorMessage
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -560,12 +562,12 @@ private fun AuthoritativeRunEvidence(
                     run.result ?: stringResource(R.string.review_no_full_result),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                TaskStageBar(run.stage)
                 Text(
                     stringResource(
-                        R.string.review_run_status,
-                        run.status.localizedLabel(),
+                        R.string.review_run_attempt,
                         run.attempt,
-                        run.provider,
+                        agentName(run.provider) ?: run.provider,
                     ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -639,17 +641,13 @@ private fun ReviewDecision.localizedLabel(): String = stringResource(
 private fun ReviewMetadata(item: ReviewItem) {
     val projectLabel = stringResource(R.string.review_metadata_project)
     val providerLabel = stringResource(R.string.review_metadata_provider)
-    val runLabel = stringResource(R.string.review_metadata_run)
     val attemptLabel = stringResource(R.string.review_metadata_attempt)
     val versionLabel = stringResource(R.string.review_metadata_version)
-    val localizedStatus = item.metadata["run_status"]
-        ?.jsonPrimitive
-        ?.content
-        ?.let { localizedRunStatus(it) }
+    // The run's status as it was when the review opened is left out: the
+    // run evidence below says which step the run is at now.
     val metadata = buildList {
         item.projectTitle?.let { add(projectLabel to it) }
-        item.metadata["provider"]?.jsonPrimitive?.content?.let { add(providerLabel to it) }
-        localizedStatus?.let { add(runLabel to it) }
+        item.metadata["provider"]?.jsonPrimitive?.content?.let { add(providerLabel to (agentName(it) ?: it)) }
         item.metadata["attempt"]?.jsonPrimitive?.content?.let { add(attemptLabel to it) }
         item.metadata["revision_version"]?.jsonPrimitive?.content?.let { add(versionLabel to it) }
     }
@@ -685,36 +683,6 @@ private fun ReviewRiskLevel.localizedLabel(): String = stringResource(
         ReviewRiskLevel.HIGH -> R.string.review_risk_high
     },
 )
-
-@Composable
-private fun AgentRunStatus.localizedLabel(): String = stringResource(
-    when (this) {
-        AgentRunStatus.QUEUED -> R.string.review_status_queued
-        AgentRunStatus.STARTING -> R.string.review_status_starting
-        AgentRunStatus.RUNNING -> R.string.review_status_running
-        AgentRunStatus.WAITING_INPUT -> R.string.review_status_waiting_input
-        AgentRunStatus.WAITING_REVIEW -> R.string.review_status_waiting_review
-        AgentRunStatus.COMPLETED -> R.string.review_status_completed
-        AgentRunStatus.FAILED -> R.string.review_status_failed
-        AgentRunStatus.CANCELLED -> R.string.review_status_cancelled
-    },
-)
-
-@Composable
-private fun localizedRunStatus(status: String): String {
-    val resource = when (status) {
-        "queued" -> R.string.review_status_queued
-        "starting" -> R.string.review_status_starting
-        "running" -> R.string.review_status_running
-        "waiting_input" -> R.string.review_status_waiting_input
-        "waiting_review" -> R.string.review_status_waiting_review
-        "completed" -> R.string.review_status_completed
-        "failed" -> R.string.review_status_failed
-        "cancelled" -> R.string.review_status_cancelled
-        else -> return status.replace('_', ' ')
-    }
-    return stringResource(resource)
-}
 
 @Composable
 private fun AgentRunEvent.localizedType(): String {

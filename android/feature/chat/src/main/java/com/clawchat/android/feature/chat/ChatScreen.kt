@@ -80,6 +80,7 @@ import com.clawchat.android.core.data.model.Conversation
 import com.clawchat.android.core.data.model.Message
 import com.clawchat.android.core.data.model.RunUpdate
 import com.clawchat.android.core.data.model.TaskDelegation
+import com.clawchat.android.core.ui.TaskStageDots
 import com.clawchat.android.core.ui.ClawCrossfade
 import com.clawchat.android.core.ui.ClawFab
 import com.clawchat.android.core.ui.ClawLetterTile
@@ -795,16 +796,6 @@ private fun RunUpdateCard(
     var reviewNote by remember(update.reviewId) { mutableStateOf("") }
     val actionableRunId = update.runId.takeIf { update.actionsLive }
     val actionableReviewId = update.reviewId.takeIf { update.actionsLive }
-    val statusLabel = stringResource(
-        when (update.status) {
-            "waiting_input" -> R.string.chat_run_status_waiting_input
-            "waiting_review" -> R.string.chat_run_status_waiting_review
-            "completed" -> R.string.chat_run_status_completed
-            "cancelled" -> R.string.chat_run_status_cancelled
-            "failed" -> R.string.chat_run_status_failed
-            else -> R.string.chat_run_status_running
-        },
-    )
     val accent = when {
         update.status == "failed" -> MaterialTheme.colorScheme.error
         update.needsUser -> MaterialTheme.colorScheme.tertiary
@@ -832,12 +823,7 @@ private fun RunUpdateCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    text = statusLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = accent,
-                )
+                TaskStageDots(update.stage)
             }
             if (update.needsUser && update.actionsLive) {
                 Text(

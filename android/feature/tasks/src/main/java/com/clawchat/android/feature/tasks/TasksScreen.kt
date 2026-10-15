@@ -82,6 +82,10 @@ import com.clawchat.android.core.data.ItemStorageLocation
 import com.clawchat.android.core.data.WorkspaceStorageContext
 import com.clawchat.android.core.data.needsListMarker
 import com.clawchat.android.core.data.todoStorageLocation
+import com.clawchat.android.core.data.model.TaskStageState
+import com.clawchat.android.core.data.model.taskStage
+import com.clawchat.android.core.ui.TaskStageBar
+import com.clawchat.android.core.ui.TaskStageDots
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
@@ -230,6 +234,10 @@ fun TasksScreen(
                 onStepAdd = { state.selectedTask?.let(stepsViewModel::add) },
                 onStepsReload = { noteTaskId?.let(stepsViewModel::load) },
                 storageLocation = todoStorageLocation(selectedTask, state.storage),
+                stage = state.stageOf(
+                    selectedTask,
+                    hasSubtasks = stepsByTask[selectedTask.id]?.items.orEmpty().isNotEmpty(),
+                ),
             )
         } else {
             TaskListView(
@@ -254,6 +262,7 @@ fun TasksScreen(
                 onDelete = viewModel::deleteTask,
                 onSetDueToday = viewModel::setDueToday,
                 onCreate = viewModel::createTask,
+                stageOf = { task -> state.stageOf(task) },
             )
         }
     }
@@ -301,6 +310,7 @@ internal fun TaskListView(
     onSetDueToday: (String) -> Unit,
     onCreate: (TodoCreate) -> Unit,
     storage: WorkspaceStorageContext? = null,
+    stageOf: (Todo) -> TaskStageState = { taskStage(taskStatus = it.status, inboxState = it.inboxState) },
 ) {
     var showCreateSheet by remember { mutableStateOf(false) }
 
@@ -352,6 +362,7 @@ internal fun TaskListView(
             onSetDueToday = onSetDueToday,
             onCreate = { showCreateSheet = true },
             storage = storage,
+            stageOf = stageOf,
         )
     }
 
@@ -377,6 +388,7 @@ private fun TaskStatusPage(
     onSetDueToday: (String) -> Unit,
     onCreate: () -> Unit,
     storage: WorkspaceStorageContext? = null,
+    stageOf: (Todo) -> TaskStageState,
 ) {
     if (isLoading && tasks.isEmpty()) {
         ClawLoadingState(modifier = modifier, message = stringResource(R.string.tasks_loading))
@@ -415,6 +427,7 @@ private fun TaskStatusPage(
                     modifier = Modifier.animateItem(),
                     task = task,
                     storageLocation = todoStorageLocation(task, storage),
+                    stage = stageOf(task),
                     onToggle = { onToggle(task) },
                     onDelete = { onDelete(task.id) },
                     onSetDueToday = { onSetDueToday(task.id) },
@@ -437,6 +450,7 @@ private fun TaskStatusPage(
                         modifier = Modifier.animateItem(),
                         task = task,
                         storageLocation = todoStorageLocation(task, storage),
+                        stage = stageOf(task),
                         onToggle = { onToggle(task) },
                         onDelete = { onDelete(task.id) },
                         onSetDueToday = { onSetDueToday(task.id) },
@@ -452,6 +466,7 @@ private fun TaskStatusPage(
                             modifier = Modifier.animateItem(),
                             task = task,
                             storageLocation = todoStorageLocation(task, storage),
+                            stage = stageOf(task),
                             onToggle = { onToggle(task) },
                             onDelete = { onDelete(task.id) },
                             onSetDueToday = { onSetDueToday(task.id) },
@@ -540,6 +555,7 @@ private fun CancelledTasksBoundary(count: Int) {
 @Composable
 private fun SwipeableTaskRow(
     task: Todo,
+    stage: TaskStageState,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
     onSetDueToday: () -> Unit,
@@ -551,6 +567,7 @@ private fun SwipeableTaskRow(
         SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
             TaskRow(
                 task = task,
+                stage = stage,
                 onToggle = onToggle,
                 onClick = onClick,
                 storageLocation = storageLocation,
@@ -563,6 +580,7 @@ private fun SwipeableTaskRow(
 @Composable
 private fun TaskRow(
     task: Todo,
+    stage: TaskStageState,
     onToggle: () -> Unit,
     onClick: () -> Unit,
     storageLocation: ItemStorageLocation? = null,
@@ -580,7 +598,6 @@ private fun TaskRow(
     )
 
     val tags = task.tags.orEmpty().filter(String::isNotBlank)
-    val inboxLabel = inboxStateLabel(task.inboxState)
     // Synced items stay unmarked; only what has not reached a workspace is flagged.
     val storageMarker = storageLocation.takeIf { it.needsListMarker() }
     ClawListItemSurface(onClick = onClick) {
@@ -632,34 +649,25 @@ private fun TaskRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (
-                    tags.isNotEmpty() || task.dueDate != null || inboxLabel != null ||
-                    storageMarker != null
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        task.dueDate?.let {
-                            ClawStatusChip(
-                                text = localizedDateLabel(it),
-                                tone = ClawTone.Warning,
-                            )
-                        }
-                        tags.forEach { tag ->
-                            ClawStatusChip(
-                                text = taskTagLabel(tag),
-                                tone = ClawTone.Default,
-                            )
-                        }
-                        inboxLabel?.let { label ->
-                            ClawStatusChip(
-                                text = label,
-                                tone = if (task.inboxState == "error") ClawTone.Error else ClawTone.Default,
-                            )
-                        }
-                        storageMarker?.let { location -> TaskStorageChip(location) }
+                    TaskStageDots(stage)
+                    task.dueDate?.let {
+                        ClawStatusChip(
+                            text = localizedDateLabel(it),
+                            tone = ClawTone.Warning,
+                        )
                     }
+                    tags.forEach { tag ->
+                        ClawStatusChip(
+                            text = taskTagLabel(tag),
+                            tone = ClawTone.Default,
+                        )
+                    }
+                    storageMarker?.let { location -> TaskStorageChip(location) }
                 }
             }
         }
@@ -723,16 +731,6 @@ private fun TaskStorageLine(location: ItemStorageLocation) {
     }
 }
 
-@Composable
-private fun inboxStateLabel(inboxState: String?): String? = when (inboxState) {
-    null, "none" -> null
-    "classifying", "planning" -> stringResource(R.string.tasks_inbox_planning)
-    "plan_ready" -> stringResource(R.string.tasks_inbox_review)
-    "captured" -> stringResource(R.string.tasks_inbox_organize)
-    "error" -> stringResource(R.string.tasks_inbox_failed)
-    else -> inboxState.replace('_', ' ')
-}
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun TaskDetailView(
@@ -758,6 +756,11 @@ internal fun TaskDetailView(
     onDiscuss: () -> Unit = {},
     onRunWithAgent: () -> Unit = {},
     storageLocation: ItemStorageLocation? = null,
+    stage: TaskStageState = taskStage(
+        taskStatus = task.status,
+        inboxState = task.inboxState,
+        hasSubtasks = steps.items.isNotEmpty(),
+    ),
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     var showDatePicker by rememberSaveable(task.id) { mutableStateOf(false) }
@@ -865,12 +868,7 @@ internal fun TaskDetailView(
                             textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
                         )
                     }
-                    if (task.status == TaskStatus.CANCELLED) {
-                        ClawStatusChip(
-                            text = stringResource(R.string.tasks_status_cancelled),
-                            tone = ClawTone.Default,
-                        )
-                    }
+                    TaskStageBar(stage)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -883,9 +881,6 @@ internal fun TaskDetailView(
                             )
                         } ?: TextButton(onClick = { showDatePicker = true }) {
                             Text(stringResource(CoreR.string.task_add_due_date))
-                        }
-                        inboxStateLabel(task.inboxState)?.let {
-                            ClawStatusChip(text = it, tone = ClawTone.Default)
                         }
                     }
                     storageLocation?.let { location -> TaskStorageLine(location) }

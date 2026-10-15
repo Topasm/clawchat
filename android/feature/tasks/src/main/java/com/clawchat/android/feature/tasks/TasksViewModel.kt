@@ -4,11 +4,14 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.WorkspaceStorageContext
+import com.clawchat.android.core.data.model.ProjectTaskRun
+import com.clawchat.android.core.data.model.TaskStageState
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
 import com.clawchat.android.core.data.model.TodoUpdate
+import com.clawchat.android.core.data.model.taskStage
 import com.clawchat.android.core.data.repository.ConversationRepository
 import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -49,7 +53,24 @@ data class TasksUiState(
     val error: String? = null,
     /** Where items are stored: this device, waiting to sync, or a named workspace. */
     val storage: WorkspaceStorageContext? = null,
-)
+    /** Each task's latest run and pending reviews, by task id. */
+    val taskRuns: Map<String, ProjectTaskRun> = emptyMap(),
+    /** The selected task's newest plan proposal status, as the server spells it. */
+    val selectedPlanStatus: String? = null,
+) {
+    /** Where [task] is among the five steps, from the task and its latest run. */
+    fun stageOf(task: Todo, hasSubtasks: Boolean = false): TaskStageState {
+        val run = taskRuns[task.id]
+        return taskStage(
+            taskStatus = task.status,
+            inboxState = task.inboxState,
+            planStatus = if (task.id == selectedTask?.id) selectedPlanStatus else null,
+            runStatus = run?.status,
+            pendingReviewCount = run?.pendingReviewCount ?: 0,
+            hasSubtasks = hasSubtasks,
+        )
+    }
+}
 
 data class PendingTaskDeletion(
     val token: Long,
@@ -121,6 +142,7 @@ class TasksViewModel @Inject constructor(
 
     init {
         doLoadTasks()
+        doLoadTaskRuns()
         viewModelScope.launch {
             itemStorageLocator.storageContext.collect { storage ->
                 _uiState.update { it.copy(storage = storage) }
@@ -130,11 +152,16 @@ class TasksViewModel @Inject constructor(
             syncManager.todoChanged.collect {
                 relationshipTitleCache.clear()
                 doLoadTasks()
+                doLoadTaskRuns()
                 _uiState.value.selectedTask?.id?.let { selectedId ->
                     doRefreshSelectedTask(selectedId)
                     doLoadRelationships(selectedId)
+                    doLoadPlanStatus(selectedId)
                 }
             }
+        }
+        viewModelScope.launch {
+            merge(syncManager.runChanged, syncManager.reviewChanged).collect { doLoadTaskRuns() }
         }
     }
 
@@ -213,6 +240,31 @@ class TasksViewModel @Inject constructor(
         }
     }
 
+    /** Run and review telemetry is a decoration: when it fails the rows just show the task's own state. */
+    private fun doLoadTaskRuns() {
+        viewModelScope.launch {
+            when (val result = projectPlanRepository.taskRuns()) {
+                is ApiResult.Success -> _uiState.update { state ->
+                    state.copy(taskRuns = result.data.associateBy { it.taskId })
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    private fun doLoadPlanStatus(taskId: String) {
+        viewModelScope.launch {
+            // A 404 means the task has never had a plan, which is no plan status at all.
+            val status = when (val result = projectPlanRepository.latestPlan(taskId)) {
+                is ApiResult.Success -> result.data.status
+                else -> null
+            }
+            _uiState.update { state ->
+                if (state.selectedTask?.id == taskId) state.copy(selectedPlanStatus = status) else state
+            }
+        }
+    }
+
     private fun doSelectTask(task: Todo?) {
         taskSelectionGeneration++
         _uiState.update {
@@ -222,9 +274,13 @@ class TasksViewModel @Inject constructor(
                 relationshipTaskTitles = emptyMap(),
                 isLoadingRelationships = task != null,
                 relationshipError = null,
+                selectedPlanStatus = null,
             )
         }
-        task?.let { doLoadRelationships(it.id) }
+        task?.let {
+            doLoadRelationships(it.id)
+            doLoadPlanStatus(it.id)
+        }
     }
 
     private fun doLoadRelationships(taskId: String) {
