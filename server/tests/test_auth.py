@@ -162,6 +162,37 @@ async def test_access_protected_endpoint_with_token(
     assert data["status"] in ("ok", "degraded")
     assert "ai_provider" in data
     assert "version" in data
+    # Anonymous callers learn enough to recognise the server, not what runs it.
+    assert data["ai_model"] == ""
+    assert "claude_code_version" not in data
+    assert "codex_cli_version" not in data
+
+    signed_in = (await client.get("/api/health", headers=auth_headers)).json()
+    assert "claude_code_status" in signed_in
+    assert "codex_cli_version" in signed_in
+
+
+@pytest.mark.asyncio
+async def test_default_pin_is_refused_from_another_machine(client: AsyncClient):
+    resp = await client.post(
+        "/api/auth/login",
+        json={"pin": "123456"},
+        headers={"X-Forwarded-For": "203.0.113.9"},
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"]["details"]["reason"] == "default_pin_remote_login"
+
+
+@pytest.mark.asyncio
+async def test_default_pin_still_works_on_this_machine(client: AsyncClient):
+    resp = await client.post("/api/auth/login", json={"pin": "123456"})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_api_description_is_hidden_outside_debug(client: AsyncClient):
+    for path in ("/openapi.json", "/docs", "/redoc"):
+        assert (await client.get(path)).status_code == 404
 
 
 @pytest.mark.asyncio

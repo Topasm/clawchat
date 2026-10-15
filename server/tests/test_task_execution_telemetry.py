@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from main import app
 
 from models.agent_run import AgentRun, AgentRunEvent
 from models.agent_task import AgentTask
@@ -261,7 +262,7 @@ async def test_execution_telemetry_project_scope_uses_current_task_project(
 
 @pytest.mark.asyncio
 async def test_execution_telemetry_contract_is_in_openapi(client):
-    schema = (await client.get("/openapi.json")).json()
+    schema = app.openapi()
     operation = schema["paths"]["/api/todos/execution-telemetry"]["get"]
     assert operation["responses"]["200"]["content"]["application/json"]["schema"]
     assert "TaskExecutionTelemetryResponse" in schema["components"]["schemas"]

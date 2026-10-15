@@ -41,6 +41,7 @@
     <string name="onboarding_error_cannot_reach_server">Cannot reach the server. Check the address and connection, then try again.</string>
     <string name="onboarding_error_pairing_failed">Couldn’t pair this device. Check the code and try again.</string>
     <string name="onboarding_error_login_failed">Couldn’t log in. Check the PIN and try again.</string>
+    <string name="onboarding_error_default_pin_refused">This server still uses the default PIN, so it can’t be used from another device. Change the PIN on the server first.</string>
     <string name="onboarding_error_host_identity_mismatch">The server identity did not match the scanned QR code.</string>
     <string name="onboarding_error_host_id_mismatch">The server ID did not match the scanned QR code.</string>
 </resources>

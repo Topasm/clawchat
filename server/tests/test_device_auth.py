@@ -155,7 +155,7 @@ def test_device_websocket_ticket_completes_handshake():
     # already owns database setup, while the app lifespan initializes the
     # separate production engine. Requests and WebSockets still traverse the
     # full ASGI routing/dependency stack without lifespan startup.
-    client = TestClient(app)
+    client = TestClient(app, client=("127.0.0.1", 50000))
     try:
         login = client.post("/api/auth/login", json={"pin": "123456"})
         assert login.status_code == 200

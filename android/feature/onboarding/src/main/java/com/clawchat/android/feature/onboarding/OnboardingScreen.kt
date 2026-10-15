@@ -633,6 +633,7 @@ private fun onboardingErrorMessage(error: OnboardingError): String = stringResou
         OnboardingError.CANNOT_REACH_SERVER -> R.string.onboarding_error_cannot_reach_server
         OnboardingError.PAIRING_FAILED -> R.string.onboarding_error_pairing_failed
         OnboardingError.LOGIN_FAILED -> R.string.onboarding_error_login_failed
+        OnboardingError.DEFAULT_PIN_REFUSED -> R.string.onboarding_error_default_pin_refused
         OnboardingError.HOST_IDENTITY_MISMATCH -> R.string.onboarding_error_host_identity_mismatch
         OnboardingError.HOST_ID_MISMATCH -> R.string.onboarding_error_host_id_mismatch
     },

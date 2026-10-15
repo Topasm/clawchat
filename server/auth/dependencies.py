@@ -5,7 +5,7 @@ import secrets
 from auth.jwt import hash_device_token
 from database import get_db
 from exceptions import UnauthorizedError
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,6 +84,26 @@ async def get_current_principal(
         raise UnauthorizedError("Missing authorization header")
     payload = decode_token_any(credentials.credentials)
     return await validate_principal(payload, db, credentials.credentials)
+
+
+async def get_optional_principal(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> AuthPrincipal | None:
+    """The caller when it presented a valid token, otherwise ``None``.
+
+    For endpoints that answer everyone but say more to a signed-in client.
+    Reads the header directly so the endpoint is not described as requiring
+    a token.
+    """
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    try:
+        payload = decode_token_any(token)
+        return await validate_principal(payload, db, token)
+    except UnauthorizedError:
+        return None
 
 
 async def get_current_user(

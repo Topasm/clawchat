@@ -140,6 +140,20 @@ def client_key(request: Request, *, scope: str = "") -> str:
     return f"{scope}:{host}" if scope else host
 
 
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def is_local_request(request: Request) -> bool:
+    """Whether the caller is on this machine and nothing stood in between.
+
+    A request that carries ``X-Forwarded-For`` came through a proxy or the
+    relay, so its loopback address says nothing about who sent it.
+    """
+    if request.headers.get("x-forwarded-for"):
+        return False
+    return request.client is not None and request.client.host in _LOOPBACK_HOSTS
+
+
 login_limiter = RateLimiter(
     name="login",
     max_failures=settings.login_max_failures,

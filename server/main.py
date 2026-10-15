@@ -5,9 +5,10 @@ from contextlib import asynccontextmanager, suppress
 from starlette.routing import Route
 
 from app_version import APP_VERSION
-from config import settings
+from config import DEFAULT_PIN, settings
 from database import async_session_factory, get_db, init_db
 from exceptions import AppError, app_error_handler
+from auth.dependencies import AuthPrincipal, get_optional_principal
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import admin as admin_router
@@ -239,9 +240,26 @@ async def lifespan(app: FastAPI):
     await codex_api.close()
 
 
-app = FastAPI(title="ClawChat Server", version=APP_VERSION, lifespan=lifespan)
+# The API description is a map of every endpoint. Development keeps it at
+# /docs; an exposed server has no reason to hand it to anyone who asks.
+# Client contracts are generated from ``app.openapi()``, not from this route.
+app = FastAPI(
+    title="ClawChat Server",
+    version=APP_VERSION,
+    lifespan=lifespan,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    openapi_url="/openapi.json" if settings.debug else None,
+)
 
 app.add_exception_handler(AppError, app_error_handler)
+
+if settings.pin == DEFAULT_PIN and settings.host not in {"127.0.0.1", "localhost", "::1"}:
+    logger.warning(
+        "PIN is still the default while the server listens on %s. Sign-in with "
+        "it is refused from other machines; set PIN to something else.",
+        settings.host,
+    )
 
 _cors_origins = settings.resolved_cors_origins()
 # A wildcard origin and credentialed requests are mutually exclusive per the
@@ -332,7 +350,10 @@ app.websocket("/ws")(websocket_endpoint)
 
 
 @app.get("/api/health")
-async def health(db: AsyncSession = Depends(get_db)):
+async def health(
+    db: AsyncSession = Depends(get_db),
+    principal: AuthPrincipal | None = Depends(get_optional_principal),
+):
     host_id = getattr(app.state, "host_id", None)
     host_public_key = getattr(app.state, "host_public_key", None)
     if not host_id:
@@ -361,7 +382,7 @@ async def health(db: AsyncSession = Depends(get_db)):
     else:
         effective_connected = ai_connected
         ai_model = settings.ai_model
-    return {
+    public = {
         # The desktop shell uses this marker before reusing a process that is
         # already listening on its configured port. A generic HTTP 200 is not
         # enough: port 8000 is commonly occupied by unrelated developer tools.
@@ -372,8 +393,17 @@ async def health(db: AsyncSession = Depends(get_db)):
         "status": "ok" if effective_connected else "degraded",
         "version": APP_VERSION,
         "ai_provider": active_provider,
-        "ai_model": ai_model,
         "ai_connected": effective_connected,
+    }
+    if principal is None:
+        # Enough to recognise the server, pair with it and compare versions.
+        # Which model and which CLI versions sit behind it is for signed-in
+        # clients only. ``ai_model`` stays present for older Android builds
+        # that require the key.
+        return {**public, "ai_model": ""}
+    return {
+        **public,
+        "ai_model": ai_model,
         "claude_code_status": claude_code_status,
         "claude_code_version": getattr(app.state, "claude_code_version", None),
         "claude_code_model": settings.claude_code_model,

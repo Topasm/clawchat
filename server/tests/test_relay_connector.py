@@ -1,3 +1,4 @@
+import base64
 import json
 
 import httpx
@@ -45,7 +46,13 @@ async def test_connector_handshake_and_http_tunnel():
     connector._http = httpx.AsyncClient(
         base_url="http://local",
         transport=httpx.MockTransport(
-            lambda request: httpx.Response(200, json={"path": request.url.path})
+            lambda request: httpx.Response(
+                200,
+                json={
+                    "path": request.url.path,
+                    "forwarded_for": request.headers.get("x-forwarded-for"),
+                },
+            )
         ),
     )
     connector.host_id = "claw_test"
@@ -71,6 +78,9 @@ async def test_connector_handshake_and_http_tunnel():
     response = client_cipher.decrypt(response_frame)
     assert response["type"] == "http_response"
     assert response["status"] == 200
+    # Relayed requests arrive over loopback but must not pass for local ones.
+    body = json.loads(base64.b64decode(response["body"]))
+    assert body["forwarded_for"] == "relay"
 
     await connector.stop()
 

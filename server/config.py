@@ -130,6 +130,11 @@ def save_ai_provider(path_value: str, provider: str) -> None:
         temporary_path.unlink(missing_ok=True)
 
 
+#: The PIN a fresh install ships with. Public knowledge, so it is only
+#: accepted from this machine; see ``routers/auth.py``.
+DEFAULT_PIN = "123456"
+
+
 class Settings(BaseSettings):
     # Server
     host: str = "127.0.0.1"
@@ -142,7 +147,7 @@ class Settings(BaseSettings):
     jwt_secret: str = _DEFAULT_JWT_SECRET
     jwt_secret_file: str = ""
     jwt_expiry_hours: int = 24
-    pin: str = "123456"
+    pin: str = DEFAULT_PIN
 
     # Brute-force protection for the unauthenticated credential endpoints
     # (PIN login and pairing claim). Failures only -- a successful login
