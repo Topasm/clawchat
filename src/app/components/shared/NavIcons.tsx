@@ -115,3 +115,13 @@ export function SearchIcon({ size, className, label }: IconProps = {}) {
     </IconBase>
   );
 }
+
+export function DevicesIcon({ size, className, label }: IconProps = {}) {
+  return (
+    <IconBase size={size} className={navClassName(className)} label={label}>
+      <rect x="1.5" y="3" width="11" height="8" rx="1" strokeLinejoin="round" />
+      <path d="M4.5 14h5M7 11v3" strokeLinecap="round" />
+      <rect x="13" y="6.5" width="3.5" height="8" rx="0.8" strokeLinejoin="round" />
+    </IconBase>
+  );
+}

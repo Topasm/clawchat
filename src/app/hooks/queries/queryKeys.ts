@@ -18,6 +18,10 @@ export const queryKeys = {
   project: (id: string) => ['projects', id] as const,
   executionProviders: ['execution-providers'] as const,
   executionHosts: ['execution-hosts'] as const,
+  dataSources: ['data-sources'] as const,
+  dataSourceQuery: (sourceId: string, op: string, path: string, query = '') =>
+    ['data-sources', sourceId, op, path, query] as const,
+  dataSourceLog: (sourceId: string) => ['data-sources', sourceId, 'log'] as const,
   projectWorkspace: (id: string) => ['projects', id, 'workspace'] as const,
   skills: ['skills'] as const,
   reviews: ['reviews'] as const,

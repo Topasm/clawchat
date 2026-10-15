@@ -1602,3 +1602,78 @@ export const CalendarAccountListResponseSchema = z.object({
 
 export type CalendarAccount = z.infer<typeof CalendarAccountResponseSchema>;
 export type CalendarSource = z.infer<typeof CalendarSourceResponseSchema>;
+
+// Device data sources: folders a machine offers for reading through Home.
+export const DataSourceResponseSchema = z.object({
+  id: z.string(),
+  host_id: z.string(),
+  host_label: z.string(),
+  kind: z.enum(['obsidian_vault', 'folder']),
+  name: z.string(),
+  capabilities: z.array(z.enum(['list', 'read', 'search'])),
+  include_folders: z.array(z.string()),
+  exclude_folders: z.array(z.string()),
+  is_online: z.boolean(),
+  last_seen_at: z.string().nullable().optional(),
+  index_updated_at: z.string().nullable().optional(),
+  indexed_files: z.number().optional().default(0),
+  created_at: z.string(),
+});
+
+export const DataSourceEntrySchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  title: z.string(),
+  is_dir: z.boolean().optional().default(false),
+  size: z.number().nullable().optional(),
+  modified_at: z.string().nullable().optional(),
+});
+
+export const DataSourceSearchMatchSchema = z.object({
+  path: z.string(),
+  title: z.string(),
+  snippet: z.string().nullable().optional(),
+  line: z.number().nullable().optional(),
+});
+
+export const DataSourceTodoItemSchema = z.object({
+  title: z.string(),
+  status: z.string(),
+  due_date: z.string().nullable().optional(),
+  priority: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional().default([]),
+});
+
+export const DataSourceQueryResponseSchema = z.object({
+  op: z.enum(['list', 'read', 'search']),
+  path: z.string(),
+  origin: z.enum(['live', 'cache']),
+  fallback_reason: z.enum(['offline', 'timeout']).nullable().optional(),
+  is_online: z.boolean(),
+  last_seen_at: z.string().nullable().optional(),
+  entries: z.array(DataSourceEntrySchema).optional().default([]),
+  matches: z.array(DataSourceSearchMatchSchema).optional().default([]),
+  content: z.string().nullable().optional(),
+  tasks: z.array(DataSourceTodoItemSchema).nullable().optional(),
+  truncated: z.boolean().optional().default(false),
+});
+
+export const DataSourceQueryLogSchema = z.object({
+  id: z.string(),
+  op: z.enum(['list', 'read', 'search']),
+  path: z.string().nullable().optional(),
+  query: z.string().nullable().optional(),
+  status: z.enum(['queued', 'claimed', 'done', 'failed', 'denied', 'expired']),
+  error: z.string().nullable().optional(),
+  requested_by: z.string(),
+  requester_name: z.string().nullable().optional(),
+  result_bytes: z.number().nullable().optional(),
+  created_at: z.string(),
+  completed_at: z.string().nullable().optional(),
+});
+
+export type DataSource = z.infer<typeof DataSourceResponseSchema>;
+export type DataSourceEntry = z.infer<typeof DataSourceEntrySchema>;
+export type DataSourceSearchMatch = z.infer<typeof DataSourceSearchMatchSchema>;
+export type DataSourceQueryResult = z.infer<typeof DataSourceQueryResponseSchema>;
+export type DataSourceQueryLog = z.infer<typeof DataSourceQueryLogSchema>;

@@ -3,6 +3,28 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import apiClient from '../services/apiClient';
 import type { SettingsPayload } from '../types/api';
 
+/**
+ * A folder on this machine offered to one workspace as a read-only data
+ * source. The path stays here: the server only ever learns the source's name
+ * and the relative paths inside it.
+ */
+export interface SharedSourceSetting {
+  /** Local identity; the server's source id is learned on registration. */
+  id: string;
+  /** The workspace server this folder is offered to, and only that one. */
+  serverUrl: string;
+  /** The folder on this machine. */
+  root: string;
+  name: string;
+  kind: 'obsidian_vault' | 'folder';
+  /** Folders that may be read, relative to the root. Empty: all of it. */
+  includeFolders: string[];
+  /** Folders never read, even inside an included one. */
+  excludeFolders: string[];
+  /** The server's id for this source, once it has been registered. */
+  remoteId?: string;
+}
+
 interface StreakData {
   lastCompletedDate: string;
   currentStreak: number;
@@ -48,6 +70,8 @@ interface SettingsState {
   workerLabel: string;
   /** Which CLI runs the work here. */
   workerProvider: string;
+  /** Folders on this machine offered to one workspace for reading. Desktop only. */
+  sharedSources: SharedSourceSetting[];
 
   // Streak
   streak: StreakData;
@@ -76,6 +100,9 @@ interface SettingsState {
   setWorkerEnabled: (v: boolean) => void;
   setWorkerLabel: (v: string) => void;
   setWorkerProvider: (v: string) => void;
+  addSharedSource: (source: SharedSourceSetting) => void;
+  updateSharedSource: (id: string, changes: Partial<SharedSourceSetting>) => void;
+  removeSharedSource: (id: string) => void;
   setStreak: (v: StreakData) => void;
 
   // Actions
@@ -114,6 +141,8 @@ const APPLICATION_DEFAULT_SETTINGS = {
   workerEnabled: false,
   workerLabel: '',
   workerProvider: 'claude',
+  // Nothing on this disk is offered to anyone until the user picks a folder.
+  sharedSources: [] as SharedSourceSetting[],
 
   streak: { lastCompletedDate: '', currentStreak: 0 },
 } as const;
@@ -132,6 +161,19 @@ const DEFAULT_SETTINGS = {
 } as const;
 
 type DefaultKeys = keyof typeof DEFAULT_SETTINGS;
+
+/**
+ * Settings that never leave this machine in an export, nor arrive in an
+ * import: which local folders are offered to a server is decided here, not
+ * by a file from somewhere else.
+ */
+const MACHINE_ONLY_KEYS: ReadonlySet<DefaultKeys> = new Set(['sharedSources']);
+
+function portableKeys(): DefaultKeys[] {
+  return (Object.keys(DEFAULT_SETTINGS) as DefaultKeys[]).filter(
+    (key) => !MACHINE_ONLY_KEYS.has(key),
+  );
+}
 type WorkspaceSettingKey =
   'llmModel' | 'temperature' | 'systemPrompt' | 'maxTokens' | 'streamResponses';
 
@@ -204,6 +246,18 @@ export const useSettingsStore = create<SettingsState>()(
       setWorkerEnabled: (workerEnabled) => set({ workerEnabled }),
       setWorkerLabel: (workerLabel) => set({ workerLabel }),
       setWorkerProvider: (workerProvider) => set({ workerProvider }),
+      addSharedSource: (source) =>
+        set((state) => ({ sharedSources: [...state.sharedSources, source] })),
+      updateSharedSource: (id, changes) =>
+        set((state) => ({
+          sharedSources: state.sharedSources.map((source) =>
+            source.id === id ? { ...source, ...changes } : source,
+          ),
+        })),
+      removeSharedSource: (id) =>
+        set((state) => ({
+          sharedSources: state.sharedSources.filter((source) => source.id !== id),
+        })),
       setStreak: (streak) => set({ streak }),
 
       resetApplicationPreferences: () => set({ ...APPLICATION_DEFAULT_SETTINGS }),
@@ -211,7 +265,7 @@ export const useSettingsStore = create<SettingsState>()(
       exportSettings: () => {
         const state = get();
         const exported: Record<string, unknown> = {};
-        for (const key of Object.keys(DEFAULT_SETTINGS) as DefaultKeys[]) {
+        for (const key of portableKeys()) {
           exported[key] = state[key];
         }
         return JSON.stringify(exported, null, 2);
@@ -221,7 +275,7 @@ export const useSettingsStore = create<SettingsState>()(
         try {
           const parsed = JSON.parse(json);
           const validSettings: Record<string, unknown> = {};
-          for (const key of Object.keys(DEFAULT_SETTINGS) as DefaultKeys[]) {
+          for (const key of portableKeys()) {
             if (key in parsed && typeof parsed[key] === typeof DEFAULT_SETTINGS[key]) {
               validSettings[key] = parsed[key];
             }

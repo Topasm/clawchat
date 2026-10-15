@@ -150,3 +150,9 @@ export {
   useUpdateCalendarSource,
 } from './useCalendarSyncQueries';
 export type { CalendarAccountInput } from './useCalendarSyncQueries';
+export {
+  useDataSourcesQuery,
+  useDataSourceQuery,
+  useDataSourceLogQuery,
+  dataSourceErrorReason,
+} from './useDataSourceQueries';

@@ -1566,4 +1566,62 @@ export const koreanUiTranslations: Record<string, string> = {
   Friday: '금요일',
   Saturday: '토요일',
   Sunday: '일요일',
+  'Offline · last seen {{time}}': '오프라인 · 마지막 확인 {{time}}',
+  'Offline · never connected': '오프라인 · 연결된 적 없음',
+  'Folder path': '폴더 경로',
+  Top: '처음',
+  '{{host}} did not answer in time. Showing the last list it sent.':
+    '{{host}}이(가) 제때 응답하지 않았습니다. 마지막으로 받은 목록을 보여 줍니다.',
+  'Showing the last list it sent; files cannot be opened until it is back.':
+    '마지막으로 받은 목록을 보여 줍니다. 다시 연결될 때까지 파일은 열 수 없습니다.',
+  'This file is on {{host}}, which is offline. Its contents are never stored anywhere else, so it opens once {{host}} is back.':
+    '이 파일은 오프라인 상태인 {{host}}에 있습니다. 파일 내용은 다른 곳에 저장되지 않으므로 {{host}}이(가) 다시 연결되면 열 수 있습니다.',
+  '{{host}} did not answer in time. Try again.':
+    '{{host}}이(가) 제때 응답하지 않았습니다. 다시 시도하세요.',
+  'This part of {{name}} is not shared.': '{{name}}의 이 부분은 공개되어 있지 않습니다.',
+  'Nothing exists at that path any more.': '해당 경로에 더 이상 아무것도 없습니다.',
+  'Could not reach the workspace.': '작업 공간에 연결하지 못했습니다.',
+  'Asking {{host}}…': '{{host}}에 요청하는 중…',
+  'This folder is empty.': '이 폴더는 비어 있습니다.',
+  'Only the first part of this folder is shown.': '이 폴더의 앞부분만 표시됩니다.',
+  Checklist: '체크리스트',
+  'The file is long; only its beginning is shown.': '파일이 길어 앞부분만 표시됩니다.',
+  'Searching on {{host}}…': '{{host}}에서 검색하는 중…',
+  '{{host}} is not answering, so only file names were searched.':
+    '{{host}}이(가) 응답하지 않아 파일 이름만 검색했습니다.',
+  'Nothing matched.': '일치하는 항목이 없습니다.',
+  'Search {{name}}': '{{name}} 검색',
+  Devices: '기기',
+  'Folders your other machines share through this workspace. Files are read from the machine when you open them.':
+    '다른 기기가 이 작업 공간을 통해 공개한 폴더입니다. 파일은 열 때마다 해당 기기에서 읽어 옵니다.',
+  "No machine shares a folder yet. In the desktop app, open Settings and choose a folder under Share this machine's data.":
+    "아직 폴더를 공개한 기기가 없습니다. 데스크톱 앱의 설정에서 '이 기기의 데이터 공개'로 폴더를 선택하세요.",
+  'Shared folders': '공개된 폴더',
+  'Hide access log': '접근 기록 숨기기',
+  'Show access log': '접근 기록 보기',
+  'Nothing has been read yet.': '아직 읽힌 항목이 없습니다.',
+  'Signed-in session': '로그인 세션',
+  'Stop sharing': '공개 중지',
+  'Shared folders (one per line; empty shares everything)':
+    '공개할 폴더 (한 줄에 하나, 비워 두면 전체 공개)',
+  'Never shared (one per line)': '공개하지 않을 폴더 (한 줄에 하나)',
+  'Could not open the folder picker.': '폴더 선택 창을 열지 못했습니다.',
+  'A folder named {{name}} is already shared.': '{{name}} 폴더는 이미 공개되어 있습니다.',
+  "Share this machine's data": '이 기기의 데이터 공개',
+  'Your other devices can list, read and search these folders through this workspace while this app is open. Files stay on this machine; the workspace keeps only their names and dates. Read-only.':
+    '이 앱이 열려 있는 동안 다른 기기에서 이 작업 공간을 통해 아래 폴더의 목록 보기, 읽기, 검색을 할 수 있습니다. 파일은 이 기기에 그대로 있고 작업 공간에는 파일 이름과 날짜만 저장됩니다. 읽기 전용입니다.',
+  'Name this machine above before sharing a folder.':
+    '폴더를 공개하려면 먼저 위에서 이 기기의 이름을 정하세요.',
+  'Share a folder': '폴더 공개',
+  'An Obsidian vault, or any folder of notes.': 'Obsidian 보관함 또는 메모가 있는 폴더.',
+  'Kind of folder': '폴더 종류',
+  'Obsidian vault': 'Obsidian 보관함',
+  Folder: '폴더',
+  'Choose folder…': '폴더 선택…',
+  Waiting: '대기 중',
+  Reading: '읽는 중',
+  Read: '읽음',
+  'Not read': '읽지 못함',
+  Refused: '거부됨',
+  'Timed out': '시간 초과',
 };

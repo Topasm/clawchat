@@ -19,6 +19,7 @@ import usePlatform from '../hooks/usePlatform';
 import useDataSync from '../hooks/useDataSync';
 import useWebSocket from '../hooks/useWebSocket';
 import useNetworkStatus from '../hooks/useNetworkStatus';
+import useDataSourceSharing from '../hooks/useDataSourceSharing';
 import useWorkerRunner from '../hooks/useWorkerRunner';
 import { useAuthStore } from '../stores/useAuthStore';
 import type { ConnectionStatus } from '../stores/useAuthStore';
@@ -55,6 +56,7 @@ import {
   NavCalendarIcon,
   ReviewIcon,
   AutomationsIcon,
+  DevicesIcon,
 } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
@@ -115,6 +117,7 @@ const primaryNavItems = [
 const secondaryNavItems = [
   { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon },
   { to: '/automations', labelKey: 'nav.automations', Icon: AutomationsIcon },
+  { to: '/devices', labelKey: 'nav.devices', Icon: DevicesIcon },
 ];
 const utilityNavItems = [
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
@@ -237,6 +240,7 @@ export default function Layout() {
   useNavigationShortcuts();
   // Collects the work addressed to this machine while the app is open.
   useWorkerRunner();
+  useDataSourceSharing();
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
   const activeWorkspaceName = useWorkspaceStore(
     (state) =>

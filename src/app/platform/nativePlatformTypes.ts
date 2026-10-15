@@ -52,11 +52,48 @@ export interface WorkspaceContextFile {
   text: string;
 }
 
+/** A relayed request for a folder this machine offers as a data source. */
+export interface SourceQueryRequest {
+  /** The folder on this machine. Never sent to the server. */
+  root: string;
+  op: 'list' | 'read' | 'search';
+  /** Relative to `root`. */
+  path: string;
+  query?: string | null;
+  includeFolders: string[];
+  excludeFolders: string[];
+}
+
+export interface SourceAnswer {
+  ok: boolean;
+  error?: string | null;
+  entries: { path: string; isDir: boolean; size?: number | null; modifiedAt?: number | null }[];
+  matches: { path: string; snippet?: string | null; line?: number | null }[];
+  content?: string | null;
+  truncated: boolean;
+}
+
+/** One shared file's name and date, for Home to show while this machine is off. */
+export interface SourceIndexFile {
+  path: string;
+  size: number;
+  /** Seconds since the Unix epoch. */
+  modifiedAt?: number | null;
+}
+
 export interface NativeWorkerApi {
   /** Runs an agent CLI here, in the project's directory on this machine. */
   run: (request: WorkerRunRequest) => Promise<WorkerRunResult>;
   /** What a bound folder says about itself, bounded and without following links. */
   readContext: (path: string) => Promise<WorkspaceContextFile[]>;
+  /** List, read or search a shared folder here, within what was shared. */
+  querySource: (request: SourceQueryRequest) => Promise<SourceAnswer>;
+  /** Names and dates of a shared folder's files. Never contents. */
+  indexSource: (
+    root: string,
+    includeFolders: string[],
+    excludeFolders: string[],
+  ) => Promise<SourceIndexFile[]>;
 }
 
 export interface NativeUpdaterApi {

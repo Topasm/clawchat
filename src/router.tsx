@@ -21,6 +21,7 @@ const ProjectWorkspacePage = lazy(() => import('./app/pages/ProjectWorkspacePage
 const AttentionRedirect = lazy(() => import('./app/pages/AttentionRedirect'));
 const AttentionPage = lazy(() => import('./app/pages/AttentionPage'));
 const AutomationsPage = lazy(() => import('./app/pages/AutomationsPage'));
+const DevicesPage = lazy(() => import('./app/pages/DevicesPage'));
 const MorePage = lazy(() => import('./app/pages/MorePage'));
 const ChatPage = lazy(() => import('./app/pages/ChatPage'));
 const AllTasksPage = lazy(() => import('./app/pages/AllTasksPage'));
@@ -312,6 +313,16 @@ export default function AppRouter() {
             <ErrorBoundary name="AutomationsPage">
               <LazyRoute>
                 <AutomationsPage />
+              </LazyRoute>
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/devices"
+          element={
+            <ErrorBoundary name="DevicesPage">
+              <LazyRoute>
+                <DevicesPage />
               </LazyRoute>
             </ErrorBoundary>
           }
