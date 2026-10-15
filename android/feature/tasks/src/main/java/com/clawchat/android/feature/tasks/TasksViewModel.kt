@@ -3,6 +3,7 @@ package com.clawchat.android.feature.tasks
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clawchat.android.core.data.WorkspaceStorageContext
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
@@ -13,6 +14,7 @@ import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.ItemStorageLocator
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.util.optimistic
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,6 +47,8 @@ data class TasksUiState(
     val relationshipError: String? = null,
     val pendingDeletion: PendingTaskDeletion? = null,
     val error: String? = null,
+    /** Where items are stored: this device, waiting to sync, or a named workspace. */
+    val storage: WorkspaceStorageContext? = null,
 )
 
 data class PendingTaskDeletion(
@@ -69,6 +73,7 @@ class TasksViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val taskCommentRepository: TaskCommentRepository,
     private val projectPlanRepository: ProjectPlanRepository,
+    private val itemStorageLocator: ItemStorageLocator,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TasksUiState())
@@ -116,6 +121,11 @@ class TasksViewModel @Inject constructor(
 
     init {
         doLoadTasks()
+        viewModelScope.launch {
+            itemStorageLocator.storageContext.collect { storage ->
+                _uiState.update { it.copy(storage = storage) }
+            }
+        }
         viewModelScope.launch {
             syncManager.todoChanged.collect {
                 relationshipTitleCache.clear()

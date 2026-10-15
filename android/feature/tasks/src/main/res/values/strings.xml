@@ -95,4 +95,11 @@
     <string name="projects_answer_run">Answer agent</string>
     <string name="projects_review_run">Review result</string>
     <string name="projects_actions">More actions</string>
+    <string name="tasks_storage_this_device">Only on this device · Not synced</string>
+    <string name="tasks_storage_pending">On this device · Waiting to sync to %1$s</string>
+    <string name="tasks_storage_pending_unnamed">On this device · Waiting to sync to your workspace</string>
+    <string name="tasks_storage_workspace">Saved to %1$s</string>
+    <string name="tasks_storage_workspace_unnamed">Saved to your workspace</string>
+    <string name="tasks_storage_chip_this_device">This device</string>
+    <string name="tasks_storage_chip_pending">Waiting to sync</string>
 </resources>

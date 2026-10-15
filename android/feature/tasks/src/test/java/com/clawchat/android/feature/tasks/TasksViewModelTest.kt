@@ -1,6 +1,10 @@
 package com.clawchat.android.feature.tasks
 
 import app.cash.turbine.test
+import com.clawchat.android.core.data.ItemStorageLocation
+import com.clawchat.android.core.data.WorkspaceMode
+import com.clawchat.android.core.data.WorkspaceStorageContext
+import com.clawchat.android.core.data.todoStorageLocation
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskRelationship
@@ -14,6 +18,7 @@ import com.clawchat.android.core.data.repository.TaskCommentRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.data.repository.TaskRelationshipRepository
 import com.clawchat.android.core.network.ApiResult
+import com.clawchat.android.core.sync.ItemStorageLocator
 import com.clawchat.android.core.sync.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -21,6 +26,7 @@ import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -45,6 +51,8 @@ class TasksViewModelTest {
     private lateinit var taskCommentRepository: TaskCommentRepository
     private lateinit var syncManager: SyncManager
     private lateinit var todoChanged: MutableSharedFlow<Unit>
+    private lateinit var storageContext: MutableStateFlow<WorkspaceStorageContext>
+    private lateinit var itemStorageLocator: ItemStorageLocator
     private lateinit var viewModel: TasksViewModel
 
     private val sampleTodo = Todo(
@@ -68,6 +76,9 @@ class TasksViewModelTest {
         syncManager = mockk(relaxed = true)
         todoChanged = MutableSharedFlow(extraBufferCapacity = 1)
         every { syncManager.todoChanged } returns todoChanged
+        storageContext = MutableStateFlow(WorkspaceStorageContext(mode = WorkspaceMode.SERVER, workspaceName = "Home"))
+        itemStorageLocator = mockk()
+        every { itemStorageLocator.storageContext } returns storageContext
         coEvery { relationshipRepository.listForTask(any()) } returns ApiResult.Success(emptyList())
     }
 
@@ -84,6 +95,27 @@ class TasksViewModelTest {
             conversationRepository,
             taskCommentRepository,
             mockk(relaxed = true),
+            itemStorageLocator,
+        )
+    }
+
+    @Test
+    fun `storage context follows the outbox so queued tasks read as waiting to sync`() = runTest {
+        coEvery { todoRepository.listTodos(any()) } returns ApiResult.Success(PaginatedResponse(items = sampleTodos))
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            ItemStorageLocation.Workspace("Home"),
+            todoStorageLocation(sampleTodo, vm.uiState.value.storage),
+        )
+
+        storageContext.value = storageContext.value.copy(pendingTodoIds = setOf(sampleTodo.id))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            ItemStorageLocation.PendingSync("Home"),
+            todoStorageLocation(sampleTodo, vm.uiState.value.storage),
         )
     }
 

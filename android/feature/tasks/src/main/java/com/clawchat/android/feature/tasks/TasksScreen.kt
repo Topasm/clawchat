@@ -78,6 +78,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clawchat.android.core.R as CoreR
+import com.clawchat.android.core.data.ItemStorageLocation
+import com.clawchat.android.core.data.WorkspaceStorageContext
+import com.clawchat.android.core.data.needsListMarker
+import com.clawchat.android.core.data.todoStorageLocation
 import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskRelationship
 import com.clawchat.android.core.data.model.Todo
@@ -93,6 +97,7 @@ import com.clawchat.android.core.ui.ClawTopBarColors
 import com.clawchat.android.core.ui.SwipeToDismissCard
 import com.clawchat.android.core.ui.TaskCreateSheet
 import com.clawchat.android.core.ui.datePickerDate
+import com.clawchat.android.core.ui.icons.ClawIcons
 import com.clawchat.android.core.ui.localizedErrorMessage
 import com.clawchat.android.core.ui.toDatePickerMillis
 import java.time.LocalDate
@@ -224,10 +229,12 @@ fun TasksScreen(
                 onStepEdit = { text -> noteTaskId?.let { stepsViewModel.edit(it, text) } },
                 onStepAdd = { state.selectedTask?.let(stepsViewModel::add) },
                 onStepsReload = { noteTaskId?.let(stepsViewModel::load) },
+                storageLocation = todoStorageLocation(selectedTask, state.storage),
             )
         } else {
             TaskListView(
                 tasks = state.tasks,
+                storage = state.storage,
                 isLoading = state.isLoading,
                 snackbarHostState = snackbarHostState,
                 onOpenSearch = onOpenSearch,
@@ -293,6 +300,7 @@ internal fun TaskListView(
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onCreate: (TodoCreate) -> Unit,
+    storage: WorkspaceStorageContext? = null,
 ) {
     var showCreateSheet by remember { mutableStateOf(false) }
 
@@ -343,6 +351,7 @@ internal fun TaskListView(
             onDelete = onDelete,
             onSetDueToday = onSetDueToday,
             onCreate = { showCreateSheet = true },
+            storage = storage,
         )
     }
 
@@ -367,6 +376,7 @@ private fun TaskStatusPage(
     onDelete: (String) -> Unit,
     onSetDueToday: (String) -> Unit,
     onCreate: () -> Unit,
+    storage: WorkspaceStorageContext? = null,
 ) {
     if (isLoading && tasks.isEmpty()) {
         ClawLoadingState(modifier = modifier, message = stringResource(R.string.tasks_loading))
@@ -404,6 +414,7 @@ private fun TaskStatusPage(
                 SwipeableTaskRow(
                     modifier = Modifier.animateItem(),
                     task = task,
+                    storageLocation = todoStorageLocation(task, storage),
                     onToggle = { onToggle(task) },
                     onDelete = { onDelete(task.id) },
                     onSetDueToday = { onSetDueToday(task.id) },
@@ -425,6 +436,7 @@ private fun TaskStatusPage(
                     SwipeableTaskRow(
                         modifier = Modifier.animateItem(),
                         task = task,
+                        storageLocation = todoStorageLocation(task, storage),
                         onToggle = { onToggle(task) },
                         onDelete = { onDelete(task.id) },
                         onSetDueToday = { onSetDueToday(task.id) },
@@ -439,6 +451,7 @@ private fun TaskStatusPage(
                         SwipeableTaskRow(
                             modifier = Modifier.animateItem(),
                             task = task,
+                            storageLocation = todoStorageLocation(task, storage),
                             onToggle = { onToggle(task) },
                             onDelete = { onDelete(task.id) },
                             onSetDueToday = { onSetDueToday(task.id) },
@@ -532,10 +545,16 @@ private fun SwipeableTaskRow(
     onSetDueToday: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    storageLocation: ItemStorageLocation? = null,
 ) {
     Box(modifier) {
         SwipeToDismissCard(onDelete = onDelete, onSetDueToday = onSetDueToday) {
-            TaskRow(task = task, onToggle = onToggle, onClick = onClick)
+            TaskRow(
+                task = task,
+                onToggle = onToggle,
+                onClick = onClick,
+                storageLocation = storageLocation,
+            )
         }
     }
 }
@@ -546,6 +565,7 @@ private fun TaskRow(
     task: Todo,
     onToggle: () -> Unit,
     onClick: () -> Unit,
+    storageLocation: ItemStorageLocation? = null,
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     val view = LocalView.current
@@ -561,6 +581,8 @@ private fun TaskRow(
 
     val tags = task.tags.orEmpty().filter(String::isNotBlank)
     val inboxLabel = inboxStateLabel(task.inboxState)
+    // Synced items stay unmarked; only what has not reached a workspace is flagged.
+    val storageMarker = storageLocation.takeIf { it.needsListMarker() }
     ClawListItemSurface(onClick = onClick) {
         // The checkbox sits centred against the text block, and the chips go
         // under the title: a separate chip row used to start at the left edge,
@@ -610,7 +632,10 @@ private fun TaskRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (tags.isNotEmpty() || task.dueDate != null || inboxLabel != null) {
+                if (
+                    tags.isNotEmpty() || task.dueDate != null || inboxLabel != null ||
+                    storageMarker != null
+                ) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -633,10 +658,68 @@ private fun TaskRow(
                                 tone = if (task.inboxState == "error") ClawTone.Error else ClawTone.Default,
                             )
                         }
+                        storageMarker?.let { location -> TaskStorageChip(location) }
                     }
                 }
             }
         }
+    }
+}
+
+/** List marker for an item that has not reached a workspace. */
+@Composable
+private fun TaskStorageChip(location: ItemStorageLocation) {
+    when (location) {
+        ItemStorageLocation.ThisDevice -> ClawStatusChip(
+            text = stringResource(R.string.tasks_storage_chip_this_device),
+            tone = ClawTone.Default,
+            leadingIcon = ClawIcons.PhoneAndroid,
+        )
+        is ItemStorageLocation.PendingSync -> ClawStatusChip(
+            text = stringResource(R.string.tasks_storage_chip_pending),
+            tone = ClawTone.Primary,
+            leadingIcon = ClawIcons.PhoneAndroid,
+        )
+        is ItemStorageLocation.Workspace -> Unit
+    }
+}
+
+/** The detail screen's "where is this saved" line, naming the workspace. */
+@Composable
+private fun TaskStorageLine(location: ItemStorageLocation) {
+    val text = when (location) {
+        ItemStorageLocation.ThisDevice -> stringResource(R.string.tasks_storage_this_device)
+        is ItemStorageLocation.PendingSync -> location.workspaceName
+            ?.let { stringResource(R.string.tasks_storage_pending, it) }
+            ?: stringResource(R.string.tasks_storage_pending_unnamed)
+        is ItemStorageLocation.Workspace -> location.workspaceName
+            ?.let { stringResource(R.string.tasks_storage_workspace, it) }
+            ?: stringResource(R.string.tasks_storage_workspace_unnamed)
+    }
+    Row(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = if (location is ItemStorageLocation.Workspace) {
+                ClawIcons.Cloud
+            } else {
+                ClawIcons.PhoneAndroid
+            },
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = if (location is ItemStorageLocation.PendingSync) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -674,6 +757,7 @@ internal fun TaskDetailView(
     onDelete: () -> Unit,
     onDiscuss: () -> Unit = {},
     onRunWithAgent: () -> Unit = {},
+    storageLocation: ItemStorageLocation? = null,
 ) {
     val isCompleted = task.status == TaskStatus.COMPLETED
     var showDatePicker by rememberSaveable(task.id) { mutableStateOf(false) }
@@ -804,6 +888,7 @@ internal fun TaskDetailView(
                             ClawStatusChip(text = it, tone = ClawTone.Default)
                         }
                     }
+                    storageLocation?.let { location -> TaskStorageLine(location) }
                     // The thread about this task: steps and delegated runs start there.
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = onDiscuss) {

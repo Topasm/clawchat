@@ -56,6 +56,38 @@ class PendingSyncStoreTest {
     }
 
     @Test
+    fun `pending todo ids cover queued creates and edits only`() = runTest {
+        val dao = mockk<PendingTodoMutationDao>()
+        every { dao.observeForWorkspace(WORKSPACE) } returns flowOf(
+            listOf(
+                pendingEntity(operationId = "create-1", todoId = "new-1", operationType = "create"),
+                pendingEntity(operationId = "update-1", todoId = "edited-1", operationType = "update"),
+                pendingEntity(operationId = "update-2", todoId = "edited-1", operationType = "update"),
+                pendingEntity(operationId = "comment-1", todoId = "commented-1", operationType = "comment"),
+                pendingEntity(operationId = "delete-1", todoId = "deleted-1", operationType = "delete"),
+            ),
+        )
+        val store = PendingTodoUpdateStore(dao, mockk<Context>(relaxed = true))
+
+        val pendingIds = store.observePendingTodoIds(WORKSPACE).first()
+
+        assertEquals(setOf("new-1", "edited-1"), pendingIds)
+    }
+
+    private fun pendingEntity(
+        operationId: String,
+        todoId: String,
+        operationType: String,
+    ) = PendingTodoMutationEntity(
+        workspaceKey = WORKSPACE,
+        operationId = operationId,
+        todoId = todoId,
+        operationType = operationType,
+        payload = "{}",
+        changedAt = "2026-09-01T01:00:00Z",
+    )
+
+    @Test
     fun `review status exposes only queue count and failure presence`() = runTest {
         val dao = mockk<PendingReviewDecisionDao>()
         every { dao.observeForWorkspace(WORKSPACE) } returns flowOf(
