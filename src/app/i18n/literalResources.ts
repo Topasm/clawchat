@@ -1668,8 +1668,11 @@ export const koreanUiTranslations: Record<string, string> = {
   'Could not save the vault': '보관함을 저장하지 못했습니다',
   'Choose another folder': '다른 폴더 선택',
   'Choose vault folder': '보관함 폴더 선택',
-  '{{server}} uses the vault configured on that server. Notes on this computer stay here; sharing them with another server is not available in this version.':
-    '{{server}}은(는) 해당 서버에 설정된 보관함을 사용합니다. 이 컴퓨터의 노트는 여기에 남으며, 다른 서버와 공유하는 기능은 이 버전에서 제공되지 않습니다.',
+  '{{server}} uses the vault configured on that server.':
+    '{{server}}은(는) 해당 서버에 설정된 보관함을 사용합니다.',
+  'You can also share the vault on this computer through {{server}}, so your phone and other devices can open and search it. Notes stay on this computer and can be read only while this app is open.':
+    '이 컴퓨터의 보관함을 {{server}}을(를) 통해 공유하면 휴대폰과 다른 기기에서 열고 검색할 수 있습니다. 노트는 이 컴퓨터에 남으며, 이 앱이 열려 있는 동안에만 읽을 수 있습니다.',
+  "Share this computer's vault": '이 컴퓨터의 보관함 공유',
   'The server': '서버',
   'Pair a phone': '휴대폰 페어링',
   'Optional. Scan the code with the ClawChat Android app to use the same tasks on your phone. You can do this later from Connections.':

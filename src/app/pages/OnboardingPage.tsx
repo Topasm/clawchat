@@ -21,6 +21,12 @@ type StepId = 'connect' | 'ai' | 'obsidian' | 'phone' | 'done';
 
 const STEPS: StepId[] = ['connect', 'ai', 'obsidian', 'phone', 'done'];
 
+/** `?step=` brings the wizard back where a detour to Settings left it. */
+function initialStep(search: string): StepId {
+  const step = new URLSearchParams(search).get('step');
+  return STEPS.find((id) => id === step) ?? 'connect';
+}
+
 function stepLabel(step: StepId): string {
   switch (step) {
     case 'connect':
@@ -59,7 +65,7 @@ export default function OnboardingPage() {
   const profiles = useWorkspaceStore((state) => state.profiles);
   const vaultPath = useWorkspaceRuntimeStore((state) => state.config?.obsidianVaultPath ?? '');
 
-  const [step, setStep] = useState<StepId>('connect');
+  const [step, setStep] = useState<StepId>(() => initialStep(location.search));
   const [aiResult, setAiResult] = useState<AiCheckResult | null>(null);
   const [phonePaired, setPhonePaired] = useState(false);
 
