@@ -357,8 +357,12 @@ async def register_worker(
     label: str,
     device_id: UUID | None = None,
     platform: str | None = None,
+    mark_seen: bool = True,
 ) -> ExecutionHost:
     """Record that a desktop app on some machine is available to run work.
+
+    With ``mark_seen=False`` the machine is only identified, not checked in:
+    a desktop app offering a data source has not offered to run work.
 
     New clients report a stable device id, so renaming a machine cannot change
     its identity and two machines with the same default label cannot share
@@ -416,7 +420,7 @@ async def register_worker(
             device_id=normalized_device_id,
             kind="worker",
             platform=platform,
-            last_seen_at=now,
+            last_seen_at=now if mark_seen else None,
         )
         db.add(host)
         await db.flush()
@@ -425,7 +429,8 @@ async def register_worker(
     if normalized_device_id is not None:
         host.device_id = normalized_device_id
         host.label = normalized_label
-    host.last_seen_at = now
+    if mark_seen:
+        host.last_seen_at = now
     if platform:
         host.platform = platform
     await db.flush()

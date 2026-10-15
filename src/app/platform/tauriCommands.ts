@@ -23,6 +23,8 @@ export const TAURI_COMMANDS = {
   updaterInstall: 'updater_install',
   workerRun: 'worker_run',
   workerReadContext: 'worker_read_context',
+  workerQuerySource: 'worker_query_source',
+  workerIndexSource: 'worker_index_source',
 } as const;
 
 export const TAURI_EVENTS = {

@@ -2631,6 +2631,67 @@
         "title": "CapabilitiesResponse",
         "type": "object"
       },
+      "ClaimedDataQuery": {
+        "description": "A request a machine has taken to answer from its own disk.",
+        "properties": {
+          "exclude_folders": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclude Folders",
+            "type": "array"
+          },
+          "include_folders": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Include Folders",
+            "type": "array"
+          },
+          "op": {
+            "enum": [
+              "list",
+              "read",
+              "search"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "query_id": {
+            "title": "Query Id",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query_id",
+          "source_id",
+          "op",
+          "path"
+        ],
+        "title": "ClaimedDataQuery",
+        "type": "object"
+      },
       "ClaimedJobResponse": {
         "description": "The work a machine has just taken responsibility for.",
         "properties": {
@@ -2986,6 +3047,894 @@
           "modules"
         ],
         "title": "DataOverviewResponse",
+        "type": "object"
+      },
+      "DataQueryAnswer": {
+        "description": "What the machine found, or why it would not or could not look.",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 600000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DataQueryAnswerEntry"
+            },
+            "maxItems": 5000,
+            "title": "Entries",
+            "type": "array"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/DataQueryAnswerMatch"
+            },
+            "maxItems": 200,
+            "title": "Matches",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "DataQueryAnswer",
+        "type": "object"
+      },
+      "DataQueryAnswerEntry": {
+        "properties": {
+          "is_dir": {
+            "default": false,
+            "title": "Is Dir",
+            "type": "boolean"
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At"
+          },
+          "path": {
+            "maxLength": 1000,
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "DataQueryAnswerEntry",
+        "type": "object"
+      },
+      "DataQueryAnswerMatch": {
+        "properties": {
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "path": {
+            "maxLength": 1000,
+            "title": "Path",
+            "type": "string"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "DataQueryAnswerMatch",
+        "type": "object"
+      },
+      "DataSourceEntry": {
+        "properties": {
+          "is_dir": {
+            "default": false,
+            "title": "Is Dir",
+            "type": "boolean"
+          },
+          "modified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "name",
+          "title"
+        ],
+        "title": "DataSourceEntry",
+        "type": "object"
+      },
+      "DataSourceIndexFile": {
+        "properties": {
+          "modified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified At"
+          },
+          "path": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "DataSourceIndexFile",
+        "type": "object"
+      },
+      "DataSourceIndexUpdate": {
+        "description": "The light index of a source, sent whole by the machine that holds it.",
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DataSourceIndexFile"
+            },
+            "maxItems": 20000,
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "title": "DataSourceIndexUpdate",
+        "type": "object"
+      },
+      "DataSourceQueryLog": {
+        "description": "One request for a source's data, as the audit trail keeps it.",
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "op": {
+            "enum": [
+              "list",
+              "read",
+              "search"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "requested_by": {
+            "title": "Requested By",
+            "type": "string"
+          },
+          "requester_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requester Name"
+          },
+          "result_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Bytes"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "claimed",
+              "done",
+              "failed",
+              "denied",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "op",
+          "status",
+          "requested_by",
+          "created_at"
+        ],
+        "title": "DataSourceQueryLog",
+        "type": "object"
+      },
+      "DataSourceQueryRequest": {
+        "properties": {
+          "op": {
+            "enum": [
+              "list",
+              "read",
+              "search"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "DataSourceQueryRequest",
+        "type": "object"
+      },
+      "DataSourceQueryResponse": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "entries": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DataSourceEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "offline",
+                  "timeout"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          },
+          "is_online": {
+            "title": "Is Online",
+            "type": "boolean"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "matches": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DataSourceSearchMatch"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "op": {
+            "enum": [
+              "list",
+              "read",
+              "search"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "live",
+              "cache"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "tasks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DataSourceTodoItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasks"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "op",
+          "path",
+          "origin",
+          "is_online"
+        ],
+        "title": "DataSourceQueryResponse",
+        "type": "object"
+      },
+      "DataSourceRegister": {
+        "description": "A desktop app offering a folder on its machine for reading.",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "enum": [
+                "list",
+                "read",
+                "search"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "exclude_folders": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Exclude Folders",
+            "type": "array"
+          },
+          "host_label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Host Label",
+            "type": "string"
+          },
+          "include_folders": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Include Folders",
+            "type": "array"
+          },
+          "kind": {
+            "default": "obsidian_vault",
+            "enum": [
+              "obsidian_vault",
+              "folder"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform"
+          }
+        },
+        "required": [
+          "device_id",
+          "host_label",
+          "name"
+        ],
+        "title": "DataSourceRegister",
+        "type": "object"
+      },
+      "DataSourceResponse": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "enum": [
+                "list",
+                "read",
+                "search"
+              ],
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "exclude_folders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclude Folders",
+            "type": "array"
+          },
+          "host_id": {
+            "title": "Host Id",
+            "type": "string"
+          },
+          "host_label": {
+            "title": "Host Label",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "include_folders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Include Folders",
+            "type": "array"
+          },
+          "index_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Updated At"
+          },
+          "indexed_files": {
+            "default": 0,
+            "title": "Indexed Files",
+            "type": "integer"
+          },
+          "is_online": {
+            "title": "Is Online",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "obsidian_vault",
+              "folder"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "host_id",
+          "host_label",
+          "kind",
+          "name",
+          "capabilities",
+          "include_folders",
+          "exclude_folders",
+          "is_online",
+          "created_at"
+        ],
+        "title": "DataSourceResponse",
+        "type": "object"
+      },
+      "DataSourceSearchMatch": {
+        "properties": {
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "title"
+        ],
+        "title": "DataSourceSearchMatch",
+        "type": "object"
+      },
+      "DataSourceTodoItem": {
+        "description": "A checklist line of a ``TODO.md`` that was read.",
+        "properties": {
+          "due_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Date"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "status"
+        ],
+        "title": "DataSourceTodoItem",
+        "type": "object"
+      },
+      "DataSourceUpdate": {
+        "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "list",
+                    "read",
+                    "search"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities"
+          },
+          "exclude_folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclude Folders"
+          },
+          "include_folders": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Folders"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "DataSourceUpdate",
         "type": "object"
       },
       "DelegateRequest": {
@@ -13759,6 +14708,395 @@
         ]
       }
     },
+    "/api/data-sources": {
+      "get": {
+        "operationId": "list_data_sources_api_data_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DataSourceResponse"
+                  },
+                  "title": "Response List Data Sources Api Data Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Data Sources",
+        "tags": [
+          "data-sources"
+        ]
+      },
+      "post": {
+        "description": "Offer a folder on the calling machine for reading.\n\nIdempotent per machine and name, so the desktop app can repeat it on every\nlaunch. The folder's location on the machine is never sent.",
+        "operationId": "register_data_source_api_data_sources_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataSourceRegister"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Register Data Source",
+        "tags": [
+          "data-sources"
+        ]
+      }
+    },
+    "/api/data-sources/{source_id}": {
+      "delete": {
+        "description": "Stop offering the source. Its index and request log go with it.",
+        "operationId": "delete_data_source_api_data_sources__source_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Data Source",
+        "tags": [
+          "data-sources"
+        ]
+      },
+      "get": {
+        "operationId": "get_data_source_api_data_sources__source_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Data Source",
+        "tags": [
+          "data-sources"
+        ]
+      },
+      "patch": {
+        "operationId": "update_data_source_api_data_sources__source_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataSourceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Data Source",
+        "tags": [
+          "data-sources"
+        ]
+      }
+    },
+    "/api/data-sources/{source_id}/index": {
+      "put": {
+        "description": "Replace the light index: file paths, titles and dates, never contents.",
+        "operationId": "replace_data_source_index_api_data_sources__source_id__index_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataSourceIndexUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Replace Data Source Index",
+        "tags": [
+          "data-sources"
+        ]
+      }
+    },
+    "/api/data-sources/{source_id}/queries": {
+      "get": {
+        "description": "Who asked to read what, newest first, refusals included.",
+        "operationId": "list_data_source_queries_api_data_sources__source_id__queries_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DataSourceQueryLog"
+                  },
+                  "title": "Response List Data Source Queries Api Data Sources  Source Id  Queries Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Data Source Queries",
+        "tags": [
+          "data-sources"
+        ]
+      }
+    },
+    "/api/data-sources/{source_id}/query": {
+      "post": {
+        "description": "List, read or search the source on the machine that holds it.\n\nWaits for that machine to answer. When it is off or slow, a listing or\nsearch comes from the light index (``origin: cache``); a read cannot,\nand fails with ``DATA_SOURCE_OFFLINE`` or ``DATA_SOURCE_TIMEOUT``.",
+        "operationId": "query_data_source_api_data_sources__source_id__query_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataSourceQueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSourceQueryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Query Data Source",
+        "tags": [
+          "data-sources"
+        ]
+      }
+    },
     "/api/events": {
       "get": {
         "operationId": "list_events_api_events_get",
@@ -14464,6 +15802,134 @@
           }
         ],
         "summary": "Update Execution Host",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
+    "/api/execution-hosts/{host_id}/data-queries/claim": {
+      "post": {
+        "description": "Take the next request for a data source this machine holds, or nothing.\n\nKept apart from ``jobs/claim``: a run can keep that loop busy for minutes,\nand a desktop app older than data sources must never be handed a request\nit would mistake for a run. With ``wait`` the call is held open until a\nrequest arrives, so answers do not wait for the next poll. Asking keeps\nthe machine's sources online without making it look ready to run work.",
+        "operationId": "claim_next_data_query_api_execution_hosts__host_id__data_queries_claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wait",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 25,
+              "minimum": 0,
+              "title": "Wait",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ClaimedDataQuery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Claim Next Data Query Api Execution Hosts  Host Id  Data Queries Claim Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Claim Next Data Query",
+        "tags": [
+          "execution-hosts"
+        ]
+      }
+    },
+    "/api/execution-hosts/{host_id}/data-queries/{query_id}/answer": {
+      "post": {
+        "description": "Hand back what the machine found. Dropped if nobody is waiting any more.",
+        "operationId": "answer_data_query_api_execution_hosts__host_id__data_queries__query_id__answer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "host_id",
+            "required": true,
+            "schema": {
+              "title": "Host Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "query_id",
+            "required": true,
+            "schema": {
+              "title": "Query Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataQueryAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Answer Data Query",
         "tags": [
           "execution-hosts"
         ]

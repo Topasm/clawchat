@@ -45,6 +45,9 @@ sealed class NavRoute(val route: String) {
             runId?.let { "$route?$ARG_RUN_ID=${Uri.encode(it)}" } ?: route
     }
     data object Search : NavRoute("search")
+
+    /** Folders other machines share through the workspace server. */
+    data object Devices : NavRoute("devices")
     data object Projects : NavRoute("projects") {
         const val ARG_PROJECT_ID = "project_id"
         const val ARG_TASK_ID = "task_id"

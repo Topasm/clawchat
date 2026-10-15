@@ -38,4 +38,8 @@ mod services {
     pub mod updater_policy {
         include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/services/updater_policy.rs"));
     }
+
+    pub mod worker_source {
+        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/services/worker_source.rs"));
+    }
 }

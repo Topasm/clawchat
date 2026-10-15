@@ -152,6 +152,8 @@ pub fn run() {
             commands::app::updater_install,
             commands::worker::worker_run,
             commands::worker::worker_read_context,
+            commands::worker::worker_query_source,
+            commands::worker::worker_index_source,
         ])
         .build(tauri::generate_context!());
 

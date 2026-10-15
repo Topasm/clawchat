@@ -50,6 +50,7 @@ import com.clawchat.android.feature.planner.PlannerPage
 import com.clawchat.android.feature.planner.PlannerScreen
 import com.clawchat.android.feature.progress.ProgressScreen
 import com.clawchat.android.feature.search.SearchScreen
+import com.clawchat.android.feature.devices.DevicesScreen
 import com.clawchat.android.R
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.repository.SearchType
@@ -338,6 +339,14 @@ fun ClawChatNavGraph(
                             NavRoute.Chat.ARG_CONVERSATION_ID,
                         ),
                     )
+                }
+            }
+            composable(NavRoute.Devices.route) {
+                ServerOnlyDestination(
+                    workspaceMode = workspaceMode,
+                    onConnectWorkspace = openConnectionSetup,
+                ) {
+                    DevicesScreen(onBack = { navController.popBackStack() })
                 }
             }
             composable(NavRoute.Progress.route) {

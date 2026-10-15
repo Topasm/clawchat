@@ -24,6 +24,8 @@ fn main() {
         "updater_install",
         "worker_run",
         "worker_read_context",
+        "worker_query_source",
+        "worker_index_source",
     ];
 
     tauri_build::try_build(

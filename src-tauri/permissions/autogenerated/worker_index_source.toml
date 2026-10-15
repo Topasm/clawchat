@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-worker-index-source"
+description = "Enables the worker_index_source command without any pre-configured scope."
+commands.allow = ["worker_index_source"]
+
+[[permission]]
+identifier = "deny-worker-index-source"
+description = "Denies the worker_index_source command without any pre-configured scope."
+commands.deny = ["worker_index_source"]

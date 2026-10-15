@@ -9,6 +9,8 @@ import type {
   NativePlatformApi,
   ServerConfig,
   ServerStatus,
+  SourceAnswer,
+  SourceIndexFile,
   UpdateDownloadProgress,
   UpdateInfo,
   WorkerRunResult,
@@ -76,6 +78,13 @@ export const tauriPlatformApi: NativePlatformApi = {
     run: (request) => invoke<WorkerRunResult>(TAURI_COMMANDS.workerRun, { request }),
     readContext: (path) =>
       invoke<WorkspaceContextFile[]>(TAURI_COMMANDS.workerReadContext, { path }),
+    querySource: (request) => invoke<SourceAnswer>(TAURI_COMMANDS.workerQuerySource, { request }),
+    indexSource: (root, includeFolders, excludeFolders) =>
+      invoke<SourceIndexFile[]>(TAURI_COMMANDS.workerIndexSource, {
+        root,
+        includeFolders,
+        excludeFolders,
+      }),
   },
   server: {
     getStatus: () => invoke<ServerStatus>(TAURI_COMMANDS.serverGetStatus),

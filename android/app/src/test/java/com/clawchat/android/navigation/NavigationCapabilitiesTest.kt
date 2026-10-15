@@ -47,7 +47,7 @@ class NavigationCapabilitiesTest {
 
     @Test
     fun `local mode rejects every server-only destination`() {
-        listOf("inbox", "progress", "chat", "projects", "review", "runs", "runs?run_id=run-1").forEach { route ->
+        listOf("inbox", "progress", "chat", "projects", "devices", "review", "runs", "runs?run_id=run-1").forEach { route ->
             assertFalse(route, NavigationCapabilities.canOpen(WorkspaceMode.LOCAL, route))
         }
         listOf("today", "tasks", "calendar", "search", "settings", "onboarding").forEach { route ->
@@ -62,7 +62,7 @@ class NavigationCapabilitiesTest {
             NavigationCapabilities.primaryRoutes(WorkspaceMode.SERVER),
         )
         assertEquals(
-            listOf("progress", "search", "settings"),
+            listOf("progress", "devices", "search", "settings"),
             NavigationCapabilities.secondaryRoutes(WorkspaceMode.SERVER),
         )
         assertTrue(NavigationCapabilities.canOpen(WorkspaceMode.SERVER, "progress"))
