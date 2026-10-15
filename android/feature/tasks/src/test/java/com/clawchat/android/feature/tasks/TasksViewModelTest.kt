@@ -25,8 +25,10 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -86,6 +88,12 @@ class TasksViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    /** The states that differ in what a load changes, ignoring other updates. */
+    private fun Flow<TasksUiState>.loadSteps(): Flow<TasksUiState> =
+        distinctUntilChanged { old, new ->
+            old.isLoading == new.isLoading && old.tasks == new.tasks && old.error == new.error
+        }
 
     private fun createViewModel(): TasksViewModel {
         return TasksViewModel(
@@ -300,7 +308,9 @@ class TasksViewModelTest {
 
         viewModel = createViewModel()
 
-        viewModel.uiState.test {
+        // Only the load's own steps: the storage context arrives as a separate
+        // update and is covered by its own test.
+        viewModel.uiState.loadSteps().test {
             // Initial empty state
             val initial = awaitItem()
             assertEquals(emptyList<Todo>(), initial.tasks)
@@ -324,7 +334,7 @@ class TasksViewModelTest {
 
         viewModel = createViewModel()
 
-        viewModel.uiState.test {
+        viewModel.uiState.loadSteps().test {
             awaitItem() // initial
             awaitItem() // loading
             val errorState = awaitItem()
