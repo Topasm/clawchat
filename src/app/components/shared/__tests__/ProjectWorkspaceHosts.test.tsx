@@ -16,6 +16,7 @@ const native = vi.hoisted(() => ({
 vi.mock('../../../hooks/usePlatform', () => ({ default: () => ({ isDesktop: native.isDesktop }) }));
 vi.mock('../../../platform', () => ({
   platformApi: {
+    runtime: { kind: 'web', os: 'web', appVersion: '0.0.0-test', isDesktop: false },
     server: { selectFolder: native.selectFolder },
     worker: { readContext: native.readContext },
   },

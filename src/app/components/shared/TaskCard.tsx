@@ -4,6 +4,7 @@ import { useTaskRelationshipsQuery } from '../../hooks/queries';
 import { getDependsOnCountBySource } from '../../utils/taskRelationships';
 import Checkbox from './Checkbox';
 import Badge from './Badge';
+import StorageLocationBadge from './StorageLocationBadge';
 import { translateUi } from '../../i18n';
 const EMPTY_RELATIONSHIPS = [] as const;
 const SKILL_BADGE_LABELS: Record<string, string> = {
@@ -109,6 +110,7 @@ export default function TaskCard({
             )}
           </div>
           <div className="cc-card__meta">
+            <StorageLocationBadge item={task} />
             {task.due_date && <Badge variant="due" dueDate={task.due_date} />}
             {task.tags?.map((tag) => (
               <Badge key={tag} variant="tag">

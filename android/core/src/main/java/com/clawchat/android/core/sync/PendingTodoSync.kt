@@ -207,6 +207,21 @@ class PendingTodoUpdateStore @Inject constructor(
             )
         }
 
+    /**
+     * Ids of todos whose create or edit is still queued on this device. Queued
+     * comments and deletes do not count: a comment is not the item itself, and
+     * a deleted item is no longer listed.
+     */
+    fun observePendingTodoIds(workspaceKey: String): Flow<Set<String>> =
+        dao.observeForWorkspace(workspaceKey).map { entities ->
+            entities
+                .filter {
+                    it.operationType == PendingTodoOperation.CREATE.wireValue ||
+                        it.operationType == PendingTodoOperation.UPDATE.wireValue
+                }
+                .mapTo(mutableSetOf(), PendingTodoMutationEntity::todoId)
+        }
+
     internal suspend fun remove(workspaceKey: String, operationIds: List<String>) {
         if (operationIds.isNotEmpty()) dao.deleteOperations(workspaceKey, operationIds)
     }

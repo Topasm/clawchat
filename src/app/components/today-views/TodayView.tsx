@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import AiSetupBanner from '../shared/AiSetupBanner';
 import { useNavigate } from 'react-router-dom';
 import { useToggleTodoComplete, useUpdateTodo } from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
@@ -98,6 +99,8 @@ export default function TodayView({
           </button>
         )}
       </div>
+
+      <AiSetupBanner />
 
       {/* Progress bar */}
       {progress.total > 0 && (

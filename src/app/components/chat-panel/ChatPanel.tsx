@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
+import AiSetupBanner from '../shared/AiSetupBanner';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getChatDraftKey, getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
@@ -190,6 +191,7 @@ export default function ChatPanel({
           {variant === 'side' ? <CloseIcon size={14} /> : <MinusIcon size={14} />}
         </button>
       </div>
+      <AiSetupBanner className="cc-ai-setup-banner--panel" />
       <ChatPanelMessages
         conversationId={conversationId}
         messages={messages}

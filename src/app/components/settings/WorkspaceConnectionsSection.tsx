@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { type ServerStatus } from '../../platform';
+import { isLocalHostMode } from '../../utils/workspaceLocation';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useToastStore } from '../../stores/useToastStore';
 import {
@@ -240,6 +241,12 @@ export default function WorkspaceConnectionsSection() {
   };
   const autoStartHost = runtimeConfig?.autoStartHost ?? false;
   const lanAccess = runtimeConfig?.lanAccess ?? false;
+  // The server settings below describe this machine serving its own
+  // workspace. While the window is a client of another Home they only invite
+  // changes to a server nobody here is using.
+  const hostingLocally = isLocalHostMode(runtimeConfig, activeWorkspaceId);
+  const localNeedsOpening =
+    activeWorkspaceId !== LOCAL_WORKSPACE_ID || (runtimeConfig !== null && !hostingLocally);
   return (
     <>
       <SettingsSection title={translateUi('Workspaces & Connections')}>
@@ -263,7 +270,7 @@ export default function WorkspaceConnectionsSection() {
                 : ''}
             </div>
           </div>
-          {activeWorkspaceId !== LOCAL_WORKSPACE_ID && (
+          {localNeedsOpening && (
             <button
               type="button"
               className="cc-btn cc-btn--primary cc-btn--compact"
@@ -382,7 +389,17 @@ export default function WorkspaceConnectionsSection() {
         </form>
       </SettingsSection>
 
-      {runtimeConfig && (
+      {runtimeConfig && !hostingLocally && (
+        <SettingsSection title={translateUi('This device server')}>
+          <div className="cc-settings-status cc-settings-status--subtle">
+            {translateUi(
+              "This window uses another workspace. Settings for this device's own server appear when you switch back to This device.",
+            )}
+          </div>
+        </SettingsSection>
+      )}
+
+      {runtimeConfig && hostingLocally && (
         <SettingsSection title={translateUi('This device server')}>
           {serverError && (
             <div className="cc-workspace-connect__message" role="alert">

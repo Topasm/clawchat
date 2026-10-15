@@ -6,7 +6,19 @@ mod startup_log;
 mod state;
 
 use state::{AppState, PendingUpdateState};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
+
+/// Tells the renderer the window was hidden instead of closed, so it can say
+/// once that ClawChat keeps running and how to quit it.
+const MAIN_WINDOW_HIDDEN_EVENT: &str = "main-window-hidden";
+
+fn announce_hidden_main_window<R: tauri::Runtime>(window: &tauri::Window<R>) {
+    if let Err(error) = window.emit(MAIN_WINDOW_HIDDEN_EVENT, ()) {
+        startup_log::report(&format!(
+            "[clawchat] failed to announce the hidden main window: {error}"
+        ));
+    }
+}
 
 #[cfg(unix)]
 fn install_termination_signal_handler<R: tauri::Runtime>(app_handle: tauri::AppHandle<R>) {
@@ -62,9 +74,12 @@ pub fn run() {
                 if window.label() == "main" {
                     api.prevent_close();
                     match window.hide() {
-                        Ok(()) => startup_log::report(
-                            "[clawchat] main window hidden after macOS close request",
-                        ),
+                        Ok(()) => {
+                            startup_log::report(
+                                "[clawchat] main window hidden after macOS close request",
+                            );
+                            announce_hidden_main_window(window);
+                        }
                         Err(error) => startup_log::report(&format!(
                             "[clawchat] failed to hide main window after macOS close request: {error}"
                         )),
@@ -80,7 +95,9 @@ pub fn run() {
                     .unwrap_or(false);
                 if keep_running {
                     api.prevent_close();
-                    let _ = window.hide();
+                    if window.hide().is_ok() {
+                        announce_hidden_main_window(window);
+                    }
                 } else {
                     window.app_handle().exit(0);
                 }

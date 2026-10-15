@@ -16,6 +16,7 @@ import {
 import type { ServerStatus } from '../platform';
 import { LOCAL_WORKSPACE_ID, useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { verifyClawChatHealth } from '../services/workspaceHealth';
+import ServerVersionNotice from '../components/shared/ServerVersionNotice';
 import { translateUi } from '../i18n';
 type HealthStatus = 'idle' | 'checking' | 'ok' | 'error';
 /**
@@ -76,6 +77,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
   const [showServerUrl, setShowServerUrl] = useState(!IS_DESKTOP);
   const [showScanner, setShowScanner] = useState(false);
   const [desktopClientMode, setDesktopClientMode] = useState(false);
@@ -248,9 +250,11 @@ export default function LoginPage() {
     setHealthStatus('checking');
     try {
       const activeProfile = profiles.find((profile) => profile.id === activeWorkspaceId);
-      await verifyClawChatHealth(url, activeProfile?.hostId);
+      const health = await verifyClawChatHealth(url, activeProfile?.hostId);
+      setServerVersion(health.version);
       setHealthStatus('ok');
     } catch {
+      setServerVersion(null);
       setHealthStatus('error');
     }
   }, [activeWorkspaceId, profiles, serverUrl]);
@@ -547,6 +551,7 @@ export default function LoginPage() {
                   onChange={(e) => {
                     setServerUrl(e.target.value);
                     setHealthStatus('idle');
+                    setServerVersion(null);
                   }}
                   onBlur={handleServerUrlBlur}
                   placeholder={DEFAULT_SERVER_URL_PLACEHOLDER}
@@ -577,6 +582,12 @@ export default function LoginPage() {
                     '\n                  When ClawChat is opened through a reverse proxy or tunnel, leaving this as the\n                  current site URL is usually correct.\n                ',
                   )}
                 </div>
+                {healthStatus === 'ok' && (
+                  <ServerVersionNotice
+                    serverVersion={serverVersion}
+                    className="cc-version-notice--login"
+                  />
+                )}
               </>
             ) : (
               <div

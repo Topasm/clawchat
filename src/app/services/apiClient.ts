@@ -2,6 +2,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig, type Method } 
 import { useAuthStore } from '../stores/useAuthStore';
 import { logger } from './logger';
 import { getOfflineQueueScope, offlineQueue } from './offlineQueue';
+import { OFFLINE_QUEUED_STATUS_TEXT } from './offlineQueuedResponse';
 import { refreshAuthSession } from './sessionRefresh';
 import { debugResource, getDebugSnapshot, recordDebug } from './debugLogging';
 
@@ -155,7 +156,7 @@ apiClient.interceptors.response.use(
         return {
           data: {},
           status: 0,
-          statusText: 'offline-queued',
+          statusText: OFFLINE_QUEUED_STATUS_TEXT,
           headers: {},
           config: originalRequest,
         };

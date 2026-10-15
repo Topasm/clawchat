@@ -7,6 +7,8 @@ import Slider from '../components/shared/Slider';
 import Toggle from '../components/shared/Toggle';
 import { useTheme } from '../config/ThemeContext';
 import usePlatform from '../hooks/usePlatform';
+import { useServerHealth } from '../hooks/useServerHealth';
+import ServerVersionNotice from '../components/shared/ServerVersionNotice';
 import { changeAppLanguage, getAppLanguage, useTranslation, translateUi } from '../i18n';
 import { platformApi } from '../platform';
 import {
@@ -16,7 +18,9 @@ import {
   retryAppUpdate,
   setAutomaticUpdateChecks,
 } from '../services/updateLifecycle';
+import { useAuthStore } from '../stores/useAuthStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useUpdateStore } from '../stores/useUpdateStore';
 export default function AppSettingsPage() {
   const { mode, setMode } = useTheme();
@@ -27,6 +31,11 @@ export default function AppSettingsPage() {
   const updateInfo = useUpdateStore((state) => state.info);
   const automaticChecksEnabled = useUpdateStore((state) => state.automaticChecksEnabled);
   const navigate = useNavigate();
+  const token = useAuthStore((state) => state.token);
+  const health = useServerHealth();
+  const activeWorkspaceName = useWorkspaceStore(
+    (state) => state.profiles.find((profile) => profile.id === state.activeWorkspaceId)?.name,
+  );
   return (
     <SettingsShell
       activePane="general"
@@ -209,6 +218,19 @@ export default function AppSettingsPage() {
               v{platformApi.runtime.appVersion}
             </span>
           </SettingsRow>
+          {token && health?.version && (
+            <SettingsRow
+              label={activeWorkspaceName ?? translateUi('Server')}
+              sublabel={translateUi('Server version')}
+            >
+              <span className="cc-settings-status cc-settings-status--muted">
+                v{health.version}
+              </span>
+            </SettingsRow>
+          )}
+          {token && (
+            <ServerVersionNotice serverVersion={health?.version} serverName={activeWorkspaceName} />
+          )}
         </SettingsSection>
       </div>
     </SettingsShell>

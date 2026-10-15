@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 
+import BackgroundRunNotice from './BackgroundRunNotice';
 import NativeCommandBridge from './NativeCommandBridge';
 import RemoteSessionPersistence from './RemoteSessionPersistence';
 import WorkspaceRuntimeInitializer from './WorkspaceRuntimeInitializer';
@@ -13,6 +14,7 @@ export default function AppRuntimeServices() {
         <DeferredDeleteRuntime />
       </Suspense>
       <NativeCommandBridge />
+      <BackgroundRunNotice />
       <WorkspaceRuntimeInitializer />
       <RemoteSessionPersistence />
     </>

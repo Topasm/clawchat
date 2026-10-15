@@ -1703,4 +1703,35 @@ export const koreanUiTranslations: Record<string, string> = {
   'Set up ClawChat': 'ClawChat 설정',
   'Skip setup': '설정 건너뛰기',
   'Setup steps': '설정 단계',
+  'Server version': '서버 버전',
+  'Got it': '확인',
+  'Set up': '설정',
+  'On this device': '이 기기에 있음',
+  'Update needed': '업데이트 필요',
+  'AI not connected': 'AI 연결 안 됨',
+  'Briefings and chat replies use plain text until an AI provider is set up.':
+    'AI 제공자를 설정하기 전까지 브리핑과 채팅 답변은 일반 텍스트로 표시됩니다.',
+  'Update {{server}} to {{version}} so every feature in this app works.':
+    '이 앱의 모든 기능을 쓰려면 {{server}}를 {{version}}(으)로 업데이트하세요.',
+  'Update this app to {{version}} to match {{server}}.':
+    '{{server}}와 맞추려면 이 앱을 {{version}}(으)로 업데이트하세요.',
+  'Install the same release on both so they work together.':
+    '함께 동작하도록 양쪽에 같은 릴리스를 설치하세요.',
+  '{{server}} runs {{serverVersion}}; this app is {{appVersion}}.':
+    '{{server}}는 {{serverVersion}}, 이 앱은 {{appVersion}}입니다.',
+  'Only on this device · waiting to sync to {{workspace}}':
+    '이 기기에만 있음 · {{workspace}}에 동기화 대기 중',
+  'Saved to {{workspace}}': '{{workspace}}에 저장됨',
+  'Saved on this device. It will sync to {{workspace}} when you are back online.':
+    '이 기기에 저장했습니다. 다시 연결되면 {{workspace}}에 동기화됩니다.',
+  'To quit, choose Quit ClawChat from the menu-bar icon or press ⌘Q.':
+    '종료하려면 메뉴 막대 아이콘에서 ClawChat 종료를 선택하거나 ⌘Q를 누르세요.',
+  'To quit, choose Quit ClawChat from the tray icon menu.':
+    '종료하려면 트레이 아이콘 메뉴에서 ClawChat 종료를 선택하세요.',
+  'ClawChat is still running': 'ClawChat이 계속 실행 중입니다',
+  'ClawChat keeps running in the background': 'ClawChat은 백그라운드에서 계속 실행됩니다',
+  'Closing the window hides it, so your workspace stays available to your other devices and agents.':
+    '창을 닫으면 숨겨질 뿐이라 다른 기기와 에이전트가 계속 Workspace를 사용할 수 있습니다.',
+  "This window uses another workspace. Settings for this device's own server appear when you switch back to This device.":
+    '이 창은 다른 Workspace를 사용 중입니다. 이 기기 서버 설정은 이 기기로 다시 전환하면 표시됩니다.',
 };

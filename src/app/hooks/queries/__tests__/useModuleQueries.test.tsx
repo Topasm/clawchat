@@ -19,6 +19,7 @@ import {
 import { queryKeys } from '../queryKeys';
 import { useToastStore } from '../../../stores/useToastStore';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import { useWorkspaceStore } from '../../../stores/useWorkspaceStore';
 import { deferredDeleteQueue } from '../../../services/deferredDeleteQueue';
 import { getOfflineQueueScope } from '../../../services/offlineQueue';
 
@@ -181,6 +182,46 @@ describe('todo mutations', () => {
       true,
     );
     expect(queryClient.getQueryState(queryKeys.projects)?.isInvalidated).toBe(true);
+  });
+
+  it('says a task created offline is held on this device for the named workspace', async () => {
+    useWorkspaceStore.setState({
+      profiles: [
+        ...useWorkspaceStore.getState().profiles.filter((profile) => profile.kind === 'local'),
+        {
+          id: 'remote-home',
+          kind: 'remote',
+          name: 'Home',
+          serverUrl: 'https://host.example',
+          hostId: 'host-1',
+          hostPublicKey: null,
+          apiVersion: '1',
+          credentialRef: null,
+          endpoints: [],
+          lastConnectedAt: null,
+        },
+      ],
+      activeWorkspaceId: 'remote-home',
+    });
+    useToastStore.setState({ toasts: [] });
+    apiMocks.post.mockResolvedValueOnce({ data: {}, status: 0, statusText: 'offline-queued' });
+    const { queryClient, wrapper } = createHarness();
+    const { result } = renderHook(() => useCreateTodo(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ title: 'Written on the train' });
+    });
+
+    const messages = useToastStore.getState().toasts.map((toast) => toast.message);
+    expect(messages).toContain(
+      'Saved on this device. It will sync to Home when you are back online.',
+    );
+    expect(messages).not.toContain('Task created');
+    const pending = queryClient
+      .getQueryData<TodoResponse[]>(queryKeys.todos)
+      ?.find((candidate) => candidate.title === 'Written on the train');
+    expect(pending?.id.startsWith('temp-')).toBe(true);
+    useWorkspaceStore.getState().reset();
   });
 
   it('invalidates derived graph data after updating a task', async () => {

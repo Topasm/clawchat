@@ -152,6 +152,47 @@ describe('WorkspaceConnectionsSection', () => {
     expect(await screen.findByText(/Local port 8000/)).toBeInTheDocument();
   });
 
+  it('shows this device server settings while hosting the local workspace', async () => {
+    renderSection();
+
+    expect(await screen.findByRole('switch', { name: 'Local server' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Keep available in tray' })).toBeInTheDocument();
+  });
+
+  it('hides local server settings while the window is a client of another Home', async () => {
+    useWorkspaceStore
+      .getState()
+      .upsertRemote('Home', 'https://home.example', { hostId: 'claw_home', apiVersion: '1' });
+    renderSection();
+
+    expect(await screen.findByText(/This window uses another workspace/)).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Local server' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('switch', { name: 'Keep available in tray' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Local network PIN')).not.toBeInTheDocument();
+  });
+
+  it('offers to open this device when legacy client mode left its server off', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      appMode: 'client',
+      localServerEnabled: false,
+      keepRunningInTray: false,
+      autoStartHost: false,
+      lanAccess: false,
+      port: 8000,
+      pinConfigured: true,
+      defaultPinInUse: false,
+      obsidianVaultPath: '',
+      hostServerUrl: '',
+    });
+    mocks.getStatus.mockResolvedValueOnce({ state: 'stopped', port: 8000 });
+    renderSection();
+
+    expect(await screen.findByRole('button', { name: 'Use' })).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Local server' })).not.toBeInTheDocument();
+  });
+
   it('updates the PIN while explicitly enabling trusted LAN access', async () => {
     renderSection();
 
@@ -203,7 +244,7 @@ describe('WorkspaceConnectionsSection', () => {
 
   it('explains why LAN access is unavailable while the local server is off', async () => {
     mocks.getConfig.mockResolvedValueOnce({
-      appMode: 'client',
+      appMode: 'host',
       localServerEnabled: false,
       keepRunningInTray: false,
       autoStartHost: false,

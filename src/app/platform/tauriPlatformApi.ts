@@ -36,6 +36,7 @@ const eventNames: Record<NativeEventChannel, string> = {
   'open-settings': TAURI_EVENTS.openSettings,
   'notification:action': TAURI_EVENTS.notificationAction,
   navigate: TAURI_EVENTS.navigate,
+  'main-window-hidden': TAURI_EVENTS.mainWindowHidden,
 };
 
 function subscribeNativeEvent<Channel extends NativeEventChannel>(

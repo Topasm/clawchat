@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import StorageLocationBadge from '../components/shared/StorageLocationBadge';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
@@ -217,6 +218,7 @@ export default function TaskDetailPage() {
             <Badge variant="status">{task.inbox_state}</Badge>
           )}
         </div>
+        <StorageLocationBadge item={task} variant="line" />
       </div>
 
       {/* Section 1: Next Step. A task with no plan and no sub-task is its own

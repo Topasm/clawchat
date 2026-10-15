@@ -590,3 +590,115 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* --- Workspace status notices ----------------------------- */
+.cc-ai-setup-banner,
+.cc-version-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-3);
+  margin: 0 0 var(--cc-space-3);
+  padding: var(--cc-space-2) var(--cc-space-3);
+  border: 1px solid color-mix(in srgb, var(--cc-warning) 38%, var(--cc-border));
+  border-radius: var(--cc-radius-md);
+  background: color-mix(in srgb, var(--cc-warning) 8%, var(--cc-surface));
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cc-ai-setup-banner strong,
+.cc-version-notice strong {
+  color: var(--cc-text);
+}
+
+.cc-ai-setup-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cc-ai-setup-banner__action {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.cc-ai-setup-banner--panel {
+  margin: var(--cc-space-2) var(--cc-space-3) 0;
+}
+
+.cc-chat-page > .cc-ai-setup-banner {
+  margin: var(--cc-space-2) var(--cc-space-4) 0;
+}
+
+.cc-version-notice {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.cc-version-notice--login {
+  margin-top: -6px;
+  margin-bottom: var(--cc-space-4);
+}
+
+.cc-background-notice {
+  position: fixed;
+  right: var(--cc-space-4);
+  bottom: var(--cc-space-4);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: var(--cc-space-3);
+  max-width: 420px;
+  padding: var(--cc-space-3) var(--cc-space-4);
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-overlay);
+  background: var(--cc-surface);
+  box-shadow: var(--cc-shadow-overlay);
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cc-background-notice__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-background-notice__body strong {
+  color: var(--cc-text);
+  font-size: 13px;
+}
+
+/* --- Where an item is stored ------------------------------- */
+.cc-storage-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  margin-left: var(--cc-space-1);
+  padding: 1px 5px;
+  border: 1px dashed color-mix(in srgb, var(--cc-warning) 55%, var(--cc-border));
+  border-radius: var(--cc-radius-xs);
+  color: var(--cc-text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cc-card__meta > .cc-storage-badge {
+  margin-left: 0;
+}
+
+.cc-storage-line {
+  margin-top: var(--cc-space-1);
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+}
+
+.cc-storage-line--pending {
+  color: var(--cc-warning);
+  font-weight: 600;
+}

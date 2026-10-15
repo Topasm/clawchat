@@ -10,7 +10,6 @@ import {
 import type { PanelSize } from 'react-resizable-panels';
 import { useTheme } from '../config/ThemeContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
-import apiClient from '../services/apiClient';
 import ChatPanel from './chat-panel/ChatPanel';
 import { ChatPanelControllerProvider } from './chat-panel/ChatPanelControllerContext';
 import ErrorBoundary from './shared/ErrorBoundary';
@@ -44,7 +43,6 @@ import { setAppBadge } from '../services/badgeService';
 import useCommandPalette from '../hooks/useCommandPalette';
 import useProjectRootIds from '../hooks/useProjectRootIds';
 import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
-import type { HealthResponse } from '../types/api';
 import type { ColorPalette } from '../config/theme';
 // --- SVG icon components ---
 import {
@@ -62,7 +60,10 @@ import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
 import { getAttentionBadgeCounts } from '../utils/attentionBadge';
 import UpdateNotification from './shared/UpdateNotification';
-import { StatusDot } from './shared/WorkspacePrimitives';
+import WorkspaceStatusHeader from './shared/WorkspaceStatusHeader';
+import { useServerHealthStore } from '../stores/useServerHealthStore';
+import { useServerHealthPolling } from '../hooks/useServerHealth';
+import { workspaceAddressLabel } from '../utils/workspaceLocation';
 import { platformApi } from '../platform';
 import { settingsNavigationState } from '../services/settingsNavigation';
 import WorkerStatusLine from './shared/WorkerStatusLine';
@@ -200,36 +201,8 @@ export default function Layout() {
   // Offline queue: monitor network status and flush on reconnect
   const { isFlushing, pendingCount } = useNetworkStatus(refresh);
   // Health check polling
-  const setHealthOK = useAuthStore((s) => s.setHealthOK);
-  const [healthData, setHealthData] = useState<HealthResponse | null>(null);
-  useEffect(() => {
-    if (!serverUrl) {
-      setHealthData(null);
-      setHealthOK(true);
-      return;
-    }
-    let cancelled = false;
-    const fetchHealth = async () => {
-      try {
-        const res = await apiClient.get(`${serverUrl}/api/health`);
-        if (!cancelled) {
-          setHealthData(res.data);
-          setHealthOK(true);
-        }
-      } catch {
-        if (!cancelled) {
-          setHealthData(null);
-          setHealthOK(false);
-        }
-      }
-    };
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [serverUrl, setHealthOK]);
+  useServerHealthPolling();
+  const healthData = useServerHealthStore((s) => (s.serverUrl === serverUrl ? s.health : null));
   // WebSocket connection for real-time updates
   useWebSocket();
   // Wire global keyboard shortcuts
@@ -330,39 +303,21 @@ export default function Layout() {
           </button>
         </span>
       </div>
-      <button
-        type="button"
-        className={`cc-connection-status cc-connection-status--${connectionStatus}`}
-        title={`${activeWorkspaceName} · ${connectionLabel}${healthData ? ` · AI: ${healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}` : ''}`}
-        aria-label={translateUi('Switch workspace. Current: {{name}}', {
-          name: activeWorkspaceName,
-        })}
+      <WorkspaceStatusHeader
+        name={activeWorkspaceName}
+        address={workspaceAddressLabel(serverUrl)}
+        connectionStatus={connectionStatus}
+        connectionLabel={connectionLabel}
+        pendingCount={pendingCount}
+        pendingLabel={t('connection.pending', { count: pendingCount })}
+        health={healthData}
+        aiOfflineLabel={t('connection.aiOffline')}
         onClick={() =>
           navigate('/connections', {
             state: settingsNavigationState(location.pathname, location.search, location.state),
           })
         }
-      >
-        <StatusDot className="cc-connection-status__dot" />
-        <span className="cc-sidebar__label">
-          {activeWorkspaceName} · {connectionLabel}
-          {pendingCount > 0 && (
-            <span
-              className="cc-offline-badge"
-              title={t('connection.pending', { count: pendingCount })}
-            >
-              {pendingCount}
-            </span>
-          )}
-          {healthData && (
-            <span className="cc-connection-status__ai">
-              {' · '}
-              {translateUi('AI: ')}
-              {healthData.ai_connected ? healthData.ai_model : t('connection.aiOffline')}
-            </span>
-          )}
-        </span>
-      </button>
+      />
       <WorkerStatusLine />
       {filteredPrimaryNavItems.map((item) => (
         <NavLink
@@ -527,6 +482,7 @@ export default function Layout() {
               <div className={`cc-mobile-status-bar cc-mobile-status-bar--${connectionStatus}`}>
                 <span className="cc-mobile-status-bar__dot" />
                 <span>
+                  {activeWorkspaceName} ·{' '}
                   {isFlushing
                     ? t('connection.syncing')
                     : t(CONNECTION_LABEL_KEYS[connectionStatus])}
