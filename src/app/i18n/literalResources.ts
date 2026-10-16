@@ -1,5 +1,9 @@
 /** Korean translations keyed by their canonical English UI message. */
 export const koreanUiTranslations: Record<string, string> = {
+  Progress: '진행',
+  '{{percent}}% done': '{{percent}}% 완료',
+  'Check {{count}}': '확인 {{count}}',
+  'Running {{count}}': '실행 {{count}}',
   Notes: '메모',
   'Long-press a note and drop it on a project. Tap a project to see its notes.':
     '메모를 길게 눌러 프로젝트에 놓으세요. 프로젝트를 누르면 모아 둔 메모를 볼 수 있습니다.',

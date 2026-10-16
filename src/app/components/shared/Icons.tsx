@@ -190,6 +190,15 @@ export function WarningIcon({ size = ICON_SIZE.feature, className, label }: Icon
   );
 }
 
+export function FlagIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
+  return (
+    <IconBase size={size} className={className} label={label} strokeWidth={2.2}>
+      <path d="M4 16.5V2.5" />
+      <path d="M4 3h10l-2.6 3.5L14 10H4" />
+    </IconBase>
+  );
+}
+
 export function PinIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
   return (
     <IconBase size={size} className={className} label={label}>

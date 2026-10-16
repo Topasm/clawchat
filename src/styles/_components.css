@@ -8,9 +8,8 @@
 .cc-card {
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--cc-border-subtle);
-  border-radius: var(--cc-radius-row);
-  padding: 10px 12px;
+  border-radius: var(--cc-radius-md);
+  padding: 8px 10px;
   cursor: pointer;
   transition:
     background var(--cc-transition-fast),
@@ -178,11 +177,11 @@
 
 /* --- Checkbox --------------------------------------------- */
 .cc-checkbox {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
-  border-radius: var(--cc-radius-xs);
-  border: 1.5px solid var(--cc-border);
+  border-radius: var(--cc-radius-pill);
+  border: 1.5px solid var(--cc-text-tertiary);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -207,8 +206,8 @@
 }
 
 .cc-checkbox--checked {
-  background: var(--cc-success);
-  border-color: var(--cc-success);
+  background: var(--cc-primary);
+  border-color: var(--cc-primary);
 }
 
 .cc-checkbox__check {
@@ -280,9 +279,29 @@
 
 .cc-section__title {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--cc-text);
+  font-weight: 700;
+  color: var(--cc-link);
   flex: 1;
+}
+
+/* A section's heading anywhere: blue words over one thin line. */
+.cc-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 6px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--cc-border);
+  color: var(--cc-link);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cc-section-title small,
+.cc-section-title .cc-section__count {
+  color: var(--cc-text-tertiary);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 /* Colour only when something waits on an answer (amber) or has failed (red). */

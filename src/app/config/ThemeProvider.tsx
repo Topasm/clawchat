@@ -24,7 +24,7 @@ function applyDocumentTheme(isDark: boolean) {
   document.documentElement.style.colorScheme = theme;
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', isDark ? '#111316' : '#F7F8FA');
+    ?.setAttribute('content', isDark ? '#1E1E20' : '#FFFFFF');
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

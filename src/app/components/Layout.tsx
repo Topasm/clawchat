@@ -36,6 +36,7 @@ import PullToRefresh from './shared/PullToRefresh';
 import { ChatBubbleIcon, ChevronLeftIcon, ChevronRightIcon } from './shared/Icons';
 import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import {
+  useAgentRunsQuery,
   useCapabilitiesQuery,
   useReviewsQuery,
   useRunsAwaitingInputQuery,
@@ -48,7 +49,8 @@ import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
 import type { TodoResponse } from '../types/api';
 // --- SVG icon components ---
-import { InboxIcon, ProjectsIcon, TasksIcon, NavCalendarIcon, ReviewIcon } from './shared/NavIcons';
+import { InboxIcon, TasksIcon, NavCalendarIcon, ProgressIcon, TodayIcon } from './shared/NavIcons';
+import SidebarProjects from './shared/SidebarProjects';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
 import { getAttentionBadgeCounts } from '../utils/attentionBadge';
@@ -66,16 +68,19 @@ const SimpleMode = lazy(() => import('./SimpleMode'));
 function cssVars(colors: ColorPalette, fontSize: number): React.CSSProperties {
   return {
     '--cc-background': colors.background,
+    '--cc-sidebar': colors.sidebar,
     '--cc-surface': colors.surface,
     '--cc-surface-secondary': colors.surfaceSecondary,
     '--cc-text': colors.text,
     '--cc-text-secondary': colors.textSecondary,
     '--cc-text-tertiary': colors.textTertiary,
     '--cc-border': colors.border,
+    '--cc-connector': colors.connector,
     '--cc-disabled': colors.disabled,
     '--cc-primary': colors.primary,
     '--cc-primary-light': colors.primaryLight,
     '--cc-primary-dark': colors.primaryDark,
+    '--cc-link': colors.link,
     '--cc-secondary': colors.secondary,
     '--cc-success': colors.success,
     '--cc-warning': colors.warning,
@@ -99,17 +104,37 @@ const CONNECTION_LABEL_KEYS: Record<ConnectionStatus, string> = {
   disconnected: 'connection.disconnected',
   reconnecting: 'connection.reconnecting',
 };
-const primaryNavItems = [
-  { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
-  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
-  { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
-  { to: '/projects', labelKey: 'nav.projects', Icon: ProjectsIcon },
+// The five places, each with its own coloured icon; projects follow as a list
+// of their own. Progress is where everything agents stopped on or are doing
+// lives; the run log and review history are views of it. Search, settings,
+// devices and automations live in the workspace menu at the sidebar's foot.
+interface NavItem {
+  to: string;
+  labelKey: string;
+  Icon: typeof InboxIcon;
+  tone: string;
+  isActive?: (pathname: string) => boolean;
+}
+const primaryNavItems: NavItem[] = [
+  { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon, tone: 'inbox' },
+  {
+    to: '/schedule/today',
+    labelKey: 'nav.today',
+    Icon: TodayIcon,
+    tone: 'today',
+    isActive: (pathname) => pathname === '/schedule/today',
+  },
+  {
+    to: '/schedule/week',
+    labelKey: 'nav.schedule',
+    Icon: NavCalendarIcon,
+    tone: 'schedule',
+    isActive: (pathname) => pathname.startsWith('/schedule') && pathname !== '/schedule/today',
+  },
+  { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon, tone: 'tasks' },
+  { to: '/attention', labelKey: 'nav.attention', Icon: ProgressIcon, tone: 'progress' },
 ];
-// Attention is the one place for everything agents stopped on. It joins the
-// four places only while something waits there; the run log and review history
-// stay reachable from a task's run, and search, settings, devices and
-// automations live in the workspace menu at the sidebar's foot.
-const attentionNavItem = { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon };
+const RUN_EXECUTING = new Set(['queued', 'starting', 'running']);
 const SIDEBAR_RAIL_WIDTH = 48;
 const SIDEBAR_EXPANDED_MIN_WIDTH = 160;
 const DEFAULT_SIDEBAR_SIZE = 18;
@@ -157,6 +182,11 @@ export default function Layout() {
     useTodosQuery(true, selectTodoCounts);
   const { data: pendingReviews = [] } = useReviewsQuery();
   const { data: runsAwaitingInput = [] } = useRunsAwaitingInputQuery();
+  const { data: agentRuns = [] } = useAgentRunsQuery();
+  const runningCount = useMemo(
+    () => agentRuns.filter((run) => RUN_EXECUTING.has(run.status)).length,
+    [agentRuns],
+  );
   useEffect(() => {
     if (!isDesktop) return;
     void platformApi.appWindow
@@ -238,6 +268,7 @@ export default function Layout() {
   const navBadgeCounts = useMemo<Record<string, number>>(
     () => ({
       '/schedule': dueCount,
+      '/schedule/today': dueCount,
       '/inbox': inboxCount,
       '/tasks': openTaskCount,
       '/attention': pendingReviews.length + runsAwaitingInput.length,
@@ -271,10 +302,13 @@ export default function Layout() {
     else panel.collapse();
   }, [sidebarPanelRef]);
   const attentionCount = navBadgeCounts['/attention'];
-  const showAttention = attentionCount > 0 || location.pathname.startsWith('/attention');
-  const sidebarNavItems = showAttention
-    ? [...filteredPrimaryNavItems, attentionNavItem]
-    : filteredPrimaryNavItems;
+  // Progress says what waits and what runs, in words, not a number alone.
+  const progressBadge = [
+    attentionCount > 0 ? translateUi('Check {{count}}', { count: attentionCount }) : null,
+    runningCount > 0 ? translateUi('Running {{count}}', { count: runningCount }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const sidebar = (
     <nav className={`cc-sidebar${sidebarCollapsed ? ' cc-sidebar--collapsed' : ''}`}>
       <div className="cc-sidebar__header">
@@ -294,27 +328,33 @@ export default function Layout() {
           </button>
         </span>
       </div>
-      {sidebarNavItems.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          className={({ isActive }) =>
-            `cc-nav-item cc-nav-item--primary${isActive ? ' cc-nav-item--active' : ''}`
-          }
-          title={sidebarCollapsed ? t(item.labelKey) : undefined}
-        >
-          <item.Icon />
-          <span className="cc-sidebar__label">{t(item.labelKey)}</span>
-          {navBadgeCounts[item.to] > 0 && (
-            <span
-              className={`cc-nav-badge${item.to === '/attention' ? ' cc-nav-badge--attention' : ''}`}
+      <div className="cc-sidebar__scroll">
+        {filteredPrimaryNavItems.map((item) => {
+          const active = item.isActive
+            ? item.isActive(location.pathname)
+            : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={`cc-nav-item cc-nav-item--primary cc-nav-item--${item.tone}${active ? ' cc-nav-item--active' : ''}`}
+              aria-current={active ? 'page' : undefined}
+              title={sidebarCollapsed ? t(item.labelKey) : undefined}
             >
-              {navBadgeCounts[item.to]}
-            </span>
-          )}
-        </NavLink>
-      ))}
-      <div className="cc-sidebar__spacer" />
+              <item.Icon />
+              <span className="cc-sidebar__label">{t(item.labelKey)}</span>
+              {item.to === '/attention'
+                ? progressBadge && (
+                    <span className="cc-nav-badge cc-nav-badge--attention">{progressBadge}</span>
+                  )
+                : navBadgeCounts[item.to] > 0 && (
+                    <span className="cc-nav-badge">{navBadgeCounts[item.to]}</span>
+                  )}
+            </NavLink>
+          );
+        })}
+        {serverUrl && <SidebarProjects collapsed={sidebarCollapsed} />}
+      </div>
       <WorkerStatusLine />
       <WorkspaceMenu
         workspaceName={activeWorkspaceName}
@@ -507,6 +547,7 @@ export default function Layout() {
                       <AnimatedOutlet />
                     </ErrorBoundary>
                   </div>
+                  {!chatPanel.isOpen && <FloatingActionButton />}
                 </div>
               </Panel>
               {showChatPanel && (

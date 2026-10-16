@@ -1,10 +1,11 @@
 import type { TaskExecutionTelemetryResponse, TodoResponse } from '../../types/api';
 import StorageLocationBadge from '../shared/StorageLocationBadge';
+import Checkbox from '../shared/Checkbox';
+import { FlagIcon } from '../shared/Icons';
 import { formatDueDate, isOverdue } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
 import { describeTaskStage, getTaskStage } from '../../utils/taskStage';
 import type { TaskStageState } from '../../utils/taskStage';
-import TaskStageIndicator from '../shared/TaskStageIndicator';
 import { isWaitingOnPrerequisite } from '../../hooks/useTaskFilters';
 interface TaskListViewProps {
   todos: TodoResponse[];
@@ -12,7 +13,7 @@ interface TaskListViewProps {
   allTodos?: TodoResponse[];
   onOpenTask: (taskId: string) => void;
   onToggleTask: (taskId: string) => void;
-  /** Project titles by id, for the Project column. */
+  /** Project titles by id, for the row's second line. */
   projectTitles?: Map<string, string>;
   telemetryByTaskId?: Map<string, TaskExecutionTelemetryResponse>;
 }
@@ -49,6 +50,12 @@ function getTaskDepth(todo: TodoResponse, todoById: Map<string, TodoResponse>) {
   }
   return Math.min(depth, 4);
 }
+
+/**
+ * One line per task, with a round check: the title, then in grey where it
+ * stands, its project, what it waits on and when it is due. Colour appears
+ * only where it means something -- a deadline, a question, a failure.
+ */
 export default function TaskListView({
   todos,
   allTodos = todos,
@@ -74,98 +81,82 @@ export default function TaskListView({
     );
   }
   return (
-    <div className="cc-task-list" role="table" aria-label={translateUi('Task list')}>
-      <div className="cc-task-list__header" role="row">
-        <span role="columnheader">{translateUi('Task')}</span>
-        <span role="columnheader">{translateUi('Status')}</span>
-        <span role="columnheader">{translateUi('Project')}</span>
-        <span role="columnheader">{translateUi('Due')}</span>
-      </div>
+    <div className="cc-task-rows" role="list" aria-label={translateUi('Task list')}>
       {todos.map((todo) => {
-        const status = todo.status;
+        const done = todo.status === 'completed';
         // The server names the unfinished prerequisites, so the row can say
         // what it waits on; the line goes away once they are completed.
         const waitingOn = isWaitingOnPrerequisite(todo) ? (todo.open_prerequisites ?? []) : [];
-        const { state, label } = describeTaskState(
-          todo,
-          waitingOn.length > 0,
-          telemetryByTaskId?.get(todo.id),
-        );
+        const blocked = waitingOn.length > 0;
+        const { state, label } = describeTaskState(todo, blocked, telemetryByTaskId?.get(todo.id));
         const depth = getTaskDepth(todo, todoById);
         const context =
           (todo.project_id ? projectTitles?.get(todo.project_id) : null) ||
           todo.project_label ||
           (todo.parent_id ? todoById.get(todo.parent_id)?.title : null);
+        // A captured task says nothing about its step; a finished one neither.
+        const showState =
+          Boolean(state.exception) ||
+          blocked ||
+          (state.stage !== 'capture' && state.stage !== 'done' && !done);
+        const running = state.stage === 'run' && !state.exception && !blocked && !done;
+        const overdue = Boolean(todo.due_date) && !done && isOverdue(todo.due_date!);
         return (
           <div
             key={todo.id}
-            className={`cc-task-list__row cc-task-list__row--${state.stage}`}
-            role="row"
-            tabIndex={0}
-            onClick={() => onOpenTask(todo.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onOpenTask(todo.id);
-              }
-            }}
+            className={`cc-task-row cc-task-row--${state.stage}${done ? ' cc-task-row--done' : ''}`}
+            role="listitem"
+            style={depth > 0 ? { marginLeft: depth * 22 } : undefined}
           >
-            <span
-              className="cc-task-list__task"
-              role="cell"
-              style={{ paddingLeft: 12 + depth * 22 }}
-            >
-              <input
-                type="checkbox"
-                checked={status === 'completed'}
-                onChange={() => onToggleTask(todo.id)}
-                onClick={(event) => event.stopPropagation()}
-                aria-label={translateUi(
-                  status === 'completed' ? 'Mark {{title}} incomplete' : 'Mark {{title}} complete',
-                  { title: todo.title },
+            <Checkbox checked={done} onChange={() => onToggleTask(todo.id)} />
+            <button type="button" className="cc-task-row__main" onClick={() => onOpenTask(todo.id)}>
+              <span className="cc-task-row__title">{todo.title}</span>
+              <span className="cc-task-row__meta">
+                {steps.has(todo.id) && (
+                  <span className="cc-task-row__steps">
+                    {translateUi('{{done}}/{{total}} steps', steps.get(todo.id)!)}
+                  </span>
                 )}
-              />
-              {depth > 0 && <i className="cc-task-list__branch" aria-hidden="true" />}
-              <strong>{todo.title}</strong>
-              {steps.has(todo.id) && (
-                <span className="cc-task-list__steps">
-                  {translateUi('{{done}}/{{total}} steps', steps.get(todo.id)!)}
-                </span>
-              )}
-              <StorageLocationBadge item={todo} />
-            </span>
-            <span role="cell" className="cc-task-list__status">
-              <TaskStageIndicator state={state} label={label} />
-              {waitingOn.length > 0 && (
-                <small
-                  className="cc-task-list__waiting"
-                  title={waitingOn.map((entry) => entry.title).join(', ')}
-                >
-                  {translateUi('Waiting on {{title}}', {
-                    title:
-                      waitingOn.length === 1
-                        ? waitingOn[0].title
-                        : translateUi('{{title}} +{{count}}', {
-                            title: waitingOn[0].title,
-                            count: waitingOn.length - 1,
-                          }),
-                  })}
-                </small>
-              )}
-            </span>
-            <span role="cell" title={context ?? undefined}>
-              {context || '—'}
-            </span>
-            <span
-              role="cell"
-              className={
-                todo.due_date && status !== 'completed' && isOverdue(todo.due_date)
-                  ? 'cc-task-list__overdue'
-                  : ''
-              }
-            >
-              {todo.due_date ? formatDueDate(todo.due_date) : '—'}
-            </span>
+                {showState && (
+                  <span
+                    className={`cc-task-row__state${state.exception ? ` cc-task-row__state--${state.exception}` : ''}`}
+                  >
+                    {running && <i className="cc-task-row__dot" aria-hidden="true" />}
+                    {label}
+                  </span>
+                )}
+                {context && (
+                  <span className="cc-task-row__context" title={context}>
+                    {context}
+                  </span>
+                )}
+                {blocked && (
+                  <small
+                    className="cc-task-row__waiting"
+                    title={waitingOn.map((entry) => entry.title).join(', ')}
+                  >
+                    {translateUi('Waiting on {{title}}', {
+                      title:
+                        waitingOn.length === 1
+                          ? waitingOn[0].title
+                          : translateUi('{{title}} +{{count}}', {
+                              title: waitingOn[0].title,
+                              count: waitingOn.length - 1,
+                            }),
+                    })}
+                  </small>
+                )}
+                {todo.due_date && (
+                  <span
+                    className={`cc-task-row__due${overdue ? ' cc-task-row__due--overdue' : ''}`}
+                  >
+                    <FlagIcon size={11} className="cc-task-row__flag" />
+                    {formatDueDate(todo.due_date)}
+                  </span>
+                )}
+                <StorageLocationBadge item={todo} />
+              </span>
+            </button>
           </div>
         );
       })}

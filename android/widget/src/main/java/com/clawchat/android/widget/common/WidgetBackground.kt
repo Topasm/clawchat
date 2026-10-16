@@ -16,8 +16,8 @@ import com.clawchat.android.widget.R
 fun GlanceModifier.widgetBackground(backgroundOpacity: Float): GlanceModifier {
     val opacity = backgroundOpacity.coerceIn(0f, 1f)
     val backgroundColor = ColorProvider(
-        day = Color(0xFFF7F8FA).copy(alpha = opacity),
-        night = Color(0xFF181B1F).copy(alpha = opacity),
+        day = Color(0xFFFFFFFF).copy(alpha = opacity),
+        night = Color(0xFF1E1E20).copy(alpha = opacity),
     )
 
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

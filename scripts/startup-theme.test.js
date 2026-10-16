@@ -19,7 +19,7 @@ function runStartupTheme({
   navigatorLanguage = 'en-US',
 } = {}) {
   const themeColor = {
-    content: '#F7F8FA',
+    content: '#FFFFFF',
     setAttribute(name, value) {
       if (name === 'content') this.content = value;
     },
@@ -52,7 +52,7 @@ test('applies a stored dark theme before the app starts', () => {
 
   assert.equal(documentElement.dataset.ccTheme, 'dark');
   assert.equal(documentElement.style.colorScheme, 'dark');
-  assert.equal(themeColor.content, '#111316');
+  assert.equal(themeColor.content, '#1E1E20');
 });
 
 test('resolves system mode from the OS color scheme', () => {
@@ -65,7 +65,7 @@ test('falls back safely when storage is unavailable', () => {
   const { documentElement, themeColor } = runStartupTheme({ storageError: true });
 
   assert.equal(documentElement.dataset.ccTheme, 'light');
-  assert.equal(themeColor.content, '#F7F8FA');
+  assert.equal(themeColor.content, '#FFFFFF');
 });
 
 test('applies a stored application language before the shell paints', () => {
