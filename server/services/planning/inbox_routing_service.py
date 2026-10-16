@@ -323,11 +323,12 @@ async def task_to_note(
     kind_confidence: float | None = None,
 ) -> InboxRouting:
     await _require_plain_capture(db, todo)
+    # Before the history is detached: closing finds the plans by their root task.
+    await review_item_service.close_task_plan_reviews(db, [todo.id])
     before = _todo_row(todo)
     before.update(await _detach_history(db, todo.id))
     note = Note(content=_note_content(todo), project_id=todo.project_id)
     db.add(note)
-    await review_item_service.close_task_plan_reviews(db, [todo.id])
     await db.delete(todo)
     await db.flush()
     return _record(
