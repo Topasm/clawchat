@@ -794,6 +794,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Offline — work here is refused until it is back':
     '오프라인 — 돌아올 때까지 이 기기 작업은 거절됩니다',
   'Where this runs': '어디서 실행하나',
+  'Folder on each device': '기기별 폴더 경로',
   'Applies to all tasks in this project.': '이 프로젝트의 모든 작업에 적용됩니다.',
   'Loading machines…': '기기를 불러오는 중…',
   'Runs here': '여기서 실행',
@@ -1177,8 +1178,8 @@ export const koreanUiTranslations: Record<string, string> = {
   'Pick the machine that holds this folder.': '이 폴더가 있는 머신을 고르세요.',
   'No machines registered. Open ClawChat on the machine that holds the folder and turn it on in Settings.':
     '등록된 머신이 없습니다. 폴더가 있는 머신에서 ClawChat을 열고 설정에서 켜세요.',
-  'Project created, but the folder could not be attached. Set it under "Where this runs".':
-    '프로젝트는 만들어졌지만 폴더를 연결하지 못했습니다. "Where this runs"에서 지정하세요.',
+  'Project created, but the folder could not be attached. Set it under "Folder on each device".':
+    '프로젝트는 만들어졌지만 폴더를 연결하지 못했습니다. "기기별 폴더 경로"에서 지정하세요.',
   'Folder context: {{files}} · updated {{time}}': '폴더 컨텍스트: {{files}} · {{time}} 갱신',
   'No folder context yet — the machine sends its README when it checks in or runs work here.':
     '폴더 컨텍스트가 아직 없습니다 — 머신이 체크인하거나 여기서 작업을 실행할 때 README를 보냅니다.',

@@ -22,6 +22,10 @@
   padding: 8px 0 16px;
   align-items: flex-start;
 }
+/* Inside a project the notes are already that project's. */
+.cc-notes__projects[hidden] {
+  display: none;
+}
 .cc-notes__target {
   flex-shrink: 0;
   min-width: 120px;

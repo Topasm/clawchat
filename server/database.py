@@ -847,11 +847,17 @@ async def _run_data_migrations(
 #: was lost regains one instead of leaving its tasks orphaned.
 LEGACY_PROJECT_ROOT_SOURCES = frozenset({"obsidian_project", "project_root"})
 
+#: Set once the pre-Project workspaces have been promoted. After that a root
+#: with steps or a conversation is just a task: a Project exists only because
+#: someone made one.
+FIRST_CLASS_PROJECTS_MARKER = "first_class_projects_v1"
+
 
 async def _backfill_first_class_projects(session: AsyncSession) -> None:
     """Promote legacy root-Todo workspaces without changing task identity."""
     from collections import defaultdict, deque
 
+    from models.data_migration_marker import DataMigrationMarker
     from models.conversation import Conversation
     from models.event import Event
     from models.plan_proposal import PlanProposal
@@ -859,6 +865,19 @@ async def _backfill_first_class_projects(session: AsyncSession) -> None:
     from models.task_graph_state import TaskGraphState
     from models.todo import Todo
     from utils import make_id
+
+    # The structural guess (steps, a chat) is only for a database that never had
+    # Projects: it runs once. A database that already has them, or starts
+    # empty, keeps every later task a task -- this runs on each startup, so the
+    # guess would otherwise turn a task with steps into a Project overnight.
+    marker = await session.get(DataMigrationMarker, FIRST_CLASS_PROJECTS_MARKER)
+    import_legacy_workspaces = (
+        marker is None
+        and (await session.execute(select(Project.id).limit(1))).first() is None
+    )
+    if marker is None:
+        session.add(DataMigrationMarker(name=FIRST_CLASS_PROJECTS_MARKER))
+        await session.flush()
 
     todos = list((await session.execute(select(Todo))).scalars().all())
     if not todos:
@@ -893,10 +912,9 @@ async def _backfill_first_class_projects(session: AsyncSession) -> None:
         # provenance, not structure -- every quick capture carries one, and
         # this runs on each startup, so matching them turned every capture
         # into an empty Project overnight.
-        qualifies = (
-            bool(children.get(root.id))
-            or root.id in linked_root_ids
-            or root.source in LEGACY_PROJECT_ROOT_SOURCES
+        qualifies = root.source in LEGACY_PROJECT_ROOT_SOURCES or (
+            import_legacy_workspaces
+            and (bool(children.get(root.id)) or root.id in linked_root_ids)
         )
         if not qualifies:
             continue

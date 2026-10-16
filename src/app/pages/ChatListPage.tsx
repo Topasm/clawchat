@@ -15,6 +15,7 @@ import { CheckIcon, ChevronRightIcon, TrashIcon } from '../components/shared/Ico
 import { ProjectsIcon } from '../components/shared/NavIcons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import ProjectCreateDialog from '../components/projects/ProjectCreateDialog';
+import ProjectFolderCandidates from '../components/projects/ProjectFolderCandidates';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
 import { getProjectIcon } from '../utils/projectIcons';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
@@ -247,6 +248,8 @@ export default function ChatListPage() {
           })}
         </div>
       )}
+
+      <ProjectFolderCandidates />
 
       {!loading && projects.length === 0 && (
         <EmptyState

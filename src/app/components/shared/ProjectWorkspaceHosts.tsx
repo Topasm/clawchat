@@ -123,7 +123,7 @@ export default function ProjectWorkspaceHosts({ projectId }: { projectId: string
     <section className="cc-project-workspace__section">
       <div className="cc-project-workspace__section-header">
         <div>
-          <h2>{translateUi('Where this runs')}</h2>
+          <h2>{translateUi('Folder on each device')}</h2>
           <p>{translateUi('Applies to all tasks in this project.')}</p>
         </div>
         <span className={`cc-settings-status cc-settings-status--${statusTone()}`}>
