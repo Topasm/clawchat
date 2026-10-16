@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -164,6 +166,17 @@ fun SettingsScreen(
                             authMode = state.authMode,
                         )
                     }
+                }
+            }
+
+            state.calendarAutoAdd?.takeIf { state.workspaceMode == WorkspaceMode.SERVER }?.let { autoAdd ->
+                item {
+                    CalendarSuggestionsSection(
+                        autoAdd = autoAdd,
+                        isSaving = state.isSavingCalendarAutoAdd,
+                        failed = state.calendarAutoAddFailed,
+                        onToggle = viewModel::setCalendarAutoAdd,
+                    )
                 }
             }
 
@@ -485,6 +498,55 @@ private fun SettingsSection(
         }
         if (showDivider) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+    }
+}
+
+@Composable
+private fun CalendarSuggestionsSection(
+    autoAdd: Boolean,
+    isSaving: Boolean,
+    failed: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    val label = stringResource(R.string.settings_calendar_auto_add)
+    SettingsSection(
+        title = stringResource(R.string.settings_calendar_suggestions),
+        subtitle = stringResource(R.string.settings_calendar_suggestions_description),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = autoAdd,
+                    enabled = !isSaving,
+                    role = Role.Switch,
+                    onValueChange = onToggle,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(label, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    stringResource(R.string.settings_calendar_auto_add_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = autoAdd,
+                // The row handles the tap, so the switch is read once by TalkBack.
+                onCheckedChange = null,
+                enabled = !isSaving,
+            )
+        }
+        if (failed) {
+            Text(
+                stringResource(R.string.settings_calendar_auto_add_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

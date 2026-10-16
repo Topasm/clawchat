@@ -181,7 +181,7 @@ async def lifespan(app: FastAPI):
     from services.calendar.calendar_sync_service import sync_loop as calendar_sync_loop
 
     app.state.calendar_sync_task = asyncio.create_task(
-        calendar_sync_loop(async_session_factory), name="calendar-sync"
+        calendar_sync_loop(async_session_factory, app.state), name="calendar-sync"
     )
 
     # Outbox recovery is independent of the optional feature scheduler. This

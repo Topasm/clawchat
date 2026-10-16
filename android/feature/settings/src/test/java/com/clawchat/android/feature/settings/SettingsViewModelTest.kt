@@ -6,8 +6,10 @@ import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.data.WorkspaceMode
 import com.clawchat.android.core.data.model.DeviceListResponse
 import com.clawchat.android.core.data.model.HealthResponse
+import com.clawchat.android.core.data.model.TodaySuggestionList
 import com.clawchat.android.core.data.repository.DeviceRepository
 import com.clawchat.android.core.data.repository.SettingsRepository
+import com.clawchat.android.core.data.repository.TodayRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.update.AppUpdateManager
@@ -26,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -41,6 +44,7 @@ class SettingsViewModelTest {
     private val sessionStore = mockk<SessionStore>(relaxed = true)
     private val updateManager = mockk<AppUpdateManager>(relaxed = true)
     private val syncManager = mockk<SyncManager>()
+    private val todayRepository = mockk<TodayRepository>()
     private val runtimeState = MutableStateFlow(serverRuntimeState())
 
     @Before
@@ -55,6 +59,7 @@ class SettingsViewModelTest {
         every { syncManager.isConnected } returns MutableStateFlow(true)
         every { syncManager.lastEventAtEpochMillis } returns MutableStateFlow(1_700_000_000_000L)
         every { syncManager.lastConnectionError } returns MutableStateFlow(null)
+        coEvery { todayRepository.getSuggestions() } returns ApiResult.Success(TodaySuggestionList(autoAdd = true))
     }
 
     @After
@@ -85,6 +90,7 @@ class SettingsViewModelTest {
             sessionStore,
             updateManager,
             syncManager,
+            todayRepository,
         )
         advanceUntilIdle()
 
@@ -117,6 +123,7 @@ class SettingsViewModelTest {
             sessionStore,
             updateManager,
             syncManager,
+            todayRepository,
         )
         advanceUntilIdle()
 
@@ -149,6 +156,7 @@ class SettingsViewModelTest {
             sessionStore,
             updateManager,
             syncManager,
+            todayRepository,
         )
         advanceUntilIdle()
 
@@ -177,6 +185,7 @@ class SettingsViewModelTest {
             sessionStore,
             updateManager,
             syncManager,
+            todayRepository,
         )
         advanceUntilIdle()
 
@@ -213,6 +222,7 @@ class SettingsViewModelTest {
             sessionStore,
             updateManager,
             syncManager,
+            todayRepository,
         )
         advanceUntilIdle()
 
@@ -258,6 +268,7 @@ class SettingsViewModelTest {
             sessionStore,
             updateManager,
             syncManager,
+            todayRepository,
         )
         advanceUntilIdle()
 
@@ -268,6 +279,81 @@ class SettingsViewModelTest {
         assertEquals("1.0.0", viewModel.uiState.value.health?.version)
         coVerify(exactly = 1) { sessionStore.activateSavedServer() }
     }
+
+    @Test
+    fun `the calendar auto-add switch shows the server value and saves a change`() = runTest {
+        stubServerLoad()
+        coEvery { todayRepository.getSuggestions() } returns ApiResult.Success(TodaySuggestionList(autoAdd = true))
+        coEvery { todayRepository.setSuggestionAutoAdd(false) } returns ApiResult.Success(false)
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+        assertEquals(true, viewModel.uiState.value.calendarAutoAdd)
+
+        viewModel.setCalendarAutoAdd(false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { todayRepository.setSuggestionAutoAdd(false) }
+        val state = viewModel.uiState.value
+        assertEquals(false, state.calendarAutoAdd)
+        assertFalse(state.isSavingCalendarAutoAdd)
+        assertFalse(state.calendarAutoAddFailed)
+    }
+
+    @Test
+    fun `a calendar auto-add change the server refuses is put back`() = runTest {
+        stubServerLoad()
+        coEvery { todayRepository.setSuggestionAutoAdd(false) } returns ApiResult.Error("Offline")
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.setCalendarAutoAdd(false)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(true, state.calendarAutoAdd)
+        assertTrue(state.calendarAutoAddFailed)
+        assertFalse(state.isSavingCalendarAutoAdd)
+    }
+
+    @Test
+    fun `a device-only workspace has no calendar auto-add switch`() = runTest {
+        runtimeState.value = AppRuntimeState(
+            mode = WorkspaceMode.LOCAL,
+            activeSession = null,
+            hasSavedServerSession = false,
+            workspaceKey = "local",
+        )
+        every { sessionStore.hostName } returns flowOf(null)
+        every { sessionStore.accentColor } returns flowOf("system")
+        every { sessionStore.themeMode } returns flowOf("light")
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.calendarAutoAdd)
+        viewModel.setCalendarAutoAdd(false)
+        advanceUntilIdle()
+        coVerify(exactly = 0) { todayRepository.getSuggestions() }
+        coVerify(exactly = 0) { todayRepository.setSuggestionAutoAdd(any()) }
+    }
+
+    private fun stubServerLoad() {
+        every { sessionStore.hostName } returns flowOf("demo.clawchat.app")
+        every { sessionStore.accentColor } returns flowOf("system")
+        every { sessionStore.themeMode } returns flowOf("light")
+        coEvery { settingsRepository.health() } returns ApiResult.Success(
+            HealthResponse(status = "ok", version = "1.0.0", aiProvider = "openai", aiModel = "gpt", aiConnected = true),
+        )
+        coEvery { deviceRepository.listDevices() } returns ApiResult.Success(DeviceListResponse(emptyList()))
+    }
+
+    private fun newViewModel() = SettingsViewModel(
+        settingsRepository,
+        deviceRepository,
+        sessionStore,
+        updateManager,
+        syncManager,
+        todayRepository,
+    )
 
     private fun serverRuntimeState() = AppRuntimeState(
         mode = WorkspaceMode.SERVER,

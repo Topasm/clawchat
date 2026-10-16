@@ -6,6 +6,10 @@ day, a talk its slides, a meeting a progress note, a finished meeting its
 minutes, a weekly class its project. Tasks with a deadline are offered a free
 stretch of time to do them in.
 
+A title no rule matches is asked about once, in a batch, to the active AI, and
+its answer (even "nothing") is kept by event UID so it is never asked twice.
+What the AI finds is only ever suggested.
+
 Only the surest kinds (exams and deadlines) are added without asking, and only
 while the user leaves that on; every addition can be undone. Each suggestion
 is one row keyed by (kind, event, occurrence), so it is never made twice, and
@@ -23,9 +27,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.project import ProjectStatus
 from domain.task import TaskStatus
-from exceptions import ConflictError, NotFoundError
+from exceptions import AIUnavailableError, ConflictError, NotFoundError
 from models.calendar_sync import CalendarAccount, CalendarSource
 from models.event import Event
+from models.event_kind_guess import EventKindGuess
 from models.event_suggestion import EventSuggestion
 from models.note import Note
 from models.project import Project
@@ -35,6 +40,7 @@ from services.calendar import calendar_service
 from services.calendar.scheduling_service import find_free_slots
 from services.notifications import schedule_settings
 from services.tasks import todo_service
+from utils import parse_json_object
 from ws.notifications import DEFAULT_USER_ID, notify_module_data_changed
 
 logger = logging.getLogger(__name__)
@@ -49,6 +55,9 @@ MAX_PENDING_BLOCKS = 2
 DEFAULT_BLOCK_MINUTES = 120
 DISMISSALS_TO_STOP = 2
 SOURCE_CALENDAR = "calendar"
+# Titles sent to the AI in one refresh; the rest wait for the next one.
+MAX_AI_TITLES = 30
+NO_KIND = "none"
 AUTO_ADD_SETTING = "calendar_suggestions_auto_add"
 
 PENDING = "pending"
@@ -174,6 +183,78 @@ def _matching_project(title: str, projects: list[Project]) -> Project | None:
     return None
 
 
+# --- Asking the AI ---------------------------------------------------------------
+
+_GUESS_PROMPT = """You sort calendar event titles by the preparation they call for.
+For each numbered title, answer with one of:
+- prepare_exam: an exam, test or quiz to study for
+- submit: something to hand in or a deadline
+- prepare_talk: a talk or presentation to prepare slides for
+- prepare_meeting: a meeting to bring a progress update to
+- none: no preparation needed (meals, travel, classes, social plans, reminders)
+Titles may be in any language. When unsure, answer none.
+Reply with only a JSON object mapping each number to its answer, e.g. {"1": "none"}."""
+
+
+def _unasked(
+    events: list[Event], guesses: dict[str, EventKindGuess], now: datetime
+) -> dict[str, str]:
+    """Upcoming titles no rule matches and the AI has not seen, by event UID."""
+    wanted: dict[str, str] = {}
+    for event in events:
+        uid = event.external_uid
+        title = (event.title or "").strip()
+        if not uid or not title or uid in wanted or _utc(event.start_time) <= now:
+            continue
+        if task_kind(title, is_all_day=event.is_all_day) or wants_minutes(title):
+            continue
+        known = guesses.get(uid)
+        if known is not None and known.title == title:
+            continue
+        wanted[uid] = title
+        if len(wanted) >= MAX_AI_TITLES:
+            break
+    return wanted
+
+
+async def _ask_ai(ai, titles: list[str]) -> list[str] | None:
+    """One kind per title, or None when the AI could not be asked."""
+    numbered = "\n".join(f"{index}. {title}" for index, title in enumerate(titles, 1))
+    try:
+        reply = await ai.generate_completion(_GUESS_PROMPT, numbered)
+    except AIUnavailableError:
+        logger.debug("No AI for calendar titles; trying again on a later sync")
+        return None
+    except Exception:
+        logger.warning("Asking the AI about calendar titles failed", exc_info=True)
+        return None
+    answers = parse_json_object(reply) or {}
+    kinds = []
+    for index in range(1, len(titles) + 1):
+        answer = answers.get(str(index))
+        kinds.append(answer if answer in TASK_KINDS else NO_KIND)
+    return kinds
+
+
+async def _guess_kinds(
+    db: AsyncSession, events: list[Event], ai, now: datetime
+) -> dict[tuple[str, str], str]:
+    """The AI's kind by (event UID, title) for titles the rules miss, asking about new ones."""
+    guesses = {row.subject_key: row for row in (await db.execute(select(EventKindGuess))).scalars()}
+    wanted = _unasked(events, guesses, now) if ai is not None else {}
+    if wanted:
+        kinds = await _ask_ai(ai, list(wanted.values()))
+        for (uid, title), kind in zip(wanted.items(), kinds or []):
+            row = guesses.get(uid)
+            if row is None:
+                row = EventKindGuess(subject_key=uid, title=title, kind=kind)
+                db.add(row)
+                guesses[uid] = row
+            else:
+                row.title, row.kind = title, kind
+    return {(uid, row.title): row.kind for uid, row in guesses.items() if row.kind in TASK_KINDS}
+
+
 # --- Settings -----------------------------------------------------------------------
 
 
@@ -221,6 +302,8 @@ class _Pass:
     auto_add: bool
     rows: dict[tuple[str, str, str], EventSuggestion]
     stopped: set[tuple[str, str]]
+    # What the AI said about titles no rule matches, by (event UID, title).
+    guessed: dict[tuple[str, str], str]
     changed: bool = False
 
 
@@ -228,8 +311,12 @@ async def _has_calendar(db: AsyncSession) -> bool:
     return (await db.execute(select(CalendarAccount.id).limit(1))).first() is not None
 
 
-async def refresh(db: AsyncSession, now: datetime | None = None) -> bool:
-    """Make the suggestions the calendar calls for now. True when any changed."""
+async def refresh(db: AsyncSession, now: datetime | None = None, ai=None) -> bool:
+    """Make the suggestions the calendar calls for now. True when any changed.
+
+    ``ai`` is the active provider, asked about titles the rules miss; without
+    one those titles wait for a later refresh.
+    """
     if not await _has_calendar(db):
         return False
     current = now or _now()
@@ -253,8 +340,6 @@ async def refresh(db: AsyncSession, now: datetime | None = None) -> bool:
         ).all()
         if count >= DISMISSALS_TO_STOP
     }
-    state = _Pass(current, zone, await auto_add_enabled(db), rows, stopped)
-
     events = list(
         (
             await db.execute(
@@ -271,6 +356,8 @@ async def refresh(db: AsyncSession, now: datetime | None = None) -> bool:
             )
         ).scalars()
     )
+    guessed = await _guess_kinds(db, events, ai, current)
+    state = _Pass(current, zone, await auto_add_enabled(db), rows, stopped, guessed)
     await _event_suggestions(db, state, events)
     await _project_links(db, state, events)
     await _apply_project_links(db)
@@ -304,6 +391,10 @@ async def _event_suggestions(db: AsyncSession, state: _Pass, events: list[Event]
         end = _utc(event.end_time) or start
         wanted: list[str] = []
         kind = task_kind(event.title, is_all_day=event.is_all_day)
+        from_ai = False
+        if kind is None:
+            kind = state.guessed.get((uid, (event.title or "").strip()))
+            from_ai = kind is not None
         if kind is not None and start > state.now and event.id not in linked:
             wanted.append(kind)
         if (
@@ -342,7 +433,8 @@ async def _event_suggestions(db: AsyncSession, state: _Pass, events: list[Event]
             db.add(row)
             state.rows[key] = row
             state.changed = True
-            if state.auto_add and kind in AUTO_KINDS:
+            # What the AI found is only suggested, never added without asking.
+            if state.auto_add and kind in AUTO_KINDS and not from_ai:
                 await db.flush()
                 await _accept(db, row, state.now)
                 row.auto_added = True
@@ -532,6 +624,13 @@ async def _time_blocks(db: AsyncSession, state: _Pass) -> None:
 
 async def _prune(db: AsyncSession, state: _Pass) -> None:
     """Forget old answers; a link to a project is kept for good."""
+    await db.execute(
+        delete(EventKindGuess).where(
+            EventKindGuess.subject_key.not_in(
+                select(Event.external_uid).where(Event.external_uid.isnot(None))
+            )
+        )
+    )
     await db.execute(
         delete(EventSuggestion).where(
             EventSuggestion.kind != LINK_PROJECT,

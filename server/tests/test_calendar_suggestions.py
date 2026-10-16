@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -6,8 +7,10 @@ import pytest
 from sqlalchemy import select
 
 from config import settings
+from exceptions import AIUnavailableError
 from models.calendar_sync import CalendarAccount
 from models.event import Event
+from models.event_kind_guess import EventKindGuess
 from models.event_suggestion import EventSuggestion
 from models.note import Note
 from models.project import Project
@@ -81,9 +84,9 @@ async def _connect(db) -> CalendarAccount:
     return await sync.connect_feed(db, label="", url=FEED.replace("https://", "webcal://"))
 
 
-async def _refresh(db, now: datetime = NOW) -> list[EventSuggestion]:
+async def _refresh(db, now: datetime = NOW, ai=None) -> list[EventSuggestion]:
     await sync.sync_all(db)
-    await suggestions.refresh(db, now)
+    await suggestions.refresh(db, now, ai=ai)
     db.expire_all()
     return list((await db.execute(select(EventSuggestion))).scalars())
 
@@ -215,6 +218,111 @@ async def test_auto_add_can_be_turned_off(db_session, feed):
     await suggestions.set_auto_add(db_session, False)
     row = _by_kind(await _refresh(db_session))["prepare_exam"]
     assert (row.status, row.auto_added) == ("pending", False)
+
+
+class FakeAI:
+    """Answers each numbered title from a table, recording what it was sent."""
+
+    def __init__(self, answers: dict[str, str] | None = None, error: Exception | None = None):
+        self.answers = answers or {}
+        self.error = error
+        self.prompts: list[str] = []
+
+    async def generate_completion(self, system_prompt: str, user_message: str) -> str:
+        self.prompts.append(user_message)
+        if self.error is not None:
+            raise self.error
+        reply = {}
+        for line in user_message.splitlines():
+            number, title = line.split(". ", 1)
+            reply[number] = self.answers.get(title, "none")
+        return "```json\n" + json.dumps(reply) + "\n```"
+
+
+async def test_titles_the_rules_miss_are_asked_about_once_and_only_suggested(db_session, feed):
+    soon = NOW + timedelta(days=4)
+    deadline = (NOW + timedelta(days=6)).date()
+    feed.body = _calendar(
+        _vevent("viva-1", "Thesis viva", soon, soon + timedelta(hours=1)),
+        _vevent("dinner-1", "Dinner with Jin", soon + timedelta(hours=2), soon + timedelta(hours=3)),
+        _vevent("exam-1", "Final exam", soon, soon + timedelta(hours=2)),
+        _all_day("form-1", "장학금 서류", deadline),
+        _vevent("past-1", "Old thing", NOW - timedelta(days=1), NOW - timedelta(hours=23)),
+    )
+    await _connect(db_session)
+    ai = FakeAI({"Thesis viva": "prepare_talk", "장학금 서류": "submit"})
+    rows = await _refresh(db_session, ai=ai)
+
+    # One call, titles only, and none the rules already understand or already past.
+    assert len(ai.prompts) == 1
+    assert ai.prompts[0].split("\n") == ["1. Thesis viva", "2. Dinner with Jin", "3. 장학금 서류"]
+    by_kind = _by_kind(rows)
+    assert (by_kind["prepare_talk"].title, by_kind["prepare_talk"].status) == (
+        "Prepare slides for Thesis viva",
+        "pending",
+    )
+    # A deadline the AI found is suggested, not added like a rule's would be.
+    assert (by_kind["submit"].status, by_kind["submit"].auto_added) == ("pending", False)
+    assert by_kind["prepare_exam"].status == "accepted"
+    guesses = {
+        row.subject_key: row.kind
+        for row in (await db_session.execute(select(EventKindGuess))).scalars()
+    }
+    assert guesses == {"viva-1": "prepare_talk", "dinner-1": "none", "form-1": "submit"}
+
+    # Every answer, "none" included, is remembered: the next refresh sends nothing.
+    await _refresh(db_session, ai=ai)
+    assert len(ai.prompts) == 1
+    assert len([r for r in await _refresh(db_session, ai=ai) if r.kind == "prepare_talk"]) == 1
+
+
+async def test_ai_titles_are_batched_thirty_at_a_time(db_session, feed):
+    soon = NOW + timedelta(days=2)
+    feed.body = _calendar(
+        *(
+            _vevent(f"misc-{n}", f"Errand {n}", soon + timedelta(minutes=n), soon + timedelta(hours=1))
+            for n in range(35)
+        )
+    )
+    await _connect(db_session)
+    ai = FakeAI()
+    await _refresh(db_session, ai=ai)
+    assert [len(prompt.splitlines()) for prompt in ai.prompts] == [30]
+    await _refresh(db_session, ai=ai)
+    assert [len(prompt.splitlines()) for prompt in ai.prompts] == [30, 5]
+    await _refresh(db_session, ai=ai)
+    assert len(ai.prompts) == 2
+
+
+async def test_a_renamed_event_is_asked_about_again(db_session, feed):
+    soon = NOW + timedelta(days=3)
+    feed.body = _calendar(_vevent("x-1", "Lunch", soon, soon + timedelta(hours=1)))
+    await _connect(db_session)
+    ai = FakeAI({"Board review": "prepare_meeting"})
+    await _refresh(db_session, ai=ai)
+    feed.body = _calendar(_vevent("x-1", "Board review", soon, soon + timedelta(hours=1)))
+    rows = await _refresh(db_session, ai=ai)
+    assert ai.prompts == ["1. Lunch", "1. Board review"]
+    assert _by_kind(rows)["prepare_meeting"].status == "pending"
+
+
+async def test_without_ai_the_unmatched_titles_wait_quietly(db_session, feed):
+    soon = NOW + timedelta(days=3)
+    feed.body = _calendar(
+        _vevent("viva-1", "Thesis viva", soon, soon + timedelta(hours=1)),
+        _vevent("exam-1", "Final exam", soon, soon + timedelta(hours=2)),
+    )
+    await _connect(db_session)
+    down = FakeAI({"Thesis viva": "prepare_talk"}, error=AIUnavailableError())
+    rows = await _refresh(db_session, ai=down)
+    assert [r.kind for r in rows if r.kind != "time_block"] == ["prepare_exam"]
+    assert (await db_session.execute(select(EventKindGuess))).first() is None
+
+    # Nothing was remembered, so the title is asked about once the AI is back.
+    back = FakeAI({"Thesis viva": "prepare_talk"})
+    rows = await _refresh(db_session, ai=back)
+    assert len(back.prompts) == 1
+    assert _by_kind(rows)["prepare_talk"].status == "pending"
 
 
 async def test_past_and_far_events_are_left_alone(db_session, feed):

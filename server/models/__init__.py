@@ -34,4 +34,5 @@ from models.inbox_routing import InboxRouting  # noqa: F401
 
 # Sentinel used by database.init_db to ensure all models are imported
 _register_all = True
+from models.event_kind_guess import EventKindGuess  # noqa: F401
 from models.event_suggestion import EventSuggestion  # noqa: F401

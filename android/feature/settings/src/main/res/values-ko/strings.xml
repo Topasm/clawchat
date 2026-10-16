@@ -32,6 +32,11 @@
     <string name="settings_log_out_confirm_title">이 서버에서 로그아웃할까요?</string>
     <string name="settings_log_out_confirm_message">이 기기에서 연결 정보를 지웁니다. 설정 화면에서 언제든 다시 페어링할 수 있습니다.</string>
     <string name="settings_diagnostics_copied">진단 정보를 복사했습니다</string>
+    <string name="settings_calendar_suggestions">캘린더 제안</string>
+    <string name="settings_calendar_suggestions_description">연결한 캘린더 일정에 필요한 작업을 오늘 화면에 보여 줍니다</string>
+    <string name="settings_calendar_auto_add">시험·마감 준비 작업은 바로 추가</string>
+    <string name="settings_calendar_auto_add_description">발표나 면담 같은 다른 일정은 오늘 화면에 제안만 합니다. 추가된 항목은 그곳에서 되돌릴 수 있습니다.</string>
+    <string name="settings_calendar_auto_add_failed">설정을 저장하지 못했습니다.</string>
 
     <string name="settings_connection_diagnostics">연결 진단</string>
     <string name="settings_connection_diagnostics_description">인증 정보를 노출하지 않는 이 기기의 문제 해결용 정보입니다.</string>

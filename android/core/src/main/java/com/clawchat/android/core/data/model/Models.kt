@@ -375,6 +375,12 @@ data class TodaySuggestionList(
     @SerialName("auto_add") val autoAdd: Boolean = true,
 )
 
+/** Whether exam and deadline tasks from the calendar are added without asking. */
+@Serializable
+data class TodaySuggestionSettings(
+    @SerialName("auto_add") val autoAdd: Boolean,
+)
+
 // --- Devices ---
 
 @Serializable
