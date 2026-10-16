@@ -23,7 +23,7 @@ describe('i18n', () => {
   it('switches language, document metadata, and pluralized text', async () => {
     await changeAppLanguage('ko');
 
-    expect(i18n.t('nav.inbox')).toBe('Inbox');
+    expect(i18n.t('nav.inbox')).toBe('받은함');
     expect(i18n.t('nav.tasks')).toBe('작업');
     expect(i18n.t('nav.schedule')).toBe('일정');
     expect(i18n.t('connection.pending', { count: 3 })).toBe('대기 중인 작업 3개');

@@ -47,7 +47,7 @@ import { useGlobalShortcuts, useNavigationShortcuts } from '../keyboard';
 import type { ColorPalette } from '../config/theme';
 import type { TodoResponse } from '../types/api';
 // --- SVG icon components ---
-import { InboxIcon, ChatIcon, TasksIcon, NavCalendarIcon, ReviewIcon } from './shared/NavIcons';
+import { InboxIcon, ProjectsIcon, TasksIcon, NavCalendarIcon, ReviewIcon } from './shared/NavIcons';
 import BottomNav, { mobileTabs } from './shared/BottomNav';
 import { isTaskTodo } from '../utils/inboxState';
 import { getAttentionBadgeCounts } from '../utils/attentionBadge';
@@ -102,7 +102,7 @@ const primaryNavItems = [
   { to: '/inbox', labelKey: 'nav.inbox', Icon: InboxIcon },
   { to: '/tasks', labelKey: 'nav.tasks', Icon: TasksIcon },
   { to: '/schedule', labelKey: 'nav.schedule', Icon: NavCalendarIcon },
-  { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
+  { to: '/projects', labelKey: 'nav.projects', Icon: ProjectsIcon },
 ];
 // Attention is the one place for everything agents stopped on. It joins the
 // four places only while something waits there; the run log and review history

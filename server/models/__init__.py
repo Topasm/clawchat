@@ -16,6 +16,8 @@ from models.event import Event  # noqa: F401
 from models.agent_task import AgentTask  # noqa: F401
 from models.agent_run import AgentRun, AgentRunEvent  # noqa: F401
 from models.task_placement_change import TaskPlacementChange  # noqa: F401
+from models.task_step_change import TaskStepChange  # noqa: F401
+from models.todo_path import TodoPath  # noqa: F401
 from models.inbox_review import InboxReviewPreference, InboxPreviewCache  # noqa: F401
 from models.user_settings import UserSettings  # noqa: F401
 from models.attachment import Attachment  # noqa: F401

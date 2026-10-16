@@ -71,6 +71,14 @@ export {
 } from './useTaskRelationshipQueries';
 export { useTaskGraphInsightsQuery } from './useTaskGraphInsightsQuery';
 export {
+  useAddTaskStep,
+  useMoveTaskStep,
+  useTodoPathsQuery,
+  useAddTodoPath,
+  useDeleteTodoPath,
+} from './useTaskStepQueries';
+export type { TodoPathInput } from './useTaskStepQueries';
+export {
   useReviewsQuery,
   useDecideReview,
   useArtifactsQuery,

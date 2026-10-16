@@ -6,17 +6,12 @@ import {
   useApplyPlanProposal,
   useGeneratePlanProposal,
 } from '../../hooks/queries';
-import usePlatform from '../../hooks/usePlatform';
 import Dialog from '../shared/Dialog';
-import SegmentedControl from '../shared/SegmentedControl';
-import TaskGraphView from './TaskGraphView';
-import { buildTaskGraphElements } from './taskGraphAdapter';
-import type { TaskGraphMode } from './taskGraphTypes';
+import FlowCanvas from '../task-flow/FlowCanvas';
 import {
-  buildProposalRelationships,
-  buildProposalTodos,
-  PROPOSAL_ROOT_ID,
+  buildProposalEdges,
   proposalIndexFromNodeId,
+  proposalNodeId,
   toggleProposalSelection,
 } from './taskGraphProposal';
 import { translateUi } from '../../i18n';
@@ -25,16 +20,11 @@ interface TaskGraphProposalDialogProps {
   initialTargetId?: string;
   onOpenChange: (open: boolean) => void;
 }
-const MODE_OPTIONS = [
-  { label: 'Structure', value: 'structure' },
-  { label: 'Execution', value: 'execution' },
-];
 export default function TaskGraphProposalDialog({
   targets,
   initialTargetId,
   onOpenChange,
 }: TaskGraphProposalDialogProps) {
-  const { isMobile } = usePlatform();
   const generatePlan = useGeneratePlanProposal();
   const applyPlan = useApplyPlanProposal();
   const defaultTarget = targets.some((target) => target.id === initialTargetId)
@@ -45,39 +35,21 @@ export default function TaskGraphProposalDialog({
   const [plan, setPlan] = useState<PlanProposalResponse | null>(null);
   const [draftSubtasks, setDraftSubtasks] = useState<PlanSubtask[]>([]);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
-  const [mode, setMode] = useState<TaskGraphMode>('execution');
-  const target = targets.find((candidate) => candidate.id === targetId) ?? targets[0];
-  const preview = useMemo(() => {
-    if (!target || !plan) return { nodes: [], edges: [] };
-    const todos = buildProposalTodos(target, draftSubtasks);
-    const relationships = buildProposalRelationships(draftSubtasks);
-    const elements = buildTaskGraphElements(todos, {
-      mode,
-      collapsedIds: new Set(),
-      hideCompleted: false,
-      relationships,
-      metadataTodos: todos,
-      onToggleCollapse: () => undefined,
-    });
-    return {
-      ...elements,
-      nodes: elements.nodes.map((node) => {
-        const index = proposalIndexFromNodeId(node.id);
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            proposalSelection:
-              node.id === PROPOSAL_ROOT_ID
-                ? ('fixed' as const)
-                : index !== null && selected.has(index)
-                  ? ('selected' as const)
-                  : ('excluded' as const),
-          },
-        };
-      }),
-    };
-  }, [draftSubtasks, mode, plan, selected, target]);
+  // Proposed steps are drawn dashed in the same flow as real ones; a
+  // step left out of the selection stays visible but faded.
+  const preview = useMemo(
+    () => ({
+      nodes: draftSubtasks.map((subtask, index) => ({
+        id: proposalNodeId(index),
+        title: subtask.title,
+        meta: subtask.estimated_minutes ? `${subtask.estimated_minutes}m` : undefined,
+        tone: selected.has(index) ? ('proposed' as const) : ('excluded' as const),
+        sortOrder: index,
+      })),
+      edges: buildProposalEdges(draftSubtasks),
+    }),
+    [draftSubtasks, selected],
+  );
   const handleGenerate = async () => {
     if (!targetId) return;
     try {
@@ -281,26 +253,16 @@ export default function TaskGraphProposalDialog({
                 )}
               </span>
             </div>
-            <SegmentedControl
-              ariaLabel={translateUi('Proposal graph mode')}
-              options={MODE_OPTIONS.map((option) => ({
-                ...option,
-                label: translateUi(option.label),
-              }))}
-              value={mode}
-              onChange={(value) => setMode(value as TaskGraphMode)}
-            />
           </div>
 
           {draftSubtasks.length > 0 ? (
             <div className="cc-task-proposal__workspace">
               <div className="cc-task-proposal__graph">
-                <TaskGraphView
+                <FlowCanvas
                   nodes={preview.nodes}
                   edges={preview.edges}
-                  isMobile={isMobile}
-                  onSelectTask={(nodeId) => {
-                    if (!nodeId) return;
+                  ariaLabel={translateUi('Proposed tasks')}
+                  onSelect={(nodeId) => {
                     const index = proposalIndexFromNodeId(nodeId);
                     if (index !== null) toggleSelection(index);
                   }}

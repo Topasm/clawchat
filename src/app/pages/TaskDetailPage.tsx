@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import StorageLocationBadge from '../components/shared/StorageLocationBadge';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useQuickCaptureStore } from '../stores/useQuickCaptureStore';
 import { useToastStore } from '../stores/useToastStore';
 import { useDebouncedPersist } from '../hooks/useDebouncedPersist';
 import {
@@ -22,15 +21,16 @@ import {
 import apiClient from '../services/apiClient';
 import Checkbox from '../components/shared/Checkbox';
 import Badge from '../components/shared/Badge';
-import TaskCard from '../components/shared/TaskCard';
 import PlanReviewDiff from '../components/shared/PlanReviewDiff';
-import RelationshipsSection from '../components/task-relationships/RelationshipsSection';
+import TaskFlow from '../components/task-flow/TaskFlow';
+import TaskPaths from '../components/task-detail/TaskPaths';
+import TaskMoreMenu, { type TaskMenuItem } from '../components/task-detail/TaskMoreMenu';
 import FileDropZone from '../components/shared/FileDropZone';
 import AttachmentList from '../components/shared/AttachmentList';
 import TaskAgentThreadSection from '../components/task-detail/TaskAgentThreadSection';
 import TaskStageIndicator from '../components/shared/TaskStageIndicator';
 import { getTaskStage } from '../utils/taskStage';
-import { CheckIcon, ChevronRightIcon } from '../components/shared/Icons';
+import { CheckIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
 import { translateUi } from '../i18n';
@@ -53,6 +53,7 @@ const SKILL_OPTIONS = [
 const SKILL_LABELS: Record<string, string> = Object.fromEntries(
   SKILL_OPTIONS.map(({ id, label }) => [id, label]),
 );
+const AGENT_ASSIGNEES = ['planner', 'researcher', 'executor', 'openclaw'];
 function getDueCountdown(dueDate: string): {
   label: string;
   variant: 'overdue' | 'today' | 'upcoming';
@@ -104,14 +105,10 @@ export default function TaskDetailPage() {
   const { data: telemetry = [] } = useTaskExecutionTelemetryQuery();
   const childTasks = todos.filter((t) => t.parent_id === taskId);
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
-  const incompleteChildren = childTasks.filter((t) => !isTerminalTaskStatus(t.status));
-  const nextSubtask = incompleteChildren[0] ?? null;
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const plan = latestPlanQuery.data ?? null;
   useEffect(() => {
-    setDetailsOpen(false);
     setHostsOpen(false);
   }, [taskId]);
   useEffect(() => {
@@ -210,12 +207,64 @@ export default function TaskDetailPage() {
     pendingReviewCount: taskTelemetry?.pending_review_count,
     hasSubtasks: isPlanned,
   });
-  // The next step is planning only while the task is still just captured;
-  // past that, planning again is a side action, not the thing to press.
-  const planIsNext = stage.stage === 'capture' && !stage.exception;
+  const hasAgentSkills = Boolean(
+    task.enabled_skills?.length || (task.assignee && AGENT_ASSIGNEES.includes(task.assignee)),
+  );
+  // A task is yours unless it was handed to AI (assignee) or AI already ran
+  // it. Only delegated work shows the five steps and the plan button; for
+  // your own task the top of the page is its due date and flow.
+  const isDelegated = Boolean(
+    task.assignee ||
+    hasAgentSkills ||
+    taskTelemetry?.latest_run_status ||
+    taskTelemetry?.pending_review_count,
+  );
+  const planIsNext = isDelegated && stage.stage === 'capture' && !stage.exception;
+  const organize = async () => {
+    try {
+      await apiClient.post(`/todos/${taskId}/organize`);
+      useToastStore.getState().addToast('info', translateUi('Planning...'));
+    } catch {
+      useToastStore.getState().addToast('error', translateUi('Failed'));
+    }
+  };
+  const discuss = async () => {
+    try {
+      const conversation = await getConversation.mutateAsync(task.id);
+      navigate(`/chats/${conversation.id}`);
+    } catch {
+      useToastStore.getState().addToast('error', translateUi('Failed'));
+    }
+  };
+  const setAssignee = (assignee: string | null) => {
+    const previous = task.assignee ?? null;
+    updateTodoMutation.mutate({ id: task.id, data: { assignee } });
+    useToastStore
+      .getState()
+      .addToast('success', translateUi(assignee ? 'Delegated to AI' : 'Back to you'), {
+        duration: 5000,
+        action: {
+          label: translateUi('Undo'),
+          onClick: () => updateTodoMutation.mutate({ id: task.id, data: { assignee: previous } }),
+        },
+      });
+  };
+  const canPlan = !hasPlan && !isTerminalTaskStatus(task.status);
+  const menuItems: TaskMenuItem[] = [
+    { label: translateUi('Discuss with agent'), onSelect: () => void discuss() },
+    ...(canPlan && !planIsNext
+      ? [{ label: translateUi('Suggest steps'), onSelect: () => void organize() }]
+      : []),
+    task.assignee
+      ? { label: translateUi('Do it myself'), onSelect: () => setAssignee(null) }
+      : { label: translateUi('Delegate'), onSelect: () => setAssignee('agent') },
+    ...(project
+      ? [{ label: translateUi('Where this runs'), onSelect: () => setHostsOpen(true) }]
+      : []),
+    { label: translateUi('Delete Task'), onSelect: () => void handleDelete(), danger: true },
+  ];
   return (
     <div className="cc-detail cc-exec-panel">
-      {/* Top: Status + Quick Actions */}
       <div className="cc-exec-panel__top">
         <div className="cc-exec-panel__top-row">
           <Checkbox checked={task.status === 'completed'} onChange={() => handleToggle(task.id)} />
@@ -225,197 +274,75 @@ export default function TaskDetailPage() {
             onChange={(e) => handleTitleChange(e.target.value)}
             placeholder={translateUi('Task title')}
           />
+          <TaskMoreMenu items={menuItems} />
         </div>
-        <div className="cc-exec-panel__stage">
-          <TaskStageIndicator state={stage} variant="bar" />
-        </div>
-        <StorageLocationBadge item={task} variant="line" />
-      </div>
-
-      {/* Section 1: Next Step. A task with no plan and no sub-task is its own
-          next step, and the title already says what it is; no card for that. */}
-      {(hasPlan || nextSubtask) && (
-        <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-title">{translateUi('Next step')}</div>
-          {hasPlan ? (
-            <PlanReviewDiff
-              plan={plan}
-              onApply={handleApplyPlan}
-              onDismiss={handleDismissPlan}
-              onRegenerate={handleRegeneratePlan}
-              applyError={applyPlanMutation.error}
-              isApplying={applyPlanMutation.isPending}
-              isDismissing={dismissPlanMutation.isPending}
-              isRegenerating={generatePlanMutation.isPending}
+        <div className="cc-exec-panel__meta-line">
+          <span
+            className={`cc-exec-panel__due-editor${dueInfo ? ` cc-exec-panel__info-item--${dueInfo.variant}` : ''}`}
+          >
+            <input
+              type="date"
+              className="cc-event-form__input cc-exec-panel__due-input"
+              aria-label={translateUi('Due')}
+              value={task.due_date ? task.due_date.slice(0, 10) : ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                persistField({
+                  due_date: val ? new Date(`${val}T23:59:00`).toISOString() : null,
+                });
+              }}
             />
-          ) : nextSubtask ? (
-            <div className="cc-exec-panel__next-step">
-              <TaskCard
-                task={nextSubtask}
-                onToggle={() => handleToggle(nextSubtask.id)}
-                onClick={() => navigate(`/tasks/${nextSubtask.id}`)}
-                isSubTask
-              />
-              {incompleteChildren.length > 1 && (
-                <span className="cc-exec-panel__remaining">
-                  +{incompleteChildren.length - 1}
-                  {translateUi(' more sub-task\n                ')}
-                  {incompleteChildren.length - 1 !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      {/* Section 2: Due / Estimate / Recurrence / Blockers */}
-      <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">{translateUi('Due')}</div>
-        <div className="cc-exec-panel__info-grid">
-          <div
-            className={`cc-exec-panel__info-item${dueInfo ? ` cc-exec-panel__info-item--${dueInfo.variant}` : ''}`}
-          >
-            <div className="cc-exec-panel__due-editor">
-              <input
-                type="date"
-                className="cc-event-form__input cc-exec-panel__due-input"
-                value={task.due_date ? task.due_date.slice(0, 10) : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  persistField({
-                    due_date: val ? new Date(`${val}T23:59:00`).toISOString() : null,
-                  });
-                }}
-              />
-              {task.due_date && (
-                <button
-                  type="button"
-                  className="cc-exec-panel__due-clear"
-                  onClick={() => persistField({ due_date: null })}
-                  aria-label={translateUi('Clear due date')}
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            {task.due_date && (
+              <button
+                type="button"
+                className="cc-exec-panel__due-clear"
+                onClick={() => persistField({ due_date: null })}
+                aria-label={translateUi('Clear due date')}
+              >
+                ×
+              </button>
+            )}
             {dueInfo && <span className="cc-exec-panel__info-value">{dueInfo.label}</span>}
-          </div>
-          {task.estimated_minutes && (
-            <div className="cc-exec-panel__info-item">
-              <span className="cc-exec-panel__info-label">{translateUi('Estimate')}</span>
-              <span className="cc-exec-panel__info-value">{task.estimated_minutes}m</span>
-            </div>
+          </span>
+          {project && !projectError && (
+            <Link className="cc-exec-panel__context-link" to={`/projects/${project.id}`}>
+              {project.title}
+            </Link>
           )}
+          {projectError && (
+            <span role="alert">{translateUi('This project could not be loaded.')}</span>
+          )}
+          {parentTask && (
+            <Link className="cc-exec-panel__context-link" to={`/tasks/${parentTask.id}`}>
+              ↑ {parentTask.title}
+            </Link>
+          )}
+          {isProject && (
+            <span className="cc-exec-panel__context-badge cc-exec-panel__context-badge--synced">
+              <CheckIcon size={12} />
+              {translateUi('Obsidian project')}
+            </span>
+          )}
+          <CanonicalDocumentButton target={canonicalDoc} />
+          <StorageLocationBadge item={task} variant="line" />
         </div>
       </div>
 
-      {/* Section 3: Project context */}
-      {(isProject || task.parent_id || task.assignee || task.project_id) && (
-        <div className="cc-exec-panel__section">
-          <div className="cc-exec-panel__section-heading">
-            <div className="cc-exec-panel__section-title">{translateUi('Project context')}</div>
-            <CanonicalDocumentButton target={canonicalDoc} />
+      {isDelegated && (
+        <div className="cc-exec-panel__section cc-exec-panel__agent">
+          <div className="cc-exec-panel__stage">
+            <TaskStageIndicator state={stage} variant="bar" />
           </div>
-          <div className="cc-exec-panel__context">
-            {projectLoading && <p>{translateUi('Loading project…')}</p>}
-            {projectError && <p role="alert">{translateUi('This project could not be loaded.')}</p>}
-            {project && !projectError && (
-              <>
-                <Link className="cc-exec-panel__context-link" to={`/projects/${project.id}`}>
-                  {project.title}
-                </Link>
-                <ProjectMachineLine project={project} onChange={() => setHostsOpen(true)} />
-                <Dialog
-                  open={hostsOpen}
-                  onOpenChange={setHostsOpen}
-                  title={translateUi('Where this runs')}
-                  className="cc-dialog__content--wide cc-project-settings-dialog"
-                >
-                  <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
-                </Dialog>
-              </>
-            )}
-            {isProject && (
-              <div className="cc-exec-panel__context-row">
-                <span className="cc-exec-panel__context-label">{translateUi('Source')}</span>
-                <span className="cc-exec-panel__context-badge cc-exec-panel__context-badge--synced">
-                  <CheckIcon size={12} />
-                  {translateUi('\n                  Obsidian project\n                ')}
-                </span>
-              </div>
-            )}
-            {parentTask && (
-              <div className="cc-exec-panel__context-row">
-                <span className="cc-exec-panel__context-label">{translateUi('Parent')}</span>
-                <span
-                  className="cc-exec-panel__context-link"
-                  onClick={() => navigate(`/tasks/${parentTask.id}`)}
-                >
-                  {parentTask.title}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <TaskAgentThreadSection taskId={task.id} />
-
-      {/* Section 4: Plan / Research / Execute (action bar) */}
-      <div className="cc-exec-panel__section">
-        <div className="cc-exec-panel__section-title">{translateUi('Actions')}</div>
-        <div className="cc-exec-panel__action-bar">
-          <button
-            type="button"
-            className="cc-btn cc-btn--secondary"
-            disabled={getConversation.isPending}
-            onClick={async () => {
-              try {
-                const conversation = await getConversation.mutateAsync(task.id);
-                navigate(`/chats/${conversation.id}`);
-              } catch {
-                useToastStore.getState().addToast('error', translateUi('Failed'));
-              }
-            }}
-          >
-            {translateUi('Discuss with agent')}
-          </button>
-          {!isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
+          {planIsNext && canPlan && !isPlanned && (
             <button
               type="button"
-              className={`cc-btn ${planIsNext ? 'cc-btn--primary' : 'cc-btn--secondary'}`}
-              onClick={async () => {
-                try {
-                  await apiClient.post(`/todos/${taskId}/organize`);
-                  useToastStore.getState().addToast('info', translateUi('Planning...'));
-                } catch {
-                  useToastStore.getState().addToast('error', translateUi('Failed'));
-                }
-              }}
+              className="cc-btn cc-btn--primary"
+              onClick={() => void organize()}
             >
-              {translateUi('\n              Plan this task\n            ')}
+              {translateUi('Suggest steps')}
             </button>
           )}
-          {isPlanned && !hasPlan && !isTerminalTaskStatus(task.status) && (
-            <button
-              type="button"
-              className="cc-btn cc-btn--secondary"
-              onClick={async () => {
-                try {
-                  await apiClient.post(`/todos/${taskId}/organize`);
-                  useToastStore.getState().addToast('info', translateUi('Re-planning...'));
-                } catch {
-                  useToastStore.getState().addToast('error', translateUi('Failed'));
-                }
-              }}
-            >
-              {translateUi('\n              Re-plan\n            ')}
-            </button>
-          )}
-
-          {(task.enabled_skills?.length ||
-            (task.assignee &&
-              ['planner', 'researcher', 'executor', 'openclaw'].includes(task.assignee))) && (
+          {hasAgentSkills && (
             <div className="cc-exec-panel__agent-status">
               <span className="cc-exec-panel__agent-badge">
                 {task.enabled_skills?.length
@@ -431,115 +358,84 @@ export default function TaskDetailPage() {
                     ? translateUi('Classifying...')
                     : task.inbox_state === 'plan_ready'
                       ? translateUi('Plan ready for review')
-                      : translateUi('Assigned \u00B7 start from Inbox when Ready')}
+                      : translateUi('Assigned · start from Inbox when Ready')}
               </span>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Bottom: Collapsed details */}
-      <div className="cc-exec-panel__details-toggle">
-        <button
-          type="button"
-          className="cc-exec-panel__details-btn"
-          aria-expanded={detailsOpen}
-          aria-controls="task-supplemental-details"
-          onClick={() => setDetailsOpen(!detailsOpen)}
-        >
-          <ChevronRightIcon
-            size={16}
-            className={`cc-section__chevron${detailsOpen ? ' cc-section__chevron--open' : ''}`}
-          />
-          {translateUi('\n          Details\n          ')}
-          {(task.tags?.length || childTasks.length > 0) && (
-            <span className="cc-exec-panel__details-hint">
-              {[
-                task.tags?.length ? `${task.tags.length} tags` : '',
-                childTasks.length > 0 ? `${childTasks.length} sub-tasks` : '',
-                description ? 'has description' : '',
-              ]
-                .filter(Boolean)
-                .join(', ')}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {detailsOpen && (
-        <div id="task-supplemental-details" className="cc-exec-panel__details">
-          {/* Description */}
-          <textarea
-            className="cc-detail__textarea"
-            value={description}
-            onChange={(e) => handleDescriptionChange(e.target.value)}
-            placeholder={translateUi('Add a description...')}
-          />
-
-          {/* Tags */}
-          {task.tags && task.tags.length > 0 && (
-            <div className="cc-detail__field" style={{ borderBottom: 'none' }}>
-              <span className="cc-detail__field-label">{translateUi('Tags')}</span>
-              <div
-                className="cc-detail__field-value"
-                style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}
-              >
-                {task.tags.map((tag) => (
-                  <Badge key={tag} variant="tag">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Sub-tasks list */}
-          <div className="cc-detail__section">
-            <div className="cc-detail__section-title">
-              {translateUi('\n              Sub-tasks')}
-              {childTasks.length > 0 ? ` (${childTasks.length})` : ''}
-            </div>
-            {childTasks.map((child) => (
-              <TaskCard
-                key={child.id}
-                task={child}
-                onToggle={() => handleToggle(child.id)}
-                onClick={() => navigate(`/tasks/${child.id}`)}
-                isSubTask
-              />
-            ))}
-            <button
-              type="button"
-              className="cc-btn cc-btn--ghost"
-              style={{ fontSize: 12, marginTop: 4 }}
-              onClick={() => useQuickCaptureStore.getState().open({ defaultParentId: taskId })}
-            >
-              {translateUi('\n              + Add sub-task\n            ')}
-            </button>
-          </div>
-
-          {/* Relationships */}
-          {taskId && <RelationshipsSection taskId={taskId} />}
-
-          {/* Attachments */}
-          {taskId && (
-            <div className="cc-detail__section">
-              <div className="cc-detail__section-title">{translateUi('Attachments')}</div>
-              <FileDropZone todoId={taskId} />
-              <AttachmentList ownerId={taskId} />
-            </div>
+          {project && !projectError && (
+            <ProjectMachineLine project={project} onChange={() => setHostsOpen(true)} />
           )}
         </div>
       )}
+      {projectLoading && <p className="cc-exec-panel__hint">{translateUi('Loading project…')}</p>}
 
-      {/* Delete button */}
-      <button
-        type="button"
-        className="cc-btn cc-btn--danger cc-detail__delete-btn"
-        onClick={handleDelete}
-      >
-        {translateUi('\n        Delete Task\n      ')}
-      </button>
+      {hasPlan && (
+        <div className="cc-exec-panel__section">
+          <PlanReviewDiff
+            plan={plan}
+            onApply={handleApplyPlan}
+            onDismiss={handleDismissPlan}
+            onRegenerate={handleRegeneratePlan}
+            applyError={applyPlanMutation.error}
+            isApplying={applyPlanMutation.isPending}
+            isDismissing={dismissPlanMutation.isPending}
+            isRegenerating={generatePlanMutation.isPending}
+          />
+        </div>
+      )}
+
+      <div className="cc-exec-panel__section">
+        <div className="cc-exec-panel__section-title">{translateUi('Flow')}</div>
+        <TaskFlow rootId={task.id} />
+      </div>
+
+      <TaskPaths taskId={task.id} />
+
+      <div className="cc-exec-panel__section">
+        <textarea
+          className="cc-detail__textarea"
+          value={description}
+          onChange={(e) => handleDescriptionChange(e.target.value)}
+          placeholder={translateUi('Add a description...')}
+          aria-label={translateUi('Description')}
+        />
+      </div>
+
+      <TaskAgentThreadSection taskId={task.id} />
+
+      <details className="cc-exec-panel__more">
+        <summary>
+          {translateUi('More')}
+          {task.tags?.length ? ` · ${translateUi('Tags')} ${task.tags.length}` : ''}
+        </summary>
+        {task.tags && task.tags.length > 0 && (
+          <div className="cc-exec-panel__tags">
+            {task.tags.map((tag) => (
+              <Badge key={tag} variant="tag">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+        {taskId && (
+          <div className="cc-detail__section">
+            <div className="cc-detail__section-title">{translateUi('Attachments')}</div>
+            <FileDropZone todoId={taskId} />
+            <AttachmentList ownerId={taskId} />
+          </div>
+        )}
+      </details>
+
+      {project && (
+        <Dialog
+          open={hostsOpen}
+          onOpenChange={setHostsOpen}
+          title={translateUi('Where this runs')}
+          className="cc-dialog__content--wide cc-project-settings-dialog"
+        >
+          <ProjectWorkspaceHosts key={project.id} projectId={project.id} />
+        </Dialog>
+      )}
       {confirmationDialog}
     </div>
   );

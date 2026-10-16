@@ -7,6 +7,8 @@ import type { TaskStageState } from '../../utils/taskStage';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
 interface TaskListViewProps {
   todos: TodoResponse[];
+  /** Every task, so a row can count its steps even when they are filtered out. */
+  allTodos?: TodoResponse[];
   onOpenTask: (taskId: string) => void;
   onToggleTask: (taskId: string) => void;
   /** Project titles by id, for the Project column. */
@@ -50,6 +52,7 @@ function getTaskDepth(todo: TodoResponse, todoById: Map<string, TodoResponse>) {
 }
 export default function TaskListView({
   todos,
+  allTodos = todos,
   onOpenTask,
   onToggleTask,
   projectTitles,
@@ -57,6 +60,14 @@ export default function TaskListView({
   telemetryByTaskId,
 }: TaskListViewProps) {
   const todoById = new Map(todos.map((todo) => [todo.id, todo]));
+  const steps = new Map<string, { done: number; total: number }>();
+  for (const todo of allTodos) {
+    if (!todo.parent_id || todo.status === 'cancelled') continue;
+    const entry = steps.get(todo.parent_id) ?? { done: 0, total: 0 };
+    entry.total += 1;
+    if (todo.status === 'completed') entry.done += 1;
+    steps.set(todo.parent_id, entry);
+  }
   if (todos.length === 0) {
     return (
       <div className="cc-task-list__empty">
@@ -116,6 +127,11 @@ export default function TaskListView({
               />
               {depth > 0 && <i className="cc-task-list__branch" aria-hidden="true" />}
               <strong>{todo.title}</strong>
+              {steps.has(todo.id) && (
+                <span className="cc-task-list__steps">
+                  {translateUi('{{done}}/{{total}} steps', steps.get(todo.id)!)}
+                </span>
+              )}
               <StorageLocationBadge item={todo} />
             </span>
             <span role="cell">

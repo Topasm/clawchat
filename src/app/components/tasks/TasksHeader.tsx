@@ -4,26 +4,17 @@ import usePlatform from '../../hooks/usePlatform';
 import SegmentedControl from '../shared/SegmentedControl';
 import { translateUi } from '../../i18n';
 import { matchesTasksStatusFilter, type TasksStatusFilter } from '../../utils/taskStatus';
-export type TasksViewMode = 'list' | 'graph';
 export { matchesTasksStatusFilter, taskStatusForColumn } from '../../utils/taskStatus';
 export type { TasksColumnStatus, TasksStatusFilter } from '../../utils/taskStatus';
 export const TASK_STATUS_FILTERS: TasksStatusFilter[] = ['active', 'completed', 'all'];
 interface TasksHeaderProps {
   todos: TodoResponse[];
-  viewMode: TasksViewMode;
-  onViewModeChange: (mode: TasksViewMode) => void;
   subtitle?: string;
   statusFilter: TasksStatusFilter;
   onStatusFilterChange: (filter: TasksStatusFilter) => void;
 }
-const VIEW_OPTIONS = [
-  { label: 'List', value: 'list' },
-  { label: 'Graph', value: 'graph' },
-];
 export default function TasksHeader({
   todos,
-  viewMode,
-  onViewModeChange,
   subtitle,
   statusFilter,
   onStatusFilterChange,
@@ -35,7 +26,10 @@ export default function TasksHeader({
         <div className="cc-page-header__title">{translateUi('Tasks')}</div>
         <div className="cc-page-header__subtitle">
           {subtitle ??
-            `${todos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter)).length} tasks`}
+            translateUi('{{count}} tasks', {
+              count: todos.filter((todo) => matchesTasksStatusFilter(todo.status, statusFilter))
+                .length,
+            })}
         </div>
       </div>
       <div className="cc-tasks-header__actions">
@@ -50,17 +44,6 @@ export default function TasksHeader({
             }))}
             value={statusFilter}
             onChange={(value) => onStatusFilterChange(value as TasksStatusFilter)}
-          />
-        </div>
-        <div className="cc-tasks-header__view-filter">
-          <SegmentedControl
-            ariaLabel={translateUi('Task view')}
-            options={VIEW_OPTIONS.map((option) => ({
-              ...option,
-              label: translateUi(option.label),
-            }))}
-            value={viewMode}
-            onChange={(value) => onViewModeChange(value as TasksViewMode)}
           />
         </div>
         {!isMobile && (

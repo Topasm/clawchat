@@ -6,7 +6,7 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import { CheckCircleIcon, MagnifyingGlassIcon, PinIcon, ThemeIcon } from './Icons';
 import {
   AutomationsIcon,
-  ChatIcon,
+  ProjectsIcon,
   DevicesIcon,
   GearIcon,
   InboxIcon,
@@ -67,7 +67,7 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
                   {translateUi(' Inbox\n                ')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/projects')}>
-                  <ChatIcon className="cc-cmd-palette__item-icon" />
+                  <ProjectsIcon className="cc-cmd-palette__item-icon" />
                   {translateUi(' Projects\n                ')}
                 </Command.Item>
                 <Command.Item className="cc-cmd-palette__item" onSelect={() => go('/tasks')}>
