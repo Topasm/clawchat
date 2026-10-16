@@ -119,6 +119,12 @@ interface ClawChatApi {
         @Tag expectedScope: ExpectedSessionScope? = null,
     ): TodaySuggestionList
 
+    @PUT("api/today/suggestions/settings")
+    suspend fun updateTodaySuggestionSettings(
+        @Body body: TodaySuggestionSettings,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TodaySuggestionSettings
+
     /** [answer] is accept, dismiss, or undo. */
     @POST("api/today/suggestions/{id}/{answer}")
     suspend fun answerTodaySuggestion(

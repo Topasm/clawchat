@@ -32,6 +32,11 @@
     <string name="settings_log_out_confirm_title">Log out of this server?</string>
     <string name="settings_log_out_confirm_message">This phone forgets the connection. You can pair again from the setup screen at any time.</string>
     <string name="settings_diagnostics_copied">Diagnostics copied</string>
+    <string name="settings_calendar_suggestions">Calendar suggestions</string>
+    <string name="settings_calendar_suggestions_description">Work your connected calendars call for, shown on Today</string>
+    <string name="settings_calendar_auto_add">Add exam and deadline tasks without asking</string>
+    <string name="settings_calendar_auto_add_description">Other events, such as talks and meetings, are only suggested on Today. Anything added can be undone there.</string>
+    <string name="settings_calendar_auto_add_failed">Could not save the setting.</string>
 
     <string name="settings_connection_diagnostics">Connection diagnostics</string>
     <string name="settings_connection_diagnostics_description">A credential-safe snapshot for troubleshooting this device.</string>

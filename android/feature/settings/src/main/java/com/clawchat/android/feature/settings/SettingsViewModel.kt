@@ -8,6 +8,7 @@ import com.clawchat.android.core.data.model.HealthResponse
 import com.clawchat.android.core.data.model.PairedDevice
 import com.clawchat.android.core.data.repository.DeviceRepository
 import com.clawchat.android.core.data.repository.SettingsRepository
+import com.clawchat.android.core.data.repository.TodayRepository
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.sync.SyncManager
 import com.clawchat.android.core.update.AppUpdateManager
@@ -31,6 +32,10 @@ data class SettingsUiState(
     val accentColor: String = "system",
     val themeMode: String = "light",
     val diagnostics: ConnectionDiagnostics? = null,
+    /** Exam and deadline tasks from the calendar are added without asking; null until known. */
+    val calendarAutoAdd: Boolean? = null,
+    val isSavingCalendarAutoAdd: Boolean = false,
+    val calendarAutoAddFailed: Boolean = false,
     val isSwitchingWorkspace: Boolean = false,
     val isCheckingConnection: Boolean = false,
     val isLoading: Boolean = false,
@@ -44,6 +49,7 @@ class SettingsViewModel @Inject constructor(
     private val sessionStore: SessionStore,
     private val updateManager: AppUpdateManager,
     private val syncManager: SyncManager,
+    private val todayRepository: TodayRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -89,6 +95,8 @@ class SettingsViewModel @Inject constructor(
                 accentColor = accentColor,
                 themeMode = themeMode,
                 diagnostics = null,
+                calendarAutoAdd = null,
+                calendarAutoAddFailed = false,
                 isSwitchingWorkspace = false,
             )
         }
@@ -121,6 +129,11 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
                 else -> { /* Ignore — might not have user-level auth */ }
+            }
+
+            val suggestions = todayRepository.getSuggestions()
+            if (suggestions is ApiResult.Success && isSameServer(runtimeState.workspaceKey)) {
+                _uiState.update { it.copy(calendarAutoAdd = suggestions.data.autoAdd) }
             }
         }
 
@@ -203,6 +216,33 @@ class SettingsViewModel @Inject constructor(
                 is ApiResult.Loading -> { /* not used here */ }
             }
         }
+    }
+
+    /** Shown at once; put back if the server did not keep it. */
+    fun setCalendarAutoAdd(enabled: Boolean) {
+        val previous = _uiState.value.calendarAutoAdd ?: return
+        if (_uiState.value.isSavingCalendarAutoAdd) return
+        viewModelScope.launch {
+            val workspaceKey = sessionStore.runtimeState.first().workspaceKey
+            _uiState.update {
+                it.copy(calendarAutoAdd = enabled, isSavingCalendarAutoAdd = true, calendarAutoAddFailed = false)
+            }
+            val result = todayRepository.setSuggestionAutoAdd(enabled)
+            if (!isSameServer(workspaceKey)) return@launch
+            _uiState.update {
+                when (result) {
+                    is ApiResult.Success -> it.copy(calendarAutoAdd = result.data, isSavingCalendarAutoAdd = false)
+                    is ApiResult.Error ->
+                        it.copy(calendarAutoAdd = previous, isSavingCalendarAutoAdd = false, calendarAutoAddFailed = true)
+                    ApiResult.Loading -> it
+                }
+            }
+        }
+    }
+
+    private suspend fun isSameServer(workspaceKey: String?): Boolean {
+        val current = sessionStore.runtimeState.first()
+        return current.mode == WorkspaceMode.SERVER && current.workspaceKey == workspaceKey
     }
 
     fun setAccentColor(key: String) {

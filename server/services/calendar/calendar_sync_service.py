@@ -82,8 +82,9 @@ def wake_sync() -> None:
         _changed.set()
 
 
-async def sync_loop(session_factory: Any) -> None:
+async def sync_loop(session_factory: Any, app_state: Any = None) -> None:
     """Sync every account periodically and soon after a local change."""
+    from services.ai import resolve_active_ai
     from services.calendar import event_suggestion_service
 
     while True:
@@ -91,7 +92,7 @@ async def sync_loop(session_factory: Any) -> None:
         try:
             async with session_factory() as db:
                 await sync_all(db)
-                await event_suggestion_service.refresh(db)
+                await event_suggestion_service.refresh(db, ai=resolve_active_ai(app_state))
         except asyncio.CancelledError:
             raise
         except Exception:

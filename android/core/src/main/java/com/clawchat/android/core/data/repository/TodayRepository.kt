@@ -15,6 +15,7 @@ import com.clawchat.android.core.data.model.Event
 import com.clawchat.android.core.data.model.TodayResponse
 import com.clawchat.android.core.data.model.TodaySuggestion
 import com.clawchat.android.core.data.model.TodaySuggestionList
+import com.clawchat.android.core.data.model.TodaySuggestionSettings
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.network.ApiResult
 import com.clawchat.android.core.network.apiCall
@@ -48,6 +49,10 @@ interface TodayRepository {
 
     /** [answer] is accept, dismiss, or undo. */
     suspend fun answerSuggestion(id: String, answer: String): ApiResult<TodaySuggestion> =
+        ApiResult.Error("Suggestions require a server")
+
+    /** Whether exam and deadline tasks are added without asking; returns what the server kept. */
+    suspend fun setSuggestionAutoAdd(enabled: Boolean): ApiResult<Boolean> =
         ApiResult.Error("Suggestions require a server")
 
     /** Replays the last synced day so an offline launch is not a blank screen. */
@@ -136,6 +141,21 @@ class TodayRepositoryImpl @Inject constructor(
         if (runtimeState.mode != WorkspaceMode.SERVER) return ApiResult.Error("Suggestions require a server")
         val expectedScope = runtimeState.activeServerRequestScope() ?: return workspaceNotConfigured()
         return apiCall { api.answerTodaySuggestion(id, answer, expectedScope) }
+    }
+
+    override suspend fun setSuggestionAutoAdd(enabled: Boolean): ApiResult<Boolean> {
+        val runtimeState = currentRuntimeState()
+        if (runtimeState.mode != WorkspaceMode.SERVER) return ApiResult.Error("Suggestions require a server")
+        val expectedScope = runtimeState.activeServerRequestScope() ?: return workspaceNotConfigured()
+        return when (
+            val result = apiCall {
+                api.updateTodaySuggestionSettings(TodaySuggestionSettings(enabled), expectedScope)
+            }
+        ) {
+            is ApiResult.Success -> ApiResult.Success(result.data.autoAdd)
+            is ApiResult.Error -> result
+            ApiResult.Loading -> ApiResult.Loading
+        }
     }
 
     override suspend fun getCachedToday(today: LocalDate): CachedToday {
