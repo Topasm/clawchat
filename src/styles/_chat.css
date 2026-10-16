@@ -155,14 +155,6 @@
   min-height: 0;
 }
 
-.cc-chat-panel--collapsed {
-  min-height: 58px;
-}
-
-.cc-chat-panel--collapsed .cc-chat-input {
-  min-height: 58px;
-}
-
 .cc-chat-panel__header {
   display: flex;
   align-items: center;

@@ -10,7 +10,6 @@ import {
   useDeleteTodo,
   useToggleTodoComplete,
   useLatestPlanProposalQuery,
-  useGetOrCreateProjectConversation,
   useProjectQuery,
   useTaskExecutionTelemetryQuery,
   queryKeys,
@@ -36,6 +35,8 @@ import useExperimentCompletionGate from '../hooks/useExperimentCompletionGate';
 import ProjectMachineLine from '../components/shared/ProjectMachineLine';
 import ProjectWorkspaceHosts from '../components/shared/ProjectWorkspaceHosts';
 import Dialog from '../components/shared/Dialog';
+import { useOptionalChatPanelController } from '../components/chat-panel/ChatPanelControllerContext';
+import { useOpenTaskChat } from '../hooks/useContextChat';
 const SKILL_OPTIONS = [
   { id: 'plan', label: 'Plan' },
   { id: 'research', label: 'Research' },
@@ -94,7 +95,7 @@ export default function TaskDetailPage() {
   // on the project page instead of unfolding in the middle of this one.
   const [hostsOpen, setHostsOpen] = useState(false);
   const latestPlanQuery = useLatestPlanProposalQuery(taskId, Boolean(task));
-  const getConversation = useGetOrCreateProjectConversation();
+  const openTaskChat = useOpenTaskChat(useOptionalChatPanelController());
   const { data: telemetry = [] } = useTaskExecutionTelemetryQuery();
   const childTasks = todos.filter((t) => t.parent_id === taskId);
   const parentTask = task?.parent_id ? todos.find((t) => t.id === task.parent_id) : null;
@@ -201,14 +202,8 @@ export default function TaskDetailPage() {
       useToastStore.getState().addToast('error', translateUi('Failed'));
     }
   };
-  const discuss = async () => {
-    try {
-      const conversation = await getConversation.mutateAsync(task.id);
-      navigate(`/chats/${conversation.id}`);
-    } catch {
-      useToastStore.getState().addToast('error', translateUi('Failed'));
-    }
-  };
+  // The task's conversation opens in the one AI panel, as ⌘K does here.
+  const discuss = () => openTaskChat(task.id);
   const setAssignee = (assignee: string | null) => {
     const previous = task.assignee ?? null;
     updateTodoMutation.mutate({ id: task.id, data: { assignee } });

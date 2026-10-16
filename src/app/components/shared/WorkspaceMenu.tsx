@@ -100,7 +100,7 @@ export default function WorkspaceMenu({
           >
             <SearchIcon />
             {t('nav.search')}
-            <kbd className="cc-workspace-menu__shortcut">⌘K</kbd>
+            <kbd className="cc-workspace-menu__shortcut">⌘P</kbd>
           </button>
           <button
             type="button"

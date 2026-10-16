@@ -6,7 +6,6 @@ import {
   useDeleteProject,
   useProjectsQuery,
   useTodosQuery,
-  useCreateConversation,
   useDeleteConversation,
 } from '../hooks/queries';
 import ConversationItem from '../components/shared/ConversationItem';
@@ -27,7 +26,6 @@ export default function ChatListPage() {
   const { data: conversations = [], isLoading: convsLoading } = useConversationsQuery();
   const { data: projects = [], isLoading: projsLoading } = useProjectsQuery();
   const { data: todos = [] } = useTodosQuery();
-  const createConversationMutation = useCreateConversation();
   const deleteProjectMutation = useDeleteProject();
   const deleteConversationMutation = useDeleteConversation();
   const { isMobile } = usePlatform();
@@ -121,14 +119,6 @@ export default function ChatListPage() {
     }
     return meta;
   }, [projects, todos]);
-  const handleNewChat = async () => {
-    try {
-      const convo = await createConversationMutation.mutateAsync({});
-      navigate(`/chats/${convo.id}`);
-    } catch {
-      // Stay on list page
-    }
-  };
   const handleProjectClick = (projectId: string) => {
     navigate(`/projects/${projectId}`);
   };

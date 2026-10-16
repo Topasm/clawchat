@@ -5,7 +5,8 @@ export default function useCommandPalette() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      // ⌘K belongs to the AI panel; the palette moved to ⌘P.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'p') {
         e.preventDefault();
         setIsOpen((prev) => !prev);
       }

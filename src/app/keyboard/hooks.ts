@@ -5,18 +5,30 @@ import { settingsNavigationState } from '../services/settingsNavigation';
 
 interface KeyboardHookOptions {
   onToggleChat?: () => void;
+  onNewItem?: () => void;
   onShowHelp?: () => void;
   onNewTask?: () => void;
 }
 
-export function useGlobalShortcuts({ onToggleChat, onShowHelp }: KeyboardHookOptions) {
+export function useGlobalShortcuts({ onToggleChat, onNewItem, onShowHelp }: KeyboardHookOptions) {
+  // ⌘K: the AI panel, about what is on screen. Works while typing too.
   useHotkeys(
-    'ctrl+shift+c',
+    'mod+k',
     (e) => {
       e.preventDefault();
       onToggleChat?.();
     },
-    { enableOnFormTags: false },
+    { enableOnFormTags: true },
+  );
+
+  // ⌘N: the one input for something new, from any screen.
+  useHotkeys(
+    'mod+n',
+    (e) => {
+      e.preventDefault();
+      onNewItem?.();
+    },
+    { enableOnFormTags: true },
   );
 
   useHotkeys(

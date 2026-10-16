@@ -67,7 +67,7 @@ src/
 │   │       ├── SettingsSection.tsx   # Settings group container
 │   │       ├── Dialog.tsx            # Reusable animated dialog (@radix-ui/react-dialog)
 │   │       ├── ConfirmDialog.tsx     # Confirm/cancel dialog with danger variant
-│   │       ├── CommandPalette.tsx    # Ctrl+K command menu (cmdk + Radix)
+│   │       ├── CommandPalette.tsx    # Ctrl+P command menu (cmdk + Radix)
 │   │       ├── ShortcutsHelp.tsx     # Keyboard shortcuts help dialog (?)
 │   │       ├── Icons.tsx             # Shared SVG icons (CalendarIcon, MemoIcon, SparkleIcon, etc.)
 │   │       ├── ErrorBoundary.tsx     # App-level error boundary with fallback UI
@@ -86,7 +86,7 @@ src/
 │   │   ├── useAutoLogin.ts          # Tauri host-sidecar auto-login
 │   │   ├── useCalendarNavigation.ts # Calendar week/month navigation
 │   │   ├── useChatPanel.ts          # Chat panel open/close state
-│   │   ├── useCommandPalette.ts     # Command palette open/close + Ctrl+K listener
+│   │   ├── useCommandPalette.ts     # Command palette open/close + Ctrl+P listener
 │   │   ├── useDataSync.ts           # Centralized data sync on app startup
 │   │   ├── useDebouncedPersist.ts   # Debounced optimistic persist for detail pages
 │   │   ├── useKanbanDragDrop.ts     # Kanban drag-and-drop logic
@@ -307,25 +307,26 @@ The All Tasks page (`/tasks`) renders a 3-column kanban board:
 
 ## Keyboard Shortcuts
 
-| Key                | Action                        | Scope  |
-| ------------------ | ----------------------------- | ------ |
-| `Ctrl+K` / `Cmd+K` | Open command palette          | Global |
-| `?`                | Show keyboard shortcuts help  | Global |
-| `Ctrl+Shift+C`     | Toggle chat panel             | Global |
-| `G+T`              | Go to Today                   | Global |
-| `G+I`              | Go to Inbox                   | Global |
-| `G+C`              | Go to Chats                   | Global |
-| `G+A`              | Go to All Tasks               | Global |
-| `G+S`              | Go to Settings                | Global |
-| `N`                | New task (opens QuickCapture) | Kanban |
-| `/`                | Focus search input            | Kanban |
-| `Esc`              | Close dialog / palette        | Dialog |
+| Key                | Action                                  | Scope  |
+| ------------------ | --------------------------------------- | ------ |
+| `Ctrl+N` / `Cmd+N` | New item (the Inbox input)              | Global |
+| `Ctrl+K` / `Cmd+K` | AI panel about the open task or project | Global |
+| `Ctrl+P` / `Cmd+P` | Open command palette                    | Global |
+| `?`                | Show keyboard shortcuts help            | Global |
+| `G+T`              | Go to Today                             | Global |
+| `G+I`              | Go to Inbox                             | Global |
+| `G+C`              | Go to Chats                             | Global |
+| `G+A`              | Go to All Tasks                         | Global |
+| `G+S`              | Go to Settings                          | Global |
+| `N`                | New item (opens QuickCapture)           | Tasks  |
+| `/`                | Focus search input                      | Kanban |
+| `Esc`              | Close dialog / palette                  | Dialog |
 
 Shortcuts are defined in `keyboard/registry.ts` and wired via hooks in `keyboard/hooks.ts`.
 
 ## Command Palette
 
-Opened with `Ctrl+K`, the command palette provides:
+Opened with `Ctrl+P`, the command palette provides:
 
 - **Navigation** — Jump to any page (Today, Inbox, Chats, Tasks, Calendar, Settings)
 - **Actions** — Toggle dark/light theme

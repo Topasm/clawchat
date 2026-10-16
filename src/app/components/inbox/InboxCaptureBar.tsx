@@ -5,10 +5,21 @@ interface InboxCaptureBarProps {
   busy: boolean;
   /** Resolves once the capture is saved, so the text is kept if it fails. */
   onCapture: (title: string) => Promise<unknown>;
+  autoFocus?: boolean;
+  /** Names what the line is added to when that is not the Inbox. */
+  label?: string;
 }
 
-/** On the Inbox the bottom bar adds to the Inbox instead of starting a chat. */
-export default function InboxCaptureBar({ busy, onCapture }: InboxCaptureBarProps) {
+/**
+ * The one input for something new: at the foot of the Inbox, and the same
+ * input in the ⌘N dialog on every other screen.
+ */
+export default function InboxCaptureBar({
+  busy,
+  onCapture,
+  autoFocus,
+  label,
+}: InboxCaptureBarProps) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const submit = (event: FormEvent) => {
@@ -28,7 +39,8 @@ export default function InboxCaptureBar({ busy, onCapture }: InboxCaptureBarProp
       <input
         ref={inputRef}
         className="cc-inbox-capture__input"
-        aria-label={translateUi('Add to Inbox')}
+        aria-label={label ?? translateUi('Add to Inbox')}
+        autoFocus={autoFocus}
         placeholder={translateUi('Write a task or a note')}
         value={draft}
         maxLength={500}

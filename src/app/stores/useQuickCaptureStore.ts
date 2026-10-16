@@ -2,28 +2,17 @@ import { create } from 'zustand';
 
 interface QuickCaptureState {
   isOpen: boolean;
-  placeholder: string;
   defaultParentId: string | undefined;
-  open: (opts?: { placeholder?: string; defaultParentId?: string }) => void;
+  open: (opts?: { defaultParentId?: string }) => void;
   close: () => void;
 }
 
+/** The ⌘N dialog: the Inbox input, opened from any screen. */
 export const useQuickCaptureStore = create<QuickCaptureState>()((set) => ({
   isOpen: false,
-  placeholder: '',
   defaultParentId: undefined,
 
-  open: (opts) =>
-    set({
-      isOpen: true,
-      placeholder: opts?.placeholder ?? '',
-      defaultParentId: opts?.defaultParentId,
-    }),
+  open: (opts) => set({ isOpen: true, defaultParentId: opts?.defaultParentId }),
 
-  close: () =>
-    set({
-      isOpen: false,
-      placeholder: '',
-      defaultParentId: undefined,
-    }),
+  close: () => set({ isOpen: false, defaultParentId: undefined }),
 }));
