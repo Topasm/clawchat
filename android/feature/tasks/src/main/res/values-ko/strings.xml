@@ -92,4 +92,6 @@
     <string name="tasks_paths_title">경로</string>
     <string name="tasks_paths_copied">경로 복사됨</string>
     <string name="tasks_paths_web">웹</string>
+    <string name="tasks_flow_unordered">순서 없음</string>
+    <string name="tasks_flow_done_folded">완료 %1$d</string>
 </resources>

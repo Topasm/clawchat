@@ -235,6 +235,7 @@ fun TasksScreen(
                 onStepAdd = { state.selectedTask?.let(stepsViewModel::add) },
                 onStepsReload = { noteTaskId?.let(stepsViewModel::load) },
                 storageLocation = todoStorageLocation(selectedTask, state.storage),
+                delegated = state.isDelegated(selectedTask),
                 stage = state.stageOf(
                     selectedTask,
                     hasSubtasks = stepsByTask[selectedTask.id]?.items.orEmpty().isNotEmpty(),
@@ -755,6 +756,8 @@ internal fun TaskDetailView(
     onDiscuss: () -> Unit = {},
     onRunWithAgent: () -> Unit = {},
     storageLocation: ItemStorageLocation? = null,
+    /** Handed to AI; a task you do yourself shows no five stages. */
+    delegated: Boolean = true,
     stage: TaskStageState = taskStage(
         taskStatus = task.status,
         inboxState = task.inboxState,
@@ -884,7 +887,7 @@ internal fun TaskDetailView(
                             textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
                         )
                     }
-                    TaskStageBar(stage)
+                    if (delegated) TaskStageBar(stage)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),

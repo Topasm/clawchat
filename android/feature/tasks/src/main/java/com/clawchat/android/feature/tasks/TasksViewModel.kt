@@ -59,6 +59,9 @@ data class TasksUiState(
     val selectedPlanStatus: String? = null,
 ) {
     /** Where [task] is among the five steps, from the task and its latest run. */
+    /** Handed to AI (an assignee) or already run by it; only then the five stages show. */
+    fun isDelegated(task: Todo): Boolean = task.assignee != null || taskRuns[task.id] != null
+
     fun stageOf(task: Todo, hasSubtasks: Boolean = false): TaskStageState {
         val run = taskRuns[task.id]
         return taskStage(

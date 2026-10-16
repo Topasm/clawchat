@@ -3,6 +3,7 @@ package com.clawchat.android.feature.tasks
 import androidx.lifecycle.SavedStateHandle
 import com.clawchat.android.core.data.model.PaginatedResponse
 import com.clawchat.android.core.data.model.TaskRelationship
+import com.clawchat.android.core.data.model.TaskStatus
 import com.clawchat.android.core.data.model.TaskStepResponse
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
@@ -150,14 +151,15 @@ class TaskStepsViewModelTest {
         assertEquals("https://example.com", state.paths.single().path)
     }
 
-    @Test fun `flow layers put branches in one row and joins below them`() {
+    @Test fun `flow layout keeps the main line first, branches beside it, unordered apart`() {
         val read = Todo(id = "read", title = "Read", sortOrder = 0)
         val kernel = Todo(id = "kernel", title = "Kernel", sortOrder = 10)
         val profile = Todo(id = "profile", title = "Profile", sortOrder = 20)
         val report = Todo(id = "report", title = "Report", sortOrder = 30)
         val submit = Todo(id = "submit", title = "Submit", sortOrder = 40)
-        val layers = flowLayers(
-            listOf(submit, report, profile, kernel, read),
+        val papers = Todo(id = "papers", title = "Papers", sortOrder = 50)
+        val grid = layoutFlow(
+            listOf(papers, submit, report, profile, kernel, read),
             listOf(
                 StepEdge("read", "kernel"), StepEdge("kernel", "profile"), StepEdge("kernel", "report"),
                 StepEdge("profile", "submit"), StepEdge("report", "submit"),
@@ -165,7 +167,16 @@ class TaskStepsViewModelTest {
         )
         assertEquals(
             listOf(listOf("read"), listOf("kernel"), listOf("profile", "report"), listOf("submit")),
-            layers.map { layer -> layer.map { it.id } },
+            grid.layers.map { layer -> layer.map { it.id } },
         )
+        assertEquals(listOf("papers"), grid.unordered.map { it.id })
+        assertEquals(listOf("only"), layoutFlow(listOf(Todo(id = "only", title = "Only")), emptyList()).layers.flatten().map { it.id })
+    }
+
+    @Test fun `done lead stops at the first open step`() {
+        val done = (0..3).map { Todo(id = "d$it", title = "D$it", sortOrder = it, status = TaskStatus.COMPLETED) }
+        val open = Todo(id = "open", title = "Open", sortOrder = 9)
+        val edges = listOf(StepEdge("d0", "d1"), StepEdge("d1", "d2"), StepEdge("d2", "d3"), StepEdge("d3", "open"))
+        assertEquals(setOf("d0", "d1", "d2", "d3"), doneLead(done + open, edges))
     }
 }

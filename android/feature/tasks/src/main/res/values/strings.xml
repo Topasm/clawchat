@@ -92,4 +92,6 @@
     <string name="tasks_paths_title">Paths</string>
     <string name="tasks_paths_copied">Path copied</string>
     <string name="tasks_paths_web">Web</string>
+    <string name="tasks_flow_unordered">No order yet</string>
+    <string name="tasks_flow_done_folded">Done %1$d</string>
 </resources>
