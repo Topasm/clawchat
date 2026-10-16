@@ -1,12 +1,5 @@
 package com.clawchat.android.feature.inbox
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.clawchat.android.core.data.model.InboxGraph
-import com.clawchat.android.core.data.model.ProjectPlan
-import com.clawchat.android.core.data.model.Todo
-import com.clawchat.android.core.data.repository.InboxPlacementSnapshot
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -16,6 +9,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.clawchat.android.core.data.model.InboxRouting
+import com.clawchat.android.core.data.model.ProjectFolderCandidate
+import com.clawchat.android.core.data.model.ProjectPlan
+import com.clawchat.android.core.data.model.Todo
+import com.clawchat.android.core.data.repository.InboxSnapshot
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import java.util.TimeZone
@@ -26,7 +24,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The server inbox: captures with a suggested place, one waiting for a choice. */
+/** The Inbox as two lists: what it just organized, and what still needs a look. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "w393dp-h851dp-xxhdpi")
@@ -57,36 +55,35 @@ class InboxScreenshotTest {
         }
     }
 
-    private val state = InboxPlacementState(
-        server = true,
-        snapshot = InboxPlacementSnapshot(
-            tasks = listOf(
-                Todo(id = "c1", title = "Book flights for the Berlin trip", inboxState = "plan_ready", syncStatus = "synced"),
-                Todo(id = "c2", title = "Ideas for the offsite", inboxState = "captured", syncStatus = "synced"),
-                Todo(id = "c3", title = "Renew the domain", dueDate = "2030-03-14", inboxState = "plan_ready", syncStatus = "synced"),
+    private val state = InboxUiState(
+        snapshot = InboxSnapshot(
+            routings = listOf(
+                InboxRouting(
+                    id = "r1", origin = "auto", kind = "task", todoId = "t1", title = "Send the conference slides",
+                    originalTitle = "Send the conference slides Nov 3", dueDate = "2030-11-03T00:00:00Z",
+                    createdAt = "2030-11-01T09:00:00Z",
+                ),
+                InboxRouting(
+                    id = "r2", origin = "auto", kind = "task", todoId = "t2", title = "Draft the methods chapter",
+                    originalTitle = "Draft the methods chapter", projectFolder = "01_Projects/Thesis",
+                    createdAt = "2030-11-01T09:05:00Z",
+                ),
+                InboxRouting(
+                    id = "r3", origin = "auto", kind = "note", noteId = "n1", title = "Offsite could be in Busan",
+                    originalTitle = "Offsite could be in Busan", createdAt = "2030-11-01T09:10:00Z",
+                ),
             ),
-            total = 3,
-            projects = listOf(
-                ProjectPlan(id = "p1", title = "Berlin conference", rootTaskId = "r1"),
-                ProjectPlan(id = "p2", title = "Admin", rootTaskId = "r2"),
+            captures = listOf(
+                Todo(id = "c1", title = "Something just captured", inboxState = "classifying", syncStatus = "synced"),
+                Todo(id = "c2", title = "Call about the lease", inboxState = "captured", syncStatus = "synced"),
+                Todo(id = "c3", title = "Look into the new grant", inboxState = "captured", syncStatus = "synced"),
             ),
-            graph = InboxGraph(revision = 7),
+            projectOf = mapOf("t1" to "p1"),
+            projects = listOf(ProjectPlan("p1", "Berlin conference"), ProjectPlan("p2", "Admin")),
+            candidates = listOf(ProjectFolderCandidate("Garden", "01_Projects/Garden", "Phone vault")),
         ),
-        choices = mapOf(
-            "c1" to PlacementChoice(projectId = "p1", parentId = "r1"),
-            "c3" to PlacementChoice(projectId = null, parentId = null),
-        ),
+        isLoading = false,
     )
-
-    private val actions = object : InboxPlacementActions {
-        override fun refresh() = Unit
-        override fun undo() = Unit
-        override fun approve(taskId: String) = Unit
-        override fun defer(taskId: String) = Unit
-        override fun resumeDeferred() = Unit
-        override fun changePage(delta: Int) = Unit
-        override fun editPlacement(taskId: String, choice: PlacementChoice, includeDeadline: Boolean, expectedRevision: Long, onSaved: () -> Unit) = Unit
-    }
 
     @Test
     fun inboxLight() = capture("light", "light")
@@ -98,12 +95,16 @@ class InboxScreenshotTest {
     @Test
     fun inboxLargeFont() = capture("light", "light_large", largeFont = true)
 
-    private fun capture(theme: String, variant: String, largeFont: Boolean = false) {
+    @Test
+    fun inboxSelecting() = capture("light", "selecting", state.copy(selected = setOf("c2", "c3")))
+
+    @Test
+    fun inboxEmpty() = capture("light", "empty", InboxUiState(isLoading = false))
+
+    private fun capture(theme: String, variant: String, state: InboxUiState = this.state, largeFont: Boolean = false) {
         render(theme, largeFont) {
-            androidx.compose.foundation.layout.Box(Modifier.padding(16.dp)) {
-                InboxPlacementSection(state = state, viewModel = actions, onOpenPlacement = { _, _ -> })
-            }
+            InboxLists(state = state, onAction = {}, onOpenTask = {}, onOpenNotes = {})
         }
-        composeRule.onRoot().captureRoboImage(shot("placement", variant))
+        composeRule.onRoot().captureRoboImage(shot("lists", variant))
     }
 }

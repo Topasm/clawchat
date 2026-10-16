@@ -1,24 +1,16 @@
 package com.clawchat.android.feature.inbox
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,35 +21,24 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.ClawCrossfade
 import com.clawchat.android.core.ui.ClawLoadingState
 import com.clawchat.android.core.ui.ClawSegmentedToggle
-import com.clawchat.android.core.ui.ClawEmptyState
-import com.clawchat.android.core.ui.ClawListSection
-import com.clawchat.android.core.ui.ClawListItemSurface
-import com.clawchat.android.core.ui.ClawSectionHeader
-import com.clawchat.android.core.ui.ClawStatusChip
-import com.clawchat.android.core.ui.ClawTone
 import com.clawchat.android.core.ui.ClawTopBarColors
-import com.clawchat.android.core.ui.SwipeToDismissCard
-import com.clawchat.android.core.ui.icons.ClawIcons
 import com.clawchat.android.core.ui.localizedErrorMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,39 +46,39 @@ import com.clawchat.android.core.ui.localizedErrorMessage
 fun InboxScreen(
     viewModel: InboxViewModel = hiltViewModel(),
     onTaskClick: (String) -> Unit = {},
-    onOpenPlacement: (String, String?) -> Unit = { id, _ -> onTaskClick(id) },
     onBack: () -> Unit = {},
-    placementViewModel: InboxPlacementViewModel = hiltViewModel(),
+    captureViewModel: InboxCaptureViewModel = hiltViewModel(),
 ) {
     var showNotes by rememberSaveable { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf<Todo?>(null) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val placement by placementViewModel.uiState.collectAsStateWithLifecycle()
-    val totalItems = state.planningNow.size + state.reviewSuggestion.size + state.needsOrganizing.size + state.failed.size
+    val capture by captureViewModel.uiState.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
-    LaunchedEffect(placement.captureSaved) {
-        if (placement.captureSaved) keyboard?.hide()
+    LaunchedEffect(capture.captureSaved) {
+        if (capture.captureSaved) keyboard?.hide()
+    }
+    BackHandler(enabled = !showNotes && state.selection.isNotEmpty()) {
+        viewModel.onAction(InboxAction.ClearSelection)
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (!showNotes) {
-            com.clawchat.android.core.ui.ClawComposer(
-                        value = placement.captureText,
-                        onValueChange = placementViewModel::editCapture,
-                        placeholder = stringResource(R.string.inbox_capture_label),
-                        enabled = !placement.capturing,
-                        actionEnabled = placement.captureText.isNotBlank() && !placement.capturing,
-                        actionIcon = Icons.AutoMirrored.Filled.Send,
-                        actionLabel = stringResource(if (placement.capturing) R.string.inbox_capture_saving else R.string.inbox_capture_add),
-                        onAction = placementViewModel::capture,
-            ) {
-                    if (!placement.server) placement.error?.let { Text(localizedErrorMessage(it)) }
-                    if (placement.captureSaved) Text(stringResource(
-                        if (placement.server) R.string.inbox_capture_saved_server else R.string.inbox_capture_saved),
+                com.clawchat.android.core.ui.ClawComposer(
+                    value = capture.captureText,
+                    onValueChange = captureViewModel::editCapture,
+                    placeholder = stringResource(R.string.inbox_capture_label),
+                    enabled = !capture.capturing,
+                    actionEnabled = capture.captureText.isNotBlank() && !capture.capturing,
+                    actionIcon = Icons.AutoMirrored.Filled.Send,
+                    actionLabel = stringResource(if (capture.capturing) R.string.inbox_capture_saving else R.string.inbox_capture_add),
+                    onAction = captureViewModel::capture,
+                ) {
+                    capture.error?.let { Text(localizedErrorMessage(it)) }
+                    if (capture.captureSaved) Text(stringResource(
+                        if (capture.server) R.string.inbox_capture_saved_server else R.string.inbox_capture_saved),
                         style = MaterialTheme.typography.bodySmall)
-            }
+                }
             }
         },
         topBar = {
@@ -139,144 +120,19 @@ fun InboxScreen(
                 if (notes) {
                     Box(Modifier.fillMaxSize()) { InboxNotesPanel() }
                 } else PullToRefreshBox(
-                    isRefreshing = state.isRefreshing || placement.loading,
-                    onRefresh = { viewModel.refresh(); placementViewModel.refresh() },
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = viewModel::refresh,
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     if (state.isLoading) {
                         ClawLoadingState(message = stringResource(R.string.inbox_loading))
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            if (!placement.server) item {
-                                InboxSummaryCard(
-                                    totalItems = totalItems,
-                                    planningNow = state.planningNow.size,
-                                    reviewSuggestion = state.reviewSuggestion.size,
-                                    failed = state.failed.size,
-                                )
-                            }
-
-                            if (placement.server) {
-                                item {
-                                    InboxPlacementSection(
-                                        placement,
-                                        placementViewModel,
-                                        onOpenPlacement,
-                                        deleting = state.deleting,
-                                        onDelete = viewModel::delete,
-                                        onLongPress = { confirmDelete = it },
-                                    )
-                                }
-                            }
-
-                            if (state.planningNow.isNotEmpty()) {
-                                item {
-                                    InboxSectionCard(
-                                        title = stringResource(R.string.inbox_planning_title),
-                                        subtitle = stringResource(R.string.inbox_planning_subtitle),
-                                        tone = ClawTone.Primary,
-                                        icon = {
-                                            Icon(Icons.Default.Refresh, contentDescription = null)
-                                        },
-                                        items = state.planningNow,
-                                        actionLabel = null,
-                                        onAction = null,
-                                        isError = false,
-                                        showSpinner = true,
-                                        onTaskClick = onTaskClick,
-                                        onDelete = viewModel::delete,
-                                        onLongPress = { confirmDelete = it },
-                                    )
-                                }
-                            }
-
-                            if (state.reviewSuggestion.isNotEmpty()) {
-                                item {
-                                    InboxSectionCard(
-                                        title = stringResource(R.string.inbox_review_title),
-                                        subtitle = stringResource(R.string.inbox_review_subtitle),
-                                        tone = ClawTone.Warning,
-                                        icon = {
-                                            Icon(Icons.Default.CheckCircle, contentDescription = null)
-                                        },
-                                        items = state.reviewSuggestion,
-                                        actionLabel = stringResource(R.string.inbox_action_review),
-                                        onAction = onTaskClick,
-                                        isError = false,
-                                        showSpinner = false,
-                                        onTaskClick = onTaskClick,
-                                        onDelete = viewModel::delete,
-                                        onLongPress = { confirmDelete = it },
-                                        secondaryActionLabel = stringResource(R.string.inbox_action_today),
-                                        onSecondaryAction = viewModel::moveToToday,
-                                    )
-                                }
-                            }
-
-                            if (!placement.server && state.needsOrganizing.isNotEmpty()) {
-                                item {
-                                    InboxSectionCard(
-                                        title = stringResource(R.string.inbox_organize_title),
-                                        subtitle = stringResource(R.string.inbox_organize_subtitle),
-                                        tone = ClawTone.Default,
-                                        icon = {
-                                            Icon(ClawIcons.Inbox, contentDescription = null)
-                                        },
-                                        items = state.needsOrganizing,
-                                        actionLabel = stringResource(R.string.inbox_action_organize),
-                                        onAction = viewModel::organize,
-                                        isError = false,
-                                        showSpinner = false,
-                                        onTaskClick = onTaskClick,
-                                        onDelete = viewModel::delete,
-                                        onLongPress = { confirmDelete = it },
-                                        secondaryActionLabel = stringResource(R.string.inbox_action_today),
-                                        onSecondaryAction = viewModel::moveToToday,
-                                    )
-                                }
-                            }
-
-                            if (state.failed.isNotEmpty()) {
-                                item {
-                                    InboxSectionCard(
-                                        title = stringResource(R.string.inbox_failed_title),
-                                        subtitle = stringResource(R.string.inbox_failed_subtitle),
-                                        tone = ClawTone.Error,
-                                        icon = {
-                                            Icon(Icons.Default.Refresh, contentDescription = null)
-                                        },
-                                        items = state.failed,
-                                        actionLabel = stringResource(R.string.inbox_action_retry),
-                                        onAction = viewModel::retryOrganize,
-                                        isError = true,
-                                        showSpinner = false,
-                                        onTaskClick = onTaskClick,
-                                        onDelete = viewModel::delete,
-                                        onLongPress = { confirmDelete = it },
-                                    )
-                                }
-                            }
-
-                            if (isEmpty(state) && placement.snapshot?.tasks.isNullOrEmpty() && !placement.loading) {
-                                item {
-                                    ClawEmptyState(
-                                        title = stringResource(R.string.inbox_empty_title),
-                                        description = stringResource(R.string.inbox_empty_description),
-                                        icon = {
-                                            Icon(
-                                                Icons.Default.CheckCircle,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        },
-                                    )
-                                }
-                            }
-                        }
+                        InboxLists(
+                            state = state,
+                            onAction = viewModel::onAction,
+                            onOpenTask = onTaskClick,
+                            onOpenNotes = { showNotes = true },
+                        )
                     }
 
                     state.error?.let { error ->
@@ -291,18 +147,6 @@ fun InboxScreen(
                 }
             }
         }
-    }
-
-    confirmDelete?.let { todo ->
-        InboxDeleteDialog(
-            heading = stringResource(R.string.inbox_delete_confirm),
-            body = todo.title,
-            onConfirm = {
-                viewModel.delete(todo.id)
-                confirmDelete = null
-            },
-            onDismiss = { confirmDelete = null },
-        )
     }
 }
 
@@ -321,229 +165,4 @@ internal fun InboxDeleteDialog(heading: String, body: String, onConfirm: () -> U
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.inbox_note_cancel)) }
         },
     )
-}
-
-private fun isEmpty(state: InboxUiState): Boolean =
-    state.planningNow.isEmpty() &&
-        state.reviewSuggestion.isEmpty() &&
-        state.needsOrganizing.isEmpty() &&
-        state.failed.isEmpty()
-
-@Composable
-private fun InboxSummaryCard(
-    totalItems: Int,
-    planningNow: Int,
-    reviewSuggestion: Int,
-    failed: Int,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = if (totalItems == 0) {
-                stringResource(R.string.inbox_nothing_waiting)
-            } else {
-                pluralStringResource(R.plurals.inbox_items_need_attention, totalItems, totalItems)
-            },
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
-        val planningSummary = pluralStringResource(
-            R.plurals.inbox_summary_planning,
-            planningNow,
-            planningNow,
-        )
-        val reviewSummary = pluralStringResource(
-            R.plurals.inbox_summary_review,
-            reviewSuggestion,
-            reviewSuggestion,
-        )
-        val failedSummary = pluralStringResource(
-            R.plurals.inbox_summary_failed,
-            failed,
-            failed,
-        )
-        Text(
-            text = stringResource(
-                R.string.inbox_summary_format,
-                planningSummary,
-                reviewSummary,
-                failedSummary,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun InboxSectionCard(
-    title: String,
-    subtitle: String,
-    tone: ClawTone,
-    icon: @Composable () -> Unit,
-    items: List<Todo>,
-    actionLabel: String?,
-    onAction: ((String) -> Unit)?,
-    isError: Boolean,
-    showSpinner: Boolean,
-    onTaskClick: (String) -> Unit,
-    onDelete: (String) -> Unit,
-    onLongPress: (Todo) -> Unit,
-    secondaryActionLabel: String? = null,
-    onSecondaryAction: ((String) -> Unit)? = null,
-) {
-    ClawListSection(
-        tone = tone,
-        header = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier.size(32.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    icon()
-                }
-                ClawSectionHeader(
-                    modifier = Modifier.weight(1f),
-                    title = title,
-                    subtitle = subtitle,
-                    count = items.size,
-                )
-            }
-        },
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-            items.forEach { todo ->
-                InboxItemCard(
-                    todo = todo,
-                    onDelete = { onDelete(todo.id) },
-                    onLongClick = { onLongPress(todo) },
-                    showSpinner = showSpinner,
-                    actionLabel = actionLabel,
-                    onAction = if (actionLabel != null && onAction != null) {
-                        { onAction(todo.id) }
-                    } else {
-                        null
-                    },
-                    onClick = { onTaskClick(todo.id) },
-                    isError = isError,
-                    secondaryActionLabel = secondaryActionLabel,
-                    onSecondaryAction = if (
-                        secondaryActionLabel != null && onSecondaryAction != null
-                    ) {
-                        { onSecondaryAction(todo.id) }
-                    } else {
-                        null
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun InboxItemCard(
-    todo: Todo,
-    onDelete: () -> Unit,
-    onLongClick: () -> Unit,
-    showSpinner: Boolean = false,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-    onClick: () -> Unit = {},
-    isError: Boolean = false,
-    secondaryActionLabel: String? = null,
-    onSecondaryAction: (() -> Unit)? = null,
-) {
-    SwipeToDismissCard(onDelete = onDelete) {
-        ClawListItemSurface(onClick = onClick, onLongClick = onLongClick) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    if (showSpinner) {
-                        ClawStatusChip(
-                            text = stringResource(R.string.inbox_state_working),
-                            tone = ClawTone.Primary,
-                        )
-                    } else {
-                        ClawStatusChip(
-                            text = when {
-                                isError -> stringResource(R.string.inbox_state_attention)
-                                todo.inboxState == "plan_ready" -> stringResource(R.string.inbox_state_suggestion)
-                                else -> stringResource(R.string.inbox_state_captured)
-                            },
-                            tone = if (isError) ClawTone.Error else ClawTone.Warning,
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            text = todo.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        val summary = todo.planSummary ?: todo.nextAction
-                        if (!summary.isNullOrBlank()) {
-                            Text(
-                                text = summary,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        val automationError = todo.automationError
-                        if (isError && !automationError.isNullOrBlank()) {
-                            Text(
-                                text = automationError,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-
-                if (actionLabel != null && onAction != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
-                        if (secondaryActionLabel != null && onSecondaryAction != null) {
-                            TextButton(onClick = onSecondaryAction) {
-                                Text(secondaryActionLabel)
-                            }
-                        }
-                        FilledTonalButton(onClick = onAction) {
-                            if (isError) {
-                                Icon(
-                                    Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.size(6.dp))
-                            }
-                            Text(actionLabel)
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

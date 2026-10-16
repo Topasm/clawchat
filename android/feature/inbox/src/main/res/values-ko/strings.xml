@@ -1,69 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="inbox_capture_saved_server">Inbox에 저장했습니다.</string>
-    <string name="inbox_placement_count">이 페이지의 승인 대기 %1$d개</string>
-    <string name="inbox_editor_location">프로젝트</string>
-    <string name="inbox_editor_parent">어떤 작업 아래에 넣을까요?</string>
-    <string name="inbox_editor_reason">추천 이유</string>
-    <string name="inbox_editor_cancel">취소</string>
-    <string name="inbox_editor_save">수정 저장</string>
-    <string name="inbox_deadline_proposed">마감일 적용: %1$s</string>
-    <string name="inbox_deadline_past">이미 지난 마감일입니다. 승인 전에 확인하세요.</string>
     <string name="inbox_capture_label">생각이나 해야 할 일을 입력하세요…</string>
     <string name="inbox_capture_add">Inbox에 추가</string>
     <string name="inbox_capture_saving">저장 중…</string>
     <string name="inbox_capture_saved">Inbox에 저장했습니다. 배치 제안은 서버 연결이 필요합니다.</string>
-    <string name="inbox_placement_loading">입력한 내용을 어디에 넣을지 정리하고 있어요…</string>
-    <string name="inbox_placement_stale">계획이 변경됐을 수 있습니다. 새로 확인한 뒤 승인해주세요.</string>
-    <string name="inbox_placement_choose">배치할 위치를 선택해주세요</string>
-    <string name="inbox_placement_standalone">독립 작업으로 유지</string>
-    <string name="inbox_placement_approve">승인</string>
-    <string name="inbox_placement_edit">수정</string>
-    <string name="inbox_placement_defer">나중에</string>
-    <string name="inbox_placement_deferred">보류한 입력 다시 보기</string>
-    <string name="inbox_placement_due">마감: %1$s</string>
-    <string name="inbox_placement_applied">계획에 반영됨: %1$s</string>
-    <string name="inbox_placement_open">작업 열기</string>
-    <string name="inbox_placement_open_project">프로젝트 열기</string>
-    <string name="inbox_placement_undo">실행 취소</string>
-    <string name="inbox_placement_more">입력 %2$d개 중 %1$d개를 표시합니다.</string>
-    <string name="inbox_placement_previous">이전 입력</string>
-    <string name="inbox_placement_next">다음 입력</string>
     <string name="inbox_back">뒤로</string>
     <string name="inbox_title">받은 편지함</string>
     <string name="inbox_loading">받은 편지함 불러오는 중…</string>
-    <string name="inbox_planning_title">계획 중</string>
-    <string name="inbox_planning_subtitle">AI가 항목을 분류하거나 계획하고 있습니다.</string>
-    <string name="inbox_review_title">제안 검토</string>
-    <string name="inbox_review_subtitle">확인이 필요한 AI 추천이 준비됐습니다.</string>
-    <string name="inbox_action_review">검토</string>
-    <string name="inbox_organize_title">정리 필요</string>
-    <string name="inbox_organize_subtitle">구조나 위치를 정해야 하는 항목입니다.</string>
-    <string name="inbox_action_organize">정리</string>
-    <string name="inbox_action_today">오늘로</string>
-    <string name="inbox_failed_title">실패</string>
-    <string name="inbox_failed_subtitle">다시 시도하거나 직접 확인해야 하는 항목입니다.</string>
-    <string name="inbox_action_retry">다시 시도</string>
-    <string name="inbox_empty_title">받은 편지함이 비어 있어요</string>
-    <string name="inbox_empty_description">계획이나 검토가 필요한 새 항목이 여기에 표시됩니다.</string>
-    <string name="inbox_nothing_waiting">지금 확인할 항목이 없습니다</string>
-    <plurals name="inbox_items_need_attention">
-        <item quantity="other">확인할 항목 %1$d개</item>
-    </plurals>
-    <plurals name="inbox_summary_planning">
-        <item quantity="other">계획 중 %1$d개</item>
-    </plurals>
-    <plurals name="inbox_summary_review">
-        <item quantity="other">검토 %1$d개</item>
-    </plurals>
-    <plurals name="inbox_summary_failed">
-        <item quantity="other">실패 %1$d개</item>
-    </plurals>
-    <string name="inbox_summary_format">%1$s · %2$s · %3$s</string>
-    <string name="inbox_state_working">작업 중</string>
-    <string name="inbox_state_attention">확인 필요</string>
-    <string name="inbox_state_suggestion">제안</string>
-    <string name="inbox_state_captured">수집됨</string>
+    <string name="inbox_organized_title">방금 정리됨</string>
+    <string name="inbox_review_title">확인 필요</string>
+    <string name="inbox_kind_task">작업</string>
+    <string name="inbox_kind_note">메모</string>
+    <string name="inbox_due">%1$s 마감</string>
+    <string name="inbox_project_option">프로젝트 · %1$s</string>
+    <string name="inbox_change_destination">목적지 바꾸기</string>
+    <string name="inbox_undo">되돌리기</string>
+    <string name="inbox_organizing">정리 중…</string>
+    <string name="inbox_nothing_to_check">확인할 것 없음</string>
+    <string name="inbox_selected">%1$d개 선택됨</string>
+    <string name="inbox_select_all">전체 선택</string>
+    <string name="inbox_cancel">취소</string>
+    <string name="inbox_candidates_title">vault의 프로젝트</string>
+    <string name="inbox_import">가져오기</string>
+    <string name="inbox_empty_title">받은 편지함이 비었습니다</string>
+    <string name="inbox_empty_description">아래에 할 일이나 메모를 적으세요</string>
     <string name="inbox_delete">삭제</string>
-    <string name="inbox_delete_confirm">이 할 일을 삭제할까요?</string>
 </resources>
