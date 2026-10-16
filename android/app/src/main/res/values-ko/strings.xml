@@ -59,4 +59,6 @@
     <string name="push_run_failed">에이전트 실행이 실패했습니다</string>
     <string name="push_run_untitled">에이전트 실행</string>
     <string name="push_run_failed_body">%1$s: %2$s</string>
+    <string name="push_run_low_risk_body">%1$s · 낮은 위험, 파일 변경 없음</string>
+    <string name="push_run_approve">승인</string>
 </resources>

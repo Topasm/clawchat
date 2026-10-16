@@ -68,6 +68,8 @@ object ReminderNotificationHelper {
         workspaceKey: String,
         deliveryKey: String? = null,
         deduplicate: Boolean = true,
+        /** One extra button, such as approving a low-risk agent result in place. */
+        extraAction: NotificationCompat.Action? = null,
     ): Boolean {
         // A notification without a stable workspace cannot be routed safely,
         // and an unscoped delivery claim could suppress another workspace.
@@ -118,6 +120,8 @@ object ReminderNotificationHelper {
             .setGroup(GROUP_KEY)
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setExtras(Bundle().apply { putString(EXTRA_WORKSPACE_KEY, workspaceKey) })
+
+        extraAction?.let(builder::addAction)
 
         // Add "Mark Done" action for todo reminders
         if (
@@ -186,7 +190,8 @@ object ReminderNotificationHelper {
         )
     }
 
-    private fun notificationId(workspaceKey: String, itemId: String): Int =
+    /** The id a notification for this item carries, so an action can dismiss it. */
+    fun notificationId(workspaceKey: String, itemId: String): Int =
         "$workspaceKey:$itemId".hashCode()
 
     private fun buildDismissPendingIntent(context: Context, notificationId: Int): PendingIntent {

@@ -64,4 +64,6 @@
     <string name="push_run_failed">An agent run failed</string>
     <string name="push_run_untitled">Agent run</string>
     <string name="push_run_failed_body">%1$s: %2$s</string>
+    <string name="push_run_low_risk_body">%1$s · Low risk, no file changes</string>
+    <string name="push_run_approve">Approve</string>
 </resources>

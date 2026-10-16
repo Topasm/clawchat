@@ -26,6 +26,8 @@ from schemas.agent_run import AgentRunEventResponse, AgentRunResponse
 from schemas.review import AgentRunReviewOutcome
 from services.agents import execution_host_service, run_thread_service
 from services.notifications import run_push
+from services.automation.job_provenance import scheduled_job_for_task
+from services.review import run_risk
 from services.review import (
     agent_review_handoff_service,
     artifact_service,
@@ -88,6 +90,7 @@ async def notify_run_state(
     task: AgentTask | None = None,
     *,
     review_id: str | None = None,
+    risk_level: str | None = None,
     user_id: str = DEFAULT_USER_ID,
 ) -> None:
     """Push one ``run_state_changed`` event describing where a run is now.
@@ -123,6 +126,7 @@ async def notify_run_state(
         "result_summary": run.result_summary,
         "error": run.error,
         "is_adopted": run.is_adopted,
+        "risk_level": risk_level,
         "review_id": review_id,
     }
     notify_after_commit(
@@ -354,14 +358,16 @@ async def mark_waiting_review(
         db, run, "waiting_review", "Result is ready for review", progress=100
     )
     review_id = None
+    risk_level: ReviewRiskLevel | None = None
     if task.parent_task_id is None:
+        risk_level = await run_risk.assess(db, run, task)
         review_item = await review_item_service.ensure_review_item(
             db,
             subject_type=ReviewSubjectType.AGENT_RUN,
             subject_id=run.id,
             project_id=run.project_id,
             summary=f"Review {task.agent_type} result",
-            risk_level=ReviewRiskLevel.MEDIUM,
+            risk_level=risk_level,
         )
         review_item.status = ReviewStatus.PENDING
         review_item.requested_at = now
@@ -369,10 +375,34 @@ async def mark_waiting_review(
         review_item.review_note = None
         await db.flush()
         review_id = review_item.id
+        if risk_level == ReviewRiskLevel.LOW and await _automation_skips_review(db, task):
+            # The automation was told not to ask again: the result is adopted
+            # the way an approval would adopt it, and the review is kept as
+            # the record of that, so it still shows in the history.
+            await decide_run(
+                db, run.id, ReviewStatus.APPROVED, expected_status=AgentRunStatus.WAITING_REVIEW
+            )
+            await review_item_service.set_subject_review_status(
+                db,
+                ReviewSubjectType.AGENT_RUN,
+                run.id,
+                ReviewStatus.APPROVED,
+                note=AUTO_APPROVED_NOTE,
+            )
+            return
     else:
         run.status = AgentRunStatus.COMPLETED
         run.is_adopted = True
-    await notify_run_state(db, run, task, review_id=review_id)
+    await notify_run_state(db, run, task, review_id=review_id, risk_level=risk_level)
+
+
+#: The review note an automation's auto-approved result carries.
+AUTO_APPROVED_NOTE = "Approved automatically: this automation does not ask for low-risk results"
+
+
+async def _automation_skips_review(db: AsyncSession, task: AgentTask) -> bool:
+    job = await scheduled_job_for_task(db, task)
+    return job is not None and bool(job.auto_approve_low_risk)
 
 
 async def mark_failed(db: AsyncSession, run: AgentRun, error: str) -> None:

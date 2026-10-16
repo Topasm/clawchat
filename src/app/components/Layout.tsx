@@ -57,6 +57,7 @@ import { useServerHealthStore } from '../stores/useServerHealthStore';
 import { useServerHealthPolling } from '../hooks/useServerHealth';
 import { workspaceAddressLabel } from '../utils/workspaceLocation';
 import { platformApi } from '../platform';
+import ActiveRunsLine from './shared/ActiveRunsLine';
 import WorkerStatusLine from './shared/WorkerStatusLine';
 import WorkspaceMenu from './shared/WorkspaceMenu';
 
@@ -315,6 +316,7 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />
+      <ActiveRunsLine />
       <WorkerStatusLine />
       <WorkspaceMenu
         workspaceName={activeWorkspaceName}

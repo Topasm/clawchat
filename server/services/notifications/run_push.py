@@ -59,7 +59,7 @@ def push_data(payload: dict[str, Any]) -> dict[str, str] | None:
         "run_id": str(run_id),
         "title": str(payload.get("title") or "")[:200],
     }
-    for key in ("todo_id", "conversation_id", "review_id"):
+    for key in ("todo_id", "conversation_id", "review_id", "risk_level"):
         value = payload.get(key)
         if value:
             data[key] = str(value)

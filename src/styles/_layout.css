@@ -134,12 +134,7 @@
   display: none;
 }
 
-.cc-sidebar--collapsed .cc-workspace-menu__address {
-  font-family: ui-monospace, monospace;
-  font-weight: 400;
-}
-
-.cc-workspace-menu__popover {
+.cc-sidebar--collapsed .cc-workspace-menu__popover {
   right: auto;
   left: 4px;
 }
@@ -289,7 +284,6 @@
   font-weight: 600;
 }
 
-.cc-workspace-menu__address,
 .cc-workspace-menu__state {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -348,6 +342,18 @@
   color: var(--cc-text-tertiary);
   font-family: inherit;
   font-size: 11px;
+}
+
+/* What Home is running right now; orange once a run has stopped to ask. */
+.cc-active-runs {
+  border-top: 0;
+}
+.cc-active-runs--running .cc-connection-status__dot {
+  background: var(--cc-success);
+  animation: cc-worker-pulse 1.4s ease-in-out infinite;
+}
+.cc-active-runs--needs-answer .cc-connection-status__dot {
+  background: var(--cc-warning);
 }
 
 /* What this machine is doing as a worker: idle, busy (pulsing), or not yet checked in. */

@@ -13,6 +13,7 @@ from models.project import Project
 from models.review_item import ReviewItem
 from models.todo import Todo
 from schemas.review import ReviewItemResponse
+from services.automation.job_provenance import scheduled_job_for_task
 from services.review import agent_review_handoff_service
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -216,6 +217,14 @@ async def build_review_response(
                 "run_status": run.status,
                 "approval_impact": approval_impact.model_dump(mode="json"),
             }
+            job = await scheduled_job_for_task(db, task)
+            if job is not None:
+                # The card offers "don't ask next time" right where the result is.
+                metadata["automation"] = {
+                    "scheduled_job_id": job.id,
+                    "title": job.title,
+                    "auto_approve_low_risk": bool(job.auto_approve_low_risk),
+                }
     elif item.subject_type == ReviewSubjectType.DATA_SOURCE_WRITE:
         from services.data_sources import service as data_source_service
 

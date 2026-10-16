@@ -50,6 +50,14 @@ def test_only_states_that_need_the_user_are_pushed():
     assert failed["detail"] == "boom"
 
 
+def test_a_result_waiting_for_review_carries_its_risk_so_the_phone_can_offer_approve():
+    base = {"run_id": "run_1", "title": "Course notices", "review_id": "review_1"}
+    low = run_push.push_data({**base, "status": "waiting_review", "risk_level": "low"})
+    assert (low["review_id"], low["risk_level"]) == ("review_1", "low")
+    unknown = run_push.push_data({**base, "status": "waiting_review", "risk_level": None})
+    assert "risk_level" not in unknown
+
+
 async def test_a_status_is_pushed_once_per_run():
     fake = _FakePush()
 

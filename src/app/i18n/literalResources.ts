@@ -1,5 +1,14 @@
 /** Korean translations keyed by their canonical English UI message. */
 export const koreanUiTranslations: Record<string, string> = {
+  'Running · {{title}}': '실행 중 · {{title}}',
+  'Needs an answer · {{title}}': '답 필요 · {{title}}',
+  '{{count}} need an answer': '답 필요 {{count}}개',
+  'Open what is running': '실행 중인 작업 열기',
+  'Running now': '지금 실행 중',
+  'Automation · {{title}}': '자동화 · {{title}}',
+  "Don't ask next time": '다음부터 묻지 않기',
+  'Low-risk results of this automation are approved as they land. A result that could have changed files still asks.':
+    '이 자동화의 낮은 위험 결과는 도착하는 대로 승인됩니다. 파일을 바꿨을 수 있는 결과는 여전히 묻습니다.',
   Notes: '메모',
   'Long-press a note and drop it on a project. Tap a project to see its notes.':
     '메모를 길게 눌러 프로젝트에 놓으세요. 프로젝트를 누르면 모아 둔 메모를 볼 수 있습니다.',

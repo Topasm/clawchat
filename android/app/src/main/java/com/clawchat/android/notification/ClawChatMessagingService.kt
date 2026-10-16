@@ -1,9 +1,13 @@
 package com.clawchat.android.notification
 
 import android.app.ActivityManager
+import android.app.PendingIntent
+import android.content.Intent
+import androidx.core.app.NotificationCompat
 import com.clawchat.android.R
 import com.clawchat.android.core.data.SessionStore
 import com.clawchat.android.core.notification.ReminderNotificationHelper
+import com.clawchat.android.core.notification.ReviewActionReceiver
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
@@ -99,15 +103,45 @@ class ClawChatMessagingService : FirebaseMessagingService() {
         val body = data["detail"]?.takeIf { status == "failed" && it.isNotBlank() }
             ?.let { getString(R.string.push_run_failed_body, task, it) }
             ?: task
+        // Only a low-risk result gets a button; everything else is opened and read.
+        val approve = data["review_id"]
+            ?.takeIf { status == "waiting_review" && data["risk_level"] == "low" }
+            ?.let { reviewId -> approveAction(reviewId, runId, workspaceKey) }
         ReminderNotificationHelper.showReminderNotification(
             context = this,
             reminderType = "run",
             itemId = runId,
             title = headline,
-            message = body,
+            message = if (approve != null) getString(R.string.push_run_low_risk_body, task) else body,
             workspaceKey = workspaceKey,
             deliveryKey = "run:$runId:$status",
+            extraAction = approve,
         )
+    }
+
+    private fun approveAction(
+        reviewId: String,
+        runId: String,
+        workspaceKey: String,
+    ): NotificationCompat.Action {
+        val notificationId = ReminderNotificationHelper.notificationId(workspaceKey, runId)
+        val intent = Intent(this, ReviewActionReceiver::class.java).apply {
+            action = ReviewActionReceiver.ACTION_APPROVE
+            putExtra(ReviewActionReceiver.EXTRA_REVIEW_ID, reviewId)
+            putExtra(ReminderNotificationHelper.EXTRA_WORKSPACE_KEY, workspaceKey)
+            putExtra(ReminderNotificationHelper.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            ReminderNotificationHelper.notificationId(workspaceKey, "$runId:approve"),
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return NotificationCompat.Action.Builder(
+            android.R.drawable.ic_menu_send,
+            getString(R.string.push_run_approve),
+            pendingIntent,
+        ).build()
     }
 
     private fun isInForeground(): Boolean {

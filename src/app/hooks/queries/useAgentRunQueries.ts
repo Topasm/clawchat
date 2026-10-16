@@ -49,6 +49,26 @@ export function useRunsAwaitingInputQuery() {
     enabled: !!serverUrl,
   });
 }
+/**
+ * Runs that are working right now, for the sidebar line and the palette.
+ *
+ * No polling either: `run_state_changed` arrives on every transition and
+ * invalidates the runs queries, so the line is right without a timer.
+ */
+export function useActiveRunsQuery() {
+  const serverUrl = useAuthStore((state) => state.serverUrl);
+  return useQuery({
+    queryKey: queryKeys.runsByStatus('active'),
+    queryFn: async () => {
+      const response = await apiClient.get('/runs', { params: { limit: 100 } });
+      return z
+        .array(AgentRunResponseSchema)
+        .parse(response.data)
+        .filter((run) => ACTIVE.has(run.status));
+    },
+    enabled: !!serverUrl,
+  });
+}
 export function useAgentRunEventsQuery(runId: string | null) {
   const serverUrl = useAuthStore((state) => state.serverUrl);
   return useQuery({

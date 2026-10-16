@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AgentRunReviewHandoff from './AgentRunReviewHandoff';
+import { useUpdateScheduledJob } from '../../hooks/queries';
 import type { ReviewItemResponse } from '../../types/api';
 import { agentRunApprovalImpact, type ReviewDecision } from '../../utils/agentRunReview';
 import { translateUi } from '../../i18n';
@@ -10,6 +11,23 @@ function riskLabel(level: string): string {
   if (level === 'low') return translateUi('Low risk');
   if (level === 'high') return translateUi('High risk');
   return translateUi('Worth a close look');
+}
+
+interface ReviewAutomation {
+  scheduled_job_id: string;
+  title: string;
+  auto_approve_low_risk: boolean;
+}
+
+/** The automation that produced this result, when one did. */
+export function reviewAutomation(item: ReviewItemResponse): ReviewAutomation | null {
+  const raw = item.metadata.automation as Partial<ReviewAutomation> | undefined;
+  if (!raw || typeof raw.scheduled_job_id !== 'string') return null;
+  return {
+    scheduled_job_id: raw.scheduled_job_id,
+    title: typeof raw.title === 'string' ? raw.title : '',
+    auto_approve_low_risk: raw.auto_approve_low_risk === true,
+  };
 }
 
 export function subjectLabel(item: ReviewItemResponse): string {
@@ -44,7 +62,9 @@ export default function ReviewItemCard({
   isDeciding,
 }: ReviewItemCardProps) {
   const navigate = useNavigate();
+  const updateJob = useUpdateScheduledJob();
   const impact = agentRunApprovalImpact(item);
+  const automation = reviewAutomation(item);
   const open = item.status === 'pending' || item.status === 'changes_requested';
   // The note says what to change, so it opens only once changes are asked for.
   const [requesting, setRequesting] = useState(false);
@@ -55,6 +75,13 @@ export default function ReviewItemCard({
       : item.subject_type === 'plan_proposal'
         ? translateUi('Check the steps the AI suggested before adding them.')
         : null;
+  // "Don't ask next time" lives on the card, not in a settings screen: the
+  // automation is switched right where its result is being looked at.
+  const setSkipsReview = (checked: boolean) =>
+    updateJob.mutate({
+      id: automation!.scheduled_job_id,
+      changes: { auto_approve_low_risk: checked },
+    });
   return (
     <article className="cc-review-card">
       <div className="cc-review-card__topline">
@@ -62,6 +89,9 @@ export default function ReviewItemCard({
           {riskLabel(item.risk_level)}
         </span>
         <span>{subjectLabel(item)}</span>
+        {automation && (
+          <span>{translateUi('Automation · {{title}}', { title: automation.title })}</span>
+        )}
         {item.project_title && <span>{item.project_title}</span>}
         <time dateTime={item.requested_at}>{formatShortDateTime(item.requested_at)}</time>
       </div>
@@ -149,6 +179,24 @@ export default function ReviewItemCard({
               </>
             )}
           </div>
+        </div>
+      )}
+      {automation && (
+        <div className="cc-review-card__automation">
+          <label>
+            <input
+              type="checkbox"
+              checked={automation.auto_approve_low_risk}
+              disabled={updateJob.isPending}
+              onChange={(event) => setSkipsReview(event.target.checked)}
+            />
+            {translateUi("Don't ask next time")}
+          </label>
+          <span>
+            {translateUi(
+              'Low-risk results of this automation are approved as they land. A result that could have changed files still asks.',
+            )}
+          </span>
         </div>
       )}
       {item.review_note && item.status !== 'pending' && (
