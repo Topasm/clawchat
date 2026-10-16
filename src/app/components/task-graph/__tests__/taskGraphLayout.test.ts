@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildExecutionGraphLayout,
-  buildStructureGraphLayout,
-  GRAPH_COLUMN_GAP,
-  GRAPH_NODE_WIDTH,
-} from '../taskGraphLayout';
+import { buildExecutionGraphLayout } from '../taskGraphLayout';
 
 const tasks = [
   { id: 'project', title: 'Project', sort_order: 0 },
@@ -23,18 +18,6 @@ const relationships = [
 ];
 
 describe('task graph layout', () => {
-  it('lays parent and child tasks out in left-to-right depth columns', () => {
-    const layout = buildStructureGraphLayout(tasks);
-    const positions = new Map(layout.nodes.map((node) => [node.id, node]));
-
-    expect(layout.nodes).toHaveLength(4);
-    expect(positions.get('design')!.x - positions.get('project')!.x).toBe(
-      GRAPH_NODE_WIDTH + GRAPH_COLUMN_GAP,
-    );
-    expect(positions.get('ship')!.x).toBeGreaterThan(positions.get('build')!.x);
-    expect(layout.edges.filter((edge) => edge.type === 'hierarchy')).toHaveLength(3);
-  });
-
   it('renders stored task-to-prerequisite relationships as prerequisite-to-task arrows', () => {
     const layout = buildExecutionGraphLayout(tasks, relationships);
     const positions = new Map(layout.nodes.map((node) => [node.id, node]));
@@ -46,25 +29,21 @@ describe('task graph layout', () => {
       type: 'dependency',
     });
     expect(positions.get('build')!.x).toBeGreaterThan(positions.get('design')!.x);
-    expect(layout.edges.some((edge) => edge.type === 'hierarchy')).toBe(false);
   });
 
-  it('hides descendants of collapsed tasks but keeps the collapsed node visible', () => {
-    const layout = buildStructureGraphLayout(tasks, new Set(['build']));
+  it("places nodes with the caller's box size and gaps", () => {
+    const layout = buildExecutionGraphLayout(tasks, relationships, {
+      nodeWidth: 100,
+      nodeHeight: 40,
+      columnGap: 20,
+      rowGap: 10,
+      padding: 4,
+    });
+    const positions = new Map(layout.nodes.map((node) => [node.id, node]));
 
-    expect(layout.nodes.map((node) => node.id)).toEqual(
-      expect.arrayContaining(['project', 'design', 'build']),
-    );
-    expect(layout.nodes.map((node) => node.id)).not.toContain('ship');
-  });
-
-  it('keeps malformed cyclic parent data visible', () => {
-    const layout = buildStructureGraphLayout([
-      { id: 'a', title: 'A', parent_id: 'b' },
-      { id: 'b', title: 'B', parent_id: 'a' },
-    ]);
-
-    expect(new Set(layout.nodes.map((node) => node.id))).toEqual(new Set(['a', 'b']));
+    expect(positions.get('design')).toMatchObject({ x: 4 });
+    expect(positions.get('build')).toMatchObject({ x: 124 });
+    expect(layout.width).toBe(124 + 100 + 4);
   });
 
   it('keeps cyclic dependency data visible with both directed edges', () => {

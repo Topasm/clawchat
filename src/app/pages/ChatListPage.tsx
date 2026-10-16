@@ -12,7 +12,8 @@ import {
 import ConversationItem from '../components/shared/ConversationItem';
 import EmptyState from '../components/shared/EmptyState';
 import Badge from '../components/shared/Badge';
-import { ChatBubbleIcon, CheckIcon, ChevronRightIcon, TrashIcon } from '../components/shared/Icons';
+import { CheckIcon, ChevronRightIcon, TrashIcon } from '../components/shared/Icons';
+import { ProjectsIcon } from '../components/shared/NavIcons';
 import ConfirmDialog from '../components/shared/ConfirmDialog';
 import ProjectCreateDialog from '../components/projects/ProjectCreateDialog';
 import { ChatListSkeleton } from '../components/shared/PageSkeletons';
@@ -146,11 +147,6 @@ export default function ChatListPage() {
           )}
         </div>
         <div className="cc-projects-header__actions">
-          {!isMobile && (
-            <button type="button" className="cc-btn" onClick={handleNewChat}>
-              {translateUi('+ Quick Chat')}
-            </button>
-          )}
           <button
             type="button"
             className="cc-btn cc-btn--primary"
@@ -264,9 +260,18 @@ export default function ChatListPage() {
 
       {!loading && projects.length === 0 && (
         <EmptyState
-          icon={<ChatBubbleIcon size={20} />}
+          icon={<ProjectsIcon size={20} />}
           message={translateUi('No projects yet. Create one to start a workspace.')}
         />
+      )}
+
+      {/* A chat is not a project, so starting one sits below the list. */}
+      {!isMobile && (
+        <div className="cc-quick-chats__new">
+          <button type="button" className="cc-btn cc-btn--ghost" onClick={handleNewChat}>
+            {translateUi('+ Quick Chat')}
+          </button>
+        </div>
       )}
 
       {/* Conversations outside any project: quick chats, then unscoped agent runs.

@@ -5,7 +5,6 @@ import {
   useSkillsQuery,
   useStartReadyTaskExecution,
   useTaskGraphInsightsQuery,
-  useTaskRelationshipsQuery,
   useTaskExecutionTelemetryQuery,
 } from '../../hooks/queries';
 import { useQuickCaptureStore } from '../../stores/useQuickCaptureStore';
@@ -27,7 +26,7 @@ import { getChatWorkspaceScope, useChatStore } from '../../stores/useChatStore';
 import { projectTaskAction } from './projectTaskAction';
 
 // React Flow is only needed for the flow view and the expand dialog, not the outline.
-const TaskGraph = lazy(() => import('../task-graph/TaskGraph'));
+import TaskFlow from '../task-flow/TaskFlow';
 const TaskGraphProposalDialog = lazy(() => import('../task-graph/TaskGraphProposalDialog'));
 
 type PlanView = 'outline' | 'flow';
@@ -73,7 +72,6 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
   const setSelectedTaskId = (taskId: string | null) =>
     useChatStore.getState().setProjectPlanSelection(project.id, { view, taskId });
   const [proposalTarget, setProposalTarget] = useState<TodoResponse | null>(null);
-  const { data: relationships = [] } = useTaskRelationshipsQuery();
   // Whole-graph insights, not the root's subtree: a task can belong to the
   // project without hanging under its root, and readiness depends on blockers
   // anywhere. The plan filters to its own tasks through `todos`.
@@ -135,10 +133,10 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
           <div>
             <h2>{translateUi('Plan')}</h2>
             <p>
-              {project.completed_task_count}
-              {translateUi(' of ')}
-              {project.task_count}
-              {translateUi(' tasks completed')}
+              {translateUi('{{done}}/{{total}} done', {
+                done: project.completed_task_count,
+                total: project.task_count,
+              })}
             </p>
           </div>
           <div className="cc-project-plan__view-actions">
@@ -183,20 +181,13 @@ export default function ProjectPlan({ project, todos, onDiscussTask }: ProjectPl
             selectedTaskId={selectedTaskId}
             onSelectTask={setSelectedTaskId}
           />
-        ) : (
-          <Suspense fallback={null}>
-            <TaskGraph
-              todos={todos}
-              metadataTodos={todos}
-              relationships={relationships}
-              fixedProjectId={project.id}
-              showPlanningAction={false}
-              initialMode="execution"
-              selectedTaskId={selectedTaskId}
-              onSelectTask={setSelectedTaskId}
-            />
-          </Suspense>
-        )}
+        ) : project.root_task_id ? (
+          <TaskFlow
+            rootId={project.root_task_id}
+            selectedId={selectedTaskId}
+            onSelect={setSelectedTaskId}
+          />
+        ) : null}
 
         {selectedTask && (
           <div

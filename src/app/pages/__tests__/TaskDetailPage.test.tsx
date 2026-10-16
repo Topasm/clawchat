@@ -31,7 +31,7 @@ const task = {
   source_id: null,
   idempotency_key: null,
   assignee: null,
-  enabled_skills: null,
+  enabled_skills: null as string[] | null,
   inbox_state: 'none',
   estimated_minutes: null,
   depends_on: null,
@@ -79,9 +79,10 @@ vi.mock('../../hooks/useExperimentCompletionGate', () => ({
 vi.mock('../../components/task-detail/TaskAgentThreadSection', () => ({
   default: () => <div>Agent thread</div>,
 }));
-vi.mock('../../components/task-relationships/RelationshipsSection', () => ({
-  default: () => null,
+vi.mock('../../components/task-flow/TaskFlow', () => ({
+  default: ({ rootId }: { rootId: string }) => <div>Flow for {rootId}</div>,
 }));
+vi.mock('../../components/task-detail/TaskPaths', () => ({ default: () => null }));
 vi.mock('../../components/shared/FileDropZone', () => ({ default: () => null }));
 vi.mock('../../components/shared/AttachmentList', () => ({ default: () => null }));
 vi.mock('../../components/shared/ProjectWorkspaceHosts', () => ({
@@ -112,6 +113,7 @@ describe('TaskDetailPage project context', () => {
     mocks.toggleTodo.mockReset();
     mocks.persist.mockReset();
     task.recurrence_rule = null;
+    task.enabled_skills = null;
     mocks.projectPath = '/Users/test/papers';
     mocks.hostLabel = 'My Mac';
     mocks.projectError = false;
@@ -122,36 +124,71 @@ describe('TaskDetailPage project context', () => {
 
     renderPage();
 
-    expect(screen.getByText('Project context')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open original document' })).toBeVisible();
   });
 
   it('does not use a task description path when the project has no canonical document', () => {
     renderPage();
 
-    expect(screen.getByText('Project context')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Open original document' }),
     ).not.toBeInTheDocument();
   });
 
-  it('shows the project path before opening details and edits it without opening chat', () => {
+  it('leads a task you do yourself with its due date, project and flow', () => {
     renderPage();
-    expect(screen.getByText('/Users/test/papers')).toBeVisible();
-    expect(screen.getByText('Runs on My Mac')).toBeVisible();
+
+    expect(screen.getByLabelText('Due')).toBeVisible();
     expect(screen.getByRole('link', { name: 'P0-R Semantic referent binding' })).toHaveAttribute(
       'href',
       '/projects/project-p0-r',
     );
+    expect(screen.getByText('Flow for todo-e65a')).toBeVisible();
+    expect(screen.getByPlaceholderText('Add a description...')).toBeVisible();
+    // No five steps, no plan button, no machine line for work not handed to an agent.
+    expect(document.querySelector('.cc-stage-bar')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Plan this task' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Runs on My Mac')).not.toBeInTheDocument();
+  });
+
+  it('keeps the other actions in the menu', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Discuss with agent' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Plan this task' })).toBeVisible();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Task' }));
+    expect(mocks.deleteTodo).toHaveBeenCalledWith('todo-e65a');
+  });
+
+  it('opens where this runs from the menu and resets it when switching tasks', () => {
+    renderPage();
     expect(screen.queryByText('Workspace editor: project-p0-r')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Where this runs' }));
     expect(screen.getByRole('dialog', { name: 'Where this runs' })).toBeInTheDocument();
     expect(screen.getByText('Workspace editor: project-p0-r')).toBeVisible();
-    expect(screen.getByPlaceholderText('Task title')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Other task' }));
+    expect(screen.getByText('Flow for other-task')).toBeVisible();
+    expect(screen.queryByRole('dialog', { name: 'Where this runs' })).not.toBeInTheDocument();
     expect(mocks.persist).not.toHaveBeenCalled();
   });
 
-  it('shows missing location explicitly and offers the same editor', () => {
+  it('shows the five steps, plan button and machine for a task handed to an agent', () => {
+    task.enabled_skills = ['research'];
+    renderPage();
+
+    expect(document.querySelector('.cc-stage-bar')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Plan this task' })).toBeVisible();
+    expect(screen.getByText('Runs on My Mac')).toBeVisible();
+    expect(screen.getByText('/Users/test/papers')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));
+    expect(screen.getByRole('dialog', { name: 'Where this runs' })).toBeInTheDocument();
+  });
+
+  it('shows a missing machine explicitly for an agent task', () => {
+    task.enabled_skills = ['research'];
     mocks.projectPath = null;
     mocks.hostLabel = null;
     renderPage();
@@ -161,6 +198,7 @@ describe('TaskDetailPage project context', () => {
   });
 
   it('does not present a failed project lookup as an unset workspace', () => {
+    task.enabled_skills = ['research'];
     mocks.projectError = true;
     renderPage();
     expect(screen.getByRole('alert')).toHaveTextContent('This project could not be loaded.');
@@ -168,46 +206,12 @@ describe('TaskDetailPage project context', () => {
     expect(screen.queryByRole('button', { name: 'Choose machine' })).not.toBeInTheDocument();
   });
 
-  it('refreshes the visible path and resets the editor when switching tasks', () => {
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'Change where this runs' }));
-    expect(screen.getByRole('dialog', { name: 'Where this runs' })).toBeInTheDocument();
-    // The dialog is modal, so the task switch happens after it is closed.
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    mocks.projectPath = '/Users/test/new-folder';
-    fireEvent.click(screen.getByRole('link', { name: 'Other task' }));
-    expect(screen.getByText('/Users/test/new-folder')).toBeVisible();
-    expect(screen.queryByText('/Users/test/papers')).not.toBeInTheDocument();
-    expect(screen.queryByRole('dialog', { name: 'Where this runs' })).not.toBeInTheDocument();
-  });
-
-  it('collapses optional settings without hiding the next action or thread', () => {
-    renderPage();
-    expect(screen.getByText('Agent thread')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Discuss with agent' })).toBeVisible();
-    expect(screen.queryByText('Repeat')).not.toBeInTheDocument();
-    expect(screen.queryByText(/^Skills/)).not.toBeInTheDocument();
-  });
-
-  it('does not offer recurrence even for a legacy recurring task', () => {
+  it('keeps the agent thread and offers no recurrence even for a legacy recurring task', () => {
     task.recurrence_rule = 'RRULE:FREQ=WEEKLY';
     renderPage();
+    expect(screen.getByText('Agent thread')).toBeVisible();
     expect(screen.queryByText('Repeat')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Skills/)).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Task title')).toBeVisible();
-  });
-
-  it('exposes details accessibly and resets disclosure when changing tasks', () => {
-    renderPage();
-    const details = screen.getByRole('button', { name: /Details/ });
-    expect(details).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(details);
-    expect(details).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByPlaceholderText('Add a description...')).toBeVisible();
-    fireEvent.click(screen.getByRole('link', { name: 'Other task' }));
-    expect(screen.getByRole('button', { name: /Details/ })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
-    expect(screen.queryByPlaceholderText('Add a description...')).not.toBeInTheDocument();
   });
 });

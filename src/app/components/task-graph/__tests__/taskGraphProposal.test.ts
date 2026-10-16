@@ -1,22 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { PlanSubtask, TodoResponse } from '../../../types/api';
+import type { PlanSubtask } from '../../../types/api';
 import {
-  buildProposalRelationships,
-  buildProposalTodos,
-  PROPOSAL_ROOT_ID,
+  buildProposalEdges,
   proposalIndexFromNodeId,
   proposalNodeId,
   toggleProposalSelection,
 } from '../taskGraphProposal';
-
-const root: TodoResponse = {
-  id: 'real-root',
-  title: 'Ship MVP',
-  status: 'pending',
-  tags: ['product'],
-  created_at: '2026-08-26T00:00:00Z',
-  updated_at: '2026-08-26T00:00:00Z',
-};
 
 const subtasks: PlanSubtask[] = [
   { title: 'Research', depends_on_indices: [] },
@@ -26,36 +15,18 @@ const subtasks: PlanSubtask[] = [
 ];
 
 describe('task graph proposal adapter', () => {
-  it('builds temporary hierarchy without mutating the root', () => {
-    const todos = buildProposalTodos(root, subtasks);
-
-    expect(todos[0].id).toBe(PROPOSAL_ROOT_ID);
-    expect(todos[1]).toMatchObject({
-      id: proposalNodeId(0),
-      parent_id: PROPOSAL_ROOT_ID,
-    });
-    expect(root.id).toBe('real-root');
-  });
-
-  it('builds normalized preview relationships and ignores invalid references', () => {
-    const relationships = buildProposalRelationships([
+  it('draws prerequisite arrows and ignores invalid references', () => {
+    const edges = buildProposalEdges([
       { title: 'Safe task', depends_on_indices: [-1, 0, 3] },
       { title: 'Dependent task', depends_on_indices: [0, 0] },
     ]);
 
-    expect(relationships).toEqual([
-      {
-        id: 'proposal:relationship:1:0',
-        source_task_id: proposalNodeId(1),
-        target_task_id: proposalNodeId(0),
-        type: 'depends_on',
-      },
-    ]);
+    expect(edges).toEqual([{ before: proposalNodeId(0), after: proposalNodeId(1) }]);
   });
 
   it('maps proposal node IDs back to subtask indices', () => {
     expect(proposalIndexFromNodeId(proposalNodeId(12))).toBe(12);
-    expect(proposalIndexFromNodeId(PROPOSAL_ROOT_ID)).toBeNull();
+    expect(proposalIndexFromNodeId('proposal:root')).toBeNull();
     expect(proposalIndexFromNodeId('proposal:subtask:not-a-number')).toBeNull();
   });
 });

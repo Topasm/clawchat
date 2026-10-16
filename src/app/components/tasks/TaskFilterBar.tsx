@@ -10,7 +10,7 @@ const SORT_OPTIONS = [
   { value: 'updated_at', label: 'Last Updated' },
   { value: 'sort_order', label: 'Manual Order' },
 ] as const;
-/** Search, tag and sort controls shared by the List and Graph views. */
+/** Search, tag and sort controls for the task list. */
 export default function TaskFilterBar() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filters = useModuleStore((s) => s.kanbanFilters);

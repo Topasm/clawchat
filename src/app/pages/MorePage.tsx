@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from '../i18n';
 import {
   AutomationsIcon,
-  ChatIcon,
+  ProjectsIcon,
   DevicesIcon,
   GearIcon,
   SearchIcon,
@@ -10,7 +10,7 @@ import {
 
 // Everything the phone's five tabs leave out, in the desktop sidebar's order.
 const links = [
-  { to: '/projects', labelKey: 'nav.projects', Icon: ChatIcon },
+  { to: '/projects', labelKey: 'nav.projects', Icon: ProjectsIcon },
   { to: '/automations', labelKey: 'nav.automations', Icon: AutomationsIcon },
   { to: '/devices', labelKey: 'nav.devices', Icon: DevicesIcon },
   { to: '/search', labelKey: 'nav.search', Icon: SearchIcon },
