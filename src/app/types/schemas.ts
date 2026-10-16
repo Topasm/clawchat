@@ -79,6 +79,8 @@ export const TodoResponseSchema = z.object({
   plan_summary: z.string().nullable().optional(),
   sync_status: z.string().nullable().optional(),
   project_label: z.string().nullable().optional(),
+  // Unfinished prerequisites of an active task; it waits while this is non-empty.
+  open_prerequisites: z.array(z.object({ id: z.string(), title: z.string() })).optional(),
   depends_on: z.array(z.string()).nullable().optional(),
   clarification_questions: z.array(z.string()).nullable().optional(),
   clarification_answers: z.record(z.string(), z.string()).nullable().optional(),

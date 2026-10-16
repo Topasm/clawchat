@@ -52,6 +52,7 @@ from schemas.task_step import (
 )
 from schemas.todo import (
     AnswerQuestionsRequest,
+    OpenPrerequisite,
     ProjectTodoResponse,
     TodoCreate,
     TodoResponse,
@@ -197,6 +198,26 @@ async def _enrich_todo_response(
             resp.plan_summary = payload.get("summary")
 
     return resp
+
+
+_WAITING_STATUSES = {TaskStatus.PENDING, TaskStatus.IN_PROGRESS}
+
+
+async def _attach_open_prerequisites(items: list[TodoResponse], db: AsyncSession) -> None:
+    """Fill ``open_prerequisites`` for the active tasks in one query.
+
+    A list row can then say "waiting on <prerequisite>" without every client
+    walking the relationship graph itself.
+    """
+    waiting_ids = {item.id for item in items if item.status in _WAITING_STATUSES}
+    if not waiting_ids:
+        return
+    open_by_task = await task_relationship_service.open_prerequisites_by_task(db, waiting_ids)
+    for item in items:
+        item.open_prerequisites = [
+            OpenPrerequisite(id=task_id, title=title)
+            for task_id, title in open_by_task.get(item.id, [])
+        ]
 
 
 @router.get(
@@ -361,6 +382,7 @@ async def list_todos(
     for row in rows:
         resp = await _enrich_todo_response(row, db, include_plan_summary=False)
         items.append(resp)
+    await _attach_open_prerequisites(items, db)
 
     return PaginatedResponse(items=items, total=total, page=page, limit=limit)
 
@@ -534,7 +556,9 @@ async def get_todo(
     _user: str = Depends(get_current_user),
 ):
     todo = await todo_service.get_todo(db, todo_id)
-    return await _enrich_todo_response(todo, db)
+    resp = await _enrich_todo_response(todo, db)
+    await _attach_open_prerequisites([resp], db)
+    return resp
 
 
 @router.patch("/{todo_id}", response_model=TodoResponse)

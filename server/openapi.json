@@ -6774,6 +6774,25 @@
         "title": "ObsidianProjectTodoCreate",
         "type": "object"
       },
+      "OpenPrerequisite": {
+        "description": "A prerequisite that is not completed yet, so the task waits on it.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "OpenPrerequisite",
+        "type": "object"
+      },
       "PaginatedResponse_AgentTaskResponse_": {
         "properties": {
           "items": {
@@ -12267,6 +12286,14 @@
               }
             ],
             "title": "Next Action"
+          },
+          "open_prerequisites": {
+            "description": "Prerequisites of an active task that are not completed yet; the task is blocked while this is non-empty",
+            "items": {
+              "$ref": "#/components/schemas/OpenPrerequisite"
+            },
+            "title": "Open Prerequisites",
+            "type": "array"
           },
           "parent_id": {
             "anyOf": [

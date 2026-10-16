@@ -13,12 +13,14 @@ describe('useModuleStore', () => {
       store.setKanbanSearchQuery('graph');
       store.toggleKanbanTagFilter('frontend');
       store.setKanbanSort('due_date', 'asc');
+      store.setKanbanBlockedOnly(true);
 
       expect(useModuleStore.getState().kanbanFilters).toEqual({
         searchQuery: 'graph',
         tags: ['frontend'],
         sortField: 'due_date',
         sortDirection: 'asc',
+        blockedOnly: true,
       });
     });
 
@@ -35,6 +37,7 @@ describe('useModuleStore', () => {
       store.setKanbanSearchQuery('graph');
       store.toggleKanbanTagFilter('backend');
       store.setKanbanSort('title', 'asc');
+      store.setKanbanBlockedOnly(true);
 
       store.clearKanbanFilters();
 
@@ -43,6 +46,7 @@ describe('useModuleStore', () => {
         tags: [],
         sortField: 'due_date',
         sortDirection: 'asc',
+        blockedOnly: false,
       });
     });
   });

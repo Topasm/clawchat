@@ -87,6 +87,7 @@ import com.clawchat.android.core.data.needsListMarker
 import com.clawchat.android.core.data.todoStorageLocation
 import com.clawchat.android.core.data.model.TaskStageState
 import com.clawchat.android.core.data.model.taskStage
+import com.clawchat.android.core.data.model.waitingOn
 import com.clawchat.android.core.ui.TaskStageBar
 import com.clawchat.android.core.ui.TaskStageDots
 import com.clawchat.android.core.data.model.TaskStatus
@@ -648,6 +649,26 @@ private fun TaskRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                // Which prerequisite the row waits on, as the web list says it;
+                // the line goes away by itself once that task is completed.
+                val waitingOn = task.waitingOn()
+                if (waitingOn.isNotEmpty()) {
+                    val first = waitingOn.first().title
+                    Text(
+                        text = stringResource(
+                            R.string.tasks_waiting_on,
+                            if (waitingOn.size == 1) {
+                                first
+                            } else {
+                                stringResource(R.string.tasks_waiting_on_more, first, waitingOn.size - 1)
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

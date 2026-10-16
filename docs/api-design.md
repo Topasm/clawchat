@@ -203,10 +203,14 @@ no telemetry value is persisted back onto the Todo.
 pending | in_progress | completed | cancelled
 ```
 
-`blocked` is not a status. Clients derive readiness from incomplete normalized
-`depends_on` edges. The legacy nullable `depends_on: string[]` Todo field is
-still accepted and returned during the compatibility window, but new clients
-must use the task-relationship endpoints below.
+`blocked` is not a status. A task is blocked while a normalized `depends_on`
+prerequisite is not completed (a cancelled one still blocks). `GET /api/todos`
+and `GET /api/todos/{id}` name those prerequisites for an active task in
+`open_prerequisites: [{id, title}]`, so a list row can say what it waits on
+without walking the graph; a completed or cancelled task always returns `[]`.
+The legacy nullable `depends_on: string[]` Todo field is still accepted and
+returned during the compatibility window, but new clients must use the
+task-relationship endpoints below.
 
 #### `GET /api/todos`
 

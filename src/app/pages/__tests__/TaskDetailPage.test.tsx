@@ -83,8 +83,6 @@ vi.mock('../../components/task-flow/TaskFlow', () => ({
   default: ({ rootId }: { rootId: string }) => <div>Flow for {rootId}</div>,
 }));
 vi.mock('../../components/task-detail/TaskPaths', () => ({ default: () => null }));
-vi.mock('../../components/shared/FileDropZone', () => ({ default: () => null }));
-vi.mock('../../components/shared/AttachmentList', () => ({ default: () => null }));
 vi.mock('../../components/shared/ProjectWorkspaceHosts', () => ({
   default: ({ projectId }: { projectId: string }) => <div>Workspace editor: {projectId}</div>,
 }));

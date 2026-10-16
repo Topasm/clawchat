@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domain.task import TaskStatus
 from domain.task_relationship import TaskRelationshipType
 from exceptions import ConflictError, NotFoundError, ValidationError
 from models.task_relationship import TaskRelationship
@@ -548,6 +549,37 @@ async def dependent_source_ids(
         .distinct()
     )
     return set(rows.scalars().all()) - target_task_ids
+
+
+async def open_prerequisites_by_task(
+    db: AsyncSession, task_ids: set[str]
+) -> dict[str, list[tuple[str, str]]]:
+    """Prerequisites that are not completed yet, keyed by the waiting task.
+
+    Same rule as the graph insights: any ``depends_on`` target that is not
+    completed blocks its source, a cancelled one included. Whether the source
+    itself is active is the caller's business.
+    """
+    if not task_ids:
+        return {}
+    rows = await db.execute(
+        select(
+            TaskRelationship.source_task_id,
+            Todo.id,
+            Todo.title,
+        )
+        .join(Todo, Todo.id == TaskRelationship.target_task_id)
+        .where(
+            TaskRelationship.source_task_id.in_(task_ids),
+            TaskRelationship.type == TaskRelationshipType.DEPENDS_ON,
+            Todo.status != TaskStatus.COMPLETED,
+        )
+        .order_by(TaskRelationship.created_at.asc(), TaskRelationship.id.asc())
+    )
+    result: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for source_task_id, target_task_id, title in rows.all():
+        result[source_task_id].append((target_task_id, title))
+    return dict(result)
 
 
 async def backfill_legacy_dependencies(db: AsyncSession) -> int:

@@ -6,6 +6,16 @@ interface TaskFilters {
   tags: string[];
   sortField: 'title' | 'due_date' | 'created_at' | 'updated_at' | 'sort_order';
   sortDirection: 'asc' | 'desc';
+  /** Keep only tasks waiting on an unfinished prerequisite. */
+  blockedOnly?: boolean;
+}
+
+/** An active task with a prerequisite that is not completed yet. */
+export function isWaitingOnPrerequisite(todo: TodoResponse): boolean {
+  return (
+    (todo.status === 'pending' || todo.status === 'in_progress') &&
+    (todo.open_prerequisites?.length ?? 0) > 0
+  );
 }
 
 export default function useTaskFilters(todos: TodoResponse[], filters: TaskFilters) {
@@ -26,6 +36,10 @@ export default function useTaskFilters(todos: TodoResponse[], filters: TaskFilte
     // Tag filter
     if (filters.tags.length > 0) {
       result = result.filter((t) => t.tags?.some((tag) => filters.tags.includes(tag)));
+    }
+
+    if (filters.blockedOnly) {
+      result = result.filter(isWaitingOnPrerequisite);
     }
 
     // Sort

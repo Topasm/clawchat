@@ -22,6 +22,8 @@
     <string name="tasks_deleted">Task deleted</string>
     <string name="tasks_undo">Undo</string>
     <string name="tasks_mark_complete">Mark %1$s complete</string>
+    <string name="tasks_waiting_on">Waiting on %1$s</string>
+    <string name="tasks_waiting_on_more">%1$s +%2$d</string>
     <string name="tasks_mark_incomplete">Mark %1$s incomplete</string>
     <string name="tasks_experiment_completion_title">Complete experiment task</string>
     <string name="tasks_experiment_completion_question">Did you record the verdict in the original document?</string>

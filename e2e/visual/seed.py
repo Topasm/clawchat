@@ -26,7 +26,9 @@ from models.agent_task import AgentTask  # noqa: E402
 from models.inbox_routing import InboxRouting  # noqa: E402
 from models.note import Note  # noqa: E402
 from models.project import Project  # noqa: E402
+from models.task_relationship import TaskRelationship  # noqa: E402
 from models.todo import Todo  # noqa: E402
+from domain.task_relationship import TaskRelationshipType  # noqa: E402
 from services.tasks import project_service  # noqa: E402
 
 NOW = datetime(2030, 3, 12, 9, 0, tzinfo=timezone.utc)
@@ -84,8 +86,18 @@ async def seed() -> None:
         # Distinct creation times: rows with equal timestamps have no stable order.
         child("Book flights to Berlin", days_due=1, hours_ago=31)
         child("Reserve a hotel near the venue", days_due=2, hours_ago=32)
-        child("Rehearse with the team", days_due=10, hours_ago=33)
+        rehearsal = child("Rehearse with the team", days_due=10, hours_ago=33)
         child("Send the abstract", days_due=-4, status="completed", hours_ago=120)
+        # The rehearsal waits on the slides, so the list shows a blocked row.
+        await db.flush()
+        db.add(
+            TaskRelationship(
+                source_task_id=rehearsal.id,
+                target_task_id=slides.id,
+                type=TaskRelationshipType.DEPENDS_ON,
+                created_by="user",
+            )
+        )
 
         for title, state, hours_ago in [
             ("Ideas for the offsite agenda", "captured", 2),

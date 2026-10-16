@@ -5,6 +5,7 @@ import { translateUi } from '../../i18n';
 import { describeTaskStage, getTaskStage } from '../../utils/taskStage';
 import type { TaskStageState } from '../../utils/taskStage';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
+import { isWaitingOnPrerequisite } from '../../hooks/useTaskFilters';
 interface TaskListViewProps {
   todos: TodoResponse[];
   /** Every task, so a row can count its steps even when they are filtered out. */
@@ -13,8 +14,6 @@ interface TaskListViewProps {
   onToggleTask: (taskId: string) => void;
   /** Project titles by id, for the Project column. */
   projectTitles?: Map<string, string>;
-  /** Active tasks with an unfinished prerequisite. */
-  blockedIds?: Set<string>;
   telemetryByTaskId?: Map<string, TaskExecutionTelemetryResponse>;
 }
 
@@ -56,7 +55,6 @@ export default function TaskListView({
   onOpenTask,
   onToggleTask,
   projectTitles,
-  blockedIds,
   telemetryByTaskId,
 }: TaskListViewProps) {
   const todoById = new Map(todos.map((todo) => [todo.id, todo]));
@@ -85,9 +83,12 @@ export default function TaskListView({
       </div>
       {todos.map((todo) => {
         const status = todo.status;
+        // The server names the unfinished prerequisites, so the row can say
+        // what it waits on; the line goes away once they are completed.
+        const waitingOn = isWaitingOnPrerequisite(todo) ? (todo.open_prerequisites ?? []) : [];
         const { state, label } = describeTaskState(
           todo,
-          blockedIds?.has(todo.id) ?? false,
+          waitingOn.length > 0,
           telemetryByTaskId?.get(todo.id),
         );
         const depth = getTaskDepth(todo, todoById);
@@ -133,8 +134,24 @@ export default function TaskListView({
               )}
               <StorageLocationBadge item={todo} />
             </span>
-            <span role="cell">
+            <span role="cell" className="cc-task-list__status">
               <TaskStageIndicator state={state} label={label} />
+              {waitingOn.length > 0 && (
+                <small
+                  className="cc-task-list__waiting"
+                  title={waitingOn.map((entry) => entry.title).join(', ')}
+                >
+                  {translateUi('Waiting on {{title}}', {
+                    title:
+                      waitingOn.length === 1
+                        ? waitingOn[0].title
+                        : translateUi('{{title}} +{{count}}', {
+                            title: waitingOn[0].title,
+                            count: waitingOn.length - 1,
+                          }),
+                  })}
+                </small>
+              )}
             </span>
             <span role="cell" title={context ?? undefined}>
               {context || '—'}

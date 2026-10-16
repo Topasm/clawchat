@@ -91,6 +91,22 @@
   border-color: var(--cc-primary);
 }
 
+/* The "blocked only" switch sits with the selects, in the same small type. */
+.cc-kanban-filter__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cc-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cc-kanban-filter__toggle input {
+  margin: 0;
+  accent-color: var(--cc-primary);
+}
+
 /* -- Clear button -------------------------------------------- */
 
 .cc-kanban-filter__clear {

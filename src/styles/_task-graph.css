@@ -147,6 +147,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+.cc-task-list__status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Which prerequisite the row waits on, under the step word. */
+.cc-task-list__waiting {
+  overflow: hidden;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* -- One task's flow ----------------------------------------- */
 
 .cc-flow {
@@ -535,9 +550,35 @@
   cursor: pointer;
 }
 
+.cc-task-paths__size {
+  flex: none;
+  color: var(--cc-text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
 .cc-task-paths__add {
   display: flex;
   gap: 6px;
+}
+
+/* The drop zone is one quiet line under the input, not a box of its own. */
+.cc-task-paths .cc-dropzone--compact {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-width: 1px;
+}
+
+.cc-task-paths .cc-dropzone--compact .cc-dropzone__icon {
+  margin: 0;
+  font-size: 14px;
+}
+
+.cc-task-paths .cc-dropzone--compact .cc-dropzone__text {
+  font-size: 12px;
 }
 
 .cc-task-menu {
