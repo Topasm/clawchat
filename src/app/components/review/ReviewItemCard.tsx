@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AgentRunReviewHandoff from './AgentRunReviewHandoff';
 import type { ReviewItemResponse } from '../../types/api';
 import { agentRunApprovalImpact, type ReviewDecision } from '../../utils/agentRunReview';
 import { translateUi } from '../../i18n';
+import { formatShortDateTime } from '../../utils/formatters';
 
 function riskLabel(level: string): string {
   if (level === 'low') return translateUi('Low risk');
@@ -12,7 +14,7 @@ function riskLabel(level: string): string {
 
 export function subjectLabel(item: ReviewItemResponse): string {
   const labels: Record<string, string> = {
-    plan_proposal: translateUi('Plan'),
+    plan_proposal: translateUi('AI suggestion'),
     artifact_revision: translateUi('Document change'),
     agent_run: translateUi('Agent result'),
     data_source_write: translateUi('Change to a shared file'),
@@ -44,6 +46,15 @@ export default function ReviewItemCard({
   const navigate = useNavigate();
   const impact = agentRunApprovalImpact(item);
   const open = item.status === 'pending' || item.status === 'changes_requested';
+  // The note says what to change, so it opens only once changes are asked for.
+  const [requesting, setRequesting] = useState(false);
+  const title = item.subject_title || item.summary;
+  const summary =
+    item.summary && item.summary !== title
+      ? item.summary
+      : item.subject_type === 'plan_proposal'
+        ? translateUi('Check the steps the AI suggested before adding them.')
+        : null;
   return (
     <article className="cc-review-card">
       <div className="cc-review-card__topline">
@@ -52,10 +63,10 @@ export default function ReviewItemCard({
         </span>
         <span>{subjectLabel(item)}</span>
         {item.project_title && <span>{item.project_title}</span>}
-        <time dateTime={item.requested_at}>{new Date(item.requested_at).toLocaleString()}</time>
+        <time dateTime={item.requested_at}>{formatShortDateTime(item.requested_at)}</time>
       </div>
-      <h2>{item.subject_title || item.summary}</h2>
-      <p className="cc-review-card__summary">{item.summary}</p>
+      <h2>{title}</h2>
+      {summary && <p className="cc-review-card__summary">{summary}</p>}
       {item.subject_description && (
         <pre className="cc-review-card__preview">{item.subject_description}</pre>
       )}
@@ -77,45 +88,66 @@ export default function ReviewItemCard({
       )}
       {open && (
         <div className="cc-review-card__decision">
-          <textarea
-            rows={2}
-            value={note}
-            onChange={(event) => onNoteChange(event.target.value)}
-            placeholder={translateUi('Optional review note')}
-            aria-label={translateUi('Review note for {{title}}', {
-              title: item.subject_title || item.summary,
-            })}
-          />
+          {requesting && (
+            <textarea
+              rows={2}
+              autoFocus
+              value={note}
+              onChange={(event) => onNoteChange(event.target.value)}
+              placeholder={translateUi('What should change?')}
+              aria-label={translateUi('Review note for {{title}}', { title })}
+            />
+          )}
           <div className="cc-review-card__actions">
-            <button
-              className="cc-btn cc-btn--primary"
-              type="button"
-              disabled={isDeciding}
-              onClick={() => onDecide('approved')}
-            >
-              {translateUi('\n                        Approve\n                      ')}
-            </button>
-            {/* A change to a file is approved or rejected as it stands. */}
-            {item.status === 'pending' && item.subject_type !== 'data_source_write' && (
-              <button
-                className="cc-btn"
-                type="button"
-                disabled={isDeciding}
-                onClick={() => onDecide('changes_requested')}
-              >
-                {translateUi(
-                  '\n                          Request changes\n                        ',
+            {requesting ? (
+              <>
+                <button
+                  className="cc-btn cc-btn--primary"
+                  type="button"
+                  disabled={isDeciding || !note.trim()}
+                  onClick={() => onDecide('changes_requested')}
+                >
+                  {translateUi('Request changes')}
+                </button>
+                <button
+                  className="cc-btn cc-btn--ghost"
+                  type="button"
+                  onClick={() => setRequesting(false)}
+                >
+                  {translateUi('Cancel')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="cc-btn cc-btn--primary"
+                  type="button"
+                  disabled={isDeciding}
+                  onClick={() => onDecide('approved')}
+                >
+                  {translateUi('Approve')}
+                </button>
+                {/* A change to a file is approved or rejected as it stands. */}
+                {item.status === 'pending' && item.subject_type !== 'data_source_write' && (
+                  <button
+                    className="cc-btn"
+                    type="button"
+                    disabled={isDeciding}
+                    onClick={() => setRequesting(true)}
+                  >
+                    {translateUi('Request changes')}
+                  </button>
                 )}
-              </button>
+                <button
+                  className="cc-btn cc-btn--danger"
+                  type="button"
+                  disabled={isDeciding}
+                  onClick={() => onDecide('rejected')}
+                >
+                  {translateUi('Reject')}
+                </button>
+              </>
             )}
-            <button
-              className="cc-btn cc-btn--danger"
-              type="button"
-              disabled={isDeciding}
-              onClick={() => onDecide('rejected')}
-            >
-              {translateUi('\n                        Reject\n                      ')}
-            </button>
           </div>
         </div>
       )}

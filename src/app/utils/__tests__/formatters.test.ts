@@ -11,7 +11,9 @@ import {
   formatDueDate,
   getGreeting,
   formatShortDateTime,
+  formatMonthDay,
 } from '../formatters';
+import { changeAppLanguage } from '../../i18n';
 
 describe('formatters', () => {
   describe('formatDate', () => {
@@ -181,6 +183,18 @@ describe('formatters', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-02-22T19:00:00'));
       expect(getGreeting()).toBe('Good evening');
+    });
+  });
+
+  describe('Korean dates', () => {
+    afterEach(async () => {
+      await changeAppLanguage('en');
+    });
+
+    it('reads month and day the Korean way', async () => {
+      await changeAppLanguage('ko');
+      expect(formatMonthDay('2026-11-03T12:00:00')).toBe('11월 3일');
+      expect(formatShortDateTime('2026-10-13T10:17:17')).toBe('10월 13일 오전 10:17');
     });
   });
 

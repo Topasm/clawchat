@@ -16,6 +16,7 @@ from domain.plan_proposal import (
     VaultSyncJobStatus,
 )
 from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
+from domain.task import TaskStatus
 from exceptions import (
     NotFoundError,
     PlanProposalConflictError,
@@ -68,6 +69,8 @@ _ROOT_SNAPSHOT_FIELDS = (
 )
 
 logger = logging.getLogger(__name__)
+
+_CLOSED_TASK_STATUSES = (TaskStatus.COMPLETED, TaskStatus.CANCELLED)
 
 
 async def generate_proposal(
@@ -244,7 +247,10 @@ async def generate_proposal(
         if proposal.status == PlanProposalStatus.GENERATING:
             proposal.status = (
                 PlanProposalStatus.DRAFT
-                if claimed_revision is not None and context_is_current
+                if claimed_revision is not None
+                and context_is_current
+                # Finished while the plan was being drafted: nothing to review.
+                and (todo is None or todo.status not in _CLOSED_TASK_STATUSES)
                 else PlanProposalStatus.STALE
             )
         agent_task.payload_json = payload_json
@@ -259,7 +265,7 @@ async def generate_proposal(
                     subject_type=ReviewSubjectType.PLAN_PROPOSAL,
                     subject_id=proposal.id,
                     project_id=proposal.project_id,
-                    summary=plan.summary or f"Review AI plan for {todo.title}",
+                    summary=plan.summary or todo.title,
                     risk_level=ReviewRiskLevel.MEDIUM,
                 )
             elif proposal.status != PlanProposalStatus.REJECTED:
@@ -710,7 +716,7 @@ async def apply_proposal(
             subject_type=ReviewSubjectType.PLAN_PROPOSAL,
             subject_id=proposal.id,
             project_id=proposal.project_id,
-            summary=approved_plan.summary or f"Review AI plan for {todo.title}",
+            summary=approved_plan.summary or todo.title,
             risk_level=ReviewRiskLevel.MEDIUM,
         )
         review_item.status = ReviewStatus.APPROVED

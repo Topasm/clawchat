@@ -11,7 +11,7 @@ import ToolRequestPanel from './ToolRequestPanel';
 import type { AgentRunResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
 import { skillChainLabel } from '../../utils/skillLabels';
-import { relativeTime } from '../../utils/formatters';
+import { formatTime, relativeTime } from '../../utils/formatters';
 import { agentName, getRunStage } from '../../utils/taskStage';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
 
@@ -76,7 +76,7 @@ export default function RunCard({ run, expanded, onToggle, onReview }: RunCardPr
       : null,
     run.heartbeat_at
       ? translateUi('last heard from {{time}}', {
-          time: new Date(run.heartbeat_at).toLocaleTimeString(),
+          time: formatTime(run.heartbeat_at),
         })
       : null,
   ].filter(Boolean);
@@ -204,7 +204,7 @@ export function RunEventLog({ runId }: { runId: string }) {
     <ol className="cc-run-events">
       {events.map((event) => (
         <li key={event.id}>
-          <time dateTime={event.created_at}>{new Date(event.created_at).toLocaleTimeString()}</time>
+          <time dateTime={event.created_at}>{formatTime(event.created_at)}</time>
           <strong>{event.event_type.replaceAll('_', ' ')}</strong>
           <span>{event.message || (event.progress != null ? `${event.progress}%` : '')}</span>
         </li>

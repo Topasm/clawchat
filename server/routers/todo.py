@@ -70,6 +70,7 @@ from services.planning import (
     plan_proposal_service,
 )
 from services.planning.inbox_settings import auto_organize_enabled
+from services.review import review_item_service
 from services.tasks import (
     graph_insights_service,
     task_placement_service,
@@ -382,6 +383,8 @@ async def bulk_update_todos(
         db,
         deleted_todo_ids,
     )
+    if body.delete or body.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
+        await review_item_service.close_task_plan_reviews(db, set(todos_by_id))
     for todo_id in body.ids:
         todo = todos_by_id.get(todo_id)
         if not todo:

@@ -101,9 +101,14 @@ describe('Attention review history Agent Run handoff', () => {
     expect(screen.getByLabelText('Agent approval impact')).toHaveTextContent(
       '1 downstream task will become Ready.',
     );
+    // The note box waits until changes are asked for.
+    expect(screen.queryByLabelText('Review note for Run experiment')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Request changes' }));
+    expect(screen.getByRole('button', { name: 'Request changes' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Review note for Run experiment'), {
       target: { value: 'Looks good' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
 
     expect(queryMocks.decide).toHaveBeenCalledWith(

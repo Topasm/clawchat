@@ -10,6 +10,7 @@ import Badge from './Badge';
 import { ArrowRightIcon, CalendarIcon, CheckCircleIcon } from './Icons';
 import type { EventResponse, TodoResponse } from '../../types/api';
 import { translateUi } from '../../i18n';
+import { formatTime } from '../../utils/formatters';
 interface QuickCaptureModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -248,10 +249,7 @@ export default function QuickCaptureModal({
                     )}
                     {parsed.startTime && (
                       <span className="cc-quick-capture__time">
-                        {parsed.startTime.toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatTime(parsed.startTime.toISOString())}
                       </span>
                     )}
                     <span className="cc-quick-capture__flow-chip">

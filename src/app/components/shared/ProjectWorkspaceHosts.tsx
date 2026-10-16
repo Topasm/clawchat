@@ -17,6 +17,7 @@ import { translateUi } from '../../i18n';
 import usePlatform from '../../hooks/usePlatform';
 import { platformApi } from '../../platform';
 import type { ProjectWorkspace } from '../../hooks/queries';
+import { formatShortDateTime } from '../../utils/formatters';
 
 /**
  * Where this project's work runs.
@@ -294,7 +295,7 @@ function FolderContextLine({
         ? translateUi('Folder context: {{files}} · updated {{time}}', {
             files: files.join(', '),
             time: workspace.context_updated_at
-              ? new Date(workspace.context_updated_at).toLocaleString()
+              ? formatShortDateTime(workspace.context_updated_at)
               : '',
           })
         : translateUi(

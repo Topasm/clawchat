@@ -9,7 +9,7 @@
     <string name="inbox_title">Inbox</string>
     <string name="inbox_loading">Loading inbox…</string>
     <string name="inbox_organized_title">Just organized</string>
-    <string name="inbox_review_title">Needs a look</string>
+    <string name="inbox_review_title">Couldn\'t sort</string>
     <string name="inbox_kind_task">Task</string>
     <string name="inbox_kind_note">Note</string>
     <string name="inbox_due">Due %1$s</string>

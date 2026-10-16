@@ -18,12 +18,14 @@ from services.vault.obsidian_export_service import (
     remove_todo_from_vault,
     snapshot_todo,
 )
+from services.review import review_item_service
 from services.tasks import task_relationship_service
 from utils import apply_model_updates, make_id, serialize_tags
 
 logger = logging.getLogger(__name__)
 
 _DEPENDENCIES_UNSET = object()
+_CLOSED_STATUSES = (TaskStatus.COMPLETED, TaskStatus.CANCELLED)
 
 
 _ORDER_COLUMNS = {
@@ -263,6 +265,8 @@ async def update_todo(db: AsyncSession, todo_id: str, **updates) -> Todo:
             todo.completed_at = datetime.now(timezone.utc)
         elif updates["status"] != TaskStatus.COMPLETED:
             todo.completed_at = None
+        if updates["status"] in _CLOSED_STATUSES:
+            await review_item_service.close_task_plan_reviews(db, [todo.id])
 
     if dependency_ids is not _DEPENDENCIES_UNSET:
         await task_relationship_service.replace_task_dependencies(
@@ -317,6 +321,7 @@ async def delete_todo(db: AsyncSession, todo_id: str) -> None:
         "This task is a prerequisite of an active agent run. Stop the affected run "
         "before deleting its prerequisite."
     ))
+    await review_item_service.close_task_plan_reviews(db, [todo.id])
     await db.delete(todo)
     await db.flush()
     await task_relationship_service.sync_dependency_shadows(

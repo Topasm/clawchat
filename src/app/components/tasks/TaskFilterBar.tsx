@@ -4,11 +4,10 @@ import { useTodosQuery } from '../../hooks/queries';
 import { MagnifyingGlassIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
 const SORT_OPTIONS = [
-  { value: 'created_at', label: 'Date Created' },
-  { value: 'due_date', label: 'Due Date' },
-  { value: 'title', label: 'Title' },
-  { value: 'updated_at', label: 'Last Updated' },
-  { value: 'sort_order', label: 'Manual Order' },
+  { value: 'due_date-asc', label: () => translateUi('Due date') },
+  { value: 'created_at-desc', label: () => translateUi('Newest') },
+  { value: 'updated_at-desc', label: () => translateUi('Recently updated') },
+  { value: 'title-asc', label: () => translateUi('Title') },
 ] as const;
 /** Search, tag and sort controls for the task list. */
 export default function TaskFilterBar() {
@@ -76,13 +75,8 @@ export default function TaskFilterBar() {
         }}
       >
         {SORT_OPTIONS.map((opt) => (
-          <option key={`${opt.value}-desc`} value={`${opt.value}-desc`}>
-            ↓ {translateUi(opt.label)}
-          </option>
-        ))}
-        {SORT_OPTIONS.map((opt) => (
-          <option key={`${opt.value}-asc`} value={`${opt.value}-asc`}>
-            ↑ {translateUi(opt.label)}
+          <option key={opt.value} value={opt.value}>
+            {opt.label()}
           </option>
         ))}
       </select>

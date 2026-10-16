@@ -32,6 +32,7 @@ from services.planning.inbox_deadline import (
     due_instant,
     parse_deadline,
 )
+from services.review import review_item_service
 
 # How long a move stays under "Just organized" unless the user clears it.
 RECENT_WINDOW = timedelta(hours=24)
@@ -322,6 +323,8 @@ async def task_to_note(
     kind_confidence: float | None = None,
 ) -> InboxRouting:
     await _require_plain_capture(db, todo)
+    # Before the history is detached: closing finds the plans by their root task.
+    await review_item_service.close_task_plan_reviews(db, [todo.id])
     before = _todo_row(todo)
     before.update(await _detach_history(db, todo.id))
     note = Note(content=_note_content(todo), project_id=todo.project_id)
@@ -467,8 +470,7 @@ async def undo(db: AsyncSession, routing_id: str) -> InboxRouting:
     return routing
 
 
-async def recent(db: AsyncSession, now: datetime | None = None) -> list[InboxRouting]:
-    """Moves from the last day the user has not cleared, newest first."""
+async def _unacknowledged(db: AsyncSession, now: datetime | None) -> list[InboxRouting]:
     since = (now or datetime.now(timezone.utc)) - RECENT_WINDOW
     return list(
         (
@@ -486,8 +488,24 @@ async def recent(db: AsyncSession, now: datetime | None = None) -> list[InboxRou
     )
 
 
+async def recent(db: AsyncSession, now: datetime | None = None) -> list[InboxRouting]:
+    """Moves from the last day the user has not cleared, newest first.
+
+    One line per item: a move made later to the same task or note (filed
+    again, or turned into a note and back) stands for the ones before it.
+    """
+    seen: set[str] = set()
+    latest: list[InboxRouting] = []
+    for row in await _unacknowledged(db, now):
+        produced = row.todo_id if row.kind == "task" else row.note_id
+        if produced not in seen:
+            latest.append(row)
+        seen.update(item for item in (row.todo_id, row.note_id) if item)
+    return latest
+
+
 async def acknowledge(db: AsyncSession, now: datetime | None = None) -> int:
-    rows = await recent(db, now)
+    rows = await _unacknowledged(db, now)
     stamp = now or datetime.now(timezone.utc)
     for row in rows:
         row.acknowledged_at = stamp

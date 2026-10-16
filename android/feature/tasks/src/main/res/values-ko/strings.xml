@@ -20,7 +20,7 @@
     <string name="tasks_more_actions">더 보기</string>
     <string name="tasks_cd_delete">작업 삭제</string>
     <string name="tasks_deleted">작업을 삭제했습니다</string>
-    <string name="tasks_undo">실행 취소</string>
+    <string name="tasks_undo">되돌리기</string>
     <string name="tasks_mark_complete">%1$s 완료로 표시</string>
     <string name="tasks_mark_incomplete">%1$s 미완료로 표시</string>
     <string name="tasks_experiment_completion_title">실험 작업 완료</string>
@@ -51,11 +51,11 @@
     <string name="projects_task">작업 열기</string>
     <string name="projects_run">에이전트 실행</string>
     <string name="projects_outline">계획 · 작업 트리</string>
-    <string name="projects_blocked">선행 작업 대기</string>
+    <string name="projects_blocked">앞 단계 대기</string>
     <string name="projects_running">진행 중</string>
     <string name="projects_done">완료</string>
     <string name="projects_cancelled">취소</string>
-    <string name="projects_dependencies">선행 작업: %1$s</string>
+    <string name="projects_dependencies">앞 단계: %1$s</string>
     <string name="projects_discuss">작업 대화</string>
     <string name="projects_run_confirm">프로젝트 실행 설정으로 “%1$s” 작업을 실행할까요? 서버에서 실행 가능 여부를 다시 확인합니다.</string>
     <string name="projects_close_selection">닫기</string>

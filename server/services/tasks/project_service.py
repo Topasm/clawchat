@@ -15,6 +15,7 @@ from domain.agent_run import AGENT_RUN_EXECUTING_STATUSES
 from models.todo import Todo
 from schemas.project import ProjectOverviewResponse, ProjectResponse
 from services.agents import execution_host_service
+from services.review import review_item_service
 from services.tasks import graph_insights_service
 from sqlalchemy import case, func, select
 from domain.review import ReviewStatus
@@ -142,6 +143,7 @@ async def update_project(
             if project.status == ProjectStatus.COMPLETED:
                 root.status = TaskStatus.COMPLETED
                 root.completed_at = datetime.now(timezone.utc)
+                await review_item_service.close_task_plan_reviews(db, [root.id])
             elif root.status == TaskStatus.COMPLETED:
                 root.status = TaskStatus.PENDING
                 root.completed_at = None

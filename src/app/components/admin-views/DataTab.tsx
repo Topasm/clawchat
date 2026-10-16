@@ -1,5 +1,5 @@
 import { useAdminDataQuery } from '../../hooks/queries';
-import { formatDateTimeShort } from '../../utils/formatters';
+import { formatDate } from '../../utils/formatters';
 import { useAuthStore } from '../../stores/useAuthStore';
 import SettingsSection from '../shared/SettingsSection';
 import EmptyState from '../shared/EmptyState';
@@ -28,8 +28,7 @@ export default function DataTab() {
             <div className="cc-admin-stat__value">{m.count.toLocaleString()}</div>
             {m.oldest && (
               <div style={{ fontSize: 11, color: 'var(--cc-text-tertiary)', marginTop: 4 }}>
-                {formatDateTimeShort(m.oldest).split(',')[0]} &mdash;{' '}
-                {formatDateTimeShort(m.newest!).split(',')[0]}
+                {formatDate(m.oldest)} &mdash; {formatDate(m.newest!)}
               </div>
             )}
           </div>

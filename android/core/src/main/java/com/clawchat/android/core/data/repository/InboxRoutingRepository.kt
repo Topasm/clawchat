@@ -26,7 +26,7 @@ data class InboxSnapshot(
     val hasMoreTodos: Boolean = false,
 )
 
-/** One more page of todos, for scrolling further down "Needs a look". */
+/** One more page of todos, for scrolling further down "Couldn't sort". */
 data class InboxCapturePage(
     val captures: List<Todo>,
     val projectOf: Map<String, String>,

@@ -1,8 +1,27 @@
 import { getAppLanguage, translateUi } from '../i18n';
 
+/** Dates and times follow the app's language, not the system's ("11월 3일", not "Nov 3"). */
+export function appLocale(): string {
+  return getAppLanguage() === 'ko' ? 'ko-KR' : 'en-US';
+}
+
+/** "오전 10:17": newer ICU data writes "AM" even for Korean. */
+function koreanTime(date: Date): string {
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours < 12 ? '오전' : '오후'} ${hours % 12 || 12}:${minutes}`;
+}
+
+/** "11월 3일" / "Nov 3". */
+export function formatMonthDay(dateString: string): string {
+  const date = new Date(dateString);
+  if (getAppLanguage() === 'ko') return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+  return date.toLocaleDateString(appLocale(), { month: 'short', day: 'numeric' });
+}
+
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleDateString(getAppLanguage() === 'ko' ? 'ko-KR' : 'en-US', {
+  return date.toLocaleDateString(appLocale(), {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -11,7 +30,8 @@ export function formatDate(dateString: string): string {
 
 export function formatTime(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleTimeString(getAppLanguage() === 'ko' ? 'ko-KR' : 'en-US', {
+  if (getAppLanguage() === 'ko') return koreanTime(date);
+  return date.toLocaleTimeString(appLocale(), {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -100,12 +120,14 @@ export function getGreeting(): string {
   return translateUi('Good evening');
 }
 
+/** "10월 13일 오전 10:17" / "Oct 13, 10:17 AM". */
 export function formatShortDateTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString(undefined, {
+  const date = new Date(dateStr);
+  if (getAppLanguage() === 'ko') return `${formatMonthDay(dateStr)} ${koreanTime(date)}`;
+  return date.toLocaleString(appLocale(), {
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
   });
 }
@@ -125,10 +147,6 @@ export function formatUptime(seconds: number): string {
   if (d > 0) return `${d}d ${h}h ${m}m`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
-}
-
-export function formatDateTimeShort(iso: string): string {
-  return new Date(iso).toLocaleString();
 }
 
 export function relativeTime(iso: string): string {

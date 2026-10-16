@@ -230,7 +230,7 @@
   cursor: default;
 }
 
-/* Shift- or Cmd-click under "Needs a look" brings this bar up. */
+/* Shift- or Cmd-click under "Couldn't sort" brings this bar up. */
 .cc-inbox-selection {
   display: flex;
   flex-wrap: wrap;

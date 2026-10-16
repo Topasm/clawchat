@@ -3,6 +3,7 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import { CopyIcon, EditIcon, SpinArrowsIcon, TrashIcon, UserIcon } from '../shared/Icons';
 import ActionCard from './ActionCard';
 import { translateUi } from '../../i18n';
+import { formatTime } from '../../utils/formatters';
 const INTENT_LABELS: Record<string, string> = {
   create_todo: 'Created task',
   query_todos: 'Searched tasks',
@@ -66,10 +67,7 @@ export default function MessageBubble({
         )}
         {showTimestamps && (
           <div className="cc-bubble__time">
-            {new Date(message.createdAt).toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
+            {formatTime(new Date(message.createdAt).toISOString())}
           </div>
         )}
         {message.deliveryStatus === 'pending' && (
