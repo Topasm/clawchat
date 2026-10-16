@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TodoResponse } from '../../../types/api';
+import type { PlanProposalResponse, TodoResponse } from '../../../types/api';
+import { useToastStore } from '../../../stores/useToastStore';
 import TaskFlow from '../TaskFlow';
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   addStep: vi.fn(),
   moveStep: vi.fn(),
   toggle: vi.fn(),
+  createEdge: vi.fn(),
+  deleteEdge: vi.fn(),
+  applyPlan: vi.fn(),
 }));
 
 vi.mock('../../../hooks/queries', () => ({
@@ -23,6 +27,13 @@ vi.mock('../../../hooks/queries', () => ({
   useAddTaskStep: () => ({ mutateAsync: mocks.addStep }),
   useMoveTaskStep: () => ({ mutate: mocks.moveStep }),
   useToggleTodoComplete: () => ({ mutate: mocks.toggle }),
+  useCreateTaskRelationship: () => ({ mutateAsync: mocks.createEdge }),
+  useDeleteTaskRelationship: () => ({ mutateAsync: mocks.deleteEdge }),
+  useApplyPlanProposal: () => ({ mutateAsync: mocks.applyPlan, reset: vi.fn(), error: null }),
+  useDismissPlanProposal: () => ({ mutateAsync: vi.fn() }),
+  useGeneratePlanProposal: () => ({ mutateAsync: vi.fn() }),
+  getPlanProposalMutationError: (error: Error) => ({ message: error.message }),
+  isStalePlanProposalError: () => false,
 }));
 
 function todo(id: string, overrides: Partial<TodoResponse> = {}): TodoResponse {
@@ -47,12 +58,27 @@ function edge(source: string, target: string) {
   };
 }
 
-function renderFlow() {
+function renderFlow(plan?: PlanProposalResponse) {
   return render(
     <MemoryRouter>
-      <TaskFlow rootId="hw" />
+      <TaskFlow rootId="hw" plan={plan} />
     </MemoryRouter>,
   );
+}
+
+function proposal(): PlanProposalResponse {
+  return {
+    proposal_id: 'p1',
+    status: 'draft',
+    summary: 'Three steps',
+    base_graph_revision: 4,
+    subtasks: [
+      { title: 'Benchmark' },
+      { title: 'Optimize', depends_on_indices: [0] },
+      { title: 'Write up', depends_on_indices: [1] },
+    ],
+    validation: { errors: [], warnings: [] },
+  } as unknown as PlanProposalResponse;
 }
 
 describe('TaskFlow', () => {
@@ -60,6 +86,10 @@ describe('TaskFlow', () => {
     mocks.addStep.mockReset().mockResolvedValue({});
     mocks.moveStep.mockReset();
     mocks.toggle.mockReset();
+    mocks.createEdge.mockReset().mockImplementation(async (body) => ({ id: 'new-edge', ...body }));
+    mocks.deleteEdge.mockReset().mockResolvedValue(undefined);
+    mocks.applyPlan.mockReset().mockResolvedValue({});
+    useToastStore.setState({ toasts: [] });
     mocks.todos = [
       todo('hw', { title: 'GPU homework' }),
       todo('read', { title: 'Read', parent_id: 'hw', sort_order: 0, status: 'completed' }),
@@ -67,6 +97,7 @@ describe('TaskFlow', () => {
       todo('submit', { title: 'Submit', parent_id: 'hw', sort_order: 20 }),
       todo('tile', { title: 'Tile loops', parent_id: 'kernel', sort_order: 0 }),
       todo('data', { title: 'Prepare data' }),
+      todo('lab', { title: 'Lab setup' }),
       todo('elsewhere', { title: 'Unrelated', parent_id: 'other' }),
     ];
     mocks.relationships = [edge('kernel', 'read'), edge('submit', 'kernel'), edge('read', 'data')];
@@ -203,5 +234,83 @@ describe('TaskFlow', () => {
     fireEvent.drop(read, { dataTransfer });
 
     expect(mocks.moveStep).not.toHaveBeenCalled();
+  });
+
+  it('waits on another task found from + Prerequisite, and undoes it from the toast', async () => {
+    renderFlow();
+    fireEvent.click(screen.getByRole('button', { name: '+ Prerequisite' }));
+    const search = screen.getByRole('textbox', { name: 'Prerequisite' });
+    expect(screen.queryByRole('button', { name: 'Prepare data' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'lab' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lab setup' }));
+
+    // Read is done, so the flow continues from Write kernel.
+    await waitFor(() =>
+      expect(mocks.createEdge).toHaveBeenCalledWith({
+        source_task_id: 'kernel',
+        target_task_id: 'lab',
+        type: 'depends_on',
+      }),
+    );
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast.message).toBe('Prerequisite added');
+    toast.action!.onClick();
+    expect(mocks.deleteEdge).toHaveBeenCalledWith('new-edge');
+  });
+
+  it('drops an outside prerequisite from its tag, and puts it back on undo', async () => {
+    renderFlow();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Prepare data' }));
+
+    await waitFor(() => expect(mocks.deleteEdge).toHaveBeenCalledWith('read-data'));
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast.message).toBe('Prerequisite removed');
+    toast.action!.onClick();
+    expect(mocks.createEdge).toHaveBeenCalledWith({
+      source_task_id: 'read',
+      target_task_id: 'data',
+      type: 'depends_on',
+    });
+  });
+
+  it('draws an AI plan as boxes to retitle or leave out, then adds what is kept', async () => {
+    renderFlow(proposal());
+    const steps = screen.getByRole('list', { name: 'Steps' });
+    const titles = within(steps).getAllByRole('textbox', { name: 'Step title' });
+    expect(titles.map((input) => (input as HTMLInputElement).value)).toEqual([
+      'Benchmark',
+      'Optimize',
+      'Write up',
+    ]);
+    expect(screen.getByRole('button', { name: 'Add all' })).toBeEnabled();
+
+    fireEvent.change(titles[0], { target: { value: 'Benchmark on A100' } });
+    // Leaving Optimize out also leaves out Write up, which waits on it.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Optimize' }));
+    expect(screen.getByRole('button', { name: 'Restore Write up' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Add 1' }));
+
+    await waitFor(() => expect(mocks.applyPlan).toHaveBeenCalledTimes(1));
+    expect(mocks.applyPlan).toHaveBeenCalledWith({
+      todoId: 'hw',
+      proposalId: 'p1',
+      baseGraphRevision: 4,
+      selectedIndices: [0],
+      subtasks: [
+        { title: 'Benchmark on A100' },
+        { title: 'Optimize', depends_on_indices: [0] },
+        { title: 'Write up', depends_on_indices: [1] },
+      ],
+    });
+  });
+
+  it('keeps Add off while a kept step has no title', () => {
+    renderFlow(proposal());
+    fireEvent.change(screen.getAllByRole('textbox', { name: 'Step title' })[2], {
+      target: { value: ' ' },
+    });
+    expect(screen.getByRole('button', { name: 'Add all' })).toBeDisabled();
   });
 });

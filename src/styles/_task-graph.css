@@ -199,6 +199,50 @@
   cursor: pointer;
 }
 
+.cc-flow__tag {
+  display: flex;
+  min-width: 0;
+}
+
+.cc-flow__tag button:first-child {
+  flex: 1;
+  min-width: 0;
+  border-right: 0;
+  border-radius: var(--cc-radius-sm) 0 0 var(--cc-radius-sm);
+}
+
+.cc-flow__lead .cc-flow__tag-remove {
+  flex: none;
+  border-radius: 0 var(--cc-radius-sm) var(--cc-radius-sm) 0;
+}
+
+.cc-flow__lead .cc-flow__tag-add {
+  color: var(--cc-text-secondary);
+}
+
+.cc-flow__pick {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-flow__pick input {
+  box-sizing: border-box;
+  width: 132px;
+  padding: 3px 6px;
+  border: 1px solid var(--cc-primary);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-background);
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 11px;
+}
+
+.cc-flow__lead .cc-flow__pick button {
+  border-style: solid;
+  color: var(--cc-text);
+}
+
 .cc-flow__scroll {
   flex: 1;
   min-width: 0;
@@ -261,6 +305,57 @@
 .cc-flow__box--excluded {
   border-style: dashed;
   opacity: 0.45;
+}
+
+.cc-flow__title-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cc-text);
+  font-family: inherit;
+}
+
+.cc-flow__title-input:focus {
+  outline: none;
+  text-decoration: underline dotted var(--cc-primary);
+}
+
+.cc-flow__discard {
+  flex: none;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--cc-text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cc-flow__box--excluded .cc-flow__title-input {
+  text-decoration: line-through;
+}
+
+.cc-flow__proposal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--cc-text-secondary);
+  font-size: 12px;
+}
+
+.cc-flow__proposal [role='alert'] {
+  color: var(--cc-warning);
+}
+
+.cc-flow__proposal-summary {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.cc-flow__proposal-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .cc-flow__check {

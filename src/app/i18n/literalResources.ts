@@ -1721,4 +1721,11 @@ export const koreanUiTranslations: Record<string, string> = {
   'Back to you': '내 작업으로 돌림',
   'https://calendar.google.com/calendar/ical/…/basic.ics':
     'https://calendar.google.com/calendar/ical/…/basic.ics',
+  'Step title': '단계 제목',
+  'Remove {{title}}': '{{title}} 빼기',
+  'Restore {{title}}': '{{title}} 되살리기',
+  'Prerequisite added': '선행 작업을 추가했습니다',
+  'Prerequisite removed': '선행 작업을 뺐습니다',
+  'Add all': '모두 추가',
+  'Add {{count}}': '{{count}}개 추가',
 };

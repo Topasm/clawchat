@@ -38,6 +38,10 @@ interface FlowCanvasProps {
   /** Dropping one box on another moves it right after that box. */
   onMove?: (id: string, afterId: string) => void;
   onToggle?: (id: string) => void;
+  /** Proposed boxes get a title field instead of a label. */
+  onRename?: (id: string, title: string) => void;
+  /** Proposed boxes get a button that leaves them out, or brings them back. */
+  onDiscard?: (id: string) => void;
   /** Drawn left of the flow: prerequisites from outside it. */
   lead?: ReactNode;
   /** The dashed box after the last column, where the next step is typed. */
@@ -70,6 +74,8 @@ export default function FlowCanvas({
   onSelect,
   onMove,
   onToggle,
+  onRename,
+  onDiscard,
   lead,
   tail,
   tailAfterId,
@@ -103,12 +109,14 @@ export default function FlowCanvas({
 
   const box = (node: FlowNode, style?: CSSProperties) => {
     const selected = node.id === selectedId;
-    const movable = Boolean(onMove) && !node.fixed;
+    const draft = node.tone === 'proposed' || node.tone === 'excluded';
+    const fixed = node.fixed || draft;
+    const movable = Boolean(onMove) && !fixed;
     return (
       <div
         key={node.id}
         role="listitem"
-        className={`cc-flow__box cc-flow__box--${node.tone}${selected ? ' cc-flow__box--selected' : ''}${dragId && dragId !== node.id && !node.fixed ? ' cc-flow__box--drop' : ''}`}
+        className={`cc-flow__box cc-flow__box--${node.tone}${selected ? ' cc-flow__box--selected' : ''}${dragId && dragId !== node.id && !fixed ? ' cc-flow__box--drop' : ''}`}
         style={style}
         draggable={movable}
         onDragStart={(event) => {
@@ -118,16 +126,16 @@ export default function FlowCanvas({
         }}
         onDragEnd={() => setDragId(null)}
         onDragOver={(event) => {
-          if (dragId && dragId !== node.id && !node.fixed) event.preventDefault();
+          if (dragId && dragId !== node.id && !fixed) event.preventDefault();
         }}
         onDrop={(event) => {
           event.preventDefault();
           const moved = event.dataTransfer.getData('text/plain') || dragId;
           setDragId(null);
-          if (moved && moved !== node.id && !node.fixed) onMove?.(moved, node.id);
+          if (moved && moved !== node.id && !fixed) onMove?.(moved, node.id);
         }}
       >
-        {onToggle && !node.fixed && (
+        {onToggle && !fixed && (
           <button
             type="button"
             className="cc-flow__check"
@@ -139,15 +147,40 @@ export default function FlowCanvas({
             onClick={() => onToggle(node.id)}
           />
         )}
-        <button
-          type="button"
-          className="cc-flow__label"
-          aria-current={selected || undefined}
-          onClick={() => onSelect?.(node.id)}
-        >
-          <span className="cc-flow__title">{node.title}</span>
-          {node.meta && <span className="cc-flow__meta">{node.meta}</span>}
-        </button>
+        {draft && onRename ? (
+          <span className="cc-flow__label">
+            <input
+              className="cc-flow__title cc-flow__title-input"
+              value={node.title}
+              aria-label={translateUi('Step title')}
+              onChange={(event) => onRename(node.id, event.target.value)}
+            />
+            {node.meta && <span className="cc-flow__meta">{node.meta}</span>}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="cc-flow__label"
+            aria-current={selected || undefined}
+            onClick={() => onSelect?.(node.id)}
+          >
+            <span className="cc-flow__title">{node.title}</span>
+            {node.meta && <span className="cc-flow__meta">{node.meta}</span>}
+          </button>
+        )}
+        {draft && onDiscard && (
+          <button
+            type="button"
+            className="cc-flow__discard"
+            aria-label={translateUi(
+              node.tone === 'proposed' ? 'Remove {{title}}' : 'Restore {{title}}',
+              { title: node.title },
+            )}
+            onClick={() => onDiscard(node.id)}
+          >
+            {node.tone === 'proposed' ? '×' : '↺'}
+          </button>
+        )}
       </div>
     );
   };

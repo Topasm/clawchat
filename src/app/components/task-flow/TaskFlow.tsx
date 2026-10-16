@@ -7,11 +7,13 @@ import {
   useTodosQuery,
   useToggleTodoComplete,
 } from '../../hooks/queries';
-import type { TodoResponse } from '../../types/api';
+import type { PlanProposalResponse, TodoResponse } from '../../types/api';
 import { useToastStore } from '../../stores/useToastStore';
 import { formatDueDate } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
 import FlowCanvas, { type FlowEdge, type FlowNode, type FlowTone } from './FlowCanvas';
+import FlowPrerequisites from './FlowPrerequisites';
+import useFlowProposal from './useFlowProposal';
 
 interface TaskFlowProps {
   /** The task whose steps are drawn; a box with steps of its own drills in. */
@@ -19,6 +21,8 @@ interface TaskFlowProps {
   /** Selection is lifted when a parent shows actions for the selected step. */
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
+  /** An AI plan for the root task, drawn as dashed boxes until it is added. */
+  plan?: PlanProposalResponse | null;
 }
 
 const TONE_LABELS: Record<FlowTone, string> = {
@@ -60,7 +64,12 @@ function waitsOn(edges: readonly FlowEdge[], from: string, to: string): boolean 
  * The steps of one task: its direct children as boxes and the order between
  * them as lines. Steps typed in a row form a chain; Tab forks a branch.
  */
-export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }: TaskFlowProps) {
+export default function TaskFlow({
+  rootId,
+  selectedId: controlledId,
+  onSelect,
+  plan,
+}: TaskFlowProps) {
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
   const { data: relationships = [] } = useTaskRelationshipsQuery();
@@ -99,25 +108,27 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
     return counts;
   }, [stepIds, todos]);
 
-  const { edges, allEdges, outside, prerequisites } = useMemo(() => {
+  const { edges, allEdges, stepEdges, prerequisites } = useMemo(() => {
     const inner: FlowEdge[] = [];
     const every: FlowEdge[] = [];
-    const outer = new Map<string, TodoResponse>();
+    const own: typeof relationships = [];
     const before = new Map<string, string[]>();
     for (const relationship of relationships) {
       if (relationship.type !== 'depends_on') continue;
       const { source_task_id: source, target_task_id: target } = relationship;
       every.push({ before: target, after: source });
       if (!stepIds.has(source)) continue;
+      own.push(relationship);
       before.set(source, [...(before.get(source) ?? []), target]);
       if (stepIds.has(target)) inner.push({ before: target, after: source });
-      else {
-        const task = todoById.get(target);
-        if (task) outer.set(task.id, task);
-      }
     }
-    return { edges: inner, allEdges: every, outside: [...outer.values()], prerequisites: before };
-  }, [relationships, stepIds, todoById]);
+    return { edges: inner, allEdges: every, stepEdges: own, prerequisites: before };
+  }, [relationships, stepIds]);
+  const proposal = useFlowProposal(
+    rootId,
+    scopeId === rootId ? plan : null,
+    steps.reduce((last, step) => Math.max(last, step.sort_order ?? 0), 0),
+  );
 
   const toneOf = (step: TodoResponse): FlowTone => {
     if (step.status === 'completed' || step.status === 'cancelled') return 'done';
@@ -284,9 +295,10 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
           )}
         </p>
       )}
+      {proposal?.bar}
       <FlowCanvas
-        nodes={nodes}
-        edges={shownEdges}
+        nodes={proposal ? [...nodes, ...proposal.nodes] : nodes}
+        edges={proposal ? [...shownEdges, ...proposal.edges] : shownEdges}
         ariaLabel={translateUi('Steps')}
         selectedId={selectedId}
         focusId={focusId}
@@ -297,15 +309,17 @@ export default function TaskFlow({ rootId, selectedId: controlledId, onSelect }:
           if (step) toggle.mutate({ id, currentStatus: step.status });
         }}
         onMove={move}
+        onRename={proposal?.onRename}
+        onDiscard={proposal?.onDiscard}
         lead={
-          outside.length > 0 && (
-            <div className="cc-flow__lead">
-              {outside.map((task) => (
-                <button key={task.id} type="button" onClick={() => navigate(`/tasks/${task.id}`)}>
-                  {translateUi('Other task: {{title}}', { title: task.title })}
-                </button>
-              ))}
-            </div>
+          steps.length > 0 && (
+            <FlowPrerequisites
+              scopeId={scopeId}
+              todos={todos}
+              steps={steps}
+              stepEdges={stepEdges}
+              selectedId={selectedId}
+            />
           )
         }
         tail={
