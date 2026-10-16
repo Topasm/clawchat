@@ -33,7 +33,7 @@ export default function WorkerStatusLine() {
     state === 'busy'
       ? translateUi('Running {{title}}', { title: busyRunTitle || busyRunId || '' })
       : state === 'idle'
-        ? translateUi('Idle')
+        ? translateUi('Ready for work')
         : translateUi('Connecting…');
 
   return (
@@ -49,7 +49,7 @@ export default function WorkerStatusLine() {
     >
       <span className="cc-connection-status__dot" aria-hidden="true" />
       <span className="cc-sidebar__label">
-        {translateUi('This machine: {{label}}', { label })} · {stateLabel}
+        {label} · {stateLabel}
       </span>
     </button>
   );

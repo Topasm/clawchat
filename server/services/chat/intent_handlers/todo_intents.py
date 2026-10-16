@@ -146,9 +146,9 @@ async def create_todo(ctx: IntentContext) -> IntentReply:
             due_date=due_date.date() if due_date else None,
         )
         parent_label = parent.title if parent is not None else "the selected task"
+        # One question; the card under it carries the step and the button.
         return (
-            f"Proposed '{proposal.subtasks[0].title}' as a step under "
-            f"'{parent_label}'. Apply the graph change to add it.",
+            f"Add '{proposal.subtasks[0].title}' as a step under '{parent_label}'?",
             {
                 "action_type": "plan_started",
                 "module": "todos",

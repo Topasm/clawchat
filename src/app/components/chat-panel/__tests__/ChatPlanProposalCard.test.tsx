@@ -115,7 +115,7 @@ describe('chat graph proposal card', () => {
     });
     renderCard({ ...metadata, plan_proposal_id: undefined });
 
-    expect(await screen.findByText('Preparing a graph change proposal…')).toBeInTheDocument();
+    expect(await screen.findByText('Preparing the step proposal…')).toBeInTheDocument();
     expect(screen.queryByText('Add two focused steps')).not.toBeInTheDocument();
   });
 

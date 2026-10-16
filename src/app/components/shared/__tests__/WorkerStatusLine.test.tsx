@@ -44,17 +44,17 @@ describe('WorkerStatusLine', () => {
 
   it('moves from connecting to idle to the job it is running', () => {
     renderLine();
-    expect(screen.getByText(/This machine: ubuntu-lab · Connecting…/)).toBeInTheDocument();
+    expect(screen.getByText(/ubuntu-lab · Connecting…/)).toBeInTheDocument();
 
     act(() => useWorkerStore.getState().setRegistered('host-1', 'ubuntu-lab'));
-    expect(screen.getByText(/ubuntu-lab · Idle/)).toBeInTheDocument();
+    expect(screen.getByText(/ubuntu-lab · Ready for work/)).toBeInTheDocument();
 
     act(() => useWorkerStore.getState().setBusy('run-1', 'E65a seed sweep'));
     expect(screen.getByText(/Running E65a seed sweep/)).toBeInTheDocument();
     expect(screen.getByRole('button')).toHaveClass('cc-worker-status--busy');
 
     act(() => useWorkerStore.getState().setBusy(null));
-    expect(screen.getByText(/ubuntu-lab · Idle/)).toBeInTheDocument();
+    expect(screen.getByText(/ubuntu-lab · Ready for work/)).toBeInTheDocument();
   });
 
   it('opens the worker section of Settings', () => {

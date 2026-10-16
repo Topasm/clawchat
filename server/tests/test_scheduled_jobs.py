@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from domain.agent_run import AgentRunStatus
-from domain.review import ReviewSubjectType
+from domain.review import ReviewRiskLevel, ReviewStatus, ReviewSubjectType
 from domain.task import TaskStatus
 from domain.task_relationship import TaskRelationshipType
 from models.agent_run import AgentRun
@@ -16,6 +16,7 @@ from models.task_relationship import TaskRelationship
 from models.todo import Todo
 from schemas.scheduled_job import ScheduledJobCreate, ScheduledJobUpdate
 from services.agents import agent_run_service
+from services.review import review_item_service, run_risk
 from services.automation import scheduled_job_service as jobs
 from services.automation.task_snapshot import build_task_snapshot
 from services.automation.job_schedule import parse_zone
@@ -340,3 +341,167 @@ async def test_run_now_starts_a_run_without_moving_the_schedule(
     assert after["next_run_at"] == created["next_run_at"]
     assert after["last_run_id"] == body["run_id"]
     assert after["last_run_status"] == "waiting_review"
+
+
+async def _review_for(db, run_id: str) -> ReviewItem:
+    return (
+        await db.execute(
+            select(ReviewItem).where(
+                ReviewItem.subject_type == ReviewSubjectType.AGENT_RUN,
+                ReviewItem.subject_id == run_id,
+            )
+        )
+    ).scalar_one()
+
+
+async def _fired(db, session_factory, ai, **job_fields) -> tuple[ScheduledJob, AgentRun]:
+    now = datetime.now(timezone.utc)
+    job = await jobs.create_job(
+        db,
+        ScheduledJobCreate(
+            title=job_fields.pop("title", "Course notices"),
+            instruction="Summarize this week's course notices.",
+            rrule=WEEKLY_MONDAY_9,
+            timezone="Asia/Seoul",
+            **job_fields,
+        ),
+    )
+    job.next_run_at = now - timedelta(minutes=1)
+    await db.commit()
+    job_id = job.id
+    await jobs.run_due_jobs(session_factory, _state(session_factory, ai), now=now)
+    db.expire_all()
+    job = await db.get(ScheduledJob, job_id)
+    assert job.last_run_id and job.last_error is None
+    run = await _settled(db, job.last_run_id)
+    # Settling expired everything; hand back a job whose columns are loaded.
+    return await db.get(ScheduledJob, job_id), run
+
+
+def test_risk_comes_from_what_the_chain_can_touch():
+    task = AgentTask(id="t", task_type="x", instruction="i", agent_type="summarize")
+    assert run_risk.skill_chain(task) == ["summarize"]
+    task.skill_chain = json.dumps(["research", "summarize"])
+    assert run_risk.skill_chain(task) == ["research", "summarize"]
+    assert run_risk.READ_ONLY_SKILLS.issuperset(run_risk.skill_chain(task))
+    assert "draft" not in run_risk.READ_ONLY_SKILLS
+    assert "obsidian_sync" in run_risk.VAULT_WRITING_SKILLS
+
+
+async def test_an_automation_told_not_to_ask_adopts_low_risk_results_itself(
+    db_session, session_factory
+):
+    job, run = await _fired(
+        db_session, session_factory, ReportingAI(),
+        skill_chain=["summarize"], auto_approve_low_risk=True,
+    )
+    assert run.status == AgentRunStatus.COMPLETED
+    assert run.is_adopted
+    task = await db_session.get(AgentTask, run.agent_task_id)
+    assert task.status == "completed"
+    # The review stays as the record: approved, low risk, with the note that says why.
+    review = await _review_for(db_session, run.id)
+    assert (review.status, review.risk_level) == (ReviewStatus.APPROVED, ReviewRiskLevel.LOW)
+    assert review.review_note == agent_run_service.AUTO_APPROVED_NOTE
+    response = await review_item_service.build_review_response(db_session, review)
+    assert response.metadata["automation"] == {
+        "scheduled_job_id": job.id,
+        "title": "Course notices",
+        "auto_approve_low_risk": True,
+        # The box stays on the card so it can be unticked, and Today can
+        # tell this result skipped the queue.
+        "offer_skip_review": True,
+        "auto_approved": True,
+    }
+
+
+async def test_a_result_that_could_have_changed_files_is_still_asked(
+    db_session, session_factory
+):
+    _job, run = await _fired(
+        db_session, session_factory, ReportingAI(),
+        skill_chain=["draft"], auto_approve_low_risk=True,
+    )
+    assert run.status == AgentRunStatus.WAITING_REVIEW
+    review = await _review_for(db_session, run.id)
+    assert (review.status, review.risk_level) == (ReviewStatus.PENDING, ReviewRiskLevel.MEDIUM)
+
+
+async def test_by_default_even_a_low_risk_result_waits_for_review(db_session, session_factory):
+    job, run = await _fired(db_session, session_factory, ReportingAI(), skill_chain=["summarize"])
+    assert run.status == AgentRunStatus.WAITING_REVIEW
+    review = await _review_for(db_session, run.id)
+    assert (review.status, review.risk_level) == (ReviewStatus.PENDING, ReviewRiskLevel.LOW)
+    response = await review_item_service.build_review_response(db_session, review)
+    assert response.metadata["automation"]["auto_approve_low_risk"] is False
+    # Nothing has been approved yet, so the card does not offer to stop asking.
+    assert response.metadata["automation"]["offer_skip_review"] is False
+    assert response.metadata["automation"]["auto_approved"] is False
+    # The card's checkbox is a plain job update.
+    job_id = job.id
+    await jobs.update_job(db_session, job_id, ScheduledJobUpdate(auto_approve_low_risk=True))
+    db_session.expire_all()
+    assert (await db_session.get(ScheduledJob, job_id)).auto_approve_low_risk is True
+
+
+async def _approved(db, run_id: str, note: str | None = None) -> None:
+    review = await _review_for(db, run_id)
+    review.status = ReviewStatus.APPROVED
+    review.review_note = note
+    review.reviewed_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+async def _fired_again(db, session_factory, job_id: str) -> AgentRun:
+    db.expire_all()
+    job = await db.get(ScheduledJob, job_id)
+    job.next_run_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    await db.commit()
+    await jobs.run_due_jobs(
+        session_factory, _state(session_factory, ReportingAI()), now=datetime.now(timezone.utc)
+    )
+    db.expire_all()
+    job = await db.get(ScheduledJob, job_id)
+    return await _settled(db, job.last_run_id)
+
+
+async def test_the_card_offers_to_stop_asking_only_after_two_untouched_approvals(
+    db_session, session_factory
+):
+    job, first = await _fired(db_session, session_factory, ReportingAI(), skill_chain=["summarize"])
+    job_id = job.id
+    await _approved(db_session, first.id)
+
+    async def offered() -> bool:
+        run = await _fired_again(db_session, session_factory, job_id)
+        review = await _review_for(db_session, run.id)
+        response = await review_item_service.build_review_response(db_session, review)
+        return response.metadata["automation"]["offer_skip_review"]
+
+    # One approval behind it: not yet.
+    assert await offered() is False
+    job = await db_session.get(ScheduledJob, job_id)
+    await _approved(db_session, job.last_run_id)
+    # Two untouched approvals in a row: offered.
+    assert await offered() is True
+    # An approval with a note breaks the run of untouched ones.
+    job = await db_session.get(ScheduledJob, job_id)
+    await _approved(db_session, job.last_run_id, note="Shorter next time")
+    assert await offered() is False
+
+
+async def test_a_result_that_could_change_files_never_offers_to_stop_asking(
+    db_session, session_factory
+):
+    job, first = await _fired(db_session, session_factory, ReportingAI(), skill_chain=["draft"])
+    job_id = job.id
+    await _approved(db_session, first.id)
+    second = await _fired_again(db_session, session_factory, job_id)
+    await _approved(db_session, second.id)
+    await jobs.update_job(db_session, job_id, ScheduledJobUpdate(auto_approve_low_risk=True))
+    third = await _fired_again(db_session, session_factory, job_id)
+    review = await _review_for(db_session, third.id)
+    response = await review_item_service.build_review_response(db_session, review)
+    # Medium risk: asked, and no box however many times it was approved.
+    assert review.status == ReviewStatus.PENDING
+    assert response.metadata["automation"]["offer_skip_review"] is False

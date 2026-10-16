@@ -14,6 +14,7 @@ import {
   useRunsAwaitingInputQuery,
 } from '../../hooks/queries';
 import ChatPanelMessages from './ChatPanelMessages';
+import ChatPanelRunStrip from './ChatPanelRunStrip';
 import ChatInput from './ChatInput';
 import { CloseIcon, ExternalLinkIcon, MinusIcon } from '../shared/Icons';
 import { translateUi } from '../../i18n';
@@ -192,6 +193,7 @@ export default function ChatPanel({
         </button>
       </div>
       <AiSetupBanner className="cc-ai-setup-banner--panel" />
+      <ChatPanelRunStrip conversationId={conversationId} />
       <ChatPanelMessages
         conversationId={conversationId}
         messages={messages}

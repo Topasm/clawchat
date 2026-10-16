@@ -9471,6 +9471,12 @@
       },
       "ScheduledJobCreate": {
         "properties": {
+          "auto_approve_low_risk": {
+            "default": false,
+            "description": "Approve low-risk results (prose only, no tool call) as they land instead of asking; results that could change files always ask",
+            "title": "Auto Approve Low Risk",
+            "type": "boolean"
+          },
           "enabled": {
             "default": true,
             "title": "Enabled",
@@ -9556,6 +9562,10 @@
       },
       "ScheduledJobResponse": {
         "properties": {
+          "auto_approve_low_risk": {
+            "title": "Auto Approve Low Risk",
+            "type": "boolean"
+          },
           "conversation_id": {
             "anyOf": [
               {
@@ -9703,6 +9713,7 @@
           "rrule",
           "timezone",
           "enabled",
+          "auto_approve_low_risk",
           "next_run_at",
           "conversation_id",
           "last_run_at",
@@ -9742,6 +9753,17 @@
       },
       "ScheduledJobUpdate": {
         "properties": {
+          "auto_approve_low_risk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Approve Low Risk"
+          },
           "enabled": {
             "anyOf": [
               {

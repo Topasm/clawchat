@@ -314,6 +314,15 @@ export function StopIcon({ size = ICON_SIZE.feature, className, label }: IconPro
   );
 }
 
+/** Two bars: a task paused on a prerequisite, not a task in trouble. */
+export function PauseIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
+  return (
+    <IconBase size={size} className={className} label={label}>
+      <rect x="4.5" y="4" width="3" height="10" rx="0.75" fill="currentColor" stroke="none" />
+      <rect x="10.5" y="4" width="3" height="10" rx="0.75" fill="currentColor" stroke="none" />
+    </IconBase>
+  );
+}
 export function MicrophoneIcon({ size = ICON_SIZE.feature, className, label }: IconProps) {
   return (
     <IconBase size={size} className={className} label={label}>

@@ -9,6 +9,7 @@ import {
   type ChatMessage,
 } from '../stores/useChatStore';
 import { useToastStore } from '../stores/useToastStore';
+import { useRunNoticeStore } from '../stores/useRunNoticeStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { notify } from '../services/platform';
 import { playReminderSound } from '../services/reminderSound';
@@ -207,6 +208,8 @@ export default function useWebSocket(): void {
           10000,
         );
       } else if (d.status === 'failed') {
+        // The sidebar line keeps naming the failure until it is opened once.
+        if (d.run_id) useRunNoticeStore.getState().noteFailed(d.run_id, title);
         announce(
           'error',
           translateUi('Agent run failed: {{error}}', { error: d.error ?? title }),

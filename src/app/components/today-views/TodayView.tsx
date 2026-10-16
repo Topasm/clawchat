@@ -5,6 +5,7 @@ import { useToggleTodoComplete } from '../../hooks/queries';
 import usePlatform from '../../hooks/usePlatform';
 import { formatDate } from '../../utils/formatters';
 import TaskCard from '../shared/TaskCard';
+import AutoApprovedLine from './AutoApprovedLine';
 import EventCard from '../shared/EventCard';
 import TodaySuggestions from './TodaySuggestions';
 import { ChevronRightIcon } from '../shared/Icons';
@@ -91,6 +92,7 @@ export default function TodayView({
       </div>
 
       <AiSetupBanner />
+      <AutoApprovedLine />
 
       <TodaySuggestions briefingSuggestions={briefingData?.suggestions} />
 

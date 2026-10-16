@@ -145,7 +145,7 @@ describe('TaskDetailPage project context', () => {
     expect(screen.getByText('Flow for todo-e65a')).toBeVisible();
     expect(screen.getByPlaceholderText('Add a description...')).toBeVisible();
     // No five steps, no plan button, no machine line for work not handed to an agent.
-    expect(document.querySelector('.cc-stage-bar')).toBeNull();
+    expect(document.querySelector('.cc-stage-dots')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Suggest steps' })).not.toBeInTheDocument();
     expect(screen.queryByText('Runs on My Mac')).not.toBeInTheDocument();
   });
@@ -175,7 +175,8 @@ describe('TaskDetailPage project context', () => {
     task.assignee = 'agent';
     renderPage();
 
-    expect(document.querySelector('.cc-stage-bar')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-dots')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-bar')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     expect(screen.getByRole('menuitem', { name: 'Do it myself' })).toBeVisible();
   });
@@ -198,7 +199,8 @@ describe('TaskDetailPage project context', () => {
     task.enabled_skills = ['research'];
     renderPage();
 
-    expect(document.querySelector('.cc-stage-bar')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-dots')).not.toBeNull();
+    expect(document.querySelector('.cc-stage-bar')).toBeNull();
     expect(screen.getByRole('button', { name: 'Suggest steps' })).toBeVisible();
     expect(screen.getByText('Runs on My Mac')).toBeVisible();
     expect(screen.getByText('/Users/test/papers')).toBeVisible();

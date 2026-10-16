@@ -2,10 +2,14 @@ import type { TaskExecutionTelemetryResponse, TodoResponse } from '../../types/a
 import StorageLocationBadge from '../shared/StorageLocationBadge';
 import { formatDueDate, isOverdue } from '../../utils/formatters';
 import { translateUi } from '../../i18n';
+import WaitingOnLine, { waitingOnLine } from '../shared/WaitingOnLine';
 import { describeTaskStage, getTaskStage } from '../../utils/taskStage';
 import type { TaskStageState } from '../../utils/taskStage';
 import TaskStageIndicator from '../shared/TaskStageIndicator';
 import { isWaitingOnPrerequisite } from '../../hooks/useTaskFilters';
+/** A prerequisite with one of these on it is in progress, not merely waited on. */
+const ACTIVE_RUN = new Set<string | null | undefined>(['queued', 'starting', 'running']);
+
 interface TaskListViewProps {
   todos: TodoResponse[];
   /** Every task, so a row can count its steps even when they are filtered out. */
@@ -86,11 +90,18 @@ export default function TaskListView({
         // The server names the unfinished prerequisites, so the row can say
         // what it waits on; the line goes away once they are completed.
         const waitingOn = isWaitingOnPrerequisite(todo) ? (todo.open_prerequisites ?? []) : [];
+        const telemetry = telemetryByTaskId?.get(todo.id);
         const { state, label } = describeTaskState(
           todo,
-          waitingOn.length > 0,
-          telemetryByTaskId?.get(todo.id),
+          waitingOnLine(waitingOn) !== null,
+          telemetry,
         );
+        // Five marks only where an agent is involved; a task of your own
+        // shows its status as a word.
+        const delegated =
+          Boolean(telemetry?.latest_run_status) ||
+          Boolean(todo.enabled_skills?.length) ||
+          state.stage !== 'capture';
         const depth = getTaskDepth(todo, todoById);
         const context =
           (todo.project_id ? projectTitles?.get(todo.project_id) : null) ||
@@ -126,32 +137,27 @@ export default function TaskListView({
                 )}
               />
               {depth > 0 && <i className="cc-task-list__branch" aria-hidden="true" />}
-              <strong>{todo.title}</strong>
-              {steps.has(todo.id) && (
-                <span className="cc-task-list__steps">
-                  {translateUi('{{done}}/{{total}} steps', steps.get(todo.id)!)}
+              <span className="cc-task-list__title">
+                <span className="cc-task-list__title-line">
+                  <strong>{todo.title}</strong>
+                  {steps.has(todo.id) && (
+                    <span className="cc-task-list__steps">
+                      {translateUi('{{done}}/{{total}} steps', steps.get(todo.id)!)}
+                    </span>
+                  )}
+                  <StorageLocationBadge item={todo} />
                 </span>
-              )}
-              <StorageLocationBadge item={todo} />
+                <WaitingOnLine
+                  prerequisites={waitingOn}
+                  dueDate={todo.due_date}
+                  isRunning={(id) => ACTIVE_RUN.has(telemetryByTaskId?.get(id)?.latest_run_status)}
+                  onOpenTask={onOpenTask}
+                  className="cc-task-list__waiting"
+                />
+              </span>
             </span>
             <span role="cell" className="cc-task-list__status">
-              <TaskStageIndicator state={state} label={label} />
-              {waitingOn.length > 0 && (
-                <small
-                  className="cc-task-list__waiting"
-                  title={waitingOn.map((entry) => entry.title).join(', ')}
-                >
-                  {translateUi('Waiting on {{title}}', {
-                    title:
-                      waitingOn.length === 1
-                        ? waitingOn[0].title
-                        : translateUi('{{title}} +{{count}}', {
-                            title: waitingOn[0].title,
-                            count: waitingOn.length - 1,
-                          }),
-                  })}
-                </small>
-              )}
+              <TaskStageIndicator state={state} label={label} marks={delegated} />
             </span>
             <span role="cell" title={context ?? undefined}>
               {context || '—'}

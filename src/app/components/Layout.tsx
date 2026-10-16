@@ -57,6 +57,7 @@ import { useServerHealthStore } from '../stores/useServerHealthStore';
 import { useServerHealthPolling } from '../hooks/useServerHealth';
 import { workspaceAddressLabel } from '../utils/workspaceLocation';
 import { platformApi } from '../platform';
+import ActiveRunsLine from './shared/ActiveRunsLine';
 import WorkerStatusLine from './shared/WorkerStatusLine';
 import WorkspaceMenu from './shared/WorkspaceMenu';
 
@@ -110,6 +111,23 @@ const primaryNavItems = [
 // stay reachable from a task's run, and search, settings, devices and
 // automations live in the workspace menu at the sidebar's foot.
 const attentionNavItem = { to: '/attention', labelKey: 'nav.attention', Icon: ReviewIcon };
+/** The name of the screen a path shows, as the sidebar prints it. */
+export function screenName(pathname: string, t: (key: string) => string): string {
+  const first = pathname.split('/')[1] ?? '';
+  const keys: Record<string, string> = {
+    inbox: 'nav.inbox',
+    tasks: 'nav.tasks',
+    schedule: 'nav.schedule',
+    projects: 'nav.projects',
+    attention: 'nav.attention',
+    automations: 'nav.automations',
+    devices: 'nav.devices',
+    search: 'nav.search',
+    settings: 'nav.settings',
+    more: 'nav.more',
+  };
+  return keys[first] ? t(keys[first]) : t('common.appName');
+}
 const SIDEBAR_RAIL_WIDTH = 48;
 const SIDEBAR_EXPANDED_MIN_WIDTH = 160;
 const DEFAULT_SIDEBAR_SIZE = 18;
@@ -315,6 +333,7 @@ export default function Layout() {
         </NavLink>
       ))}
       <div className="cc-sidebar__spacer" />
+      <ActiveRunsLine />
       <WorkerStatusLine />
       <WorkspaceMenu
         workspaceName={activeWorkspaceName}
@@ -400,6 +419,12 @@ export default function Layout() {
   // No chat bar waits at the foot of the page: the panel opens on ⌘K or the
   // top-right button, about the task or project on screen.
   const showChatPanel = !onChatPage && chatPanel.isOpen;
+  // The panel is a conversation about the screen in view, and its title says
+  // which one; a project, task or run thread keeps its own name.
+  const panelTitle =
+    chatPanel.presentation.kind === 'quick'
+      ? `${translateUi('AI')} · ${screenName(location.pathname, t)}`
+      : chatPanel.presentation.title;
   const aiToggle = !onChatPage && !chatPanel.isOpen && (
     <button
       type="button"
@@ -426,7 +451,7 @@ export default function Layout() {
           conversationId={chatPanel.conversationId}
           onToggle={chatPanel.toggle}
           onSetConversationId={chatPanel.setConversationId}
-          title={chatPanel.presentation.title}
+          title={panelTitle}
           subtitle={chatPanel.presentation.subtitle}
         />
       )}
@@ -523,7 +548,7 @@ export default function Layout() {
                       conversationId={chatPanel.conversationId}
                       onToggle={chatPanel.toggle}
                       onSetConversationId={chatPanel.setConversationId}
-                      title={chatPanel.presentation.title}
+                      title={panelTitle}
                       subtitle={chatPanel.presentation.subtitle}
                       variant="side"
                     />

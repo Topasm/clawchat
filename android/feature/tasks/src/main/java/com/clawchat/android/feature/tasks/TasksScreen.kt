@@ -655,29 +655,28 @@ private fun TaskRow(
                 // Which prerequisite the row waits on, as the web list says it;
                 // the line goes away by itself once that task is completed.
                 val waitingOn = task.waitingOn()
-                if (waitingOn.isNotEmpty()) {
-                    val first = waitingOn.first().title
-                    Text(
-                        text = stringResource(
-                            R.string.tasks_waiting_on,
-                            if (waitingOn.size == 1) {
-                                first
-                            } else {
-                                stringResource(R.string.tasks_waiting_on_more, first, waitingOn.size - 1)
-                            },
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
                     TaskStageDots(stage)
+                    if (waitingOn.isNotEmpty()) {
+                        val first = waitingOn.first().title
+                        // Being blocked is an order, not a problem: grey,
+                        // unless the blocked task is itself late.
+                        ClawStatusChip(
+                            text = stringResource(
+                                R.string.tasks_waiting_on,
+                                if (waitingOn.size == 1) {
+                                    first
+                                } else {
+                                    stringResource(R.string.tasks_waiting_on_more, first, waitingOn.size - 1)
+                                },
+                            ),
+                            tone = if (isPastDue(task.dueDate)) ClawTone.Warning else ClawTone.Default,
+                        )
+                    }
                     task.dueDate?.let {
                         ClawStatusChip(
                             text = localizedDateLabel(it),
@@ -696,6 +695,9 @@ private fun TaskRow(
         }
     }
 }
+
+private fun isPastDue(rawDate: String?): Boolean =
+    rawDate != null && runCatching { LocalDate.parse(rawDate).isBefore(LocalDate.now()) }.getOrDefault(false)
 
 /** List marker for an item that has not reached a workspace. */
 @Composable

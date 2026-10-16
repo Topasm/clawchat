@@ -26,6 +26,7 @@ import { getTaskStage } from '../utils/taskStage';
 import { CheckIcon } from '../components/shared/Icons';
 import type { TodoResponse, TodoUpdate } from '../types/api';
 import { isTerminalTaskStatus } from '../utils/taskStatus';
+import { formatDate } from '../utils/formatters';
 import { translateUi } from '../i18n';
 import CanonicalDocumentButton from '../components/shared/CanonicalDocumentButton';
 import { extractCanonicalDoc } from '../utils/canonicalDoc';
@@ -68,7 +69,7 @@ function getDueCountdown(dueDate: string): {
   if (diffDays === 0) return { label: translateUi('Due today'), variant: 'today' };
   if (diffDays === 1) return { label: translateUi('Due tomorrow'), variant: 'upcoming' };
   return {
-    label: translateUi('Due in {{count}} days', { count: diffDays }),
+    label: translateUi('{{count}} days left', { count: diffDays }),
     variant: 'upcoming',
   };
 }
@@ -240,6 +241,9 @@ export default function TaskDetailPage() {
             onChange={(e) => handleTitleChange(e.target.value)}
             placeholder={translateUi('Task title')}
           />
+          {/* Where a delegated task is, small at the end of the title row; a
+              task of your own has no run, plan or review to be between. */}
+          {isDelegated && <TaskStageIndicator state={stage} />}
           <TaskMoreMenu items={menuItems} />
         </div>
         <div className="cc-exec-panel__meta-line">
@@ -268,7 +272,11 @@ export default function TaskDetailPage() {
                 ×
               </button>
             )}
-            {dueInfo && <span className="cc-exec-panel__info-value">{dueInfo.label}</span>}
+            {dueInfo && task.due_date && (
+              <span className="cc-exec-panel__info-value cc-exec-panel__due-line">
+                {formatDate(task.due_date)} · {dueInfo.label}
+              </span>
+            )}
           </span>
           {project && !projectError && (
             <Link className="cc-exec-panel__context-link" to={`/projects/${project.id}`}>
@@ -296,9 +304,6 @@ export default function TaskDetailPage() {
 
       {isDelegated && (
         <div className="cc-exec-panel__section cc-exec-panel__agent">
-          <div className="cc-exec-panel__stage">
-            <TaskStageIndicator state={stage} variant="bar" />
-          </div>
           {planIsNext && canPlan && !isPlanned && (
             <button
               type="button"

@@ -355,7 +355,7 @@ async def test_create_todo_from_task_agent_is_a_revisioned_apply_and_undo_propos
     assert metadata["action_type"] == "plan_started"
     assert metadata["proposal_kind"] == "add_task"
     assert metadata["todo_id"] == parent.id
-    assert "Apply the graph change" in text
+    assert text.endswith("?") and "as a step under" in text
     assert proposal.status == "draft"
     assert proposal.base_graph_revision is not None
     assert payload.subtasks[0].title == "Check support terms"
