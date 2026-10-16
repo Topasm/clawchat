@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.data.model.TodoCreate
+import com.clawchat.android.core.data.model.TodoPath
+import com.clawchat.android.core.data.repository.TaskFlowRepository
 import com.clawchat.android.core.data.repository.TodoRepository
 import com.clawchat.android.core.network.ApiResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,8 +18,16 @@ import java.util.UUID
 import javax.inject.Inject
 import com.clawchat.android.core.sync.SyncManager
 
+/** [before] must finish before [after] starts. */
+data class StepEdge(val before: String, val after: String)
+
 data class TaskStepsState(
     val items: List<Todo> = emptyList(),
+    /** Order between the steps, from `depends_on` rows between siblings. */
+    val edges: List<StepEdge> = emptyList(),
+    /** Prerequisites of the steps that belong to other tasks, by id. */
+    val outside: List<String> = emptyList(),
+    val paths: List<TodoPath> = emptyList(),
     val draft: String = "",
     val loading: Boolean = false,
     val saving: Boolean = false,
@@ -29,6 +39,7 @@ class TaskStepsViewModel @Inject constructor(
     private val repository: TodoRepository,
     private val savedState: SavedStateHandle,
     private val syncManager: SyncManager,
+    private val flowRepository: TaskFlowRepository,
 ) : ViewModel() {
     private val states = MutableStateFlow<Map<String, TaskStepsState>>(emptyMap())
     val steps = states.asStateFlow()
@@ -76,6 +87,23 @@ class TaskStepsViewModel @Inject constructor(
                 }
             }
             update(id) { it.copy(loading = false, items = items.filter { task -> task.parentId == id }.distinctBy { task -> task.id }) }
+            loadFlow(id)
+        }
+    }
+
+    /** Order and paths come from the server; without them the steps still list. */
+    private suspend fun loadFlow(id: String) {
+        val stepIds = current(id).items.map { it.id }.toSet()
+        val edges = (flowRepository.dependencies() as? ApiResult.Success)?.data.orEmpty()
+            .filter { it.type == "depends_on" && it.sourceTaskId in stepIds }
+        val paths = (flowRepository.paths(id) as? ApiResult.Success)?.data
+        update(id) { state ->
+            state.copy(
+                edges = edges.filter { it.targetTaskId in stepIds }
+                    .map { StepEdge(before = it.targetTaskId, after = it.sourceTaskId) },
+                outside = edges.map { it.targetTaskId }.filter { it !in stepIds }.distinct(),
+                paths = paths ?: state.paths,
+            )
         }
     }
 
@@ -88,15 +116,26 @@ class TaskStepsViewModel @Inject constructor(
         }
         update(parent.id) { it.copy(saving = true, error = null) }
         viewModelScope.launch {
-            val result = repository.createTodo(TodoCreate(
-                title = title, parentId = parent.id, projectId = parent.projectId,
-                source = "android_app", inboxState = "none", idempotencyKey = key,
-            ))
+            // On a server a step goes after the flow's end with its order wired
+            // in the same change; a device-only workspace keeps a plain sub-task.
+            val result = if (flowRepository.isServer()) {
+                when (val added = flowRepository.addStep(parent.id, title)) {
+                    is ApiResult.Success -> ApiResult.Success(added.data.todo)
+                    is ApiResult.Error -> added
+                    ApiResult.Loading -> ApiResult.Loading
+                }
+            } else {
+                repository.createTodo(TodoCreate(
+                    title = title, parentId = parent.id, projectId = parent.projectId,
+                    source = "android_app", inboxState = "none", idempotencyKey = key,
+                ))
+            }
             when (result) {
                 is ApiResult.Success -> {
                     savedState["step:${parent.id}"] = ""
                     savedState.remove<String>("step-key:${parent.id}")
                     update(parent.id) { it.copy(saving = false, draft = "", items = (it.items + result.data).distinctBy { task -> task.id }) }
+                    loadFlow(parent.id)
                 }
                 is ApiResult.Error -> update(parent.id) { it.copy(saving = false, error = result.message) }
                 ApiResult.Loading -> update(parent.id) { it.copy(saving = false, error = "Request did not complete") }

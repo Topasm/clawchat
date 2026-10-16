@@ -839,3 +839,24 @@ async def test_scoped_snapshot_uses_constant_query_count(db_session):
 
     assert response.scope.primary_task_count == 31
     assert len(statements) <= 8
+
+
+@pytest.mark.asyncio
+async def test_open_inbox_captures_stay_out_of_the_graph(db_session):
+    task = _todo("todo_task")
+    capture = _todo("todo_capture")
+    capture.inbox_state = "needs_review"
+    filed_capture = _todo("todo_filed_capture", status=TaskStatus.COMPLETED)
+    filed_capture.inbox_state = "needs_review"
+    db_session.add_all([task, capture, filed_capture])
+    await db_session.flush()
+    db_session.add(_dependency(task.id, capture.id))
+    await db_session.commit()
+
+    response = await get_graph_insights(db_session)
+    nodes = _nodes_by_id(response)
+
+    assert capture.id not in nodes
+    assert set(nodes) == {task.id, filed_capture.id}
+    assert nodes[task.id].is_ready is True
+    assert response.issues == []

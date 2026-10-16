@@ -42,6 +42,14 @@ from schemas.task_placement import (
     TaskPlacementResponse,
 )
 from schemas.task_execution_telemetry import TaskExecutionTelemetryResponse
+from schemas.task_step import (
+    TaskStepCreate,
+    TaskStepMove,
+    TaskStepResponse,
+    TaskStepUndoResponse,
+    TodoPathCreate,
+    TodoPathResponse,
+)
 from schemas.todo import (
     AnswerQuestionsRequest,
     ProjectTodoResponse,
@@ -68,6 +76,8 @@ from services.tasks import (
     task_placement_service,
     task_execution_telemetry_service,
     task_relationship_service,
+    task_step_service,
+    todo_path_service,
     todo_service,
 )
 from services.vault import (
@@ -748,6 +758,115 @@ async def undo_todo_placement(
         change_set_id=change.id,
         reverted=True,
     )
+
+
+@router.post(
+    "/{todo_id}/steps",
+    response_model=TaskStepResponse,
+    status_code=201,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
+async def add_todo_step(
+    todo_id: str,
+    body: TaskStepCreate,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Add a step under a task and wire its order in one undoable change."""
+    step, change, affected_ids = await task_step_service.add_step(
+        db,
+        todo_id,
+        title=body.title,
+        branch_from_id=body.branch_from_id,
+        after_id=body.after_id,
+    )
+    await db.commit()
+    await db.refresh(step)
+    await notify_module_data_changed("todos")
+    return TaskStepResponse(
+        todo=await _enrich_todo_response(step, db),
+        change_id=change.id,
+        affected_task_ids=affected_ids,
+    )
+
+
+@router.post(
+    "/{todo_id}/steps/move",
+    response_model=TaskStepResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
+async def move_todo_step(
+    todo_id: str,
+    body: TaskStepMove,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Move a step to right after another, rewiring the order around it."""
+    step, change, affected_ids = await task_step_service.move_step(
+        db,
+        todo_id,
+        step_id=body.step_id,
+        after_id=body.after_id,
+    )
+    await db.commit()
+    await db.refresh(step)
+    await notify_module_data_changed("todos")
+    return TaskStepResponse(
+        todo=await _enrich_todo_response(step, db),
+        change_id=change.id,
+        affected_task_ids=affected_ids,
+    )
+
+
+@router.post(
+    "/step-changes/{change_id}/undo",
+    response_model=TaskStepUndoResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
+async def undo_todo_step_change(
+    change_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    change, affected_ids = await task_step_service.undo_step_change(db, change_id)
+    await db.commit()
+    await notify_module_data_changed("todos")
+    return TaskStepUndoResponse(change_id=change.id, affected_task_ids=affected_ids)
+
+
+@router.get("/{todo_id}/paths", response_model=list[TodoPathResponse])
+async def list_todo_paths(
+    todo_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """The task's paths, then the ones it inherits from its parent or project."""
+    return await todo_path_service.list_paths(db, todo_id)
+
+
+@router.post("/{todo_id}/paths", response_model=TodoPathResponse, status_code=201)
+async def add_todo_path(
+    todo_id: str,
+    body: TodoPathCreate,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    path = await todo_path_service.add_path(db, todo_id, body)
+    await db.commit()
+    await notify_module_data_changed("todos")
+    return path
+
+
+@router.delete("/{todo_id}/paths/{path_id}", status_code=204)
+async def delete_todo_path(
+    todo_id: str,
+    path_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    await todo_path_service.delete_path(db, todo_id, path_id)
+    await db.commit()
+    await notify_module_data_changed("todos")
 
 
 @router.delete("/{todo_id}", status_code=204)

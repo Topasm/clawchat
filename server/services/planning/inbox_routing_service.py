@@ -16,11 +16,12 @@ from models.artifact import Artifact
 from models.attachment import Attachment
 from models.inbox_routing import InboxRouting
 from models.note import Note
+from models.plan_proposal import PlanProposal
 from models.project import Project
 from models.task_comment import TaskComment
 from models.task_relationship import TaskRelationship
 from models.todo import Todo
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.planning.inbox_deadline import (
@@ -65,7 +66,10 @@ _ROW_FIELDS = (
 
 def _cannot_move(message: str, **details: object) -> AppError:
     return AppError(
-        code="INBOX_ROUTING_NOT_ALLOWED", message=message, status_code=409, details=details
+        code="INBOX_ROUTING_NOT_ALLOWED",
+        message=message,
+        status_code=409,
+        details=details,
     )
 
 
@@ -181,7 +185,9 @@ async def file_as_task(
     return routing
 
 
-def is_upcoming(deadline: ParsedDeadline, zone: Zone, now: datetime | None = None) -> bool:
+def is_upcoming(
+    deadline: ParsedDeadline, zone: Zone, now: datetime | None = None
+) -> bool:
     today = (now or datetime.now(timezone.utc)).astimezone(as_zone(zone)).date()
     return deadline.local_date >= today
 
@@ -202,32 +208,105 @@ async def route_on_capture(
     return None
 
 
+# Agent runs in these states are history; a run in any other is still going.
+_FINISHED_RUN_STATES = ("completed", "failed", "cancelled")
+
+
 async def _require_plain_capture(db: AsyncSession, todo: Todo) -> None:
-    """A note has no steps, links, files, comments or runs to carry over."""
+    """A note has no steps, links, files, comments or live runs to carry over.
+
+    Finished runs and plan drafts are only history (an Inbox that used to plan
+    by itself left one on many captures); they are detached, and undo puts
+    them back.
+    """
     if todo.status in {TaskStatus.COMPLETED, TaskStatus.CANCELLED}:
         raise _cannot_move("A finished task cannot become a note", todo_id=todo.id)
-    checks = (
-        select(Todo.id).where(Todo.parent_id == todo.id),
-        select(Project.id).where(Project.root_task_id == todo.id),
-        select(TaskRelationship.id).where(
-            or_(
-                TaskRelationship.source_task_id == todo.id,
-                TaskRelationship.target_task_id == todo.id,
-            )
-        ),
-        select(TaskComment.id).where(TaskComment.todo_id == todo.id),
-        select(Attachment.id).where(Attachment.todo_id == todo.id),
-        select(AgentTask.id).where(AgentTask.todo_id == todo.id),
-        select(Artifact.id).where(Artifact.task_id == todo.id),
-    )
     if todo.parent_id is not None:
-        raise _cannot_move("A step of another task cannot become a note", todo_id=todo.id)
-    for query in checks:
+        raise _cannot_move(
+            "A step of another task cannot become a note", todo_id=todo.id
+        )
+    checks = (
+        (select(Todo.id).where(Todo.parent_id == todo.id), "it has steps"),
+        (
+            select(Project.id).where(Project.root_task_id == todo.id),
+            "it is a project's root",
+        ),
+        (
+            select(TaskRelationship.id).where(
+                or_(
+                    TaskRelationship.source_task_id == todo.id,
+                    TaskRelationship.target_task_id == todo.id,
+                )
+            ),
+            "it is linked to other tasks",
+        ),
+        (
+            select(TaskComment.id).where(TaskComment.todo_id == todo.id),
+            "it has comments",
+        ),
+        (select(Attachment.id).where(Attachment.todo_id == todo.id), "it has files"),
+        (
+            select(AgentTask.id).where(
+                AgentTask.todo_id == todo.id,
+                AgentTask.status.not_in(_FINISHED_RUN_STATES),
+            ),
+            "an agent run on it is still going",
+        ),
+        (select(Artifact.id).where(Artifact.task_id == todo.id), "it has run results"),
+    )
+    for query, reason in checks:
         if (await db.execute(query.limit(1))).first() is not None:
             raise _cannot_move(
-                "Only a task without steps, links, files, comments or runs can become a note",
+                f"This task cannot become a note: {reason}",
                 todo_id=todo.id,
+                reason=reason,
             )
+
+
+async def _detach_history(db: AsyncSession, todo_id: str) -> dict[str, list[str]]:
+    """Unlink finished runs and plan drafts from a task about to be removed."""
+    run_ids = list(
+        (
+            await db.execute(select(AgentTask.id).where(AgentTask.todo_id == todo_id))
+        ).scalars()
+    )
+    proposal_ids = list(
+        (
+            await db.execute(
+                select(PlanProposal.id).where(PlanProposal.root_task_id == todo_id)
+            )
+        ).scalars()
+    )
+    if run_ids:
+        await db.execute(
+            update(AgentTask).where(AgentTask.id.in_(run_ids)).values(todo_id=None)
+        )
+    if proposal_ids:
+        await db.execute(
+            update(PlanProposal)
+            .where(PlanProposal.id.in_(proposal_ids))
+            .values(root_task_id=None)
+        )
+    return {"agent_task_ids": run_ids, "plan_proposal_ids": proposal_ids}
+
+
+async def _reattach_history(db: AsyncSession, todo_id: str, before: dict) -> None:
+    run_ids = before.get("agent_task_ids") or []
+    proposal_ids = before.get("plan_proposal_ids") or []
+    if run_ids:
+        await db.execute(
+            update(AgentTask)
+            .where(AgentTask.id.in_(run_ids), AgentTask.todo_id.is_(None))
+            .values(todo_id=todo_id)
+        )
+    if proposal_ids:
+        await db.execute(
+            update(PlanProposal)
+            .where(
+                PlanProposal.id.in_(proposal_ids), PlanProposal.root_task_id.is_(None)
+            )
+            .values(root_task_id=todo_id)
+        )
 
 
 def _note_content(todo: Todo) -> str:
@@ -245,6 +324,7 @@ async def task_to_note(
 ) -> InboxRouting:
     await _require_plain_capture(db, todo)
     before = _todo_row(todo)
+    before.update(await _detach_history(db, todo.id))
     note = Note(content=_note_content(todo), project_id=todo.project_id)
     db.add(note)
     await review_item_service.close_task_plan_reviews(db, [todo.id])
@@ -354,9 +434,14 @@ async def undo(db: AsyncSession, routing_id: str) -> InboxRouting:
             raise _cannot_move("The task already exists", routing_id=routing.id)
         await db.delete(note)
         await db.flush()
-        if before.get("project_id") and await db.get(Project, before["project_id"]) is None:
+        if (
+            before.get("project_id")
+            and await db.get(Project, before["project_id"]) is None
+        ):
             before["project_id"] = None
         db.add(_restore_todo(before))
+        await db.flush()
+        await _reattach_history(db, str(before["id"]), before)
     else:
         todo = await db.get(Todo, routing.todo_id)
         if todo is None:

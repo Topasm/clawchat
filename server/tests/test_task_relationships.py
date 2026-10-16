@@ -482,6 +482,8 @@ async def test_dependency_command_reports_cycle_path_and_stale_revision(
     assert cycle.status_code == 400, cycle.text
     assert cycle.json()["error"]["details"] == {
         "reason": "dependency_cycle",
+        "earlier_title": "A",
+        "later_title": "C",
         "proposed_edge": {
             "source_task_id": task_c["id"],
             "target_task_id": task_a["id"],

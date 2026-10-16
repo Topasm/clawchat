@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.clawchat.android.core.data.model.TaskStatus
+import com.clawchat.android.core.data.model.TodoPath
 import com.clawchat.android.core.data.model.Todo
 import com.clawchat.android.core.ui.theme.ClawChatTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -105,14 +106,25 @@ class TasksScreenshotTest {
                     TaskDetailView(
                         steps = TaskStepsState(
                             items = listOf(
-                                Todo(id = "s1", title = "Pull the revenue numbers", parentId = "t1", syncStatus = "synced"),
                                 Todo(
                                     id = "s2",
                                     title = "Write the hiring section",
                                     parentId = "t1",
                                     status = TaskStatus.COMPLETED,
                                     syncStatus = "synced",
+                                    sortOrder = 0,
                                 ),
+                                Todo(id = "s1", title = "Pull the revenue numbers", parentId = "t1", syncStatus = "synced", sortOrder = 10),
+                                Todo(id = "s3", title = "Draft the outlook", parentId = "t1", syncStatus = "synced", sortOrder = 20),
+                                Todo(id = "s4", title = "Send to finance", parentId = "t1", syncStatus = "synced", sortOrder = 30),
+                            ),
+                            edges = listOf(
+                                StepEdge("s2", "s1"), StepEdge("s2", "s3"),
+                                StepEdge("s1", "s4"), StepEdge("s3", "s4"),
+                            ),
+                            paths = listOf(
+                                TodoPath(id = "p1", kind = "device", hostLabel = "MacBook", path = "~/reports/q3"),
+                                TodoPath(id = "p2", kind = "url", path = "https://example.com/brief", inherited = true),
                             ),
                         ),
                         onOpenStep = {},
@@ -125,8 +137,6 @@ class TasksScreenshotTest {
                         onReloadNotes = {},
                         task = detailTask,
                         relationships = emptyList(),
-                        isLoadingRelationships = false,
-                        relationshipError = null,
                         taskTitles = emptyMap(),
                         snackbarHostState = SnackbarHostState(),
                         onBack = {},

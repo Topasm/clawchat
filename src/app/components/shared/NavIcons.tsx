@@ -30,11 +30,11 @@ export function InboxIcon({ size, className, label }: IconProps = {}) {
   );
 }
 
-export function ChatIcon({ size, className, label }: IconProps = {}) {
+export function ProjectsIcon({ size, className, label }: IconProps = {}) {
   return (
     <IconBase size={size} className={navClassName(className)} label={label}>
       <path
-        d="M16 12a1.5 1.5 0 01-1.5 1.5H5L2 16.5V4A1.5 1.5 0 013.5 2.5h11A1.5 1.5 0 0116 4z"
+        d="M2.5 5A1.5 1.5 0 014 3.5h3.2l1.6 1.8H14A1.5 1.5 0 0115.5 6.8v6.7A1.5 1.5 0 0114 15H4a1.5 1.5 0 01-1.5-1.5z"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

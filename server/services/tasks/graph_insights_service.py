@@ -29,7 +29,7 @@ from schemas.graph_insights import (
     GraphInsightsResponse,
     GraphInsightSummary,
 )
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 DEFAULT_GRAPH_INSIGHT_LIMIT = 2_000
@@ -145,6 +145,14 @@ def _task_snapshot(row: object) -> _TaskSnapshot:
     )
 
 
+def _is_graph_task():
+    """Open Inbox captures are not tasks yet; finished ones stay in history."""
+    return or_(
+        Todo.inbox_state == "none",
+        Todo.status.in_((TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value)),
+    )
+
+
 def _task_columns():
     return (
         Todo.id,
@@ -165,7 +173,10 @@ async def _load_scoped_tasks(
         rows = list(
             (
                 await db.execute(
-                    select(*_task_columns()).order_by(Todo.id.asc()).limit(limit + 1)
+                    select(*_task_columns())
+                    .where(_is_graph_task())
+                    .order_by(Todo.id.asc())
+                    .limit(limit + 1)
                 )
             ).all()
         )
@@ -234,7 +245,12 @@ async def _load_scoped_tasks(
         (
             await db.execute(
                 select(*_task_columns())
-                .where(Todo.id.in_(select(graph_scope.c.id)))
+                .where(
+                    Todo.id.in_(select(graph_scope.c.id)),
+                    # Placed under the root, a task is the project's even while
+                    # it is still being questioned; outside it, only tasks.
+                    or_(Todo.id.in_(primary_ids), _is_graph_task()),
+                )
                 .order_by(Todo.id.asc())
                 .limit(limit + 1)
             )
@@ -281,6 +297,20 @@ async def _load_snapshot(
             f"Execution graph exceeds the relationship limit of {relationship_limit}",
             details={"relationship_limit": relationship_limit},
         )
+    # An edge to an Inbox capture that exists but sits outside the graph is
+    # dropped rather than reported as a missing dependency.
+    outside_ids = {
+        task_id
+        for _, source_task_id, target_task_id in relationship_rows
+        for task_id in (source_task_id, target_task_id)
+        if task_id not in task_ids
+    }
+    if outside_ids:
+        outside_ids = set(
+            (
+                await db.execute(select(Todo.id).where(Todo.id.in_(outside_ids)))
+            ).scalars()
+        )
     edges = tuple(
         _EdgeSnapshot(
             relationship_id=relationship_id,
@@ -288,6 +318,7 @@ async def _load_snapshot(
             target_task_id=target_task_id,
         )
         for relationship_id, source_task_id, target_task_id in relationship_rows
+        if source_task_id not in outside_ids and target_task_id not in outside_ids
     )
 
     container_ids: set[str] = set()

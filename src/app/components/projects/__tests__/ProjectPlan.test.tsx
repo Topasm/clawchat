@@ -28,8 +28,8 @@ vi.mock('../../../hooks/queries', () => ({
   useTaskExecutionTelemetryQuery: () => ({ data: execution.telemetry, isSuccess: true }),
 }));
 
-vi.mock('../../task-graph/TaskGraph', () => ({
-  default: () => <div>Task graph</div>,
+vi.mock('../../task-flow/TaskFlow', () => ({
+  default: () => <div>Task flow</div>,
 }));
 
 vi.mock('../../task-graph/TaskGraphProposalDialog', () => ({

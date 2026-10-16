@@ -11,7 +11,7 @@ vi.mock('../../../services/apiClient', () => ({ default: apiMocks }));
 vi.mock('../../../hooks/usePlatform', () => ({
   default: () => ({ isMobile: false }),
 }));
-vi.mock('../TaskGraphView', () => ({
+vi.mock('../../task-flow/FlowCanvas', () => ({
   default: () => <div data-testid="proposal-graph" />,
 }));
 vi.mock('../../shared/Dialog', () => ({

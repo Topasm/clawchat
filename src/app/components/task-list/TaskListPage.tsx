@@ -14,7 +14,6 @@ import TaskFilterBar from '../tasks/TaskFilterBar';
 import TasksHeader, {
   matchesTasksStatusFilter,
   type TasksStatusFilter,
-  type TasksViewMode,
 } from '../tasks/TasksHeader';
 import TaskListView from './TaskListView';
 import { isTaskTodo } from '../../utils/inboxState';
@@ -22,18 +21,11 @@ import useExperimentCompletionGate from '../../hooks/useExperimentCompletionGate
 import { translateUi } from '../../i18n';
 
 interface TaskListPageProps {
-  viewMode: TasksViewMode;
-  onViewModeChange: (mode: TasksViewMode) => void;
   statusFilter: TasksStatusFilter;
   onStatusFilterChange: (filter: TasksStatusFilter) => void;
 }
 
-export default function TaskListPage({
-  viewMode,
-  onViewModeChange,
-  statusFilter,
-  onStatusFilterChange,
-}: TaskListPageProps) {
+export default function TaskListPage({ statusFilter, onStatusFilterChange }: TaskListPageProps) {
   const navigate = useNavigate();
   const { data: todos = [] } = useTodosQuery();
   const filters = useModuleStore((state) => state.kanbanFilters);
@@ -97,8 +89,6 @@ export default function TaskListPage({
     <div>
       <TasksHeader
         todos={taskTodos}
-        viewMode={viewMode}
-        onViewModeChange={onViewModeChange}
         statusFilter={statusFilter}
         onStatusFilterChange={onStatusFilterChange}
         subtitle={translateUi('{{count}} tasks', { count: filteredTodos.length })}
@@ -106,6 +96,7 @@ export default function TaskListPage({
       <TaskFilterBar />
       <TaskListView
         todos={orderedTodos}
+        allTodos={todos}
         projectTitles={projectTitles}
         blockedIds={blockedIds}
         telemetryByTaskId={telemetryByTaskId}

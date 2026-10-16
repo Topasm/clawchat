@@ -1,7 +1,5 @@
-import type { PlanSubtask, TodoResponse } from '../../types/api';
-import type { GraphRelationshipLike } from './taskGraphLayout';
-
-export const PROPOSAL_ROOT_ID = 'proposal:root';
+import type { PlanSubtask } from '../../types/api';
+import type { FlowEdge } from '../task-flow/FlowCanvas';
 
 export function proposalNodeId(index: number) {
   return `proposal:subtask:${index}`;
@@ -14,48 +12,14 @@ export function proposalIndexFromNodeId(nodeId: string): number | null {
   return Number.isInteger(index) && index >= 0 ? index : null;
 }
 
-export function buildProposalTodos(root: TodoResponse, subtasks: PlanSubtask[]): TodoResponse[] {
-  const now = new Date().toISOString();
-  const virtualRoot: TodoResponse = {
-    ...root,
-    id: PROPOSAL_ROOT_ID,
-    status: 'pending',
-    parent_id: null,
-    created_at: root.created_at || now,
-    updated_at: root.updated_at || now,
-  };
-  const children = subtasks.map((subtask, index): TodoResponse => ({
-    id: proposalNodeId(index),
-    title: subtask.title,
-    description: subtask.description,
-    status: 'pending',
-    due_date: subtask.due_date,
-    tags: root.tags ?? [],
-    parent_id: PROPOSAL_ROOT_ID,
-    sort_order: index,
-    project_label: root.title,
-    created_at: now,
-    updated_at: now,
-  }));
-
-  return [virtualRoot, ...children];
-}
-
-export function buildProposalRelationships(subtasks: PlanSubtask[]): GraphRelationshipLike[] {
+/** Prerequisite → dependent arrows between proposed steps, skipping bad indices. */
+export function buildProposalEdges(subtasks: PlanSubtask[]): FlowEdge[] {
   return subtasks.flatMap((subtask, index) =>
-    [...new Set(subtask.depends_on_indices ?? [])].flatMap((dependencyIndex) => {
-      if (dependencyIndex < 0 || dependencyIndex >= subtasks.length || dependencyIndex === index) {
-        return [];
-      }
-      return [
-        {
-          id: `proposal:relationship:${index}:${dependencyIndex}`,
-          source_task_id: proposalNodeId(index),
-          target_task_id: proposalNodeId(dependencyIndex),
-          type: 'depends_on',
-        },
-      ];
-    }),
+    [...new Set(subtask.depends_on_indices ?? [])].flatMap((dependencyIndex) =>
+      dependencyIndex < 0 || dependencyIndex >= subtasks.length || dependencyIndex === index
+        ? []
+        : [{ before: proposalNodeId(dependencyIndex), after: proposalNodeId(index) }],
+    ),
   );
 }
 

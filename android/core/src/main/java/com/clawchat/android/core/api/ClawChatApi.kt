@@ -187,6 +187,28 @@ interface ClawChatApi {
         @Tag expectedScope: ExpectedSessionScope? = null,
     ): List<TaskRelationship>
 
+    @GET("api/task-relationships")
+    suspend fun listTaskRelationshipsOfType(
+        @Query("type") type: String,
+        @Query("limit") limit: Int,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): List<TaskRelationship>
+
+    // --- Task flow ---
+
+    @POST("api/todos/{todoId}/steps")
+    suspend fun addTaskStep(
+        @Path("todoId") todoId: String,
+        @Body body: TaskStepCreate,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): TaskStepResponse
+
+    @GET("api/todos/{todoId}/paths")
+    suspend fun listTodoPaths(
+        @Path("todoId") todoId: String,
+        @Tag expectedScope: ExpectedSessionScope? = null,
+    ): List<TodoPath>
+
     // --- Task comments ---
 
     @GET("api/task-comments")

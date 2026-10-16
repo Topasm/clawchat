@@ -156,6 +156,26 @@ export const TaskPlacementResponseSchema = z.object({
   reverted: z.boolean().optional(),
 });
 
+export const TaskStepResponseSchema = z.object({
+  todo: TodoResponseSchema,
+  change_id: z.string(),
+  affected_task_ids: z.array(z.string()),
+});
+
+export const TodoPathKindSchema = z.enum(['device', 'vault', 'url']);
+
+export const TodoPathResponseSchema = z.object({
+  id: z.string(),
+  todo_id: z.string().nullable().optional(),
+  kind: TodoPathKindSchema,
+  host_id: z.string().nullable().optional(),
+  host_label: z.string().nullable().optional(),
+  path: z.string(),
+  label: z.string().nullable().optional(),
+  inherited: z.boolean().optional(),
+  created_at: z.string().nullable().optional(),
+});
+
 export const TaskBatchPlacementRequestSchema = TaskPlacementRequestSchema.extend({
   todo_ids: z.array(z.string().min(1)).min(1).max(100),
 });
@@ -893,6 +913,9 @@ export type TodoCreate = z.infer<typeof TodoCreateSchema>;
 export type TodoUpdate = z.infer<typeof TodoUpdateSchema>;
 export type TaskPlacementRequest = z.infer<typeof TaskPlacementRequestSchema>;
 export type TaskPlacementResponse = z.infer<typeof TaskPlacementResponseSchema>;
+export type TaskStepResponse = z.infer<typeof TaskStepResponseSchema>;
+export type TodoPathKind = z.infer<typeof TodoPathKindSchema>;
+export type TodoPathResponse = z.infer<typeof TodoPathResponseSchema>;
 export type TaskBatchPlacementRequest = z.infer<typeof TaskBatchPlacementRequestSchema>;
 export type TaskBatchPlacementResponse = z.infer<typeof TaskBatchPlacementResponseSchema>;
 export type TaskPlacementGroup = z.infer<typeof TaskPlacementGroupSchema>;

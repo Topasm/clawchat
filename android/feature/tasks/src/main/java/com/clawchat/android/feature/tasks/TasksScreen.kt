@@ -201,8 +201,6 @@ fun TasksScreen(
             TaskDetailView(
                 task = selectedTask,
                 relationships = state.relationships,
-                isLoadingRelationships = state.isLoadingRelationships,
-                relationshipError = state.relationshipError,
                 taskTitles = state.tasks.associate { it.id to it.title } + state.relationshipTaskTitles,
                 snackbarHostState = snackbarHostState,
                 onBack = returnFromDetail,
@@ -237,6 +235,7 @@ fun TasksScreen(
                 onStepAdd = { state.selectedTask?.let(stepsViewModel::add) },
                 onStepsReload = { noteTaskId?.let(stepsViewModel::load) },
                 storageLocation = todoStorageLocation(selectedTask, state.storage),
+                delegated = state.isDelegated(selectedTask),
                 stage = state.stageOf(
                     selectedTask,
                     hasSubtasks = stepsByTask[selectedTask.id]?.items.orEmpty().isNotEmpty(),
@@ -748,8 +747,6 @@ internal fun TaskDetailView(
     onReloadNotes: () -> Unit,
     task: Todo,
     relationships: List<TaskRelationship>,
-    isLoadingRelationships: Boolean,
-    relationshipError: String?,
     taskTitles: Map<String, String>,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
@@ -759,6 +756,8 @@ internal fun TaskDetailView(
     onDiscuss: () -> Unit = {},
     onRunWithAgent: () -> Unit = {},
     storageLocation: ItemStorageLocation? = null,
+    /** Handed to AI; a task you do yourself shows no five stages. */
+    delegated: Boolean = true,
     stage: TaskStageState = taskStage(
         taskStatus = task.status,
         inboxState = task.inboxState,
@@ -888,7 +887,7 @@ internal fun TaskDetailView(
                             textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
                         )
                     }
-                    TaskStageBar(stage)
+                    if (delegated) TaskStageBar(stage)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -934,50 +933,19 @@ internal fun TaskDetailView(
                 }
             }
 
-            // Keep dependencies, loading and failures visible; hide only the empty placeholder.
-            if (task.syncStatus != "local" &&
-                (detailsOpen || relationships.isNotEmpty() || isLoadingRelationships || relationshipError != null)
-            ) {
-                item {
-                    ClawSectionCard {
-                        ClawSectionHeader(
-                            title = stringResource(R.string.tasks_links_title),
-                            subtitle = stringResource(R.string.tasks_links_subtitle),
-                            count = relationships.size.takeIf { it > 0 },
-                        )
-                        when {
-                            isLoadingRelationships -> Text(
-                                text = stringResource(R.string.tasks_links_loading),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            relationshipError != null -> Text(
-                                text = localizedErrorMessage(relationshipError),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            relationships.isEmpty() -> Text(
-                                text = stringResource(R.string.tasks_links_empty),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                relationships.forEach { relationship ->
-                                    TaskRelationshipRow(
-                                        relationship = relationship,
-                                        currentTaskId = task.id,
-                                        taskTitles = taskTitles,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             item(key = "task-steps") {
-                TaskStepsSection(task.id, steps, onOpenStep, onStepEdit, onStepAdd, onStepsReload)
+                // The task's own prerequisites and its steps' ones from other
+                // tasks are named above the flow, not drawn in it.
+                val outsideTitles = (
+                    relationships
+                        .filter { it.type == "depends_on" && it.sourceTaskId == task.id }
+                        .map { it.targetTaskId } + steps.outside
+                    )
+                    .distinct()
+                    .map { id -> taskTitles[id] ?: stringResource(R.string.tasks_fallback_title, id.take(8)) }
+                TaskStepsSection(steps, outsideTitles, onOpenStep, onStepEdit, onStepAdd, onStepsReload)
             }
+            item(key = "task-paths") { TaskPathsSection(steps.paths) }
             notes?.let { note ->
                 item {
                     Text(stringResource(R.string.tasks_notes_title), style = MaterialTheme.typography.titleMedium)
@@ -1029,79 +997,6 @@ internal fun TaskDetailView(
             DatePicker(state = datePickerState)
         }
     }
-}
-
-@Composable
-private fun TaskRelationshipRow(
-    relationship: TaskRelationship,
-    currentTaskId: String,
-    taskTitles: Map<String, String>,
-) {
-    val isOutgoing = relationship.sourceTaskId == currentTaskId
-    val otherTaskId = if (isOutgoing) relationship.targetTaskId else relationship.sourceTaskId
-    val otherTaskTitle = taskTitles[otherTaskId]
-        ?: stringResource(R.string.tasks_fallback_title, otherTaskId.take(8))
-    val direction = when (relationship.type) {
-        "depends_on" -> if (isOutgoing) {
-            stringResource(R.string.tasks_relationship_depends_on)
-        } else {
-            stringResource(R.string.tasks_relationship_required_by)
-        }
-        "duplicate" -> if (isOutgoing) {
-            stringResource(R.string.tasks_relationship_duplicates)
-        } else {
-            stringResource(R.string.tasks_relationship_duplicated_by)
-        }
-        "related" -> stringResource(R.string.tasks_relationship_related_to)
-        else -> relationship.type.replace('_', ' ')
-    }
-
-    ClawListItemSurface {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Text(
-                    text = direction,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = otherTaskTitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                relationship.label?.takeIf { it.isNotBlank() }?.let { label ->
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            ClawStatusChip(
-                text = relationshipTypeLabel(relationship.type),
-                tone = if (relationship.type == "depends_on") ClawTone.Warning else ClawTone.Default,
-            )
-        }
-    }
-}
-
-@Composable
-private fun relationshipTypeLabel(type: String): String = when (type) {
-    "depends_on" -> stringResource(R.string.tasks_relationship_type_depends_on)
-    "duplicate" -> stringResource(R.string.tasks_relationship_type_duplicate)
-    "related" -> stringResource(R.string.tasks_relationship_type_related)
-    else -> type.replace('_', ' ')
 }
 
 @Composable

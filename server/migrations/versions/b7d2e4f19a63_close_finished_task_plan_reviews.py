@@ -1,13 +1,13 @@
 """Close plan reviews left behind by tasks that are done, deleted or now notes.
 
 Revision ID: b7d2e4f19a63
-Revises: a4c9e2f7b310
+Revises: b7e3d1a9c425
 """
 
 from alembic import op
 
 revision = "b7d2e4f19a63"
-down_revision = "a4c9e2f7b310"
+down_revision = "b7e3d1a9c425"
 branch_labels = None
 depends_on = None
 
