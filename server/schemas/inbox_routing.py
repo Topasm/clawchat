@@ -19,6 +19,7 @@ class InboxRoutingResponse(BaseModel):
     original_title: str
     due_date: UtcDatetime | None
     project_folder: str | None
+    kind_confidence: float | None = None
     created_at: UtcDatetime
     reverted_at: UtcDatetime | None
 

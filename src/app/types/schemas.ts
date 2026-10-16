@@ -288,6 +288,7 @@ export const InboxRoutingResponseSchema = z.object({
   original_title: z.string(),
   due_date: z.string().nullable(),
   project_folder: z.string().nullable(),
+  kind_confidence: z.number().nullable().optional(),
   created_at: z.string(),
   reverted_at: z.string().nullable(),
 });

@@ -158,6 +158,20 @@ describe('InboxPage', () => {
     expect(mocks.move).toHaveBeenCalledWith({ action: 'undo', routingId: 'route-gpu' });
   });
 
+  it('marks an item filed with low confidence and leaves sure ones plain', () => {
+    mocks.routings = [
+      { ...gpuTask, kind_confidence: null },
+      { ...ideaNote, kind_confidence: 0.4 },
+    ];
+    renderPage();
+    const unsure = screen.getByRole('button', { name: 'Lam 신호로 active vision GRU 학습' });
+    expect(unsure).toHaveClass('cc-inbox-row__title--unsure');
+    expect(unsure).toHaveAttribute('title', 'Filed with low confidence. Check where it went.');
+    expect(screen.getByRole('button', { name: 'Gpu 컴퓨팅 과제' })).not.toHaveClass(
+      'cc-inbox-row__title--unsure',
+    );
+  });
+
   it('changes a filed item from its destination menu', () => {
     mocks.routings = [gpuTask, ideaNote];
     mocks.projects = [project];

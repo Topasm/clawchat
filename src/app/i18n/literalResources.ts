@@ -1760,6 +1760,7 @@ export const koreanUiTranslations: Record<string, string> = {
   'Added to tasks, due {{date}}': '{{date}} 마감으로 추가됨',
   'Could not add to the Inbox': '받은함에 추가하지 못했습니다',
   'Organize the Inbox automatically': '받은함 자동 정리',
-  'A capture with a date becomes a task due that day; an idea becomes a note. Anything unclear waits under Needs a look.':
-    '날짜가 있으면 그날 마감인 작업으로, 아이디어는 메모로 옮깁니다. 애매한 항목은 확인 필요에 남깁니다.',
+  'A capture with a date becomes a task due that day; an idea becomes a note. When unsure it is still filed and marked, so you can change where it went.':
+    '날짜가 있으면 그날 마감인 작업으로, 아이디어는 메모로 옮깁니다. 확신이 낮아도 일단 옮기고 표시해 두니, 목적지를 눌러 고치면 됩니다.',
+  'Filed with low confidence. Check where it went.': '확신이 낮게 분류됨. 목적지를 확인하세요.',
 };

@@ -45,7 +45,7 @@ export default function InboxSettings() {
       <SettingsRow
         label={translateUi('Organize the Inbox automatically')}
         sublabel={translateUi(
-          'A capture with a date becomes a task due that day; an idea becomes a note. Anything unclear waits under Needs a look.',
+          'A capture with a date becomes a task due that day; an idea becomes a note. When unsure it is still filed and marked, so you can change where it went.',
         )}
       >
         <Toggle

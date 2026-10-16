@@ -239,13 +239,39 @@ async def test_a_sure_task_without_a_date_leaves_the_inbox_without_a_plan(db_ses
     assert len(json.loads(todo.tags)) == 2
 
 
-async def test_an_unsure_capture_waits_for_the_user(db_session):
+async def test_an_unsure_capture_is_filed_anyway_and_marked(client, auth_headers, db_session):
     todo_id = await _classify(
         db_session, "GRU 학습", _ai(kind="task", kind_confidence=0.5)
     )
     todo = await db_session.get(Todo, todo_id, populate_existing=True)
+    assert todo.inbox_state == "none"
+    [routing] = (await client.get("/api/inbox/routings", headers=auth_headers)).json()["items"]
+    assert (routing["kind"], routing["kind_confidence"]) == ("task", 0.5)
+
+
+async def test_an_unsure_idea_becomes_a_note_with_its_confidence(db_session):
+    await _classify(db_session, "학습 구조 생각", _ai(kind="note", kind_confidence=0.4))
+    routing = (await db_session.execute(select(InboxRouting))).scalar_one()
+    assert (routing.kind, routing.kind_confidence) == ("note", 0.4)
+
+
+async def test_a_capture_the_classifier_could_not_read_waits_for_the_user(db_session):
+    # No kind at all: the AI failed or answered nothing usable.
+    todo_id = await _classify(db_session, "GRU 학습", _ai())
+    todo = await db_session.get(Todo, todo_id, populate_existing=True)
     assert todo.inbox_state == "captured"
     assert (await db_session.execute(select(InboxRouting))).first() is None
+
+
+async def test_a_rule_filed_task_has_no_confidence(client, auth_headers):
+    await _use_utc(client, auth_headers)
+    await client.post(
+        "/api/todos",
+        headers=auth_headers,
+        json={"title": f"과제 {_next_year_date()}", "inbox_state": "captured"},
+    )
+    [routing] = (await client.get("/api/inbox/routings", headers=auth_headers)).json()["items"]
+    assert routing["kind_confidence"] is None
 
 
 async def test_the_ai_deadline_is_used_only_when_the_rules_found_none(db_session):

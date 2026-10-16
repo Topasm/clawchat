@@ -96,6 +96,18 @@
   cursor: pointer;
 }
 
+/* Filed anyway, but the classifier was unsure: a quiet dot, nothing more. */
+.cc-inbox-row__title--unsure::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--cc-space-2);
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-text-tertiary);
+  vertical-align: middle;
+}
+
 .cc-inbox-row__title--static {
   display: grid;
   cursor: default;

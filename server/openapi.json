@@ -5805,6 +5805,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "kind_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind Confidence"
+          },
           "note_id": {
             "anyOf": [
               {

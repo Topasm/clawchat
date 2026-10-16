@@ -8,7 +8,7 @@ back exactly as it was.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, Index, String, Text
+from sqlalchemy import CheckConstraint, DateTime, Float, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -33,6 +33,9 @@ class InboxRouting(Base):
         DateTime(timezone=True), nullable=True
     )
     project_folder: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The classifier's certainty when it chose the kind; null when a rule or
+    # the user did. Low values are filed anyway and only marked on the row.
+    kind_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     before_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
